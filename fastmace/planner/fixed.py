@@ -73,7 +73,7 @@ AUTO_RULES = MappingProxyType({
     "EngineConfig.cueq_conv_fusion": "on_for_plain_cueq_unless_reproducible",
     "EngineConfig.expandable_segments": "on_for_torch_2_14_unless_alloc_conf_set",
     "EngineConfig.fp64_emulation": "on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible",
-    "EngineConfig.fp64_emulation_mantissa_bits": "56_for_mh1_float64_on_measured_gpus_decision_65_else_dynamic",
+    "EngineConfig.fp64_emulation_mantissa_bits": "dynamic_decision_65_d1_suspended_after_recapture_defect",
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
@@ -355,7 +355,7 @@ FP64_EMULATION_MANTISSA_NAME = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"
 # capability would take in GPUs never measured (the L4, other sm_89 and sm_120 cards). Adding a GPU here needs its
 # own A/B of all three in both orders.
 DECISION_65_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
-DECISION_65_MANTISSA_BITS = 56
+DECISION_65_MANTISSA_BITS = 56  # D1's bit count; its "auto" default is suspended (_fp64_mantissa), explicit requests stay
 # w_tables: measured on two and three species (NaNbO3: 1.3 GB of tables); four would pass W_TABLE_MAX_BYTES.
 DECISION_65_MAX_SPECIES = 3
 
@@ -589,8 +589,11 @@ class FixedPlanner:
 
     def _fp64_mantissa(self, book, fp64_emulation, decision_65):
         """``EngineConfig.fp64_emulation_mantissa_bits`` (ideas-20261027 D1, owner decision 65): "auto" is
-        ``DECISION_65_MANTISSA_BITS`` where the emulation is on in a float64 MH-1 plan on ``DECISION_65_GPUS``,
-        else "dynamic" (cuBLAS's own choice). Returns an int or "dynamic"."""
+        "dynamic" (cuBLAS's own choice). D1's ``DECISION_65_MANTISSA_BITS`` default on ``DECISION_65_GPUS`` is
+        suspended (owner, 28 October 2026): with 56 fixed bits, a CUDA graph captured during a run computed wrong
+        energies and forces (NbOCl3 3x3x3 relaxation: +0.34 eV/atom after the first re-capture, the same edges),
+        and the step's small products were ~8 bits accurate (fp64-D1 fix). An explicit int still applies.
+        Returns an int or "dynamic"."""
         rule = AUTO_RULES["EngineConfig.fp64_emulation_mantissa_bits"]
         request = self.engine.fp64_emulation_mantissa_bits
         if fp64_emulation != "on":
@@ -599,8 +602,8 @@ class FixedPlanner:
             value, why = request, ("cuBLAS's dynamic mantissa bits" if request == "dynamic"
                                    else f"{request} fixed mantissa bits ({FP64_EMULATION_MANTISSA_NAME})")
         elif decision_65 is None:
-            value, why = DECISION_65_MANTISSA_BITS, (f"{DECISION_65_MANTISSA_BITS} fixed mantissa bits on a measured "
-                                                     f"GPU, decision 65 ({FP64_EMULATION_MANTISSA_NAME})")
+            value, why = "dynamic", (f"cuBLAS's dynamic mantissa bits: decision 65 D1 ({DECISION_65_MANTISSA_BITS} fixed "
+                                     "bits) suspended, graphs captured during a run computed wrong energies with it")
         else:
             value, why = "dynamic", f"cuBLAS's dynamic mantissa bits: {decision_65}"
         book.decide("EngineConfig.fp64_emulation_mantissa_bits", str(value), _why(request, rule, why))

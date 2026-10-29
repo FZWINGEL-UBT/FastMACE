@@ -23,6 +23,26 @@ def times_3x3(rows, matrix):
     return rows[:, 0:1] * matrix[0] + rows[:, 1:2] * matrix[1] + rows[:, 2:3] * matrix[2]
 
 
+def matmul_small(a, b):
+    """``a @ b`` for small float64 matrices (``[..., m, k] @ [..., k, n]``) as element-wise products and sums.
+
+    No FP64 GEMM, like ``times_3x3``: inside a captured step, cuBLAS's float64 emulation with a fixed mantissa bit
+    count (owner decision 65 D1) returned such products about 8 bits accurate, while the products are far too
+    small for a GEMM to pay (fp64-D1 relaxation fix, 28 October 2026). Rounding differs from a GEMM's sum order only.
+    """
+    return (a.unsqueeze(-1) * b.unsqueeze(-3)).sum(-2)
+
+
+def matvec_small(m, v):
+    """``m @ v`` for ``[r, c] @ [c]`` as an element-wise product and a row sum (no FP64 GEMV; see matmul_small)."""
+    return (m * v).sum(-1)
+
+
+def vecmat_small(v, m):
+    """``v @ m`` for ``[r] @ [r, c]`` as an element-wise product and a column sum (no FP64 GEMV)."""
+    return (v.unsqueeze(-1) * m).sum(-2)
+
+
 def det_3x3(m):
     """Determinant of a 3 x 3 tensor from element-wise products (no LAPACK call, CUDA-graph safe)."""
     return (m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
@@ -439,10 +459,10 @@ class SkinNeighbourList:
         if not self.variable_cell:
             squared = ((positions - self.reference_positions) ** 2).sum(dim=1)
             return squared.max() > (fraction * self.skin / 2) ** 2
-        to_build = inverse_3x3(self.cell_t) @ self.build_cell  # F^-1: x -> build-cell coordinates
+        to_build = matmul_small(inverse_3x3(self.cell_t), self.build_cell)  # F^-1: x -> build-cell coordinates
         squared = ((times_3x3(positions, to_build) - self.reference_positions) ** 2).sum(dim=1)
-        strain = inverse_3x3(self.build_cell) @ self.cell_t - torch.eye(3, dtype=torch.float64,
-                                                                        device=self.cell_t.device)
+        strain = matmul_small(inverse_3x3(self.build_cell), self.cell_t) - torch.eye(3, dtype=torch.float64,
+                                                                                     device=self.cell_t.device)
         lower = 1.0 - torch.sqrt((strain * strain).sum())  # <= smallest singular value of F
         allowed = self.cutoff + self.skin - self.cutoff / torch.clamp(lower, min=1e-6)
         return (2 * torch.sqrt(squared.max()) > fraction * allowed) | (lower <= 0)

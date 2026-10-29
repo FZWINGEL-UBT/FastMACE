@@ -16,7 +16,8 @@ Everything runs on the device without host syncs or LAPACK calls, so a step stay
   a mask, ``F`` is no longer an exponential of ``X``, and ``logm_3x3`` (inverse scaling and squaring) gives it;
 - ASE's nine ``expm_frechet`` calls are one: the adjoint of ``L_exp(A, .)`` is ``L_exp(A^T, .)``, the upper
   right block of ``expm([[A^T, G], [0, A^T]])``;
-- 3 x 3 inverses and determinants by cofactors (``neighbors.skin``).
+- 3 x 3 inverses and determinants by cofactors, and every product as element-wise sums (``neighbors.skin``): no
+  FP64 GEMM, which cuBLAS's fixed-mantissa float64 emulation (decision 65 D1) rounded to ~8 bits inside graphs.
 
 The fixed iteration counts are exact in float64 for ``|log F| <= LOG_LIMIT`` per element (strains up to about
 65 %). A move outside it is not applied: ``cell_ok`` drops, ``max_force`` becomes NaN, and the driver stops
@@ -34,7 +35,7 @@ from ase import units
 from ase.stress import voigt_6_to_full_3x3_stress
 
 from fastmace.integrators.baoab import expm_3x3
-from fastmace.neighbors.skin import det_3x3, inverse_3x3, times_3x3
+from fastmace.neighbors.skin import det_3x3, inverse_3x3, matmul_small, times_3x3
 from fastmace.optimize.base import DOFView
 
 LOG_LIMIT = 0.5          # largest |log F| element the matrix functions below are sized for
@@ -50,7 +51,7 @@ def _sqrtm_3x3(a: torch.Tensor, eye: torch.Tensor) -> torch.Tensor:
     m, y = a, a
     for _ in range(SQRTM_ITERATIONS):
         m_inverse = inverse_3x3(m)
-        y = y @ (eye + m_inverse) / 2
+        y = matmul_small(y, eye + m_inverse) / 2
         m = (eye + (m + m_inverse) / 2) / 2
     return y
 
@@ -61,11 +62,11 @@ def logm_3x3(f: torch.Tensor) -> torch.Tensor:
     y = f
     for _ in range(LOGM_ROOTS):
         y = _sqrtm_3x3(y, eye)
-    t = (y - eye) @ inverse_3x3(y + eye)  # Y - I and (Y + I)^-1 commute: both are functions of Y
-    t2 = t @ t
+    t = matmul_small(y - eye, inverse_3x3(y + eye))  # Y - I and (Y + I)^-1 commute: both are functions of Y
+    t2 = matmul_small(t, t)
     term, total = t, t
     for j in range(1, ATANH_TERMS):
-        term = term @ t2
+        term = matmul_small(term, t2)
         total = total + term / (2 * j + 1)
     return total * 2.0 ** (LOGM_ROOTS + 1)
 
@@ -180,7 +181,7 @@ class FrechetCellFilter(DOFView):
             ok = ok & (log_deform.abs().max() <= LOG_LIMIT)
             same = (x == self._x).all()
             apply = ok & ~same
-            state.cell.copy_(torch.where(apply, self.orig_cell @ transform, state.cell))
+            state.cell.copy_(torch.where(apply, matmul_small(self.orig_cell, transform), state.cell))
             state.positions.copy_(torch.where(apply, times_3x3(new[:natoms], transform), state.positions))
             self.log_deform.copy_(torch.where(apply, log_deform, self.log_deform))
             current[natoms:] = torch.where(apply, cell_rows, current[natoms:])
@@ -199,7 +200,7 @@ class FrechetCellFilter(DOFView):
                 virial = eye * (torch.trace(virial) / 3.0)
             if self.masked:
                 virial = virial * self._mask
-            cell_gradient = expm_frechet_adjoint(self.log_deform, virial @ deform_inverse.T)
+            cell_gradient = expm_frechet_adjoint(self.log_deform, matmul_small(virial, deform_inverse.T))
             if self.constant_volume:
                 cell_gradient = cell_gradient - eye * (torch.trace(cell_gradient) / 3.0)
             gradient = self._gradient.view(-1, 3)
@@ -224,7 +225,7 @@ class FrechetCellFilter(DOFView):
     def _atom_rows(self) -> tuple[torch.Tensor, torch.Tensor]:
         """``x``'s atom rows ``solve(F, r.T).T`` at the state's positions and cell; returns ``F`` and ``F^-1``."""
         state = self.state
-        deform = (self._orig_inverse @ state.cell).T
+        deform = matmul_small(self._orig_inverse, state.cell).T
         deform_inverse = inverse_3x3(deform)
         self._x.view(-1, 3)[:state.natoms] = times_3x3(state.positions, deform_inverse.T)
         return deform, deform_inverse

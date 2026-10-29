@@ -949,11 +949,14 @@ def float64_plan(monkeypatch, hardware, ratio=1 / 64, label="mh1-r2scan", atoms=
 
 @pytest.mark.parametrize("hardware", [GPU, ADA], ids=lambda h: h.name)
 def test_decision_65_turns_d1_d2_d3_on_on_the_measured_gpus(monkeypatch, hardware):
-    """Owner decision 65 (28 October 2026): the 56 fixed mantissa bits, w_tables and save_transcendentals are on in
-    float64 MH-1 plans on the GPU models where the A/Bs measured a speed-up."""
+    """Owner decision 65 (28 October 2026): w_tables and save_transcendentals are on in float64 MH-1 plans on the GPU
+    models where the A/Bs measured a speed-up. D1, the 56 fixed mantissa bits, is suspended (owner, 28 October 2026):
+    with them, a graph captured during a run computed wrong energies and forces (fp64-D1 fix), so "auto" is
+    cuBLAS's dynamic choice; an explicit bit count still applies."""
     assert fixed.DECISION_65_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
     plan = float64_plan(monkeypatch, hardware)
-    assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == 56
+    assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == "dynamic"
+    assert "suspended" in str(decision(plan, "EngineConfig.fp64_emulation_mantissa_bits")[2])
     assert plan.rewrites.w_tables == "on" and plan.rewrites.save_transcendentals == "on"
     assert plan.rewrites.radial_tables == "on" and plan.rewrites.chunked_conv_backward == "on"
     for item in DECISION_65:
@@ -1001,7 +1004,7 @@ def test_decision_65_w_tables_stay_off_above_three_species(monkeypatch):
                  cell=[4.0, 4.0, 4.0], pbc=True).repeat((2, 2, 2))
     plan = float64_plan(monkeypatch, ADA, atoms=four)
     assert plan.rewrites.w_tables == "off" and plan.rewrites.save_transcendentals == "on"
-    assert plan.engine.fp64_emulation_mantissa_bits == 56
+    assert plan.engine.fp64_emulation_mantissa_bits == "dynamic"  # D1 suspended
     assert dict(plan.auto_options_off)["w_tables"].startswith("4 species, decision 65")
 
 

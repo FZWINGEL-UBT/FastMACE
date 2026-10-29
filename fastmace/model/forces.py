@@ -818,7 +818,9 @@ class MACEForceField:
             cell = leader.cell_t
         else:
             cell = self._leader_cell
-        torch.matmul(self._unit_shifts.to(torch.float64), cell, out=self._shifts64)
+        from fastmace.neighbors.skin import times_3x3
+
+        self._shifts64.copy_(times_3x3(self._unit_shifts.to(torch.float64), cell))  # no FP64 GEMM in the step
         self._shifts.copy_(self._shifts64)
 
     def set_cell(self, cell):
