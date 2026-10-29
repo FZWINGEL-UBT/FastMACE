@@ -130,27 +130,14 @@ def tf32_on(torch):
     return matmul.fp32_precision == "tf32" if hasattr(matmul, "fp32_precision") else bool(matmul.allow_tf32)
 
 
-def ieee_rewrite_selfchecks(torch):
-    """Run every rewrite self-check (``Registry.selfcheck``, SPEC §6.4) in IEEE FP32, whatever the matmul mode.
-    Under TF32 the checks compare two TF32 computations and fail on TF32's own rounding (factor_species: relative
-    error 4e-4 to 1.1e-3 against 1e-4, murphy, 29 October 2026), so the default plan does not build. The rewrites
-    are exact; the check runs as production runs it, and the screen measures TF32 everywhere else."""
-    from fastmace.rewrites import registry
-
-    original = registry.Registry.selfcheck
-    if getattr(original, "_ieee_wrapped", False):
-        return
-
-    def selfcheck(self, *args, **kwargs):
-        mode = tf32_on(torch)
-        set_tf32(torch, False)
-        try:
-            return original(self, *args, **kwargs)
-        finally:
-            set_tf32(torch, mode)
-
-    selfcheck._ieee_wrapped = True
-    registry.Registry.selfcheck = selfcheck
+def tf32_after_build(torch, engine):
+    """Switch a built engine to TF32: set the mode and drop its captured CUDA graphs, which re-capture on the next
+    step with TF32 cuBLAS kernels (Inductor sends the model's GEMMs to cuBLAS here: too few SMs for its GEMM
+    templates). The engine is built in IEEE FP32 as production builds it: under TF32 the rewrite self-checks
+    (SPEC §6.4, tolerance 1e-4) fail on TF32's own rounding (factor_species 4e-4 to 1.1e-3, block_linear 1.6e-4 to
+    4.8e-4; murphy, 29 October 2026) and rule 13 would re-plan without the rewrites."""
+    set_tf32(torch, True)
+    engine.invalidate_graphs("TF32 screen: re-capture with TF32 GEMMs")
 
 
 class Tf32Side:

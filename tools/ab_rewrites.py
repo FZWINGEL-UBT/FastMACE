@@ -191,8 +191,6 @@ def main(argv=None):
 
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
-    if args.a_tf32 or args.b_tf32:
-        ab_step_time.ieee_rewrite_selfchecks(torch)
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
     from fastmace.config import NeighbourConfig
 
@@ -221,7 +219,7 @@ def main(argv=None):
         for side in order:
             started = time.perf_counter()
             tf32 = args.a_tf32 if side == "a" else args.b_tf32
-            ab_step_time.set_tf32(torch, tf32)
+            ab_step_time.set_tf32(torch, False)  # built in IEEE (tf32_after_build)
             rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
             field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
             integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
@@ -230,6 +228,8 @@ def main(argv=None):
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             with _Constants(args.a_constant if side == "a" else args.b_constant):
                 engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
+            if tf32:
+                ab_step_time.tf32_after_build(torch, engine)
             sides[side] = ab_step_time.Tf32Side(ab_step_time.FastMACESide(engine, torch), tf32, torch)
             setup[side] = time.perf_counter() - started
             lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()

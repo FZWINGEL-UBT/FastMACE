@@ -912,10 +912,6 @@ def fastmace_production_child(job, result):
     """
     import torch
 
-    if job.get("production_tf32"):
-        import ab_step_time
-        ab_step_time.set_tf32(torch, True)
-        ab_step_time.ieee_rewrite_selfchecks(torch)
     build = _fastmace_build(job, result)
 
     from fastmace import _patches
@@ -926,6 +922,9 @@ def fastmace_production_child(job, result):
         for cell_mode in CELL_MODES:
             started = time.perf_counter()
             engine, plan = build(structure, base, cell_mode)
+            if job.get("production_tf32"):
+                import ab_step_time
+                ab_step_time.tf32_after_build(torch, engine)
             result["setup_s"][f"{structure}/{cell_mode}"] = time.perf_counter() - started
             result["plans"][f"{structure}/{cell_mode}"] = plan
             result["force_fields"][f"{structure}/{cell_mode}"] = dict(engine.force_field.info())

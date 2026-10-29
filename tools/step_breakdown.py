@@ -738,9 +738,6 @@ def main(argv=None):
     from torch.profiler import ProfilerActivity, profile
 
     label_triton_kernels()
-    ab_step_time.set_tf32(torch, args.tf32)
-    if args.tf32:
-        ab_step_time.ieee_rewrite_selfchecks(torch)
     if not args.allow_busy_gpu and ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     if args.pass_ == "main":
@@ -751,6 +748,8 @@ def main(argv=None):
     MaxwellBoltzmannDistribution(atoms, temperature_K=args.temperature_K, rng=np.random.default_rng(args.velocity_seed))
     Stationary(atoms)
     engine, plan = build_engine(args, atoms)
+    if args.tf32:
+        ab_step_time.tf32_after_build(torch, engine)
     field, integrator = engine.force_field, engine.integrator
     captures = [0]
     original_capture = engine._capture

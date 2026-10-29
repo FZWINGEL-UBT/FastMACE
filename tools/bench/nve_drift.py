@@ -71,9 +71,6 @@ def main(argv=None):
     import force_stress_gate
 
     rewrites = force_stress_gate.rewrite_overrides(args.rewrites)
-    ab_step_time.set_tf32(torch, args.tf32)
-    if args.tf32:
-        ab_step_time.ieee_rewrite_selfchecks(torch)
 
     spec = importlib.util.spec_from_file_location("_ab_frontends", TOOLS / "ab_frontends.py")
     frontends = importlib.util.module_from_spec(spec)
@@ -91,6 +88,8 @@ def main(argv=None):
                         engine=EngineConfig(**engine_options) if engine_options else None)
     setup_s = time.perf_counter() - started
     engine = sim._engine
+    if args.tf32:
+        ab_step_time.tf32_after_build(torch, engine)
 
     def sample(step):
         values = engine.integrator.output_values(engine.state)
