@@ -9,7 +9,9 @@ Under WSL2 a FastMACE run holds 2-7 GiB of device memory outside PyTorch's cachi
   replayed, then the graph deleted;
 - ``graph-reuse``: like ``graph`` but the graph's output feeds a second capture in the same pool;
 - ``linear``: a cuBLAS GEMM chain captured as a graph (library workspaces inside a capture);
-- ``triton``: a Triton kernel captured as a graph.
+- ``triton``: a Triton kernel captured as a graph;
+- ``nodes-5000``, ``nodes-20000``: that many tiny kernels captured in one graph (memory per graph node);
+- ``local-memory``: a Triton kernel whose large per-thread array spills to local memory, captured as a graph.
 
 Each case prints one JSON line: the outside-allocator bytes after every step. ``--gib`` sets the size of the
 intermediates. Run inside a local GPU reservation, with or without ``PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True``.
@@ -23,7 +25,7 @@ import os
 import subprocess
 import sys
 
-CASES = ("eager", "graph", "graph-reuse", "linear", "triton")
+CASES = ("eager", "graph", "graph-reuse", "linear", "triton", "nodes-5000", "nodes-20000", "local-memory")
 
 
 def outside(torch):
@@ -119,6 +121,58 @@ def run_case(case, gib):
         torch.cuda.current_stream().wait_stream(stream)
         torch.cuda.empty_cache()
         steps["after_warmup"] = outside(torch)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            out = launch(x)
+        steps["after_capture"] = outside(torch)
+        graph.replay()
+        steps["after_replay"] = outside(torch)
+        del graph, out
+        torch.cuda.empty_cache()
+        steps["after_delete"] = outside(torch)
+    elif case.startswith("nodes-"):
+        count = int(case.split("-")[1])
+        small = torch.zeros(1024, device="cuda")
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            small.add_(1.0)
+        torch.cuda.current_stream().wait_stream(stream)
+        steps["before_capture"] = outside(torch)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            for _ in range(count):
+                small.add_(1.0)
+        steps["after_capture"] = outside(torch)
+        graph.replay()
+        steps["after_replay"] = outside(torch)
+        del graph
+        torch.cuda.empty_cache()
+        steps["after_delete"] = outside(torch)
+    elif case == "local-memory":
+        import triton
+        import triton.language as tl
+
+        @triton.jit
+        def spill(src, dst, count, BLOCK: tl.constexpr, WIDTH: tl.constexpr):
+            offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+            mask = offsets < count
+            v = tl.load(src + offsets, mask=mask)
+            acc = tl.zeros([BLOCK, WIDTH], dtype=tl.float32) + v[:, None] * tl.arange(0, WIDTH)[None, :]
+            acc = tl.sin(acc) * tl.cos(acc)  # a [256, 512] float32 tile per 128 threads spills to local memory
+            tl.store(dst + offsets, tl.sum(acc, axis=1), mask=mask)
+
+        def launch(v):
+            y = torch.empty_like(v)
+            spill[(triton.cdiv(v.numel(), 256),)](v, y, v.numel(), BLOCK=256, WIDTH=512, num_warps=4)
+            return y
+
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            launch(x)
+        torch.cuda.current_stream().wait_stream(stream)
+        steps["after_eager_launch"] = outside(torch)
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph):
             out = launch(x)
