@@ -58,8 +58,14 @@ def parse_args(argv=None):
         q.add_argument("--timestep-fs", type=float, default=1.0)
         q.add_argument("--temperature-K", type=float, default=300.0)
         q.add_argument("--seed", type=int, default=1)
+        q.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                       help="RewriteConfig overrides on the default plan (candidates; the scan itself takes none)")
+        q.add_argument("--tag", default="", help="suffix of the point files (a candidate's points)")
     point = sub.choices["point"]
     point.add_argument("--repeat", required=True, help="NXxNYxNZ")
+    point.add_argument("--diagnose", action="store_true",
+                       help="record the allocator's history; on a failure, list the largest live blocks and where "
+                            "they were allocated (run with CUDA_LAUNCH_BLOCKING=1 to stop at the failing call)")
     scan = sub.choices["scan"]
     scan.add_argument("--start-atoms", type=int, default=4000)
     scan.add_argument("--growth", type=float, default=1.5, help="atom ratio between sizes before the first failure")
@@ -128,6 +134,28 @@ def _tried(message):
     return match.group(1) if match else None
 
 
+def _live_blocks(torch, limit=25):
+    """The largest live allocations of the caching allocator, with their innermost FastMACE frames, and the
+    total live bytes per allocating FastMACE line (needs ``_record_memory_history``)."""
+    root = str(Path(fastmace.__file__).resolve().parents[1])
+    snapshot = torch.cuda.memory._snapshot()
+    blocks, by_site = [], {}
+    for segment in snapshot["segments"]:
+        for block in segment["blocks"]:
+            if block["state"] != "active_allocated":
+                continue
+            frames = [f for f in block.get("frames", ()) if f["filename"].startswith(root)]
+            site = (f"{os.path.relpath(frames[0]['filename'], root)}:{frames[0]['line']} {frames[0]['name']}"
+                    if frames else "outside FastMACE")
+            by_site[site] = by_site.get(site, 0) + block["size"]
+            blocks.append((block["size"], site, [f"{os.path.relpath(f['filename'], root)}:{f['line']} {f['name']}"
+                                                 for f in frames[:6]]))
+    blocks.sort(key=lambda b: -b[0])
+    return dict(largest=[dict(bytes=b[0], site=b[1], frames=b[2]) for b in blocks[:limit]],
+                by_site=sorted(([site, size] for site, size in by_site.items()), key=lambda x: -x[1])[:limit],
+                live_bytes=sum(b[0] for b in blocks), segments_bytes=sum(s["total_size"] for s in snapshot["segments"]))
+
+
 def run_point(args):
     from fastmace.model.compile import configure_allocator
 
@@ -155,6 +183,10 @@ def run_point(args):
                   timestep_fs=args.timestep_fs, temperature_K=args.temperature_K, status="running", phases={})
     free, total = torch.cuda.mem_get_info()
     record["start"] = dict(cuda_free_bytes=int(free), cuda_total_bytes=int(total), windows=windows_memory())
+    record["rewrites"] = dict(item.split("=", 1) for item in args.rewrites)
+    record["environment"] = {key: os.environ.get(key) for key in ("CUDA_LAUNCH_BLOCKING", "PYTORCH_CUDA_ALLOC_CONF")}
+    if args.diagnose:
+        torch.cuda.memory._record_memory_history(max_entries=200_000)
     phase, caught, sim = "load", [], None
     times = {}
 
@@ -180,7 +212,10 @@ def run_point(args):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             started = time.perf_counter()
-            field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision)
+            from fastmace.config import RewriteConfig
+
+            field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision,
+                                  **({"rewrites": RewriteConfig(**record["rewrites"])} if args.rewrites else {}))
             torch.cuda.synchronize()
             times["load_s"] = time.perf_counter() - started
             record["phases"]["load"] = peaks()
@@ -222,6 +257,11 @@ def run_point(args):
                                  message=message[:4000], tried_to_allocate=_tried(message),
                                  stage=getattr(error, "fastmace_stage", None),
                                  frames=_fastmace_frames(error.__traceback__), memory=peaks())
+        if args.diagnose:
+            try:
+                record["failure"]["live"] = _live_blocks(torch)
+            except Exception as problem:  # noqa: BLE001
+                record["failure"]["live"] = f"no snapshot: {problem}"
         if sim is not None:
             record["edges"] = edges()
     finally:
@@ -233,7 +273,7 @@ def run_point(args):
             except Exception:  # noqa: BLE001
                 pass
     args.output.mkdir(parents=True, exist_ok=True)
-    path = args.output / f"point-{name}-{args.precision}-{len(atoms)}.json"
+    path = args.output / f"point-{name}-{args.precision}-{len(atoms)}{args.tag}.json"
     path.write_text(json.dumps(record, indent=2, default=str) + "\n")
     peak = record["phases"].get("steady", {}).get("max_reserved")
     print(f"point {name} {args.precision} {len(atoms)} atoms ({record['repeat']}): {record['status']}"
@@ -250,19 +290,19 @@ def _has(plan, key):
 # --------------------------------------------------------------------------- the scan
 
 
-def point_path(output, name, precision, atoms):
-    return output / f"point-{name}-{precision}-{atoms}.json"
+def point_path(output, name, precision, atoms, tag=""):
+    return output / f"point-{name}-{precision}-{atoms}{tag}.json"
 
 
 def scan(args):
     name, cell = base_cell(args.structure)
     sizes = supercells([float(x) for x in cell.cell.lengths()], len(cell), args.max_atoms)
     deadline = time.monotonic() + 60 * args.budget_minutes
-    log = args.output / f"scan-{name}-{args.precision}.log"
+    log = args.output / f"scan-{name}-{args.precision}{args.tag}.log"
     args.output.mkdir(parents=True, exist_ok=True)
 
     def outcome(index):
-        path = point_path(args.output, name, args.precision, sizes[index][0])
+        path = point_path(args.output, name, args.precision, sizes[index][0], args.tag)
         if path.is_file():
             return json.loads(path.read_text())["status"] == "ok"
         if time.monotonic() > deadline:
@@ -271,7 +311,9 @@ def scan(args):
                    "--precision", args.precision, "--output", str(args.output), "--steps", str(args.steps),
                    "--warmup", str(args.warmup), "--timestep-fs", str(args.timestep_fs),
                    "--temperature-K", str(args.temperature_K), "--seed", str(args.seed),
-                   "--repeat", repeat_text(sizes[index][1])]
+                   "--repeat", repeat_text(sizes[index][1]), "--tag", args.tag]
+        if args.rewrites:
+            command += ["--rewrites", *args.rewrites]
         with open(log, "a") as stream:
             stream.write(f"{datetime.now(timezone.utc).isoformat()} start {sizes[index]}\n")
             stream.flush()
@@ -328,9 +370,10 @@ def scan(args):
             failing = middle
     best = sizes[passing] if passing is not None else None
     worst = sizes[failing] if failing is not None else None
-    summary = dict(structure=name, precision=args.precision, largest_passing=best, smallest_failing=worst)
-    (args.output / f"scan-{name}-{args.precision}.json").write_text(json.dumps(summary, indent=2) + "\n")
-    print(f"scan: done {name} {args.precision}: largest passing {best}, smallest failing {worst}", flush=True)
+    summary = dict(structure=name, precision=args.precision, rewrites=args.rewrites, largest_passing=best,
+                   smallest_failing=worst)
+    (args.output / f"scan-{name}-{args.precision}{args.tag}.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print(f"scan: done {name} {args.precision}{args.tag}: largest passing {best}, smallest failing {worst}", flush=True)
 
 
 def main(argv=None):
