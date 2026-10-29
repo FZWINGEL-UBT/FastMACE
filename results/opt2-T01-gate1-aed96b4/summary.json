@@ -1,0 +1,129 @@
+{
+  "tool": "fused_conv_bench",
+  "created_utc": "2026-10-21T14:28:14.328075+00:00",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "layout": "ir_mul",
+  "weight_dim": 1280,
+  "input_dim": 512,
+  "output_dim": 5120,
+  "edge_dim": 16,
+  "channels": 128,
+  "cutoff": 6.0,
+  "cases": {
+    "NaCl": {
+      "nodes": 216,
+      "edges": 6912,
+      "mean_degree": 32.0,
+      "reference_us": 229.0719971060753,
+      "gemm_us": 167.6959991455078,
+      "conv_us": 100.832000374794,
+      "fused": {
+        "16,8,4": {
+          "us": 251.0560005903244,
+          "saving": -0.09596984250357354,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 49920
+        },
+        "16,8,2": {
+          "us": 330.49599826335907,
+          "saving": -0.4427603654684944,
+          "max_rel_error": 0.0,
+          "registers": 126,
+          "shared_bytes": 45760
+        },
+        "8,16,4": {
+          "us": 362.11198568344116,
+          "saving": -0.5807780534421223,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 37440
+        },
+        "32,4,4": {
+          "us": 388.17600905895233,
+          "saving": -0.6945589769281206,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 87360
+        }
+      }
+    },
+    "NbCl5": {
+      "nodes": 1944,
+      "edges": 51084,
+      "mean_degree": 26.27777777777778,
+      "reference_us": 1944.096028804779,
+      "gemm_us": 1132.64000415802,
+      "conv_us": 800.9120225906372,
+      "fused": {
+        "16,8,4": {
+          "us": 1857.2800159454346,
+          "saving": 0.04465623692092957,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 49920
+        },
+        "16,8,2": {
+          "us": 2295.151948928833,
+          "saving": -0.18057540107207637,
+          "max_rel_error": 0.0,
+          "registers": 126,
+          "shared_bytes": 45760
+        },
+        "8,16,4": {
+          "us": 2482.2239875793457,
+          "saving": -0.27680112031575166,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 37440
+        },
+        "32,4,4": {
+          "us": 3028.2719135284424,
+          "saving": -0.5576760965816125,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 87360
+        }
+      }
+    },
+    "NaNbO3": {
+      "nodes": 1080,
+      "edges": 83808,
+      "mean_degree": 77.6,
+      "reference_us": 3044.607996940613,
+      "gemm_us": 1847.9520082473755,
+      "conv_us": 1186.2720251083374,
+      "fused": {
+        "16,8,4": {
+          "us": 3105.087995529175,
+          "saving": -0.01986462580711068,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 49920
+        },
+        "16,8,2": {
+          "us": 4009.80806350708,
+          "saving": -0.3170194874139307,
+          "max_rel_error": 0.0,
+          "registers": 126,
+          "shared_bytes": 45760
+        },
+        "8,16,4": {
+          "us": 4296.960115432739,
+          "saving": -0.4113344377176167,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 37440
+        },
+        "32,4,4": {
+          "us": 4701.375961303711,
+          "saving": -0.5441646235009263,
+          "max_rel_error": 0.0,
+          "registers": 128,
+          "shared_bytes": 87360
+        }
+      }
+    }
+  }
+}
