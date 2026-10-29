@@ -692,7 +692,7 @@ def attach_wprime(model):
     return names
 
 
-def _wprime_case(interaction, generator, wprime):
+def _wprime_case(interaction, generator, wprime, recompute_rows=0):
     """One random receiver-sorted graph through the interaction's table and folded streaming convolution, with
     the record (``wprime``) or the chain: ``[message, density, dL/dr, dx, dsh]``. A twelfth of the edges lie at or
     beyond the cutoff (the neighbour list's skin and padding)."""
@@ -727,7 +727,8 @@ def _wprime_case(interaction, generator, wprime):
         leaves = [t.clone().requires_grad_() for t in (r, x, sh)]
         if wprime:
             message, density = interaction.wprime_backward.convolution(leaves[0], pair, table, weight, leaves[1],
-                                                                       leaves[2], s32, r32, row_ptr, kernels, fused)
+                                                                       leaves[2], s32, r32, row_ptr, kernels, fused,
+                                                                       recompute_rows)
         else:
             a, density = radial_table(leaves[0], pair, table.coef, table.dcoef, table.starts, table.scales,
                                       table.bins, table.r_lo, table.bin_scale, table.r_max)
@@ -761,6 +762,50 @@ def _apply_wprime(model, context):
     return attach_wprime(model)
 
 
+# --------------------------------------------------------------------------- recompute_conv_weights (CAP-T07)
+
+# Edges per chunk in the self-check: below its 720-edge graph, so the chunks and a partial last one run.
+RECOMPUTE_CHECK_ROWS = 256
+
+
+def attach_recompute(model):
+    """``recompute_conv_weights`` in every interaction with ``wprime_backward``: its backward builds the per-edge
+    weights again in chunks of the interaction's chunked-backward edges instead of keeping them (``[E, W]``);
+    returns their names."""
+    names = []
+    for index, interaction in _factored(model):
+        if getattr(interaction, "wprime_backward", None) is None:
+            continue
+        interaction.recompute_weight_rows = int(interaction.chunked_backward_edges)
+        names.append(f"interactions.{index} ({interaction.recompute_weight_rows} edges per chunk)")
+    if not names:
+        raise RewriteError("recompute_conv_weights: no interaction with wprime_backward")
+    return names
+
+
+def _recompute_selfcheck(original, rewritten, context):
+    """Per interaction, the record's message, edge density and gradients against wprime_backward with the stored
+    weights, on a random graph in chunks of ``RECOMPUTE_CHECK_ROWS`` edges."""
+    import torch
+
+    cases, dtype = CaseErrors(), None
+    for index, interaction in _factored(rewritten):
+        if not getattr(interaction, "recompute_weight_rows", 0):
+            continue
+        dtype = interaction.radial_table.coef.dtype
+        seed = context.seed + 29 + index
+        stored = _wprime_case(interaction, torch.Generator().manual_seed(seed), wprime=True)
+        got = _wprime_case(interaction, torch.Generator().manual_seed(seed), wprime=True,
+                           recompute_rows=RECOMPUTE_CHECK_ROWS)
+        for name, a, b in zip(("message", "density", "dr", "dx", "dsh"), stored, got):
+            cases.add(f"interactions.{index}.{name}", a, b)
+    return cases.result(dtype)
+
+
+def _apply_recompute(model, context):
+    return attach_recompute(model)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
@@ -779,7 +824,14 @@ RECORDS = {
         conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
         deterministic=False, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_wprime,
         selfcheck=_wprime_selfcheck),
+    # plans/capacity.md CAP-T07: exact (the recomputed weights equal the stored ones bitwise; only the atomic sender
+    # additions' order differs, as between any two runs); off unless rule 12 needs it (planner.memory.MEMORY_RESCUE).
+    "recompute_conv_weights": Rewrite(
+        name="recompute_conv_weights", applies_to=_w_support, requires=("wprime_backward",), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="exact", default="off", deterministic=False,
+        workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_recompute, selfcheck=_recompute_selfcheck,
+        memory=memory_terms.recompute_conv_weights),
 }
 
-__all__ = ["DEGREE", "R_LO", "RECORDS", "W_TABLE_MAX_BYTES", "attach_w_tables", "attach_wprime", "certify", "fit",
-           "tabulate_radials"]
+__all__ = ["DEGREE", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECORDS", "W_TABLE_MAX_BYTES", "attach_recompute",
+           "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]

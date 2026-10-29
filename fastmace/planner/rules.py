@@ -74,10 +74,10 @@ RULES: tuple[Rule, ...] = (
     Rule(10, "preference", "stress path and k-headroom from the integrator or optimiser", ("rule-10-optimizer",)),
     Rule(11, "preference", "skin, headroom and re-capture budget; D3 and displacement skins", (
         "rule-11", "rule-11-fixed", "rule-11-md-only", "rule-11-optimizer", "rule-11-d3")),
-    # 5-T03: the MACE model's estimate ("rule-12-memory") and decision 51's action (drop, warn).
+    # 5-T03: the MACE model's estimate ("rule-12-memory") and decision 51's action (drop, warn); CAP-T07's rescue.
     Rule(12, "preference", "GPU memory: drop memory-heavy rewrites or warn", (
         "rule-12-d3", "rule-12-d3-memory", "rule-12-d3-warn", "rule-12-memory", "rule-12-memory-drop",
-        "rule-12-memory-warn")),
+        "rule-12-memory-rescue", "rule-12-memory-warn")),
     Rule(13, "reaction", "a rewrite self-check fails: disable it and its dependants", (
         "selfcheck-failed", "selfcheck-dependant")),
     # 5-T08: the mid-run fallback's codes (decision 54).

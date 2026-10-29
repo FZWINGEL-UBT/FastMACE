@@ -111,6 +111,12 @@ def chunked_conv_backward(dims, width):
     return -round(_CHUNKED_BACKWARD_SHARE * _stock_edge_floats(dims)) * width, 0
 
 
+def recompute_conv_weights(dims, width):
+    """wprime_backward without the stored per-edge weights: the streaming interactions' ``[E, W]`` weights are not
+    kept (MH-1: the second interaction's, 1,280 floats per edge; the first takes the reassociated path)."""
+    return -sum(block.weight_numel for block in dims.interactions[1:]) * width, 0
+
+
 def radial_tables(dims, width):
     """Tabulated radial networks keep no hidden activations per edge (measured)."""
     return -round(_RADIAL_TABLES_SHARE * _stock_edge_floats(dims)) * width, 0
@@ -147,4 +153,5 @@ _SEGMENT_SELFCHECK_TENSORS = 9
 
 __all__ = ["block_linear_resident", "chunked_conv_backward", "factor_species", "fold_cutoff", "fused_radial_hidden",
            "generic_reassociate", "joint_radial_input", "merged_residual_resident", "mh1_streaming_conv",
-           "radial_tables", "reassociate_first", "segment_gemm_selfcheck", "streaming_conv"]
+           "radial_tables", "reassociate_first", "recompute_conv_weights", "segment_gemm_selfcheck",
+           "streaming_conv"]

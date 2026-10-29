@@ -227,6 +227,7 @@ def test_declared_terms():
                         "reassociate_first", "streaming_conv", "chunked_conv_backward", "generic_reassociate",
                         "generic_streaming"}
     assert radial.RECORDS["radial_tables"].memory is terms.radial_tables
+    assert radial.RECORDS["recompute_conv_weights"].memory is terms.recompute_conv_weights
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert terms.streaming_conv(dims, 4) == (8, 0)
     # Decision 67: MH-1's fused path keeps less per edge than the stock structure, so its terms are negative and
@@ -485,6 +486,29 @@ def test_rule_12_never_drops_a_group_that_saves_nothing(monkeypatch):
         tight = plan(memory_bytes=2**20, rewrites=RewriteConfig(factor_species="on", reassociate_first="on"))
     assert tight.rewrites.streaming_conv == "on" and tight.rewrites.chunked_conv_backward == "on"
     assert getattr(tight.decision("RewriteConfig.streaming_conv")[2], "code", None) != "rule-12-memory-drop"
+
+
+@pytest.mark.rule(12)
+def test_rule_12_turns_on_a_memory_rescue_only_when_the_plan_does_not_fit():
+    """CAP-T07: recompute_conv_weights ("auto") stays off while the plan fits; when it does not, rule 12 turns it on
+    if wprime_backward is on and it lowers the estimate, with its own reason; an explicit "off" is kept."""
+    from fastmace.planner.fixed import AUTO_RULES
+
+    assert "recompute_conv_weights" in memory.MEMORY_RESCUE
+    assert AUTO_RULES["RewriteConfig.recompute_conv_weights"] == "on_by_rule_12_when_the_plan_does_not_fit_without_it"
+    full = plan()
+    assert full.rewrites.recompute_conv_weights == "off"
+    if full.rewrites.wprime_backward != "on":
+        pytest.skip("wprime_backward is off in this plan (decision 66's GPUs)")
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20)
+    assert tight.rewrites.recompute_conv_weights == "on"
+    _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
+    assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(recompute_conv_weights="off"))
+    assert kept.rewrites.recompute_conv_weights == "off"
 
 
 @pytest.mark.rule(12)

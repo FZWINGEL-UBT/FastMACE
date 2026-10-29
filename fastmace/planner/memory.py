@@ -45,6 +45,9 @@ from typing import Any
 
 # Decision 51: the estimate must stay below this share of the free GPU memory.
 MARGIN = 0.9
+# Records rule 12 turns on, when they are "auto" and the plan does not fit without them, if they lower the estimate
+# (plans/capacity.md CAP-T07): they trade step time for memory, so they stay off whenever the plan fits.
+MEMORY_RESCUE = ("recompute_conv_weights",)
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
 # 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]).
 # Below 1 because the run term is stock-structured: it counts what stock MACE keeps per edge, while the fused
