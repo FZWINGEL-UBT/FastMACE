@@ -107,7 +107,7 @@ def constant_overrides(items):
             raise ValueError(f"{item!r}: expected MODULE:NAME=VALUE")
         current = getattr(importlib.import_module(module), name)
         new = ast.literal_eval(value)
-        if type(new) is not type(current):
+        if current is not None and type(new) is not type(current):  # a None default takes any literal
             raise ValueError(f"{item!r}: {name} is {type(current).__name__}, not {type(new).__name__}")
         out[(module, name)] = new
     return out
