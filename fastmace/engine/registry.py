@@ -217,9 +217,23 @@ class Registry:
     def tensors(self) -> dict[str, torch.Tensor]:
         return {name: tensor for name, (_, tensor) in self.entries().items()}
 
-    def snapshot(self) -> RegistrySnapshot:
-        """Copies of every captured buffer, sticky flags included."""
-        return RegistrySnapshot({name: (_identity(tensor), tensor.detach().clone())
+    def snapshot(self, offload_bytes: int | None = None) -> RegistrySnapshot:
+        """Copies of every captured buffer, sticky flags included. With ``offload_bytes``, buffers of at least that
+        many bytes are copied to host memory (pinned on CUDA) instead of the device: the graph engine's captures,
+        whose snapshot would otherwise sit beside the force stage's activations at the memory peak (CAP-T05)."""
+        def copy(tensor):
+            tensor = tensor.detach()
+            if offload_bytes is None or tensor.numel() * tensor.element_size() < offload_bytes:
+                return tensor.clone()
+            if tensor.device.type != "cuda":
+                return tensor.to("cpu", copy=True)
+            host = torch.empty(tensor.shape, dtype=tensor.dtype, pin_memory=True)
+            host.copy_(tensor)
+            return host
+
+        import torch
+
+        return RegistrySnapshot({name: (_identity(tensor), copy(tensor))
                                  for name, (policy, tensor) in self.entries().items() if policy.capture})
 
     def restore(self, snapshot: RegistrySnapshot) -> None:
