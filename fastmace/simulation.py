@@ -651,6 +651,9 @@ class Simulation:
             setup["move_energy_gate"] = move_s + time.perf_counter() - started
         if failure is not None:  # the fallback (§9.4; plan task 2-T15)
             self._engine = None
+            # CAP-T07: an error that left the CUDA context unusable (a driver out-of-memory error surfacing as a
+            # cuBLAS or launch failure) is raised with its explanation; the search's re-plans would fail on it.
+            fallback.raise_if_context_unusable(failure, ff)
             started = time.perf_counter()
             result = fallback.Fallback(planner, ff, atoms, self._config, references, options.fallback, seed=seed,
                                        gate=options.gate, moves=moves).run(failure)

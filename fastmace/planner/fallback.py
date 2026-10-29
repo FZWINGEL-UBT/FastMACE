@@ -437,6 +437,39 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
                      planner=planner)
 
 
+def raise_if_context_unusable(failure: Any, force_field: Any, *,
+                              usable: Callable[[Any], bool] = _context_usable) -> None:
+    """Raise ``failure.error`` with an explanation when the CUDA context is not usable after it (CAP-T07).
+
+    A driver out-of-memory error during a launch can surface asynchronously as another error (on WSL2, NbCl5
+    46,656 atoms: ``CUBLAS_STATUS_EXECUTION_FAILED``) and leave the context sticky; the fallback search's re-plans
+    then fail in ``cudaMemGetInfo``. When rule 12 had warned that the plan may not fit, the note names the memory
+    rescue's records (set "on", when they are off) or a smaller cell as the fix."""
+    from fastmace.planner.memory import MEMORY_RESCUE
+
+    plan = failure.plan
+    if usable(plan.engine.device):
+        return
+    error = failure.error
+    try:
+        tight = plan.decision("memory")[1] == "warn"
+    except (KeyError, AttributeError, TypeError, ValueError):
+        tight = False
+    off = [name for name in MEMORY_RESCUE if _off(getattr(plan.rewrites, name, "on"))]
+    note = (f"FastMACE: the CUDA context is not usable after this {failure.stage} error, so the fallback cannot run "
+            "in this process.")
+    if tight:
+        fix = "a smaller cell"
+        if off:
+            fix = "fm.ForceField(..., rewrites=RewriteConfig(" + ", ".join(f'{name}="on"' for name in off) + "))"
+        note += (f" Rule 12 had warned that the plan may not fit the free GPU memory, so it is most likely out of "
+                 f"memory: run again in a fresh process with {fix}.")
+    message = str(error.args[0]) if error.args else ""
+    if note not in message:
+        error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
+    raise error
+
+
 def _record(name):
     from fastmace.planner import minimal
 

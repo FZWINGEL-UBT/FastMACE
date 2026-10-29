@@ -4,7 +4,7 @@
 #     env FM=<pinned source copy> bash results/capacity-16gb-20261029/local.sh ROOT JOB...
 # Jobs: point:<structure>:<precision>:<NXxNYxNZ> (tools/bench/capacity_scan.py point);
 #       scan:<structure>:<precision>[:<start atoms>] (tools/bench/capacity_scan.py scan, 13-minute budget);
-#       diag:<structure>:<precision>:<NXxNYxNZ> (point --diagnose with CUDA_LAUNCH_BLOCKING=1, tag -diag).
+#       diag:<structure>:<precision>:<NXxNYxNZ> (point --diagnose with CUDA_LAUNCH_BLOCKING=1, or $BLOCKING; tag -diag).
 # Optional environment: TAG (point-file suffix), REWRITES (FIELD=VALUE ..., RewriteConfig overrides) and
 # MODEL (a label; default mh1-r2scan), ENGINE (FIELD=VALUE ..., EngineConfig overrides) and TRACE (non-empty:
 # point jobs sample device memory over time, --trace).
@@ -50,7 +50,7 @@ for job in "$@"; do
              --output "$ROOT/points" --repeat "$extra" "${opts[@]}" >> "$ROOT/jobs.log" 2>&1 < /dev/null ;;
     scan) "$PY" "$FM/tools/bench/capacity_scan.py" scan --structure "$structure" --precision "$precision" \
             --output "$ROOT/points" ${extra:+--start-atoms "$extra"} "${opts[@]}" >> "$ROOT/jobs.log" 2>&1 < /dev/null ;;
-    diag) CUDA_LAUNCH_BLOCKING=1 "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
+    diag) CUDA_LAUNCH_BLOCKING=${BLOCKING-1} "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
             --precision "$precision" --output "$ROOT/points" --repeat "$extra" --diagnose "--tag=${TAG:--diag}" \
             --model "${MODEL:-mh1-r2scan}" ${REWRITES:+--rewrites $REWRITES} ${ENGINE:+--engine $ENGINE} \
             >> "$ROOT/jobs.log" 2>&1 < /dev/null ;;

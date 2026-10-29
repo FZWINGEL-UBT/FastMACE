@@ -113,6 +113,23 @@ def test_no_rescue(stubbed, case):
     assert stubbed == []
 
 
+@pytest.mark.parametrize("memory", ["warn", "fits"])
+def test_an_unusable_context_raises_the_failure_instead_of_searching(memory):
+    """CAP-T07, NbCl5 46,656 atoms on WSL2 without blocking launches: the driver's out-of-memory error surfaced as a
+    cuBLAS failure, which went into the fallback search and crashed there in cudaMemGetInfo."""
+    error = RuntimeError("CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm(...)`")
+    plan = stub_plan()
+    plan.decision = lambda key: ("memory", memory, "rule 12: ...")
+    failure = types.SimpleNamespace(plan=plan, stage="build", error=error)
+    fallback.raise_if_context_unusable(failure, None, usable=lambda device: True)  # usable: the search runs
+    with pytest.raises(RuntimeError) as raised:
+        fallback.raise_if_context_unusable(failure, None, usable=lambda device: False)
+    assert raised.value is error
+    text = str(raised.value)
+    assert text.startswith("CUDA error: CUBLAS_STATUS_EXECUTION_FAILED") and "not usable" in text
+    assert ('RewriteConfig(recompute_conv_weights="on")' in text) == (memory == "warn")
+
+
 def test_context_usable(monkeypatch):
     assert fallback._context_usable("cpu")
 
