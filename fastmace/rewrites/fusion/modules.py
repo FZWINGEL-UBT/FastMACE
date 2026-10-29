@@ -54,6 +54,7 @@ class GatedRows(torch.nn.Module):
         self.joined = None  # segment_gemm: (input index, output offset, dim) per product of ``second``
         self.sms = None  # segment_gemm: the device's SM count for the shape rule (None: not float32 on CUDA)
         self.tf32x3 = False  # tf32x3_gemms: the joined products as 3xTF32, all in Triton (OPT4-T03)
+        self.gate_epilogue = False  # gate_epilogue: the gate's backward in linear_2's input-gradient GEMM (OPT10)
 
     def join_in_place(self):
         """Let ``second``'s products write straight into its joined output (``segment_gemm``); returns
@@ -80,6 +81,18 @@ class GatedRows(torch.nn.Module):
         self.joined = tuple(plan)
         return True, "ok"
 
+    def fold_gate_backward(self):
+        """Run the gate's backward in ``second``'s input-gradient GEMM (``gate_epilogue``, after ``segment_gemm``);
+        returns (True, "ok") or (False, reason). Needs every row of the gate (scalars and gated segments) to be the
+        input of exactly one joined product."""
+        if self.joined is None:
+            return False, "linear_2 does not write into its joined output (segment_gemm)"
+        inputs = sorted(i for i, _, _, _ in self.joined)
+        if inputs != list(range(1 + len(self.gated))):
+            return False, f"linear_2's products read the gate's rows {inputs}, not each of them once"
+        self.gate_epilogue = True
+        return True, "ok"
+
     def _any_triton(self, rows, n):
         """Whether the shape rule picks the Triton GEMM for any of ``second``'s products at ``n`` atoms; if
         not, the joined op would only add launches, so the stock products and join run (NaCl-sized cells)."""
@@ -88,6 +101,19 @@ class GatedRows(torch.nn.Module):
         if self.tf32x3:  # every product runs in the Triton GEMM (segment_gemm._choices)
             return bool(self.sms)
         return any(tile_rule.uses_triton(n * dim, self.sms) for _, _, dim, _ in self.joined)
+
+    def _gate_epilogue(self, outputs, scalars, gates):
+        from fastmace.kernels.triton.gated_products import gated_joined_products
+
+        second = self.second
+        width = sum(mul * dim for _, mul, dim in second.segments_out)
+        out = gated_joined_products(scalars, [outputs[segment] for segment, _, _, _ in self.gated], gates,
+                                    [offset for _, offset, _, _ in self.gated],
+                                    [getattr(second, f"weight_{k}") for _, _, _, k in self.joined],
+                                    [getattr(second, f"weight_t_{k}") for _, _, _, k in self.joined],
+                                    [offset for _, offset, _, _ in self.joined], [dim for _, _, dim, _ in self.joined],
+                                    [i for i, _, _, _ in self.joined], width)
+        return second.transpose_out(out)
 
     def forward(self, x, y):
         outputs, n, like = self.first.output_rows(x, y)
@@ -101,6 +127,8 @@ class GatedRows(torch.nn.Module):
             gates = outputs[index].narrow(1, start, length)
             if self.act_gate is not None:
                 gates = self.act_gate(gates) * self.gate_cst
+            if self.gate_epilogue and not self.tf32x3 and self._any_triton(rows, n):
+                return self._gate_epilogue(outputs, scalars, gates)
             for segment, offset, mul, dim in self.gated:
                 gated = outputs[segment].view(n, dim, mul)
                 gate = gates.narrow(-1, offset, mul).unsqueeze(-2)

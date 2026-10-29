@@ -106,6 +106,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
+    "RewriteConfig.gate_epilogue": "never_automatic",
     "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
@@ -122,7 +123,7 @@ AUTO_RULES = MappingProxyType({
 # adapt_options_to_model's ``requires``: option -> rewrite_support key, in its order.
 STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
-    ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
+    ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"), ("gate_epilogue", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
     ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"),
@@ -137,8 +138,8 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
                   "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
                   "fused_folded_forward", "radial_tables", "w_tables",
-                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
-                  "species_skip",
+                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_epilogue",
+                  "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
                   "combo_kernels", "save_transcendentals", "tf32x3_gemms",
                   "fx_e3nn_linear", "polar_graph_sums")
@@ -1037,6 +1038,10 @@ class FixedPlanner:
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
+        # opt-10 OPT10-T01: opt-in until its whole-step A/Bs (decision 66: per-GPU defaults by exact device name).
+        needs("gate_epilogue", r.gate_epilogue == "on", v["segment_gemm"], "segment_gemm")
+        if r.gate_epilogue == "auto":
+            v["_why"]["gate_epilogue"] = "off: only an explicit 'on' enables it (OPT10-T01, opt-in)"
         # Owner decision 57, 24 October 2026 (OPT4-T04): on by default for the generic MACE family only; stage 2
         # drops it for the other families, the FastMACE rules in float64 and reproducible plans.
         needs("grouped_launch", r.grouped_launch != "off", v["block_linear"], "block_linear")
@@ -1156,6 +1161,17 @@ class FixedPlanner:
             v["segment_gemm"] = False
             v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
                                           else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
+        if v["gate_epilogue"]:
+            # OPT10-T01: the fused kernel is float32 IEEE; it runs only where segment_gemm's joined products do.
+            if dtype != "float32":
+                book.refuse(f"RewriteConfig.gate_epilogue='on' needs float32, not {dtype} (the fused kernel is "
+                            "float32)", "gate-epilogue-needs-float32")
+            elif not v["segment_gemm"]:
+                book.refuse("RewriteConfig.gate_epilogue='on' requires segment_gemm, which is off",
+                            "rewrite-requirement-missing")
+            if v["tf32x3_gemms"]:
+                book.refuse("RewriteConfig.gate_epilogue and tf32x3_gemms both reroute linear_2's input gradients",
+                            "rewrite-conflict")
         for name in POLAR_GRAPH_RECORDS:  # decision 58, as decision 57: float64 and reproducible keep MACE's code
             if v[name] and name not in explicit and (dtype != "float32" or reproducible):
                 v[name] = False

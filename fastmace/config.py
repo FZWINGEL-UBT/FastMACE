@@ -160,6 +160,11 @@ class RewriteConfig:
     # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); auto = on with gated_rows in float32,
     # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
+    # The gate's backward of those chains in linear_2's input-gradient GEMM: one atom-tiled Triton kernel per gated
+    # segment where the shared shape rule picks Triton, without the drows round trip (opt-10 OPT10-T01,
+    # fastmace.kernels.triton.gated_products); rounding; float32 plans only, not beside tf32x3_gemms; opt-in,
+    # auto = off.
+    gate_epilogue: Toggle = "auto"
     # A block linear's small per-l products (too few row tiles for the GPU by the shared shape rule) in one
     # Triton launch (opt-1 OPT-T03 candidate 2); auto = on with block_linear for the generic MACE family, in
     # float32, not reproducible (owner, 24 Oct 2026, decision 57).

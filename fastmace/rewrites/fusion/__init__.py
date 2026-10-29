@@ -1,6 +1,6 @@
 """The fusion family of optimisation round 1 (``plans/opt-1.md``, OPT-T02; ``docs/design/opt-T02-fusion.md``).
 
-``RECORDS`` holds ``gated_rows``, ``segment_gemm`` and ``grouped_launch``:
+``RECORDS`` holds ``gated_rows``, ``segment_gemm``, ``gate_epilogue`` and ``grouped_launch``:
 
 - ``gated_rows`` (stage A): in every interaction whose forward reads ``gated_rows`` (the folded
   MH-1 forward, ``fastmace.rewrites.mh1.modules.cutoff_folded_forward``) and that has merged
@@ -18,6 +18,12 @@
   before the symmetric contraction and its backward. ``rounding`` (another GEMM), deterministic (no
   atomics). On by default with ``gated_rows`` in float32 plans that are not reproducible (owner decision,
   20 October 2026); float64 and ``reproducible=True`` keep the stock products and join.
+
+- ``gate_epilogue`` (plans/opt-10.md, OPT10-T01): in those chains, the gate's backward runs in ``linear_2``'s
+  input-gradient GEMM (``fastmace.kernels.triton.gated_products``): for each gated segment whose product the
+  shape rule gives to Triton, one atom-tiled kernel stores ``dgated`` and sums ``dgate`` over the components in
+  registers, without writing ``drows``. The forward is ``segment_gemm``'s. ``rounding`` (the K- and m-sums in
+  another order), deterministic. Opt-in; float32 only (the planner); not beside ``tf32x3_gemms``.
 
 - ``grouped_launch`` (OPT-T03 candidate 2, ``docs/design/opt-T03-small-m.md``): in every block linear
   (``BlockLinear``, ``ResidualBlockLinear``, also inside the ``gated_rows`` chains), the products that the
@@ -202,6 +208,76 @@ def _segment_selfcheck(original, rewritten, context):
     return cases.result(dtype)
 
 
+def fold_gate_backwards(model):
+    """Let every ``gated_rows`` chain that writes into its joined output run the gate's backward in ``linear_2``'s
+    input-gradient GEMM; returns the names of the interactions."""
+    names = []
+    for index, interaction in enumerate(getattr(model, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is not None and chain.fold_gate_backward()[0]:
+            names.append(f"interactions.{index}")
+    return names
+
+
+def _epilogue_selfcheck(original, rewritten, context):
+    """The chains against the unrewritten interactions (as ``gated_rows``), and each chain's joined products over
+    the gated rows with the folded backward against ``joined_products`` over the same rows built by autograd, on
+    enough atoms that the shape rule picks Triton for every product on this device: values and the input
+    gradients of the scalars, the gated rows and the gates."""
+    import torch
+
+    from fastmace.kernels.triton import tile_rule
+    from fastmace.kernels.triton.gated_products import _gated_rows, gated_joined_products
+    from fastmace.kernels.triton.segment_gemm import joined_products
+
+    cases, dtype = _chain_cases(original, rewritten, context)
+    generator = torch.Generator().manual_seed(context.seed + 2)
+    for index, interaction in enumerate(getattr(rewritten, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is None or not chain.gate_epilogue or not chain.gated:
+            continue
+        second = chain.second
+        weight = second.weight_0
+        sms = tile_rule.device_sms(weight.device) or 1
+        atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(dim for *_, dim in chain.gated))
+
+        def probe(*shape):
+            return torch.randn(shape, generator=generator, dtype=torch.float64).to(weight)
+
+        scalars = probe(atoms, chain.scalars[2]).requires_grad_()
+        gated = [probe(atoms * dim, mul).requires_grad_() for _, _, mul, dim in chain.gated]
+        gates = probe(atoms, chain.gates[2]).requires_grad_()
+        width = sum(mul * dim for _, mul, dim in second.segments_out)
+        grad = probe(atoms, width)
+        weights = [getattr(second, f"weight_{k}") for *_, k in chain.joined]
+        weights_t = [getattr(second, f"weight_t_{k}") for *_, k in chain.joined]
+        offsets, dims = [o for _, o, _, _ in chain.joined], [d for _, _, d, _ in chain.joined]
+        inputs, gate_offsets = [i for i, *_ in chain.joined], [o for _, o, _, _ in chain.gated]
+        leaves = (scalars, gates, *gated)
+
+        def stock():
+            rows = _gated_rows(scalars, gated, gates, gate_offsets)
+            return joined_products([rows[i] for i in inputs], weights, weights_t, offsets, dims, width)
+
+        def folded():
+            return gated_joined_products(scalars, gated, gates, gate_offsets, weights, weights_t, offsets, dims,
+                                         inputs, width)
+
+        with torch.enable_grad():
+            values = []
+            for function in (stock, folded):
+                out = function()
+                values.append((out.detach(), *torch.autograd.grad(out, leaves, grad)))
+        for a, b in zip(*values):
+            cases.add(f"interactions.{index}.gated_rows.gate_epilogue", a, b)
+        del values, scalars, gated, gates, grad, leaves
+    return cases.result(dtype)
+
+
+def _apply_epilogue(model, context):
+    return fold_gate_backwards(model)
+
+
 def _block_modules(model):
     from fastmace.rewrites.linear.modules import BlockLinear, ResidualBlockLinear
 
@@ -286,10 +362,16 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
         default="auto", deterministic=True, workload_constraints=(), apply=_apply_segment,
         selfcheck=_segment_selfcheck, selfcheck_memory=memory_terms.segment_gemm_selfcheck),
+    "gate_epilogue": Rewrite(
+        name="gate_epilogue", applies_to=_segment_support, requires=("segment_gemm",), conflicts=("tf32x3_gemms",),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
+        workload_constraints=(), apply=_apply_epilogue, selfcheck=_epilogue_selfcheck,
+        selfcheck_memory=memory_terms.segment_gemm_selfcheck),
     "grouped_launch": Rewrite(
         name="grouped_launch", applies_to=_grouped_launch_support, requires=("block_linear",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
         workload_constraints=(), apply=_apply_grouped_launch, selfcheck=_grouped_launch_selfcheck),
 }
 
-__all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_rows", "join_in_place"]
+__all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "fold_gate_backwards", "gate_rows",
+           "join_in_place"]
