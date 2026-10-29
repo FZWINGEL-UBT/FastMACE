@@ -27,8 +27,8 @@ from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum
 from fastmace.kernels.triton.fused_radial import run_hidden_plan
 from fastmace.kernels.triton.skinny_linear import folded_linear
 from fastmace.rewrites.fusion import READS_GATED_ROWS
-from fastmace.rewrites.species import READS_SPECIES_RESIDUAL
 from fastmace.rewrites.linear import READS_RESIDUAL_LINEAR
+from fastmace.rewrites.species import READS_SPECIES_RESIDUAL
 
 
 class ProjectedEmbedding(torch.nn.Module):
