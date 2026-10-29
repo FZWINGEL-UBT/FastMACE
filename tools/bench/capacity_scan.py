@@ -62,6 +62,8 @@ def parse_args(argv=None):
         q.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                        help="RewriteConfig overrides on the default plan (candidates; the scan itself takes none)")
         q.add_argument("--tag", default="", help="suffix of the point files (a candidate's points)")
+        q.add_argument("--engine", nargs="*", default=[], metavar="FIELD=VALUE",
+                       help="EngineConfig overrides on the default plan (candidates), e.g. force_graphs=one")
     point = sub.choices["point"]
     point.add_argument("--repeat", required=True, help="NXxNYxNZ")
     point.add_argument("--diagnose", action="store_true",
@@ -206,6 +208,7 @@ def run_point(args):
     free, total = torch.cuda.mem_get_info()
     record["start"] = dict(cuda_free_bytes=int(free), cuda_total_bytes=int(total), windows=windows_memory())
     record["rewrites"] = dict(item.split("=", 1) for item in args.rewrites)
+    record["engine"] = dict(item.split("=", 1) for item in args.engine)
     record["environment"] = {key: os.environ.get(key) for key in ("CUDA_LAUNCH_BLOCKING", "PYTORCH_CUDA_ALLOC_CONF")}
     if args.diagnose:
         torch.cuda.memory._record_memory_history(max_entries=200_000)
@@ -239,7 +242,9 @@ def run_point(args):
                     force_graphs=getattr(engine.config, "force_graphs", None),
                     force_graph_releases=getattr(engine, "force_graph_releases", None),
                     force_graph_floor=getattr(engine, "force_graph_floor", None),
-                    recaptures=getattr(engine, "recaptures", None))
+                    recaptures=getattr(engine, "recaptures", None),
+                    force_bytes_per_edge=getattr(engine, "_force_bytes_per_edge", None),
+                    pool_bytes=engine._pool_bytes() if hasattr(engine, "_pool_bytes") else None)
 
     try:
         with warnings.catch_warnings(record=True) as caught:
@@ -254,10 +259,11 @@ def run_point(args):
             record["phases"]["load"] = peaks()
             phase = "build"
             started = time.perf_counter()
-            from fastmace.config import FallbackConfig
+            from fastmace.config import EngineConfig, FallbackConfig
 
             sim = fm.Simulation(atoms, field, seed=args.seed,
                                 **({"fallback": FallbackConfig(fallback="refuse")} if args.diagnose else {}),
+                                **({"engine": EngineConfig(**record["engine"])} if args.engine else {}),
                                 integrator=fm.integrators.Langevin(
                 timestep_fs=args.timestep_fs, temperature_K=args.temperature_K, friction_per_fs=0.002))
             torch.cuda.synchronize()
@@ -355,6 +361,8 @@ def scan(args):
                    "--repeat", repeat_text(sizes[index][1]), f"--tag={args.tag}"]
         if args.rewrites:
             command += ["--rewrites", *args.rewrites]
+        if args.engine:
+            command += ["--engine", *args.engine]
         with open(log, "a") as stream:
             stream.write(f"{datetime.now(timezone.utc).isoformat()} start {sizes[index]}\n")
             stream.flush()
