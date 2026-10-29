@@ -1,0 +1,956 @@
+{
+ "meta": {
+  "date_utc": "2026-10-29T23:32:07+00:00",
+  "label": "Modal NVIDIA A100-SXM4-80GB",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "capability": "8.0",
+  "sms": 108,
+  "clock_khz_nominal": 1410000,
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "budget_cycles": 2000000,
+  "repeats": 5,
+  "nvrtc_log": "\u0000",
+  "kernels": {
+   "reg_tf32": {
+    "regs": 52,
+    "max_threads": 512,
+    "smem_bytes": 8,
+    "local_bytes": 0
+   },
+   "reg_bf16": {
+    "regs": 52,
+    "max_threads": 512,
+    "smem_bytes": 8,
+    "local_bytes": 0
+   },
+   "reg_fp16": {
+    "regs": 52,
+    "max_threads": 512,
+    "smem_bytes": 8,
+    "local_bytes": 0
+   },
+   "smem_tf32": {
+    "regs": 101,
+    "max_threads": 512,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "smem_bf16": {
+    "regs": 101,
+    "max_threads": 512,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "smem_fp16": {
+    "regs": 101,
+    "max_threads": 512,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "gemm_tf32": {
+    "regs": 164,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "gemm_bf16": {
+    "regs": 164,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "gemm_fp16": {
+    "regs": 164,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_tf32": {
+    "regs": 200,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_fp16": {
+    "regs": 237,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_pipe_tf32": {
+    "regs": 202,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_pipe_fp16": {
+    "regs": 202,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   }
+  },
+  "rule": {
+   "keep_min": 0.9,
+   "gain_min": 1.1,
+   "primary": {
+    "tf32": "3xTF32",
+    "bf16": "BF16x6",
+    "fp16": "3xFP16"
+   }
+  }
+ },
+ "rows": [
+  {
+   "variant": "gemm",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 164,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.48200635293287,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.1326633747205176,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 837.62040910992,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.9541411078717201
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 87.1744372305333,
+     "mma_flop_per_cycle_sm": 610.9537023705673,
+     "simt_tflops": 0.09929652388427898,
+     "mma_tflops": 0.6957948717948719
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.26641909593067,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.1438135198135198,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 1001.943366119725,
+     "simt_tflops": 0.0,
+     "mma_tflops": 1.1413076883424436
+    }
+   },
+   "keep": 0.7483940220466365,
+   "mma_share": 0.729392091842395,
+   "decompositions": {
+    "3xTF32": {
+     "c": 3,
+     "useful_vs_simt": 2.496743320791307,
+     "gain_vs_best_single": 0.8707847604611141,
+     "mma_alone_fp32_equiv_vs_simt": 2.396995139237743
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "gemm",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 108,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 164,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.48200635293287,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 14.319900068132466,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 837.6215605745072,
+     "simt_tflops": 0.0,
+     "mma_tflops": 103.01284628545655
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 87.19508260952865,
+     "mma_flop_per_cycle_sm": 610.9024172494549,
+     "simt_tflops": 10.72209215769652,
+     "mma_tflops": 75.12366146122693
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.29766094340366,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 15.534767510495847,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 1001.9436165048319,
+     "simt_tflops": 0.0,
+     "mma_tflops": 123.21461302989147
+    }
+   },
+   "keep": 0.7485712629754441,
+   "mma_share": 0.7293298620804957,
+   "decompositions": {
+    "3xTF32": {
+     "c": 3,
+     "useful_vs_simt": 2.49677380050861,
+     "gain_vs_best_single": 0.8707951732070676,
+     "mma_alone_fp32_equiv_vs_simt": 2.396998434352079
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "gemm",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 164 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 164 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 164 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 164,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.48200635293287,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.13262470862470863,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 1675.24081821984,
+     "simt_tflops": 0.0,
+     "mma_tflops": 1.9082822157434403
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 87.1744372305333,
+     "mma_flop_per_cycle_sm": 1221.9074047411345,
+     "simt_tflops": 0.09929652388427898,
+     "mma_tflops": 1.3915897435897437
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.27747848624135,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.14380320203966096,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 2003.88673223945,
+     "simt_tflops": 0.0,
+     "mma_tflops": 2.2822831223067017
+    }
+   },
+   "keep": 0.7483940220466365,
+   "mma_share": 0.729392091842395,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 4.245092619535978,
+     "gain_vs_best_single": 0.740276729501034,
+     "mma_alone_fp32_equiv_vs_simt": 4.793990278475486
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 108,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 164,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.48205001703465,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 14.325240750055901,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 1675.243121135095,
+     "simt_tflops": 0.0,
+     "mma_tflops": 206.0340395120994
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 87.19382058613402,
+     "mma_flop_per_cycle_sm": 1221.8343534589967,
+     "simt_tflops": 10.721376762878249,
+     "mma_tflops": 150.23992016747394
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.296417075137,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 15.530127346427587,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 2003.8872330096638,
+     "simt_tflops": 0.0,
+     "mma_tflops": 246.47617942998076
+    }
+   },
+   "keep": 0.748560147880146,
+   "mma_share": 0.7293474827887179,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 4.2450483858541865,
+     "gain_vs_best_single": 0.7402691083516899,
+     "mma_alone_fp32_equiv_vs_simt": 4.793995071601455
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 164 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 164 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 164 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 200,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.68997680416375,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.13292594752186587,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 231.4808424185387,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.2636039603960396
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 75.73503539550066,
+     "mma_flop_per_cycle_sm": 169.20168373023427,
+     "simt_tflops": 0.10649397993484261,
+     "mma_tflops": 0.23796021659647337
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.10180153562266,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.17735301935557385,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 257.65928851595635,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.36245179856115106
+    }
+   },
+   "keep": 0.6490277697338463,
+   "mma_share": 0.7309532916953102,
+   "decompositions": {
+    "3xTF32 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.099038202199686,
+     "gain_vs_best_single": 0.9506225082608131,
+     "mma_alone_fp32_equiv_vs_simt": 1.9837251558205724
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 108,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 200,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.68997680416375,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.728106255903164,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 231.09156162072392,
+     "simt_tflops": 0.0,
+     "mma_tflops": 35.12248679032206
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 75.7253490805069,
+     "mma_flop_per_cycle_sm": 169.2234067639344,
+     "simt_tflops": 11.499467387118619,
+     "mma_tflops": 25.69688456775056
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.11388316754605,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.156638727589147,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 257.65928851595635,
+     "simt_tflops": 0.0,
+     "mma_tflops": 39.13543557986476
+    }
+   },
+   "keep": 0.6489447607620474,
+   "mma_share": 0.732278606700794,
+   "decompositions": {
+    "3xTF32 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.0991413534645678,
+     "gain_vs_best_single": 0.9506692239013619,
+     "mma_alone_fp32_equiv_vs_simt": 1.9803891298098029
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 200 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 200 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 200 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 237,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.79490384182118,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.16430813534917207,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 440.2147187445648,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.6150590703966966
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 66.23198297215299,
+     "mma_flop_per_cycle_sm": 308.2034359416889,
+     "simt_tflops": 0.09252957010109261,
+     "mma_tflops": 0.43065686680966236
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.355685033002,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.17649055447768813,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 482.3330670163112,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.6737646442934581
+    }
+   },
+   "keep": 0.5670793912536881,
+   "mma_share": 0.700120697510172,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 3.2059225753629708,
+     "gain_vs_best_single": 0.7763005369507032,
+     "mma_alone_fp32_equiv_vs_simt": 3.769126085678881
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 108,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 237,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 116.79490384182118,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.65576550018357,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 441.99718488510746,
+     "simt_tflops": 0.0,
+     "mma_tflops": 66.80602184105153
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 66.21909949361489,
+     "mma_flop_per_cycle_sm": 308.1301457232057,
+     "simt_tflops": 10.005927961901332,
+     "mma_tflops": 46.573159831008795
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.34488435040119,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.092255290114725,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 481.9800952201547,
+     "simt_tflops": 0.0,
+     "mma_tflops": 72.84657823815047
+    }
+   },
+   "keep": 0.5669690826861538,
+   "mma_share": 0.6971314665800438,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 3.205184754668859,
+     "gain_vs_best_single": 0.7766902594718742,
+     "mma_alone_fp32_equiv_vs_simt": 3.7843875918055243
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 237 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 237 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 237 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 202,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 111.99786331684732,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.15645461043602574,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 231.4808424185387,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.3255587440328111
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 70.8848401790143,
+     "mma_flop_per_cycle_sm": 232.2808323521775,
+     "simt_tflops": 0.09968345323741008,
+     "mma_tflops": 0.3267380946478594
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.03426759882652,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.17715642491039518,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 257.65928851595635,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.36232151394628365
+    }
+   },
+   "keep": 0.6329124331459584,
+   "mma_share": 1.0034559660543845,
+   "decompositions": {
+    "3xTF32 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.7068880026177076,
+     "gain_vs_best_single": 1.1766145683213642,
+     "mma_alone_fp32_equiv_vs_simt": 2.0668326659381737
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 108,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 202,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 111.9029801899672,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.00511246175027,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 231.09156162072392,
+     "simt_tflops": 0.0,
+     "mma_tflops": 35.12502764384071
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 70.87173823377577,
+     "mma_flop_per_cycle_sm": 232.27358981076804,
+     "simt_tflops": 10.759822008926484,
+     "mma_tflops": 35.26479013073106
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 125.85882252719918,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.118825243753314,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 257.65928851595635,
+     "simt_tflops": 0.0,
+     "mma_tflops": 39.13426686119426
+    }
+   },
+   "keep": 0.6333319998579436,
+   "mma_share": 1.005114977724648,
+   "decompositions": {
+    "3xTF32 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.709001382536215,
+     "gain_vs_best_single": 1.1765356094498824,
+     "mma_alone_fp32_equiv_vs_simt": 2.065106409395187
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 202 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 202 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 202 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 202,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 111.99786331684732,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.15746762589928057,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 440.2147187445648,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.6192656587473002
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 72.1447684176781,
+     "mma_flop_per_cycle_sm": 462.27176596809954,
+     "simt_tflops": 0.10147436331712167,
+     "mma_tflops": 0.6502988505747127
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.15031924805477,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.17734053137073377,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 482.3330670163112,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.6783077757564103
+    }
+   },
+   "keep": 0.6441620070338047,
+   "mma_share": 1.0501052015853505,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 4.771667231488941,
+     "gain_vs_best_single": 1.1079823693027149,
+     "mma_alone_fp32_equiv_vs_simt": 3.9305635456560117
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 108,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 202,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 111.90236490565131,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.005569038488776,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 441.97963795762723,
+     "simt_tflops": 0.0,
+     "mma_tflops": 67.15935096011778
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 72.12690943463616,
+     "mma_flop_per_cycle_sm": 462.18764881388233,
+     "simt_tflops": 10.951614978187557,
+     "mma_tflops": 70.17480657234746
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.12966287512496,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.15722598237997,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 481.9856833285884,
+     "simt_tflops": 0.0,
+     "mma_tflops": 73.22271562367534
+    }
+   },
+   "keep": 0.6445521459305066,
+   "mma_share": 1.0457215878759385,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 4.774828116447917,
+     "gain_vs_best_single": 1.10856935533551,
+     "mma_alone_fp32_equiv_vs_simt": 3.949689877691819
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 202 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 202 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 202 registers"
+  }
+ ],
+ "verdict": {
+  "pass_any": false,
+  "pass_realistic": false,
+  "best_realistic": {
+   "variant": "x3_pipe",
+   "kind": "tf32",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 1,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 202,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 111.99786331684732,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.15645461043602574,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 231.4808424185387,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.3255587440328111
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 70.8848401790143,
+     "mma_flop_per_cycle_sm": 232.2808323521775,
+     "simt_tflops": 0.09968345323741008,
+     "mma_tflops": 0.3267380946478594
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 126.03426759882652,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 0.17715642491039518,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 257.65928851595635,
+     "simt_tflops": 0.0,
+     "mma_tflops": 0.36232151394628365
+    }
+   },
+   "keep": 0.6329124331459584,
+   "mma_share": 1.0034559660543845,
+   "decompositions": {
+    "3xTF32 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.7068880026177076,
+     "gain_vs_best_single": 1.1766145683213642,
+     "mma_alone_fp32_equiv_vs_simt": 2.0668326659381737
+    }
+   },
+   "pass": false
+  }
+ }
+}

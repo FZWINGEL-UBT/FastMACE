@@ -26,7 +26,8 @@ kernels and their hook are screen code under `tools/bench/tc_gemm/`.
 - **No concurrent branch is left to overlap.** The review's "2.9 ms of overlap on NaNbO3" predates
   `wprime_backward`. Under today's default the step is one chain: 55–69 µs of concurrent kernel time per step on
   the A100 and 7 µs on the 5060 Ti. The rz3 gain is the GEMM time alone: 4.14 → 2.34 ms per NaNbO3 step and
-  6.60 → 3.67 ms per NbCl5 step (§3).
+  6.60 → 3.67 ms per NbCl5 step (§3). A hybrid inside one kernel fails the co-execution probe on the A100
+  (keep 0.57–0.75); only a split-producer variant reaches 1.18× in the inner loop, at most about 5 % of the step.
 - **Idea 2:** the corrected (round-to-nearest) splits `rn3`/`rn4` are more accurate under cancellation but 2.8–4.9×
   slower than IEEE on the A100, so stock `rz3` is the variant to use. `segment_gemm` already writes the
   interleaved layout from its epilogue; the CUTLASS kernels write it too (batched-strided). On the 5060 Ti every
@@ -35,7 +36,7 @@ kernels and their hook are screen code under `tools/bench/tc_gemm/`.
   check (AGENTS.md: NAS work paused), and later all permitted workstation GPUs were taken. The prepacked-FP16
   check is ready (`fp16x3_prepacked` in the screen). On the A100 it already halves the GEMM time (0.50×), but its
   accuracy is up to 11× worse than IEEE on real operands (§2.2), so it fails the "full-range numerical pass".
-- **Modal (new account `fzwingel-ubt`): $4.57 metered,** including two failed starts of my own making (a library
+- **Modal (new account `fzwingel-ubt`): $4.58 metered,** including two failed starts of my own making (a library
   that did not load, then a hung step until the job timeout; $2.04 of the total).
 - **Adoption** (decision 66) needs the owner: rz3 changes the 9 October precision decision (FP32, TF32 off), so
   it is neither a default nor in the library. An opt-in library backend is the follow-up (§6).
@@ -124,11 +125,30 @@ file graph kernels under the launch stream). `wprime_backward` on.
 - The step has no second branch any more: `wprime_backward` replaced the chunked convolution backward and its side
   stream with one launch. Tensor-core GEMMs therefore cannot hide beside CUDA-core work between kernels; the rz3
   gain is its GEMM time saved (1.8 ms of 2.0 ms on NaNbO3, 2.9 ms of 3.3 ms on NbCl5).
-- **A hybrid inside one GEMM** (some output columns on SIMT FP32, the rest on 3×TF32 at the same time) is not
-  tested on sm_80. Its ceiling is about 1.4× rz3's GEMM rate (about 40 TFLOPS of 3×TF32 plus at most 19 of SIMT),
-  and it failed on sm_120 (opt-5 §3.3–3.8). With rz3 the GEMMs are 32 % of the NaNbO3 step, so a 1.2× faster GEMM
-  would be worth about 5 % of the step. A co-execution probe (`tools/megakernel_probe.py` on the A100) would decide
-  it before any kernel work (§6).
+- **A hybrid inside one GEMM** (SIMT FP32 work beside 3×TF32 MMA in one kernel): the single-SM co-execution probe
+  (`tools/megakernel_probe.py`, opt4-T07's gate: keep = SIMT rate kept ≥ 0.90 and gain over the better unit alone
+  ≥ 1.10) on the Modal A100-SXM4-80GB, 30 October, commit `afc82168`
+  (`results/tc-gemm-20261029/modal-a100-sxm4-probe/`):
+
+  | Variant (4×4 warps, one block per SM) | keep | gain | Verdict |
+  | --- | ---: | ---: | --- |
+  | `gemm` tf32 (SIMT SGEMM loop beside a 64×64 MMA tile) | 0.75 | 0.87 | fail |
+  | `x3` tf32 (3×TF32 with the split on the MMA warps, as CUTLASS) | 0.65 | 0.95 | fail |
+  | `x3` fp16 (3×FP16) | 0.57 | 0.78 | fail |
+  | `x3_pipe` tf32 (SIMT warps produce the split, MMA warps only multiply) | 0.63 | **1.18** | fail (keep) |
+  | `x3_pipe` fp16 | 0.64 | 1.11 | fail (keep) |
+
+  - The plain hybrid loses: on sm_80 the tensor cores alone (3×TF32 at 258 FLOP/cycle/SM, split included) are
+    twice the CUDA cores' 126, and sharing the issue slots costs more than the SIMT side adds. This confirms opt4-T07
+    on the A100-SXM4-40GB (keep 0.58, gain 0.92).
+  - `x3_pipe` is not a FP32 + TF32 hybrid in the original sense: the CUDA cores do the split for the MMA warps,
+    which then run at their full rate (MMA share 1.00 against 0.73). Its 1.18 combined rate fails the rule's
+    keep ≥ 0.90. That threshold assumes the CUDA cores are the main unit, which on the A100 they are not, so the
+    gain is the relevant number there. It is an inner-loop upper bound without global memory. On sm_120 a 1.22×
+    inner-loop gain vanished in the real GEMM (opt-5 §3.4). With rz3 the GEMMs are 32 % of the NaNbO3 step, so
+    even the full 1.18 would be worth at most about 5 % of the step.
+  - **Verdict: no hybrid kernel is worth building now.** A producer/consumer 3×TF32 GEMM on the A100 (CUTLASS
+    warp-specialised, split on SIMT warps) would be the only candidate, at ≤ 5 % of the step.
 
 ## 4. Accuracy gate and NVE drift
 
@@ -201,7 +221,7 @@ show whether it is a trend or noise.
   - idea 3 on the A4000 and RTX 4000 Ada (workstations unavailable);
   - the A100 NaCl/NbCl5 numbers for the PCIe card;
   - the A100 NbCl5 GEMM screen (harness bug above).
-- **Intra-GEMM hybrid on the A100:** a co-execution probe before any kernel (§3).
+- **Intra-GEMM hybrid on the A100:** probed, fails (§3); a split-producer 3×TF32 GEMM is worth at most about 5 % of the step.
 
 ## Reproducing
 
