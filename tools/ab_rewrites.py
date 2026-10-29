@@ -53,8 +53,9 @@ def parse_args(argv=None):
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--a", nargs="*", default=[], metavar="FIELD=VALUE", help="Side a's RewriteConfig fields")
     p.add_argument("--b", nargs="*", default=[], metavar="FIELD=VALUE", help="Side b's RewriteConfig fields")
-    p.add_argument("--a-engine", nargs="*", default=[], metavar="FIELD=true|false",
-                   help="Side a's boolean EngineConfig fields (opt-2 OPT2-T04: overlap_rebuild, step_graph)")
+    p.add_argument("--a-engine", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="Side a's boolean, float or string EngineConfig fields (opt-2 OPT2-T04: overlap_rebuild, "
+                        "step_graph; CAP-T01: force_graphs)")
     p.add_argument("--b-engine", nargs="*", default=[], metavar="FIELD=true|false", help="Side b's, as --a-engine")
     p.add_argument("--a-neighbours", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="Side a's NeighbourConfig fields (e.g. skin=0.66, edge_bucket_fraction=0.025)")
@@ -133,22 +134,25 @@ class _Constants:
 
 
 def engine_overrides(items):
-    """{field: value} of ``FIELD=VALUE`` items: a boolean EngineConfig field with true|false, or a float one."""
+    """{field: value} of ``FIELD=VALUE`` items: a boolean EngineConfig field with true|false, a float one, or a
+    string one (a choice such as ``force_graphs=keep``; EngineConfig validates it)."""
     from fastmace.config import EngineConfig
 
     fields = {f.name: f for f in dataclasses.fields(EngineConfig)
-              if isinstance(f.default, bool) or type(f.default) is float}
+              if isinstance(f.default, (bool, str)) or type(f.default) is float}
     out = {}
     for item in items:
         name, _, value = item.partition("=")
-        if name not in fields:
-            raise ValueError(f"{item!r}: expected FIELD=VALUE with a boolean or float EngineConfig field")
+        if name not in fields or not value:
+            raise ValueError(f"{item!r}: expected FIELD=VALUE with a boolean, float or string EngineConfig field")
         if isinstance(fields[name].default, bool):
             if value.lower() not in ("true", "false"):
                 raise ValueError(f"{item!r}: {name} takes true or false")
             out[name] = value.lower() == "true"
-        else:
+        elif type(fields[name].default) is float:
             out[name] = float(value)
+        else:
+            out[name] = value
     return out
 
 

@@ -112,6 +112,11 @@ MAX_REDOS = 3
 POOL_RESET = "graph pool retired"
 # Entries kept in ``recapture_log`` and ``overflow_log`` (the counters keep counting past it).
 LOG_LIMIT = 256
+# Stage kinds whose graphs hold a force evaluation's activations (``EngineConfig.force_graphs``, CAP-T01).
+FORCE_KINDS = ("B", "ACB", "ACPB")
+# ``force_graphs="fit"``: a new force variant must fit the free memory with this margin (its warm-up and
+# capture, estimated from the pool's bytes per edge, beside fragmentation the estimate does not see).
+FORCE_GRAPH_MARGIN = 1.15
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +141,12 @@ def _kinds(word: int) -> list[str]:
 def _kind(key) -> Any:
     """A graph key's family: a stage key's first element (``("B", edges)`` -> ``"B"``), else the key."""
     return key[0] if isinstance(key, tuple) else key
+
+
+def next_force_graph_fits(*, bytes_per_edge: float, edges: int, free: int) -> bool:
+    """``force_graphs="fit"``: does a force graph at ``edges`` padded edges fit ``free`` bytes, at the largest
+    bytes per edge the graph pool held after a force capture, times ``FORCE_GRAPH_MARGIN``?"""
+    return bytes_per_edge * edges * FORCE_GRAPH_MARGIN <= free
 
 
 def _precision(field) -> str:
@@ -230,6 +241,11 @@ class GraphEngine(Engine):
         self.rebuilds_beside = 0
         self.capture_memory = []
         self.pool_resets = 0
+        # EngineConfig.force_graphs (CAP-T01): releases before a force capture, the padded size kept since, and
+        # the graph pool's largest bytes per force-graph edge.
+        self.force_graph_releases = 0
+        self.force_graph_floor = 0
+        self._force_bytes_per_edge = 0.0
         self.edge_sizes_used = set()
         self.rebuilds = 0
         self.rebuild_needed = torch.zeros((), dtype=torch.bool, device=device)
@@ -698,6 +714,8 @@ class GraphEngine(Engine):
             "recapture_budget": self.recapture_budget,
             "recapture_budget_exceeded_at": self.recapture_budget_exceeded_at,
             "graph_variant_cap": self.config.graph_variant_cap, "graph_evictions": self.graph_evictions,
+            "force_graphs": self.config.force_graphs, "force_graph_releases": self.force_graph_releases,
+            "force_graph_floor": self.force_graph_floor,
             "recapture_log": [dict(entry) for entry in self.recapture_log],
             "invalidations": [dict(entry) for entry in self.invalidations],
             "captures": self.capture_count, "capture_seconds": self.capture_seconds,
@@ -845,7 +863,9 @@ class GraphEngine(Engine):
 
     def _padded(self, count: int) -> int:
         if self.pad_edges:
-            return round_up_edges(count, self.force_field.edge_capacity, self.edge_bucket)
+            capacity = self.force_field.edge_capacity
+            # After a force-graph release the captured size is kept: a smaller one would capture again.
+            return min(capacity, max(round_up_edges(count, capacity, self.edge_bucket), self.force_graph_floor))
         return count
 
     def _use_edges(self, edges: int) -> None:
@@ -1202,6 +1222,9 @@ class GraphEngine(Engine):
         if edges is not None and active is not None and active != edges:
             raise RuntimeError(f"capturing {key!r} with {active} active edges, not its {edges}: the graph would "
                                "read the wrong edges for the rest of the run (call force_field.use_edges first)")
+        force = _kind(key) in FORCE_KINDS
+        if force:
+            self._limit_force_graphs(key, edges)
         counted, reason = self._capture_reason(key)
         while len(self._graphs) >= self.config.graph_variant_cap:
             evicted, _ = self._graphs.popitem(last=False)
@@ -1220,6 +1243,47 @@ class GraphEngine(Engine):
         seconds = _clock() - self._capture_clock
         self._kinds_seen.add(_kind(key))
         self._record_capture(key, counted, reason, seconds)
+        if force and edges and self.config.force_graphs == "fit":
+            pool = self._pool_bytes()
+            if pool:
+                self._force_bytes_per_edge = max(self._force_bytes_per_edge, pool / edges)
+
+    def _limit_force_graphs(self, key, edges: int | None) -> None:
+        """``EngineConfig.force_graphs`` before capturing the force graph ``key`` (CAP-T01): with another force
+        graph captured, ``"one"`` releases every captured graph and the pool, ``"fit"`` does so when ``key``
+        would not fit the free device memory; the padded size is kept at ``edges`` from then on."""
+        mode = self.config.force_graphs
+        others = [other for other in self._graphs if _kind(other) in FORCE_KINDS and other != key]
+        if mode not in ("one", "fit") or not others or not edges:
+            return
+        if mode == "fit":
+            free = self._free_device_bytes()
+            if (free is None or not self._force_bytes_per_edge
+                    or next_force_graph_fits(bytes_per_edge=self._force_bytes_per_edge, edges=edges, free=free)):
+                return
+        if self.cuda:
+            torch.cuda.synchronize()  # a replay of a released graph may still run
+        self.invalidate_graphs(f"one force graph ({mode}): released {len(others)} force graph(s) before "
+                               f"capturing {key!r}")
+        self.force_graph_releases += 1
+        self.force_graph_floor = max(self.force_graph_floor, int(edges))
+        if self.cuda:
+            torch.cuda.empty_cache()  # the retired pool's blocks back to the device
+
+    def _free_device_bytes(self) -> int | None:
+        """The device's free memory after releasing cached blocks (``None`` off CUDA)."""
+        if not self.cuda:
+            return None
+        torch.cuda.empty_cache()
+        return int(torch.cuda.mem_get_info(self.state.positions.device)[0])
+
+    def _pool_bytes(self) -> int | None:
+        """The bytes the graph pool's segments hold (``None`` off CUDA or without a pool)."""
+        if not self.cuda or self._pool is None:
+            return None
+        pool = tuple(self._pool)
+        return sum(segment["total_size"] for segment in torch.cuda.memory_snapshot()
+                   if tuple(segment.get("segment_pool_id", ())) == pool)
 
     def _capture_reason(self, key) -> tuple[bool, str]:
         """Whether capturing ``key`` now counts against the budget, and why (conductor answer 3 of 3-T04)."""

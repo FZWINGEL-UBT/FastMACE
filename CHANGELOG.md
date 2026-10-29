@@ -8,6 +8,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `EngineConfig.force_graphs` (`"auto"`, `"keep"`, `"fit"`, `"one"`): near the GPU memory limit the graph engine
+  releases its captured graphs and their pool before capturing a force graph at a larger padded edge size, so one
+  force evaluation's activations live at a time; `"auto"` is `"fit"` with CUDA graphs (plans/capacity.md CAP-T01).
+
 - `RewriteConfig.gate_epilogue` (opt-10 OPT10-T01, float32, opt-in): in MH-1's gated chains the gate's backward
   runs in `linear_2`'s input-gradient GEMM (`fastmace.kernels.triton.gated_products`), one atom-tiled Triton kernel
   per gated segment where the shape rule picks Triton, without the `drows` round trip. Rounding-class,

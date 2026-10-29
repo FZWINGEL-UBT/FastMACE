@@ -83,6 +83,7 @@ AUTO_RULES = MappingProxyType({
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
+    "EngineConfig.force_graphs": "fit_when_capturing_on_cuda_else_keep",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
     "RewriteConfig.fold_cutoff": "on_with_factor_species_if_model_supports",
@@ -847,6 +848,12 @@ class FixedPlanner:
             integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=bool(mc and mc[0]))
             integrator = _dof(book, integrator)
 
+        capturing = not evaluation and self._device_type() == "cuda"
+        force_graphs = engine.force_graphs if engine.force_graphs != "auto" else "fit" if capturing else "keep"
+        book.decide("EngineConfig.force_graphs", force_graphs, _why(
+            engine.force_graphs, AUTO_RULES["EngineConfig.force_graphs"],
+            "CUDA graphs: one force graph when the next padded size would not fit the free memory (CAP-T01)"
+            if capturing else "no CUDA graphs"))
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
                                        evaluation=evaluation, mc=mc, optimizer=optimizer)
         return dict(
@@ -855,7 +862,7 @@ class FixedPlanner:
             engine=dataclasses.replace(engine, backend=backend, pipelined=_toggle(pipelined),
                                        async_output=_toggle(async_output), cueq_conv_fusion=_toggle(bool(fusion)),
                                        expandable_segments=expandable, fp64_emulation=fp64_emulation,
-                                       fp64_emulation_mantissa_bits=mantissa_bits,
+                                       fp64_emulation_mantissa_bits=mantissa_bits, force_graphs=force_graphs,
                                        **phase_3["engine"]),
             precision=dataclasses.replace(self.precision, dtype=dtype, **phase_3["precision"]),
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),

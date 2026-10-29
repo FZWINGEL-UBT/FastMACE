@@ -28,3 +28,11 @@ def test_sides_parse_and_must_differ():
         tool.parse_args(["--output", "o", "--checkpoint", "c", "--a", "gated_rows=on", "--b", "gated_rows=on"])
     with pytest.raises(SystemExit):
         tool.parse_args(["--output", "o", "--checkpoint", "c", "--b", "nonsense=on"])
+
+
+def test_engine_sides_take_booleans_floats_and_choices():
+    assert tool.engine_overrides(["step_graph=true", "force_graphs=keep"]) == {"step_graph": True,
+                                                                               "force_graphs": "keep"}
+    for bad in (["step_graph=on"], ["no_such_field=1"], ["force_graphs="]):
+        with pytest.raises(ValueError):
+            tool.engine_overrides(bad)
