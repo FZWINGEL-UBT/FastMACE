@@ -193,7 +193,8 @@ def _live_blocks(torch, limit=25):
 def run_point(args):
     from fastmace.model.compile import configure_allocator
 
-    configure_allocator()  # before the first CUDA call, as the engine's process constraints require
+    # Before the first CUDA call, as the engine's process constraints require; off with expandable_segments=off.
+    configure_allocator(enabled="expandable_segments=off" not in args.engine)
     import torch
 
     import fastmace as fm
