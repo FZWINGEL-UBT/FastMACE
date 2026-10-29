@@ -1,0 +1,2906 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/reference/planner/">
+      
+      
+        <link rel="prev" href="../mc/">
+      
+      
+        <link rel="next" href="../engine/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Planner, gate and fallback - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#planner-gate-and-fallback" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Planner, gate and fallback
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/md/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running MD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command line and TOML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models, D3, PolarMACE and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators and optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planner, gate and fallback
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planner, gate and fallback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simulation-keyword-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulation keyword arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmworkload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.Workload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gateconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GateConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fallbackconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FallbackConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runnerconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunnerConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adaptationconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdaptationConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibrationconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CalibrationConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-change-these" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to change these
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine and neighbour list
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrites and precision
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment and cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simulation-keyword-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulation keyword arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmworkload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.Workload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gateconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GateConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fallbackconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FallbackConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runnerconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunnerConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adaptationconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdaptationConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibrationconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CalibrationConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-change-these" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to change these
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="planner-gate-and-fallback">Planner, gate and fallback<a class="headerlink" href="#planner-gate-and-fallback" title="Permanent link">&para;</a></h1>
+<p>These are the planner's inputs: the keyword arguments of <code>fm.Simulation</code>
+that choose the tier and the checks, the <code>fm.Workload</code> record, and five
+configuration records:</p>
+<ul>
+<li><code>FallbackConfig</code>: what happens when a build, compile, capture, self-check
+  or gate fails;</li>
+<li><code>GateConfig</code>: where the gate's float64 references may run;</li>
+<li><code>RunnerConfig</code>: the child process that runs a plan this process cannot;</li>
+<li><code>AdaptationConfig</code>: runtime tier switches;</li>
+<li><code>CalibrationConfig</code>: the optional backend measurement before a run.</li>
+</ul>
+<p>The <a href="../../guide/planner/">planner guide</a> explains how to read a plan. This
+page lists every option. Engine and neighbour-list options are on
+<a href="../engine/">Engine and neighbour list</a>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">fastmace</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">fm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fastmace.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdaptationConfig</span><span class="p">,</span> <span class="n">FallbackConfig</span><span class="p">,</span> <span class="n">GateConfig</span><span class="p">,</span> <span class="n">RunnerConfig</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"mh1"</span><span class="p">,</span> <span class="n">head</span><span class="o">=</span><span class="s2">"matpes_r2scan"</span><span class="p">)</span>
+<span class="n">sim</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">Simulation</span><span class="p">(</span>
+    <span class="n">atoms</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span>
+    <span class="n">integrator</span><span class="o">=</span><span class="n">fm</span><span class="o">.</span><span class="n">integrators</span><span class="o">.</span><span class="n">Langevin</span><span class="p">(</span><span class="n">temperature_K</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span> <span class="n">friction_per_fs</span><span class="o">=</span><span class="mf">0.02</span><span class="p">),</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">workload</span><span class="o">=</span><span class="n">fm</span><span class="o">.</span><span class="n">Workload</span><span class="p">(</span><span class="n">max_temperature_K</span><span class="o">=</span><span class="mi">900</span><span class="p">),</span>
+    <span class="n">check</span><span class="o">=</span><span class="s2">"gate"</span><span class="p">,</span>
+    <span class="n">fallback</span><span class="o">=</span><span class="n">FallbackConfig</span><span class="p">(</span><span class="n">fallback</span><span class="o">=</span><span class="s2">"refuse"</span><span class="p">),</span>
+    <span class="n">gate</span><span class="o">=</span><span class="n">GateConfig</span><span class="p">(</span><span class="n">cpu_float64_time_limit_s</span><span class="o">=</span><span class="mi">600</span><span class="p">),</span>
+    <span class="n">runner</span><span class="o">=</span><span class="n">RunnerConfig</span><span class="p">(</span><span class="n">stall_timeout_s</span><span class="o">=</span><span class="mi">3600</span><span class="p">),</span>
+    <span class="n">adaptation</span><span class="o">=</span><span class="n">AdaptationConfig</span><span class="p">(</span><span class="n">adapt</span><span class="o">=</span><span class="s2">"off"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sim</span><span class="o">.</span><span class="n">plan</span><span class="p">)</span>        <span class="c1"># tier, backend, precision and the decisions that matter</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sim</span><span class="o">.</span><span class="n">gate</span><span class="p">)</span>        <span class="c1"># the gate record</span>
+</code></pre></div>
+<p><code>fm.Workload</code> is in the <code>fm</code> namespace. The other records are imported from
+<code>fastmace.config</code>. Every record is frozen and checks its values when you
+build it (<code>ValueError</code>). Options the planner cannot honour raise
+<code>PlanRefused</code> with every reason when the <code>Simulation</code> is built, before
+anything runs.</p>
+<p><code>fm.md</code> takes <code>mode=</code>, <code>allow_reference=</code>, <code>check=</code>, <code>seed=</code>, <code>fallback=</code>,
+<code>gate=</code>, <code>runner=</code>, <code>engine=</code> and <code>neighbours=</code> and passes them on
+unchanged. It builds the <code>Workload</code> from its own arguments (the highest
+target temperature of the schedule, and the declared MC moves), and takes
+<code>calibrate=True</code> instead of a <code>CalibrationConfig</code>. It has no <code>adaptation=</code>
+or <code>allow_naive_cueq=</code>; use <code>fm.Simulation</code> for those.</p>
+<p>The options are recorded in <code>simulation.json</code> next to the restart.
+<code>Simulation.resume</code> plans with the same options.</p>
+<h2 id="tiers">Tiers<a class="headerlink" href="#tiers" title="Permanent link">&para;</a></h2>
+<p>A tier is the way the engine executes each step. Every tier runs FastMACE's
+own integrators, noise, output and restart, so a trajectory has the same
+physics on every tier.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>What runs</th>
+<th>When the planner picks it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>graph</code></td>
+<td>The compiled model, with each stage of a step recorded once as a CUDA graph and replayed. Edges are padded to buckets so that one graph fits many steps. Fastest.</td>
+<td>The default for MD and relaxations. On a CPU device the same engine runs its stages without graphs.</td>
+</tr>
+<tr>
+<td><code>compiled</code></td>
+<td>The compiled model without CUDA graphs. Exact edge counts; a new edge count does not compile again. Each step is launched from the host.</td>
+<td>Without <code>mode=</code>, when padded edges would change this model's energies (padding is not exact). With <code>mode="compiled"</code>. As the target of a runtime switch.</td>
+</tr>
+<tr>
+<td><code>eager</code></td>
+<td>The graph tier's backend, rewrites and precision, with no compilation and no CUDA graphs. Exact edge counts.</td>
+<td>With <code>mode="eager"</code>. When the installed MACE cannot capture this model's readout (some multi-head models), even for <code>mode="graph"</code>. As a fallback candidate.</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>MACE's own calculator through the versioned reference record: stock uncompiled cuEquivariance model, no rewrites, no padding, MACE's own neighbour list. Slowest.</td>
+<td>With <code>mode="reference"</code>. As the last fallback candidate, if it fits on the device and <code>reference_last=True</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Host callbacks (<code>Workload.host_callbacks_every</code>) keep the graph tier, with a
+host synchronisation at each callback: the compiled tier measured 1.3–4.7×
+slower with a callback every 1–10 steps (MH-1, hybrid float32, NaCl and
+NbCl5 on an RTX 5060 Ti).</p>
+<h2 id="backends">Backends<a class="headerlink" href="#backends" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>What it is</th>
+<th>When <code>EngineConfig.backend="auto"</code> picks it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hybrid</code></td>
+<td>cuEquivariance for the symmetric contraction and linear layers, OpenEquivariance kernels for the convolutions (message passing). Most rewrites need it. Float32 by default.</td>
+<td>OpenEquivariance can build, the device is CUDA, MACE was not imported before FastMACE prepared the OpenEquivariance runtime, and the process has not compiled a plain cuEq model.</td>
+</tr>
+<tr>
+<td><code>cueq</code></td>
+<td>Plain cuEquivariance throughout, with its fused convolution unless the plan is reproducible.</td>
+<td>Every other case, with the reason in the plan. <code>reproducible=True</code> always uses it.</td>
+</tr>
+</tbody>
+</table>
+<p>One process can hold compiled models of only one of the two backends, because
+MACE's compile setting is process-wide. A plan of the other backend runs in
+a child process through the subprocess runner (<code>RunnerConfig</code>). Calibration
+measures the two backends against each other on your structure.</p>
+<h2 id="simulation-keyword-arguments"><code>Simulation</code> keyword arguments<a class="headerlink" href="#simulation-keyword-arguments" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td><code>None</code>, <code>"graph"</code>, <code>"compiled"</code>, <code>"eager"</code>, <code>"reference"</code></td>
+<td><code>None</code>: the graph tier, or the compiled tier when padding is not exact for the model</td>
+<td>Asks for a <a href="#tiers">tier</a>.</td>
+<td>An explicit <code>"graph"</code> with inexact padding is refused. An explicit mode also stops runtime tier switches.</td>
+</tr>
+<tr>
+<td><code>check</code></td>
+<td><code>"skip"</code>, <code>"gate"</code>, <code>"allow_unavailable"</code></td>
+<td><code>"skip"</code></td>
+<td>Whether the <a href="#the-gate">gate</a> runs before the first step. <code>"gate"</code>: a failed gate goes to the fallback, or raises <code>GateFailed</code>; a gate whose reference cannot run raises <code>GateUnavailable</code>. <code>"allow_unavailable"</code>: as <code>"gate"</code>, but an unavailable reference is recorded and the run goes on.</td>
+<td>MC runs always run the move-energy part of the gate, whatever <code>check</code> is. The record is <code>sim.gate</code>.</td>
+</tr>
+<tr>
+<td><code>allow_reference</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>False</code></td>
+<td>Recorded in the plan.</td>
+<td>It does not lift any refusal and is not needed for <code>mode="reference"</code>.</td>
+</tr>
+<tr>
+<td><code>allow_naive_cueq</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>False</code></td>
+<td>Accepts cuEquivariance's slow fallback kernels when its fused kernels (<code>cuequivariance_ops_torch</code>) do not load.</td>
+<td>Without it, such a plan is refused with the import error. Recorded.</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>int</td>
+<td>required</td>
+<td>The seed of the integrator's noise. MC streams derive their own seeds from it.</td>
+<td><code>fm.md(seed=None)</code> draws a seed and records it in <code>metadata.json</code>.</td>
+</tr>
+<tr>
+<td><code>workload</code></td>
+<td><code>fm.Workload</code> or <code>None</code></td>
+<td><code>None</code>: <code>fm.Workload(max_temperature_K=&lt;integrator's temperature_K&gt;)</code>; for a relaxation <code>max_temperature_K=0</code></td>
+<td>What the run will do; see <a href="#fmworkload"><code>fm.Workload</code></a>.</td>
+<td>An integrator without a temperature (NVE) needs an explicit workload. A starting target above <code>max_temperature_K</code> is refused.</td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td><code>EngineConfig</code> or <code>None</code></td>
+<td><code>None</code>: the default planner's</td>
+<td>Engine options; see <a href="../engine/#engineconfig">Engine and neighbour list</a>.</td>
+<td>A record you pass replaces the default as a whole.</td>
+</tr>
+<tr>
+<td><code>neighbours</code></td>
+<td><code>NeighbourConfig</code> or <code>None</code></td>
+<td><code>None</code>: the default planner's</td>
+<td>Neighbour-list options; see <a href="../engine/#neighbourconfig">Engine and neighbour list</a>.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>fallback</code></td>
+<td><code>FallbackConfig</code> or <code>None</code></td>
+<td><code>None</code>: <code>FallbackConfig()</code></td>
+<td>See <a href="#fallbackconfig"><code>FallbackConfig</code></a>.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>gate</code></td>
+<td><code>GateConfig</code> or <code>None</code></td>
+<td><code>None</code>: <code>GateConfig()</code></td>
+<td>See <a href="#gateconfig"><code>GateConfig</code></a>.</td>
+<td>The record is <code>sim.gate_config</code>; the result is <code>sim.gate</code>.</td>
+</tr>
+<tr>
+<td><code>runner</code></td>
+<td><code>RunnerConfig</code> or <code>None</code></td>
+<td><code>None</code>: <code>RunnerConfig()</code></td>
+<td>See <a href="#runnerconfig"><code>RunnerConfig</code></a>.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>adaptation</code></td>
+<td><code>AdaptationConfig</code> or <code>None</code></td>
+<td><code>None</code>: <code>AdaptationConfig()</code></td>
+<td>See <a href="#adaptationconfig"><code>AdaptationConfig</code></a>.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>calibration</code></td>
+<td><code>CalibrationConfig</code> or <code>None</code></td>
+<td><code>None</code>: <code>CalibrationConfig()</code></td>
+<td>See <a href="#calibrationconfig"><code>CalibrationConfig</code></a>.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="fmworkload"><code>fm.Workload</code><a class="headerlink" href="#fmworkload" title="Permanent link">&para;</a></h2>
+<p>The workload holds the facts about the run that no other object knows.
+Periodicity and constraints come from the <code>Atoms</code>, the ensemble from the
+integrator, and the precision and species superset from the <code>ForceField</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_temperature_K</code></td>
+<td>float ≥ 0, K</td>
+<td>required (<code>Simulation</code> fills it from the integrator)</td>
+<td>The highest thermostat target of the run.</td>
+<td><code>Simulation.run</code> refuses a schedule that goes above it. For MC and species-change runs it sizes the skin and the pair buffers; for plain MD it is recorded.</td>
+</tr>
+<tr>
+<td><code>species_changes</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>False</code></td>
+<td>Declares that species will change (swaps, transmutations, species events).</td>
+<td>Required for <code>"swap"</code> and <code>"transmute"</code> moves. Keeps the graph tier and builds species-dependent tables for the whole superset. Makes the planner size the skin and buffers from the workload.</td>
+</tr>
+<tr>
+<td><code>atom_count_changes</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>False</code></td>
+<td>Declares that atoms will be added or removed.</td>
+<td>Accepted by the record and refused by the planner: not supported in 1.0.</td>
+</tr>
+<tr>
+<td><code>min_mc_temperature_K</code></td>
+<td>float &gt; 0, K, or <code>None</code></td>
+<td><code>None</code></td>
+<td>The lowest MC target temperature. Sets the move-energy gate's limit, 0.01 k_B T_min.</td>
+<td>Required when <code>mc_moves</code> is not empty. Attaching MC moves while the target temperature is below it is refused.</td>
+</tr>
+<tr>
+<td><code>host_callbacks_every</code></td>
+<td>int &gt; 0 or <code>None</code></td>
+<td><code>None</code></td>
+<td>Declares that user Python runs every n steps.</td>
+<td>Keeps the graph tier, with a host synchronisation at each callback. The ASE front end sets it from its attached observers.</td>
+</tr>
+<tr>
+<td><code>needs_per_atom</code></td>
+<td>set of names, for example <code>{"energies", "charges"}</code></td>
+<td>empty</td>
+<td>Per-atom outputs the run needs.</td>
+<td>Recorded in the plan.</td>
+</tr>
+<tr>
+<td><code>mc_moves</code></td>
+<td>tuple of <code>"swap"</code>, <code>"transmute"</code>, <code>"displace"</code></td>
+<td><code>()</code></td>
+<td>The MC move types the run will attach through <code>Simulation.run(mc=...)</code>.</td>
+<td>Attaching a move type not declared here is refused. Declaring moves turns on the move-energy gate.</td>
+</tr>
+<tr>
+<td><code>reproducible</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>False</code></td>
+<td>Asks for bitwise reproducible trajectories on the same hardware, driver, software, model, plan, seeds and restart cadence.</td>
+<td>Qualified only for plain cuEq with the unfused convolution, the MH-1 architecture, the graph or eager tier and the checked <code>cuequivariance_ops</code> version; everything else is refused with the reason. The process is set to deterministic mode before CUDA starts; if CUDA already started, the plan runs in a child process.</td>
+</tr>
+<tr>
+<td><code>mc_energy_precision</code></td>
+<td><code>"auto"</code>, <code>"float32"</code>, <code>"float64"</code></td>
+<td><code>"auto"</code>: the force precision if the move-energy gate passes, else float64</td>
+<td>The precision of MC trial energies. MD forces keep their own precision.</td>
+<td><code>"float32"</code> with float64 forces is refused.</td>
+</tr>
+<tr>
+<td><code>max_displacement_A</code></td>
+<td>float &gt; 0, Å, or <code>None</code></td>
+<td><code>None</code></td>
+<td>The largest displacement any <code>Displace</code> move of the run may use, adaptive steps included.</td>
+<td>Required when <code>"displace"</code> is in <code>mc_moves</code>. Adds 2 × this value to the skin. A <code>Displace</code> with a larger <code>delta_A</code> is refused.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-gate">The gate<a class="headerlink" href="#the-gate" title="Permanent link">&para;</a></h2>
+<p>The gate checks the planned engine on your structure before the first step.
+It is opt-in: <code>check="gate"</code>.</p>
+<ol>
+<li><strong>Copies.</strong> The gate makes 2 copies of the structure, each rattled by
+   0.05 Å. For a variable-cell integrator it adds 2 copies strained by up
+   to ±2 % and then rattled.</li>
+<li><strong>References.</strong> On each copy it evaluates MACE's own model in float64
+   (the reference) and in float32 with the energy summed in float64 (the
+   yardstick). These run before the production engine is built, or in a
+   child process.</li>
+<li><strong>Production.</strong> It evaluates each copy through the planned engine, in
+   the mode it will run (captured graphs on the graph tier), and restores
+   the engine's state bit for bit afterwards.</li>
+<li><strong>Rule.</strong> For energy per atom, forces and stress, the production error
+   against the float64 reference, maximised over all copies, must be at
+   most 2 × the yardstick's error, or at most the floor: 0.01 meV/atom,
+   1×10⁻⁵ eV/Å (largest force component), 1×10⁻⁷ eV/Å³ (largest stress
+   component; 5×10⁻⁷ eV/Å³ for PolarMACE). Any NaN or infinity fails. NVT
+   plans have no stress path and record "stress: not in plan".</li>
+</ol>
+<p><strong>Move energies.</strong> A run with MC moves always runs the move-energy part,
+whatever <code>check</code> is. It samples trial moves (2 swaps, 1 transmutation,
+4 displacements per declared type) and requires every
+|ΔE_production − ΔE_reference| ≤ 0.01 k_B T_min, which keeps acceptance
+probabilities within about 1 %. With <code>mc_energy_precision="auto"</code>, a
+failure switches the MC energies to float64.</p>
+<p><strong>Resources.</strong> If the float64 reference runs out of GPU memory, the gate
+tries, in order: the CPU in float64 on the full cell (if its estimated time
+is within <code>cpu_float64_time_limit_s</code> and its memory fits); a reduced cell
+on the GPU; the reduced cell on the CPU. A pass on a reduced cell is
+recorded as <code>passed-reduced</code>. A reference that fails for any reason other
+than memory makes the gate unavailable at once.</p>
+<h2 id="gateconfig"><code>GateConfig</code><a class="headerlink" href="#gateconfig" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cpu_float64_time_limit_s</code></td>
+<td>float ≥ 0, s</td>
+<td><code>300.0</code></td>
+<td>After a GPU out-of-memory, the CPU float64 reference is tried only if its estimated time is within this limit.</td>
+<td><code>0</code> never tries the CPU. The estimate comes from timing two small boxes cut from your structure, in the same run.</td>
+</tr>
+<tr>
+<td><code>reduced_cell</code></td>
+<td><code>"auto"</code>, <code>"off"</code></td>
+<td><code>"auto"</code>: the largest supercell of the same primitive cell, smaller than the production cell, whose every height is at least <code>reduced_cell_min_height_cutoffs</code> × the cutoff</td>
+<td>Allows the reference on a reduced cell when the full cell does not fit.</td>
+<td><code>"off"</code>: never; the gate is unavailable instead. On a reduced cell the production path is evaluated by a separate uncaptured force field with the same rewrites and precision, and the captured replay is checked against it on the full cell.</td>
+</tr>
+<tr>
+<td><code>reduced_cell_min_height_cutoffs</code></td>
+<td>float ≥ 1</td>
+<td><code>2.0</code></td>
+<td>The reduced cell's smallest height, in cutoffs.</td>
+<td>Below 1 a periodic image would sit inside the cutoff.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="fallbackconfig"><code>FallbackConfig</code><a class="headerlink" href="#fallbackconfig" title="Permanent link">&para;</a></h2>
+<p>The fallback acts when something fails before the first step: the build,
+compilation, the first CUDA graph capture, a rewrite self-check, or the
+gate. With <code>fallback="auto"</code> it searches for the closest plan that passes:</p>
+<ol>
+<li><strong>Diagnose.</strong> It runs the failing check again on the eager tier with
+   the same rewrites. If eager passes, the CUDA graphs or compilation were
+   the problem and the tier changes. If not, it narrows down the rewrite
+   set (turning rewrites off in groups, respecting their dependencies),
+   each try checked with a reduced gate: one rattled copy, the failing
+   quantity only.</li>
+<li><strong>Budget.</strong> At most <code>diagnosis_budget</code> reduced-gate runs. Each candidate
+   that would become active also gets a full gate run, counted apart.</li>
+<li><strong>Terminal sequence.</strong> When the budget is spent: the same tier with
+   every rewrite off; eager with every rewrite off; the reference tier if
+   it fits and <code>reference_last=True</code>.</li>
+<li><strong>Nothing passes.</strong> <code>FallbackExhausted</code> with every candidate tried.</li>
+</ol>
+<p>Candidates are built from the pristine model, never by undoing rewrites in
+place. A candidate becomes active only after it passed. The physics
+(integrator, force precision, structure) never changes. Every candidate is
+listed in <code>sim.plan.fallbacks</code> and in <code>metadata.json</code>. With <code>check="skip"</code>
+the fallback still validates its candidate against float64 references; the
+gate record stays <code>skipped</code>.</p>
+<p>During <code>run()</code>, a capture error at a re-capture or a compile error on the
+compiled tier starts the same search from the last committed restart
+point. A second such failure before the next restart point stops the run
+with <code>FallbackExhausted</code>. Out-of-memory errors, non-finite values,
+refusals and process constraints never start the fallback.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fallback</code></td>
+<td><code>"auto"</code>, <code>"refuse"</code></td>
+<td><code>"auto"</code>: search for a validated slower plan and record it</td>
+<td>What a failure does. <code>"refuse"</code> raises the original error, with the record.</td>
+<td>No effect on a run where nothing fails.</td>
+</tr>
+<tr>
+<td><code>diagnosis_budget</code></td>
+<td>int &gt; 0</td>
+<td><code>64</code></td>
+<td>The most reduced-gate runs of one fallback.</td>
+<td>Full gate runs (one per candidate that would become active) are not counted.</td>
+</tr>
+<tr>
+<td><code>reference_last</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>True</code></td>
+<td>Allows the reference tier as the last candidate, if it fits on the plan's device: the gate's reference ran there on the full cell, or a trial evaluation runs.</td>
+<td><code>False</code> ends the search with <code>FallbackExhausted</code> instead.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="runnerconfig"><code>RunnerConfig</code><a class="headerlink" href="#runnerconfig" title="Permanent link">&para;</a></h2>
+<p>Some plans cannot run in the current process:</p>
+<ul>
+<li>a compiled model of the other backend after this process compiled one;</li>
+<li><code>reproducible=True</code> after CUDA was started in this process, or a plan
+  that is not reproducible in a process that was made reproducible.</li>
+</ul>
+<p>The planner then marks the plan <code>runner="subprocess"</code>. The <code>Simulation</code>
+builds nothing in this process; a child process plans, gates and builds,
+and the two hand the state over through restart files in
+<code>&lt;output&gt;/.fastmace-handoff/</code> (or the cache's <code>handoff/</code> without output).
+<code>sim.plan</code>, <code>sim.gate</code>, <code>sim.report</code> and <code>metadata.json</code> reflect the
+child. The runner is also used for calibration.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>python</code></td>
+<td>path or <code>None</code></td>
+<td><code>None</code>: this process's <code>sys.executable</code></td>
+<td>The child's Python interpreter.</td>
+<td>The child imports the same FastMACE as the parent.</td>
+</tr>
+<tr>
+<td><code>environment</code></td>
+<td>mapping or <code>(name, value)</code> pairs of strings</td>
+<td><code>()</code></td>
+<td>Environment variables set in the child, over the inherited ones.</td>
+<td>A mapping is stored as sorted pairs.</td>
+</tr>
+<tr>
+<td><code>inherit_environment</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>True</code></td>
+<td>The child starts from the parent's environment.</td>
+<td><code>False</code>: from <code>environment</code> alone.</td>
+</tr>
+<tr>
+<td><code>timeout_s</code></td>
+<td>float &gt; 0, s, or <code>None</code></td>
+<td><code>None</code>: no limit</td>
+<td>The total time limit of one child run.</td>
+<td>A child past it is killed; <code>SubprocessRunnerError</code> is raised.</td>
+</tr>
+<tr>
+<td><code>stall_timeout_s</code></td>
+<td>float &gt; 0, s</td>
+<td><code>1800.0</code></td>
+<td>A child with no progress (no committed step, read from its heartbeat file) for this long is killed.</td>
+<td>The heartbeat changes when the child's phase or committed step changes. One long setup phase (compilation, the gate's reference) counts as no progress, so keep this above your longest setup phase.</td>
+</tr>
+<tr>
+<td><code>persistent</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>True</code></td>
+<td>One child serves every <code>run()</code> of the <code>Simulation</code> and keeps its compiled engine.</td>
+<td><code>False</code>: a fresh child for each <code>run()</code>, resuming from the last hand-off. Windows always uses fresh children. Both write the same restart points.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="adaptationconfig"><code>AdaptationConfig</code><a class="headerlink" href="#adaptationconfig" title="Permanent link">&para;</a></h2>
+<p>During a run the monitor reads the engine's counters at each restart point
+and at the end of each <code>run()</code>: re-captures and their time, overflows
+redone, neighbour-list rebuilds. These are in <code>metadata.json</code> and the
+report's <code>runtime</code> line.</p>
+<p>The implemented adaptation is one switch from the graph tier to the
+compiled tier. It happens when both:</p>
+<ul>
+<li>the run has made more re-captures than <code>EngineConfig.recapture_budget</code>;</li>
+<li>re-capturing took more than <code>recapture_time_fraction</code> of the wall time
+  since the start (or the last switch).</li>
+</ul>
+<p>The switch is made at the next committed step outside an MC block, which
+becomes a restart point. The new plan has the same backend, rewrites,
+precision and physics; it is a new plan revision, validated before it
+becomes active. A resume rebuilds the same revision. A run that never
+reaches the trigger is unchanged.</p>
+<p>There is no switch with <code>reproducible=True</code>, with an explicit <code>mode=</code>, for
+a relaxation, or on any tier other than graph.</p>
+<p><strong>Refused values.</strong> The record can hold more options than are
+implemented. <code>Simulation</code> refuses, with <code>PlanRefused</code> (code
+<code>adaptation-unsupported</code>), any record where:</p>
+<ul>
+<li><code>trigger</code> is <code>"recapture-budget"</code>;</li>
+<li><code>skin_replan</code> is <code>True</code>;</li>
+<li><code>max_switches</code> is <code>None</code> or above 1;</li>
+<li><code>switch_back_after</code> is not <code>None</code>;</li>
+<li><code>min_points_between</code> is not <code>None</code>;</li>
+<li><code>reproducible</code> is <code>True</code>.</li>
+</ul>
+<p>This holds even with <code>adapt="off"</code>. To turn adaptation off, change only
+<code>adapt</code> (or <code>trigger="none"</code>, or <code>max_switches=0</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adapt</code></td>
+<td><code>"auto"</code>, <code>"off"</code></td>
+<td><code>"auto"</code>: switch as described above</td>
+<td>Whether the monitor may switch tiers.</td>
+<td><code>"off"</code>: the monitor still records.</td>
+</tr>
+<tr>
+<td><code>trigger</code></td>
+<td><code>"recapture-time"</code>, <code>"none"</code>; <code>"recapture-budget"</code> is refused</td>
+<td><code>"recapture-time"</code></td>
+<td>What fires a switch. <code>"recapture-time"</code>: budget exceeded and re-capture time above <code>recapture_time_fraction</code>. <code>"none"</code>: no switch.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>recapture_time_fraction</code></td>
+<td>float, &gt; 0 and &lt; 1</td>
+<td><code>0.2</code></td>
+<td>The share of wall time spent re-capturing above which an exceeded budget switches tiers.</td>
+<td>Measured in the run, so it holds on any GPU.</td>
+</tr>
+<tr>
+<td><code>skin_replan</code></td>
+<td><code>False</code> only</td>
+<td><code>False</code></td>
+<td>Reserved: re-plan the skin from the measured rebuild rate.</td>
+<td><code>True</code> is refused.</td>
+</tr>
+<tr>
+<td><code>max_switches</code></td>
+<td><code>0</code>, <code>1</code></td>
+<td><code>1</code></td>
+<td>The most tier switches one run may make. A resume counts the switches already in its plan history.</td>
+<td><code>0</code> disables switches. <code>None</code> (no limit) and values above 1 are refused.</td>
+</tr>
+<tr>
+<td><code>switch_back_after</code></td>
+<td><code>None</code> only</td>
+<td><code>None</code>: switches are one way</td>
+<td>Reserved: go back to the graph tier after this many quiet segments.</td>
+<td>Any other value is refused.</td>
+</tr>
+<tr>
+<td><code>min_points_between</code></td>
+<td><code>None</code> only</td>
+<td><code>None</code></td>
+<td>Reserved: a minimum number of restart points between two switches.</td>
+<td>Any other value is refused.</td>
+</tr>
+<tr>
+<td><code>reproducible</code></td>
+<td><code>False</code> only</td>
+<td><code>False</code></td>
+<td>Reserved: allow switches under <code>reproducible=True</code>.</td>
+<td><code>True</code> is refused.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="calibrationconfig"><code>CalibrationConfig</code><a class="headerlink" href="#calibrationconfig" title="Permanent link">&para;</a></h2>
+<p>Calibration is off by default. With <code>calibrate=True</code> the run first measures
+the two backends on your structure, when the rules rank them equal: the
+planner chose <code>hybrid</code> because OpenEquivariance builds, and plain cuEq is
+also allowed. It does nothing when you set <code>EngineConfig.backend</code>, for
+reproducible runs, for the reference tier, or when the plan runs in a child
+process.</p>
+<p>Each measurement is a fresh child process that builds the plan, runs 50
+warm-up steps, then times <code>steps</code> steps. The blocks alternate hybrid, cuEq,
+hybrid, cuEq (2 pairs). Plain cuEq replaces hybrid only when it is faster
+by more than <code>margin</code> in <strong>every</strong> pair. The four child builds are the
+cost; the report shows it as <code>setup: calibration</code>. Nothing is stored or
+reused by another run. The chosen backend is recorded, so a resume plans
+the same one; a resume never calibrates.</p>
+<p><code>calibrate=True</code> is refused (code <code>calibration-workload</code>) for relaxations
+and for runs with MC moves: their step time is not a steady MD step.
+<code>fm.md(calibrate=True)</code> sets it.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calibrate</code></td>
+<td><code>True</code>, <code>False</code></td>
+<td><code>False</code></td>
+<td>Measures the backends before the run.</td>
+<td>MD runs only.</td>
+</tr>
+<tr>
+<td><code>steps</code></td>
+<td>int ≥ 1</td>
+<td><code>50</code></td>
+<td>Timed steps per block, after the warm-up.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>margin</code></td>
+<td>float, &gt; 0 and &lt; 1</td>
+<td><code>0.05</code></td>
+<td>How much faster plain cuEq must be, in every pair, to replace hybrid.</td>
+<td>The default is above the cross-process timing noise of about 3 %.</td>
+</tr>
+<tr>
+<td><code>choose</code></td>
+<td><code>True</code> only</td>
+<td><code>True</code></td>
+<td>The measurement may change the backend.</td>
+<td><code>False</code> (measure and record only) is not implemented: <code>Simulation</code> refuses it with code <code>calibration-unsupported</code>, even with <code>calibrate=False</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="when-to-change-these">When to change these<a class="headerlink" href="#when-to-change-these" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Debugging a failure.</strong> Pass <code>mode="eager"</code>: same backend, rewrites and
+  precision, no compilation and no graphs, so a traceback points at the
+  failing operation. <code>fallback=FallbackConfig(fallback="refuse")</code> raises
+  the original error instead of searching for another plan.</li>
+<li><strong>New model or new structure.</strong> Run once with <code>check="gate"</code>. If the
+  gate is unavailable on a large cell and you accept running without it,
+  use <code>check="allow_unavailable"</code>. Raise <code>cpu_float64_time_limit_s</code> if the
+  CPU reference is declined for time and you can wait.</li>
+<li><strong>Gate is slow.</strong> The gate's float64 reference dominates setup on large
+  cells. It is a one-off cost per run; leave <code>check="skip"</code> for production
+  runs of a validated model and structure.</li>
+<li><strong>MC runs.</strong> Declare every move type in <code>Workload.mc_moves</code>, with
+  <code>min_mc_temperature_K</code> and, for displacements, <code>max_displacement_A</code>. Set
+  <code>max_temperature_K</code> to the highest target of the whole run, not of the
+  first segment.</li>
+<li><strong>Hot or changing structures.</strong> If re-captures are frequent, the graph
+  tier loses its advantage. Leave <code>adaptation</code> at its default, so the run
+  can move to the compiled tier, or plan <code>mode="compiled"</code> yourself.</li>
+<li><strong>Long setups in a child process.</strong> A child that compiles and runs the
+  gate on a large cell can take a long time before its first step. Raise
+  <code>stall_timeout_s</code> if it is killed during setup, and set <code>timeout_s</code> on
+  shared machines so that a stuck child cannot hold the GPU.</li>
+<li><strong>Persistent runner.</strong> Keep <code>persistent=True</code>: one child keeps its
+  compiled engine across <code>run()</code> calls. Use <code>False</code> only to get a fresh
+  process per <code>run()</code>, for example to release GPU memory between calls.</li>
+<li><strong>Comparing backends on one structure.</strong> Use <code>calibrate=True</code> (or
+  <code>fm.md(calibrate=True)</code>) for an MD run. It costs four extra builds, so use
+  it for long runs only.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2993 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/reference/output/">
+      
+      
+        <link rel="prev" href="../rewrites/">
+      
+      
+        <link rel="next" href="../environment/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Output files - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#output-files" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Output files
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/md/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running MD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command line and TOML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models, D3, PolarMACE and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators and optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planner, gate and fallback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine and neighbour list
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrites and precision
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fmoutput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.Output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-output-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The output directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chunks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chunks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thermo-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thermo table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trajectory-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trajectory frames
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#durable-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restartnpz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        restart.npz
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simulationjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        simulation.json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resume
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadatajson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metadata.json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quench-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quench directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace-relax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fastmace relax
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment and cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fmoutput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.Output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-output-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The output directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chunks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chunks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thermo-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thermo table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trajectory-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trajectory frames
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#durable-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restartnpz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        restart.npz
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simulationjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        simulation.json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resume
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadatajson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metadata.json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quench-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quench directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace-relax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fastmace relax
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="output-files">Output files<a class="headerlink" href="#output-files" title="Permanent link">&para;</a></h1>
+<p>This page lists what a run writes, file by file and column by column. The
+how-to is <a href="../../guide/restart/">Output, restart and resume</a>.</p>
+<h2 id="fmoutput"><code>fm.Output</code><a class="headerlink" href="#fmoutput" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">fm</span><span class="o">.</span><span class="n">Output</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">trajectory_every</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">thermo_every</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">restart_every</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Values</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>path (<code>str</code> or <code>os.PathLike</code>)</td>
+<td>required</td>
+<td>where the run writes; kept as given, as a string</td>
+</tr>
+<tr>
+<td><code>trajectory_every</code></td>
+<td>int ≥ 1 or <code>None</code></td>
+<td><code>20</code></td>
+<td>steps between trajectory frames; <code>None</code> writes no trajectory</td>
+</tr>
+<tr>
+<td><code>thermo_every</code></td>
+<td>int ≥ 1</td>
+<td><code>20</code></td>
+<td>steps between thermo rows; thermo rows are always written</td>
+</tr>
+<tr>
+<td><code>restart_every</code></td>
+<td>int ≥ 1 or <code>None</code></td>
+<td><code>10000</code></td>
+<td>steps between restart points; <code>None</code> writes no restart files on its own</td>
+</tr>
+</tbody>
+</table>
+<p><code>fm.md(output=...)</code> takes a directory or an <code>fm.Output</code>. A directory gets
+these default intervals. Without <code>output</code>, <code>fm.md</code> writes to
+<code>./&lt;structure stem&gt;.fastmace/</code>, or <code>./fastmace-run/</code> for an in-memory
+<code>Atoms</code>. <code>fm.Simulation(output=None)</code> writes nothing.</p>
+<p>Intervals count the simulation's steps from 0, across <code>run()</code> calls and
+resumes. A thermo row and, with <code>trajectory_every</code>, a frame are written at
+step 0 when the run starts, then at every step that is a multiple of the
+interval. A restart point is written at every multiple of <code>restart_every</code>.</p>
+<h2 id="the-output-directory">The output directory<a class="headerlink" href="#the-output-directory" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Written by</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>thermo.&lt;n&gt;.csv</code></td>
+<td>every MD run</td>
+<td>thermo rows, one chunk per file</td>
+</tr>
+<tr>
+<td><code>trajectory.&lt;n&gt;.traj</code></td>
+<td>every MD run</td>
+<td>ASE trajectory frames, one chunk per file</td>
+</tr>
+<tr>
+<td><code>restart.npz</code></td>
+<td>restart points</td>
+<td>the complete state at the last restart point</td>
+</tr>
+<tr>
+<td><code>simulation.json</code></td>
+<td>restart points</td>
+<td>the inputs a resume needs</td>
+</tr>
+<tr>
+<td><code>metadata.json</code></td>
+<td>setup, each <code>run()</code>, restart points, stops</td>
+<td>plan, gate, report, counters, provenance</td>
+</tr>
+<tr>
+<td><code>.fastmace-handoff/</code></td>
+<td>a plan that runs in a child process</td>
+<td>the hand-off between parent and child; deleted on a clean close</td>
+</tr>
+<tr>
+<td><code>protocol.json</code></td>
+<td>protocol runs</td>
+<td>stages, pieces, status</td>
+</tr>
+<tr>
+<td><code>relaxation.log</code>, <code>relaxed.extxyz</code></td>
+<td>protocol runs with <code>[relax]</code></td>
+<td>the initial relaxation</td>
+</tr>
+<tr>
+<td><code>quench/</code>, <code>quench-NAME/</code></td>
+<td>protocol runs with <code>[quench]</code>, <code>fastmace quench</code></td>
+<td>the quenched frames</td>
+</tr>
+</tbody>
+</table>
+<p>A new run refuses a directory that already holds output chunks
+(<code>FileExistsError</code>): resume the run or use a new directory.</p>
+<h2 id="chunks">Chunks<a class="headerlink" href="#chunks" title="Permanent link">&para;</a></h2>
+<p>The thermo table and the trajectory are written in chunks, <code>n = 0, 1, ...</code>.
+Every restart point closes the current pair of chunk files and opens the
+next, so a chunk boundary lies exactly at each restart point. Each chunk is
+complete on its own: every thermo chunk starts with the header, and a chunk
+without rows or frames still has both files.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">fastmace.io.output</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_frames</span><span class="p">,</span> <span class="n">read_thermo</span>
+
+<span class="n">header</span><span class="p">,</span> <span class="n">rows</span> <span class="o">=</span> <span class="n">read_thermo</span><span class="p">(</span><span class="s2">"run/"</span><span class="p">)</span>      <span class="c1"># every chunk, in order; rows as strings</span>
+<span class="n">frames</span> <span class="o">=</span> <span class="n">read_frames</span><span class="p">(</span><span class="s2">"run/"</span><span class="p">)</span>            <span class="c1"># a list of ase.Atoms</span>
+<span class="n">ase</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">"run/trajectory.0.traj"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">":"</span><span class="p">)</span>   <span class="c1"># one chunk</span>
+</code></pre></div>
+<h2 id="thermo-table">Thermo table<a class="headerlink" href="#thermo-table" title="Permanent link">&para;</a></h2>
+<p><code>thermo.&lt;n&gt;.csv</code> is a CSV file with a header line. Energies are per atom.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Unit</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>step</code></td>
+<td></td>
+<td>the MD step</td>
+</tr>
+<tr>
+<td><code>time_ps</code></td>
+<td>ps</td>
+<td><code>step × timestep_fs / 1000</code></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td></td>
+<td><code>heating</code>, <code>cooling</code> or <code>hold</code> (the schedule segment), or <code>constant</code> without a schedule</td>
+</tr>
+<tr>
+<td><code>target_K</code></td>
+<td>K</td>
+<td>the thermostat target at this step; <code>nan</code> for NVE</td>
+</tr>
+<tr>
+<td><code>temperature_K</code></td>
+<td>K</td>
+<td>the kinetic temperature, 2 E_kin / (f k_B)</td>
+</tr>
+<tr>
+<td><code>potential_eV_atom</code></td>
+<td>eV/atom</td>
+<td>potential energy</td>
+</tr>
+<tr>
+<td><code>kinetic_eV_atom</code></td>
+<td>eV/atom</td>
+<td>kinetic energy</td>
+</tr>
+<tr>
+<td><code>total_eV_atom</code></td>
+<td>eV/atom</td>
+<td>potential plus kinetic</td>
+</tr>
+<tr>
+<td><code>volume_A3_atom</code></td>
+<td>Å³/atom</td>
+<td>NPT runs only: the cell volume</td>
+</tr>
+<tr>
+<td><code>pressure_GPa</code></td>
+<td>GPa</td>
+<td>NPT runs only: the instantaneous pressure, kinetic part included</td>
+</tr>
+<tr>
+<td><code>mc_&lt;move&gt;_attempted</code>, <code>mc_&lt;move&gt;_accepted</code></td>
+<td></td>
+<td>runs with MC only: cumulative counts per move type, as of the last MC block</td>
+</tr>
+</tbody>
+</table>
+<p>The degrees of freedom f are 3N − 3 for Langevin NVT with the centre of
+mass fixed under the <code>"mass_weighted"</code> projection, 3(N − n_fixed) with
+<code>FixAtoms</code>, and otherwise the integrator's count (3N for ASE's projection,
+NPT and <code>fixcm</code> off). <code>Simulation.degrees_of_freedom</code> gives the value of a
+run. A non-finite value stops the run before the row is written.</p>
+<p>The NPT columns appear for every integrator with <code>ensemble</code> NPT:
+LangevinBAOAB, MTK, and Berendsen with a pressure.</p>
+<h2 id="trajectory-frames">Trajectory frames<a class="headerlink" href="#trajectory-frames" title="Permanent link">&para;</a></h2>
+<p><code>trajectory.&lt;n&gt;.traj</code> is an ASE trajectory. Each frame holds the step's
+cell, positions and momenta, and a single-point calculator with the energy
+and forces; variable-cell runs add the stress (Voigt, eV/Å³). After an MC
+swap or transmutation, a frame carries the step's species and masses.</p>
+<h2 id="durable-writes">Durable writes<a class="headerlink" href="#durable-writes" title="Permanent link">&para;</a></h2>
+<p><code>restart.npz</code>, <code>simulation.json</code> and <code>metadata.json</code> are written durably and
+atomically: a temporary file next to the target is written, flushed and
+fsynced, renamed over the target, and then the directory is fsynced. A
+crash leaves the old file or the new one, never a short one. The directory
+fsync is skipped on Windows and on file systems that refuse it.</p>
+<p>Thermo rows are flushed after each row; frames are on disk once written. At
+a restart point, the output queue is drained, the closing chunks and the
+directory are fsynced, and only then is the restart file written. So a
+restart never counts rows or frames that are not on disk. Rows and frames
+after the last restart point are flushed but not fsynced.</p>
+<p>Output is asynchronous: a step's values are copied to the host behind the
+step and written while the next step runs. The files are the same as with
+synchronous writing.</p>
+<h2 id="restartnpz"><code>restart.npz</code><a class="headerlink" href="#restartnpz" title="Permanent link">&para;</a></h2>
+<p>One <code>.npz</code> file (plain arrays and JSON text, no pickles), format version 4.
+The writer makes the same bytes from the same state.</p>
+<table>
+<thead>
+<tr>
+<th>Entry</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>step</code>, <code>engine</code></td>
+<td>the step and the writing engine (<code>"fastmace"</code>)</td>
+</tr>
+<tr>
+<td><code>positions</code>, <code>momenta</code>, <code>velocities</code>, <code>cell</code>, <code>forces</code>, <code>energy</code></td>
+<td>the state at the step</td>
+</tr>
+<tr>
+<td><code>masses</code>, <code>species</code>, <code>charges</code></td>
+<td>the current composition, after any MC change</td>
+</tr>
+<tr>
+<td><code>cell_state</code>, <code>stress</code>, <code>p_eps</code>, <code>force_eps</code></td>
+<td>variable-cell runs: the barostat state</td>
+</tr>
+<tr>
+<td><code>rng_state</code>, <code>noise</code>, <code>noise_next</code></td>
+<td>the random generator's state and the batch drawn ahead with its cursor</td>
+</tr>
+<tr>
+<td><code>integrator_keys</code></td>
+<td>the integrator scheme's own state (NHC, MTK, CSVR)</td>
+</tr>
+<tr>
+<td><code>physical</code></td>
+<td>total charge, spin, PBC, constraints, fixed atoms</td>
+</tr>
+<tr>
+<td><code>integrator</code></td>
+<td>class, configuration and thermostat target</td>
+</tr>
+<tr>
+<td><code>protocol</code></td>
+<td>the schedule and its position</td>
+</tr>
+<tr>
+<td><code>plan</code>, <code>plan_revision</code></td>
+<td>the plan record, with the edge bucket and neighbour capacity</td>
+</tr>
+<tr>
+<td><code>identity</code>, <code>identity_digest</code></td>
+<td>the force-field identity</td>
+</tr>
+<tr>
+<td><code>output_chunk</code>, <code>output_rows</code>, <code>output_frames</code></td>
+<td>the last closed chunk, and the rows and frames in chunks 0 to it</td>
+</tr>
+<tr>
+<td><code>mc</code></td>
+<td>the attached move set: moves, cycle position, counters, stream seeds, displacement step sizes</td>
+</tr>
+<tr>
+<td><code>fastmace_restart</code></td>
+<td>the format version</td>
+</tr>
+</tbody>
+</table>
+<p>Every restart write is a canonical point: the pipeline is quiesced and the
+neighbour lists are rebuilt first, so a resumed engine is in the state of
+the uninterrupted one. Restart writes happen only at committed steps,
+never inside an MC block.</p>
+<p><code>restart.npz</code> is written:</p>
+<ul>
+<li>every <code>restart_every</code> steps;</li>
+<li>by <code>sim.save_restart(directory)</code> (the file name must be <code>restart.npz</code>);</li>
+<li>at the end of each piece of a protocol run;</li>
+<li>when an NPT run stops because the cell diverged.</li>
+</ul>
+<p>A run that ends between restart points, for example <code>fm.md</code> with <code>steps</code> not
+a multiple of <code>restart_every</code>, has no restart at its last step. Call
+<code>sim.save_restart(...)</code> on <code>RunResult.simulation</code> if you need one.</p>
+<h2 id="simulationjson"><code>simulation.json</code><a class="headerlink" href="#simulationjson" title="Permanent link">&para;</a></h2>
+<p>Written next to every restart: what the restart format does not hold.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>simulation_record_version</code></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>label</code>, <code>path</code>, <code>head</code>, <code>sha256</code>, <code>trust</code>, <code>charge</code>, <code>spin_multiplicity</code></td>
+</tr>
+<tr>
+<td><code>force_field</code></td>
+<td><code>precision</code>, <code>species</code>, <code>rewrites</code>, and <code>dispersion</code> (the D3 record) when there is one</td>
+</tr>
+<tr>
+<td><code>integrator</code></td>
+<td><code>class</code> and <code>fields</code> of the <code>fm.integrators</code> record</td>
+</tr>
+<tr>
+<td><code>workload</code></td>
+<td>the <code>fm.Workload</code> fields</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td>the <code>fm.Output</code> fields; <code>directory</code> is <code>"."</code> when the restart lies in the output directory, so the directory can be moved</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>the seed</td>
+</tr>
+<tr>
+<td><code>allow_naive_cueq</code></td>
+<td>as given</td>
+</tr>
+<tr>
+<td><code>planner_options</code></td>
+<td><code>mode</code>, <code>allow_reference</code>, the fallback, gate, runner, engine, neighbour, adaptation and calibration records</td>
+</tr>
+<tr>
+<td><code>structure</code></td>
+<td>initial <code>numbers</code>, <code>masses</code>, <code>pbc</code></td>
+</tr>
+<tr>
+<td><code>plan_revision</code></td>
+<td>the active plan revision</td>
+</tr>
+<tr>
+<td><code>restart_points</code></td>
+<td><code>[{step, output_chunk, output_rows, output_frames}]</code></td>
+</tr>
+<tr>
+<td><code>mc</code></td>
+<td>the MC record</td>
+</tr>
+<tr>
+<td><code>reference_volume_A3</code></td>
+<td>NPT only: the starting volume of the cell-divergence check</td>
+</tr>
+</tbody>
+</table>
+<h2 id="resume">Resume<a class="headerlink" href="#resume" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">sim</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">Simulation</span><span class="o">.</span><span class="n">resume</span><span class="p">(</span><span class="s2">"run/"</span><span class="p">,</span> <span class="n">allow_plan_change</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="s2">"skip"</span><span class="p">)</span>
+<span class="n">sim</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>                     <span class="c1"># the rest of the schedule, or sim.run(steps=...)</span>
+</code></pre></div>
+<p><code>Simulation.resume(directory)</code> needs <code>restart.npz</code> and <code>simulation.json</code> in
+<code>directory</code>. It:</p>
+<ol>
+<li>loads the model again from <code>simulation.json</code>'s file, checked against its
+   SHA-256;</li>
+<li>compares the force-field identity with the restart's. A different
+   identity raises <code>RestartMismatch</code>; a different MACE or FastMACE version
+   alone warns, and is recorded as a new plan revision and in the report;</li>
+<li>plans again. A plan different from the recorded one needs
+   <code>allow_plan_change=True</code>, and makes a new revision. A resume never
+   calibrates;</li>
+<li>builds the engine at the restart's positions, cell and composition, then
+   loads the state, edge bucket and neighbour capacity;</li>
+<li>checks the output: every chunk up to <code>output_chunk</code> must be present with
+   the recorded numbers of rows and frames, and every later chunk must be
+   deletable. Otherwise it raises <code>RestartMismatch</code> before it touches
+   anything;</li>
+<li>deletes the later chunks (rows and frames written after the restart
+   point) and continues with chunk <code>output_chunk + 1</code>. Nothing is rewritten.</li>
+</ol>
+<p><code>check</code> is as in <code>fm.Simulation</code>. The command-line resume,
+<code>fastmace run --resume RUN_DIR</code>, is for protocol runs only (below).</p>
+<h2 id="metadatajson"><code>metadata.json</code><a class="headerlink" href="#metadatajson" title="Permanent link">&para;</a></h2>
+<p>Schema <code>fastmace.metadata/1</code>, minor version 1. A JSON object with these
+top-level keys, in this order. It holds no NaN, no infinity and no raw
+random states (generator states appear as SHA-256 hashes).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema</code>, <code>schema_minor</code></td>
+<td><code>"fastmace.metadata/1"</code>, <code>1</code>; a record without <code>schema_minor</code> is minor 0</td>
+</tr>
+<tr>
+<td><code>created_utc</code></td>
+<td>ISO time of the write</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td><code>version</code>, <code>git_commit</code>, <code>git_dirty</code></td>
+</tr>
+<tr>
+<td><code>checkpoint</code></td>
+<td><code>path</code>, <code>sha256</code>, <code>head</code>, <code>licence</code>, <code>label</code>, <code>trust</code></td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>the model block</td>
+</tr>
+<tr>
+<td><code>force_field_identity</code></td>
+<td>the force-field identity and its <code>digest</code></td>
+</tr>
+<tr>
+<td><code>reference_record</code></td>
+<td>the reference record, with at least <code>id</code></td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td>the active plan: <code>revision</code>, <code>tier</code>, <code>reason</code>, <code>step</code>, <code>description</code> (<code>str(plan)</code>), <code>description_full</code> (<code>plan.describe(full=True)</code>), <code>backend</code>, <code>conv_fusion</code>, <code>rewrites</code>, <code>engine</code>, <code>neighbours</code>, <code>polar</code>, <code>integrator</code>, <code>decisions</code> (<code>key</code>, <code>choice</code>, <code>reason</code>, <code>code</code>, <code>rule</code>), <code>requested</code>, <code>auto_options_off</code>, <code>superset</code>, <code>workload</code>, <code>software</code>, <code>allowances</code>, <code>fallbacks_tried</code>, <code>predicted_memory_bytes</code>, <code>runner</code> (<code>"in-process"</code> or <code>"subprocess"</code>), <code>calibration</code>, <code>adaptation</code></td>
+</tr>
+<tr>
+<td><code>plan_revisions</code></td>
+<td>every revision, oldest first, the active one last: <code>revision</code>, <code>tier</code>, <code>step</code>, <code>reason</code>, <code>description</code>, <code>description_full</code>, <code>runner</code>, <code>fallback</code></td>
+</tr>
+<tr>
+<td><code>precision</code></td>
+<td><code>force</code>, <code>integration</code> (always <code>"float64"</code>), <code>tf32</code> (PyTorch's process-wide matmul TF32 flag when the record was written: <code>torch.backends.cuda.matmul.allow_tf32</code>, also set by <code>torch.set_float32_matmul_precision</code>), <code>tf32_requested</code> (the plan's <code>PrecisionConfig.tf32</code>), <code>float64_energy</code></td>
+</tr>
+<tr>
+<td><code>runtime</code></td>
+<td><code>file_locks</code> (<code>"soft"</code> or <code>"kernel"</code>), <code>file_lock_source</code>, <code>file_lock_switch_late</code>, <code>cuda_driver_cache</code> (see <a href="../environment/#file-locks-on-nfs">Environment and cache</a>)</td>
+</tr>
+<tr>
+<td><code>software</code></td>
+<td><code>versions</code> (Python and packages), <code>kernels</code>, <code>patches</code>, <code>triton</code>, <code>oeq_extension</code> (the OEq build variables for a hybrid plan, else <code>null</code>), <code>treatments</code></td>
+</tr>
+<tr>
+<td><code>hardware</code></td>
+<td><code>gpu</code>, <code>driver</code>, <code>compute_capability</code>; <code>null</code> off CUDA</td>
+</tr>
+<tr>
+<td><code>random</code></td>
+<td><code>seed</code>, <code>generators</code> (SHA-256 of each generator state), <code>cursors</code></td>
+</tr>
+<tr>
+<td><code>integrator</code></td>
+<td>the integrator parameters</td>
+</tr>
+<tr>
+<td><code>schedule</code></td>
+<td>the schedule and its position</td>
+</tr>
+<tr>
+<td><code>gate</code></td>
+<td><code>status</code>, <code>reason</code>, <code>selfchecks</code>, <code>device</code>, <code>reduced_cell</code>, <code>steps</code>, and the rest of the gate record; <code>status</code> <code>"skipped"</code> without <code>check="gate"</code></td>
+</tr>
+<tr>
+<td><code>counters</code></td>
+<td><code>recaptures</code>, <code>neighbour_lists</code> (<code>{name: {rebuilds, build_time_s, skin_A}}</code>), <code>overflows_redone</code>, <code>mc</code> (<code>{move: {attempted, impossible, accepted}}</code>), <code>tier_switches</code>, <code>segments</code> (the runtime monitor's last 1,000 segments), <code>fallbacks</code> (mid-run fallbacks), <code>engine</code> (the engine's <code>info()</code>)</td>
+</tr>
+<tr>
+<td><code>restart_points</code></td>
+<td><code>[{step, output_chunk, output_rows, output_frames}]</code></td>
+</tr>
+<tr>
+<td><code>timing</code></td>
+<td><code>setup_s</code> (<code>{stage: seconds}</code>), <code>setup_total_s</code>, <code>status</code>, <code>steps</code>, <code>loop_s</code></td>
+</tr>
+<tr>
+<td><code>report</code></td>
+<td>the run report: <code>text</code>, <code>speed</code>, <code>measured_window</code>, <code>speed_window</code>, <code>setup_s</code>, <code>setup_total_s</code>, <code>licence</code>, <code>gate_status</code>, <code>move_energy_status</code>, <code>mc_energy_precision</code>, <code>reasons</code>, <code>warnings</code>, <code>mc</code></td>
+</tr>
+<tr>
+<td><code>force_field</code></td>
+<td>the engine's force field record: backend, dtype, rewrites applied with their decisions and self-check errors, <code>energy_treatment</code>, <code>strain_path</code>, and <code>d3</code> with D3</td>
+</tr>
+<tr>
+<td><code>subprocess</code></td>
+<td><code>null</code> in-process; for a plan in a child: <code>python</code>, <code>reason</code>, <code>directory</code>, <code>children</code>, <code>calls</code>, <code>persistent</code>, <code>seconds</code>, <code>failed</code>, <code>last</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>timing.status</code> is <code>running</code>, <code>paused</code> (after a <code>run()</code> call; also after
+<code>fm.md</code> returns), <code>complete</code> (after <code>sim.close()</code>), <code>non-finite</code>,
+<code>cell-diverged</code> or <code>fallback-failed</code>. The <code>fastmace.ase</code> integrators add an
+<code>ase</code> block.</p>
+<h2 id="runresult"><code>RunResult</code><a class="headerlink" href="#runresult" title="Permanent link">&para;</a></h2>
+<p><code>fm.md</code> returns a frozen <code>RunResult</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>summary</code></td>
+<td><code>str</code></td>
+<td>the one-screen run report</td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td><code>Plan</code></td>
+<td>the plan the run used</td>
+</tr>
+<tr>
+<td><code>gate</code></td>
+<td>gate record</td>
+<td>the gate status and results</td>
+</tr>
+<tr>
+<td><code>simulation</code></td>
+<td><code>fm.Simulation</code></td>
+<td>the simulation, with its output flushed; it can run on (<code>run</code>) or write a restart (<code>save_restart</code>)</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td><code>metadata.json</code> as written at the end of the run</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>str</code></td>
+<td>the output directory</td>
+</tr>
+</tbody>
+</table>
+<h2 id="protocol-runs">Protocol runs<a class="headerlink" href="#protocol-runs" title="Permanent link">&para;</a></h2>
+<p><code>fastmace run</code> with <code>[relax]</code>, <code>[quench]</code> or <code>--steps</code> writes, besides the
+files above:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>protocol.json</code></td>
+<td>the protocol record (below)</td>
+</tr>
+<tr>
+<td><code>relaxation.log</code></td>
+<td>the initial relaxation's optimizer log</td>
+</tr>
+<tr>
+<td><code>relaxed.extxyz</code></td>
+<td>the relaxed starting structure</td>
+</tr>
+<tr>
+<td><code>quench/</code></td>
+<td>the quench (below)</td>
+</tr>
+</tbody>
+</table>
+<p><code>protocol.json</code> keys: <code>protocol_record_version</code> (1), <code>source</code>, <code>structure</code>,
+<code>repeat</code>, <code>atoms</code>, <code>timestep_fs</code>, <code>relax</code> and <code>relaxation</code> (settings and
+summary), <code>quench</code> and <code>quench_result</code>, <code>mc</code>, <code>min_mc_temperature_K</code>,
+<code>md_steps</code> (the run's MD steps for a run without a schedule, so that
+<code>--resume</code> continues to it; <code>null</code> with a schedule), <code>dispersion</code>, <code>pieces</code> (each <code>first_step</code>, <code>last_step</code>, <code>wall_s</code>,
+<code>counters</code>), <code>counters</code> (the sums of <code>neighbour_rebuilds</code>, <code>d3_builds</code>,
+<code>d3_rebuilds</code>, <code>d3_build_s</code>), and <code>status</code>:</p>
+<table>
+<thead>
+<tr>
+<th><code>status</code></th>
+<th>Meaning</th>
+<th><code>--resume</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>relax</code></td>
+<td>the relaxation is running</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>md</code></td>
+<td>the MD is running or paused</td>
+<td>continues</td>
+</tr>
+<tr>
+<td><code>quench</code></td>
+<td>the quench is running</td>
+<td>continues</td>
+</tr>
+<tr>
+<td><code>complete</code></td>
+<td>done</td>
+<td>reports it is complete</td>
+</tr>
+<tr>
+<td><code>relaxation not converged</code></td>
+<td>the relaxation stopped</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>cell diverged</code></td>
+<td>an NPT piece stopped; <code>stop</code> holds the reason</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<h2 id="quench-directory">Quench directory<a class="headerlink" href="#quench-directory" title="Permanent link">&para;</a></h2>
+<p><code>quench/</code> (or <code>quench-NAME/</code> from <code>fastmace quench --into NAME</code>):</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>settings.json</code></td>
+<td>the resolved settings, written first; an interrupted quench continues only with them</td>
+</tr>
+<tr>
+<td><code>captured.traj</code></td>
+<td>the picked MD frames</td>
+</tr>
+<tr>
+<td><code>quenched.traj</code></td>
+<td>their minima</td>
+</tr>
+<tr>
+<td><code>quench.csv</code></td>
+<td>one row per frame, written after each frame</td>
+</tr>
+<tr>
+<td><code>quench.json</code></td>
+<td>settings and summary, written last; a quench with it is complete</td>
+</tr>
+</tbody>
+</table>
+<p><code>quench.csv</code> columns: <code>phase</code>, <code>bin</code>, <code>frame</code>, <code>step</code>, <code>time_ps</code>,
+<code>target_K</code>, <code>md_temperature_K</code>, <code>md_potential_eV_atom</code>,
+<code>singlepoint_eV_atom</code>, <code>quenched_eV_atom</code>, <code>converged</code>, <code>optimizer_steps</code>,
+<code>seconds</code>, <code>fmax_eV_A</code>, <code>volume_A3_atom</code>.</p>
+<h2 id="fastmace-relax"><code>fastmace relax</code><a class="headerlink" href="#fastmace-relax" title="Permanent link">&para;</a></h2>
+<p><code>fastmace relax</code> writes three files, by default <code>&lt;stem&gt;.relaxed.extxyz</code>,
+<code>&lt;stem&gt;.relaxed.json</code> and <code>&lt;stem&gt;.relaxed.log</code> (the <code>--output</code> name with
+<code>.json</code> and <code>.log</code>).</p>
+<table>
+<thead>
+<tr>
+<th><code>.json</code> key</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>structure</code>, <code>repeat</code>, <code>atoms</code></td>
+<td>the input</td>
+</tr>
+<tr>
+<td><code>model</code>, <code>head</code>, <code>precision</code>, <code>output</code></td>
+<td>the model and the output file</td>
+</tr>
+<tr>
+<td><code>optimizer</code></td>
+<td>the optimizer that ran</td>
+</tr>
+<tr>
+<td><code>fixed_cell</code></td>
+<td><code>false</code> with <code>--cell-filter</code></td>
+</tr>
+<tr>
+<td><code>fmax_target_eV_A</code>, <code>max_steps</code></td>
+<td>the limits</td>
+</tr>
+<tr>
+<td><code>converged</code>, <code>steps</code>, <code>seconds</code></td>
+<td>the result</td>
+</tr>
+<tr>
+<td><code>initial_eV_atom</code>, <code>energy_eV_atom</code></td>
+<td>energy per atom before and after</td>
+</tr>
+<tr>
+<td><code>fmax_eV_A</code></td>
+<td>the largest force at the end</td>
+</tr>
+<tr>
+<td><code>energies_eV</code>, <code>fmax_history_eV_A</code>, <code>neighbour_rebuilds</code>, <code>recaptures</code></td>
+<td><code>gpu-*</code> optimizers only</td>
+</tr>
+<tr>
+<td><code>cell_A</code>, <code>volume_A3</code>, <code>stress_GPa</code>, <code>scalar_pressure_GPa</code></td>
+<td>with <code>--cell-filter</code> only</td>
+</tr>
+</tbody>
+</table>
+<p>A relaxation <code>Simulation</code> in Python writes no output files and no restart.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

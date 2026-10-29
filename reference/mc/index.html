@@ -1,0 +1,2615 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/reference/mc/">
+      
+      
+        <link rel="prev" href="../integrators/">
+      
+      
+        <link rel="next" href="../planner/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Monte Carlo - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#monte-carlo-moves" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Monte Carlo
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/md/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running MD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command line and TOML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models, D3, PolarMACE and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators and optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-hybrid-mdmc-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How hybrid MD/MC works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmmcswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.mc.Swap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmmctransmute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.mc.Transmute
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmmcdisplace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.mc.Displace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#velocity-treatments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Velocity treatments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#random-numbers-and-seeds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Random numbers and seeds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attaching-moves-to-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attaching moves to a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attaching moves to a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fmmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fmsimulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.Simulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TOML
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mcconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planner, gate and fallback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine and neighbour list
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrites and precision
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment and cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-hybrid-mdmc-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How hybrid MD/MC works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmmcswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.mc.Swap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmmctransmute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.mc.Transmute
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fmmcdisplace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.mc.Displace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#velocity-treatments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Velocity treatments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#random-numbers-and-seeds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Random numbers and seeds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attaching-moves-to-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attaching moves to a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attaching moves to a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fmmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fmsimulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fm.Simulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TOML
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mcconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="monte-carlo-moves">Monte Carlo moves<a class="headerlink" href="#monte-carlo-moves" title="Permanent link">&para;</a></h1>
+<p>This page lists every move record in <code>fm.mc</code>, how moves attach to an MD run,
+and the <code>MCConfig</code> limits. For worked examples see
+<a href="../../guide/mc/">Monte Carlo and swaps</a>. The generated API page is
+<a href="../../api/mc/">Monte Carlo</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Experimental</p>
+<p>MC moves are not yet qualified. Every run with MC has an
+"MC: experimental: not yet qualified" line in its report.</p>
+</div>
+<h2 id="how-hybrid-mdmc-works">How hybrid MD/MC works<a class="headerlink" href="#how-hybrid-mdmc-works" title="Permanent link">&para;</a></h2>
+<p>A run with MC alternates MD steps and <strong>blocks</strong> of MC attempts. A move with
+<code>every=100</code> and <code>attempts=50</code> runs a block of 50 attempts after every
+simulation step that is a multiple of 100. When several moves are due at
+the same step, they run in the order they were attached.</p>
+<p>Each attempt is: propose, apply the trial, evaluate the energy, accept or
+reject, and restore the old state where rejected. All of it runs as device
+operations inside a captured CUDA graph, so an attempt costs one energy
+evaluation and no re-capture. The forces are recomputed once at the end of a
+block that accepted anything.</p>
+<p><strong>Acceptance.</strong> The Metropolis rule at the thermostat's current target
+temperature T: accept if ln u &lt; −ΔE / (k_B T), with u uniform in [0, 1).
+For a transmutation the exponent uses ΔE − Σ Δμ_s ΔN_s, the semi-grand
+canonical excess. A NaN energy rejects. T is the target at the start of the
+block, so it follows a schedule.</p>
+<p><strong>Energy precision.</strong> The MC energy is evaluated in the force precision when
+the plan's move-energy gate passes, else in float64. The gate threshold is
+0.01 k_B T_min, with T_min the workload's <code>min_mc_temperature_K</code>. Set
+<code>fm.Workload(mc_energy_precision="float32" | "float64")</code> to choose it
+yourself.</p>
+<p><strong>Counters.</strong> Each move counts <code>attempted</code>, <code>impossible</code> (a swap whose
+species are not both present, for example) and <code>accepted</code>. The thermo output
+has <code>mc_&lt;move&gt;_attempted</code> and <code>mc_&lt;move&gt;_accepted</code> columns, and the counters
+survive restarts.</p>
+<h2 id="fmmcswap"><code>fm.mc.Swap</code><a class="headerlink" href="#fmmcswap" title="Permanent link">&para;</a></h2>
+<p>Swap the species of two atoms. A pair type is chosen uniformly from
+<code>pairs</code>, then one atom of each of its two species uniformly.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fm</span><span class="o">.</span><span class="n">mc</span><span class="o">.</span><span class="n">Swap</span><span class="p">(</span><span class="n">pairs</span><span class="o">=</span><span class="p">[(</span><span class="s2">"O"</span><span class="p">,</span> <span class="s2">"Cl"</span><span class="p">)],</span> <span class="n">every</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">attempts</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values / units</th>
+<th>Default</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pairs</code></td>
+<td>sequence of pairs of species (symbols or atomic numbers)</td>
+<td>required</td>
+<td>The species pairs that may swap.</td>
+<td>At least one pair; each pair names two different species.</td>
+</tr>
+<tr>
+<td><code>every</code></td>
+<td>MD steps, int ≥ 1</td>
+<td>required</td>
+<td>Block interval.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>attempts</code></td>
+<td>int ≥ 1</td>
+<td>required</td>
+<td>Attempts per block.</td>
+<td>At most 10,000.</td>
+</tr>
+<tr>
+<td><code>velocities</code></td>
+<td><code>"exchange"</code>, <code>"rescale"</code>, <code>"redraw"</code>, <code>"redraw_all"</code></td>
+<td><code>"exchange"</code></td>
+<td>Momentum treatment of the two atoms after an accepted swap.</td>
+<td>See <a href="#velocity-treatments">Velocity treatments</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>With a model that reads per-atom charges, the charges move with the species.</p>
+<h2 id="fmmctransmute"><code>fm.mc.Transmute</code><a class="headerlink" href="#fmmctransmute" title="Permanent link">&para;</a></h2>
+<p>Change one atom's species within a transmutable set: semi-grand canonical
+MC. One atom whose species is in the set is chosen uniformly, and a new
+species is drawn uniformly from the rest of the set.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fm</span><span class="o">.</span><span class="n">mc</span><span class="o">.</span><span class="n">Transmute</span><span class="p">(</span><span class="n">species</span><span class="o">=</span><span class="p">(</span><span class="s2">"Na"</span><span class="p">,</span> <span class="s2">"K"</span><span class="p">),</span> <span class="n">every</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">attempts</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="p">{</span><span class="s2">"K"</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.15</span><span class="p">})</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values / units</th>
+<th>Default</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>species</code></td>
+<td>sequence of species (symbols or atomic numbers)</td>
+<td>required</td>
+<td>The transmutable set.</td>
+<td>At least two different species.</td>
+</tr>
+<tr>
+<td><code>every</code></td>
+<td>MD steps, int ≥ 1</td>
+<td>required</td>
+<td>Block interval.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>attempts</code></td>
+<td>int ≥ 1</td>
+<td>required</td>
+<td>Attempts per block.</td>
+<td>At most 10,000.</td>
+</tr>
+<tr>
+<td><code>velocities</code></td>
+<td><code>None</code>, <code>"rescale"</code>, <code>"redraw"</code>, <code>"redraw_all"</code></td>
+<td><code>None</code></td>
+<td>Momentum treatment of the changed atom.</td>
+<td><code>None</code>: <code>"redraw_all"</code> when the integrator fixes the centre of mass, <code>"rescale"</code> otherwise. <code>"exchange"</code> is for swaps only.</td>
+</tr>
+<tr>
+<td><code>mu</code></td>
+<td>mapping species → eV</td>
+<td><code>None</code></td>
+<td>Configurational chemical-potential differences Δμ_s, against a reference species.</td>
+<td>Species left out have 0. Keys must be in <code>species</code>.</td>
+</tr>
+<tr>
+<td><code>formal_charges</code></td>
+<td>mapping species → int</td>
+<td><code>None</code></td>
+<td>Formal charge q_s of each species, for the charge and spin parity rule.</td>
+<td>Species left out have 0.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Chemical potentials.</strong> <code>mu</code> takes <em>configurational</em> differences. To convert
+full chemical-potential differences (which include the kinetic part), use</p>
+<div class="highlight"><pre><span></span><code><span class="n">mu</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">mc</span><span class="o">.</span><span class="n">configurational_mu</span><span class="p">({</span><span class="s2">"K"</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.20</span><span class="p">},</span> <span class="n">temperature_K</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span> <span class="n">reference</span><span class="o">=</span><span class="s2">"Na"</span><span class="p">)</span>
+</code></pre></div>
+<p>which returns Δμ_s^conf = Δμ_s^full + (3/2) k_B T ln(m_s / m_ref) for each
+key. <code>masses=</code> (amu, by species) replaces ASE's standard atomic masses. The
+reference's own entry, if given, must be 0.</p>
+<p><strong>Charge and spin.</strong> For a model that reads charges or a total charge or
+spin (PolarMACE, MACE-OMOL-0), every pair of species in the set must have
+ΔZ − Δq even, so that the spin multiplicity stays valid. Give
+<code>formal_charges</code> to make it so; otherwise the move is refused with
+<code>ChargeParityRefused</code>. For other models the rule does not apply.</p>
+<h2 id="fmmcdisplace"><code>fm.mc.Displace</code><a class="headerlink" href="#fmmcdisplace" title="Permanent link">&para;</a></h2>
+<p>Move one atom, chosen uniformly, to a uniform point in a sphere of radius δ
+around it. The proposal is symmetric, so the acceptance is plain Metropolis
+on ΔE. Momenta are not changed.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fm</span><span class="o">.</span><span class="n">mc</span><span class="o">.</span><span class="n">Displace</span><span class="p">(</span><span class="n">delta_A</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">every</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">attempts</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values / units</th>
+<th>Default</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>delta_A</code></td>
+<td>Å, &gt; 0</td>
+<td>required</td>
+<td>Sphere radius δ, and the largest δ an adaptive move may reach.</td>
+<td>At most the workload's <code>max_displacement_A</code>.</td>
+</tr>
+<tr>
+<td><code>every</code></td>
+<td>MD steps, int ≥ 1</td>
+<td>required</td>
+<td>Block interval.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>attempts</code></td>
+<td>int ≥ 1</td>
+<td>required</td>
+<td>Attempts per block.</td>
+<td>At most 10,000.</td>
+</tr>
+<tr>
+<td><code>adaptive</code></td>
+<td>bool</td>
+<td><code>False</code></td>
+<td>Tune δ at the end of every block toward 30 % acceptance.</td>
+<td>See below.</td>
+</tr>
+</tbody>
+</table>
+<p>With <code>adaptive=True</code>, after each block δ ← δ · clamp(acceptance / 0.3, 0.5,
+2), capped at <code>delta_A</code> and at <code>max_displacement_A</code>. Every value is recorded,
+and the restart keeps the current one. A changing δ breaks detailed balance,
+so use an adaptive move for equilibration and a fixed one for sampling.</p>
+<p>Displacements need <code>fm.Workload(max_displacement_A=...)</code>, because the
+neighbour-list skin is sized for them (2δ is added to the skin). They are
+refused with a variable cell (NPT). <code>fm.md</code> sets <code>max_displacement_A</code> to the
+largest <code>delta_A</code> of its <code>Displace</code> moves; with <code>fm.Simulation</code>, pass it in
+the <code>Workload</code>.</p>
+<p>An attempt that would need a neighbour-list rebuild, or more edges than the
+captured graph holds, is redone on the host with the same random numbers.
+The outcome is the same; only that attempt is slower.</p>
+<h2 id="velocity-treatments">Velocity treatments<a class="headerlink" href="#velocity-treatments" title="Permanent link">&para;</a></h2>
+<p>A swap or transmutation changes atomic masses. The momentum treatment says
+what the velocities of the changed atoms become after an accepted move. v is
+the velocity, m the mass, z a standard normal vector.</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Moves</th>
+<th>What it does</th>
+<th>Conserves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"exchange"</code></td>
+<td>swaps</td>
+<td>The two atoms exchange velocities with their species: v_i' = v_j, v_j' = v_i.</td>
+<td>Kinetic energy and total momentum.</td>
+</tr>
+<tr>
+<td><code>"rescale"</code></td>
+<td>swaps, transmutations</td>
+<td>Keep each atom's kinetic energy: v' = v · sqrt(m_old / m_new).</td>
+<td>Kinetic energy, not total momentum.</td>
+</tr>
+<tr>
+<td><code>"redraw"</code></td>
+<td>swaps, transmutations</td>
+<td>Draw the changed atoms' velocities from Maxwell-Boltzmann at T with the new masses: v' = sqrt(k_B T / m_new) · z.</td>
+<td>Neither.</td>
+</tr>
+<tr>
+<td><code>"redraw_all"</code></td>
+<td>swaps, transmutations</td>
+<td>Once per block with an acceptance, draw every velocity from Maxwell-Boltzmann at T and project to zero total momentum.</td>
+<td>Total momentum (zero).</td>
+</tr>
+</tbody>
+</table>
+<p>The integrator's centre-of-mass setting limits the choice:</p>
+<ul>
+<li>With <code>fixcm</code> on, <code>"rescale"</code> and <code>"redraw"</code> are refused, because they change
+  the total momentum behind the integrator's back. Use <code>"exchange"</code> (swaps)
+  or <code>"redraw_all"</code>.</li>
+<li><code>"redraw_all"</code> under <code>fixcm</code> draws (3N − 3)·k_B T of kinetic energy. It
+  needs the Langevin noise projection <code>fixcm_projection="mass_weighted"</code>,
+  which is what <code>"auto"</code> gives under NVT <code>Langevin</code> with <code>fixcm</code> on.
+  <code>LangevinBAOAB</code> never fixes the centre of mass (<code>fixcm=False</code>), so its
+  moves follow the rules without <code>fixcm</code>.</li>
+</ul>
+<h2 id="random-numbers-and-seeds">Random numbers and seeds<a class="headerlink" href="#random-numbers-and-seeds" title="Permanent link">&para;</a></h2>
+<p>MC uses three counter-based random streams (Philox4x32-10): <code>proposal</code>,
+<code>acceptance</code> and <code>velocity</code>. Their seeds are fixed 63-bit values derived by
+SHA-256 from the <code>Simulation</code>'s <code>seed</code>, distinct from the integrator's noise
+seed. Every attempt consumes a fixed count of numbers from each stream,
+whatever its outcome, so a number is a function of the seed and its position
+only. The numbers are the same on the CPU and the GPU. A stream's state is
+its seed and offset, which the restart stores; a resumed run continues the
+same streams.</p>
+<h2 id="attaching-moves-to-a-run">Attaching moves to a run<a class="headerlink" href="#attaching-moves-to-a-run" title="Permanent link">&para;</a></h2>
+<h3 id="fmmd"><code>fm.md</code><a class="headerlink" href="#fmmd" title="Permanent link">&para;</a></h3>
+<p><code>fm.md(..., mc=...)</code> takes one move record or a sequence of them. It infers
+the species superset (the structure's species plus every species the moves
+name) and the workload from <code>mc=</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values / units</th>
+<th>Default</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mc</code></td>
+<td>an <code>fm.mc</code> record or a sequence of them</td>
+<td><code>None</code></td>
+<td>The move set.</td>
+<td>Refused with <code>ensemble="NVE"</code>.</td>
+</tr>
+<tr>
+<td><code>min_mc_temperature_K</code></td>
+<td>K, &gt; 0</td>
+<td><code>None</code></td>
+<td>The lowest target at which MC blocks run, and T_min of the energy gate.</td>
+<td>Without a schedule: defaults to <code>temperature_K</code>, which must be positive. With a schedule: required.</td>
+</tr>
+</tbody>
+</table>
+<p>With a schedule, the move set is attached only over the step ranges whose
+target is at or above <code>min_mc_temperature_K</code>, and detached elsewhere. The
+report and <code>metadata.json</code> record the ranges.</p>
+<h3 id="fmsimulation"><code>fm.Simulation</code><a class="headerlink" href="#fmsimulation" title="Permanent link">&para;</a></h3>
+<p><code>sim.run(steps=..., mc=...)</code> attaches a move set. It stays attached until a
+later <code>run</code> passes another <code>mc=</code> or <code>mc=None</code>. The workload must declare the
+moves up front, because the plan and its gate are built for them:</p>
+<div class="highlight"><pre><span></span><code><span class="n">workload</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">Workload</span><span class="p">(</span><span class="n">max_temperature_K</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">species_changes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                       <span class="n">mc_moves</span><span class="o">=</span><span class="p">(</span><span class="s2">"swap"</span><span class="p">,),</span> <span class="n">min_mc_temperature_K</span><span class="o">=</span><span class="mi">250</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>Workload</code> field</th>
+<th>Needed for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mc_moves</code></td>
+<td>Every move type you will attach (<code>"swap"</code>, <code>"transmute"</code>, <code>"displace"</code>). An undeclared move is refused.</td>
+</tr>
+<tr>
+<td><code>species_changes=True</code></td>
+<td>Swaps and transmutations.</td>
+</tr>
+<tr>
+<td><code>min_mc_temperature_K</code></td>
+<td>Any MC. A block whose target falls below it is refused.</td>
+</tr>
+<tr>
+<td><code>max_displacement_A</code></td>
+<td>Displacements.</td>
+</tr>
+<tr>
+<td><code>mc_energy_precision</code></td>
+<td>Optional: <code>"auto"</code> (default), <code>"float32"</code> or <code>"float64"</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>ForceField</code>'s <code>species=</code> must contain every species a move can create;
+a species outside it raises <code>SpeciesNotInSuperset</code>. MC with any constraint,
+<code>FixAtoms</code> included, is refused.</p>
+<h3 id="toml">TOML<a class="headerlink" href="#toml" title="Permanent link">&para;</a></h3>
+<p>One <code>[[mc]]</code> table per move, with <code>move = "swap"</code>, <code>"transmute"</code> or
+<code>"displace"</code> and the record's fields:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[[mc]]</span>
+<span class="n">move</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"swap"</span>
+<span class="n">pairs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="s2">"O"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Cl"</span><span class="p">]]</span>
+<span class="n">every</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span>
+<span class="n">attempts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">50</span>
+<span class="n">velocities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"exchange"</span>
+</code></pre></div>
+<h2 id="mcconfig"><code>MCConfig</code><a class="headerlink" href="#mcconfig" title="Permanent link">&para;</a></h2>
+<p><code>fastmace.config.MCConfig</code> holds the limits of the MC driver. A <code>Simulation</code>
+always uses the defaults; <code>fm.md</code>, <code>Simulation</code> and the TOML files take no
+<code>MCConfig</code>. A move set over a limit raises <code>ValueError</code> when it is attached.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values / units</th>
+<th>Default</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_attempts_per_block</code></td>
+<td>int ≥ 1</td>
+<td>10,000</td>
+<td>The largest <code>attempts</code> of one move. The captured attempt is replayed at most this often per block.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>max_move_sets</code></td>
+<td>int ≥ 1</td>
+<td>8</td>
+<td>The most move records attached at once.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

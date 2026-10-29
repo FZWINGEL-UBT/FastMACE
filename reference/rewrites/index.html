@@ -1,0 +1,3025 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/reference/rewrites/">
+      
+      
+        <link rel="prev" href="../engine/">
+      
+      
+        <link rel="next" href="../output/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Rewrites and precision - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rewrites-and-precision-options" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Rewrites and precision
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/md/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running MD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command line and TOML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models, D3, PolarMACE and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators and optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planner, gate and fallback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine and neighbour list
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrites and precision
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrites and precision
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-rewrite-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a rewrite is
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What a rewrite is">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toggle-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exactness-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exactness classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#short-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Short names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#see-which-rewrites-are-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See which rewrites are on
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-an-option" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set an option
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-auto-chains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How "auto" chains
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#radial-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radial network
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#density-and-first-interaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Density and first interaction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convolution-oeq-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convolution (OEq streaming)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear layers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#species-tables-and-folding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Species tables and folding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiler-inductor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compiler (Inductor)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#precision-tricks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Precision tricks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polarmace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PolarMACE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stress
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#precisionconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PrecisionConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-change-these" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to change these
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment and cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-rewrite-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a rewrite is
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What a rewrite is">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toggle-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exactness-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exactness classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#short-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Short names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#see-which-rewrites-are-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See which rewrites are on
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-an-option" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set an option
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-auto-chains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How "auto" chains
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#radial-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radial network
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#density-and-first-interaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Density and first interaction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convolution-oeq-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convolution (OEq streaming)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear layers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#species-tables-and-folding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Species tables and folding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiler-inductor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compiler (Inductor)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#precision-tricks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Precision tricks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polarmace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PolarMACE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stress
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#precisionconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PrecisionConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-change-these" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to change these
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="rewrites-and-precision-options">Rewrites and precision options<a class="headerlink" href="#rewrites-and-precision-options" title="Permanent link">&para;</a></h1>
+<p>This page lists every field of <code>RewriteConfig</code> and <code>PrecisionConfig</code>, what
+<code>"auto"</code> resolves to, and the limits of each option. For the history of the
+screens behind these defaults (measurements, rejected ideas) see
+<a href="../../rewrites/">Rewrite screens</a>. For how the planner works in general see
+<a href="../../guide/planner/">The planner</a>.</p>
+<h2 id="what-a-rewrite-is">What a rewrite is<a class="headerlink" href="#what-a-rewrite-is" title="Permanent link">&para;</a></h2>
+<p>A <strong>rewrite</strong> replaces part of the MACE model with code that computes the same
+function faster: weights folded together, sums reordered, several kernels
+fused into one, or a stock module replaced by a custom kernel. The model's
+weights and its physics do not change. Each rewrite is a record in the rewrite
+registry (<code>fastmace/rewrites/</code>). The record names the models it fits, the
+MACE source it was written against (checked by hash), the records it needs
+and its exactness class.</p>
+<p>Every rewrite runs a <strong>self-check</strong> when it is applied: the rewritten module
+is compared with the original module on random inputs. The relative error must
+be at most 1e-4 in float32 and 1e-10 in float64. A failed self-check turns the
+rewrite off, together with every rewrite that needs it, and the plan is built
+again from the unrewritten model.</p>
+<h3 id="toggle-values">Toggle values<a class="headerlink" href="#toggle-values" title="Permanent link">&para;</a></h3>
+<p>Most fields take one of three values:</p>
+<ul>
+<li><code>"auto"</code> (the default): the planner decides, by a fixed rule per field,
+  from the backend, the force precision, the model and whether the plan is
+  reproducible. The rule and the outcome are recorded in the plan.</li>
+<li><code>"on"</code>: you ask for the rewrite. If the model, the backend or the plan
+  cannot take it, planning stops with <code>PlanRefused</code>, which lists every reason.
+  An <code>"on"</code> is never silently turned off.</li>
+<li><code>"off"</code>: the rewrite is not applied. Rewrites that need it are off too.</li>
+</ul>
+<p>A few fields are plain booleans or have their own values; their rows say so.</p>
+<h3 id="exactness-classes">Exactness classes<a class="headerlink" href="#exactness-classes" title="Permanent link">&para;</a></h3>
+<p>Each registry record has one of these classes. The tables below give the
+class of each option.</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>exact</td>
+<td>The same arithmetic in the same order as the original. Results are bit-for-bit identical, except where a kernel sums with atomic additions, whose order can change from run to run.</td>
+</tr>
+<tr>
+<td>rounding</td>
+<td>The same mathematical function, computed in a different order or grouping (reassociated sums, folded or factored weights, different matrix-product grouping). Results differ from the original only by floating-point rounding. Most rewrites are of this class.</td>
+</tr>
+<tr>
+<td>certified</td>
+<td>An approximation (for example a fitted table) whose error is measured when the plan is built, on the plan's own model, species and range, against a float64 evaluation of the same weights. The error must be at most the rounding error of the computation it replaces, for the values and their first derivatives. The self-check holds this certificate; a ratio above 1 fails it and turns the rewrite off.</td>
+</tr>
+<tr>
+<td>approximate</td>
+<td>Not exact to rounding. Never on under <code>"auto"</code>. No current option is of this class.</td>
+</tr>
+</tbody>
+</table>
+<p>"Deterministic" in the tables means bitwise repeatable from run to run on the
+same GPU. A reproducible plan (<code>fm.Workload(reproducible=True)</code>) refuses any
+rewrite that is not deterministic.</p>
+<h3 id="short-names">Short names<a class="headerlink" href="#short-names" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>cuEq</strong>: NVIDIA cuEquivariance, the tensor-product library MACE uses.</li>
+<li><strong>OEq</strong>: OpenEquivariance, the second tensor-product library of the hybrid
+  backend. "Hybrid" means cuEq for most of the model and OEq for the
+  convolution.</li>
+<li><strong>Plain cuEq</strong>: the cuEq backend without OEq.</li>
+<li><strong>Inductor</strong>: PyTorch's compiler (<code>torch.compile</code>).</li>
+<li><strong>MH-1 class</strong>: models whose interaction blocks are MACE's non-linear
+  residual blocks and that apply the radial cutoff inside the interaction.
+  MACE-MH-1 is the main one; OMOL-0 and POLAR-1 also have these blocks.</li>
+<li><strong>Generic MACE family</strong>: MACE-MP-0, MPA-0, OMAT-0 and MatPES, whose
+  interactions are MP-0's residual block or the density-normalised block.
+  MACE-OFF has a plain first interaction and is not in this family, but takes
+  the generic variants of some rewrites.</li>
+</ul>
+<h3 id="see-which-rewrites-are-on">See which rewrites are on<a class="headerlink" href="#see-which-rewrites-are-on" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">sim</span><span class="o">.</span><span class="n">plan</span><span class="p">)</span>                        <span class="c1"># rewrites on, and the ones off with a short reason</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sim</span><span class="o">.</span><span class="n">plan</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">full</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>    <span class="c1"># every decision with its rule and reason</span>
+<span class="n">sim</span><span class="o">.</span><span class="n">plan</span><span class="o">.</span><span class="n">decision</span><span class="p">(</span><span class="s2">"RewriteConfig.fold_cutoff"</span><span class="p">)</span>   <span class="c1"># (item, choice, reason)</span>
+<span class="n">sim</span><span class="o">.</span><span class="n">plan</span><span class="o">.</span><span class="n">overrides</span><span class="p">()</span>                   <span class="c1"># the options you set explicitly</span>
+</code></pre></div>
+<p>The resolved values are also in <code>sim.plan.rewrites</code> and <code>sim.plan.precision</code>,
+in the run report and in <code>metadata.json</code>.</p>
+<h3 id="set-an-option">Set an option<a class="headerlink" href="#set-an-option" title="Permanent link">&para;</a></h3>
+<p><code>RewriteConfig</code> is not in the top-level <code>fastmace</code> namespace. Import it from
+<code>fastmace.config</code> and pass it to the force field:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">fastmace</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">fm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fastmace.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">RewriteConfig</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"mh1"</span><span class="p">,</span> <span class="n">head</span><span class="o">=</span><span class="s2">"matpes_r2scan"</span><span class="p">)</span>
+<span class="n">ff</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">ForceField</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">atoms</span><span class="p">,</span> <span class="n">precision</span><span class="o">=</span><span class="s2">"float32"</span><span class="p">,</span>
+                   <span class="n">rewrites</span><span class="o">=</span><span class="n">RewriteConfig</span><span class="p">(</span><span class="n">radial_tables</span><span class="o">=</span><span class="s2">"off"</span><span class="p">,</span> <span class="n">direct_node_feats</span><span class="o">=</span><span class="s2">"on"</span><span class="p">))</span>
+<span class="n">sim</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">Simulation</span><span class="p">(</span><span class="n">atoms</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">integrator</span><span class="o">=</span><span class="n">fm</span><span class="o">.</span><span class="n">integrators</span><span class="o">.</span><span class="n">Langevin</span><span class="p">(</span><span class="n">timestep_fs</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">temperature_K</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span>
+                                                       <span class="n">friction_per_fs</span><span class="o">=</span><span class="mf">0.002</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sim</span><span class="o">.</span><span class="n">plan</span><span class="o">.</span><span class="n">decision</span><span class="p">(</span><span class="s2">"RewriteConfig.radial_tables"</span><span class="p">))</span>
+</code></pre></div>
+<p>Fields you leave out stay at <code>"auto"</code>. <code>rewrites="auto"</code> is the same as
+<code>RewriteConfig()</code>. <code>fm.md</code> always uses <code>rewrites="auto"</code>.</p>
+<h3 id="how-auto-chains">How "auto" chains<a class="headerlink" href="#how-auto-chains" title="Permanent link">&para;</a></h3>
+<p>Many rewrites build on another one. Under <code>"auto"</code> a rewrite is on only when
+the rewrites it needs are on, so turning one off also turns off what is built
+on it. The main chains are:</p>
+<ul>
+<li><code>factor_species</code> → <code>fold_cutoff</code> → <code>density_first</code>, <code>joint_radial_input</code>,
+  <code>reassociate_first</code>, <code>fused_folded_backward</code>, <code>streaming_conv</code>,
+  <code>radial_tables</code>;</li>
+<li><code>streaming_conv</code> + <code>fused_folded_backward</code> → <code>chunked_conv_backward</code> →
+  <code>fused_folded_forward</code>; <code>radial_tables</code> + <code>chunked_conv_backward</code> →
+  <code>w_tables</code>, <code>wprime_backward</code>;</li>
+<li><code>block_linear</code> → <code>grouped_linear</code>, <code>merged_residual</code> → <code>gated_rows</code> →
+  <code>segment_gemm</code>; <code>block_linear</code> → <code>grouped_launch</code>, <code>fold_readout_tail</code>;
+  <code>block_linear</code> + <code>species_tables</code> → <code>fold_product_linear</code>.</li>
+</ul>
+<p><code>factor_species</code> and <code>block_linear</code> are on under <code>"auto"</code> only with the hybrid
+backend, so on plain cuEq most rewrites are off. Setting <code>fold_cutoff="off"</code>
+also turns off the generic variants of <code>reassociate_first</code>, <code>streaming_conv</code>
+and <code>fused_folded_backward</code>, because the planner checks <code>fold_cutoff</code> before
+it checks which variant fits the model.</p>
+<p>The reference tier (<code>Simulation(mode="reference")</code>) runs MACE's own
+calculator with every rewrite off. The eager and compiled tiers keep the
+graph plan's rewrites.</p>
+<h2 id="radial-network">Radial network<a class="headerlink" href="#radial-network" title="Permanent link">&para;</a></h2>
+<p>The radial network turns each edge length into the weights of that edge's
+tensor product. In the MH-1 class it also reads the species of both atoms.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>factor_species</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with the hybrid backend where the model takes it (MH-1 class).</td>
+<td>Splits the radial network's first layer into a species part and a distance part, so the species part is computed once per species instead of once per edge.</td>
+<td>rounding, deterministic. Needs a factored (MH-1-class) interaction.</td>
+</tr>
+<tr>
+<td><code>fold_cutoff</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>factor_species</code> where the model takes it.</td>
+<td>Folds the cutoff function into the last radial layer instead of multiplying the edge weights by it afterwards.</td>
+<td>rounding, deterministic. Needs <code>factor_species</code> and a model that applies its cutoff in the interaction (<code>apply_cutoff=False</code>).</td>
+</tr>
+<tr>
+<td><code>joint_radial_input</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>fold_cutoff</code>.</td>
+<td>Runs one first layer for both radial networks of an interaction (the tensor-product weights and the edge density) instead of two.</td>
+<td>rounding, deterministic. Needs <code>fold_cutoff</code>.</td>
+</tr>
+<tr>
+<td><code>fused_folded_backward</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>fold_cutoff</code> (MH-1 class); for the generic MACE family its generic variant is on with the hybrid backend.</td>
+<td>Computes the input gradient of the folded last radial layer in one Triton kernel.</td>
+<td>rounding, deterministic.</td>
+</tr>
+<tr>
+<td><code>folded_backward_tiles</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>fused_folded_backward</code> (MH-1 class).</td>
+<td>Picks 128-row tiles for that gradient kernel where 64-row tiles would give 2 to 8 waves over the GPU's multiprocessors. A rule from the GPU's size, not a per-GPU table.</td>
+<td>exact (bitwise the same), deterministic. Needs <code>fused_folded_backward</code>.</td>
+</tr>
+<tr>
+<td><code>fused_radial_hidden</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off. Only <code>"on"</code> enables it.</td>
+<td>Runs the radial network's hidden block as one pair of Triton kernels.</td>
+<td>rounding, deterministic. Needs <code>fold_cutoff</code>. No measured gain.</td>
+</tr>
+<tr>
+<td><code>radial_tables</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>fold_cutoff</code> (MH-1 class) in float32 and float64 plans that are not reproducible.</td>
+<td>Replaces the radial chain (distance → edge weights and edge density) with per-species-pair piecewise Chebyshev tables, fitted when the plan is built. One Triton kernel evaluates them; the backward recomputes.</td>
+<td>certified, deterministic. Needs <code>fold_cutoff</code>. A failed certificate turns it off. Float64 tables are held to float64 rounding. <code>"on"</code> is refused in reproducible float64 plans.</td>
+</tr>
+<tr>
+<td><code>w_tables</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On only in float64 MH-1 plans that are not reproducible, on an NVIDIA GeForce RTX 5060 Ti or an NVIDIA RTX 4000 Ada Generation, with at most 3 species. Off elsewhere.</td>
+<td>Builds the second interaction's per-edge weights straight from the radial tables (one table per piece already multiplied by the last layer), and their distance gradient without a separate product.</td>
+<td>rounding, not deterministic. Needs <code>radial_tables</code> and <code>chunked_conv_backward</code>. <code>"on"</code> needs float64 outside reproducible plans. The tables grow with the square of the species count; above 2 GiB per interaction the rewrite does not apply.</td>
+</tr>
+<tr>
+<td><code>wprime_backward</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On for MH-1 checkpoints in float32 plans that are not reproducible, on an NVIDIA A100-SXM4-80GB, an NVIDIA GeForce RTX 5060 Ti or an NVIDIA RTX 4000 Ada Generation (matched by exact name). Off on every other GPU, for other models, in float64 and in reproducible plans.</td>
+<td>Computes the second interaction's distance gradient inside the streaming convolution's backward: each edge's weight gradient is multiplied with the derivative of its per-edge weights, read from per-piece tables. The weight gradient is never stored, and the folded layer's input gradient and the radial table's backward are not needed.</td>
+<td>rounding, not deterministic. Needs <code>radial_tables</code> and <code>chunked_conv_backward</code>. <code>"on"</code> needs float32 outside reproducible plans; with it, any GPU takes it. MD step 6–19 % faster on the listed GPUs (<code>docs/validation/opt9-T03.md</code>).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="density-and-first-interaction">Density and first interaction<a class="headerlink" href="#density-and-first-interaction" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>density_first</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>fold_cutoff</code> (MH-1 class).</td>
+<td>Divides by the edge density before the bias-free <code>linear_1</code> instead of after it.</td>
+<td>rounding, deterministic. Needs <code>fold_cutoff</code>.</td>
+</tr>
+<tr>
+<td><code>reassociate_first</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with the hybrid backend where the first interaction's inputs depend only on species: the MH-1 variant needs <code>fold_cutoff</code>; the generic variant serves the generic MACE family and MACE-OFF. Off on plain cuEq.</td>
+<td>Sums the first interaction per receiver and per sender species before its last radial layer, so the layer runs on far fewer rows.</td>
+<td>rounding, deterministic. <code>"on"</code> on plain cuEq is refused. Built for the species superset.</td>
+</tr>
+<tr>
+<td><code>segmented_first_sum</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>reassociate_first</code> and receiver-sorted edges.</td>
+<td>Computes that per-species sum with a run-segmented Triton kernel over receiver-sorted edges.</td>
+<td>exact, not deterministic (atomic additions). Needs <code>reassociate_first</code> and <code>NeighbourConfig.sort_receivers="on"</code>.</td>
+</tr>
+<tr>
+<td><code>species_skip</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with the graph engine on either backend where the model takes it (generic MACE family, MACE-OFF).</td>
+<td>Restricts the element-dependent skip connection to the species of the structure (or the declared superset).</td>
+<td>exact, deterministic.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="convolution-oeq-streaming">Convolution (OEq streaming)<a class="headerlink" href="#convolution-oeq-streaming" title="Permanent link">&para;</a></h2>
+<p>The convolution combines each edge's weights with its sender's features and
+sums the messages per receiver.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>streaming_conv</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with the hybrid backend and receiver-sorted edges, where the model takes it: the MH-1 variant needs <code>fold_cutoff</code>; the generic variant serves the generic MACE family and MACE-OFF.</td>
+<td>Runs the convolution with OEq's receiver-streaming kernels: messages are summed per receiver as they are produced, without a per-edge message tensor.</td>
+<td>exact, not deterministic. Needs the hybrid backend and <code>NeighbourConfig.sort_receivers="on"</code>: on unsorted edges these kernels give wrong results while every self-check passes, so the planner refuses that combination.</td>
+</tr>
+<tr>
+<td><code>chunked_conv_backward</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>streaming_conv</code> and <code>fused_folded_backward</code> (MH-1 class).</td>
+<td>Runs the streaming backward in edge chunks sized to the GPU's L2 cache. Each chunk's weight gradient goes straight into the folded layer's input gradient, so the full per-edge weight gradient is never written to device memory. Cells whose weights fit in four L2 caches run unchunked inside the same kernel.</td>
+<td>exact, not deterministic. Needs <code>streaming_conv</code> and <code>fused_folded_backward</code>.</td>
+</tr>
+<tr>
+<td><code>fused_folded_forward</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On for MH-1 checkpoints (by label, or by SHA-256 and head) in float32 plans that are not reproducible. Off for other models, in float64 and in reproducible plans.</td>
+<td>Fuses the folded last radial layer into the streaming forward: one kernel builds the per-edge weights and the message, and stores the weights for the chunked backward.</td>
+<td>exact (the same float32 sums in the same order), not deterministic. Needs <code>chunked_conv_backward</code>. <code>"on"</code> needs float32; with it, any float32 model with <code>chunked_conv_backward</code> takes it.</td>
+</tr>
+<tr>
+<td><code>direct_node_feats</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off. Only <code>"on"</code> enables it.</td>
+<td>In the folded MH-1 forward, skips the join of node features and attributes that MACE builds for LAMMPS, whose strided slices the streaming convolution had to copy.</td>
+<td>exact, deterministic. Needs <code>fold_cutoff</code>.</td>
+</tr>
+<tr>
+<td><code>folded_constants</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off. Only <code>"on"</code> enables it.</td>
+<td>Builds the folded last radial layer's weight-and-bias matrix and its halves once, not on every force call.</td>
+<td>exact, deterministic. Needs <code>fold_cutoff</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="linear-layers">Linear layers<a class="headerlink" href="#linear-layers" title="Permanent link">&para;</a></h2>
+<p>MACE's equivariant linear layers act per angular momentum <code>l</code>. cuEq runs each
+as one generic kernel; these rewrites run them as ordinary matrix products.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>block_linear</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with the hybrid backend.</td>
+<td>Runs each cuEq <code>Linear</code> as one matrix product per <code>l</code>, with the weights extracted once.</td>
+<td>rounding, deterministic.</td>
+</tr>
+<tr>
+<td><code>grouped_linear</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>block_linear</code>.</td>
+<td>Puts input segments of the same irrep that feed one output segment into a single product.</td>
+<td>rounding, deterministic. Needs <code>block_linear</code>.</td>
+</tr>
+<tr>
+<td><code>merged_residual</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>block_linear</code>.</td>
+<td>Runs <code>linear_1</code> and the residual linear as one product per output segment.</td>
+<td>rounding, deterministic. Needs <code>block_linear</code> and <code>density_first</code>; does nothing on models without <code>density_first</code>.</td>
+</tr>
+<tr>
+<td><code>gated_rows</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>merged_residual</code> (MH-1 class).</td>
+<td>Runs the residual products, the gate and <code>linear_2</code> of MH-1-class interactions on per-segment rows, without the joins and copies between them.</td>
+<td>exact, deterministic. Needs <code>block_linear</code> and <code>merged_residual</code>.</td>
+</tr>
+<tr>
+<td><code>segment_gemm</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>gated_rows</code> in float32 plans that are not reproducible.</td>
+<td>Writes <code>linear_2</code>'s products straight into its joined output with a gathered-row Triton matrix product, where a shared shape rule picks it.</td>
+<td>rounding, deterministic. Needs <code>gated_rows</code>. The kernel is float32.</td>
+</tr>
+<tr>
+<td><code>gate_epilogue</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off. Only <code>"on"</code> enables it.</td>
+<td>Runs the gate's backward inside <code>linear_2</code>'s input-gradient matrix product in MH-1-class chains: one atom-tiled Triton kernel per gated segment stores the gated rows' gradient and sums the gates' gradient in registers, where the shape rule picks Triton.</td>
+<td>rounding, deterministic. Needs <code>segment_gemm</code> and float32. Conflicts with <code>tf32x3_gemms</code>.</td>
+</tr>
+<tr>
+<td><code>grouped_launch</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>block_linear</code> for the generic MACE family in float32 plans that are not reproducible. Off for other families.</td>
+<td>Runs a block linear's small per-<code>l</code> products (too few row tiles to fill the GPU, by the shared shape rule) in one Triton launch.</td>
+<td>rounding, deterministic. Needs <code>block_linear</code>. Conflicts with <code>tf32x3_gemms</code>.</td>
+</tr>
+<tr>
+<td><code>inplace_block_linear</code></td>
+<td><code>False</code>, <code>True</code> (bool)</td>
+<td><code>False</code>.</td>
+<td>Runs the per-<code>l</code> products as in-place strided-batched products.</td>
+<td><code>True</code> is refused: it was slower and is not carried over.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="species-tables-and-folding">Species tables and folding<a class="headerlink" href="#species-tables-and-folding" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>species_tables</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On where the model takes it, in float32 and float64 plans that are not reproducible, on either backend.</td>
+<td>Replaces atom-level products that depend only on the species (embeddings, the first interaction's <code>skip_tp</code> and <code>linear_up</code>) with per-species tables, gathered each step.</td>
+<td>rounding, deterministic (but not bitwise equal to the per-atom products on the GPU). Needs <code>ScaleShiftMACE</code>, a factored first interaction with species-only inputs, and no charge/spin embedding (so not OMOL-0). Tables are built for the species superset.</td>
+</tr>
+<tr>
+<td><code>species_residual</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off unless set to <code>"on"</code> (opt-in; not a default yet).</td>
+<td>With <code>species_tables</code>, the first interaction's residual product <code>linear_res(linear_up(embedding))</code> depends only on the species, so it becomes per-species rows added to <code>linear_1</code>'s products; the merged product loses that half of its inputs and of its backward. Measured 0.4–0.8 % faster on the RTX 4000 Ada and 0.2–1 % on the RTX 5060 Ti's large cells (fp32 profile, 29 October 2026).</td>
+<td>rounding. Needs <code>species_tables</code> and the <code>fold_cutoff</code> interaction forward.</td>
+</tr>
+<tr>
+<td><code>fold_readout_tail</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>block_linear</code> where the model takes it, in plans that are not reproducible.</td>
+<td>Folds the last readout's first linear into the last product's linear and <code>skip_tp</code>.</td>
+<td>rounding, deterministic. Needs <code>block_linear</code>, <code>ScaleShiftMACE</code> and a factored last interaction (MH-1, OMOL-0).</td>
+</tr>
+<tr>
+<td><code>fold_product_linear</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On with <code>species_tables</code> and <code>block_linear</code> where the model takes it, in plans that are not reproducible.</td>
+<td>Folds layer 0's product linear into the linear layers that read layer 0's output, with the species carried next to the contraction.</td>
+<td>rounding, deterministic. Needs <code>block_linear</code> and <code>species_tables</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="compiler-inductor">Compiler (Inductor)<a class="headerlink" href="#compiler-inductor" title="Permanent link">&para;</a></h2>
+<p>These change how <code>torch.compile</code> builds the model. They have no effect when
+nothing is compiled (<code>EngineConfig.compile_mode="none"</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>combo_kernels</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off. Only <code>"on"</code> enables it.</td>
+<td>Turns on Inductor's combo kernels for pointwise operations: independent adjacent pointwise kernels run in one launch.</td>
+<td>rounding (the energy moves by about 1e-9 relative), deterministic.</td>
+</tr>
+<tr>
+<td><code>save_transcendentals</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On only in float64 MH-1 plans that are not reproducible, on an NVIDIA GeForce RTX 5060 Ti or an NVIDIA RTX 4000 Ada Generation. Off elsewhere.</td>
+<td>A custom partitioner saves the results of transcendental operations (exp, tanh, sigmoid and others) for the backward pass instead of recomputing them there.</td>
+<td>exact, deterministic. May use more memory, since the saved tensors are kept until the backward.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="precision-tricks">Precision tricks<a class="headerlink" href="#precision-tricks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tf32x3_gemms</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>Off. Only <code>"on"</code> enables it.</td>
+<td>Runs every atom-level matrix product (block linears, <code>segment_gemm</code>, species skip, reassociated first interaction) and its input gradient as three TF32 tensor-core products (Triton's <code>tf32x3</code>), which together reach about float32 accuracy.</td>
+<td>rounding, deterministic; not equivalent to IEEE float32 when terms cancel. Needs <code>block_linear</code>, float32 and compute capability 8.0 or higher. Conflicts with <code>grouped_launch</code>: set <code>grouped_launch="off"</code> with it on the generic MACE family.</td>
+</tr>
+</tbody>
+</table>
+<p>The float64 emulation on integer tensor cores, and its mantissa bits, are
+engine options (<code>EngineConfig.fp64_emulation</code>,
+<code>EngineConfig.fp64_emulation_mantissa_bits</code>), not rewrites.</p>
+<h2 id="polarmace">PolarMACE<a class="headerlink" href="#polarmace" title="Permanent link">&para;</a></h2>
+<p>These apply only to MACE-POLAR-1 models.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>polar_uvu</code></td>
+<td><code>True</code>, <code>False</code> (bool)</td>
+<td><code>True</code>. No effect on other models.</td>
+<td>Reassociates PolarMACE's sparse UVU tensor product (the l × l → 0 paths contract the weight first, as one matrix product) instead of forming the pair tensor.</td>
+<td>rounding, deterministic.</td>
+</tr>
+<tr>
+<td><code>fx_e3nn_linear</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On for the checkpoints <code>polar1-s</code>, <code>polar1-m</code> and <code>polar1-l</code> (identified by SHA-256) in hybrid float32 plans that are not reproducible. Off for every other model.</td>
+<td>Builds e3nn's <code>o3.Linear</code> as an fx graph instead of the TorchScript a checkpoint restores, so the compiler can trace PolarMACE's whole forward.</td>
+<td>rounding, deterministic.</td>
+</tr>
+<tr>
+<td><code>polar_graph_sums</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>As <code>fx_e3nn_linear</code>.</td>
+<td>Computes PolarMACE's per-structure sums (Fukui norms, total charges, barycentre) as a sum over atoms and a broadcast, not with <code>scatter_add_</code> and an index.</td>
+<td>rounding, deterministic (no atomics). Needs one structure per evaluation, which is always the case.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="stress">Stress<a class="headerlink" href="#stress" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>single_graph_strain</code></td>
+<td><code>auto</code>, <code>on</code>, <code>off</code></td>
+<td>On for every engine. It acts only where stress is computed (variable-cell MD, relaxations with a cell filter).</td>
+<td>Uses MACE PR 1498's one-structure strain: the strained cell is used directly instead of being gathered per edge. Bound into the force field's own forward; nothing in MACE is patched process-wide.</td>
+<td>rounding, deterministic. Needs one structure per evaluation.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="precisionconfig">PrecisionConfig<a class="headerlink" href="#precisionconfig" title="Permanent link">&para;</a></h2>
+<p>The force evaluation runs in float32 or float64. <strong>Integration is always
+float64</strong>: positions, momenta, thermostat and barostat state are float64
+whatever the force precision. The potential energy is summed in float64 in
+both precisions.</p>
+<p>Float32 is the default and the fast path: several rewrites (<code>segment_gemm</code>,
+<code>grouped_launch</code>, <code>fused_folded_forward</code>, <code>wprime_backward</code>, <code>tf32x3_gemms</code>, the PolarMACE
+compiler rewrites) are float32 only. Float64 is slower; how much depends on
+the GPU's float64 rate. Choose float64 when:</p>
+<ul>
+<li>you need energies or forces beyond float32 rounding, for example for
+  finite-difference checks or long NVE runs where float32 drift matters;</li>
+<li>you compare against a float64 reference or another float64 code;</li>
+<li>the gate (<code>check="gate"</code>) fails in float32 on your system.</li>
+</ul>
+<p>On GPUs with a reduced float64 rate (consumer and workstation cards, about
+1/64 of float32) the planner turns on cuBLAS's float64 emulation on integer
+tensor cores (<code>EngineConfig.fp64_emulation</code>), which keeps float64 accuracy.</p>
+<p>Not every field is set through <code>PrecisionConfig</code> by users. The table says
+where each one comes from.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Values</th>
+<th>Default (<code>auto</code> means)</th>
+<th>What it does</th>
+<th>Exactness / limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dtype</code></td>
+<td><code>auto</code>, <code>float32</code>, <code>float64</code></td>
+<td>Set with <code>fm.ForceField(model, atoms, precision=...)</code> (default <code>"float32"</code>); <code>fm.md</code> always uses float32. The planner's own <code>"auto"</code> rule (float32 for the hybrid backend, float64 for plain cuEq) is not used for user plans: the planner takes the force field's precision.</td>
+<td>Precision of the model and of the force evaluation.</td>
+<td>On a MACE install whose float64-energy patch cannot be applied (its source hash does not match), a non-PolarMACE float32 force field is promoted to float64, so the energy is still summed in float64. The plan records this as the <code>force_precision</code> decision.</td>
+</tr>
+<tr>
+<td><code>tf32</code></td>
+<td><code>False</code>, <code>True</code> (bool)</td>
+<td><code>False</code>. Not settable through <code>Simulation</code>, <code>fm.md</code> or <code>ForceField</code>.</td>
+<td>TF32 tensor-core matrix products.</td>
+<td>Never on by default. <code>True</code> is only a label in the plan ("TF32" in the header); FastMACE never switches PyTorch's TF32 mode. <code>metadata.json</code> records the real flag as <code>precision.tf32</code> and this field as <code>precision.tf32_requested</code>. If your script enables TF32 (<code>torch.set_float32_matmul_precision("high")</code>), float32 forces are no longer IEEE float32.</td>
+</tr>
+<tr>
+<td><code>float64_energy</code></td>
+<td><code>True</code>, <code>False</code> (bool)</td>
+<td><code>True</code>. Not settable through <code>Simulation</code>, <code>fm.md</code> or <code>ForceField</code>.</td>
+<td>Accumulates the potential energy in float64 (forces and stress are MACE's either way).</td>
+<td><code>False</code> reproduces the research engine's float32 energy sum, for A/B comparisons only.</td>
+</tr>
+<tr>
+<td><code>mc_energy</code></td>
+<td><code>auto</code>, <code>float32</code>, <code>float64</code></td>
+<td>Set with <code>fm.Workload(mc_energy_precision=...)</code>. <code>"auto"</code>: the force precision if the move-energy gate passes, float64 otherwise. Without MC moves it equals the force precision.</td>
+<td>Precision of the energies that Monte Carlo moves compare. MD forces keep <code>dtype</code>.</td>
+<td><code>"float32"</code> with float64 forces is refused: MC energies are never evaluated below the force precision.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="when-to-change-these">When to change these<a class="headerlink" href="#when-to-change-these" title="Permanent link">&para;</a></h2>
+<p>You almost never need to. The <code>"auto"</code> rules come from same-process A/B
+timings and force gates, and every rewrite is checked when it is applied.
+Leave <code>rewrites="auto"</code> unless one of these applies.</p>
+<p><strong>To bisect a gate failure or a suspicious result.</strong> Turn rewrites off one at
+a time, or a whole chain at its root (<code>factor_species="off"</code> or
+<code>block_linear="off"</code>), and compare. The automatic fallback after a failed gate
+does the same search and records it in <code>sim.gate</code>. <code>Simulation(mode="reference")</code>
+runs with no rewrites at all.</p>
+<p><strong>To try the opt-in rewrites.</strong> These are off under <code>"auto"</code> because they gave
+no gain, or a loss, in the measurements so far:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Measured</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>direct_node_feats</code>, <code>folded_constants</code></td>
+<td>Together, NaCl about 0.5–1 % faster on an RTX 5060 Ti; NbCl5 and an L4 neutral.</td>
+</tr>
+<tr>
+<td><code>combo_kernels</code></td>
+<td>NaCl about 1–2 % faster, NbCl5 2–3 % slower on an RTX 5060 Ti and an L4.</td>
+</tr>
+<tr>
+<td><code>fused_radial_hidden</code></td>
+<td>No measured gain.</td>
+</tr>
+<tr>
+<td><code>tf32x3_gemms</code></td>
+<td>An accuracy screen; slower than cuBLAS float32 on most production shapes measured.</td>
+</tr>
+<tr>
+<td><code>gate_epilogue</code></td>
+<td>MH-1 with <code>wprime_backward</code> on (the default on both GPUs): no gain; NbCl5 0.3 % slower on an RTX 4000 Ada, NaNbO3 0.7-0.9 % slower on an RTX 5060 Ti. Small cells such as NaCl run the stock path.</td>
+</tr>
+</tbody>
+</table>
+<p>Test them with a same-process A/B on your own GPU and structure before you
+rely on them.</p>
+<p><strong>Float64 on other GPUs.</strong> <code>w_tables</code> and <code>save_transcendentals</code> are on only
+on the two GPU models where they were measured faster in float64 MH-1 runs (an
+RTX 5060 Ti and an RTX 4000 Ada): per MD step <code>w_tables</code> 0.86–0.94 and
+<code>save_transcendentals</code> 0.97–0.98 of the time without them. On an A100, which
+runs float64 at half the float32 rate, both were slower (<code>w_tables</code> 1.06–1.27,
+<code>save_transcendentals</code> up to 1.02). On another reduced-rate GPU you may set
+them <code>"on"</code> and measure. Unmeasured GPUs keep them off even when they share a
+compute capability with a measured one.</p>
+<p><strong>For reproducible plans.</strong> With <code>fm.Workload(reproducible=True)</code> the planner
+uses plain cuEq and turns off every rewrite that is not deterministic or that
+is kept for non-reproducible plans only (<code>radial_tables</code>, <code>species_tables</code>,
+<code>fold_readout_tail</code>, <code>fold_product_linear</code>, <code>segment_gemm</code>, <code>grouped_launch</code>,
+<code>fused_folded_forward</code>, <code>w_tables</code>, <code>wprime_backward</code>, <code>save_transcendentals</code>,
+<code>fx_e3nn_linear</code>, <code>polar_graph_sums</code>). An explicit <code>"on"</code> for a rewrite that is not
+deterministic is refused.</p>
+<p><strong>To save memory.</strong> <code>radial_tables</code> and <code>w_tables</code> hold tables that grow with
+the square of the species count. Turn them off if the plan's memory estimate
+is close to the GPU's memory.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "toc.follow", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
