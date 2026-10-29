@@ -191,6 +191,8 @@ def main(argv=None):
 
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
+    if args.a_tf32 or args.b_tf32:
+        ab_step_time.ieee_rewrite_selfchecks(torch)
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
     from fastmace.config import NeighbourConfig
 

@@ -739,6 +739,8 @@ def main(argv=None):
 
     label_triton_kernels()
     ab_step_time.set_tf32(torch, args.tf32)
+    if args.tf32:
+        ab_step_time.ieee_rewrite_selfchecks(torch)
     if not args.allow_busy_gpu and ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     if args.pass_ == "main":

@@ -72,6 +72,8 @@ def main(argv=None):
 
     rewrites = force_stress_gate.rewrite_overrides(args.rewrites)
     ab_step_time.set_tf32(torch, args.tf32)
+    if args.tf32:
+        ab_step_time.ieee_rewrite_selfchecks(torch)
 
     spec = importlib.util.spec_from_file_location("_ab_frontends", TOOLS / "ab_frontends.py")
     frontends = importlib.util.module_from_spec(spec)

@@ -124,6 +124,29 @@ def set_tf32(torch, on):
         matmul.allow_tf32 = bool(on)
 
 
+def ieee_rewrite_selfchecks(torch):
+    """Run every rewrite self-check (``Registry.selfcheck``, SPEC §6.4) in IEEE FP32, whatever the matmul mode.
+    Under TF32 the checks compare two TF32 computations and fail on TF32's own rounding (factor_species: relative
+    error 4e-4 to 1.1e-3 against 1e-4, murphy, 29 October 2026), so the default plan does not build. The rewrites
+    are exact; the check runs as production runs it, and the screen measures TF32 everywhere else."""
+    from fastmace.rewrites import registry
+
+    original = registry.Registry.selfcheck
+    if getattr(original, "_ieee_wrapped", False):
+        return
+
+    def selfcheck(self, *args, **kwargs):
+        mode = torch.backends.cuda.matmul.allow_tf32
+        set_tf32(torch, False)
+        try:
+            return original(self, *args, **kwargs)
+        finally:
+            set_tf32(torch, mode)
+
+    selfcheck._ieee_wrapped = True
+    registry.Registry.selfcheck = selfcheck
+
+
 class Tf32Side:
     """A TimedEngine under its own matmul mode (``set_tf32``): set before every step, so whatever the side
     compiles or captures (its build, new edge sizes in warm-up) and launches eagerly uses its mode."""

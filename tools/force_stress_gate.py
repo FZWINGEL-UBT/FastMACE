@@ -915,6 +915,7 @@ def fastmace_production_child(job, result):
     if job.get("production_tf32"):
         import ab_step_time
         ab_step_time.set_tf32(torch, True)
+        ab_step_time.ieee_rewrite_selfchecks(torch)
     build = _fastmace_build(job, result)
 
     from fastmace import _patches
