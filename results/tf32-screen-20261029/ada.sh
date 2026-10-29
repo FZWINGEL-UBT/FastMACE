@@ -3,6 +3,8 @@
 # float32 default plan; side a = IEEE FP32 (production), side b = PyTorch's TF32 matmul mode. Phases:
 #   speed  same-process A/Bs (tools/ab_rewrites.py --b-tf32, 12 blocks of 300 steps), both build orders,
 #          NaCl NaNbO3 NbCl5
+#   x3     3xTF32 atom GEMMs (RewriteConfig.tf32x3_gemms=on, grouped_launch=off, which it conflicts with) against
+#          the default: same-process A/Bs in both orders, and the gate
 #   control  NaCl A/B with side b's graphs dropped and re-captured in IEEE (the TF32 side's method, no TF32)
 #   gemms  per-GEMM breakdown: tools/step_breakdown.py main pass with and without --tf32 (in-model GEMM times),
 #          then tools/gemm_precision_bench.py on the FP32 pass's shapes (cuBLAS IEEE / TF32 / Triton tf32x3)
@@ -74,6 +76,12 @@ acc)
     run "nve-tf32-$s" $E/bin/python "$FM/tools/bench/nve_drift.py" --structure "$s" --output "$ROOT/nve-tf32" --tf32
     run "nve-ieee-$s" $E/bin/python "$FM/tools/bench/nve_drift.py" --structure "$s" --output "$ROOT/nve-ieee"
   done ;;
+x3)
+  for s in NaCl NaNbO3 NbCl5; do for order in ab ba; do
+    if [ "$order" = ab ]; then pattern=abab; else pattern=abba; fi
+    run "x3-$s-$order" $E/bin/python "$FM/tools/ab_rewrites.py" --output "$ROOT/x3-$s-$order" --checkpoint "$CK"       --model mh1-r2scan --structures "$s" --b tf32x3_gemms=on grouped_launch=off --order "$order" --pattern "$pattern"
+  done; done
+  run gate-x3 $E/bin/python "$FM/tools/force_stress_gate.py" --output "$ROOT/gate-x3" --engine fastmace     --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B"     --rewrites tf32x3_gemms=on grouped_launch=off --reference-command "$REF" --production-command "$E/bin/python" ;;
 *) note "unknown phase $phase"; exit 2 ;;
 esac; done
 note DONE
