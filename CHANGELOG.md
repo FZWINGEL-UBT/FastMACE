@@ -8,6 +8,11 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `RewriteConfig.gate_epilogue` (opt-10 OPT10-T01, float32, opt-in): in MH-1's gated chains the gate's backward
+  runs in `linear_2`'s input-gradient GEMM (`fastmace.kernels.triton.gated_products`), one atom-tiled Triton kernel
+  per gated segment where the shape rule picks Triton, without the `drows` round trip. Rounding-class,
+  deterministic. Needs `segment_gemm`; refused in float64 and beside `tf32x3_gemms`:
+  `docs/validation/opt10-gate-epilogue.md`.
 - Three float64 speed-ups, **on by default on the measured GPUs** (owner decision 65; `plans/ideas-20261027.md`):
   `EngineConfig.fp64_emulation_mantissa_bits` ("auto" = 56 fixed mantissa bits in cuBLAS's float64 emulation,
   "dynamic" or a bit count from 8 to 128 to choose), `RewriteConfig.w_tables` (per-piece folded radial tables,
