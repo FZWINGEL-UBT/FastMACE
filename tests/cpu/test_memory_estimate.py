@@ -336,10 +336,10 @@ def test_plan_text_memory_line():
     line = next(line for line in full.describe().splitlines() if "memory (rule 12)" in line)
     assert f"{full.predicted_memory_bytes / 2**30:.2f} GiB predicted (run; run" in line
     assert ", fits (" in line and "GiB free)" in line and len(line) <= 120
-    without = plan(rewrites=RewriteConfig(factor_species="off"))
+    without = plan(rewrites=RewriteConfig(reassociate_first="off"))
     free = (full.predicted_memory_bytes + without.predicted_memory_bytes) / 2 / memory.MARGIN
     tight = next(line for line in plan(memory_bytes=free).describe().splitlines() if "memory (rule 12)" in line)
-    assert "turned off factor_species" in tight and len(tight) <= 120
+    assert "turned off reassociate_first" in tight and len(tight) <= 120
 
 
 @pytest.mark.rule(12)
@@ -437,19 +437,22 @@ def test_stand_in_traits_are_not_estimated():
 @pytest.mark.rule(12)
 def test_rule_12_turns_off_the_largest_edge_sized_rewrite_and_its_dependants():
     """Decision 51: above 90 % of the free memory the rewrite with the largest edge-sized term goes, with the
-    records that require it, until the estimate fits; rule 11's sizes, the tier and the precision stay."""
+    records that require it, until the estimate fits; rule 11's sizes, the tier and the precision stay. Decision
+    67: only a group whose removal lowers the estimate goes. factor_species takes MH-1's fused path with it, which
+    keeps less per edge, so it stays; reassociate_first (with segmented_first_sum) goes."""
     full = plan()
-    without = plan(rewrites=RewriteConfig(factor_species="off"))
+    without = plan(rewrites=RewriteConfig(reassociate_first="off"))
     assert without.predicted_memory_bytes < full.predicted_memory_bytes
+    assert plan(rewrites=RewriteConfig(factor_species="off")).predicted_memory_bytes > full.predicted_memory_bytes
     free = (full.predicted_memory_bytes + without.predicted_memory_bytes) / 2 / memory.MARGIN
     tight = plan(memory_bytes=free)
     assert tight.predicted_memory_bytes <= memory.MARGIN * free < full.predicted_memory_bytes
-    assert tight.rewrites.factor_species == "off"
-    for field in ("factor_species", "fold_cutoff", "joint_radial_input"):
+    assert tight.rewrites.reassociate_first == "off" and tight.rewrites.factor_species == "on"
+    for field in ("reassociate_first", "segmented_first_sum"):
         _, choice, reason = tight.decision(f"RewriteConfig.{field}")
         assert choice == "off" and (reason.rule, reason.code) == (12, "rule-12-memory-drop"), field
         check(reason)
-    assert "factor_species" in str(tight.decision("RewriteConfig.fold_cutoff")[2])
+    assert "reassociate_first" in str(tight.decision("RewriteConfig.segmented_first_sum")[2])
     assert tight.decision("memory")[1] == "fits"
     for part in ("neighbours", "tier", "precision", "engine"):
         assert getattr(tight, part) == getattr(full, part), part
@@ -462,22 +465,24 @@ def test_rule_12_warns_when_nothing_more_can_go():
     _, choice, reason = planned.decision("memory")
     assert choice == "warn" and (reason.rule, reason.code) == (12, "rule-12-memory-warn")
     check(reason)
-    assert "factor_species" in str(reason)  # turned off on the way
+    assert "reassociate_first" in str(reason)  # turned off on the way
+    assert planned.rewrites.factor_species == "on"  # decision 67: turning it off would raise the estimate
     assert planned.tier == "graph" and planned.precision == plan().precision
 
 
 @pytest.mark.rule(12)
 def test_rule_12_never_drops_a_group_that_saves_nothing(monkeypatch):
     """Decision 67: a rewrite whose own per-edge term is positive stays on when turning it off with its dependants
-    would raise the estimate (here the streaming convolution with its old +8 bytes, beside the chunked backward's
-    measured saving)."""
+    would raise the estimate (here the streaming convolution with its index bytes alone, beside the chunked
+    backward's measured saving). factor_species and reassociate_first are set explicitly, so their groups, which
+    would save memory here, stay too."""
     monkeypatch.setattr(terms, "_MH1_STREAMING_SHARE", {4: 0.0, 8: 0.0})  # the index bytes alone: +8 per edge
     assert terms.mh1_streaming_conv(capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"])), 4)[0] == 8
     full = plan()
     if full.rewrites.chunked_conv_backward != "on":
         pytest.skip("the plan does not enable the chunked backward here")
     with pytest.warns(ResourceWarning, match="rule 12"):
-        tight = plan(memory_bytes=2**20)
+        tight = plan(memory_bytes=2**20, rewrites=RewriteConfig(factor_species="on", reassociate_first="on"))
     assert tight.rewrites.streaming_conv == "on" and tight.rewrites.chunked_conv_backward == "on"
     assert getattr(tight.decision("RewriteConfig.streaming_conv")[2], "code", None) != "rule-12-memory-drop"
 
