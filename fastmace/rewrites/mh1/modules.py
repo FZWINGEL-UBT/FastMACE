@@ -27,6 +27,7 @@ from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum
 from fastmace.kernels.triton.fused_radial import run_hidden_plan
 from fastmace.kernels.triton.skinny_linear import folded_linear
 from fastmace.rewrites.fusion import READS_GATED_ROWS
+from fastmace.rewrites.species import READS_SPECIES_RESIDUAL
 from fastmace.rewrites.linear import READS_RESIDUAL_LINEAR
 
 
@@ -305,12 +306,14 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     message = self.truncate_ghosts(message, n_real)
     density = self.truncate_ghosts(density, n_real)
     sc = self.truncate_ghosts(sc, n_real)
+    # species_residual: the residual products are per-species rows, read from the one-hot node_attrs.
+    residual_input = node_attrs if getattr(self, "species_residual", False) else node_feats
     gated_rows = getattr(self, "gated_rows", None)  # gated_rows: residual products, gate and linear_2 on rows
     if gated_rows is not None:
-        message = gated_rows(message / (density * self.beta + self.alpha), node_feats)
+        message = gated_rows(message / (density * self.beta + self.alpha), residual_input)
         return (self.reshape(message), sc)
     if residual_linear is not None:  # with density_first (merge_residual_linears)
-        message = residual_linear(message / (density * self.beta + self.alpha), node_feats)
+        message = residual_linear(message / (density * self.beta + self.alpha), residual_input)
     else:
         node_feats_res = self.truncate_ghosts(node_feats_res, n_real)
         if getattr(self, "density_before_linear", False):  # density_first; linear_1 is bias-free
@@ -325,6 +328,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
 
 setattr(cutoff_folded_forward, READS_RESIDUAL_LINEAR, True)
 setattr(cutoff_folded_forward, READS_GATED_ROWS, True)
+setattr(cutoff_folded_forward, READS_SPECIES_RESIDUAL, True)
 
 
 def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,

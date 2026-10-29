@@ -14,6 +14,12 @@ import numpy as np
 import torch
 
 from ..config import DEFAULT_SKIN_A, NeighbourConfig
+
+# Early rebuilds beside the force graph without a host synchronisation (``build_gpu_async``; fp32 profile,
+# 28 October 2026). Read when a list is constructed; off: every build is ``build_gpu``'s.
+ASYNC_EARLY_BUILD = False
+# How far an overflowed asynchronous build moves its reference positions (Angstrom): the next rebuild test fires.
+OVERFLOW_DISPLACEMENT_A = 1.0e6
 from .buckets import edge_capacity
 from .pair_search import candidate_pairs
 
@@ -135,8 +141,11 @@ class SkinNeighbourList:
         self.group_count = (1 if self.sender_groups is None else
                             int(group_count) if group_count is not None else int(self.sender_groups.max()) + 1)
         self.capacity = 0
+        self._candidates_device = None  # an asynchronous build's candidate count, until num_candidates reads it
         self.num_candidates = 0
         self.rebuilds = 0
+        self.async_build = bool(ASYNC_EARLY_BUILD)
+        self.async_builds = 0
         self.variable_cell = bool(variable_cell)
         if self.variable_cell:
             self.cell_t = torch.tensor(self.cell, dtype=torch.float64, device=self.device)  # current cell
@@ -205,6 +214,19 @@ class SkinNeighbourList:
         self._allocate(capacity, exact=True)
         return True
 
+    @property
+    def num_candidates(self) -> int:
+        """Candidates of the last build (a host synchronisation after an asynchronous build, read once)."""
+        if self._candidates_device is not None:
+            self._num_candidates = int(self._candidates_device)
+            self._candidates_device = None
+        return self._num_candidates
+
+    @num_candidates.setter
+    def num_candidates(self, value) -> None:
+        self._num_candidates = int(value)
+        self._candidates_device = None
+
     def build(self, positions) -> bool:
         """Rebuild from (N, 3) float64 positions (NumPy or tensor). Returns True if the capacity grew.
 
@@ -213,7 +235,12 @@ class SkinNeighbourList:
         buffer, so captured graphs are stale.
         """
         if self.gpu_build and self.device.type == "cuda":
-            return self.build_gpu(torch.as_tensor(positions, dtype=torch.float64, device=self.device))
+            positions = torch.as_tensor(positions, dtype=torch.float64, device=self.device)
+            # A rebuild beside the force graph in flight (the engine sets reader_stream for it, OPT2-T04).
+            if self.reader_stream is not None and self._async_ready():
+                self.build_gpu_async(positions)
+                return False
+            return self.build_gpu(positions)
         return self.build_cpu(positions)
 
     def build_cpu(self, positions) -> bool:
@@ -365,6 +392,82 @@ class SkinNeighbourList:
         self.num_candidates = n
         self.rebuilds += 1
         return grew
+
+    def _async_ready(self) -> bool:
+        """Whether ``build_gpu_async`` can run: switched on, fixed cell, a synchronous build done before."""
+        return (self.async_build and not self.variable_cell and self.capacity > 0
+                and self._pair_search_state.get("buffer") is not None and self.reference_positions is not None)
+
+    def build_gpu_async(self, positions: torch.Tensor) -> None:
+        """``build_gpu`` without a host synchronisation, for an early rebuild beside the force graph in flight.
+
+        The same pairs in the same order, from fixed-shape device operations only: the screen's whole output
+        buffer is decoded (entries past its counter masked), sorted and cut to the list's capacity, and the
+        slots past the candidate count get the padding pair. The count stays on the device (``num_candidates``
+        reads it when asked). Nothing grows here: if the screen's buffer or the capacity was too small, the
+        reference positions are moved ``OVERFLOW_DISPLACEMENT_A`` away, so the next rebuild test fires and the
+        engine's rebuild redo (a synchronous ``build_gpu``, which grows) runs before that step commits.
+        """
+        from fastmace.neighbors.pair_search import screen_into
+
+        r = self.cutoff + self.skin
+        natoms = positions.shape[0]
+        device = positions.device
+        constants = self._constants(device)
+        cell, inverse = constants["cell"], constants["inverse"]
+        images, image_vectors = constants["images"], constants["image_vectors"]
+        offsets = torch.floor(times_3x3(positions, inverse))
+        wrapped = positions - times_3x3(offsets, cell)
+        state = self._pair_search_state
+        out = state["buffer"]
+        counter = state.get("async_counter")
+        if counter is None:
+            counter = state["async_counter"] = torch.zeros(1, dtype=torch.int32, device=device)
+        counter.zero_()
+        screen_into(wrapped, image_vectors, r, out, counter)
+        slots = out.numel()
+        found = counter.to(torch.int64)
+        valid = torch.arange(slots, device=device) < found
+        code = torch.where(valid, out, 0)
+        pairs = natoms * natoms
+        image = code // pairs
+        rest = code - image * pairs
+        sender, receiver = rest // natoms, rest % natoms
+        vectors = wrapped[receiver] - wrapped[sender] + image_vectors[image]
+        unit_shifts = images[image] - offsets[receiver] + offsets[sender]
+        keep = valid & ((vectors * vectors).sum(dim=1) < r * r) & ~(
+            (sender == receiver) & (unit_shifts == 0).all(dim=1))
+        nimages = len(images)
+        if self.sort_receivers:
+            primary = receiver
+            if constants["groups"] is not None:
+                primary = receiver * constants["group_count"] + constants["groups"][sender]
+            key = (primary * natoms + sender) * nimages + image
+        else:
+            key = (image * natoms + sender) * natoms + receiver
+        key = torch.where(keep, key, torch.iinfo(torch.int64).max)
+        n = keep.sum()
+        k = min(slots, self.capacity)
+        order = torch.sort(key).indices[:k]
+        take = torch.arange(k, device=device) < n
+        pad_unit, pad_shift = constants["pad_unit"], constants["pad_shift"]
+        unit = torch.where(take[:, None], unit_shifts[order], pad_unit)
+        shifts = torch.where(take[:, None], times_3x3(unit_shifts[order], cell), pad_shift)
+        self.candidate_index[0, :k].copy_(torch.where(take, sender[order], 0))
+        self.candidate_index[1, :k].copy_(torch.where(take, receiver[order], 0))
+        self.candidate_index[:, k:].zero_()
+        self.candidate_unit_shifts[:k].copy_(unit)
+        self.candidate_unit_shifts[k:].copy_(pad_unit)
+        self.candidate_shifts[:k].copy_(shifts)
+        self.candidate_shifts[k:].copy_(pad_shift)
+        self.candidate_shifts64[:k].copy_(shifts)
+        self.candidate_shifts64[k:].copy_(pad_shift)
+        overflow = (found > slots) | (n > self.capacity)
+        self.reference_positions.copy_(positions + overflow.to(positions.dtype) * OVERFLOW_DISPLACEMENT_A)
+        self._num_candidates = 0
+        self._candidates_device = torch.clamp(n, max=self.capacity)
+        self.rebuilds += 1
+        self.async_builds += 1
 
     def _set_reference(self, positions):
         if self.reference_positions is None:

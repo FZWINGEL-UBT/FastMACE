@@ -1,0 +1,36 @@
+== NaCl: per step span 2.901 ms, any stream busy 2.502 ms
+   stream 144: busy 2.247 ms; Kernel2 1.150, oeq_projected_backward 0.262, fused_folded_forward 0.218, kernel 0.166, segmented_polynomial_bwd_algo1_2 0.050, forward 0.028
+   stream 143: busy 0.200 ms; Kernel2 0.107, oeq_projected_backward 0.021, fused_folded_forward 0.015, kernel 0.014, segmented_polynomial_bwd_algo1_2 0.005, forward 0.002
+   stream 141: busy 0.046 ms; reduce_kernel 0.026, drift_kernel 0.010, scatter_kernel 0.003, inside_kernel 0.003, DeviceScanKernel 0.002, noise_kernel 0.001
+   overlap of the two busiest streams 0.000 ms
+   idle holes >= 10 us: 237.0 us per step
+       111.0 us/step  1.00/step  scatter_kernel -> unrolled_elementwise_kernel
+        21.9 us/step  0.09/step  elementwise_kernel -> noise_kernel
+        14.7 us/step  0.06/step  reduce_kernel -> fill_reverse_indices_kernel
+        11.5 us/step  0.08/step  vectorized_elementwise_kernel -> elementwise_kernel
+        10.7 us/step  0.09/step  vectorized_elementwise_kernel -> vectorized_elementwise_kernel
+         6.6 us/step  0.07/step  elementwise_kernel -> elementwise_kernel
+== NaNbO3: per step span 14.410 ms, any stream busy 14.072 ms
+   stream 144: busy 10.944 ms; kernel 3.103, Kernel2 2.336, fused_folded_forward 1.919, gemm 1.590, forward 0.285, segmented_polynomial_bwd_algo2_2 0.216
+   stream 145: busy 5.975 ms; oeq_projected_backward 3.218, Kernel2 0.572, gemm 0.550, kernel 0.454, backward 0.229, segmented_polynomial_bwd_algo2_2 0.229
+   stream 21: busy 0.130 ms; vectorized_elementwise_kernel 0.033, index_elementwise_kernel 0.026, DeviceRadixSortOnesweepKernel 0.019, kernel 0.019, elementwise_kernel 0.013, reduce_kernel 0.008
+   overlap of the two busiest streams 2.915 ms
+   idle holes >= 10 us: 218.7 us per step
+        86.9 us/step  1.00/step  vectorized_elementwise_kernel -> noise_kernel
+        81.0 us/step  1.00/step  scatter_kernel -> unrolled_elementwise_kernel
+        47.7 us/step  1.00/step  kernel -> memset
+         1.1 us/step  0.01/step  memset -> Kernel2
+         0.6 us/step  0.00/step  segmented_polynomial_bwd_algo2_2 -> elementwise_kernel
+         0.5 us/step  0.00/step  forward -> triton_poi_fused_cat_unsqueeze_35
+== NbCl5: per step span 18.612 ms, any stream busy 18.284 ms
+   stream 146: busy 13.863 ms; gemm 3.794, Kernel2 3.098, kernel 2.025, fused_folded_forward 1.363, segmented_polynomial_bwd_algo4_2 0.371, triton_red_fused__unsafe_view_add_clone_ 0.297
+   stream 147: busy 6.202 ms; oeq_projected_backward 2.039, gemm 1.228, magma_sgemmEx_kernel 0.515, Kernel2 0.460, segmented_polynomial_bwd_algo1_4 0.403, kernel 0.342
+   stream 21: busy 0.119 ms; kernel 0.035, vectorized_elementwise_kernel 0.025, index_elementwise_kernel 0.022, DeviceRadixSortOnesweepKernel 0.018, elementwise_kernel 0.009, reduce_kernel 0.005
+   overlap of the two busiest streams 1.856 ms
+   idle holes >= 10 us: 224.0 us per step
+       102.9 us/step  1.00/step  scatter_kernel -> unrolled_elementwise_kernel
+        70.2 us/step  1.00/step  vectorized_elementwise_kernel -> noise_kernel
+        46.9 us/step  1.00/step  kernel -> memset
+         2.3 us/step  0.00/step  scatter_kernel -> elementwise_kernel
+         0.6 us/step  0.00/step  triton_poi_fused_mul_10 -> vectorized_elementwise_kernel
+         0.5 us/step  0.00/step  triton_poi_fused_mul_sum_view_6 -> triton_poi_fused_add_mul_slice_backward_

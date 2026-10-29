@@ -1,0 +1,4508 @@
+{
+ "tool": "fp32_setup",
+ "created_utc": "2026-10-28T20:35:01.513849+00:00",
+ "host": "Fabi-PC",
+ "label": "warm",
+ "fastmace_commit": "312942df5850f7cf9be7dc96438eecef77662eff",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "environment": {
+  "FASTMACE_CACHE": "/home/fzwin/fastmace-cache/fp32-profile",
+  "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-cache/fp32-profile/inductor",
+  "TRITON_CACHE_DIR": "/home/fzwin/fastmace-cache/fp32-profile/triton",
+  "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-cache/fp32-profile/compile",
+  "TORCHINDUCTOR_COMPILE_THREADS": "4",
+  "FASTMACE_MODELS": "/home/fzwin/models",
+  "CUDA_VISIBLE_DEVICES": null
+ },
+ "structure": "NbCl5",
+ "natoms": 1944,
+ "wrapped": {
+  "fm.md (total)": true,
+  "load: load_pristine": true,
+  "load: sha256_of": true,
+  "load: resolve_checkpoint": true,
+  "load: loading.load (MACE calculator, conversion)": true,
+  "load: check_oeq": true,
+  "load: check_cueq": true,
+  "OEq: prepare_hybrid": true,
+  "OEq: prepare_hybrid_if_possible": true,
+  "OEq: reuse_extension (build or cache hit)": true,
+  "OEq: load_prebuilt_module": true,
+  "Simulation.__init__": true,
+  "Simulation._build_for": true,
+  "Simulation._validate": true,
+  "output: open": true,
+  "output: metadata": true,
+  "Simulation.run": true,
+  "plan: detect_software": true,
+  "plan: hardware": true,
+  "plan: MinimalPlanner.plan": true,
+  "plan: revise_memory": true,
+  "build: MinimalPlanner.build": true,
+  "build: execution model": true,
+  "ForceField.__init__": true,
+  "build: ForceField.execution_model": true,
+  "build: template cache": true,
+  "build: templates.private (copy)": true,
+  "build: MACEForceField.__init__": true,
+  "build: species setup": true,
+  "build: species tables": true,
+  "rewrites: resolve": true,
+  "rewrites: apply (incl. self-checks)": true,
+  "rewrites: self-checks": true,
+  "radial tables: fit": true,
+  "radial tables: certify": true,
+  "OEq streaming: render": true,
+  "OEq streaming: NVRTC compile_cubin": true,
+  "fused forward: render": true,
+  "compile: private_copy": true,
+  "compile: simplify_traceable": true,
+  "compile: compile_model (wrap; compiles lazily)": true,
+  "engine: GraphEngine.__init__": true,
+  "engine: prepare (captures)": true,
+  "engine: first compiled force call": true,
+  "engine: neighbour-list rebuild": true,
+  "engine: eager warm-up": true,
+  "engine: graph capture": true,
+  "build: check_engine": true,
+  "build: SimulationState.from_atoms": true,
+  "provenance: collect": true
+ },
+ "import_fastmace_s": 0.05256850100704469,
+ "import_torch_s": 1.2102285740111256,
+ "args": {
+  "output": "/home/fzwin/fastmace-runs/fp32-profile-20261028/local/setup-NbCl5-warm1",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "temperature_K": 1000.0,
+  "timestep_fs": 1.0,
+  "steps": 2000,
+  "timed_steps": 1000,
+  "seed": 1,
+  "label": "warm",
+  "cprofile": false,
+  "allow_busy_gpu": false
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "md_call_start_s": 3.666514869997627,
+ "md_total_s": 73.9274421200098,
+ "first_step": {
+  "step_s": 0.18181365699274465,
+  "end_s": 39.136017044002074
+ },
+ "setup_to_first_step_s": 35.46950217400445,
+ "process_to_first_step_s": 39.136017044002074,
+ "simulation_setup_s": {
+  "plan": 1.5364111579983728,
+  "build": 27.92706661799457,
+  "capture": 0.5103341229987564,
+  "provenance": 0.0708204249967821
+ },
+ "steady_ms_per_step_with_output": 19.31484590898617,
+ "steps": 2000,
+ "plan": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (22): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, chunked_conv_backward,\n      fused_folded_forward, radial_tables, block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm,\n      single_graph_strain, species_tables, fold_readout_tail, fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); w_tables, save_transcendentals (float32 plan, decision 65);\n      grouped_launch (not the generic MACE family, decision 57) (+4 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.92 GiB predicted (run; run 1.92, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 5060\u2026\n  workload: Langevin NVT, fixcm=True; 1944 atoms, 3D PBC, no constraints; up to 1000 K\n  rules 8-11: superset Cl Nb (8), max_temperature_K 1000 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+ "engine_info": {
+  "rebuilds_beside": 450,
+  "fused_integrator": true,
+  "engine": "graph",
+  "mode": "pipelined",
+  "capture": true,
+  "pad_edges": true,
+  "variable_cell": false,
+  "initial_edges": 51084,
+  "edge_bucket": 2560,
+  "edge_sizes_used": [
+   51200,
+   53760,
+   56320,
+   58880
+  ],
+  "neighbour_rebuilds": 452,
+  "graphs": [
+   "('B', 51200)",
+   "('B', 53760)",
+   "C",
+   "('B', 58880)",
+   "ACP",
+   "('B', 56320)"
+  ],
+  "pool_resets": 0,
+  "capture_memory": [
+   {
+    "key": "ACP",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 1552.0,
+    "max_reserved_after_capture_MiB": 1552.0
+   },
+   {
+    "key": "('B', 51200)",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 1552.0,
+    "max_reserved_after_capture_MiB": 1552.0
+   },
+   {
+    "key": "('B', 53760)",
+    "warmup_in_pool": true,
+    "max_reserved_after_warmup_MiB": 1552.0,
+    "max_reserved_after_capture_MiB": 1552.0
+   },
+   {
+    "key": "('B', 56320)",
+    "warmup_in_pool": true,
+    "max_reserved_after_warmup_MiB": 1552.0,
+    "max_reserved_after_capture_MiB": 1552.0
+   },
+   {
+    "key": "('B', 58880)",
+    "warmup_in_pool": true,
+    "max_reserved_after_warmup_MiB": 1552.0,
+    "max_reserved_after_capture_MiB": 1552.0
+   },
+   {
+    "key": "C",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 1552.0,
+    "max_reserved_after_capture_MiB": 1552.0
+   }
+  ],
+  "speculative_launches": 0,
+  "speculative_rollbacks": 0,
+  "speculative_rebuild_rollbacks": 0,
+  "speculative_bucket_rollbacks": 0,
+  "pipelined_redos": 22,
+  "pipelined_rebuild_redos": 2,
+  "pipelined_early_rebuilds": 450,
+  "canonical_points": 0,
+  "polar_overflow_steps": [],
+  "process": {
+   "allocator": "expandable_segments:True",
+   "dynamo_cache_size_limit": 64,
+   "compile_family": "oeq"
+  },
+  "energy_graphs": {
+   "float32": {
+    "copy": false,
+    "backend": "hybrid",
+    "compile_mode": "default"
+   }
+  },
+  "overflow_check": "edges",
+  "overflows_redone": 20,
+  "overflow_log": [
+   {
+    "step": 1,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 52,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 1070,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 1149,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 1493,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 1496,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 1508,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 1902,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2184,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2192,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2204,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2212,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2217,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2617,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2620,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2633,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2639,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2733,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2743,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   },
+   {
+    "step": 2829,
+    "kinds": [
+     "edges"
+    ],
+    "mode": "pipelined"
+   }
+  ],
+  "recaptures": 3,
+  "recapture_budget": 64,
+  "recapture_budget_exceeded_at": null,
+  "graph_variant_cap": 64,
+  "graph_evictions": 0,
+  "recapture_log": [
+   {
+    "step": 0,
+    "key": "ACP",
+    "reason": "first capture",
+    "counted": false,
+    "s": 0.21327451399702113
+   },
+   {
+    "step": 0,
+    "key": "('B', 51200)",
+    "reason": "first capture",
+    "counted": false,
+    "s": 0.2552664319955511
+   },
+   {
+    "step": 1,
+    "key": "('B', 53760)",
+    "reason": "new variant of B",
+    "counted": true,
+    "s": 0.09785752699826844
+   },
+   {
+    "step": 52,
+    "key": "('B', 56320)",
+    "reason": "new variant of B",
+    "counted": true,
+    "s": 0.10211755799537059
+   },
+   {
+    "step": 1070,
+    "key": "('B', 58880)",
+    "reason": "new variant of B",
+    "counted": true,
+    "s": 0.1053965960018104
+   },
+   {
+    "step": 1494,
+    "key": "C",
+    "reason": "first capture",
+    "counted": false,
+    "s": 0.03889734999393113
+   }
+  ],
+  "invalidations": [],
+  "captures": 6,
+  "capture_seconds": 0.8128099769819528,
+  "recapture_seconds": 0.3053716809954494
+ },
+ "stages": {
+  "fm.md (total)": {
+   "total_s": 73.6187484050024,
+   "calls": 1,
+   "parents": [
+    ""
+   ]
+  },
+  "Simulation.run": {
+   "total_s": 38.63994496098894,
+   "calls": 1,
+   "parents": [
+    "fm.md (total)"
+   ]
+  },
+  "Simulation.__init__": {
+   "total_s": 30.24009488300362,
+   "calls": 1,
+   "parents": [
+    "fm.md (total)"
+   ]
+  },
+  "build: MinimalPlanner.build": {
+   "total_s": 27.924110844993265,
+   "calls": 1,
+   "parents": [
+    "Simulation.__init__"
+   ]
+  },
+  "engine: GraphEngine.__init__": {
+   "total_s": 12.028309845991316,
+   "calls": 1,
+   "parents": [
+    "build: MinimalPlanner.build"
+   ]
+  },
+  "engine: first compiled force call": {
+   "total_s": 11.975031377995037,
+   "calls": 1,
+   "parents": [
+    "engine: GraphEngine.__init__"
+   ]
+  },
+  "build: MACEForceField.__init__": {
+   "total_s": 10.136644882004475,
+   "calls": 1,
+   "parents": [
+    "build: MinimalPlanner.build"
+   ]
+  },
+  "compile: compile_model (wrap; compiles lazily)": {
+   "total_s": 9.97840144399379,
+   "calls": 1,
+   "parents": [
+    "build: MACEForceField.__init__"
+   ]
+  },
+  "rewrites: apply (incl. self-checks)": {
+   "total_s": 9.130613057001028,
+   "calls": 1,
+   "parents": [
+    "compile: compile_model (wrap; compiles lazily)"
+   ]
+  },
+  "load: loading.load (MACE calculator, conversion)": {
+   "total_s": 7.969006083003478,
+   "calls": 2,
+   "parents": [
+    "build: template cache",
+    "load: load_pristine"
+   ]
+  },
+  "load: load_pristine": {
+   "total_s": 4.492889075001585,
+   "calls": 1,
+   "parents": [
+    "fm.md (total)"
+   ]
+  },
+  "rewrites: self-checks": {
+   "total_s": 4.444104143985896,
+   "calls": 21,
+   "parents": [
+    "rewrites: apply (incl. self-checks)"
+   ]
+  },
+  "build: execution model": {
+   "total_s": 4.029892677994212,
+   "calls": 1,
+   "parents": [
+    "build: MinimalPlanner.build"
+   ]
+  },
+  "build: ForceField.execution_model": {
+   "total_s": 4.029878222994739,
+   "calls": 1,
+   "parents": [
+    "build: execution model"
+   ]
+  },
+  "build: template cache": {
+   "total_s": 4.022979611007031,
+   "calls": 1,
+   "parents": [
+    "build: ForceField.execution_model"
+   ]
+  },
+  "radial tables: certify": {
+   "total_s": 3.4848331270040944,
+   "calls": 2,
+   "parents": [
+    "rewrites: apply (incl. self-checks)"
+   ]
+  },
+  "rewrites: resolve": {
+   "total_s": 1.7264420190040255,
+   "calls": 1,
+   "parents": [
+    "build: MinimalPlanner.build"
+   ]
+  },
+  "plan: MinimalPlanner.plan": {
+   "total_s": 1.4971620909927879,
+   "calls": 1,
+   "parents": [
+    "Simulation.__init__"
+   ]
+  },
+  "compile: private_copy": {
+   "total_s": 0.9651055879949126,
+   "calls": 2,
+   "parents": [
+    "build: templates.private (copy)",
+    "compile: compile_model (wrap; compiles lazily)"
+   ]
+  },
+  "radial tables: fit": {
+   "total_s": 0.6932123510050587,
+   "calls": 2,
+   "parents": [
+    "rewrites: apply (incl. self-checks)"
+   ]
+  },
+  "engine: graph capture": {
+   "total_s": 0.6300269959901925,
+   "calls": 3,
+   "parents": [
+    "Simulation.run",
+    "engine: prepare (captures)"
+   ]
+  },
+  "engine: prepare (captures)": {
+   "total_s": 0.5102919529890642,
+   "calls": 1,
+   "parents": [
+    "Simulation.__init__"
+   ]
+  },
+  "build: templates.private (copy)": {
+   "total_s": 0.4655634450027719,
+   "calls": 1,
+   "parents": [
+    "build: template cache"
+   ]
+  },
+  "plan: hardware": {
+   "total_s": 0.20687773599638604,
+   "calls": 1,
+   "parents": [
+    "plan: MinimalPlanner.plan"
+   ]
+  },
+  "OEq streaming: render": {
+   "total_s": 0.0915344290115172,
+   "calls": 2,
+   "parents": [
+    "rewrites: apply (incl. self-checks)"
+   ]
+  },
+  "OEq streaming: NVRTC compile_cubin": {
+   "total_s": 0.08572868598275818,
+   "calls": 4,
+   "parents": [
+    "rewrites: apply (incl. self-checks)"
+   ]
+  },
+  "OEq: prepare_hybrid_if_possible": {
+   "total_s": 0.0807379149919143,
+   "calls": 1,
+   "parents": [
+    "load: load_pristine"
+   ]
+  },
+  "output: metadata": {
+   "total_s": 0.06683891201100778,
+   "calls": 1,
+   "parents": [
+    "Simulation.__init__"
+   ]
+  },
+  "OEq: prepare_hybrid": {
+   "total_s": 0.05412334999709856,
+   "calls": 2,
+   "parents": [
+    "OEq: prepare_hybrid_if_possible",
+    "load: loading.load (MACE calculator, conversion)"
+   ]
+  },
+  "load: sha256_of": {
+   "total_s": 0.03285652199701872,
+   "calls": 2,
+   "parents": [
+    "load: loading.load (MACE calculator, conversion)"
+   ]
+  },
+  "output: open": {
+   "total_s": 0.010664166999049485,
+   "calls": 1,
+   "parents": [
+    "Simulation.__init__"
+   ]
+  },
+  "build: species tables": {
+   "total_s": 0.007366731995716691,
+   "calls": 1,
+   "parents": [
+    "build: MACEForceField.__init__"
+   ]
+  },
+  "compile: simplify_traceable": {
+   "total_s": 0.0022011140099493787,
+   "calls": 1,
+   "parents": [
+    "compile: compile_model (wrap; compiles lazily)"
+   ]
+  },
+  "plan: detect_software": {
+   "total_s": 0.0019254829967394471,
+   "calls": 1,
+   "parents": [
+    "plan: MinimalPlanner.plan"
+   ]
+  },
+  "build: species setup": {
+   "total_s": 0.001459951003198512,
+   "calls": 1,
+   "parents": [
+    "build: MACEForceField.__init__"
+   ]
+  },
+  "OEq: reuse_extension (build or cache hit)": {
+   "total_s": 0.0014305569930002093,
+   "calls": 1,
+   "parents": [
+    "OEq: prepare_hybrid"
+   ]
+  },
+  "ForceField.__init__": {
+   "total_s": 0.001371934005874209,
+   "calls": 1,
+   "parents": [
+    "Simulation.__init__"
+   ]
+  },
+  "build: SimulationState.from_atoms": {
+   "total_s": 0.0012760070094373077,
+   "calls": 1,
+   "parents": [
+    "build: MinimalPlanner.build"
+   ]
+  },
+  "build: check_engine": {
+   "total_s": 0.000651951995678246,
+   "calls": 1,
+   "parents": [
+    "engine: GraphEngine.__init__"
+   ]
+  },
+  "fused forward: render": {
+   "total_s": 0.00036250399716664106,
+   "calls": 2,
+   "parents": [
+    "rewrites: apply (incl. self-checks)"
+   ]
+  },
+  "load: check_cueq": {
+   "total_s": 0.00014592299703508615,
+   "calls": 1,
+   "parents": [
+    "load: loading.load (MACE calculator, conversion)"
+   ]
+  },
+  "load: check_oeq": {
+   "total_s": 0.00012786799925379455,
+   "calls": 1,
+   "parents": [
+    "load: loading.load (MACE calculator, conversion)"
+   ]
+  },
+  "load: resolve_checkpoint": {
+   "total_s": 0.00010504598321858793,
+   "calls": 2,
+   "parents": [
+    "load: loading.load (MACE calculator, conversion)"
+   ]
+  }
+ },
+ "stages_after_first_step": {
+  "Simulation.run": {
+   "total_s": 19.314816291996976,
+   "calls": 1,
+   "parents": [
+    ""
+   ]
+  },
+  "engine: neighbour-list rebuild": {
+   "total_s": 1.2804585550620686,
+   "calls": 452,
+   "parents": [
+    "Simulation.run"
+   ]
+  },
+  "engine: graph capture": {
+   "total_s": 0.3137474749964895,
+   "calls": 3,
+   "parents": [
+    "Simulation.run"
+   ]
+  },
+  "output: metadata": {
+   "total_s": 0.07183732099656481,
+   "calls": 2,
+   "parents": [
+    "Simulation.run"
+   ]
+  }
+ },
+ "timeline": [
+  {
+   "label": "fm.md (total)",
+   "parent": "",
+   "start_s": 3.9752,
+   "seconds": 73.6187,
+   "depth": 0
+  },
+  {
+   "label": "load: load_pristine",
+   "parent": "fm.md (total)",
+   "start_s": 4.2205,
+   "seconds": 4.4929,
+   "depth": 1
+  },
+  {
+   "label": "OEq: prepare_hybrid_if_possible",
+   "parent": "load: load_pristine",
+   "start_s": 4.2206,
+   "seconds": 0.0807,
+   "depth": 2
+  },
+  {
+   "label": "OEq: prepare_hybrid",
+   "parent": "OEq: prepare_hybrid_if_possible",
+   "start_s": 4.2472,
+   "seconds": 0.0541,
+   "depth": 3
+  },
+  {
+   "label": "OEq: reuse_extension (build or cache hit)",
+   "parent": "OEq: prepare_hybrid",
+   "start_s": 4.2996,
+   "seconds": 0.0014,
+   "depth": 4
+  },
+  {
+   "label": "load: loading.load (MACE calculator, conversion)",
+   "parent": "load: load_pristine",
+   "start_s": 4.3013,
+   "seconds": 4.4121,
+   "depth": 2
+  },
+  {
+   "label": "load: resolve_checkpoint",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 4.3013,
+   "seconds": 0.0,
+   "depth": 3
+  },
+  {
+   "label": "load: sha256_of",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 4.3014,
+   "seconds": 0.0164,
+   "depth": 3
+  },
+  {
+   "label": "Simulation.__init__",
+   "parent": "fm.md (total)",
+   "start_s": 8.7135,
+   "seconds": 30.2401,
+   "depth": 1
+  },
+  {
+   "label": "ForceField.__init__",
+   "parent": "Simulation.__init__",
+   "start_s": 8.775,
+   "seconds": 0.0014,
+   "depth": 2
+  },
+  {
+   "label": "plan: MinimalPlanner.plan",
+   "parent": "Simulation.__init__",
+   "start_s": 8.8283,
+   "seconds": 1.4972,
+   "depth": 2
+  },
+  {
+   "label": "plan: hardware",
+   "parent": "plan: MinimalPlanner.plan",
+   "start_s": 8.8283,
+   "seconds": 0.2069,
+   "depth": 3
+  },
+  {
+   "label": "plan: detect_software",
+   "parent": "plan: MinimalPlanner.plan",
+   "start_s": 9.0369,
+   "seconds": 0.0019,
+   "depth": 3
+  },
+  {
+   "label": "build: MinimalPlanner.build",
+   "parent": "Simulation.__init__",
+   "start_s": 10.3255,
+   "seconds": 27.9241,
+   "depth": 2
+  },
+  {
+   "label": "build: execution model",
+   "parent": "build: MinimalPlanner.build",
+   "start_s": 10.3256,
+   "seconds": 4.0299,
+   "depth": 3
+  },
+  {
+   "label": "build: ForceField.execution_model",
+   "parent": "build: execution model",
+   "start_s": 10.3256,
+   "seconds": 4.0299,
+   "depth": 4
+  },
+  {
+   "label": "build: template cache",
+   "parent": "build: ForceField.execution_model",
+   "start_s": 10.3325,
+   "seconds": 4.023,
+   "depth": 5
+  },
+  {
+   "label": "load: loading.load (MACE calculator, conversion)",
+   "parent": "build: template cache",
+   "start_s": 10.3325,
+   "seconds": 3.5569,
+   "depth": 6
+  },
+  {
+   "label": "load: resolve_checkpoint",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 10.3325,
+   "seconds": 0.0001,
+   "depth": 7
+  },
+  {
+   "label": "load: sha256_of",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 10.3326,
+   "seconds": 0.0165,
+   "depth": 7
+  },
+  {
+   "label": "OEq: prepare_hybrid",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 10.3491,
+   "seconds": 0.0,
+   "depth": 7
+  },
+  {
+   "label": "load: check_cueq",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 10.3491,
+   "seconds": 0.0001,
+   "depth": 7
+  },
+  {
+   "label": "load: check_oeq",
+   "parent": "load: loading.load (MACE calculator, conversion)",
+   "start_s": 10.3493,
+   "seconds": 0.0001,
+   "depth": 7
+  },
+  {
+   "label": "build: templates.private (copy)",
+   "parent": "build: template cache",
+   "start_s": 13.8894,
+   "seconds": 0.4656,
+   "depth": 6
+  },
+  {
+   "label": "compile: private_copy",
+   "parent": "build: templates.private (copy)",
+   "start_s": 13.8895,
+   "seconds": 0.4655,
+   "depth": 7
+  },
+  {
+   "label": "rewrites: resolve",
+   "parent": "build: MinimalPlanner.build",
+   "start_s": 14.3562,
+   "seconds": 1.7264,
+   "depth": 3
+  },
+  {
+   "label": "build: MACEForceField.__init__",
+   "parent": "build: MinimalPlanner.build",
+   "start_s": 16.0827,
+   "seconds": 10.1366,
+   "depth": 3
+  },
+  {
+   "label": "compile: compile_model (wrap; compiles lazily)",
+   "parent": "build: MACEForceField.__init__",
+   "start_s": 16.1727,
+   "seconds": 9.9784,
+   "depth": 4
+  },
+  {
+   "label": "compile: private_copy",
+   "parent": "compile: compile_model (wrap; compiles lazily)",
+   "start_s": 16.5091,
+   "seconds": 0.4996,
+   "depth": 5
+  },
+  {
+   "label": "rewrites: apply (incl. self-checks)",
+   "parent": "compile: compile_model (wrap; compiles lazily)",
+   "start_s": 17.0091,
+   "seconds": 9.1306,
+   "depth": 5
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 17.0123,
+   "seconds": 0.5779,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 17.5918,
+   "seconds": 0.0674,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 17.6593,
+   "seconds": 0.0564,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 17.7162,
+   "seconds": 0.051,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 17.7672,
+   "seconds": 0.242,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.0093,
+   "seconds": 0.06,
+   "depth": 6
+  },
+  {
+   "label": "OEq streaming: render",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.0694,
+   "seconds": 0.0826,
+   "depth": 6
+  },
+  {
+   "label": "OEq streaming: NVRTC compile_cubin",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.152,
+   "seconds": 0.0159,
+   "depth": 6
+  },
+  {
+   "label": "OEq streaming: render",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.1702,
+   "seconds": 0.009,
+   "depth": 6
+  },
+  {
+   "label": "OEq streaming: NVRTC compile_cubin",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.1792,
+   "seconds": 0.0464,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.2264,
+   "seconds": 0.0963,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.3229,
+   "seconds": 0.0481,
+   "depth": 6
+  },
+  {
+   "label": "fused forward: render",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.3712,
+   "seconds": 0.0002,
+   "depth": 6
+  },
+  {
+   "label": "OEq streaming: NVRTC compile_cubin",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.3714,
+   "seconds": 0.0101,
+   "depth": 6
+  },
+  {
+   "label": "fused forward: render",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.3821,
+   "seconds": 0.0002,
+   "depth": 6
+  },
+  {
+   "label": "OEq streaming: NVRTC compile_cubin",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.3823,
+   "seconds": 0.0134,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.3965,
+   "seconds": 0.0646,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.47,
+   "seconds": 0.0705,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.5406,
+   "seconds": 0.0766,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.7348,
+   "seconds": 0.0915,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.8437,
+   "seconds": 0.0699,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.9142,
+   "seconds": 0.0243,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 18.9655,
+   "seconds": 0.035,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 19.0006,
+   "seconds": 2.4708,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 21.5347,
+   "seconds": 0.0044,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 21.5907,
+   "seconds": 0.0042,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 21.5971,
+   "seconds": 0.1945,
+   "depth": 6
+  },
+  {
+   "label": "radial tables: fit",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 21.8107,
+   "seconds": 0.3293,
+   "depth": 6
+  },
+  {
+   "label": "radial tables: certify",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 22.1406,
+   "seconds": 1.1399,
+   "depth": 6
+  },
+  {
+   "label": "radial tables: fit",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 23.2911,
+   "seconds": 0.3639,
+   "depth": 6
+  },
+  {
+   "label": "radial tables: certify",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 23.6557,
+   "seconds": 2.345,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 26.0009,
+   "seconds": 0.1374,
+   "depth": 6
+  },
+  {
+   "label": "rewrites: self-checks",
+   "parent": "rewrites: apply (incl. self-checks)",
+   "start_s": 26.1384,
+   "seconds": 0.0013,
+   "depth": 6
+  },
+  {
+   "label": "compile: simplify_traceable",
+   "parent": "compile: compile_model (wrap; compiles lazily)",
+   "start_s": 26.1398,
+   "seconds": 0.0022,
+   "depth": 5
+  },
+  {
+   "label": "build: species setup",
+   "parent": "build: MACEForceField.__init__",
+   "start_s": 26.1529,
+   "seconds": 0.0015,
+   "depth": 4
+  },
+  {
+   "label": "build: species tables",
+   "parent": "build: MACEForceField.__init__",
+   "start_s": 26.1547,
+   "seconds": 0.0074,
+   "depth": 4
+  },
+  {
+   "label": "build: SimulationState.from_atoms",
+   "parent": "build: MinimalPlanner.build",
+   "start_s": 26.2194,
+   "seconds": 0.0013,
+   "depth": 3
+  },
+  {
+   "label": "engine: GraphEngine.__init__",
+   "parent": "build: MinimalPlanner.build",
+   "start_s": 26.2212,
+   "seconds": 12.0283,
+   "depth": 3
+  },
+  {
+   "label": "build: check_engine",
+   "parent": "engine: GraphEngine.__init__",
+   "start_s": 26.2214,
+   "seconds": 0.0007,
+   "depth": 4
+  },
+  {
+   "label": "engine: first compiled force call",
+   "parent": "engine: GraphEngine.__init__",
+   "start_s": 26.2224,
+   "seconds": 11.975,
+   "depth": 4
+  },
+  {
+   "label": "engine: prepare (captures)",
+   "parent": "Simulation.__init__",
+   "start_s": 38.2526,
+   "seconds": 0.5103,
+   "depth": 2
+  },
+  {
+   "label": "engine: graph capture",
+   "parent": "engine: prepare (captures)",
+   "start_s": 38.2526,
+   "seconds": 0.2329,
+   "depth": 3
+  },
+  {
+   "label": "engine: graph capture",
+   "parent": "engine: prepare (captures)",
+   "start_s": 38.4857,
+   "seconds": 0.2772,
+   "depth": 3
+  },
+  {
+   "label": "output: open",
+   "parent": "Simulation.__init__",
+   "start_s": 38.8486,
+   "seconds": 0.0107,
+   "depth": 2
+  },
+  {
+   "label": "output: metadata",
+   "parent": "Simulation.__init__",
+   "start_s": 38.8867,
+   "seconds": 0.0668,
+   "depth": 2
+  },
+  {
+   "label": "Simulation.run",
+   "parent": "fm.md (total)",
+   "start_s": 38.9536,
+   "seconds": 38.6399,
+   "depth": 1
+  },
+  {
+   "label": "engine: graph capture",
+   "parent": "Simulation.run",
+   "start_s": 38.9975,
+   "seconds": 0.1199,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 39.2459,
+   "seconds": 0.0314,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 39.405,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 39.534,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 39.6816,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 39.8296,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 39.9774,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: graph capture",
+   "parent": "Simulation.run",
+   "start_s": 40.1069,
+   "seconds": 0.125,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 40.287,
+   "seconds": 0.0099,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 40.4433,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 40.594,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 40.7433,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 40.8733,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.0051,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.1362,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.2862,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.4361,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.5872,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.7182,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 41.8499,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.0012,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.1496,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.3174,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.4903,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.6582,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.8083,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 42.958,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.1082,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.2388,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.3895,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.5567,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.7069,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.8378,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 43.9709,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.1193,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.2317,
+   "seconds": 0.0033,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.3639,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.4949,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.6079,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.7212,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.8345,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 44.9661,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.0974,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.229,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.3603,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.492,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.6429,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.7748,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 45.906,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.037,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.1683,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.3056,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.4376,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.57,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.7015,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.8323,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 46.9813,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.1128,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.2444,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.3764,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.5072,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.6574,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.8078,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 47.957,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.0879,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.2008,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.3318,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.4516,
+   "seconds": 0.0035,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.5841,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.7162,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 48.8656,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.0234,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.1541,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.2854,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.4167,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.5669,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.6986,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.8117,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 49.9437,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.0742,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.2252,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.3755,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.5087,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.6407,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.7728,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.8867,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 50.9997,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.1312,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.263,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.3951,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.5082,
+   "seconds": 0.0017,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.6393,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.771,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 51.9021,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.0342,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.1655,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.2976,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.4108,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.5433,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.6818,
+   "seconds": 0.0039,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.8146,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 52.9468,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.0602,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.1727,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.3049,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.4359,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.5663,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.6978,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.8369,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 53.9688,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.1002,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.2312,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.3642,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.4963,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.6276,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.765,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 54.8965,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.0287,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.1606,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.2933,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.425,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.538,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.6513,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.7655,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.8786,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 55.9728,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.0856,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.1985,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.3119,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.4433,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.5746,
+   "seconds": 0.0036,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.708,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.8238,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 56.9555,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.0885,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.2205,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.3532,
+   "seconds": 0.004,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.4855,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.6165,
+   "seconds": 0.0034,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.7297,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.8426,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 57.9554,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.0678,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.1994,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.331,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.4624,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.5941,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.7721,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 58.9222,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 59.0546,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 59.1878,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 59.3195,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 59.4333,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: graph capture",
+   "parent": "Simulation.run",
+   "start_s": 59.4907,
+   "seconds": 0.1271,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 59.6936,
+   "seconds": 0.0921,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 59.8982,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.011,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.1245,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.257,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.3701,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.4837,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.5963,
+   "seconds": 0.0034,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.7092,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.8225,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 60.9391,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.0513,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.1825,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.3344,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.4662,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.5799,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.7107,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.8421,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 61.9724,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.1238,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.2556,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.3691,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.4834,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.5962,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.728,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.8411,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 62.9544,
+   "seconds": 0.0033,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.0682,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.2,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.3329,
+   "seconds": 0.0033,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.4469,
+   "seconds": 0.0018,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.5595,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.6725,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.7758,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 63.8888,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.0025,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.1338,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.2478,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.3621,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.4757,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.5889,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.7029,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.8149,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 64.9272,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.0397,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.1571,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.2889,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.4021,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.5158,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.6293,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.7605,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 65.8927,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.025,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.1568,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.2702,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.4021,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.5148,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.646,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.7595,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.872,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 66.9847,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.117,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.2538,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.3861,
+   "seconds": 0.0033,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.4993,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.6121,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.7826,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: graph capture",
+   "parent": "Simulation.run",
+   "start_s": 67.7853,
+   "seconds": 0.0616,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 67.9977,
+   "seconds": 0.0058,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.1349,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.2887,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.4203,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.5526,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.6841,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.8237,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 68.9552,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.0691,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.1816,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.2952,
+   "seconds": 0.0109,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.4354,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.5489,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.6628,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.7752,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 69.907,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.0207,
+   "seconds": 0.0036,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.1347,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.251,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.3835,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.5149,
+   "seconds": 0.0022,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.6273,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.759,
+   "seconds": 0.0036,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 70.892,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.0238,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.138,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.2507,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.3855,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.5182,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.6497,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.7631,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 71.8751,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.0063,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.1379,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.2701,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.3824,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.4957,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.6281,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.7594,
+   "seconds": 0.0033,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 72.8916,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.0225,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.1548,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.2868,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.4178,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.5537,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.7115,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.8442,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 73.9766,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.0902,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.1853,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.2978,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.4293,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.5619,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.6757,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.8074,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 74.9393,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.0702,
+   "seconds": 0.0023,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.1841,
+   "seconds": 0.0025,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.3157,
+   "seconds": 0.0034,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.4305,
+   "seconds": 0.0027,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.5439,
+   "seconds": 0.0019,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.7005,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.8357,
+   "seconds": 0.003,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 75.9516,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.0672,
+   "seconds": 0.0028,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.181,
+   "seconds": 0.0032,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.2947,
+   "seconds": 0.0026,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.4266,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.5583,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.6913,
+   "seconds": 0.0034,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.8239,
+   "seconds": 0.0031,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 76.9563,
+   "seconds": 0.0024,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.088,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.2195,
+   "seconds": 0.0021,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.3509,
+   "seconds": 0.0029,
+   "depth": 2
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.4826,
+   "seconds": 0.002,
+   "depth": 2
+  },
+  {
+   "label": "output: metadata",
+   "parent": "Simulation.run",
+   "start_s": 77.5598,
+   "seconds": 0.0337,
+   "depth": 2
+  },
+  {
+   "label": "Simulation.run",
+   "parent": "",
+   "start_s": 77.594,
+   "seconds": 19.3148,
+   "depth": 0
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.6497,
+   "seconds": 0.0018,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.7635,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.859,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 77.9533,
+   "seconds": 0.0018,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.0473,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.1415,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.2546,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.3686,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.4812,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.6011,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.7143,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.8283,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 78.9428,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.0568,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.1695,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.2818,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.3947,
+   "seconds": 0.0035,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.5097,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.623,
+   "seconds": 0.008,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.761,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 79.8927,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.0237,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.1555,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.2681,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.3994,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.5309,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.645,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.7577,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 80.8714,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.0035,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.1561,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.3072,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.4416,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.5769,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.7179,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.8527,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 81.9673,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.0811,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.1943,
+   "seconds": 0.0051,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.3105,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.4239,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.5373,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.6692,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.8021,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 82.9156,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.03,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.1425,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.2746,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.407,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.5479,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.6618,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.7782,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 83.8909,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.0061,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.1385,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.2706,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.4021,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.5338,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.6657,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.7983,
+   "seconds": 0.0033,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 84.9307,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.0439,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.1581,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.271,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.3862,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.4991,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.6315,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.7456,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.8619,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 85.9751,
+   "seconds": 0.0032,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.0896,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.2212,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.3533,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.4861,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.5996,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.713,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.8256,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 86.9583,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.0896,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.2044,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.3189,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.4517,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.5835,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.7164,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.8475,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 87.9799,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.0945,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.2088,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.3494,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.463,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.5771,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.7093,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.8414,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 88.9748,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.0891,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.2024,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.3335,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.4667,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.6017,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.7345,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 89.8699,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.0302,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.1649,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.3003,
+   "seconds": 0.0033,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.4171,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.5521,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.6686,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.785,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 90.9007,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.0173,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.134,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.2499,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.3655,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.488,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.6041,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.7197,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 91.8545,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.0068,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.1211,
+   "seconds": 0.0018,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.2342,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.3483,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.4619,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.5938,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.7254,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.8584,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 92.9719,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.0851,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.1982,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.3125,
+   "seconds": 0.0026,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.4344,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.5487,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.6818,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.7956,
+   "seconds": 0.0027,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 93.9101,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.0437,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.1752,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.3068,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.4392,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.5717,
+   "seconds": 0.0018,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.7031,
+   "seconds": 0.0017,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.8336,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 94.9661,
+   "seconds": 0.0023,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.0793,
+   "seconds": 0.0024,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.1926,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.3065,
+   "seconds": 0.002,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.4205,
+   "seconds": 0.0029,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.5356,
+   "seconds": 0.0018,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.6297,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.7434,
+   "seconds": 0.0022,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.8562,
+   "seconds": 0.003,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 95.9697,
+   "seconds": 0.0115,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.0912,
+   "seconds": 0.0031,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.2063,
+   "seconds": 0.0019,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.3189,
+   "seconds": 0.0025,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.4324,
+   "seconds": 0.0034,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.5468,
+   "seconds": 0.0028,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.6604,
+   "seconds": 0.0032,
+   "depth": 1
+  },
+  {
+   "label": "engine: neighbour-list rebuild",
+   "parent": "Simulation.run",
+   "start_s": 96.7745,
+   "seconds": 0.0021,
+   "depth": 1
+  },
+  {
+   "label": "output: metadata",
+   "parent": "Simulation.run",
+   "start_s": 96.8706,
+   "seconds": 0.0382,
+   "depth": 1
+  }
+ ],
+ "dynamo_compile_times": "TorchDynamo compilation metrics:\nFunction                                               Runtimes (s)\n---------------------------------------------------  --------------\n_compile.compile_inner                                       9.6116\ncompile_attempt_0                                            2.6016\nbytecode_tracing                                             4.4619\nget_fake_value                                               0.6714\ncreate_proxy                                                 0.2922\nwrap_to_fake_tensor_and_record                               0.1078\nvariable_builder_call                                        2.1651\ncompile_attempt_1                                            5.3311\ninsert_deferred_runtime_asserts                              0.0513\nOutputGraph.call_user_compiler                               2.9509\ninductor_codecache_torch_key                                 0.0603\n_recursive_pre_grad_passes                                   0.1401\npass.pre_grad_passes.group_batch_fusion_passes               0.0006\npass.pre_grad_passes.efficient_conv_bn_eval_pass             0.0022\npass.pre_grad_passes.apply_gumbel_max_trick_pass             0.0008\ncreate_aot_dispatcher_function                               2.7845\naot_collect_metadata                                         0.3241\naot_trace_joint_graph                                        1.2612\n_recursive_joint_graph_passes                                0.3994\npass.joint_graph_passes.remove_noop_ops                      0.0109\npass.joint_graph_passes.constant_fold_uniform_value          0.0506\npass.joint_graph_passes.pass_pattern_0                       0.1478\nCacheBase.get_system.triton_key                              0.0001\npass.joint_graph_passes.pass_pattern_1                       0.0008\nmin_cut_rematerialization_partition                          0.2697\ncompile_fx.<locals>.fw_compiler_base                         0.207\ncompile_fx_inner                                             0.3631\nfx_codegen_and_compile                                       0.3281\nTritonBundler.read_and_emit                                  0.0042\nTritonBundler.load_cached_static_autotuners                  0.0019\nPyCodeCache.load_by_key_path                                 0.0983\nStaticAutotunerFuture.warm_precompile                        0.0466\nasync_compile.wait                                           0.0228\ncompile_fx.<locals>.bw_compiler                              0.1565\nbuild_guards                                                 1.5573\ngc                                                           0.002\nAOTAutogradCache.inductor_load                               0.0049",
+ "dynamo_counters": {
+  "frames": {
+   "total": 8,
+   "ok": 8
+  },
+  "graph_break": {
+   "Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x7681c17e4160>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": 3
+  },
+  "stats": {
+   "calls_captured": 497,
+   "unique_graphs": 3
+  },
+  "aot_autograd": {
+   "total": 3,
+   "autograd_cache_bypass": 1,
+   "ok": 3,
+   "autograd_cache_hit": 2
+  },
+  "inductor": {
+   "pattern_matcher_count": 118,
+   "pattern_matcher_nodes": 133,
+   "removed_pointless_view_pair": 6,
+   "triton_bundler_load_static_autotuner": 79,
+   "async_compile_cache_miss": 237,
+   "async_compile_cache_hit": 158,
+   "pad_rewritten_as_cat": 2,
+   "extern_calls": 78,
+   "fxgraph_cache_hit": 4
+  },
+  "resumes": {
+   "torch_dynamo_resume_in_forward_at_136": 1,
+   "torch_dynamo_resume_in_get_outputs_at_197": 1,
+   "torch_dynamo_resume_in_compute_forces_at_26": 1
+  }
+ }
+}

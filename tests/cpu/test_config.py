@@ -90,6 +90,7 @@ AUTO_RULES = {
     "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
+    "RewriteConfig.species_residual": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
     "GateConfig.reduced_cell": "largest_smaller_supercell_at_least_min_height",
