@@ -12,11 +12,15 @@ Modes, each on the same operands:
 - ``ieee_default``: what the default plan runs: dense products on cuBLAS IEEE; joined products by
   ``tile_rule.segment_gemm_choice`` on the Triton IEEE ``segment_gemm`` or on cuBLAS plus the copy into the
   joined layout (emulated: gather the rows, ``mm``, copy into the output);
+- ``cublas_batched``: joined products as one cuBLAS strided batched GEMM each, straight into the joined layout
+  (``cutlass_tc.cublas_joined``); dense products on cuBLAS;
 - ``cublas_ieee`` / ``cublas_tf32``: cuBLAS on the gathered, contiguous operands (pure GEMM time, no layout;
   TF32 is a rate reference);
 - ``triton_tf32x3``: the record as it is (Triton ``tf32x3``);
 - ``cutlass_<variant>`` (``cutlass_tc``: rz3, rn3, rn4, tf32) at the tile rule's tile, and ``cutlass_rz3_t0`` /
   ``_t1`` at both tiles, written straight into the joined layout;
+- ``cutlass_simt`` (``_t0``, ``_t1``): CUTLASS SIMT IEEE FP32 straight into the joined layout (idea 2's IEEE
+  alternative to the Triton ``segment_gemm``);
 - ``fp16x3_prepacked`` (idea 3's first check): A and W split once, outside the timing, into power-of-two
   normalised FP16 big and 2^11-scaled small parts (per row of A, per column of W), then
   ``C = Ah Wh + 2^-11 [Ah | Al] [Wl; Wh]`` as two cuBLAS FP16 GEMMs with FP32 accumulation and output
@@ -43,8 +47,9 @@ import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
 
 HERE = Path(__file__).resolve().parent
 TOOLS = HERE.parents[1]
-MODES = ("ieee_default", "cublas_ieee", "cublas_tf32", "triton_tf32x3", "cutlass_rz3", "cutlass_rz3_t0",
-         "cutlass_rz3_t1", "cutlass_rn3", "cutlass_rn4", "cutlass_tf32", "fp16x3_prepacked", "fp16x3_split")
+MODES = ("ieee_default", "cublas_batched", "cublas_ieee", "cublas_tf32", "triton_tf32x3", "cutlass_rz3", "cutlass_rz3_t0",
+         "cutlass_rz3_t1", "cutlass_rn3", "cutlass_rn4", "cutlass_tf32", "cutlass_simt", "cutlass_simt_t0",
+         "cutlass_simt_t1", "fp16x3_prepacked", "fp16x3_split")
 SMALL_SCALE = 2.0 ** 11
 
 
@@ -141,6 +146,11 @@ class Runner:
         """(callable, result getter) for ``mode``, or None if the mode does not apply."""
         torch, p = self.torch, self.p
         L = p.launch
+        if mode == "cublas_batched":
+            if p.kind == "dense":
+                return (lambda: torch.mm(p.a, p.b, out=self.c)), (lambda: self.c)
+            return (lambda: self.cutlass_tc.cublas_joined(L["a"], L["a_offset"], L["a_n"], L["a_m"], p.b, self.jc,
+                                                          L["c_offset"], L["c_n"], L["c_m"], L["rows"], L["dim"])),                 self.joined_view
         if mode == "cublas_ieee":
             return (lambda: torch.mm(p.a, p.b, out=self.c)), (lambda: self.c)
         if mode == "cublas_tf32":
@@ -301,6 +311,8 @@ def main(argv=None):
             row = dict(kind=p.kind, m=p.m, k=p.k, n=p.n, dim=p.launch.get("dim", 1),
                        tile_rule=cutlass_tc.tile_for(p.launch.get("rows", p.m) // p.launch.get("dim", 1), p.n,
                                                      p.launch.get("dim", 1), sms),
+                       tile_rule_simt=cutlass_tc.tile_for(p.launch.get("rows", p.m) // p.launch.get("dim", 1), p.n,
+                                                          p.launch.get("dim", 1), sms, "simt"),
                        us={mode: times[mode][i] for mode in args.modes}, errors={})
             for mode in args.modes:
                 fn, get = r.fn(mode)

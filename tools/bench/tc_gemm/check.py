@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cutlass_tc  # noqa: E402
 
 # Max relative error bounds against float64 (Gaussian operands): FP32-class for the 3x variants, TF32 for tf32.
-BOUND = {"rz3": 5e-6, "rn3": 5e-6, "rn4": 5e-6, "tf32": 5e-3}
+BOUND = {"rz3": 5e-6, "rn3": 5e-6, "rn4": 5e-6, "tf32": 5e-3, "simt": 5e-6}
 failures = []
 
 
@@ -58,6 +58,21 @@ def main():
             e = rel(got, ref)
             untouched = bool(out[:, :offset].isnan().all() and out[:, offset + dim * n:].isnan().all())
             report(f"joined {variant} t{tile}", e < BOUND[variant] and untouched, f"{e:.2e}, rest untouched={untouched}")
+    # cuBLAS strided batched into the joined layout: right values, the rest untouched, and one kernel, no copy
+    atoms, dim, k, n, width, offset = 300, 3, 64, 96, 10 + 3 * 96 + 6, 10
+    x, w = torch.randn(atoms * dim, k, device=dev), torch.randn(k, n, device=dev)
+    out = torch.full((atoms, width), float("nan"), device=dev)
+    cutlass_tc.cublas_joined(x, 0, dim * k, k, w, out, offset, width, n, atoms * dim, dim)
+    from torch.profiler import ProfilerActivity, profile
+
+    with profile(activities=[ProfilerActivity.CUDA]) as prof:
+        cutlass_tc.cublas_joined(x, 0, dim * k, k, w, out, offset, width, n, atoms * dim, dim)
+        torch.cuda.synchronize()
+    kernels = [e.name for e in prof.events() if e.device_type == torch.autograd.DeviceType.CUDA]
+    e = rel(out[:, offset:offset + dim * n], (x.double() @ w.double()).reshape(atoms, dim * n))
+    untouched = bool(out[:, :offset].isnan().all() and out[:, offset + dim * n:].isnan().all())
+    report("joined cublas strided batched", e < 5e-6 and untouched and len(kernels) == 1,
+           f"{e:.2e}, rest untouched={untouched}, kernels={kernels}")
     # capture: a graph replay equals the eager result bitwise
     a, w = torch.randn(1512, 512, device=dev), torch.randn(512, 512, device=dev)
     eager, graphed = torch.empty(1512, 512, device=dev), torch.empty(1512, 512, device=dev)

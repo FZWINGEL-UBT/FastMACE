@@ -8,7 +8,7 @@
 //
 // Compiled once per variant (-DFM_VARIANT): 0 = CUTLASS's 3xTF32 (OpMultiplyAddFastF32: big rounded toward zero,
 // small half-ulp truncated, small*big + big*small + big*big), 1 = round-to-nearest split, three products, 2 = the
-// same plus small*small, 3 = plain 1xTF32 (rate reference only, not FP32-accurate).
+// same plus small*small, 3 = plain 1xTF32 (rate reference only, not FP32-accurate), 4 = IEEE FP32 SIMT (below).
 #include <cuda_runtime.h>
 
 #include "cutlass/cutlass.h"
@@ -28,6 +28,20 @@ using Operator = cutlass::arch::OpMultiplyAddFastF32Rn4;
 using Operator = cutlass::arch::OpMultiplyAdd;
 #endif
 
+#if FM_VARIANT == 4
+// Variant 4: IEEE FP32 on the CUDA cores (SIMT FFMA, Sm80 multistage), the joined layout's IEEE alternative to the
+// Triton segment_gemm. Tile 0: 64x64x8, tile 1: 128x128x8, warps 32x64x8 (CUTLASS's Sm80 SIMT sgemm tests).
+template <int T> struct Tile;
+template <> struct Tile<0> { using TB = GemmShape<64, 64, 8>; using W = GemmShape<32, 64, 8>; static constexpr int S = 4; };
+template <> struct Tile<1> { using TB = GemmShape<128, 128, 8>; using W = GemmShape<32, 64, 8>; static constexpr int S = 3; };
+
+template <int T, class LayoutB, int Align>
+using Gemm = cutlass::gemm::device::GemmUniversal<
+    float, cutlass::layout::RowMajor, float, LayoutB, float, cutlass::layout::RowMajor, float,
+    cutlass::arch::OpClassSimt, cutlass::arch::Sm80, typename Tile<T>::TB, typename Tile<T>::W, GemmShape<1, 1, 1>,
+    cutlass::epilogue::thread::LinearCombination<float, 1, float, float>,
+    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, Tile<T>::S, 1, 1, cutlass::arch::OpMultiplyAdd>;
+#else
 // Tile 0: 64x64x16, warps 32x32x16, 4 stages; tile 1: 64x128x16, warps 32x64x16, 4 stages (the two tiles that won
 // all 92 shapes of opt-T01 §5 between them).
 template <int T> struct Tile;
@@ -40,6 +54,7 @@ using Gemm = cutlass::gemm::device::GemmUniversal<
     cutlass::arch::OpClassTensorOp, cutlass::arch::Sm80, typename Tile<T>::TB, typename Tile<T>::W, GemmShape<16, 8, 8>,
     cutlass::epilogue::thread::LinearCombination<float, Align, float, float>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, Align, Align, Operator>;
+#endif
 
 template <int T, class LayoutB, int Align>
 static int run(int m, int n, int k, int batch, const float* A, long long lda, long long sA, const float* B,
