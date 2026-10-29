@@ -235,7 +235,11 @@ def run_point(args):
                     edge_bucket=getattr(engine, "edge_bucket", None),
                     padded_sizes=sorted(int(e) for e in getattr(engine, "edge_sizes_used", ())),
                     rebuilds=int(getattr(nl, "rebuilds", 0)),
-                    captures=list(getattr(engine, "capture_memory", ())))
+                    captures=list(getattr(engine, "capture_memory", ())),
+                    force_graphs=getattr(engine.config, "force_graphs", None),
+                    force_graph_releases=getattr(engine, "force_graph_releases", None),
+                    force_graph_floor=getattr(engine, "force_graph_floor", None),
+                    recaptures=getattr(engine, "recaptures", None))
 
     try:
         with warnings.catch_warnings(record=True) as caught:
