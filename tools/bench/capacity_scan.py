@@ -296,7 +296,10 @@ def run_point(args):
             except Exception as problem:  # noqa: BLE001
                 record["failure"]["live"] = f"no snapshot: {problem}"
         if sim is not None:
-            record["edges"] = edges()
+            try:
+                record["edges"] = edges()
+            except Exception as problem:  # noqa: BLE001  (after a sticky CUDA error)
+                record["edges"] = f"not readable: {type(problem).__name__}"
     finally:
         record["times"] = times
         record["warnings"] = [f"{w.category.__name__}: {w.message}" for w in caught][:20]
