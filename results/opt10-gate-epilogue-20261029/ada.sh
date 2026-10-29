@@ -36,7 +36,7 @@ run() {  # name command...
   return $status
 }
 note "fastmace=$(cat "$FM/.source_commit") gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
-run check $E/bin/python -m pytest -p no:cacheprovider -q -rf -s "$FM/tests/gpu/test_gated_products_cuda.py" "$FM/tests/gpu/test_segment_gemm_cuda.py" || { note "STOP: check failed"; exit 4; }
+run check $REF -m pytest -p no:cacheprovider -q -rf -s "$FM/tests/gpu/test_gated_products_cuda.py" "$FM/tests/gpu/test_segment_gemm_cuda.py" || { note "STOP: check failed"; exit 4; }
 run gate $E/bin/python "$FM/tools/force_stress_gate.py" --output "$ROOT/gate" --engine fastmace --checkpoint "$CK" \
   --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" --rewrites gate_epilogue=on \
   --reference-command "$REF" --production-command "$E/bin/python"
