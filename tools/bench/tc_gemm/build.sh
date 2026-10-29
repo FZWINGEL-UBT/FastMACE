@@ -18,7 +18,10 @@ done
 status=0
 for p in "${pids[@]}"; do wait "$p" || status=1; done
 [ $status -eq 0 ] || { tail -30 "$OUT"/build_v*.log; exit 1; }
-"$NVCC" $ARCH -shared -o "$OUT/libfm_tc_gemm.so" "$OUT"/cutlass_tc_v*.o
+# libstdc++ and libgcc linked statically, plus glibc_shim.c: the library then runs on older distributions (Modal's
+# Debian image, glibc 2.36).
+gcc -std=gnu17 -O2 -fPIC -c "$HERE/glibc_shim.c" -o "$OUT/glibc_shim.o"
+"$NVCC" $ARCH -shared -Xcompiler "-static-libstdc++ -static-libgcc" -o "$OUT/libfm_tc_gemm.so" "$OUT"/cutlass_tc_v*.o   "$OUT/glibc_shim.o"
 "$NVCC" --version | tail -1 > "$OUT/nvcc.txt"
 git -C "$CUTLASS" rev-parse HEAD > "$OUT/cutlass_commit.txt" 2>/dev/null || true
 echo "built $OUT/libfm_tc_gemm.so"
