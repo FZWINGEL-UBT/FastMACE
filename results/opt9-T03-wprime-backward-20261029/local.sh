@@ -21,6 +21,10 @@ export PYTHONPATH=$FM PYTHONDONTWRITEBYTECODE=1 FASTMACE_CACHE=$CACHE FASTMACE_M
   FASTMACE_STRUCTURES=$B TORCHINDUCTOR_CACHE_DIR=$CACHE/inductor TRITON_CACHE_DIR=$CACHE/triton \
   MACE_COMPILE_CACHE=$CACHE/compile XDG_CACHE_HOME=$CACHE/xdg TMPDIR=$ROOT/tmp TMP=$ROOT/tmp TEMP=$ROOT/tmp \
   TORCHINDUCTOR_COMPILE_THREADS=4
+# The GPU test's child script, run without pytest (mace_cueq_oeq has none locally).
+CHILD='import ast, sys, textwrap
+tree = ast.parse(open(sys.argv[1], encoding="utf-8").read())
+exec(textwrap.dedent(next(n.value.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "CHILD")))'
 log=$ROOT/run.log
 note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
 idle() {  # 6 samples, 5 s apart, all idle
@@ -53,7 +57,7 @@ drift() {  # job structure value
 note "fastmace=$(cat "$FM/.source_commit") source=$FM host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 for job in "$@"; do
   case $job in
-    check) run $job "$PY" -m pytest -p no:cacheprovider -q -rf -s "$FM/tests/gpu/test_wprime_backward_cuda.py" ;;
+    check) run $job "$PY" -c "$CHILD" "$FM/tests/gpu/test_wprime_backward_cuda.py" ;;  # the local env has no pytest
     gate) run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate" --engine fastmace \
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --rewrites wprime_backward=on --reference-command "$REF" --production-command "$PY" ;;
