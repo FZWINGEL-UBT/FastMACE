@@ -65,7 +65,8 @@ def parse_args(argv=None):
     point.add_argument("--repeat", required=True, help="NXxNYxNZ")
     point.add_argument("--diagnose", action="store_true",
                        help="record the allocator's history; on a failure, list the largest live blocks and where "
-                            "they were allocated (run with CUDA_LAUNCH_BLOCKING=1 to stop at the failing call)")
+                            "they were allocated (run with CUDA_LAUNCH_BLOCKING=1 to stop at the failing call); "
+                            "the fallback refuses, so the first failure is the one raised")
     scan = sub.choices["scan"]
     scan.add_argument("--start-atoms", type=int, default=4000)
     scan.add_argument("--growth", type=float, default=1.5, help="atom ratio between sizes before the first failure")
@@ -234,7 +235,11 @@ def run_point(args):
             record["phases"]["load"] = peaks()
             phase = "build"
             started = time.perf_counter()
-            sim = fm.Simulation(atoms, field, seed=args.seed, integrator=fm.integrators.Langevin(
+            from fastmace.config import FallbackConfig
+
+            sim = fm.Simulation(atoms, field, seed=args.seed,
+                                **({"fallback": FallbackConfig(fallback="refuse")} if args.diagnose else {}),
+                                integrator=fm.integrators.Langevin(
                 timestep_fs=args.timestep_fs, temperature_K=args.temperature_K, friction_per_fs=0.002))
             torch.cuda.synchronize()
             times["build_s"] = time.perf_counter() - started
