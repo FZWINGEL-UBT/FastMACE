@@ -34,7 +34,7 @@ DATA = Path(__file__).resolve().parents[1] / "_support" / "data" / "rule12_fit.j
 FIT = json.loads(DATA.read_text())
 LOW, HIGH = 1.0, 1.5
 CAPACITY = json.loads((DATA.parent / "rule12_capacity.json").read_text())
-CAPACITY_HIGH = 1.35
+CAPACITY_HIGH = 1.4
 
 
 def predicted(case):

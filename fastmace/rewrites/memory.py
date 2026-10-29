@@ -20,14 +20,16 @@ _KEY_BYTES = 8
 # int32 senders and receivers per edge, saved by the streaming convolution for its backward.
 _STREAMING_INDEX_BYTES = 2 * 4
 # MH-1's fused path, measured on the GPU (decision 67, plans/capacity.md CAP-T02; docs/validation/capacity-T02.md):
-# floats per edge each record keeps below the estimate's stock structure. chunked_conv_backward and radial_tables:
-# the change in the peak when the record alone is turned off (NbCl5, 14,976 atoms, RTX 5060 Ti, float32: 2,086 and
-# 2,306 bytes per edge). The streaming convolution's: the remainder of the fused path, fitted so that the estimate
-# stays 1.05-1.3x above the measured peaks of the capacity scan (tests/cpu/test_memory_fit.py's capacity cases);
-# per precision, as the fused paths keep different tensors in float32 and float64.
-_CHUNKED_BACKWARD_FLOATS = 521
-_RADIAL_TABLES_FLOATS = 576
-_MH1_STREAMING_FLOATS = {4: 2000, 8: 673}
+# the share of the estimate's stock per-edge floats (``_stock_edge_floats``; 8,265 for MH-1) each record does not
+# keep. chunked_conv_backward and radial_tables: the change in the peak when the record alone is turned off (NbCl5,
+# 14,976 atoms, RTX 5060 Ti, float32: 2,086 and 2,306 bytes per edge, 521 and 576 of MH-1's floats). The
+# streaming convolution's: the remainder of the fused path (2,000 and 673 floats), fitted so that the estimate
+# stays 1.05-1.32x above the capacity scan's measured peaks (tests/cpu/test_memory_fit.py's capacity cases); per
+# precision, as the fused paths keep different tensors in float32 and float64. Shares, so a smaller model's terms
+# shrink with its widths.
+_CHUNKED_BACKWARD_SHARE = 521 / 8265
+_RADIAL_TABLES_SHARE = 576 / 8265
+_MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
 
 
 def _first_hidden(block) -> int:
@@ -83,21 +85,35 @@ def streaming_conv(dims, width):
     return _STREAMING_INDEX_BYTES, 0
 
 
+def _stock_edge_floats(dims) -> int:
+    """The floats per edge the estimate counts for stock MACE with a fused convolution (``planner.memory``): every
+    interaction's per-edge tensors, the widest backward transient and the shared edge geometry."""
+    from fastmace.planner import memory as estimate  # planner.memory imports nothing from torch or MACE
+
+    if not dims.interactions:
+        return 0
+    first = dims.interactions[0]
+    return (sum(edge for edge, _ in estimate.interaction_floats(dims, fused_conv=True))
+            + max(block.weight_numel for block in dims.interactions)
+            + estimate._GEOMETRY_FLOATS + first.edge_attrs + first.edge_feats)
+
+
 def mh1_streaming_conv(dims, width):
-    """MH-1's streaming convolution with its fused folded path: its int32 senders and receivers, less the per-edge
-    tensors of the estimate's stock structure that the fused path does not keep (``_MH1_STREAMING_FLOATS``,
-    fitted on the capacity scan's GPU peaks, decision 67)."""
-    return _STREAMING_INDEX_BYTES - _MH1_STREAMING_FLOATS.get(width, _MH1_STREAMING_FLOATS[4]) * width, 0
+    """MH-1's streaming convolution with its fused folded path: its int32 senders and receivers, less the share of
+    the stock per-edge floats the fused path does not keep (``_MH1_STREAMING_SHARE``, fitted on the capacity
+    scan's GPU peaks, decision 67)."""
+    share = _MH1_STREAMING_SHARE.get(width, _MH1_STREAMING_SHARE[4])
+    return _STREAMING_INDEX_BYTES - round(share * _stock_edge_floats(dims)) * width, 0
 
 
 def chunked_conv_backward(dims, width):
     """The chunked convolution backward keeps no per-edge weight gradient of the whole edge set (measured)."""
-    return -_CHUNKED_BACKWARD_FLOATS * width, 0
+    return -round(_CHUNKED_BACKWARD_SHARE * _stock_edge_floats(dims)) * width, 0
 
 
 def radial_tables(dims, width):
     """Tabulated radial networks keep no hidden activations per edge (measured)."""
-    return -_RADIAL_TABLES_FLOATS * width, 0
+    return -round(_RADIAL_TABLES_SHARE * _stock_edge_floats(dims)) * width, 0
 
 
 def block_linear_resident(dims, width):

@@ -471,8 +471,8 @@ def test_rule_12_never_drops_a_group_that_saves_nothing(monkeypatch):
     """Decision 67: a rewrite whose own per-edge term is positive stays on when turning it off with its dependants
     would raise the estimate (here the streaming convolution with its old +8 bytes, beside the chunked backward's
     measured saving)."""
-    monkeypatch.setattr(terms, "_MH1_STREAMING_FLOATS", {4: -1, 8: -1})  # +12 bytes per edge in float32
-    assert terms.mh1_streaming_conv(None, 4) == (12, 0)
+    monkeypatch.setattr(terms, "_MH1_STREAMING_SHARE", {4: 0.0, 8: 0.0})  # the index bytes alone: +8 per edge
+    assert terms.mh1_streaming_conv(capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"])), 4)[0] == 8
     full = plan()
     if full.rewrites.chunked_conv_backward != "on":
         pytest.skip("the plan does not enable the chunked backward here")

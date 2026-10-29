@@ -2805,7 +2805,7 @@ Open decisions for the owner:
    (2,086 and 2,306 bytes per edge in float32), and MH-1's streaming convolution
    the remainder of the fused path, fitted per precision on the capacity scan's
    peaks (RTX 5060 Ti under WSL2, RTX 4000 Ada under Linux). The estimate then
-   stays between 1.0 and 1.35 times the measured peak on NaCl, NbCl5 and SrTiO3
+   stays between 1.0 and 1.4 times the measured peak on NaCl, NbCl5 and SrTiO3
    up to 30,600 atoms. Before, it was 1.5-2.3 times, so rule 12 turned the fused
    path off from about 13k atoms. That raised the peak, slowed the step and, under
    WSL2, let OEq's own convolution kernels reserve several GiB of stack memory.
@@ -3286,7 +3286,7 @@ launcher remains a requirement. Results: `docs/validation/6-T15.md`.
 **Decision 67 (29 October 2026, owner: "It should only do this if memory would not be enough"):** rule 12
 (§9.3) turns off the streaming convolution and its dependants only when the plan would not fit with them on and
 turning them off lowers the estimate; decision 51 amended to match. MH-1's fused-path rewrites declare their
-measured and fitted per-edge savings, so the estimate predicts the capacity scan's peaks (1.0-1.35x, was
+measured and fitted per-edge savings, so the estimate predicts the capacity scan's peaks (1.0-1.4x, was
 1.5-2.3x). See §18, decision 67.
 
 **Decision 66 (29 October 2026, owner):** per-GPU defaults allowed. Goal 2 and §9.1 now permit a default that

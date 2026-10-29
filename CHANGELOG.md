@@ -94,7 +94,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
-- Rule 12 (decision 67, owner): the memory estimate predicts the measured peak of MH-1's fused path (1.0-1.35x,
+- Rule 12 (decision 67, owner): the memory estimate predicts the measured peak of MH-1's fused path (1.0-1.4x,
   was 1.5-2.3x), and a rewrite is turned off for memory only when the plan would not fit with it on and turning it
   off lowers the estimate. Large MH-1 cells keep `streaming_conv` and its dependants: on the RTX 5060 Ti NaCl float32
   reaches 27,000 atoms instead of 21,952, and runs faster per atom (plans/capacity.md CAP-T02).
