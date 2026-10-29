@@ -33,6 +33,9 @@ run() {  # name command... (each step at most STEP seconds, default 900)
 }
 note "fastmace=$(cat .source_commit) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) phase=$phase variant=$variant"
 case $phase in
+probe)  # single-SM co-execution probe (opt4-T07's gate): SIMT FP32 beside 3xTF32 / 3xFP16 MMA, incl. x3_pipe
+  run probe python tools/megakernel_probe.py --label "Modal $(nvidia-smi --query-gpu=name --format=csv,noheader)" \
+    --output "$OUT/probe" --variants gemm x3 x3_pipe --kinds tf32 fp16 ;;
 debug)  # find a faulting mode: NbCl5 warm-up launches one by one, blocking (the log's last line names it)
   run debug-NbCl5 env CUDA_LAUNCH_BLOCKING=1 FASTMACE_SCREEN_VERBOSE=1 python $W/tc_gemm_screen.py     --output "$OUT/debug" --provider modal --structures NbCl5 --blocks 1 --iters 1 ;;
 screen)
