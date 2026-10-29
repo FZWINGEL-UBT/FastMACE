@@ -50,7 +50,8 @@ for job in "$@"; do
             --output "$ROOT/points" ${extra:+--start-atoms "$extra"} "${opts[@]}" >> "$ROOT/jobs.log" 2>&1 < /dev/null ;;
     diag) CUDA_LAUNCH_BLOCKING=1 "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
             --precision "$precision" --output "$ROOT/points" --repeat "$extra" --diagnose "--tag=${TAG:--diag}" \
-            ${REWRITES:+--rewrites $REWRITES} >> "$ROOT/jobs.log" 2>&1 < /dev/null ;;
+            --model "${MODEL:-mh1-r2scan}" ${REWRITES:+--rewrites $REWRITES} ${ENGINE:+--engine $ENGINE} \
+            >> "$ROOT/jobs.log" 2>&1 < /dev/null ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
   note "end $job exit=$?"
