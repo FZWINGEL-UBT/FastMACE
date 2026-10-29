@@ -106,7 +106,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
-    "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
+    "RewriteConfig.grouped_launch":
+        "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
@@ -359,6 +360,10 @@ DECISION_65_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generatio
 DECISION_65_MANTISSA_BITS = 56
 # w_tables: measured on two and three species (NaNbO3: 1.3 GB of tables); four would pass W_TABLE_MAX_BYTES.
 DECISION_65_MAX_SPECIES = 3
+# Decision 66 (owner, 29 October 2026): per-GPU defaults where same-process whole-step A/Bs in both build orders
+# measured a speed-up, by exact device name. grouped_launch for MH-1 on the RTX 5060 Ti (current main, 29 October):
+# NaCl 0.971 / 0.975, NbCl5 1.002 / 0.998, NaNbO3 1.001 / 0.999. The RTX 4000 Ada lost 0.5 % in OPT-T03b.
+DECISION_66_GROUPED_LAUNCH_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -714,7 +719,7 @@ class FixedPlanner:
         backend, dtype, fusion = self._backend(book, backend_choice, reproducible)
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
-        self._stage2(book, values, traits, explicit, model_label)
+        self._stage2(book, values, traits, explicit, model_label, hardware)
         decision_65 = _decision_65(dtype, reproducible, hardware, model_label)
         species = len(set(superset)) if superset else len(set(int(z) for z in atoms.get_atomic_numbers()))
         self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability,
@@ -1070,7 +1075,7 @@ class FixedPlanner:
                  f"stage 1: {backend_name} backend")
         return v
 
-    def _stage2(self, book, v, traits, explicit, model_label=None):
+    def _stage2(self, book, v, traits, explicit, model_label=None, hardware=None):
         """``workflow.adapt_options_to_model``: unsupported options off (auto) or refused (on)."""
         support = traits.rewrite_support
         for name, key in STAGE2_SUPPORT:
@@ -1086,12 +1091,19 @@ class FixedPlanner:
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
         if v["grouped_launch"] and "grouped_launch" not in explicit and not _generic_mace_family(traits):
-            # Measured only on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b).
-            reason = (f"not the generic MACE family, decision 57 (interactions "
-                      f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
-            v["grouped_launch"] = False
-            v["_auto_off"]["grouped_launch"] = reason
-            v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
+            # Measured on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b) and gains on the
+            # RTX 5060 Ti (decision 66).
+            name = getattr(hardware, "name", None)
+            if _mh1(model_label) and name in DECISION_66_GROUPED_LAUNCH_GPUS:
+                v["_why"]["grouped_launch"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            else:
+                reason = (f"not the generic MACE family, decision 57 (interactions "
+                          f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
+                if _mh1(model_label):
+                    reason += f"; MH-1 not on a measured GPU, decision 66 ({name})"
+                v["grouped_launch"] = False
+                v["_auto_off"]["grouped_launch"] = reason
+                v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
         for name in POLAR_GRAPH_RECORDS:
             if v[name] and name not in explicit and not _qualified_polar(traits, model_label):
                 # Gated on the three POLAR-1 checkpoints (OPT4-T02); other models were not screened.

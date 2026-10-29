@@ -77,6 +77,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- **Per-GPU defaults (owner decision 66, 29 October 2026).** `RewriteConfig.grouped_launch` is now on by default
+  for MH-1 on the RTX 5060 Ti (planner rule
+  `on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus`,
+  `planner.fixed.DECISION_66_GROUPED_LAUNCH_GPUS`): NaCl MD step 0.971 / 0.975 in both build orders, NbCl5 and
+  NaNbO3 neutral (`docs/validation/decision66-grouped-launch.md`). Off for MH-1 on every other GPU (the RTX 4000
+  Ada measured slower); the generic family keeps it everywhere.
 - `LangevinBAOAB.fixcm` is `False` and only `False`: BAOAB, as ASE's, never removed the total momentum, so the
   record no longer claims a fixed centre of mass. `fixcm=True` is refused; restarts recorded with it resume
   with `False`.

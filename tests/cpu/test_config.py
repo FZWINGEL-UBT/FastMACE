@@ -80,7 +80,8 @@ AUTO_RULES = {
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
-    "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
+    "RewriteConfig.grouped_launch":
+        "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
