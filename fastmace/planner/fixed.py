@@ -132,7 +132,7 @@ STAGE2_SUPPORT = (
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
     ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"), ("wprime_backward", "fold_cutoff"),
-    ("recompute_conv_weights", "fold_cutoff"), ("species_tables", "species_tables"),
+    ("species_tables", "species_tables"),
     ("fold_product_linear", "species_tables"),
     ("species_residual", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
