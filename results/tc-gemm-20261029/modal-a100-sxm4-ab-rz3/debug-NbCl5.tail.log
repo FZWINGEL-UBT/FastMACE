@@ -1,0 +1,30 @@
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cublas_batched
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cublas_ieee
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cublas_tf32
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode triton_tf32x3
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_rz3
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_rz3_t0
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_rz3_t1
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_rn3
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_rn4
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_tf32
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_simt
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_simt_t0
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode cutlass_simt_t1
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode fp16x3_prepacked
+warm-up product 47 dense [1944, 128] @ [128, 130] dim 1 mode fp16x3_split
+Traceback (most recent call last):
+  File "/tmp/fastmace-src/tools/bench/tc_gemm/tc_gemm_screen.py", line 378, in <module>
+    main()
+  File "/tmp/fastmace-src/tools/bench/tc_gemm/tc_gemm_screen.py", line 312, in main
+    times = time_modes(torch, runners, args.modes, args.reps, args.iters, args.blocks)
+  File "/tmp/fastmace-src/tools/bench/tc_gemm/tc_gemm_screen.py", line 260, in time_modes
+    g.replay()
+  File "/usr/local/lib/python3.10/site-packages/torch/cuda/graphs.py", line 711, in replay
+    super().replay()
+torch.AcceleratorError: CUDA error: an illegal memory access was encountered
+Search for `cudaErrorIllegalAddress' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+The CUDA driver logged these messages, which may provide useful details:
+Returning 700 (CUDA_ERROR_ILLEGAL_ADDRESS) from cuGraphLaunch
+
+
