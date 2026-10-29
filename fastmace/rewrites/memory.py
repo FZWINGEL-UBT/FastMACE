@@ -24,7 +24,7 @@ _STREAMING_INDEX_BYTES = 2 * 4
 # keep. chunked_conv_backward and radial_tables: the change in the peak when the record alone is turned off (NbCl5,
 # 14,976 atoms, RTX 5060 Ti, float32: 2,086 and 2,306 bytes per edge, 521 and 576 of MH-1's floats). The
 # streaming convolution's: the remainder of the fused path (2,000 and 673 floats), fitted so that the estimate
-# stays 1.05-1.32x above the capacity scan's measured peaks (tests/cpu/test_memory_fit.py's capacity cases); per
+# stays 1.05-1.34x above the capacity scan's measured peaks (tests/cpu/test_memory_fit.py's capacity cases); per
 # precision, as the fused paths keep different tensors in float32 and float64. Shares, so a smaller model's terms
 # shrink with its widths.
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
