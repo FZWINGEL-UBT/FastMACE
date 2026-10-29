@@ -1362,19 +1362,19 @@ class Simulation:
         """Release the active engine before another is built (memory: conductor's answer, 5-T07 Q3)."""
         import gc
 
+        import torch
+
         engine = self._engine
         if self._mc is not None:
             self._mc_record = self._mc.state_dict()
             self._mc.detach()
             self._mc = None
         self._engine = self._fill = None
-        device = engine.device if engine is not None and engine.device.type == "cuda" else None
+        cuda = engine is not None and engine.device.type == "cuda"
         del engine
         gc.collect()
-        if device is not None:
-            from fastmace._device_memory import release_cached_memory
-
-            release_cached_memory(device)  # and wait until the driver shows it free: a new engine follows (CAP-T03)
+        if cuda:
+            torch.cuda.empty_cache()
 
     def _build_for(self, plan, atoms):
         """``plan``'s engine at ``atoms`` (the committed structure), from the pristine model; not validated."""

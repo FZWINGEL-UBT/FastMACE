@@ -246,11 +246,6 @@ class GraphEngine(Engine):
         self.force_graph_releases = 0
         self.force_graph_floor = 0
         self._force_bytes_per_edge = 0.0
-        # Cache releases before allocations, the seconds spent waiting for the driver, and the releases it did not
-        # show free within the timeout (_release_cached, CAP-T03).
-        self.memory_releases = 0
-        self.memory_release_seconds = 0.0
-        self.memory_releases_unsettled = 0
         self.edge_sizes_used = set()
         self.rebuilds = 0
         self.rebuild_needed = torch.zeros((), dtype=torch.bool, device=device)
@@ -720,9 +715,7 @@ class GraphEngine(Engine):
             "recapture_budget_exceeded_at": self.recapture_budget_exceeded_at,
             "graph_variant_cap": self.config.graph_variant_cap, "graph_evictions": self.graph_evictions,
             "force_graphs": self.config.force_graphs, "force_graph_releases": self.force_graph_releases,
-            "force_graph_floor": self.force_graph_floor, "memory_releases": self.memory_releases,
-            "memory_release_seconds": self.memory_release_seconds,
-            "memory_releases_unsettled": self.memory_releases_unsettled,
+            "force_graph_floor": self.force_graph_floor,
             "recapture_log": [dict(entry) for entry in self.recapture_log],
             "invalidations": [dict(entry) for entry in self.invalidations],
             "captures": self.capture_count, "capture_seconds": self.capture_seconds,
@@ -1275,24 +1268,13 @@ class GraphEngine(Engine):
         self.force_graph_releases += 1
         self.force_graph_floor = max(self.force_graph_floor, int(edges))
         if self.cuda:
-            self._release_cached()  # the retired pool's blocks back to the device
-
-    def _release_cached(self) -> None:
-        """``empty_cache`` and wait until the driver shows the blocks free (``fastmace._device_memory``, CAP-T03):
-        under WSL2 an allocation right after it can fail near a full card."""
-        from fastmace._device_memory import release_cached_memory
-
-        released = release_cached_memory(self.state.positions.device)
-        if released.released:
-            self.memory_releases += 1
-            self.memory_release_seconds += released.seconds
-            self.memory_releases_unsettled += not released.settled
+            torch.cuda.empty_cache()  # the retired pool's blocks back to the device
 
     def _free_device_bytes(self) -> int | None:
         """The device's free memory after releasing cached blocks (``None`` off CUDA)."""
         if not self.cuda:
             return None
-        self._release_cached()
+        torch.cuda.empty_cache()
         return int(torch.cuda.mem_get_info(self.state.positions.device)[0])
 
     def _pool_bytes(self) -> int | None:
@@ -1394,7 +1376,7 @@ class GraphEngine(Engine):
             # The capture allocates in the graph pool and cannot reuse blocks cached by the warm-up,
             # so otherwise both count towards the peak.
             torch.cuda.synchronize()
-            self._release_cached()
+            torch.cuda.empty_cache()
         if self._pool is None:
             self._pool = torch.cuda.graph_pool_handle()
         graph = torch.cuda.CUDAGraph()

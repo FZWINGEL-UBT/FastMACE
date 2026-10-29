@@ -744,9 +744,9 @@ def _d3_record(job):
 def _free(device):
     gc.collect()
     if str(device).startswith("cuda"):
-        from fastmace._device_memory import release_cached_memory
+        import torch
 
-        release_cached_memory(device)  # and wait until the driver shows it free (CAP-T03)
+        torch.cuda.empty_cache()
 
 
 def _evaluate_one(reference, atoms):
