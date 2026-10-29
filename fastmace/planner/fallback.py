@@ -370,6 +370,74 @@ def _with_estimate(error, plan):
     return annotate_out_of_memory(error, plan)
 
 
+def _out_of_memory(error) -> bool:
+    return isinstance(error, MemoryError) or type(error).__name__ == "OutOfMemoryError"
+
+
+def _context_usable(device) -> bool:
+    """Can the process still use ``device`` after an error (CAP-T07)? A CUDA error during a capture can leave the
+    context sticky: every later call fails, ``cudaMemGetInfo`` included. ``True`` off CUDA."""
+    if not str(device).startswith("cuda"):
+        return True
+    try:
+        import torch
+
+        torch.cuda.synchronize(device)
+        torch.cuda.mem_get_info(torch.device(device))
+    except Exception:  # noqa: BLE001 - any failure here means the context cannot run a rebuild
+        return False
+    return True
+
+
+def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any, *, planner: Any, stage: str,
+                  usable: Callable[[Any], bool] = _context_usable) -> Any:
+    """The plan to rebuild with after ``error`` at ``stage`` (``"build"`` or ``"capture"``), or ``None``
+    (plans/capacity.md CAP-T07; the owner's rule: memory-saving records only when memory would not be enough).
+
+    ``None`` unless ``error`` is an out-of-memory error and the plan has a record of ``memory.MEMORY_RESCUE`` off
+    that the caller left "auto" and whose requirements are on. Then, if the device is still usable, a revision of
+    ``plan`` with those records on (``candidate``: "fallback: rewrites recompute_conv_weights on: out of memory at
+    build; ..."), which the run record keeps in ``Plan.revisions``. If the context is not usable (a sticky CUDA
+    error), ``error`` is raised again with a note naming the fix: the records set "on" in a fresh process.
+    """
+    from fastmace.planner.memory import MEMORY_RESCUE, annotate_out_of_memory
+
+    if not _out_of_memory(error):
+        return None
+    requested = getattr(force_field, "rewrites", "auto")
+    names = []
+    for name in MEMORY_RESCUE:
+        if requested != "auto" and getattr(requested, name, "auto") != "auto":
+            continue  # the caller's explicit value is kept
+        record = _record(name)
+        if not _off(getattr(plan.rewrites, name, "on")) or record is None:
+            continue
+        if all(not _off(getattr(plan.rewrites, other, "off")) for other in record.requires):
+            names.append(name)
+    if not names:
+        return None
+    if not usable(plan.engine.device):
+        fix = ", ".join(f'{name}="on"' for name in names)
+        note = (f"FastMACE (CAP-T07): out of memory at {stage}, and the CUDA context is not usable afterwards, so "
+                f"this process cannot rebuild with {', '.join(names)} on. Run again in a fresh process with "
+                f"fm.ForceField(..., rewrites=RewriteConfig({fix})).")
+        annotate_out_of_memory(error, plan)
+        message = str(error.args[0]) if error.args else ""
+        if note not in message:
+            error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
+        raise error
+    why = (f"out of memory at {stage}; {', '.join(names)} auto -> on (the memory rescue, rule 12; CAP-T07)")
+    return candidate(plan, {"rewrites": {name: "on" for name in names}, "reason": why}, force_field, atoms,
+                     planner=planner)
+
+
+def _record(name):
+    from fastmace.planner import minimal
+
+    registry = minimal._rewrite_registry()
+    return registry[name] if name in registry.names() else None
+
+
 def stage_of(error, default: str = "build") -> str:
     """The stage an error before the first step was raised in: ``"capture"`` for an error the graph
     engine tagged while capturing (``engine.graph.CAPTURE_STAGE``, 2-T15b), ``"self-check"``,

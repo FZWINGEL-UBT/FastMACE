@@ -45,9 +45,15 @@ from typing import Any
 
 # Decision 51: the estimate must stay below this share of the free GPU memory.
 MARGIN = 0.9
-# Records rule 12 turns on, when they are "auto" and the plan does not fit without them, if they lower the estimate
-# (plans/capacity.md CAP-T07): they trade step time for memory, so they stay off whenever the plan fits.
+# Records that trade step time for memory (plans/capacity.md CAP-T07), when "auto": off in the plan, and turned on
+# only when memory would not be enough without them. A run whose estimate does not fit tries without them first and
+# rebuilds once with them on after a recoverable out-of-memory error at build or capture
+# (planner.fallback.memory_rescue); rule 12 turns them on in the plan only for cells that cannot fit without them
+# (``short_by_far``).
 MEMORY_RESCUE = ("recompute_conv_weights",)
+# The estimate's largest overstatement of the measured peak in decision 67's fit (the capacity cells: 1.05 to 1.34
+# times the peak): a cell whose estimate, divided by it, still exceeds the free memory cannot fit (CAP-T07).
+RESCUE_OVERSTATEMENT = 1.34
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
 # 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]).
 # Below 1 because the run term is stock-structured: it counts what stock MACE keeps per edge, while the fused
@@ -263,6 +269,12 @@ def fits(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
     return not free_bytes or estimate_.needed <= MARGIN * free_bytes
 
 
+def short_by_far(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
+    """CAP-T07: is the free memory below even the smallest peak the estimate allows (``needed`` divided by
+    ``RESCUE_OVERSTATEMENT``)? Then a build without the memory rescue would only fail. ``False`` off CUDA."""
+    return bool(free_bytes) and estimate_.needed / RESCUE_OVERSTATEMENT > free_bytes
+
+
 def drop_order(rewrite_terms: tuple[tuple[str, int], ...], edge_sized: set[str], explicit: set[str]) -> list[str]:
     """Decision 51's order: the rewrites with an edge-sized term, largest first, the caller's explicit ones
     left out. Ties keep application order."""
@@ -315,6 +327,7 @@ def annotate_out_of_memory(error, plan) -> Any:
 
 
 __all__ = ["DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm",
-           "POLAR_STREAMING_BACKWARD", "SAFETY", "WORKSPACE_BYTES", "annotate_out_of_memory", "drop_order",
+           "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD", "RESCUE_OVERSTATEMENT", "SAFETY", "WORKSPACE_BYTES",
+           "annotate_out_of_memory", "drop_order", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
            "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]

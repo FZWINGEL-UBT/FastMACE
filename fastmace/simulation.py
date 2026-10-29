@@ -606,25 +606,24 @@ class Simulation:
         move_s = time.perf_counter() - started
         self._references, self._move_references = references, moves
 
-        started = time.perf_counter()
-        failure = None
+        rescue = None
         try:
-            self._engine = planner.build(self._plan, ff, atoms)
+            failure = self._build_and_prepare(planner, ff, atoms, stored, setup)
         except Exception as error:
-            failure = self._failure("build", error, stored)
-        else:
-            self._attach_engine()
-        setup["build"] = time.perf_counter() - started
-        # The first step's CUDA graphs, captured now, inside the fallback window, not at the first
-        # run() (2-T15b). A resume keeps capturing at its first step: it never falls back.
-        if failure is None and stored is None and not getattr(self, "_resuming", False):
-            started = time.perf_counter()
-            try:
-                self._engine.prepare()
-            except Exception as error:
-                failure = self._failure("capture", error, stored)
-            if self._engine is not None and self._engine.capture:
-                setup["capture"] = time.perf_counter() - started
+            # CAP-T07: an out-of-memory error at build or capture rebuilds once with the memory rescue's records
+            # on, when the caller left them "auto"; any other error, or none to turn on, is raised as before.
+            if stored is not None or getattr(self, "_resuming", False):
+                raise
+            rescue = fallback.memory_rescue(self._plan, error, ff, atoms, planner=planner,
+                                            stage=getattr(error, "fastmace_build_step", "build"))
+            if rescue is None:
+                raise
+            fallback.detach(error)  # its frames hold the failed engine (2-T15c)
+        if rescue is not None:
+            self._engine = self._fill = None
+            fallback._release()  # the failed engine's graphs and pools, before the rebuild
+            self._plan = rescue
+            failure = self._build_and_prepare(planner, ff, atoms, stored, setup)
 
         # The production half through this engine; GateFailed (and the unavailable record under
         # check="allow_unavailable") come from selfcheck. The record is final: sim.gate.
@@ -684,6 +683,41 @@ class Simulation:
             self._last_point = self._setup_point = self._hand_over(canonicalise=False)
             self._mc_events = []
         self._write_metadata()
+
+    def _build_and_prepare(self, planner, ff, atoms, stored, setup):
+        """Build the plan's engine and capture its first step's graphs: the failure for the fallback, or ``None``.
+        An error ``_failure`` raises again carries the step it came from (``fastmace_build_step``)."""
+        started = time.perf_counter()
+        failure = None
+        try:
+            self._engine = planner.build(self._plan, ff, atoms)
+        except Exception as error:
+            failure = self._tagged("build", error, stored)
+        else:
+            self._attach_engine()
+        setup["build"] = time.perf_counter() - started
+        # The first step's CUDA graphs, captured now, inside the fallback window, not at the first
+        # run() (2-T15b). A resume keeps capturing at its first step: it never falls back.
+        if failure is None and stored is None and not getattr(self, "_resuming", False):
+            started = time.perf_counter()
+            try:
+                self._engine.prepare()
+            except Exception as error:
+                failure = self._tagged("capture", error, stored)
+            if self._engine is not None and self._engine.capture:
+                setup["capture"] = time.perf_counter() - started
+        return failure
+
+    def _tagged(self, step, error, stored):
+        """``_failure``, with ``step`` on an error it raises again (CAP-T07's memory rescue reads it)."""
+        try:
+            return self._failure(step, error, stored)
+        except Exception as raised:
+            try:
+                raised.fastmace_build_step = step
+            except AttributeError:  # pragma: no cover - an exception type without a __dict__
+                pass
+            raise
 
     def _attach_engine(self):
         """The engine's state carries the force field's identity and the plan revision; the target fill."""

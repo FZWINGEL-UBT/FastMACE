@@ -512,6 +512,32 @@ def test_rule_12_turns_on_a_memory_rescue_only_when_the_plan_does_not_fit():
 
 
 @pytest.mark.rule(12)
+def test_rule_12_leaves_the_rescue_to_the_run_when_the_cell_may_fit():
+    """CAP-T07 (owner: only when memory would not be enough): the estimate overstates the peak by up to
+    RESCUE_OVERSTATEMENT, so a plan that does not fit 90 % of the free memory, but whose estimate divided by it
+    does, keeps recompute_conv_weights off; the run rebuilds with it after a real out-of-memory error."""
+    full = plan()
+    if full.rewrites.wprime_backward != "on":
+        pytest.skip("wprime_backward is off in this plan (decision 66's GPUs)")
+    pinned = RewriteConfig(**{f.name: "on" for f in dataclasses.fields(RewriteConfig)
+                              if getattr(full.rewrites, f.name) == "on"})  # explicit: decision 51 drops none
+    free = plan(rewrites=pinned).predicted_memory_bytes  # above the estimate / 1.34, below the estimate / 0.9
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=free, rewrites=pinned)
+    assert tight.decision("memory")[1] == "warn"
+    assert tight.rewrites.recompute_conv_weights == "off"
+    _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
+    assert choice == "off" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    assert "rebuilds once with recompute_conv_weights on" in reason
+    check(reason)
+    bound = type("Estimate", (), {})
+    bound.needed = free
+    assert not memory.short_by_far(bound, free)
+    bound.needed = 1.35 * free
+    assert memory.short_by_far(bound, free)
+
+
+@pytest.mark.rule(12)
 def test_rule_12_keeps_an_explicit_on_and_warns():
     with pytest.warns(ResourceWarning, match="kept as set: factor_species"):
         planned = plan(memory_bytes=2**20, rewrites=RewriteConfig(factor_species="on"))

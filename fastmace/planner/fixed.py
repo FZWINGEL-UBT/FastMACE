@@ -1330,7 +1330,8 @@ class FixedPlanner:
         v["recompute_conv_weights"] = self.rewrites.recompute_conv_weights == "on" and v["wprime_backward"]
         v["_why"]["recompute_conv_weights"] = (
             "on: requested" if v["recompute_conv_weights"] else
-            "off: rule 12 turns it on only when the plan would not fit the free memory without it (CAP-T07)"
+            "off: on only when memory would not be enough without it: rule 12 for a cell that cannot fit, or a "
+            "rebuild after an out-of-memory error at build or capture (CAP-T07)"
             if self.rewrites.recompute_conv_weights == "auto" else "off: requested")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
