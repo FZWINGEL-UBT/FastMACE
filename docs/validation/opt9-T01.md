@@ -19,7 +19,9 @@ kernel cannot have the sorted order that makes the dot cheap, so no fused kernel
     62 s, about $0.05. Not a research GPU.
   - murphy, RTX 4000 Ada (sm_89, 40 MiB L2), `mace_cueq_oeq` (torch 2.14.1+cu130), source in
     `/mnt/homes/zwingel/opt9-20261029`; GPU idle checked before the run.
-  - The local RTX 5060 Ti run is queued behind other sessions' screens; not in this report.
+  - local RTX 5060 Ti (sm_120, 32 MiB L2), `mace_cueq_oeq`, under the FIFO reservation (29 October, after the
+    first version of this report): `wdot` / removed NaNbO3 2.041 / 2.465 ms = **0.83**, NbCl5 1.235 / 1.565 ms =
+    **0.79**; sorted 1.042 and 0.918 ms (`results/opt9-T01-wprime-20261029/local-rtx5060ti/`). Not met either.
 
 ## Results (ms per call, standalone)
 

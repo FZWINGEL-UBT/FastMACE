@@ -85,6 +85,19 @@ def _candidate_pairs_cpu(wrapped, image_vectors, screen, half=False):
     return hits[:, 0], hits[:, 1], hits[:, 2]
 
 
+def screen_into(wrapped, image_vectors, radius, out, counter, half=False):
+    """Launch the CUDA screen into ``out`` (int64 codes) behind ``counter`` (int32, zeroed by the caller); no
+    host synchronisation. Codes past ``out.numel()`` are dropped while ``counter`` still counts them, so
+    ``counter > out.numel()`` means the buffer was too small (``SkinNeighbourList.build_gpu_async``)."""
+    import triton
+
+    natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
+    screen = (radius + SCREEN_MARGIN) ** 2
+    grid = (triton.cdiv(natoms, BLOCK), triton.cdiv(natoms, BLOCK))
+    _triton_kernel()[grid](wrapped.float().contiguous(), image_vectors.float().contiguous(), out, counter, natoms,
+                           nimages, screen, out.numel(), BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+
+
 def candidate_pairs(wrapped, image_vectors, radius, state=None, half=False):
     """(image, sender, receiver) int64 tensors of the screened pairs (unordered on CUDA).
 

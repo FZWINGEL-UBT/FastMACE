@@ -324,7 +324,7 @@ def check_oeq(context):
         lines += [f"missing: {problem}" for problem in problems]
         return _fail("\n".join(lines),
                      "pip install 'fastmace[oeq]' (prebuilt fastmace-oeq-ext for torch 2.14.1+cu130, CPython "
-                     "3.10-3.12), or see docs/design/oeq-runtime.md (SPEC §14): g++, ninja (pip install ninja), "
+                     "3.10-3.12), or see docs/design/oeq-runtime.md: g++, ninja (pip install ninja), "
                      "the CUDA 13 runtime wheels (nvidia/cu13) and libcuda.so.1 (OEQ_CUDA_DRIVER_LIBRARY).")
     built = _built_extensions(context.environ)
     if prebuilt.usable:
@@ -388,8 +388,7 @@ def check_cache_root(context):
     state = "exists" if root.is_dir() else "not created yet"
     if not _writable(root):
         return _fail(f"{root} ({source}) is not writable",
-                     f"Set {_cache.ENVIRONMENT_VARIABLE} to a writable directory outside the Python environment "
-                     "(SPEC §14).")
+                     f"Set {_cache.ENVIRONMENT_VARIABLE} to a writable directory outside the Python environment.")
     return _ok(f"{root} ({source}; {state})")
 
 
@@ -411,12 +410,12 @@ def check_file_locks(context):
               f"({info.cuda_driver_cache})")
     if info.file_locks != "soft" and root_on_nfs:
         return _fail(detail, "Use soft file locks on NFS: `import fastmace` before torch, and do not set "
-                             f"{_file_locks.ENVIRONMENT_VARIABLE}=0 (SPEC §14).")
+                             f"{_file_locks.ENVIRONMENT_VARIABLE}=0.")
     disabled = info.cuda_driver_cache.startswith("disabled") or \
         info.cuda_driver_cache == "CUDA_CACHE_DISABLE=1 set by the user"
     if driver_on_nfs and not disabled:
         return _fail(detail, "Unset CUDA_CACHE_DISABLE (fastmace then disables the driver cache on NFS), or set "
-                             "CUDA_CACHE_DISABLE=1, or CUDA_CACHE_PATH to a local directory (SPEC §14).")
+                             "CUDA_CACHE_DISABLE=1, or CUDA_CACHE_PATH to a local directory.")
     return _ok(detail)
 
 

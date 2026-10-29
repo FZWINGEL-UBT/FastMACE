@@ -1,0 +1,18 @@
+== native_f64.cubin (oeq_projected_forward)
+89 DMUL
+86 DFMA
+== dd_forward_cvt.cubin (oeq_projected_forward_dd)
+2510 FADD
+526 FFMA
+376 FMUL
+110 F2F.F64.F32
+70 DADD
+60 F2F.F32.F64
+== dd_forward_bits.cubin (oeq_projected_forward_dd)
+3152 FADD
+788 FMUL
+598 FFMA
+182 I2FP
+182 FSEL
+80 F2F.F64.F32
+40 DADD

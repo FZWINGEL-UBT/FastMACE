@@ -1,0 +1,206 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-29T00:00:53.432724+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "6eac97fe9aac6b03d929d693b5de3c0cac82e510",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "sides": {
+    "a": {},
+    "b": {
+      "save_transcendentals": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "load": [
+    3.98046875,
+    3.58251953125,
+    4.44970703125
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 2.7689886883066115,
+            "mean_ms": 2.789571042493561,
+            "min_ms": 2.7097876433496517,
+            "max_ms": 2.9825026000132007,
+            "stdev_ms": 0.06792400243626281,
+            "spread": 0.09848901074071527,
+            "block_ms": [
+              2.9825026000132007,
+              2.792987480012622,
+              2.821402879975115,
+              2.8061053499792856,
+              2.7664334999766043,
+              2.7666654933030563,
+              2.7713118833101666,
+              2.7414074300031643,
+              2.7580113066748404,
+              2.800756439974066,
+              2.757480503350962,
+              2.7097876433496517
+            ]
+          },
+          "a": {
+            "median_ms": 2.7740253766630003,
+            "mean_ms": 2.791293461385875,
+            "min_ms": 2.7533749400269394,
+            "max_ms": 3.025908786657965,
+            "stdev_ms": 0.07486169416459823,
+            "spread": 0.09824490032563027,
+            "block_ms": [
+              3.025908786657965,
+              2.786136390010749,
+              2.7764257999660913,
+              2.7533749400269394,
+              2.779465990024619,
+              2.775360619998537,
+              2.7641690366726834,
+              2.772690133327463,
+              2.756879983304922,
+              2.753603523306083,
+              2.789053820015397,
+              2.7624525133190523
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0018189631390184,
+        "pair_ratios_b_over_a": [
+          1.0145536123403789,
+          0.9975470387708855,
+          0.9840586112928968,
+          0.9812086848582733,
+          1.0047109355956414,
+          1.0031428182107769,
+          0.997422575683199,
+          1.0114111835336577,
+          0.9995898046657096,
+          0.9831642209243944,
+          1.0114500598013536,
+          1.0194350542924093
+        ]
+      },
+      "ratio_b_over_a": 0.9981843394805394,
+      "pair_ratios": [
+        0.985655156944534,
+        1.0024589930437133,
+        1.016199633359398,
+        1.0191511912111142,
+        0.9953111532593716,
+        0.9968670281502066,
+        1.002584084599284,
+        0.9887175624321363,
+        1.0004103636635506,
+        1.017124076240057,
+        0.9886795599146019,
+        0.9809354659616848
+      ],
+      "setup_s": {
+        "b": 30.982551412002067,
+        "a": 18.39398712500406
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.save_transcendentals = on  (requested 'on': transcendental ops saved for the backward, not recomputed (ideas-20261027 D3))"
+        ],
+        "a": [
+          "RewriteConfig.save_transcendentals = off  (auto (on_for_mh1_float64_on_measured_gpus_decision_65): transcendental ops saved for the backward, not recomputed (ideas-20261027 D3); off: float32 plan, decision 65)"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 1050.6440396896724,
+          "potential_eV_atom": -6.757596557890928,
+          "kinetic_eV_atom": 0.13580620135251387
+        },
+        "a": {
+          "temperature_K": 1050.644014864178,
+          "potential_eV_atom": -6.757596283047287,
+          "kinetic_eV_atom": 0.1358061981435716
+        }
+      },
+      "load_after": [
+        3.9033203125,
+        3.8671875,
+        4.4951171875
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 565,
+          "pipelined_redos": 6,
+          "pipelined_early_rebuilds": 565
+        },
+        "a": {
+          "rebuilds": 565,
+          "pipelined_redos": 6,
+          "pipelined_early_rebuilds": 565
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

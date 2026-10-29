@@ -21,6 +21,11 @@ from dataclasses import dataclass
 BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 64, 32, 4, 3
 # Triton only where M covers at least this many waves of BLOCK_M-row tiles over the SMs (one column of tiles).
 MIN_TRITON_WAVES = 2
+# The Triton products' tile rows and warps (the waves rule above keeps BLOCK_M): one configuration for every
+# device; screens set them per A/B side (fp32 profile, 28 October 2026: 128 rows with 8 warps were bit-identical
+# and 3.8 % faster on sm_89, neutral on sm_120, in tools/bench/segment_gemm_tiles.py).
+TRITON_BLOCK_M = BLOCK_M
+TRITON_NUM_WARPS = NUM_WARPS
 
 
 @dataclass(frozen=True)
@@ -59,7 +64,8 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
     if waves < MIN_TRITON_WAVES:
         return GemmChoice("cublas", reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs "
                                            f"(< {MIN_TRITON_WAVES})")
-    return GemmChoice("triton", reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs")
+    return GemmChoice("triton", block_m=TRITON_BLOCK_M, num_warps=TRITON_NUM_WARPS,
+                      reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs")
 
 
 def device_sms(device) -> int | None:

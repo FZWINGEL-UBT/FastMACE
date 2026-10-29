@@ -39,7 +39,7 @@ class ForceField:
     """
 
     def __init__(self, model: Any, atoms: Any = None, *, precision: Literal["float32", "float64"] = "float32",
-                 rewrites: Any = "auto", species: Any = None, dispersion: Any = None):
+                 rewrites: Any = "auto", species: Any = None, dispersion: Any = None, polar: Any = None):
         from fastmace.config import RewriteConfig
 
         if isinstance(model, str):
@@ -59,6 +59,7 @@ class ForceField:
         self.precision = precision
         self.rewrites = rewrites
         self.dispersion, self.dispersion_warnings = _dispersion(dispersion, model)
+        self.polar, self.polar_warnings = _polar(polar, model)
         self._traits = None
         self._evaluations = {}
         self.species = None
@@ -133,6 +134,9 @@ class ForceField:
             from fastmace.longrange import d3
 
             physics["dispersion"] = d3.identity_entry(self.dispersion)
+        options = _pr1762_options(self.polar)
+        if options is not None:  # absent without MACE PR 1762's options, so other identities keep their digests
+            physics["polar"] = options
         return ForceFieldIdentity(
             checkpoint_sha256=model.sha256, head=model.head or None, species=self.species,
             force_precision=self.effective_precision()[0], physics=physics,
@@ -218,6 +222,39 @@ class ForceField:
                 f"periodic boundaries in all three directions (3D PBC) are required, got pbc={tuple(atoms.pbc)} "
                 "(SPEC §4.4)", rule=1, code="non-3d-pbc")])
         return self._evaluator(atoms)[1].evaluate(atoms, stress=stress)
+
+
+# MACE PR 1762 through ForceField(polar=): wired through the planner, the gate's reference and restarts, but no
+# PolarMACE run with these options has been validated (owner, 28 October 2026: "add it but flag it as not tested").
+POLAR_NOT_TESTED = ("PolarMACE with MACE PR 1762 options (fukui_regularisation={fukui:g}, dipole_cap={cap}): "
+                    "not tested; these options change the model and no FastMACE run with them has been validated")
+
+
+def _polar(polar, model):
+    """``(PolarConfig, warnings)`` of ``ForceField(polar=...)``: the default without one; a non-default record is
+    refused for a model that is not PolarMACE, and MACE PR 1762's options add the not-tested warning."""
+    from fastmace.config import PolarConfig
+    from fastmace.longrange import polar as longrange
+
+    if polar is None:
+        return PolarConfig(), ()
+    if not isinstance(polar, PolarConfig):
+        raise TypeError(f"polar must be a fastmace.config.PolarConfig or None, got {type(polar).__name__}")
+    if polar != PolarConfig() and not longrange.is_polar(model.model):
+        raise ValueError(f"polar={polar!r} applies to PolarMACE (MACE-POLAR-1) only, not {type(model.model).__name__}")
+    if not longrange.stabilised(polar):
+        return polar, ()
+    return polar, (POLAR_NOT_TESTED.format(fukui=polar.fukui_regularisation, cap=polar.dipole_cap),)
+
+
+def _pr1762_options(polar):
+    """MACE PR 1762's options of ``polar`` as plain values, or ``None`` when it asks for none."""
+    from fastmace.longrange import polar as longrange
+
+    if not longrange.stabilised(polar):
+        return None
+    return {"fukui_regularisation": float(polar.fukui_regularisation),
+            "dipole_cap": None if polar.dipole_cap is None else list(polar.dipole_cap)}
 
 
 def _dispersion(dispersion, model):

@@ -52,7 +52,7 @@ import torch
 
 from .buckets import edge_capacity
 from .pair_search import candidate_pairs
-from .skin import inverse_3x3, times_3x3
+from .skin import inverse_3x3, matmul_small, times_3x3
 
 # Stored-pair capacity above the first build (as ``NeighbourConfig.capacity_headroom``).
 DEFAULT_HEADROOM = 1.15
@@ -339,10 +339,10 @@ class D3PairList:
         if not self.variable_cell:
             squared = ((positions - self.reference_positions) ** 2).sum(dim=1)
             return squared.max() > (fraction * self.skin / 2) ** 2
-        to_build = inverse_3x3(self.cell_t) @ self.build_cell  # F^-1: x -> build-cell coordinates
+        to_build = matmul_small(inverse_3x3(self.cell_t), self.build_cell)  # F^-1: x -> build-cell coordinates
         squared = ((times_3x3(positions, to_build) - self.reference_positions) ** 2).sum(dim=1)
-        strain = inverse_3x3(self.build_cell) @ self.cell_t - torch.eye(3, dtype=torch.float64,
-                                                                        device=self.cell_t.device)
+        strain = matmul_small(inverse_3x3(self.build_cell), self.cell_t) - torch.eye(3, dtype=torch.float64,
+                                                                                     device=self.cell_t.device)
         lower = 1.0 - torch.sqrt((strain * strain).sum())  # <= smallest singular value of F
         allowed = self.cutoff + self.skin - self.cutoff / torch.clamp(lower, min=1e-6)
         return (2 * torch.sqrt(squared.max()) > fraction * allowed) | (lower <= 0)

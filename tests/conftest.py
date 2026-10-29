@@ -52,6 +52,27 @@ def _check_acceptance_environment(config):
                                                "'Test tiers'), which needs:", *problems]))
 
 
+# Per-worker thread limits under xdist (suite-speed, 27 October 2026). Without them every worker's
+# OpenMP pool and Inductor compile pool take all cores: eight workers on 24 threads ran the CPU
+# suite in about 100 min at load ~130, against about 14 min with OMP_NUM_THREADS=2 (6-T16).
+_XDIST_THREAD_DEFAULTS = {"OMP_NUM_THREADS": "2", "MKL_NUM_THREADS": "2", "TORCHINDUCTOR_COMPILE_THREADS": "1"}
+
+
+def _xdist_defaults(config):
+    """With ``-n``: thread limits for the workers and their child processes, and
+    ``--maxschedchunk=1`` for the load scheduler (docs/development.md, 'CPU test scheduling').
+
+    The controller runs before it starts the workers, so they inherit these variables before they
+    import torch. Values set by the caller and an explicit ``--maxschedchunk`` are kept.
+    """
+    if not getattr(config.option, "numprocesses", None):
+        return
+    for name, value in _XDIST_THREAD_DEFAULTS.items():
+        os.environ.setdefault(name, value)
+    if getattr(config.option, "dist", None) == "load" and getattr(config.option, "maxschedchunk", 0) is None:
+        config.option.maxschedchunk = 1
+
+
 def pytest_configure(config):
     """One Inductor/Triton cache root for the whole run, inherited by every child process (1b-T24).
 
@@ -61,9 +82,13 @@ def pytest_configure(config):
     cache of their own (the edge-bucket regression tests) still set one explicitly. Without this,
     torch puts its caches in /tmp, which the workstations forbid.
     """
+    from _support import naive_cueq_cache
+
+    naive_cueq_cache.install()  # in every process that runs tests (suite-speed)
     if hasattr(config, "workerinput"):  # an xdist worker inherits the controller's variables
         return
     _check_acceptance_environment(config)
+    _xdist_defaults(config)
     from fastmace import _cache
     from fastmace.kernels.triton import cache
 
@@ -103,6 +128,28 @@ def pytest_collection_modifyitems(config, items):
             cuda = torch.cuda.is_available()
         if not cuda:
             item.add_marker(pytest.mark.skip(reason=_NO_CUDA))
+    if hasattr(config, "workerinput"):
+        _longest_first(items)
+
+
+_DURATIONS = Path(__file__).resolve().parent / "_support" / "data" / "cpu_durations.json"
+
+
+def _longest_first(items):
+    """In xdist workers: the test functions recorded as slow first, longest first (tools/test_order.py).
+
+    With collection order the 50-75 s tests started in the last minutes of the run and left the other
+    workers idle (suite-speed, 27 October 2026). Every worker sorts the same way, so their collections
+    stay identical; unrecorded tests keep their order after the recorded ones.
+    """
+    import json
+
+    try:
+        seconds = json.loads(_DURATIONS.read_text())
+    except (OSError, ValueError):
+        return
+    rank = {item: seconds.get(item.nodeid.split("[", 1)[0], 0.0) for item in items}
+    items.sort(key=lambda item: -rank[item])
 
 
 @pytest.fixture

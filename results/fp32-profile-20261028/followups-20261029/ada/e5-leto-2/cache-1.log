@@ -1,0 +1,93 @@
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/homes/zwingel/fm-fp32-profile-20261028/src-rtc/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-fp32-profile-20261028/src-rtc/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-fp32-profile-20261028/src-rtc/tools/bench/fp32_setup.py:119: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  return function(*args, **kwargs)
+/mnt/homes/zwingel/fm-fp32-profile-20261028/src-rtc/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+{
+ "structure": "NaNbO3",
+ "label": "cache-1",
+ "setup_to_first_step_s": 43.02373000001535,
+ "process_to_first_step_s": 44.89862765700673,
+ "steady_ms_per_step_with_output": 17.317290560458787,
+ "simulation_setup_s": {
+  "plan": 0.4082961950043682,
+  "build": 37.29940845398232,
+  "capture": 0.2812302289821673,
+  "provenance": 0.01593318599043414
+ }
+}
+    43.927 s  x1    fm.md (total)  <- 
+    38.348 s  x1    Simulation.__init__  <- fm.md (total)
+    37.296 s  x1    build: MinimalPlanner.build  <- Simulation.__init__
+    18.245 s  x1    build: MACEForceField.__init__  <- build: MinimalPlanner.build
+    18.172 s  x1    compile: compile_model (wrap; compiles lazily)  <- build: MACEForceField.__init__
+    17.196 s  x1    rewrites: apply (incl. self-checks)  <- compile: compile_model (wrap; compiles lazily)
+    13.529 s  x1    engine: GraphEngine.__init__  <- build: MinimalPlanner.build
+    13.477 s  x1    engine: first compiled force call  <- engine: GraphEngine.__init__
+     8.668 s  x2    load: loading.load (MACE calculator, conversion)  <- build: template cache, load: load_pristine
+     7.396 s  x2    radial tables: certify  <- rewrites: apply (incl. self-checks)
+     5.711 s  x21   rewrites: self-checks  <- rewrites: apply (incl. self-checks)
+     5.007 s  x1    build: execution model  <- build: MinimalPlanner.build
+     5.007 s  x1    build: ForceField.execution_model  <- build: execution model
+     5.006 s  x1    build: template cache  <- build: ForceField.execution_model
+     4.542 s  x1    load: load_pristine  <- fm.md (total)
+     2.007 s  x2    radial tables: fit  <- rewrites: apply (incl. self-checks)
+     1.643 s  x4    OEq streaming: NVRTC compile_cubin  <- rewrites: apply (incl. self-checks)
+     1.216 s  x2    compile: private_copy  <- build: templates.private (copy), compile: compile_model (wrap; compiles lazily)
+     0.996 s  x1    Simulation.run  <- fm.md (total)
+     0.707 s  x1    build: templates.private (copy)  <- build: template cache
+     0.513 s  x1    rewrites: resolve  <- build: MinimalPlanner.build
+     0.384 s  x1    plan: MinimalPlanner.plan  <- Simulation.__init__
+     0.281 s  x1    engine: prepare (captures)  <- Simulation.__init__
+     0.281 s  x2    engine: graph capture  <- engine: prepare (captures)
+     0.215 s  x1    plan: hardware  <- plan: MinimalPlanner.plan
+     0.172 s  x1    OEq: prepare_hybrid_if_possible  <- load: load_pristine
+     0.172 s  x2    OEq: prepare_hybrid  <- OEq: prepare_hybrid_if_possible, load: loading.load (MACE calculator, conversion)
+     0.146 s  x1    OEq: reuse_extension (build or cache hit)  <- OEq: prepare_hybrid
+     0.121 s  x1    output: open  <- Simulation.__init__
+     0.070 s  x2    load: sha256_of  <- load: loading.load (MACE calculator, conversion)
+     0.060 s  x1    output: metadata  <- Simulation.__init__
+     0.041 s  x2    OEq streaming: render  <- rewrites: apply (incl. self-checks)
+     0.002 s  x2    load: resolve_checkpoint  <- load: loading.load (MACE calculator, conversion)
+     0.002 s  x1    compile: simplify_traceable  <- compile: compile_model (wrap; compiles lazily)
+     0.002 s  x1    plan: detect_software  <- plan: MinimalPlanner.plan
+     0.002 s  x1    ForceField.__init__  <- Simulation.__init__
+     0.001 s  x1    build: species tables  <- build: MACEForceField.__init__
+     0.000 s  x2    fused forward: render  <- rewrites: apply (incl. self-checks)
+     0.000 s  x1    build: species setup  <- build: MACEForceField.__init__
+     0.000 s  x1    build: check_engine  <- engine: GraphEngine.__init__

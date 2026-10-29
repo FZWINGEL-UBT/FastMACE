@@ -216,7 +216,8 @@ FASTMACE_ONLY_DEFAULTS = {
     "fold_readout_tail": "on_with_block_linear_unless_reproducible_if_model_supports",
     "fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
     # Owner decision 57, 24 October 2026 (OPT4-T04): the generic MACE family only, float32, not reproducible.
-    "grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
+    "grouped_launch":
+        "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     # Owner decision 58, 24 October 2026 (OPT4-T02): the qualified POLAR-1 checkpoints (S and M), hybrid float32,
     # not reproducible.
     "fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
@@ -239,7 +240,8 @@ GENERIC_FAMILY_LABELS = tuple(label for label, facts in LABEL_FACTS.items()
 APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
            "chunked_conv_backward": FACTORED_LABELS, "radial_tables": FACTORED_LABELS,
            "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
-           "fold_readout_tail": (*MH1_LABELS, "omol0-xl"), "grouped_launch": GENERIC_FAMILY_LABELS,
+           "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
+           "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
            "fused_folded_forward": MH1_LABELS}
 
@@ -315,14 +317,22 @@ def test_segment_gemm_default_keeps_the_stock_path_in_float64():
     assert on(plan_for("mh1-r2scan").rewrites.segment_gemm)
 
 def test_grouped_launch_default_is_the_generic_mace_family():
-    """Owner decision 57 (OPT4-T04): auto turns grouped_launch on for the generic MACE family only, in float32
-    plans; explicit 'on' and 'off' override it."""
+    """Owner decision 57 (OPT4-T04): auto turns grouped_launch on for the generic MACE family, and (decision 66) for
+    MH-1 on the measured GPUs, in float32 plans; explicit 'on' and 'off' override it."""
     assert set(GENERIC_FAMILY_LABELS) == {"mp0-medium", "mp0-large", "mp0b3-medium", "mpa0-medium", "omat0-medium",
                                           "matpes-pbe", "matpes-r2scan"}
     plan = plan_for("omat0-medium")
     item, choice, reason = decision(plan, "RewriteConfig.grouped_launch")
     assert choice == "on" and "generic_mace_family" in reason
-    for label in ("mh1-r2scan", "polar1-s", "omol0-xl", "off23-medium"):
+    # Decision 66: MH-1 on the RTX 5060 Ti (this file's GPU) gets it; on the Ada (not measured faster) it does not.
+    plan = plan_for("mh1-r2scan")
+    item, choice, reason = decision(plan, "RewriteConfig.grouped_launch")
+    assert choice == "on" and "decision 66 (NVIDIA GeForce RTX 5060 Ti)" in reason
+    ada = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), ADA,
+                                              model_label="mh1-r2scan")
+    item, choice, reason = decision(ada, "RewriteConfig.grouped_launch")
+    assert choice == "off" and "MH-1 not on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation)" in reason
+    for label in ("polar1-s", "omol0-xl", "off23-medium"):
         plan = plan_for(label)
         item, choice, reason = decision(plan, "RewriteConfig.grouped_launch")
         assert choice == "off" and "not the generic MACE family" in reason, label
@@ -949,11 +959,14 @@ def float64_plan(monkeypatch, hardware, ratio=1 / 64, label="mh1-r2scan", atoms=
 
 @pytest.mark.parametrize("hardware", [GPU, ADA], ids=lambda h: h.name)
 def test_decision_65_turns_d1_d2_d3_on_on_the_measured_gpus(monkeypatch, hardware):
-    """Owner decision 65 (28 October 2026): the 56 fixed mantissa bits, w_tables and save_transcendentals are on in
-    float64 MH-1 plans on the GPU models where the A/Bs measured a speed-up."""
+    """Owner decision 65 (28 October 2026): w_tables and save_transcendentals are on in float64 MH-1 plans on the GPU
+    models where the A/Bs measured a speed-up. D1, the 56 fixed mantissa bits, is suspended (owner, 28 October 2026):
+    with them, a graph captured during a run computed wrong energies and forces (fp64-D1 fix), so "auto" is
+    cuBLAS's dynamic choice; an explicit bit count still applies."""
     assert fixed.DECISION_65_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
     plan = float64_plan(monkeypatch, hardware)
-    assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == 56
+    assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == "dynamic"
+    assert "suspended" in str(decision(plan, "EngineConfig.fp64_emulation_mantissa_bits")[2])
     assert plan.rewrites.w_tables == "on" and plan.rewrites.save_transcendentals == "on"
     assert plan.rewrites.radial_tables == "on" and plan.rewrites.chunked_conv_backward == "on"
     for item in DECISION_65:
@@ -1001,7 +1014,7 @@ def test_decision_65_w_tables_stay_off_above_three_species(monkeypatch):
                  cell=[4.0, 4.0, 4.0], pbc=True).repeat((2, 2, 2))
     plan = float64_plan(monkeypatch, ADA, atoms=four)
     assert plan.rewrites.w_tables == "off" and plan.rewrites.save_transcendentals == "on"
-    assert plan.engine.fp64_emulation_mantissa_bits == 56
+    assert plan.engine.fp64_emulation_mantissa_bits == "dynamic"  # D1 suspended
     assert dict(plan.auto_options_off)["w_tables"].startswith("4 species, decision 65")
 
 

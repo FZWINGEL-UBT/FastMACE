@@ -1,0 +1,41 @@
+profile: 262 kernels, 20.15 ms per force call
+linked 47 saved values; sequence rows used 261 of 262
+forward alone: 84 launches (0 without a time), kernel sum 7.96 ms, critical path 3.64 ms, off the path 4.31 ms (54%)
+    off path: GEMM: 3.330 ms
+    off path: Triton pointwise/reduction: 0.690 ms
+    off path: custom op cuequivariance::uniform_1d: 0.201 ms
+    off path: custom op fastmace::radial_table_forward: 0.092 ms
+        1307.2 us  fastmace::joined_products
+         292.0 us  extern_kernels.mm
+         249.1 us  triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_25
+         244.0 us  extern_kernels.mm
+         242.2 us  extern_kernels.mm
+         201.1 us  cuequivariance::uniform_1d
+         163.6 us  triton_poi_fused_add_div_mul_47
+         162.1 us  extern_kernels.mm
+backward alone: 62 launches (0 without a time), kernel sum 12.15 ms, critical path 9.83 ms, off the path 2.32 ms (19%)
+    off path: GEMM: 1.392 ms
+    off path: Triton pointwise/reduction: 0.844 ms
+    off path: custom op fastmace::radial_table_backward: 0.082 ms
+         284.1 us  extern_kernels.mm
+         266.1 us  extern_kernels.mm
+         242.2 us  extern_kernels.mm
+         194.7 us  extern_kernels.mm
+         145.5 us  extern_kernels.mm
+         140.8 us  triton_poi_fused_mul_sigmoid_slice_unsqueeze_view_11
+         140.8 us  triton_poi_fused_mul_sigmoid_slice_unsqueeze_view_11
+         112.7 us  triton_poi_fused_mul_sum_view_5
+forward + backward (backward starts as soon as its saved values exist): 146 launches (0 without a time), kernel sum 20.11 ms, critical path 13.48 ms, off the path 6.63 ms (33%)
+    off path: GEMM: 4.723 ms
+    off path: Triton pointwise/reduction: 1.534 ms
+    off path: custom op cuequivariance::uniform_1d: 0.201 ms
+    off path: custom op fastmace::radial_table_forward: 0.092 ms
+    off path: custom op fastmace::radial_table_backward: 0.082 ms
+        1307.2 us  fastmace::joined_products
+         292.0 us  extern_kernels.mm
+         284.1 us  extern_kernels.mm
+         266.1 us  extern_kernels.mm
+         249.1 us  triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_25
+         244.0 us  extern_kernels.mm
+         242.2 us  extern_kernels.mm
+         242.2 us  extern_kernels.mm

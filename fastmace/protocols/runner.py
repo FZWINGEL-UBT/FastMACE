@@ -124,6 +124,12 @@ def _release_device_memory() -> None:
         torch.cuda.empty_cache()
 
 
+def _unscheduled_left(record, step):
+    """The MD steps after ``step`` of a run without a schedule (``md_steps`` in the record; 0 when unknown)."""
+    total = record.get("md_steps")
+    return 0 if total is None else max(int(total) - int(step), 0)
+
+
 def _remaining(schedule, timestep_fs, steps):
     """The steps of this piece: ``steps`` clamped to the schedule's remaining steps (``None``: all)."""
     if schedule is None:
@@ -164,6 +170,12 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     # fm.md's timestep: an explicit integrator record's, else timestep_fs= (default 0.5 fs).
     integrator = options.get("integrator")
     timestep_fs = integrator.timestep_fs if integrator is not None else options.get("timestep_fs", 0.5)
+    # The file's steps= is the run's length; --steps (``steps``) can only shorten this piece.
+    file_steps = options.pop("steps", None)
+    # Without a schedule the record keeps the run's length, so that --resume continues to it.
+    md_steps = None if schedule is not None else file_steps if file_steps is not None else steps
+    if file_steps is not None:
+        steps = file_steps if steps is None else min(steps, file_steps)
     steps = _remaining(schedule, timestep_fs, steps)
 
     atoms = quick._structure(structure)
@@ -181,7 +193,8 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
               "repeat": list(repeat), "atoms": len(atoms), "timestep_fs": timestep_fs, "relax": relax,
               "relaxation": None, "quench": quench, "quench_result": None,
               "mc": None if mc is None else [move_record(move) for move in mc],
-              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "dispersion": None, "pieces": [],
+              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "md_steps": md_steps,
+              "dispersion": None, "pieces": [],
               "counters": None,
               "status": "relax"}
     _write(directory, record)
@@ -239,7 +252,17 @@ def resume(directory: str | Path, *, steps: int | None = None, log: Callable[[st
     sim.report.repeat = tuple(record["repeat"])
     first = int(sim.committed().step)
     position = sim.schedule
-    if record["status"] == "md" and position is not None and not position.finished:
+    left = _unscheduled_left(record, first) if position is None else 0
+    if record["status"] == "md" and position is None and left > 0:
+        try:
+            sim.run(steps=left if steps is None else min(steps, left))
+        except CellDivergedError as error:
+            sim.close()
+            _stopped(directory, record, first, started, error)
+            raise
+        sim.flush_output()
+        log(sim.report.text())
+    elif record["status"] == "md" and position is not None and not position.finished:
         count = position.remaining if steps is None else min(steps, position.remaining)
         moves = None if record["mc"] is None else tuple(move_from_record(move) for move in record["mc"])
         try:
@@ -271,10 +294,11 @@ def _end_piece(sim, directory, record, first, started, log):
                                  "counters": _piece_counters(sim)})
         record["counters"] = _sum_counters(record["pieces"])
     position = sim.schedule
-    if position is not None and not position.finished:
+    total = position.total_steps if position is not None else record.get("md_steps")
+    if (position is not None and not position.finished) or (position is None and _unscheduled_left(record, step)):
         sim.flush_output()
         _write(directory, record)
-        log(f"paused at step {step} of {position.total_steps}; continue with fastmace run --resume {directory}")
+        log(f"paused at step {step} of {total}; continue with fastmace run --resume {directory}")
         return record
     resolved = None if position is None else position.resolved
     frame_every = sim.output.trajectory_every

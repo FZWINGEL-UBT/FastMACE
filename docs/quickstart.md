@@ -1,193 +1,229 @@
 # FastMACE in five minutes
 
-This page takes you from installation to a running MD simulation (SPEC §15).
-FastMACE runs MD with pretrained MACE models on an NVIDIA GPU.
+This page takes you from a fresh install to a finished MD run. It runs the
+same simulation three ways: with the `fastmace md` command, with `fm.md`
+in Python, and as a ported ASE script. All three build the same
+`Simulation`, so for the same inputs they give the same plan, gate and
+trajectory.
 
-## 1. Install
+You need Linux, an NVIDIA GPU and a FastMACE install (see
+[Install](install.md)).
 
-```bash
-pip install "fastmace[full]"
-```
-
-`[full]` is the union of `[oeq]` (OpenEquivariance, the fastest backend),
-`[polar]` (graph-longrange, for PolarMACE) and `[d3]` (torch-dftd). Install
-the PyTorch build that matches your CUDA first. The cuEquivariance ops wheel
-(`cuequivariance-ops-torch-cu12` or `-cu13`) depends on your CUDA build too,
-so it is not installed automatically.
-
-The base install (`pip install fastmace`) also works. It runs on the plain
-cuEquivariance backend, and the run report tells you so.
-
-## 2. Check the installation
+## 1. Check the installation
 
 ```bash
 fastmace doctor
 ```
 
-`doctor` checks the GPU, driver, torch, MACE, the cuEquivariance ops and
-their fused kernels, OpenEquivariance and its build path, Triton, NVRTC,
-graph-longrange, torch-dftd, the cache root, the lock mode on NFS and the
-model files. For each item that fails it names the command or document that
-fixes it. It changes nothing. It exits 0 when everything is ready and 1
-otherwise. On a CPU-only machine it exits 1, because the GPU items fail.
+`doctor` checks the GPU, the driver, torch, MACE, the cuEquivariance ops
+and their fused kernels, OpenEquivariance, Triton, NVRTC, the optional
+packages, the cache root and the model files. For each item that fails it
+names the command or page that fixes it. It changes nothing. It exits 1 if a
+required check fails and 0 otherwise. Optional items, such as the GPU
+and OpenEquivariance, only warn.
 
-`fastmace models` lists the model labels with their heads, file names,
-SHA-256 and licences.
+## 2. Get a model and a structure
 
-## 3. Run MD from the command line
+`fastmace models` lists the model labels with their heads, files, SHA-256
+and licences. This tutorial uses MH-1 with its r2SCAN head. Download the
+checkpoint once; FastMACE checks its SHA-256 and keeps it in its cache:
+
+```bash
+python -c 'import fastmace as fm; fm.load("mh1", head="matpes_r2scan", download=True)'
+```
+
+Later runs find the file in the cache, or in `$FASTMACE_MODELS` if you keep
+your checkpoints there. MH-1 is under the Academic Software License
+(non-commercial); see [Models and licences](guide/models.md).
+
+Any structure file ASE reads works. To make a rock-salt NaCl cell (8 atoms,
+a = 5.64 Å):
+
+```bash
+python -c 'from ase.build import bulk; bulk("NaCl", "rocksalt", a=5.64, cubic=True).write("NaCl.cif")'
+```
+
+## 3. Run it from the command line
 
 ```bash
 fastmace md --model mh1 --head matpes_r2scan --structure NaCl.cif \
-  --ensemble NVT --temperature 300 --steps 1000000 --repeat 3 3 3 --output run/
+  --ensemble NVT --temperature 300 --timestep 0.5 --steps 20000 \
+  --repeat 3 3 3 --seed 1 --output run/
 ```
 
-This is a Langevin NVT run at 300 K with MH-1's r2SCAN head on a 3×3×3
-supercell. The summary report shows the plan, the gate status and the speed.
-`run/` holds the trajectory, the thermo table, the restart files and
-`metadata.json`, which records the plan, gate and provenance.
+This is 20,000 Langevin NVT steps of 0.5 fs (10 ps) at 300 K on a 3×3×3
+supercell, 216 atoms. The first start takes tens of seconds, because
+FastMACE compiles the model and captures CUDA graphs; later starts reuse
+the caches.
 
-| Flag | `fm.md` argument | Default |
+The flags you will use most:
+
+| Flag | Meaning | Default |
 | --- | --- | --- |
-| `--model` | `model`: label, path or URL | required |
-| `--head` | `head` | required for multi-head models such as MH-1 |
-| `--charge`, `--spin-multiplicity` | `charge`, `spin_multiplicity` | the model's |
-| `--sha256`, `--trusted` | `sha256`, `trusted`, for model files outside the label table | |
-| `--structure` | the structure, any format ASE reads | required |
-| `--repeat NA NB NC` | `repeat` | `1 1 1`: the cell is never expanded silently |
-| `--ensemble` | `ensemble`: `NVT` (Langevin), `NPT` (LangevinBAOAB) or `NVE` (velocity Verlet) | `NVT` |
-| `--temperature` | `temperature_K` (K) | required, except for NVE, which refuses it |
-| `--pressure`, `--cell-mode` | `pressure_GPa` (GPa), `cell_mode` (`hydrostatic`, `full`), NPT only | `0`, `hydrostatic` |
-| `--timestep` | `timestep_fs` (fs) | `0.5` |
-| `--steps` | `steps` | required |
-| `--dispersion`, `--d3-functional` | `dispersion`: `none`, or `d3bj` expanded from the head's functional (or the functional given) | `none` |
-| `--seed` | `seed` | drawn and recorded |
-| `--check` | `check`: `skip`, `gate` or `allow_unavailable` | `skip` |
-| `--output` | `output` directory | `./<structure stem>.fastmace/` |
+| `--model`, `--head` | model label, path or URL, and its head | required; the head is required for MH-1 |
+| `--structure` | structure file, any format ASE reads | required |
+| `--repeat NA NB NC` | supercell | `1 1 1`: the cell is never expanded silently |
+| `--ensemble` | `NVT` (Langevin), `NPT` (Langevin-BAOAB) or `NVE` (velocity Verlet) | `NVT` |
+| `--temperature` | target temperature, K | required, except for NVE |
+| `--pressure` | NPT pressure, GPa | `0` |
+| `--timestep` | timestep, fs | `0.5` |
+| `--steps` | number of MD steps | required |
+| `--dispersion d3bj` | add D3(BJ) dispersion | `none` |
+| `--seed` | noise seed | drawn and recorded |
+| `--check gate` | run the gate before the first step | `skip` |
+| `--output` | output directory | `./<structure stem>.fastmace/` |
 
-The Langevin friction is `fm.md`'s default, 0.02 per ASE time unit (about
-0.002/fs), as in `main.py`.
+[Command line and TOML](reference/cli.md) lists every flag. An error prints
+its message without a traceback and exits 1; `--debug` adds the traceback.
+A wrong combination of flags exits 2.
 
-NVE has no target temperature. It starts from the momenta in the structure
-file, and `fm.md` draws no velocities: a file without momenta starts at rest.
-The skin is sized for twice the starting kinetic temperature, at least 1 K.
-MC moves run through `fastmace run` (below), and they are experimental until
-their qualification study is recorded. An error prints its message without a traceback and exits
-1. `--debug` also prints the traceback. A wrong combination of arguments
-exits 2.
-
-The gate checks the model on your structure against references, and it is
-opt-in. `--check gate` runs it before the first step.
-
-## 4. Runs with a schedule or an explicit integrator: `fastmace init` and `fastmace run`
-
-Some runs have no `md` flag: a temperature schedule, MC moves, an explicit
-integrator, a full D3 record or the output intervals. For these, write a TOML
-file:
-
-```bash
-fastmace init > run.toml
-fastmace run run.toml
-```
-
-`run.toml` holds every `fm.md` argument under its own name. The values that
-are set are those of the example run above. Every other argument is a
-commented line with what it does and an example. With `md`'s flags, `init`
-sets those flags instead:
-
-```bash
-fastmace init --model mh1 --head matpes_r2scan --structure NaCl.cif --temperature 300 --steps 1000 > run.toml
-```
-
-Then `fastmace run run.toml` is the same run as `fastmace md` with the same
-flags. `fastmace run -` reads the file from standard input. A key that is not
-an `fm.md` argument is refused, naming it. Paths are relative to the directory
-you start `fastmace run` in.
-
-The records are tables at the end of the file:
-
-```toml
-schedule = "anneal"            # a profile: slow, fast, ultrafast, anneal
-
-# or segments:
-[[schedule]]
-kind = "ramp"
-start_K = 0.0
-end_K = 1000.0
-ps = 20.0
-
-[[schedule]]
-kind = "hold"
-temperature_K = 1000.0
-ps = 10.0
-
-[integrator]                   # an fm.integrators record: Langevin, LangevinBAOAB, NVE, CSVR,
-type = "LangevinBAOAB"         # NoseHooverChain, MTK or Berendsen
-temperature_K = 300.0
-cell_mode = "full"
-
-[dispersion]                   # a full fm.D3 record
-functional = "r2scan"
-
-[output]                       # fm.Output
-directory = "run/"
-thermo_every = 20
-```
-
-Use either `schedule = "anneal"` or `[[schedule]]` segments, not both.
-
-## 5. The same run from Python: `fm.md`
+## 4. The same run from Python
 
 ```python
 import fastmace as fm
 
 run = fm.md("NaCl.cif", model="mh1", head="matpes_r2scan", ensemble="NVT",
-            temperature_K=300, timestep_fs=0.5, steps=1_000_000, repeat=(3, 3, 3),
-            output="run/", seed=1)
-print(run.summary)                 # the report
-run.plan, run.gate                 # the plan and gate records
+            temperature_K=300, timestep_fs=0.5, steps=20_000, repeat=(3, 3, 3),
+            output="run-py/", seed=1)
+print(run.summary)                 # the run report
+print(run.plan)                    # the plan
 sim = run.simulation               # the Simulation, to run on or restart
+sim.run(steps=20_000)              # 20,000 more steps
 ```
 
-`fm.md`, `fastmace md` and `fastmace run` build the same `Simulation`. For
-the same inputs they give the same plan, gate and trajectory.
+Import `fastmace` before anything that imports torch. On NFS home
+directories this is what switches PyTorch's file locks to soft locks (see
+the [FAQ](faq.md#nfs-home-directories-and-soft-file-locks)).
 
-## 6. Relaxations and quenches: `fastmace relax` and `fastmace quench`
+`fm.md` returns a `RunResult` with `summary`, `plan`, `gate`, `simulation`,
+`metadata` (the contents of `metadata.json`) and `output` (the directory).
+
+## 5. The same run as an ASE script
+
+If you have an ASE Langevin script, change the import and name the model:
+
+```python
+from ase import units
+from ase.io import read
+
+from fastmace.ase import Langevin      # was: from ase.md.langevin import Langevin
+
+atoms = read("NaCl.cif").repeat((3, 3, 3))
+dyn = Langevin(atoms, 0.5 * units.fs, temperature_K=300, friction=0.02,
+               model="mh1", head="matpes_r2scan", seed=1,
+               trajectory="run.traj", logfile="run.log", loginterval=20)
+dyn.run(20_000)
+print(dyn.summary)
+```
+
+The arguments keep ASE's names and units. `friction=0.02` is 0.02 per ASE
+time unit, about 0.002 per fs: the friction `fm.md` and `fastmace md` use.
+(`friction=0.02 / units.fs` would be 0.02 per fs, ten times as much.)
+`trajectory=` and `logfile=` keep their ASE format; FastMACE's own files go
+to `run.fastmace/`. See [Port your ASE script](guide/ase.md).
+
+## 6. Read the report
+
+Every run prints a one-screen report, and `metadata.json` keeps it. It
+looks like this (an example; your numbers differ):
+
+```text
+FastMACE 1.0.0  |  mh1 (head matpes_r2scan)  |  NaCl, 216 atoms (3×3×3), 3D PBC, NVT Langevin 0.5 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 14 off (reasons in run.plan)
+gate:    not run (opt-in: check="gate")
+setup:   42 s (load 6 s, rewrites 9 s, compilation 17 s, capture 4 s)
+speed:   4.1 ms/step, measured over steps 1,000–2,000 of this run
+licence: ASL (non-commercial), from the label table
+warn:    none
+```
+
+| Line | What it tells you |
+| --- | --- |
+| header | version, model and head, structure, atom count, supercell, ensemble and timestep |
+| `physics` | dispersion, charge and spin |
+| `plan` | the tier (`graph` is the CUDA-graph engine, the fastest), the backend, the force precision and the rewrites |
+| `gate` | the gate result, or that it was not run |
+| `setup` | the time to load, rewrite, compile, capture and gate |
+| `speed` | the measured time per step; at the end of the run, the whole-run mean |
+| `output` | the files written |
+| `licence` | the model's licence |
+| `warn` | anything you should know: a slower plan than a full install would give and why, experimental features, small cells |
+
+If the plan line does not say `graph` and `hybrid`, a warning says why and
+what would change it. `print(run.plan)` gives about 30 lines on the
+decisions, and `run.plan.describe(full=True)` all of them. See
+[The planner](guide/planner.md).
+
+## 7. Find the files
+
+`run/` holds:
+
+| File | Content |
+| --- | --- |
+| `thermo.0.csv` | thermo rows: step, time, temperature, energies (and pressure for NPT) |
+| `trajectory.0.traj` | ASE trajectory frames |
+| `restart.npz` | the complete state at the last restart point |
+| `simulation.json` | the inputs and planner options, for resume |
+| `metadata.json` | the report, plan, gate and provenance (versions, model hash, GPU) |
+
+By default FastMACE writes a frame and a thermo row every 20 steps and a
+restart point every 10,000 steps. At each restart point a new chunk
+starts (`thermo.1.csv`, `trajectory.1.traj`, ...). To read a whole run in
+order:
+
+```python
+from fastmace.io.output import read_frames, read_thermo
+
+frames = read_frames("run/")
+thermo = read_thermo("run/")
+```
+
+To continue a run: `fm.Simulation.resume("run/")`, then `sim.run(steps=...)`.
+See [Output, restart and resume](guide/restart.md).
+
+## 8. Runs the flags cannot express
+
+A temperature schedule, MC moves, an explicit integrator, a full D3 record
+or other output intervals go in a TOML file. `fastmace init` writes one
+with every `fm.md` argument, each commented with what it does:
 
 ```bash
-fastmace relax NaCl.cif --model mh1 --head matpes_r2scan --optimizer gpu-LBFGS --fmax 0.01
-fastmace relax NaCl.cif --model mh1 --head matpes_r2scan --optimizer gpu-FIRE --cell-filter frechet --pressure 0
-fastmace quench run/ --into gpu --optimizer gpu-LBFGS
+fastmace init --model mh1 --head matpes_r2scan --structure NaCl.cif --temperature 300 --steps 20000 > run.toml
+fastmace run run.toml
 ```
 
-The optimizers are `gpu-LBFGS` and `gpu-FIRE` on the graph engine, and
-`ase-LBFGS` and `ase-BFGS`, ASE's on `fm.calc`. Bare `LBFGS` and `BFGS` mean
-ASE's, so existing protocol files keep their meaning. The default is
-`gpu-LBFGS`, which reproduces the annealing-benchmark minima of ASE's LBFGS
-(plan task 4-T08). The same names go into a protocol's `[relax]` and `[quench]`
-tables, and the records hold the name that ran.
+With the same flags, `fastmace run run.toml` is the same run as
+`fastmace md`. The keys are `fm.md`'s argument names, and the records are
+tables at the end of the file. For example, a CSVR thermostat with sparser
+output:
 
-`fastmace relax` writes the relaxed structure (`--output`, default
-`<stem>.relaxed.extxyz`) with its `.json` summary and `.log`. `fastmace quench
-RUN_DIR` quenches the frames of any finished run with a schedule, trajectory
-frames and a restart, as a protocol's quench picks them. Each frame keeps its
-own cell. `--into NAME` writes `RUN_DIR/quench-NAME/`, so one run can be
-quenched with several optimizers side by side. A GPU quench relaxes all its
-frames on one engine.
+```toml
+[integrator]
+type = "CSVR"
+timestep_fs = 1.0
+temperature_K = 300.0
+tau_fs = 100.0
 
-## For CI: the install check
-
-The CPU CI checks that a fresh environment resolves `[full]` and that
-`doctor` runs. These commands do that, from the repository root, with CPU
-torch:
-
-```bash
-python -m venv /tmp/fastmace-full
-/tmp/fastmace-full/bin/python -m pip install --upgrade pip
-/tmp/fastmace-full/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-/tmp/fastmace-full/bin/python -m pip install ".[full]"
-/tmp/fastmace-full/bin/python -m pip check
-/tmp/fastmace-full/bin/fastmace doctor; test $? -le 1
+[output]
+directory = "run/"
+trajectory_every = 100
+thermo_every = 20
 ```
 
-Without a GPU, `doctor` exits 1, so the check accepts 0 or 1. Exit code 2 or
-a traceback fails the check.
+A schedule is `schedule = "anneal"` (a profile: `slow`, `fast`,
+`ultrafast` or `anneal`) or a list of `[[schedule]]` segments, not both.
+`fastmace run` refuses a key that is not an `fm.md` argument and names it.
+Paths are relative to the directory you start it in.
+
+## Next steps
+
+- [Running MD](guide/md.md): ensembles, integrators, timestep, friction,
+  schedules and output intervals.
+- [Relaxations and quenches](guide/relax.md): `fastmace relax`,
+  `fastmace quench` and `Simulation.relax`.
+- [NPT and D3 dispersion](guide/npt-d3.md) and
+  [Monte Carlo and swaps](guide/mc.md).
+- The runnable scripts in
+  [`examples/`](https://github.com/FZWINGEL-UBT/FastMACE/tree/main/examples).
+- [FAQ and troubleshooting](faq.md) when something fails.

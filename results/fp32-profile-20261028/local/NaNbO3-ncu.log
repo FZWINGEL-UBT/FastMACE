@@ -1,0 +1,341 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1846448 (/home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/python3.10)
+/mnt/d/Margraf/fm-fp32-profile/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/fm-fp32-profile/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/fm-fp32-profile/fastmace/model/loading.py:753: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/d/Margraf/fm-fp32-profile/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+==PROF== Connected to process 1848415 (/home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/python3.10)
+==PROF== Profiling "unrolled_elementwise_kernel" - 0: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_per_fused_argmax_0" - 1: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_index_1" - 2: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_cat_inde..." - 3: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_argmax_index..." - 4: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_index_se..." - 5: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 6: 0%....50%....100% - 10 passes
+==PROF== Profiling "forward" - 7: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_arg..." - 8: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 9: 0%....50%....100% - 10 passes
+==PROF== Profiling "splitKreduce_kernel" - 10: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_exp_mul_..." - 11: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_exp_mul_..." - 12: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_exp_mul_..." - 13: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_cat_clone_mu..." - 14: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_cat_mul_10" - 15: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_stack_11" - 16: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_12" - 17: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 18: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 19: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 20: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 21: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 22: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 23: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_cat_view_15" - 24: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 25: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 26: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_cat_view_17" - 27: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 28: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 29: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 30: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_cat_view_20" - 31: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_cat_div_..." - 32: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 33: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 34: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clone_di..." - 35: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 36: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 37: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clone_di..." - 38: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 39: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 40: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clone_di..." - 41: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 42: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 43: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 44: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 45: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 46: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 47: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 48: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 49: 0%....50%....100% - 10 passes
+==PROF== Profiling "segmented_polynomial_algo1_4" - 50: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_cat_cons..." - 51: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clone_co..." - 52: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 53: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_per_fused_add_argmax_c..." - 54: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 55: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_cat_inde..." - 56: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_argmax_index..." - 57: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 58: 0%....50%....100% - 10 passes
+==PROF== Profiling "forward" - 59: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_cat_unsqueez..." - 60: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_exp_mul_..." - 61: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_ara..." - 62: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_ara..." - 63: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 64: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 65: 0%....50%....100% - 10 passes
+==PROF== Profiling "fused_folded_forward" - 66: 0%....50%....100% - 10 passes
+==PROF== Profiling "scal_kernel" - 67: 0%....50%....100% - 10 passes
+==PROF== Profiling "sgemm_largek_lds64" - 68: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_cat_div_..." - 69: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 70: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 71: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 72: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 73: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 74: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 75: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 76: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 77: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 78: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 79: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_joined_produ..." - 80: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 81: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 82: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 83: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 84: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 85: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 86: 0%....50%....100% - 10 passes
+==PROF== Profiling "segmented_polynomial_algo1_2" - 87: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_scatter_add_..." - 88: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_zeros_43" - 89: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_zeros_43" - 90: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_zeros_44" - 91: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_index_45" - 92: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_arange_46" - 93: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_index_sq..." - 94: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 95: 0%....50%....100% - 10 passes
+==PROF== Profiling "splitKreduce_kernel" - 96: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 97: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 98: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy__un..." - 99: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 100: 0%....50%....100% - 10 passes
+==PROF== Profiling "splitKreduce_kernel" - 101: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 102: 0%....50%....100% - 10 passes
+==PROF== Profiling "splitKreduce_kernel" - 103: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_per_fused_add_argmax_i..." - 104: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 105: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_div_mul_51" - 106: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_ones_like_0" - 107: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 108: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 109: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 110: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 111: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 112: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 113: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 114: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 115: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 116: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy__un..." - 117: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 118: 0%....50%....100% - 10 passes
+==PROF== Profiling "segmented_polynomial_bwd_algo..." - 119: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 120: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 121: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 122: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 123: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 124: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clone_di..." - 125: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clone_di..." - 126: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sum_view_5" - 127: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sum_view_6" - 128: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_mul_slic..." - 129: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_mul_sigm..." - 130: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 131: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sigmoid_..." - 132: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 133: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sigmoid_..." - 134: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 135: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sigmoid_..." - 136: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 137: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_red_fused__unsafe_view..." - 138: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 139: 0%....50%....100% - 10 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 140: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 141: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 142: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 143: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 144: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 145: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 146: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 147: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 148: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 149: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 150: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 151: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 152: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 153: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 154: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 155: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 156: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 157: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 158: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 159: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 160: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 161: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 162: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 163: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 164: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 165: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 166: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 167: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 168: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 169: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 170: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 171: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 172: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 173: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 174: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 175: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 176: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 177: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 178: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 179: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 180: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 181: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 182: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 183: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 184: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 185: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 186: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 187: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 188: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 189: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 190: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 191: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 192: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 193: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 194: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 195: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 196: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 197: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 198: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 199: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 200: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 201: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 202: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 203: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 204: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 205: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 206: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 207: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 208: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 209: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 210: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 211: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 212: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 213: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 214: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 215: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 216: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 217: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 218: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 219: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 220: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 221: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 222: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 223: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 224: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 225: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 226: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 227: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 228: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 229: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 230: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 231: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 232: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 233: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 234: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 235: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 236: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 237: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 238: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 239: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 240: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 241: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 242: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 243: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 244: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 245: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 246: 0%....50%....100% - 10 passes
+==PROF== Profiling "oeq_projected_backward" - 247: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 248: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 249: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 250: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 251: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 252: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 253: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 254: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_constant..." - 255: 0%....50%....100% - 10 passes
+==PROF== Profiling "segmented_polynomial_bwd_algo..." - 256: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 257: 0%....50%....100% - 10 passes
+==PROF== Profiling "elementwise_kernel" - 258: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 259: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 260: 0%....50%....100% - 10 passes
+==PROF== Profiling "gemm" - 261: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sigmoid_..." - 262: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 263: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sum_view_5" - 264: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sum_view_6" - 265: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_mul_slic..." - 266: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_mul_sigm..." - 267: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 268: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sigmoid_..." - 269: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 270: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_sigmoid_..." - 271: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 272: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_red_fused_add_div_mul_..." - 273: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 274: 0%....50%....100% - 10 passes
+==PROF== Profiling "magma_sgemmEx_kernel" - 275: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mm_19" - 276: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 277: 0%....50%....100% - 10 passes
+==PROF== Profiling "magma_sgemmEx_kernel" - 278: 0%....50%....100% - 10 passes
+==PROF== Profiling "Kernel2" - 279: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_clone_slice_..." - 280: 0%....50%....100% - 10 passes
+==PROF== Profiling "magma_sgemmEx_kernel" - 281: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_edge_out..." - 282: 0%....50%....100% - 10 passes
+==PROF== Profiling "kernel" - 283: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_index_put_ne..." - 284: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_index_put_ne..." - 285: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 286: 0%....50%....100% - 10 passes
+==PROF== Profiling "backward" - 287: 0%....50%....100% - 10 passes
+==PROF== Profiling "backward" - 288: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 289: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clamp_mi..." - 290: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_clamp_mi..." - 291: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_add_28" - 292: 0%....50%....100% - 10 passes
+==PROF== Profiling "triton_poi_fused_mul_0" - 293: 0%....50%....100% - 10 passes
+==PROF== Disconnected from process 1848415
+==PROF== Disconnected from process 1846448
+==PROF== Report: /home/fzwin/fastmace-runs/fp32-profile-20261028/local/NaNbO3/ncu.ncu-rep

@@ -1,0 +1,115 @@
+{
+  "tool": "block_linear_concurrency_bench",
+  "created_utc": "2026-10-20T19:49:06.171063+00:00",
+  "host": "murphy",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "sms": 48,
+  "torch": "2.14.1+cu130",
+  "triton": "3.8.0",
+  "fastmace_commit": "fe204491a2e6eed1b54cbdf191172e69674a27d9",
+  "load": [
+    0.27099609375,
+    1.62060546875,
+    2.1416015625
+  ],
+  "repeats": 100,
+  "cases": {
+    "NaCl/forward": {
+      "sequential": {
+        "us": 162.59199380874634,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 173.0560064315796,
+        "speedup": 0.9395339529751002,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 191.40800088644028,
+        "speedup": 0.8494524421955063,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 162.59199380874634,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 9.60468128141656e-07
+      },
+      "flop_tflops_sequential": 11.14408702147627
+    },
+    "NaCl/input_grad": {
+      "sequential": {
+        "us": 188.4160041809082,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 169.72800344228745,
+        "speedup": 1.1101055828125335,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 186.36800348758698,
+        "speedup": 1.0109890145035418,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 162.81600296497345,
+        "speedup": 1.15723270900737,
+        "max_rel_diff_vs_sequential": 1.0727951575972838e-06
+      },
+      "flop_tflops_sequential": 9.616695438781626
+    },
+    "NbCl5/forward": {
+      "sequential": {
+        "us": 1325.8880376815796,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 1396.7360258102417,
+        "speedup": 0.9492760358296312,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 1391.3919925689697,
+        "speedup": 0.9529219980873628,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 1369.088053703308,
+        "speedup": 0.9684461376279817,
+        "max_rel_diff_vs_sequential": 1.027071448334027e-06
+      },
+      "flop_tflops_sequential": 12.299269235820905
+    },
+    "NbCl5/input_grad": {
+      "sequential": {
+        "us": 1413.6320352554321,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 1390.4959559440613,
+        "speedup": 1.016638724630927,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 1384.5439553260803,
+        "speedup": 1.0210091415425675,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 1369.088053703308,
+        "speedup": 1.0325355125491271,
+        "max_rel_diff_vs_sequential": 1.2462650147426757e-06
+      },
+      "flop_tflops_sequential": 11.535854837254996
+    }
+  },
+  "load_after": [
+    0.27099609375,
+    1.62060546875,
+    2.1416015625
+  ]
+}

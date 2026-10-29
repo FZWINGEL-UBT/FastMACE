@@ -1,0 +1,493 @@
+{
+  "tool": "step_breakdown",
+  "created_utc": "2026-10-27T12:23:33.073554+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": null,
+  "packages": {
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "mace-torch": "0.3.16",
+    "cuequivariance": "0.12.0",
+    "cuequivariance-torch": "0.12.0",
+    "cuequivariance-ops-torch-cu13": "0.12.0",
+    "openequivariance": "0.7.0",
+    "e3nn": "0.4.4",
+    "ase": "3.27.0",
+    "numpy": "2.2.6"
+  },
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "cuda": "13.0",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: reused')",
+  "other_gpu_processes": [],
+  "compute_capability": "12.0",
+  "sms": 36,
+  "max_sm_clock_mhz": 3090.0,
+  "fp32_peak_tflops": 28.47744,
+  "model": "omat0-medium",
+  "checkpoint": "/home/fzwin/models/mace-omat-0-medium.model",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "structure": "NbCl5",
+  "natoms": 1944,
+  "temperature_K": 1000.0,
+  "steps": 300,
+  "equilibrate_steps": 300,
+  "calls": 8,
+  "padded_edges": 56320,
+  "plan": {
+    "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (MD only: phase 1a's skin and headroom; rule 11 would give skin 0.33 A, headroom 1.15 (fastest of 1944 atoms at 1000 K, lightest mass 35.45 u, 0.5 fs: 0.0102 A per step, 16 steps per rebuild) (it applies to MC and species-change workloads))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (no species changes: species-dependent rewrites are built for the superset (SPEC \u00a79.3 rule 8))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = off  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.fold_cutoff = off  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.density_first = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok (GENERIC_REASSOCIATE)))\n  RewriteConfig.joint_radial_input = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = off  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok (GENERIC_REASSOCIATE)))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.chunked_conv_backward = off  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.radial_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT6-T05, opt-in))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = off  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.segment_gemm = off  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.grouped_launch = on  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = on  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = off  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.fold_readout_tail = off  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: off, not supported by the model (the last interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',) (its skip_tp is element-dependent)))\n  RewriteConfig.fold_product_linear = off  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: off, not supported by the model (the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.3 A  (auto (rule_11_skin_from_workload): phase 1a's skin: rule 11 sizes only MC and species-change workloads; rule 11 would give 0.33 A)\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.15 and edge_bucket_fraction as given; rule 11 would give 1.15)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04))\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): the force precision: no MC moves, no MC energies)\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.06 GiB (run; run 1.06, build 0.23) at 64215 edges, 1944 atoms, float32 (activations 946 MiB, workspace 160 MiB, weights (pristine and execution copy) 69 MiB); needs 1.06 of 14.80 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+    "options": {
+      "reassociate_first": true,
+      "fused_folded_backward": true,
+      "segmented_first_sum": true,
+      "streaming_conv": true,
+      "block_linear": true,
+      "grouped_linear": true,
+      "merged_residual": true,
+      "grouped_launch": true,
+      "species_skip": true,
+      "single_graph_strain": true,
+      "sort_receivers": true,
+      "gpu_neighbour_list": true,
+      "off:density_first": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:joint_radial_input": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:gated_rows": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:segment_gemm": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:folded_backward_tiles": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:chunked_conv_backward": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:species_tables": "the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:fold_product_linear": "the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:fold_readout_tail": "the last interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',) (its skip_tp is element-dependent)",
+      "off:fold_cutoff": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:factor_species": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+      "off:fx_e3nn_linear": "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+      "off:polar_graph_sums": "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+    },
+    "load_s": 4.152241869014688,
+    "setup_s": 23.046681545005413,
+    "sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a"
+  },
+  "engine_mode": "pipelined",
+  "load_s": 4.152241869014688,
+  "setup_s": 23.046681545005413,
+  "equilibrate_s": 3.624878428003285,
+  "wall_ms_per_step": 9.982111293356866,
+  "wall_windows": [
+    {
+      "ms_per_step": 10.005861276683087,
+      "rebuilds": 21,
+      "redos": 0,
+      "early_rebuilds": 21,
+      "graph_captures": 0,
+      "edge_sizes": [
+        51200,
+        53760,
+        56320
+      ]
+    },
+    {
+      "ms_per_step": 9.982111293356866,
+      "rebuilds": 21,
+      "redos": 0,
+      "early_rebuilds": 21,
+      "graph_captures": 0,
+      "edge_sizes": [
+        51200,
+        53760,
+        56320
+      ]
+    }
+  ],
+  "graph_captures_before_stages": 4,
+  "force_graph_replay_profile": {
+    "graph": "('B', 56320)",
+    "kernels_per_replay": 222.0,
+    "kernel_ms_per_replay": 9.87815337500001,
+    "span_ms_per_replay": 9.965145750000001,
+    "gaps_inside_replays": {
+      "gaps_per_replay": 221.0,
+      "total_gap_us_per_replay": 92.77487499998819,
+      "histogram_per_replay": {
+        "<2us": {
+          "count": 209.25,
+          "us": 19.426874999989707
+        },
+        "2-5us": {
+          "count": 7.375,
+          "us": 28.291125000002296
+        },
+        "5-20us": {
+          "count": 4.25,
+          "us": 25.96112499999623
+        },
+        ">=20us": {
+          "count": 0.125,
+          "us": 19.095749999999953
+        }
+      },
+      "largest": [
+        {
+          "gap_us": 152.77,
+          "before": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>",
+          "after": "kernel"
+        },
+        {
+          "gap_us": 8.71,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 8.68,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 8.49,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 7.92,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 7.85,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 7.72,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 7.5,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 7.5,
+          "before": "kernel",
+          "after": "triton_poi_fused_clone_slice_transpose_view_20"
+        },
+        {
+          "gap_us": 7.34,
+          "before": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, fl",
+          "after": "triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_4"
+        },
+        {
+          "gap_us": 6.03,
+          "before": "triton_poi_fused_add_slice_backward_view_26",
+          "after": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_tn_align1>(cutlass_80_sim"
+        },
+        {
+          "gap_us": 5.81,
+          "before": "kernel",
+          "after": "triton_poi_fused_clone_slice_transpose_view_20"
+        },
+        {
+          "gap_us": 5.74,
+          "before": "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutlass_80_simt",
+          "after": "triton_poi_fused__unsafe_view_cat_clone_slice_42"
+        },
+        {
+          "gap_us": 5.71,
+          "before": "triton_poi_fused_add_slice_backward_view_26",
+          "after": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_tn_align1>(cutlass_80_sim"
+        },
+        {
+          "gap_us": 5.68,
+          "before": "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, 3, 3>(int,",
+          "after": "triton_poi_fused_cat_view_24"
+        },
+        {
+          "gap_us": 5.65,
+          "before": "segmented_polynomial_algo1_4",
+          "after": "triton_poi_fused_clone_permute_unsqueeze_33"
+        },
+        {
+          "gap_us": 5.59,
+          "before": "triton_poi_fused_div_mul_slice_t_unsqueeze_11",
+          "after": "triton_poi_fused_cat_mul_12"
+        },
+        {
+          "gap_us": 5.58,
+          "before": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutlass_80_sim",
+          "after": "triton_poi_fused_cat_view_39"
+        },
+        {
+          "gap_us": 5.58,
+          "before": "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, 3, 3>(int,",
+          "after": "triton_poi_fused_cat_view_24"
+        },
+        {
+          "gap_us": 5.58,
+          "before": "segmented_polynomial_algo1_4",
+          "after": "triton_poi_fused_clone_permute_unsqueeze_33"
+        }
+      ]
+    }
+  },
+  "instrumented_wall_ms_per_step": 9.97389233331584,
+  "gpu_span_ms_per_step": 9.987376302083334,
+  "stage_ms_per_step": {
+    "Noise upload (every step a slice; a new batch every noise_batch)": 0.056891519958153364,
+    "ACP: Langevin half kick, positions, neighbour check, edge compaction": 0.044973653430740036,
+    "B: forces + second half kick": 9.815467748641968,
+    "Neighbour-list rebuild (GPU)": 0.4202069362004598
+  },
+  "stage_calls": {
+    "Noise upload (every step a slice; a new batch every noise_batch)": 300,
+    "ACP: Langevin half kick, positions, neighbour check, edge compaction": 300,
+    "B: forces + second half kick": 300,
+    "Neighbour-list rebuild (GPU)": 23
+  },
+  "gpu_idle_ms_per_step": -0.35016355614798655,
+  "instrumented": {
+    "rebuilds": 23,
+    "redos": 0,
+    "early_rebuilds": 23,
+    "graph_captures": 0
+  },
+  "force_graph_ms_per_replay": 9.815467748641968,
+  "eager_force_kernel_ms_per_call": 9.685671499999998,
+  "eager_kernels_per_call": 214.0,
+  "engine_info": {
+    "rebuilds_beside": 84,
+    "fused_integrator": true,
+    "engine": "graph",
+    "mode": "pipelined",
+    "capture": true,
+    "pad_edges": true,
+    "variable_cell": false,
+    "initial_edges": 51084,
+    "edge_bucket": 2560,
+    "edge_sizes_used": [
+      51200,
+      53760,
+      56320
+    ],
+    "neighbour_rebuilds": 84,
+    "graphs": [
+      "('B', 51200)",
+      "('B', 53760)",
+      "ACP",
+      "('B', 56320)"
+    ],
+    "pool_resets": 0,
+    "capture_memory": [
+      {
+        "key": "ACP",
+        "warmup_in_pool": false,
+        "max_reserved_after_warmup_MiB": 944.0,
+        "max_reserved_after_capture_MiB": 944.0
+      },
+      {
+        "key": "('B', 51200)",
+        "warmup_in_pool": false,
+        "max_reserved_after_warmup_MiB": 1050.0,
+        "max_reserved_after_capture_MiB": 1066.0
+      },
+      {
+        "key": "('B', 53760)",
+        "warmup_in_pool": true,
+        "max_reserved_after_warmup_MiB": 1128.0,
+        "max_reserved_after_capture_MiB": 1128.0
+      },
+      {
+        "key": "('B', 56320)",
+        "warmup_in_pool": true,
+        "max_reserved_after_warmup_MiB": 1174.0,
+        "max_reserved_after_capture_MiB": 1174.0
+      }
+    ],
+    "speculative_launches": 0,
+    "speculative_rollbacks": 0,
+    "speculative_rebuild_rollbacks": 0,
+    "speculative_bucket_rollbacks": 0,
+    "pipelined_redos": 2,
+    "pipelined_rebuild_redos": 0,
+    "pipelined_early_rebuilds": 84,
+    "canonical_points": 0,
+    "polar_overflow_steps": [],
+    "process": {
+      "allocator": "expandable_segments:True",
+      "dynamo_cache_size_limit": 64,
+      "compile_family": "oeq"
+    },
+    "energy_graphs": {
+      "float32": {
+        "copy": false,
+        "backend": "hybrid",
+        "compile_mode": "default"
+      }
+    },
+    "overflow_check": "edges",
+    "overflows_redone": 2,
+    "overflow_log": [
+      {
+        "step": 2,
+        "kinds": [
+          "edges"
+        ],
+        "mode": "pipelined"
+      },
+      {
+        "step": 99,
+        "kinds": [
+          "edges"
+        ],
+        "mode": "pipelined"
+      }
+    ],
+    "recaptures": 2,
+    "recapture_budget": 64,
+    "recapture_budget_exceeded_at": null,
+    "graph_variant_cap": 64,
+    "graph_evictions": 0,
+    "recapture_log": [
+      {
+        "step": 0,
+        "key": "ACP",
+        "reason": "first capture",
+        "counted": false,
+        "s": 0.14780093598528765
+      },
+      {
+        "step": 0,
+        "key": "('B', 51200)",
+        "reason": "first capture",
+        "counted": false,
+        "s": 0.2313710399903357
+      },
+      {
+        "step": 2,
+        "key": "('B', 53760)",
+        "reason": "new variant of B",
+        "counted": true,
+        "s": 0.07050634501501918
+      },
+      {
+        "step": 99,
+        "key": "('B', 56320)",
+        "reason": "new variant of B",
+        "counted": true,
+        "s": 0.06906266100122593
+      }
+    ],
+    "invalidations": [],
+    "captures": 4,
+    "capture_seconds": 0.5187409819918685,
+    "recapture_seconds": 0.1395690060162451
+  },
+  "force_field_info": {
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "compile_mode": "default",
+    "training": false,
+    "compute_stress": false,
+    "padding_exact": true,
+    "rewrites": [
+      "generic_species_skip",
+      "generic_reassociate",
+      "generic_segmented_first_sum",
+      "generic_fused_radial_backward",
+      "generic_streaming",
+      "block_linear",
+      "grouped_linear",
+      "grouped_launch",
+      "single_graph_strain"
+    ],
+    "decisions": {
+      "factor_species": "off",
+      "fold_cutoff": "off",
+      "density_first": "off",
+      "joint_radial_input": "off",
+      "fused_folded_backward": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field fused_folded_backward honoured by generic_fused_radial_backward)",
+      "folded_backward_tiles": "off",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "streaming_conv": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field streaming_conv honoured by generic_streaming)",
+      "chunked_conv_backward": "off",
+      "reassociate_first": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field reassociate_first honoured by generic_reassociate)",
+      "segmented_first_sum": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field segmented_first_sum honoured by generic_segmented_first_sum)",
+      "generic_species_skip": "on",
+      "generic_reassociate": "on",
+      "generic_segmented_first_sum": "on",
+      "generic_fused_radial_backward": "on",
+      "generic_streaming": "on",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "no ('RealAgnosticResidualNonLinearInteractionBlock',) interaction with cuEquivariance linear_1 and linear_res (RewriteConfig.merged_residual is on; this record stays off)",
+      "gated_rows": "off",
+      "segment_gemm": "off",
+      "grouped_launch": "on",
+      "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+      "polar_graph_sums": "off",
+      "species_tables": "off",
+      "fold_readout_tail": "off",
+      "fold_product_linear": "off",
+      "tf32x3_gemms": "off",
+      "radial_tables": "off",
+      "fx_e3nn_linear": "off",
+      "single_graph_strain": "on",
+      "combo_kernels": "off"
+    },
+    "selfchecks": {
+      "generic_species_skip": 9.349527054173965e-07,
+      "generic_reassociate": 5.290240469522341e-07,
+      "generic_segmented_first_sum": 6.111139852724083e-07,
+      "generic_fused_radial_backward": 5.350295911491125e-07,
+      "generic_streaming": 3.845525186384246e-07,
+      "block_linear": 2.5368899312462236e-07,
+      "grouped_linear": 2.5368899312462236e-07,
+      "grouped_launch": 8.659261266431614e-07,
+      "single_graph_strain": 0.0
+    },
+    "streaming_interactions": 1,
+    "sort_receivers": true,
+    "gpu_neighbour_list": true,
+    "neighbour_rebuilds": 85,
+    "edge_capacity": 76032,
+    "candidates": 67982,
+    "species_columns": [
+      16,
+      40
+    ],
+    "superset": [
+      17,
+      41
+    ],
+    "charge": null,
+    "spin_multiplicity": null,
+    "dynamo_reset": false,
+    "polar": null,
+    "float64_energy": true,
+    "energy_treatment": "patched",
+    "strain_path": "one_graph",
+    "follows": null
+  },
+  "args": {
+    "output": "share-omat-NbCl5",
+    "pass_": "main",
+    "summarize_ncu": null,
+    "summarize_nsys": null,
+    "ncu_metrics": false,
+    "checkpoint": "/home/fzwin/models/mace-omat-0-medium.model",
+    "model": "omat0-medium",
+    "structure": "NbCl5",
+    "backend": "hybrid",
+    "temperature_K": 1000.0,
+    "velocity_seed": 20261007,
+    "equilibrate_steps": 300,
+    "steps": 300,
+    "calls": 8,
+    "rewrites": {},
+    "allow_busy_gpu": false
+  }
+}

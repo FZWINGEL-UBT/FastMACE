@@ -2781,7 +2781,11 @@ Open decisions for the owner:
    A100 and a loss on the RTX 4000 Ada; it becomes default only where its step
    A/B measures a speed-up. Earlier findings closed only for being per-GPU
    (for example `grouped_launch` for MH-1 on sm_120) may be reopened the same
-   way.
+   way. Applied first (conductor, 29 October 2026, under the owner's "make it
+   default on gpus where its faster overall"): `grouped_launch` for MH-1 on
+   "NVIDIA GeForce RTX 5060 Ti" (`planner.fixed.DECISION_66_GROUPED_LAUNCH_GPUS`;
+   NaCl 0.971 / 0.975, NbCl5 and NaNbO3 neutral, same-process both orders on
+   main `30ff3b7c`; `docs/validation/decision66-grouped-launch.md`).
 
 ---
 

@@ -46,6 +46,7 @@ W_TILE_REGISTERS = 40  # paths per part × BATCH
 MAX_WARPS = 12
 MIN_WARPS = 4
 CHANNEL_BLOCK = 32
+BLOCKS_PER_SM = 2  # blocks per SM over all slices of the grid (the persistent grid's size)
 
 _REGISTRY = {}
 _IDS = itertools.count()
@@ -91,7 +92,7 @@ def launch_rule(paths, k, edge_dim, channels, shared_optin, sms):
     wbytes = 4 * slice_floats(per, k)
     warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
     slices = (channels // CHANNEL_BLOCK) * parts
-    return LaunchRule(parts, warps, max(1, -(-2 * sms // slices)), wbytes + warps * staging)
+    return LaunchRule(parts, warps, max(1, -(-BLOCKS_PER_SM * sms // slices)), wbytes + warps * staging)
 
 
 def balanced_parts(costs, parts):

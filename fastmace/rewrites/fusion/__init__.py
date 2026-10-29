@@ -173,10 +173,13 @@ def _segment_selfcheck(original, rewritten, context):
         sms = tile_rule.device_sms(weight.device) or 1
         dims = [dim for _, _, dim, _ in chain.joined]
         atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(dims))
-        rows = [torch.randn((atoms * second.segments_in[i][2], second.segments_in[i][1]), generator=generator,
-                            dtype=torch.float64).to(weight).requires_grad_() for i, _, _, _ in chain.joined]
+        # Drawn on the weights' device in their dtype: these probes fill the device, and drawing them in float64
+        # on the CPU and copying them over took 2.1 of the 4.6 s of MH-1's self-checks (fp32 profile, O5).
+        probes = torch.Generator(device=weight.device).manual_seed(context.seed + 2 + index)
+        rows = [torch.randn((atoms * second.segments_in[i][2], second.segments_in[i][1]), generator=probes,
+                            device=weight.device, dtype=weight.dtype).requires_grad_() for i, _, _, _ in chain.joined]
         width = sum(mul * dim for _, mul, dim in second.segments_out)
-        grad = torch.randn((atoms, width), generator=generator, dtype=torch.float64).to(weight)
+        grad = torch.randn((atoms, width), generator=probes, device=weight.device, dtype=weight.dtype)
         full = [None] * len(second.segments_in)
         for (i, _, _, _), x in zip(chain.joined, rows):
             full[i] = x

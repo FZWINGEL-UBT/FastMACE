@@ -60,8 +60,9 @@ validation.
 replaces or adds a variant of a key captured before (a new edge size, a capture after
 ``invalidate_graphs``, an eviction or a pool reset) is a re-capture and counts against
 ``EngineConfig.recapture_budget``. Past the budget the engine warns once (``RecaptureBudgetWarning``),
-records the step and recommends the compiled tier (``recapture_warning``); it never downgrades mid-run
-(runtime adaptation is phase 5, SPEC §9.6). At most ``EngineConfig.graph_variant_cap`` graphs are kept:
+records the step and recommends the compiled tier (``recapture_warning``). The engine itself never
+downgrades; runtime adaptation (SPEC §9.6, ``AdaptationConfig``) may switch the run to the compiled tier at
+a committed step. At most ``EngineConfig.graph_variant_cap`` graphs are kept:
 the least recently replayed one is evicted, and its later capture counts. The registry
 (``fastmace.engine.registry``) holds the buffer policies.
 

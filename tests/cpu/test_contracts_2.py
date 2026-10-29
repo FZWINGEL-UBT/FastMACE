@@ -106,10 +106,8 @@ def test_runner_config_validation(kwargs):
 
 def test_new_fields_of_existing_records():
     assert config.EngineConfig().dynamic_edges is True  # 2-T13; on by default since decision 59 (OPT4-T05)
-    assert config.RewriteConfig().selfcheck_cache == "use"  # 2-T19, inert until then
-    assert config.RewriteConfig(selfcheck_cache="refresh").selfcheck_cache == "refresh"
-    with pytest.raises(ValueError):
-        config.RewriteConfig(selfcheck_cache="always")
+    # selfcheck_cache was removed: checkpoint 2 decided no self-check cache, and nothing read it.
+    assert "selfcheck_cache" not in {field.name for field in dataclasses.fields(config.RewriteConfig)}
     with pytest.raises(ValueError):
         config.EngineConfig(dynamic_edges="yes")
 

@@ -59,3 +59,5 @@ FastMACE's own licence and its dependencies' licences are on the
 - Dispersion: see [NPT and D3](npt-d3.md). MACE-OFF, OMOL-0 and MH-1's
   `omol` head already contain dispersion, so `dispersion="d3bj"` is refused
   for them.
+
+See also: [Models, D3, PolarMACE and schedules](../reference/models.md), [Environment and cache](../reference/environment.md).

@@ -484,3 +484,17 @@ def test_torch_dftd3_forces_are_every_atoms(monkeypatch):
     atoms = sim_atoms()
     _, forces, _ = d3.torch_dftd3(atoms, None)
     assert forces[list(SIM_FIXED)].any()
+
+
+def test_baoab_does_not_claim_a_fixed_centre_of_mass():
+    """LangevinBAOAB never removes the total momentum (nor does ASE's), so its record has fixcm=False only."""
+    from fastmace.simulation import _integrator
+
+    baoab = records.LangevinBAOAB(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.02)
+    assert baoab.fixcm is False and baoab.to_config(seed=0).fixcm is False
+    with pytest.raises(ValueError, match="centre-of-mass"):
+        records.LangevinBAOAB(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.02, fixcm=True)
+    # A restart from before kept fixcm=True, which had no effect on the dynamics: it resumes as False.
+    old = {"class": "LangevinBAOAB", "fields": dict(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.02,
+                                                     fixcm=True)}
+    assert _integrator(old).fixcm is False

@@ -53,7 +53,7 @@ import torch
 from ase import units
 
 from fastmace.config import IntegratorConfig
-from fastmace.neighbors.skin import det_3x3, times_3x3
+from fastmace.neighbors.skin import det_3x3, matmul_small, times_3x3
 
 from .base import CONSERVED_KEY, Integrator
 from .langevin import base_output_values, check_ensemble
@@ -285,7 +285,7 @@ class MTK(Integrator):
         else:
             grow, rel = self._exp_and_exprel(self.p_cell * delta / self.W)
             x.copy_(times_3x3(x, grow) + times_3x3(v * delta, rel))
-            state.cell.copy_(state.cell @ grow)
+            state.cell.copy_(matmul_small(state.cell, grow))
 
     def first_half(self, state: SimulationState) -> None:
         dt2 = self.dt / 2

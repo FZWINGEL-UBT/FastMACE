@@ -8,6 +8,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `fm.md(initial_velocities=...)` (and the `fastmace run` key `initial_velocities`), opt-in: a
+  structure at rest starts with seeded Maxwell-Boltzmann velocities at the run's starting target
+  (`"maxwell_boltzmann"`) or at a given temperature in K; `"keep"` (default) leaves it at rest as before. Drawn
+  from `seed` on a stream of its own, never for a structure that already moves, and recorded in the report and
+  `metadata.json`'s warnings (owner, 28 October 2026: an option, documented clearly; `docs/guide/md.md`,
+  "Starting velocities").
 - Three float64 speed-ups, **on by default on the measured GPUs** (owner decision 65; `plans/ideas-20261027.md`):
   `EngineConfig.fp64_emulation_mantissa_bits` ("auto" = 56 fixed mantissa bits in cuBLAS's float64 emulation,
   "dynamic" or a bit count from 8 to 128 to choose), `RewriteConfig.w_tables` (per-piece folded radial tables,
@@ -40,10 +46,50 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Fixed
 
+- **Decision 65's D1 default is suspended** (owner, 28 October 2026): `EngineConfig.fp64_emulation_mantissa_bits`
+  "auto" is cuBLAS's dynamic choice everywhere; an explicit bit count still applies. With 56 fixed mantissa bits
+  (D1's default on the RTX 5060 Ti and RTX 4000 Ada), float64 graphs went wrong in two ways, in ResearchModule's
+  Energy_Hull relaxations of MH-1:
+  - the step's small FP64 products came back about 8 bits accurate: a variable-cell `gpu-LBFGS` relaxation of
+    NaCl 3×3×3 set the cell to 16.75000 instead of 16.76443 Å after one step and diverged;
+  - a graph re-captured during the run computed wrong energies and forces: NbOCl3 3×3×3 was +0.34 eV/atom from
+    the first step after the re-capture on, with the same edges, and never converged.
+
+  The same runs with dynamic bits follow ASE's path. The root cause in cuBLAS's fixed-mantissa emulation is not
+  known. As hardening, every small product of the step code outside the model is now element-wise sums
+  (`neighbors.skin.matmul_small`, `matvec_small`, `vecmat_small`), which no cuBLAS setting reaches: the LBFGS
+  mat-vecs and history, the Frechet cell filter, `expm_3x3`, the BAOAB, MTK and Berendsen barostats, the
+  variable-cell neighbour and D3 rebuild tests, the D3 image shifts and the leader shift copy. LBFGS's two
+  triangular solves stay TRSM. That hardening alone fixes the first defect, not the second. Rounding changes by a
+  few ulps (`logm` within 2e-14 of SciPy, was 1e-14): `docs/validation/fp64-d1-relax.md`.
 - A CSVR run from a structure at rest is refused at once, before planning, with `fastmace.errors.InputError`
   (a `ValueError`) that says how to draw velocities. Before, the integrator's refusal counted as a fallback
   candidate failure: each candidate compiled first, and the run ended in a misleading `FallbackExhausted`
   (NaMOCl4 report, 28 October 2026). The fallback search now passes every `InputError` through.
+- Documentation pass (`fastmace/docs-20261028`): a feature tour, a first-run tutorial and a complete option
+  reference (`docs/reference/`, checked by `tests/cpu/test_docs_options.py`), plus the fixes it found:
+  - `fastmace run`: a `steps` key in the file no longer crashes; it is the run's length, `--steps` only
+    shortens a piece, and `--resume` continues an unscheduled run to it.
+  - `fm.md` declares the largest `Displace` `delta_A` as `Workload.max_displacement_A` (MC with `Displace`
+    failed without it).
+  - `ForceField(polar=PolarConfig(...))` takes MACE PR 1762's PolarMACE options, recorded in the identity and
+    restarts; **not tested**: no run with them has been validated, and the report says so.
+
+### Changed
+
+- **Per-GPU defaults (owner decision 66, 29 October 2026).** `RewriteConfig.grouped_launch` is now on by default
+  for MH-1 on the RTX 5060 Ti (planner rule
+  `on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus`,
+  `planner.fixed.DECISION_66_GROUPED_LAUNCH_GPUS`): NaCl MD step 0.971 / 0.975 in both build orders, NbCl5 and
+  NaNbO3 neutral (`docs/validation/decision66-grouped-launch.md`). Off for MH-1 on every other GPU (the RTX 4000
+  Ada measured slower); the generic family keeps it everywhere.
+- `LangevinBAOAB.fixcm` is `False` and only `False`: BAOAB, as ASE's, never removed the total momentum, so the
+  record no longer claims a fixed centre of mass. `fixcm=True` is refused; restarts recorded with it resume
+  with `False`.
+- `RewriteConfig.selfcheck_cache` is removed (it never had an effect); restarts that hold it still load.
+- `metadata.json`'s `precision.tf32` records PyTorch's real matmul TF32 flag when the record is made;
+  `precision.tf32_requested` holds the plan's `PrecisionConfig.tf32` label (FastMACE never sets the flag).
+- Help texts, `fastmace init` and error messages cite no SPEC sections or rule numbers.
 
 ## [1.0.0] - 2026-10-25
 

@@ -17,7 +17,8 @@ from fastmace.errors import CacheLocationError  # noqa: F401 (re-exported: the 1
 
 ENVIRONMENT_VARIABLE = "FASTMACE_CACHE"
 # "models": downloaded checkpoints, each verified against its SHA-256 before it is kept (SPEC §7.6).
-CACHE_KINDS = ("triton", "inductor", "oeq", "compile", "models")
+# "radial-tables": fitted and certified radial_tables, keyed by everything they depend on (rewrites.radial.cache_key).
+CACHE_KINDS = ("triton", "inductor", "oeq", "compile", "models", "radial-tables")
 
 
 def _user_cache_directory(environ):

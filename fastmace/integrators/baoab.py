@@ -29,7 +29,7 @@ from ase.stress import voigt_6_to_full_3x3_stress
 
 from fastmace.config import IntegratorConfig
 from fastmace.config import external_stress as stress_components
-from fastmace.neighbors.skin import det_3x3, times_3x3
+from fastmace.neighbors.skin import det_3x3, matmul_small, times_3x3
 
 from .base import Integrator
 from .langevin import allocate_noise, base_output_values, check_ensemble
@@ -42,7 +42,7 @@ EXPM_DEGREE = 14   # float64 for |A| <= 1, while a barostat half step moves |A| 
 
 
 def expm_3x3(a):
-    """Matrix exponential of a square tensor (fixed scaling and squaring, Taylor); CUDA-graph safe.
+    """Matrix exponential of a square tensor (fixed scaling and squaring, Taylor); CUDA-graph safe, no FP64 GEMM.
 
     Named for its 3 x 3 use here; ``optimize.cell`` also calls it on the 6 x 6 block of a Fréchet derivative.
     """
@@ -50,10 +50,10 @@ def expm_3x3(a):
     eye = torch.eye(a.shape[-1], dtype=a.dtype, device=a.device)
     result, term = eye.clone(), eye
     for k in range(1, EXPM_DEGREE + 1):
-        term = term @ a / k
+        term = matmul_small(term, a) / k
         result = result + term
     for _ in range(EXPM_SCALING):
-        result = result @ result
+        result = matmul_small(result, result)
     return result
 
 
@@ -292,7 +292,7 @@ class LangevinBAOAB(Integrator):
             x.mul_(factor)
         else:
             transform = expm_3x3(half * self.p_eps).T
-            cell.copy_(cell @ transform)
+            cell.copy_(matmul_small(cell, transform))
             x.copy_(times_3x3(x, transform))
 
     def first_half(self, state: SimulationState) -> None:

@@ -159,8 +159,8 @@ def resolve_checkpoint(source, head=None, checkpoint=None, environ=None, downloa
 
     Order for a label: ``checkpoint`` (explicit path), else ``$FASTMACE_MODELS/<file>``,
     else ``<cache root>/models/<file>``, else (``download=True``) the official URL into
-    the cache directory. A path is used as it is; a URL is downloaded into the cache
-    directory unless the file is there already. A download is checked against the
+    the cache directory. A path is used as it is; a URL's file is taken from the cache
+    directory if it is there, else downloaded into it with ``download=True`` only. A download is checked against the
     table's SHA-256, or for a URL against ``sha256``, and not kept if it differs.
     """
     environ = os.environ if environ is None else environ
