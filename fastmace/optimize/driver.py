@@ -59,6 +59,11 @@ class OptimizerStepper(Integrator):
         self.optimizer.update()
 
     def start(self, state) -> None:
+        # A fresh relaxation at a canonical point (a build or a host write): the cell filter's reference is the
+        # current cell, as a new engine's would be (relax-throughput A-T01).
+        reset = getattr(self.dof, "reset_reference", None)
+        if reset is not None:
+            reset()
         self.dof.refresh()  # the cell filter's x and gradient at the first (or re-evaluated) forces, 4-T07
         self.optimizer.start()
 
