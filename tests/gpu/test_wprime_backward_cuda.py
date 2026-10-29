@@ -62,7 +62,7 @@ coef = torch.randn(pairs, pieces, degree + 1, k + 1, generator=cpu, dtype=torch.
     1.0 + torch.arange(degree + 1, dtype=torch.float64))[None, None, :, None] ** 2
 scale = 2 * pieces / (r_max - r_lo)
 dcoef = torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * scale
-table = SimpleNamespace(coef=coef.float().cuda(), dcoef=dcoef.float().cuda(),
+table = SimpleNamespace(coef=coef.float().cuda(), dcoef=dcoef.float().contiguous().cuda(),  # the kernels' layout
                         starts=torch.linspace(r_lo, r_max, pieces + 1, dtype=torch.float64)[:-1].float().cuda(),
                         scales=torch.full((pieces,), scale, dtype=torch.float32, device="cuda"),
                         bins=torch.arange(pieces, dtype=torch.int32, device="cuda"), r_lo=r_lo,
@@ -132,7 +132,7 @@ for layout in ("ir_mul", "mul_ir"):
         largest = float(ref.abs().max())
         err_new = float((dr_new.double() - ref).abs().max()) / largest
         err_chain = float((dr_chain.double() - ref).abs().max()) / largest
-        assert err_new <= 1e-5, (name, err_new, err_chain)
+        assert err_new <= 1e-5 and err_chain <= 1e-5, (name, err_new, err_chain)
         report[name] = {"dr error (new)": err_new, "dr error (chain)": err_chain,
                         "dsh bitwise": bool(torch.equal(new[4], chain[4])),
                         "dx max rel": float((new[3] - chain[3]).abs().max() / chain[3].abs().max())}

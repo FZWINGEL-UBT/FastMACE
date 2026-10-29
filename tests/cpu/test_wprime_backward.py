@@ -26,7 +26,7 @@ def _tables(dtype=torch.float64, pairs=4, pieces=6, degree=10, width=66, outputs
     coef = torch.randn(pairs, pieces, degree + 1, width, generator=gen, dtype=torch.float64)
     starts = torch.linspace(R_LO, R_MAX, pieces + 1, dtype=torch.float64)[:-1]
     scale = 2 * pieces / (R_MAX - R_LO)
-    dcoef = torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * scale
+    dcoef = (torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * scale).contiguous()
     weight = torch.randn(outputs, width - 1, generator=gen, dtype=torch.float64)
     table = SimpleNamespace(coef=coef.to(dtype), dcoef=dcoef.to(dtype), starts=starts.to(dtype),
                             scales=torch.full((pieces,), scale, dtype=dtype),
