@@ -273,7 +273,7 @@ def _epilogue_selfcheck(original, rewritten, context):
                 values.append((out.detach(), *torch.autograd.grad(out, leaves, grad)))
         for a, b in zip(*values):
             cases.add(f"interactions.{index}.gated_rows.gate_epilogue", a, b)
-        del values, scalars, gated, gates, grad, leaves
+        del values, grad, leaves  # the probe leaves stay bound: stock() and folded() read them (F821)
     return cases.result(dtype)
 
 
