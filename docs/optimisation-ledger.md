@@ -274,6 +274,10 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [lin-cublaslt](#lin-cublaslt) | cuBLASLt as preferred BLAS | `TORCH_BLAS_PREFER_CUBLASLT`, `PREFERRED_BLAS` | both | REJECTED | 2026-10-08, 2026-10-14, 2026-10-26 | full step NaCl −1.2 %, NaNbO3 +1.0 % | [opt-5](validation/opt-5.md) §3.10 |
 | [lin-cublaslt-heuristic](#lin-cublaslt-heuristic) | Per-shape cuBLASLt algorithm search | none | FM | REJECTED | 2026-10-26 | 505.23 vs 427.02 µs, unqualified, shape-keyed | [opt-5](validation/opt-5.md) §3.9 |
 | [lin-svd](#lin-svd) | Low-rank atom linears (truncated SVD) | none | FM | REJECTED | 2026-10-27 | rank 509–512 of 512 | [ideas](../plans/ideas-20261027.md) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Interaction-0 per-species residual table | `species_residual` | FM | PENDING (NEVER-AUTOMATIC; owner decision) | 2026-10-29 | Ada 0.9918–0.9956; local 0.990–1.002; NVE drift unchanged; A100 open | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Readout head slice (one head's 16 of 96 hidden columns) | constant `species.TAIL_HEAD` (prototype) | FM | MEASUREMENT | 2026-10-29 | NbCl5 0.996 Ada, 0.991–0.994 local; NaCl, NaNbO3 neutral; rounding-class | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | `segment_gemm` 128-row tiles, 8 warps | constants `tile_rule.TRITON_BLOCK_M/NUM_WARPS` | FM | REJECTED | 2026-10-29 | 0.999–1.001 (Ada and local); 12 tiles within 3 % in isolation | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | int32 addressing in `segment_gemm` (A2) | none (probe) | FM | REJECTED | 2026-10-29 | isolated 1.013 Ada, 0.981 local; stop rule 10 % | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
 
 ### Atom-level elementwise and gates
 
@@ -319,7 +323,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [rad-tables-omol](#rad-tables-omol) | `radial_tables` self-check failure on OMOL-0 XL | `radial_tables` | FM | PENDING | 2026-10-27 | errors 1.4–2.2e-4 > 1e-4 | [opt8-T02](validation/opt8-T02.md) |
 | [rad-f64-tables](#rad-f64-tables) | Float64 radial tables | `radial_tables` (float64) | FM | DEFAULT (scoped: float64, not reproducible) | decision 63(d) | step 0.90 NaCl, 0.91 NbCl5 | [f64-T01](validation/f64-T01.md) §4 |
 | [rad-f64-r03](#rad-f64-r03) | 0.3 Å lower bound in float64 tables (bug) | `R_LO_64` | FM | SUPERSEDED | 2026-10-27 | certificate 3e10 on CUDA | [f64-T01](validation/f64-T01.md) §4 |
-| [rad-table-cache](#rad-table-cache) | Cache fitted, certified tables under `FASTMACE_CACHE` | none | FM | ON BRANCH | 2026-10-28 | fit + certify 42 of 87 s of a float64 build (trillian) | branch fastmace/radial-table-cache: commit `54b6f13f` |
+| [rad-table-cache](#rad-table-cache) | Cache fitted, certified tables under `FASTMACE_CACHE` | none | FM | ON BRANCH | 2026-10-28 | fit + certify 42 of 87 s of a float64 build (trillian); float32 NaNbO3 warm start −5 s (leto), about −20 s (local) | branch fastmace/radial-table-cache: commit `54b6f13f` |
 | [rad-w-tables](#rad-w-tables) | Per-piece folded `w` tables (D2) | `w_tables` | FM | DEFAULT (scoped: float64 MH-1, RTX 5060 Ti and RTX 4000 Ada) | decision 65(b) | local NbCl5 0.911 / 0.912, NaNbO3 0.855 / 0.855; A100 slower | [ideas](../plans/ideas-20261027.md) |
 | [rad-w-tables-auto](#rad-w-tables-auto) | D2/D3 by measured FP64 rate instead of GPU names | none | FM | NOT BUILT | 2026-10-28 | not measured | [ideas](../plans/ideas-20261027.md) |
 | [rad-w-tables-r1](#rad-w-tables-r1) | Keep only w-table pieces with r ≥ 1 Å | none | FM | NOT BUILT | 2026-10-28 | not measured | [ideas](../plans/ideas-20261027.md) |
@@ -327,6 +331,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [rad-f4](#rad-f4) | Piecewise w-tables in float32 (F4) | none | FM | SUPERSEDED | 2026-10-27 | not measured | [ideas](../plans/ideas-20261027.md) |
 | [rad-f0](#rad-f0) | Float32 input-gradient tiles in the chunked backward (F0) | none | FM | REJECTED | 2026-10-27 | stub ceiling NbCl5 0.5 %, NaNbO3 2.6 % | [ideas](../plans/ideas-20261027.md) |
 | [rad-f64-reshape](#rad-f64-reshape) | Reshaped folded forward product in float64 | none | FM | REJECTED | 2026-10-27 | 24.6–36.0 vs 25.1 ms | [f64-T01](validation/f64-T01.md) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Backward-only w′ table, real operands (E4) | none (probe) | FM | REJECTED | 2026-10-29 | local 1.22–1.24 large cells, 0.83 NaCl (32 µs); agrees with OPT9-T01 | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
 
 ### Interaction-2 convolution (streaming, OEq)
 
@@ -370,6 +375,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [conv-path-grouping](#conv-path-grouping) | Path-group traffic reduction | none | FM | NOT BUILT | 2026-10-27 | inferred loss (receiver-owned 2.10 vs 1.66 ms) | branch fastmace/opt7-plan: docs/validation/opt7-T00-T02.md |
 | [conv-deriv-activity](#conv-deriv-activity) | Derivative activity specialisation | none | FM | NOT BUILT | 2026-10-27 | only 1/16 of `dsh` discardable | branch fastmace/opt7-plan: plans/opt-7.md |
 | [conv-wide-loads](#conv-wide-loads) | `float2` loads in the streaming backward | none (transform in results) | FM | NOT BUILT | owner 2026-10-27 "document it" | local 0.931–0.971, murphy 0.951–1.003 (kernel) | branch fastmace/opt7-plan: docs/validation/opt7-T00-T02.md |
+| [fp32-followups-20261029](#fp32-followups-20261029) | `fused_folded_forward` 4 blocks per SM (O7) | constant `fused_forward.BLOCKS_PER_SM` | FM | REJECTED | 2026-10-29 | NaNbO3 1.027–1.031 local, 1.005–1.008 Ada; NaCl neutral | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
 
 ### Interaction 1 (reassociated)
 
@@ -474,6 +480,8 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [launch-cublasdx](#launch-cublasdx) | cuBLASDx block GEMM as megakernel primitive | bench | FM | REJECTED | 2026-10-26 | ratio 1.062 | [opt-5](validation/opt-5.md) §3.12 |
 | [launch-two-streams](#launch-two-streams) | Independent branches on two streams | probe | FM | REJECTED | 2026-10-26 | 0.985–1.151× | [opt-5](validation/opt-5.md) §3.12 |
 | [launch-profiles](#launch-profiles) | Step breakdowns and profiles (RE ncu, 15 Oct, 2-T20a, OPT-T09, OPT-T10, OPT4-BASE, float32 after tables, float64) | none | both | MEASUREMENT | 2026-10-09 … 2026-10-27 | see entry | [2-T20a](validation/2-T20a-step-breakdown.md), [OPT-T10](design/opt-T10-step-breakdown.md) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Inductor aggressive fusion | `torch._inductor.config.aggressive_fusion` | FM | REJECTED | 2026-10-29 | local 0.997–1.003 | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Save-transcendentals partitioner in float32 | `save_transcendentals=on` | FM | REJECTED | 2026-10-29 | NbCl5 1.015–1.019 local, 1.004 Ada | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
 
 ### Integrator, engine and neighbour list
 
@@ -507,6 +515,10 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [eng-parity](#eng-parity) | Parity and regression A/Bs (1a, 1b, 2, Ada, 5) | none | FM | MEASUREMENT | 2026-10-18 … 2026-10-23 | see entry | [phase-1a](validation/phase-1a.md) |
 | [eng-bucket-compile](#eng-bucket-compile) | 1a-T13b: compile at the first new bucket (fix) | none | FM | DEFAULT | 2026-10-18 (`ae3e758`) | invalid blocks before the fix | [1a-T13b](validation/1a-T13b-bucket-compile.md) |
 | [eng-static-relax](#eng-static-relax) | Static-relaxation GPU screen (threads, optimiser, EOS fmax, mixed precision, concurrency) | various | RE | MEASUREMENT | 2026-10-01 | see entry | `ResearchModule:Experiments/Benchmark_MACE_GPU_OPTIMIZATIONS/README.md` |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Skin 0.66 and 1.0 Å | `NeighbourConfig.skin` | FM | MEASUREMENT | 2026-10-29 | NaCl 0.983 (1.0 Å) and 0.989 (0.66 Å) local, ≥ 0.997 Ada; large cells neutral | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Edge buckets of 2.5 % | `edge_bucket_fraction` | FM | REJECTED | 2026-10-29 | 0.990–1.006 | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Sync-free neighbour rebuild | constant `neighbors.skin.ASYNC_EARLY_BUILD` (new, off) | FM | REJECTED | 2026-10-29 | Ada 0.9996–1.005, local 0.998–1.005 | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Pipelined edge margin 0.005 | `pipeline_edge_margin` | FM | REJECTED | 2026-10-29 | NbCl5 redos 36 → 0 but 1.008–1.009 Ada | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
 
 ### Setup, compilation and start-up
 
@@ -525,7 +537,8 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [setup-other-items](#setup-other-items) | OEq build, portable artifacts, self-check cost, load, graph variants | none | FM | NOT BUILT | 2026-10-24 | below the build rule | [opt4-T05](validation/opt4-T05.md) |
 | [setup-selfcheck-cache](#setup-selfcheck-cache) | Qualification cache to skip self-checks | `selfcheck_cache` | FM | NOT BUILT | 2-T19, 2026-10-20 | ≤ 1.4 s per process warm | [2-T19](validation/2-T19-setup.md) |
 | [setup-gap](#setup-gap) | Setup gap diagnosis (1b-T11) | none | FM | MEASUREMENT | 2026-10-18/19 | artefact of cold caches | [1b-T11](validation/1b-T11-mp0-setup.md) |
-| [profile-fp32-20261028](#profile-fp32-20261028) | Fine-grained float32 step and setup profile (1 fs) | none | FM | MEASUREMENT | 2026-10-28 | step 2.72 / 14.36 / 18.68 ms; `fm.md` loop +0.40 ms NaCl; warm start 34–41 s | [fp32 profile](validation/fp32-profile-20261028.md) |
+| [profile-fp32-20261028](#profile-fp32-20261028) | Fine-grained float32 step and setup profile (1 fs) | none | FM | MEASUREMENT | 2026-10-28 | step 2.72 / 14.36 / 18.68 ms; `fm.md` loop +0.045 ms NaCl (same-process A/B); warm start 34–41 s | [fp32 profile](validation/fp32-profile-20261028.md) |
+| [fp32-followups-20261029](#fp32-followups-20261029) | Self-check probes drawn on the device | none (always) | FM | ON BRANCH | 2026-10-29 | 21 self-checks 4.3–4.5 → 2.3 s (warm NaCl) | [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026) |
 
 ### Output
 
@@ -625,7 +638,7 @@ Do not retry these unless the stated condition changes.
 | Item | State | Where |
 | --- | --- | --- |
 | D1 suspension (`fp64_emulation_mantissa_bits` auto = dynamic everywhere) and the small-product fix | On branch `fastmace/fp64-d1-relax-fix`; its GPU checks are open (ResearchModule AGENTS.md) | [prec-d1-relax-fix](#prec-d1-relax-fix) |
-| Radial-table cache under `FASTMACE_CACHE/radial-tables` | On branch `fastmace/radial-table-cache`, not merged; no timing beyond the commit message | [rad-table-cache](#rad-table-cache) |
+| Radial-table cache under `FASTMACE_CACHE/radial-tables` | On branch `fastmace/radial-table-cache`, not merged; float32 warm start −5 s (leto) to −20 s (local), fp32 profile §5 | [rad-table-cache](#rad-table-cache) |
 | `save_transcendentals` in float32 | Never measured | [prec-save-transcendentals](#prec-save-transcendentals) |
 | F5 incremental neighbour list; O(N) rebuild for large cells | Not screened; future work (owner, 28 October 2026) | [eng-incremental-nl](#eng-incremental-nl), [eng-on-nl](#eng-on-nl) |
 | Wide `float2` loads in the streaming backward | Eligible, documented, not built (owner, 27 October 2026); build recipe in the round 7 report | [conv-wide-loads](#conv-wide-loads) |
@@ -3242,8 +3255,28 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - What: MH-1 default float32 plan, NaCl/NaNbO3/NbCl5 3×3×3 at 1 fs and 1000 K, local RTX 5060 Ti. Stages (CUDA events), kernels by part (torch.profiler), Nsight Compute per kernel, Nsight Systems over graph replays and over whole steps (NVTX per stage), module attribution on the eager tier, and `fm.md` setup timers (cold and warm).
 - Status: MEASUREMENT.
 - Measured: engine loop 2.716 / 14.358 / 18.675 ms; through `fm.md` with default output 3.12 / 14.79 / 19.32 ms. Large cells 98 % GPU-busy on two graph streams; NaCl 86 %. Rebuild kernels 0.03–0.13 ms per step at 161–214 rebuilds per 1,000 steps. Warm `fm.md` → first step 34–41 s, cold 71 s (NaCl). Ranked opportunities O1–O9 in the report.
+- Correction: the `fm.md` figures came from separate processes. A same-process A/B (`tools/bench/sim_loop_overhead.py`) puts the default output at +0.045 ms (NaCl) and +0.12 ms (NbCl5) over the engine loop.
 - Why: to guide the next round.
 - Sources: [fp32 profile](validation/fp32-profile-20261028.md); `results/fp32-profile-20261028/`.
+
+<a id="fp32-followups-20261029"></a>
+#### fp32-followups-20261029: fixes and screens after the float32 profile
+- Switch: per candidate (see the index rows); every one off by default
+- Engine: FM
+- Date/round: 28–29 October 2026, after the fp32 profile (owner: "try to fix/optimize everything you found"; conductor 29 October: take `species_residual` to a decision)
+- What: same-process A/Bs (`tools/ab_rewrites.py`, 1 fs, 1000 K, 12 × 300 steps, both build orders) on the local RTX 5060 Ti and the RTX 4000 Ada (murphy, leto), plus isolated probes. Candidates: `species_residual`, the readout head slice, the radial-table cache, device-side self-check probes, O7 grid, `segment_gemm` tiles, skin 0.66/1.0 Å, 2.5 % buckets, save-transcendentals in float32, aggressive fusion, a sync-free rebuild, edge margin 0.005, int32 `segment_gemm` addressing (A2), backward-only w′ table on real operands (E4).
+- Status: `species_residual` PENDING (owner decision; A100 open); readout head slice MEASUREMENT (prototype constant); self-check probes ON BRANCH; the rest REJECTED or MEASUREMENT.
+- Measured: `species_residual`:
+  - b/a, Ada: NaCl 0.9949 / 0.9956, NaNbO3 0.9953 / 0.9942, NbCl5 0.9945 / 0.9918;
+  - b/a, local: 1.0017 / 0.9933, 0.9989 / 0.9896, 0.9970 / 0.9976;
+  - NVE drift 20 ps unchanged (NaCl −1.1e-6 → 2.1e-7, NbCl5 2.5e-6 → 5.1e-7 meV/atom/ps; same rms);
+  - gate ratios: E 0.11–0.76, F 0.97–1.03, S 0.37–1.0.
+
+  The rest:
+  - readout head slice: NbCl5 0.996 (Ada), 0.991–0.994 (local), neutral elsewhere; forces within 2.4e-6 eV/Å of the default;
+  - others: as in the index rows.
+- Why: `species_residual` removes interaction 0's residual columns, the head slice the inactive heads' columns. The rest addressed profile items O2, O7, the rebuild and the setup.
+- Sources: [fp32 profile §5](validation/fp32-profile-20261028.md#5-follow-ups-fixes-and-screens-2829-october-2026); `results/fp32-profile-20261028/followups-20261029/`.
 
 <a id="setup-torch-compile"></a>
 #### setup-torch-compile: torch.compile kernel fusion in `default` mode
