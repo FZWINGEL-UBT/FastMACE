@@ -299,6 +299,13 @@ class EngineConfig:
     recapture_budget: int | Literal["auto"] = "auto"
     # Captured graph variants kept at once, oldest dropped first (SPEC §8.1: dynamo's limit, at most 64).
     graph_variant_cap: int = 64
+    # Force graphs (B, ACB, ACPB) at several padded edge sizes, each with its activations in the graph pool
+    # (plans/capacity.md, CAP-T01). "keep": every variant up to graph_variant_cap; "one": the captured graphs and
+    # their pool are released before a new force variant is captured, so one force graph lives at a time; "fit":
+    # that release only when the new variant would not fit the free device memory (estimated from the bytes per
+    # edge earlier force captures added). After a release the padded size never drops below the captured one.
+    # "auto": the planner's rule (fit on CUDA, keep elsewhere).
+    force_graphs: Literal["auto", "keep", "fit", "one"] = "auto"
 
     def __post_init__(self):
         _check_choices(self)

@@ -57,6 +57,7 @@ AUTO_RULES = {
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
+    "EngineConfig.force_graphs": "fit_when_capturing_on_cuda_else_keep",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
     "RewriteConfig.fold_cutoff": "on_with_factor_species_if_model_supports",
