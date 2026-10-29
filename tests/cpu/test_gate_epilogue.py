@@ -21,8 +21,8 @@ from fastmace.kernels.triton.segment_gemm import joined_products
 from fastmace.planner import fixed
 from fastmace.planner.fixed import PlanRefused
 from fastmace.rewrites import fusion
-from fastmace.rewrites.fusion import modules as fm
 from fastmace.rewrites import registry as reg
+from fastmace.rewrites.fusion import modules as fm
 
 MUL, DIMS = 6, (1, 3, 5)
 
