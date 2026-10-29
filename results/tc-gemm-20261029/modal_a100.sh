@@ -22,17 +22,19 @@ export FASTMACE_SCREEN_TC_GEMM_LIB=$PWD/tc_gemm_lib/libfm_tc_gemm.so
 W=tools/bench/tc_gemm
 log=$OUT/run.log
 note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
-run() {  # name command...
+run() {  # name command... (each step at most STEP seconds, default 900)
   local name=$1; shift
   if [ $(( $(date +%s) - start )) -ge "$limit" ]; then note "skip $name (time)"; return 0; fi
   note "begin $name"
-  "$@" > "$OUT/$name.log" 2>&1 < /dev/null
+  timeout "${STEP:-900}" "$@" > "$OUT/$name.log" 2>&1 < /dev/null
   local status=$?
   note "end $name exit=$status"
   return $status
 }
 note "fastmace=$(cat .source_commit) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) phase=$phase variant=$variant"
 case $phase in
+debug)  # find a faulting mode: NbCl5 warm-up launches one by one, blocking (the log's last line names it)
+  run debug-NbCl5 env CUDA_LAUNCH_BLOCKING=1 FASTMACE_SCREEN_VERBOSE=1 python $W/tc_gemm_screen.py     --output "$OUT/debug" --provider modal --structures NbCl5 --blocks 1 --iters 1 ;;
 screen)
   run check python $W/check.py || { note "STOP: check failed"; exit 1; }
   run screen python $W/tc_gemm_screen.py --output "$OUT/screen" --provider modal

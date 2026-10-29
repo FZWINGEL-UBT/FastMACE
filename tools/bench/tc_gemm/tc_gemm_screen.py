@@ -230,6 +230,10 @@ def time_modes(torch, runners, modes, reps, iters, blocks):
     for i, r in enumerate(runners):
         for mode in modes:
             fn = r.fn(mode)[0]
+            if os.environ.get("FASTMACE_SCREEN_VERBOSE"):  # with CUDA_LAUNCH_BLOCKING=1: the last line names a fault
+                p = r.p
+                print(f"warm-up product {i} {p.kind} [{p.m}, {p.k}] @ [{p.k}, {p.n}] dim {p.launch.get('dim', 1)} "
+                      f"mode {mode}", flush=True)
             stream.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(stream):
                 fn()
