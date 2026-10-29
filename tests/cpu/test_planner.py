@@ -5,7 +5,8 @@ before the model is loaded) followed by ``workflow.adapt_options_to_model`` (sta
 ``gpu_langevin.rewrite_support`` of the loaded model), at ResearchModule tag
 ``research-engine-baseline-20261017``.
 
-- Models: one stand-in per label of the 19 (SPEC §12.5), built from ``LABEL_FACTS``, which were read
+- Models: one stand-in per label of the 19 (SPEC §12.5), built from ``LABEL_FACTS``
+  (``tools/plan_corpus_labels.py``), which were read
   from the released checkpoints with ``fastmace.model.capabilities.model_traits`` (``~/models``,
   18 October 2026; ``tests/gpu/test_planner_gpu.py`` re-reads them when ``FASTMACE_MODELS`` is set).
   The traits only look at class names and attributes, so the stand-ins give the checkpoints' verdicts.
@@ -59,51 +60,18 @@ UNSORTED = NeighbourConfig(sort_receivers="off")
 
 # --------------------------------------------------------------------------- the 19 labels
 
-MH1 = "RealAgnosticResidualNonLinearInteractionBlock"
-RESIDUAL = "RealAgnosticResidualInteractionBlock"
-DENSITY_FIRST, DENSITY = "RealAgnosticDensityInteractionBlock", "RealAgnosticDensityResidualInteractionBlock"
-PLAIN = "RealAgnosticInteractionBlock"
-PER_GRAPH = (("total_charge", "graph"), ("total_spin", "graph"))
-
-# label -> (model class, interaction classes, apply_cutoff, joint embeddings), read from the released
-# checkpoints (model_traits; every node embedding is MACE's LinearNodeEmbeddingBlock).
-LABEL_FACTS = {
-    "mp0-medium": ("ScaleShiftMACE", (RESIDUAL, RESIDUAL), True, ()),
-    "mp0-large": ("ScaleShiftMACE", (RESIDUAL, RESIDUAL), True, ()),
-    "mp0b3-medium": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
-    "mpa0-medium": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
-    "omat0-medium": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
-    "matpes-pbe": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
-    "matpes-r2scan": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
-    "mh1-omat": ("ScaleShiftMACE", (MH1, MH1), False, ()),
-    "mh1-mp": ("ScaleShiftMACE", (MH1, MH1), False, ()),
-    "mh1-r2scan": ("ScaleShiftMACE", (MH1, MH1), False, ()),
-    "polar1-s": ("PolarMACE", (MH1,), False, ()),
-    "polar1-m": ("PolarMACE", (MH1, MH1), False, ()),
-    "polar1-l": ("PolarMACE", (MH1, MH1, MH1), False, ()),
-    "omol0-xl": ("ScaleShiftMACE", (MH1, MH1, MH1), False, PER_GRAPH),
-    "off23-small": ("ScaleShiftMACE", (PLAIN, RESIDUAL), True, ()),
-    "off23-medium": ("ScaleShiftMACE", (PLAIN, RESIDUAL), True, ()),
-    "off23-large": ("ScaleShiftMACE", (PLAIN, RESIDUAL), True, ()),
-    "off23b-medium": ("ScaleShiftMACE", (PLAIN, RESIDUAL), True, ()),
-    "off24-medium": ("ScaleShiftMACE", (PLAIN, RESIDUAL), True, ()),
-}
+# The facts and the stand-ins live in tools/plan_corpus_labels.py (5-T11), shared with tools/plan_corpus.py.
+_spec = importlib.util.spec_from_file_location("plan_corpus_labels",
+                                               REPOSITORY_ROOT / "tools" / "plan_corpus_labels.py")
+_labels = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_labels)
+MH1, RESIDUAL, PLAIN, PER_GRAPH = _labels.MH1, _labels.RESIDUAL, _labels.PLAIN, _labels.PER_GRAPH
+DENSITY_FIRST, DENSITY = _labels.DENSITY_FIRST, _labels.DENSITY
+LABEL_FACTS = _labels.LABEL_FACTS
 LABELS = tuple(LABEL_FACTS)
 # MH-1's interaction class with the cutoff passed: every MH-1 rewrite applies (MH-1, POLAR-1, OMOL-0).
 FACTORED_LABELS = tuple(label for label, facts in LABEL_FACTS.items() if facts[1][0] == MH1)
-
-
-def stand_in(label):
-    """An object with the attributes model_traits reads, as the released checkpoint of ``label`` has them."""
-    model_class, interactions, apply_cutoff, joint = LABEL_FACTS[label]
-    model = type(model_class, (), {})()
-    model.interactions = [type(name, (), {})() for name in interactions]
-    model.radial_embedding = types.SimpleNamespace(apply_cutoff=apply_cutoff)
-    model.node_embedding = type("LinearNodeEmbeddingBlock", (), {})()
-    if joint:
-        model.joint_embedding = object()
-        model.embedding_specs = {name: {"per": per} for name, per in joint}
-    return model
+stand_in = _labels.stand_in
 
 
 def traits(label):

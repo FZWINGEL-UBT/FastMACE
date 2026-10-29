@@ -1,5 +1,5 @@
 """A restart written by an earlier release, resumed by this checkout (4-T13, phase 4 item 5: restart format 4
-still loads format 3).
+still loads format 3; 5-T11, phase 5 item 4: a format-4 restart of the phase 4 release resumes here).
 
 One stage per process, CPU float64 by default (the CPU tests' planner: ``device="cpu"``, ``compile_mode="none"``),
 ``fm.Simulation`` with Langevin at ``--temperature-K`` from seeded Maxwell-Boltzmann momenta:

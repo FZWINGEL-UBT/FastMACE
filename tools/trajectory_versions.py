@@ -28,6 +28,9 @@ Phase 5 (5-T11, item 4) runs it against the ``fastmace-4`` tag (dae3848) with ``
 Phase 6 (6-T13, item 6) runs it against the ``fastmace-5`` tag (d304834) with ``run --against 5 --side 5|6``.
 Phase 4 (4-T13, item 5) runs it against the 3b release with ``run --against 3b --side 3b|4 --expected-commit SHA``,
 in NVT and NPT, with ``--dispersion none`` and ``d3bj`` (D3(BJ) on both sides; ``compare`` checks it matches).
+
+Phase 5 (5-T11, item 4) runs it against the phase 4 release with ``run --against 4 --side 4|5`` (tag ``fastmace-4``,
+dae3848), the same cases as phase 4.
 """
 
 from __future__ import annotations

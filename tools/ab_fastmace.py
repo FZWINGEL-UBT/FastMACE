@@ -31,6 +31,10 @@ one for a control or an alternating-process run):
     4   this checkout, as above, D3 off
     3b  the release at tag ``fastmace-3b`` (or the 3b freeze commit, ff80ca2, while the tag is not set),
         exported as ``fastmace_3b``, through its minimal planner; give --expected-commit
+  --release 4 (5-T11, phase 5 item 5):
+    5   this checkout, as above, D3 off
+    4   the release at tag ``fastmace-4`` (dae3848, phase 4's acceptance freeze), exported as ``fastmace_4``,
+        through its minimal planner
 
 ``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
 (``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
