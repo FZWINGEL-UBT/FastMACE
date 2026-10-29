@@ -416,8 +416,10 @@ def test_md_signature():
                 "schedule", "pressure_GPa", "cell_mode", "timestep_fs", "steps", "mc", "min_mc_temperature_K",
                 "dispersion", "repeat", "output", "seed", "check", "integrator",
                 "mode", "allow_reference", "fallback", "gate", "runner", "engine", "neighbours",  # 2-T01
-                "calibrate"}  # 5-T09
+                "calibrate",  # 5-T09
+                "initial_velocities"}  # owner 28 October 2026: seeded Maxwell-Boltzmann start, opt-in
     assert set(_keyword_only(signature)) == expected
+    assert signature.parameters["initial_velocities"].default == "keep"
     assert signature.parameters["calibrate"].default is False
     assert signature.parameters["repeat"].default == (1, 1, 1)
     assert signature.parameters["check"].default == "skip"

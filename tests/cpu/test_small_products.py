@@ -6,7 +6,8 @@ relaxation of NaCl 3x3x3 from a non-minimal start set the cell to 16.75000 inste
 step and diverged (ResearchModule Experiments/Energy_Hull, H0-diag). The model's own products were exact. The
 products of the optimisers, the cell filter, the barostats, the variable-cell neighbour tests, the D3 image shifts
 and the leader-shift copy are therefore written as element-wise sums (``neighbors.skin.matmul_small`` and friends),
-which no cuBLAS setting reaches (LBFGS's triangular solves excepted, see ``ALLOWED``). These tests hold the helpers to torch's products and keep GEMMs out of the step code.
+which no cuBLAS setting reaches (LBFGS's triangular solves excepted, see ``ALLOWED``). These tests hold the helpers
+to torch's products and keep GEMMs out of the step code.
 """
 
 import ast

@@ -72,7 +72,8 @@ def test_expm_is_unchanged_on_3x3_to_rounding():
     generator = np.random.default_rng(1)
     for scale in (1e-6, 1e-3, 0.1, 1.0):
         a = torch.tensor(generator.standard_normal((3, 3)) * scale)
-        torch.testing.assert_close(expm_3x3(a), _expm_3x3_before(a), rtol=4e-16, atol=1e-16)
+        # A few ulps: 6.7e-16 relative on leto's CPU (29 October 2026), so 4e-16 was too tight.
+        torch.testing.assert_close(expm_3x3(a), _expm_3x3_before(a), rtol=1e-15, atol=1e-16)
 
 
 def test_expm_takes_larger_squares():

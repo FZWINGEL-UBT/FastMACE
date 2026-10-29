@@ -355,7 +355,8 @@ FP64_EMULATION_MANTISSA_NAME = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"
 # capability would take in GPUs never measured (the L4, other sm_89 and sm_120 cards). Adding a GPU here needs its
 # own A/B of all three in both orders.
 DECISION_65_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
-DECISION_65_MANTISSA_BITS = 56  # D1's bit count; its "auto" default is suspended (_fp64_mantissa), explicit requests stay
+# D1's bit count; its "auto" default is suspended (_fp64_mantissa), explicit requests stay.
+DECISION_65_MANTISSA_BITS = 56
 # w_tables: measured on two and three species (NaNbO3: 1.3 GB of tables); four would pass W_TABLE_MAX_BYTES.
 DECISION_65_MAX_SPECIES = 3
 
@@ -602,8 +603,9 @@ class FixedPlanner:
             value, why = request, ("cuBLAS's dynamic mantissa bits" if request == "dynamic"
                                    else f"{request} fixed mantissa bits ({FP64_EMULATION_MANTISSA_NAME})")
         elif decision_65 is None:
-            value, why = "dynamic", (f"cuBLAS's dynamic mantissa bits: decision 65 D1 ({DECISION_65_MANTISSA_BITS} fixed "
-                                     "bits) suspended, graphs captured during a run computed wrong energies with it")
+            value, why = "dynamic", (f"cuBLAS's dynamic mantissa bits: decision 65 D1 ({DECISION_65_MANTISSA_BITS} "
+                                     "fixed bits) suspended, graphs captured during a run computed wrong energies "
+                                     "with it")
         else:
             value, why = "dynamic", f"cuBLAS's dynamic mantissa bits: {decision_65}"
         book.decide("EngineConfig.fp64_emulation_mantissa_bits", str(value), _why(request, rule, why))
