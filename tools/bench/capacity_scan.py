@@ -276,6 +276,11 @@ def run_point(args):
         found = dict(max_allocated=int(torch.cuda.max_memory_allocated()),
                      max_reserved=int(torch.cuda.max_memory_reserved()),
                      allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()))
+        stats = torch.cuda.memory_stats()
+        found.update({key: int(stats.get(f"{key}.all.peak", stats.get(key, 0)))
+                      for key in ("inactive_split_bytes", "active_bytes", "reserved_bytes")},
+                     alloc_retries=int(stats.get("num_alloc_retries", 0)),
+                     segments=int(stats.get("segment.all.current", 0)))
         try:  # device memory in use outside PyTorch's allocator (libraries, graphs, the context)
             free_now, total_now = torch.cuda.mem_get_info()
             found.update(cuda_free=int(free_now), outside_allocator=int(total_now - free_now - found["reserved"]))
