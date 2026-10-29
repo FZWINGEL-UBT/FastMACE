@@ -129,6 +129,9 @@ def _tried(message):
 
 
 def run_point(args):
+    from fastmace.model.compile import configure_allocator
+
+    configure_allocator()  # before the first CUDA call, as the engine's process constraints require
     import torch
 
     import fastmace as fm
