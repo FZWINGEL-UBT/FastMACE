@@ -13,6 +13,14 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   per gated segment where the shape rule picks Triton, without the `drows` round trip. Rounding-class,
   deterministic. Needs `segment_gemm`; refused in float64 and beside `tf32x3_gemms`:
   `docs/validation/opt10-gate-epilogue.md`.
+- `RewriteConfig.wprime_backward` (opt-9 OPT9-T03, float32; **on by default for MH-1 on the measured GPUs**, owner
+  decision 66): the second MH-1 interaction's radial distance gradient inside the streaming convolution's backward,
+  each edge's weight gradient dotted with `w'(r)` from per-piece derivative tables; the weight gradient is never
+  stored, and the folded input gradient and the radial table's backward drop out. Rounding class, not
+  deterministic; needs `radial_tables` and `chunked_conv_backward`. "auto" turns it on in float32 MH-1 plans that
+  are not reproducible on "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada
+  Generation" (exact device names): MD step 0.81-0.89 of the default on the A100, 0.94-0.97 on the RTX 5060 Ti,
+  0.93-0.96 on the RTX 4000 Ada; off on every other GPU (`docs/validation/opt9-T03.md`).
 - `fm.md(initial_velocities=...)` (and the `fastmace run` key `initial_velocities`), opt-in: a
   structure at rest starts with seeded Maxwell-Boltzmann velocities at the run's starting target
   (`"maxwell_boltzmann"`) or at a given temperature in K; `"keep"` (default) leaves it at rest as before. Drawn

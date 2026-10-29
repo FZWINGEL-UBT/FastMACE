@@ -2785,7 +2785,13 @@ Open decisions for the owner:
    default on gpus where its faster overall"): `grouped_launch` for MH-1 on
    "NVIDIA GeForce RTX 5060 Ti" (`planner.fixed.DECISION_66_GROUPED_LAUNCH_GPUS`;
    NaCl 0.971 / 0.975, NbCl5 and NaNbO3 neutral, same-process both orders on
-   main `30ff3b7c`; `docs/validation/decision66-grouped-launch.md`).
+   main `30ff3b7c`; `docs/validation/decision66-grouped-launch.md`). Second
+   (owner, 29 October 2026): `wprime_backward` (OPT9) for MH-1 in float32
+   plans that are not reproducible on "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce
+   RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation"
+   (`planner.fixed.DECISION_66_WPRIME_GPUS`; MD step b/a in both orders 0.81-0.89
+   on the A100, 0.94-0.97 on the RTX 5060 Ti, 0.93-0.96 on the RTX 4000 Ada,
+   every block pair below 1; `docs/validation/opt9-T03.md`).
 
 ---
 

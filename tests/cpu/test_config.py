@@ -71,6 +71,7 @@ AUTO_RULES = {
     "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
+    "RewriteConfig.wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",

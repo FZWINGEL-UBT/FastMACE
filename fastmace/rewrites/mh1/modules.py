@@ -257,8 +257,11 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
     tp_weights = augmented = None
     table = getattr(self, "radial_table", None)  # radial_tables: edge_feats are then the edge lengths [E, 1]
-    w_lengths = None
-    if table is not None and edge_feats.shape[-1] == 1:
+    w_lengths = wprime_lengths = None
+    wprime = getattr(self, "wprime_backward", None)  # wprime_backward (OPT9-T03)
+    if table is not None and edge_feats.shape[-1] == 1 and chunked and wprime is not None:
+        wprime_lengths = edge_feats  # the message and the edge density from one op
+    elif table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
         if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
             w_lengths = edge_feats
@@ -291,8 +294,13 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
             edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
         if cutoff is not None:
             edge_density = edge_density * cutoff
+    if wprime_lengths is not None:
+        message, edge_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
+                                                  node_attrs=node_attrs, wprime_lengths=wprime_lengths)
     density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
-    if reassociation is not None:
+    if wprime_lengths is not None:
+        pass
+    elif reassociation is not None:
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
                                 self.conv_tp_weights.folded_weight())
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv
@@ -332,12 +340,14 @@ setattr(cutoff_folded_forward, READS_SPECIES_RESIDUAL, True)
 
 
 def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,
-                      w_lengths=None, node_attrs=None):
+                      w_lengths=None, node_attrs=None, wprime_lengths=None):
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
     radial layer, built inside the convolution, whose backward runs in L2-sized edge chunks; with
-    ``fused_folded_forward`` attached (opt-8 OPT8-T02) one kernel builds them and the message.
+    ``fused_folded_forward`` attached (opt-8 OPT8-T02) one kernel builds them and the message. With
+    ``wprime_lengths`` (wprime_backward, opt-9 OPT9-T03) the radial table runs inside the op too, which returns
+    ``(message, edge density)``; its backward forms the lengths' gradient without the weight gradient.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
@@ -352,7 +362,14 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     conv = self.conv_tp
     transpose = self.streaming_kernels.layout == "mul_ir" and conv.layout_transpose_in is not None
     feats = conv.layout_transpose_in(node_feats) if transpose else node_feats
-    if w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
+    density = None
+    if wprime_lengths is not None:
+        radial = self.conv_tp_weights
+        message, density = self.wprime_backward.convolution(
+            wprime_lengths, self.radial_table.pair(node_attrs, edge_index), self.radial_table, radial.folded_weight(),
+            feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,
+            getattr(self, "fused_folded_forward", None))
+    elif w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
         message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
                                            self.streaming_kernels)
@@ -368,7 +385,7 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
                                         receiver.to(torch.int32), row_ptr, self.streaming_kernels)
     if transpose:
         message = conv.layout_transpose_out(message)
-    return message
+    return message if density is None else (message, density)
 
 
 def attach_streaming_kernels(interaction):

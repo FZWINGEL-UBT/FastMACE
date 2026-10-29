@@ -119,13 +119,16 @@ def _table_module(tables, columns, device):
             self.fit_error = tables["fit_error"]
             self.certificate = {}
 
+        def pair(self, node_attrs, edge_index):
+            """Per edge the table's (sender species, receiver species) index (int32)."""
+            species = node_attrs[:, self.columns].argmax(dim=1).to(torch.int32)
+            return species[edge_index[0]] * self.species + species[edge_index[1]]
+
         def forward(self, lengths, node_attrs, edge_index):
             from fastmace.kernels.triton.radial_table import radial_table
 
-            species = node_attrs[:, self.columns].argmax(dim=1).to(torch.int32)
-            pair = species[edge_index[0]] * self.species + species[edge_index[1]]
-            return radial_table(lengths, pair, self.coef, self.dcoef, self.starts, self.scales, self.bins,
-                                self.r_lo, self.bin_scale, self.r_max)
+            return radial_table(lengths, self.pair(node_attrs, edge_index), self.coef, self.dcoef, self.starts,
+                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max)
 
         def extra_repr(self):
             return (f"pairs={self.coef.shape[0]}, pieces={self.coef.shape[1]}, degree={self.coef.shape[2] - 1}, "
@@ -651,6 +654,112 @@ def _apply_w_tables(model, context):
     return attach_w_tables(model)
 
 
+# --------------------------------------------------------------------------- wprime_backward (opt-9 OPT9-T03)
+
+
+def attach_wprime(model):
+    """``wprime_backward`` (``fastmace.kernels.oeq_streaming.wprime_backward``) in every float32 interaction whose
+    tables feed the chunked streaming convolution; returns their names. Reassociated interactions keep their own
+    path."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.wprime_backward import WPrime
+
+    names = []
+    for index, interaction in _factored(model):
+        table = getattr(interaction, "radial_table", None)
+        if table is None or getattr(interaction, "first_reassociation", None) is not None:
+            continue
+        kernels = getattr(interaction, "streaming_kernels", None)
+        if kernels is None or not getattr(interaction, "chunked_backward_edges", 0):
+            continue
+        if table.coef.dtype != torch.float32:
+            raise RewriteError(f"wprime_backward is float32 only, interactions.{index} has {table.coef.dtype} tables")
+        if table.coef.device.type != "cuda":
+            raise RewriteError(f"wprime_backward needs the model on a CUDA device (interactions.{index})")
+        weight = interaction.conv_tp_weights.folded_weight().detach()
+        pairs, pieces, terms, _ = table.dcoef.shape
+        size = pairs * pieces * terms * weight.shape[0] * table.dcoef.element_size()
+        if size > W_TABLE_MAX_BYTES:
+            raise RewriteError(f"wprime_backward: interactions.{index} would hold {size / 2**30:.1f} GiB of tables "
+                               f"(more than W_TABLE_MAX_BYTES)")
+        interaction.wprime_backward = WPrime(table, weight, kernels)
+        names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB)")
+    if not names:
+        raise RewriteError("wprime_backward: no interaction with float32 radial tables and the chunked streaming "
+                           "convolution")
+    return names
+
+
+def _wprime_case(interaction, generator, wprime):
+    """One random receiver-sorted graph through the interaction's table and folded streaming convolution, with
+    the record (``wprime``) or the chain: ``[message, density, dL/dr, dx, dsh]``. A twelfth of the edges lie at or
+    beyond the cutoff (the neighbour list's skin and padding)."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming import folded_streaming_convolution
+    from fastmace.kernels.triton.radial_table import radial_table
+
+    table, kernels = interaction.radial_table, interaction.streaming_kernels
+    radial = interaction.conv_tp_weights
+    weight = radial.folded_weight().detach()
+    device, dtype = table.coef.device, table.coef.dtype
+    nodes, edges = 37, 720
+
+    def rand(*shape):
+        return torch.rand(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+
+    def randn(*shape):
+        return torch.randn(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+
+    receivers = torch.sort(torch.randint(0, nodes, (edges,), generator=generator)).values.to(device)
+    senders = torch.randint(0, nodes, (edges,), generator=generator).to(device)
+    r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * rand(edges, 1)
+    r[::12] = table.r_max + 0.5 * rand(r[::12].shape[0], 1)
+    pair = torch.randint(0, table.species ** 2, (edges,), generator=generator, dtype=torch.int32).to(device)
+    x, sh = randn(nodes, kernels.input_dim), randn(edges, kernels.edge_dim)
+    dout, dd = randn(nodes, kernels.output_dim), randn(edges, 1)
+    row_ptr = torch.searchsorted(receivers, torch.arange(nodes + 1, device=device)).to(torch.int32)
+    s32, r32 = senders.to(torch.int32), receivers.to(torch.int32)
+    fused = getattr(interaction, "fused_folded_forward", None)
+    with torch.enable_grad():
+        leaves = [t.clone().requires_grad_() for t in (r, x, sh)]
+        if wprime:
+            message, density = interaction.wprime_backward.convolution(leaves[0], pair, table, weight, leaves[1],
+                                                                       leaves[2], s32, r32, row_ptr, kernels, fused)
+        else:
+            a, density = radial_table(leaves[0], pair, table.coef, table.dcoef, table.starts, table.scales,
+                                      table.bins, table.r_lo, table.bin_scale, table.r_max)
+            message = folded_streaming_convolution(a, weight, leaves[1], leaves[2], s32, r32, row_ptr, kernels,
+                                                   interaction.chunked_backward_edges, radial.folded_tiles,
+                                                   radial.folded_parts, fused)
+        grads = torch.autograd.grad([message, density], leaves, [dout, dd])
+    return [message.detach(), density.detach(), *grads]
+
+
+def _wprime_selfcheck(original, rewritten, context):
+    """Per interaction, the record's message, edge density and gradients to r, x and sh against the chain it
+    replaces (the table, the folded streaming convolution and its chunked backward) on a random graph, to SPEC
+    §6.4's float32 limit."""
+    import torch
+
+    cases, dtype = CaseErrors(), None
+    for index, interaction in _factored(rewritten):
+        if getattr(interaction, "wprime_backward", None) is None:
+            continue
+        dtype = interaction.radial_table.coef.dtype
+        seed = context.seed + 17 + index
+        chain = _wprime_case(interaction, torch.Generator().manual_seed(seed), wprime=False)
+        got = _wprime_case(interaction, torch.Generator().manual_seed(seed), wprime=True)
+        for name, a, b in zip(("message", "density", "dr", "dx", "dsh"), chain, got):
+            cases.add(f"interactions.{index}.{name}", a, b)
+    return cases.result(dtype)
+
+
+def _apply_wprime(model, context):
+    return attach_wprime(model)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
@@ -661,6 +770,14 @@ RECORDS = {
         name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_w_tables, selfcheck=_w_selfcheck),
+    # opt-9 OPT9-T03: rounding (the derivative series and the folded product reassociated); float32; default on
+    # for MH-1 on the measured GPUs (decision 66, planner.fixed.DECISION_66_WPRIME_GPUS).
+    "wprime_backward": Rewrite(
+        name="wprime_backward", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"),
+        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
+        deterministic=False, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_wprime,
+        selfcheck=_wprime_selfcheck),
 }
 
-__all__ = ["DEGREE", "R_LO", "RECORDS", "W_TABLE_MAX_BYTES", "attach_w_tables", "certify", "fit", "tabulate_radials"]
+__all__ = ["DEGREE", "R_LO", "RECORDS", "W_TABLE_MAX_BYTES", "attach_w_tables", "attach_wprime", "certify", "fit",
+           "tabulate_radials"]

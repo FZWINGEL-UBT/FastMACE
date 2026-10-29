@@ -96,6 +96,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
+    "RewriteConfig.wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -128,7 +129,7 @@ STAGE2_SUPPORT = (
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"), ("gate_epilogue", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
-    ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"),
+    ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"), ("wprime_backward", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("species_residual", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
@@ -140,7 +141,7 @@ STAGE2_SUPPORT = (
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
                   "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
-                  "fused_folded_forward", "radial_tables", "w_tables",
+                  "fused_folded_forward", "radial_tables", "w_tables", "wprime_backward",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_epilogue",
                   "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -368,6 +369,11 @@ DECISION_65_MAX_SPECIES = 3
 # measured a speed-up, by exact device name. grouped_launch for MH-1 on the RTX 5060 Ti (current main, 29 October):
 # NaCl 0.971 / 0.975, NbCl5 1.002 / 0.998, NaNbO3 1.001 / 0.999. The RTX 4000 Ada lost 0.5 % in OPT-T03b.
 DECISION_66_GROUPED_LAUNCH_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
+# wprime_backward (OPT9-T05, owner 29 October 2026): MD step b/a in both build orders, every block pair below 1.
+# A100-SXM4-80GB: NaNbO3 0.815 / 0.812, NbCl5 0.889 / 0.889. RTX 5060 Ti: NaNbO3 0.937 / 0.940, NbCl5 0.970 / 0.971,
+# NaCl 0.946 / 0.935. RTX 4000 Ada: NaNbO3 0.938 / 0.939, NbCl5 0.964 / 0.964, NaCl 0.934 / 0.934
+# (docs/validation/opt9-T03.md). The A100-SXM4-40GB was not measured.
+DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -1045,6 +1051,10 @@ class FixedPlanner:
         # ideas-20261027 D2; owner decision 65: "auto" on in float64 MH-1 plans on the measured GPUs (the FastMACE
         # rules).
         needs("w_tables", r.w_tables != "off", v["fold_cutoff"], "fold_cutoff")
+        # opt-9 OPT9-T03; decision 66 (owner, 29 October 2026): "auto" on for MH-1 on DECISION_66_WPRIME_GPUS (stage
+        # 2), in float32 plans that are not reproducible, with radial_tables and chunked_conv_backward (the FastMACE
+        # rules).
+        needs("wprime_backward", r.wprime_backward != "off", v["fold_cutoff"], "fold_cutoff")
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
@@ -1138,6 +1148,17 @@ class FixedPlanner:
                 v["fused_folded_forward"] = False
                 v["_auto_off"]["fused_folded_forward"] = reason
                 v["_why"]["fused_folded_forward"] += f"; stage 2: off, {reason}"
+        if v["wprime_backward"] and "wprime_backward" not in explicit:
+            # Decision 66: measured faster for MH-1 on these GPU models only (OPT9-T05), matched by exact name.
+            name = getattr(hardware, "name", None)
+            if _mh1(model_label) and name in DECISION_66_WPRIME_GPUS:
+                v["_why"]["wprime_backward"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            else:
+                reason = (f"not MH-1, decision 66 (label {model_label})" if not _mh1(model_label)
+                          else f"not a measured GPU, decision 66 ({name})")
+                v["wprime_backward"] = False
+                v["_auto_off"]["wprime_backward"] = reason
+                v["_why"]["wprime_backward"] += f"; stage 2: off, {reason}"
 
     def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None,
                         decision_65="no hardware given, decision 65", species=None):
@@ -1278,6 +1299,20 @@ class FixedPlanner:
         if v["w_tables"] and (dtype != "float64" or reproducible):
             book.refuse(f"RewriteConfig.w_tables='on' needs float64 outside reproducible plans, not {dtype}"
                         f"{' (reproducible)' if reproducible else ''}", "w-tables-needs-float64")
+        if v["wprime_backward"] and "wprime_backward" not in explicit:
+            if dtype != "float32" or reproducible:
+                v["wprime_backward"] = False
+                v["_why"]["wprime_backward"] += ("; off: reproducible=True keeps the chained backward" if reproducible
+                                                 else f"; off: {dtype} plans keep the chained backward")
+            elif not (v["radial_tables"] and v["chunked_conv_backward"]):
+                v["wprime_backward"] = False
+                v["_why"]["wprime_backward"] += "; off: requires radial_tables and chunked_conv_backward"
+        if v["wprime_backward"] and (dtype != "float32" or reproducible):
+            book.refuse(f"RewriteConfig.wprime_backward='on' needs float32 outside reproducible plans, not {dtype}"
+                        f"{' (reproducible)' if reproducible else ''}", "wprime-backward-needs-float32")
+        elif v["wprime_backward"] and not (v["radial_tables"] and v["chunked_conv_backward"]):
+            book.refuse("RewriteConfig.wprime_backward='on' requires radial_tables and chunked_conv_backward, which "
+                        "are not both on", "rewrite-requirement-missing")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))

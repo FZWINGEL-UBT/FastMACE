@@ -141,6 +141,11 @@ class RewriteConfig:
     # float64 MH-1 plans with at most 3 species on the measured GPUs (owner decision 65,
     # planner.fixed.DECISION_65_GPUS), off elsewhere.
     w_tables: Toggle = "auto"
+    # The second MH-1 interaction's radial r-gradient inside the streaming backward: each edge's weight gradient
+    # dotted with w'(r) from per-piece derivative tables, without the dw stores, the folded input gradient and
+    # the table backward (opt-9 OPT9-T03); rounding; float32 plans outside reproducible ones, with radial_tables
+    # and chunked_conv_backward; opt-in (a per-GPU default under decision 66 is the owner's).
+    wprime_backward: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.

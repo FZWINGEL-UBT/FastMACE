@@ -112,7 +112,7 @@ on it. The main chains are:
   `radial_tables`;
 - `streaming_conv` + `fused_folded_backward` → `chunked_conv_backward` →
   `fused_folded_forward`; `radial_tables` + `chunked_conv_backward` →
-  `w_tables`;
+  `w_tables`, `wprime_backward`;
 - `block_linear` → `grouped_linear`, `merged_residual` → `gated_rows` →
   `segment_gemm`; `block_linear` → `grouped_launch`, `fold_readout_tail`;
   `block_linear` + `species_tables` → `fold_product_linear`.
@@ -142,6 +142,7 @@ tensor product. In the MH-1 class it also reads the species of both atoms.
 | `fused_radial_hidden` | `auto`, `on`, `off` | Off. Only `"on"` enables it. | Runs the radial network's hidden block as one pair of Triton kernels. | rounding, deterministic. Needs `fold_cutoff`. No measured gain. |
 | `radial_tables` | `auto`, `on`, `off` | On with `fold_cutoff` (MH-1 class) in float32 and float64 plans that are not reproducible. | Replaces the radial chain (distance → edge weights and edge density) with per-species-pair piecewise Chebyshev tables, fitted when the plan is built. One Triton kernel evaluates them; the backward recomputes. | certified, deterministic. Needs `fold_cutoff`. A failed certificate turns it off. Float64 tables are held to float64 rounding. `"on"` is refused in reproducible float64 plans. |
 | `w_tables` | `auto`, `on`, `off` | On only in float64 MH-1 plans that are not reproducible, on an NVIDIA GeForce RTX 5060 Ti or an NVIDIA RTX 4000 Ada Generation, with at most 3 species. Off elsewhere. | Builds the second interaction's per-edge weights straight from the radial tables (one table per piece already multiplied by the last layer), and their distance gradient without a separate product. | rounding, not deterministic. Needs `radial_tables` and `chunked_conv_backward`. `"on"` needs float64 outside reproducible plans. The tables grow with the square of the species count; above 2 GiB per interaction the rewrite does not apply. |
+| `wprime_backward` | `auto`, `on`, `off` | On for MH-1 checkpoints in float32 plans that are not reproducible, on an NVIDIA A100-SXM4-80GB, an NVIDIA GeForce RTX 5060 Ti or an NVIDIA RTX 4000 Ada Generation (matched by exact name). Off on every other GPU, for other models, in float64 and in reproducible plans. | Computes the second interaction's distance gradient inside the streaming convolution's backward: each edge's weight gradient is multiplied with the derivative of its per-edge weights, read from per-piece tables. The weight gradient is never stored, and the folded layer's input gradient and the radial table's backward are not needed. | rounding, not deterministic. Needs `radial_tables` and `chunked_conv_backward`. `"on"` needs float32 outside reproducible plans; with it, any GPU takes it. MD step 6–19 % faster on the listed GPUs (`docs/validation/opt9-T03.md`). |
 
 ## Density and first interaction
 
@@ -234,7 +235,7 @@ whatever the force precision. The potential energy is summed in float64 in
 both precisions.
 
 Float32 is the default and the fast path: several rewrites (`segment_gemm`,
-`grouped_launch`, `fused_folded_forward`, `tf32x3_gemms`, the PolarMACE
+`grouped_launch`, `fused_folded_forward`, `wprime_backward`, `tf32x3_gemms`, the PolarMACE
 compiler rewrites) are float32 only. Float64 is slower; how much depends on
 the GPU's float64 rate. Choose float64 when:
 
@@ -296,8 +297,8 @@ compute capability with a measured one.
 uses plain cuEq and turns off every rewrite that is not deterministic or that
 is kept for non-reproducible plans only (`radial_tables`, `species_tables`,
 `fold_readout_tail`, `fold_product_linear`, `segment_gemm`, `grouped_launch`,
-`fused_folded_forward`, `w_tables`, `save_transcendentals`, `fx_e3nn_linear`,
-`polar_graph_sums`). An explicit `"on"` for a rewrite that is not
+`fused_folded_forward`, `w_tables`, `wprime_backward`, `save_transcendentals`,
+`fx_e3nn_linear`, `polar_graph_sums`). An explicit `"on"` for a rewrite that is not
 deterministic is refused.
 
 **To save memory.** `radial_tables` and `w_tables` hold tables that grow with
