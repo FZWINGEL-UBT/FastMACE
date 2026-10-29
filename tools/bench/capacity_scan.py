@@ -311,7 +311,7 @@ def scan(args):
                    "--precision", args.precision, "--output", str(args.output), "--steps", str(args.steps),
                    "--warmup", str(args.warmup), "--timestep-fs", str(args.timestep_fs),
                    "--temperature-K", str(args.temperature_K), "--seed", str(args.seed),
-                   "--repeat", repeat_text(sizes[index][1]), "--tag", args.tag]
+                   "--repeat", repeat_text(sizes[index][1]), f"--tag={args.tag}"]
         if args.rewrites:
             command += ["--rewrites", *args.rewrites]
         with open(log, "a") as stream:
