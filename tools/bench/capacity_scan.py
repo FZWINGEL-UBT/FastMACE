@@ -129,6 +129,19 @@ def _fastmace_frames(tb, limit=8):
             f"{f.name}: {(f.line or '').strip()}" for f in picked]
 
 
+def _causes(error, limit=6):
+    """The errors behind ``error`` (``__cause__``, else ``__context__``): a fallback that fails again hides the
+    first failure there."""
+    found, seen = [], {id(error)}
+    error = error.__cause__ or error.__context__
+    while error is not None and id(error) not in seen and len(found) < limit:
+        seen.add(id(error))
+        found.append(dict(type=f"{type(error).__module__}.{type(error).__name__}", message=str(error)[:2000],
+                          stage=getattr(error, "fastmace_stage", None), frames=_fastmace_frames(error.__traceback__)))
+        error = error.__cause__ or error.__context__
+    return found
+
+
 def _tried(message):
     match = re.search(r"Tried to allocate ([\d.]+ [KMGT]iB)", message)
     return match.group(1) if match else None
@@ -256,7 +269,8 @@ def run_point(args):
         record["failure"] = dict(phase=phase, type=f"{type(error).__module__}.{type(error).__name__}",
                                  message=message[:4000], tried_to_allocate=_tried(message),
                                  stage=getattr(error, "fastmace_stage", None),
-                                 frames=_fastmace_frames(error.__traceback__), memory=peaks())
+                                 frames=_fastmace_frames(error.__traceback__), memory=peaks(),
+                                 causes=_causes(error))
         if args.diagnose:
             try:
                 record["failure"]["live"] = _live_blocks(torch)
