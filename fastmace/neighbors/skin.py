@@ -14,14 +14,14 @@ import numpy as np
 import torch
 
 from ..config import DEFAULT_SKIN_A, NeighbourConfig
+from .buckets import edge_capacity
+from .pair_search import candidate_pairs
 
 # Early rebuilds beside the force graph without a host synchronisation (``build_gpu_async``; fp32 profile,
 # 28 October 2026). Read when a list is constructed; off: every build is ``build_gpu``'s.
 ASYNC_EARLY_BUILD = False
 # How far an overflowed asynchronous build moves its reference positions (Angstrom): the next rebuild test fires.
 OVERFLOW_DISPLACEMENT_A = 1.0e6
-from .buckets import edge_capacity
-from .pair_search import candidate_pairs
 
 
 def times_3x3(rows, matrix):
