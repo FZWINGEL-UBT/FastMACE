@@ -1,0 +1,29 @@
+{
+  "structure": "NbCl5",
+  "rewrites": [
+    "wprime_backward=on",
+    "tf32x3_gemms=on",
+    "grouped_launch=off"
+  ],
+  "steps": 20,
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "fastmace_commit": "7b448f8d8a3660219e860030544c806c7a7d2e1c",
+  "kernels": 3816,
+  "span_us": 7812.69775390625,
+  "union_us": 7746.554907226562,
+  "kernel_sum_us": 7791.080100000002,
+  "concurrent_us": 44.52519277343981,
+  "gemm_overlapping_non_gemm_us": 24.530419921875,
+  "stream_busy_us": {
+    "7": 7741.38388671875,
+    "17": 38.44716796875
+  },
+  "top_two_overlap_us": 33.2761474609375,
+  "gemm_us": 3670.131150000002,
+  "gemm_overlapping_other_streams_us": 18.95634765625,
+  "gemm_kernels_per_step": 55.0,
+  "gemm_by_stream_us": {
+    "7": 3670.131150000002,
+    "17": 0.0
+  }
+}

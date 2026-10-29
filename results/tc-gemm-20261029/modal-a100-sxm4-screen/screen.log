@@ -1,0 +1,45 @@
+  fp16x3_split           1395.8 us  1.175x default
+  largest [1512, 512] @ [512, 512] (joined): ieee_default 56.2, cublas_batched 99.8, cublas_ieee 53.1, cublas_tf32 14.1, triton_tf32x3 67.7, cutlass_rz3 40.6, cutlass_rz3_t0 40.6, cutlass_rz3_t1 52.2, cutlass_rn3 167.3, cutlass_rn4 172.0, cutlass_tf32 23.3, cutlass_simt 104.8, cutlass_simt_t0 104.8, cutlass_simt_t1 102.2, fp16x3_prepacked 25.8, fp16x3_split 37.1
+  largest [1512, 512] @ [512, 512] (joined): ieee_default 56.2, cublas_batched 99.8, cublas_ieee 53.1, cublas_tf32 14.1, triton_tf32x3 67.8, cutlass_rz3 40.6, cutlass_rz3_t0 40.6, cutlass_rz3_t1 51.8, cutlass_rn3 167.3, cutlass_rn4 172.0, cutlass_tf32 23.4, cutlass_simt 104.8, cutlass_simt_t0 104.7, cutlass_simt_t1 102.2, fp16x3_prepacked 26.0, fp16x3_split 37.1
+  value = original(*args, **kwargs)
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+NaNbO3: 48 products
+  ieee_default           4253.6 us  1.000x default  cancel/ieee median 1.00 max 1.00
+  cublas_batched         4336.0 us  1.019x default  cancel/ieee median 1.00 max 1.00
+  cublas_ieee            4015.0 us  0.944x default  cancel/ieee median 1.00 max 1.00
+  cublas_tf32            1067.0 us  0.251x default  cancel/ieee median 600.12 max 2442.82
+  triton_tf32x3          5269.0 us  1.239x default  cancel/ieee median 0.63 max 1.58
+  cutlass_rz3            2247.2 us  0.528x default  cancel/ieee median 0.96 max 2.26
+  cutlass_rz3_t0         2142.6 us  0.504x default  cancel/ieee median 0.96 max 2.26
+  cutlass_rz3_t1         2438.1 us  0.573x default  cancel/ieee median 0.96 max 2.26
+  cutlass_rn3           11986.2 us  2.818x default  cancel/ieee median 0.67 max 1.64
+  cutlass_rn4           12340.8 us  2.901x default  cancel/ieee median 0.66 max 1.76
+  cutlass_tf32           1205.1 us  0.283x default  cancel/ieee median 600.12 max 2442.82
+  cutlass_simt           5817.7 us  1.368x default  cancel/ieee median 1.00 max 5.35
+  cutlass_simt_t0        5622.9 us  1.322x default  cancel/ieee median 1.00 max 5.35
+  cutlass_simt_t1        6144.8 us  1.445x default  cancel/ieee median 1.00 max 5.35
+  fp16x3_prepacked       2107.9 us  0.496x default  cancel/ieee median 1.86 max 8.11
+  fp16x3_split           2770.7 us  0.651x default
+  largest [7560, 512] @ [512, 512] (joined): ieee_default 241.0, cublas_batched 291.3, cublas_ieee 228.4, cublas_tf32 63.8, triton_tf32x3 285.7, cutlass_rz3 123.2, cutlass_rz3_t0 114.5, cutlass_rz3_t1 123.2, cutlass_rn3 659.4, cutlass_rn4 684.5, cutlass_tf32 55.2, cutlass_simt 303.8, cutlass_simt_t0 265.5, cutlass_simt_t1 303.6, fp16x3_prepacked 92.8, fp16x3_split 122.2
+  largest [7560, 512] @ [512, 512] (joined): ieee_default 241.0, cublas_batched 290.9, cublas_ieee 228.6, cublas_tf32 63.7, triton_tf32x3 285.8, cutlass_rz3 123.1, cutlass_rz3_t0 114.7, cutlass_rz3_t1 123.1, cutlass_rn3 659.5, cutlass_rn4 683.9, cutlass_tf32 55.3, cutlass_simt 303.9, cutlass_simt_t0 265.7, cutlass_simt_t1 303.9, fp16x3_prepacked 93.0, fp16x3_split 122.2
+  value = original(*args, **kwargs)
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+Traceback (most recent call last):
+  File "/tmp/fastmace-src/tools/bench/tc_gemm/tc_gemm_screen.py", line 374, in <module>
+    main()
+  File "/tmp/fastmace-src/tools/bench/tc_gemm/tc_gemm_screen.py", line 308, in main
+    times = time_modes(torch, runners, args.modes, args.reps, args.iters, args.blocks)
+  File "/tmp/fastmace-src/tools/bench/tc_gemm/tc_gemm_screen.py", line 261, in time_modes
+    end.synchronize()
+  File "/usr/local/lib/python3.10/site-packages/torch/cuda/streams.py", line 254, in synchronize
+    super().synchronize()
+torch.AcceleratorError: CUDA error: an illegal memory access was encountered
+Search for `cudaErrorIllegalAddress' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+The CUDA driver logged these messages, which may provide useful details:
+Returning 700 (CUDA_ERROR_ILLEGAL_ADDRESS) from cuEventSynchronize
+
+
