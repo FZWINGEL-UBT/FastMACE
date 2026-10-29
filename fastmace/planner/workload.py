@@ -30,7 +30,8 @@ class Workload:
     """What the run will do (SPEC §9.2). Only ``max_temperature_K`` is required.
 
     - ``max_temperature_K``: the highest thermostat target of the run, K; sizes the skin and the
-      bucket headroom (rule 11). ``Simulation.run`` refuses a schedule above it (§7.6);
+      bucket headroom of MC and species-change workloads (rule 11; plain MD keeps the 0.3 Å skin).
+      ``Simulation.run`` refuses a schedule above it (§7.6);
     - ``species_changes``: swaps, transmutations or species events (§8.5);
     - ``atom_count_changes``: reserved; the planner refuses it in 1.0 (§9.3 rule 7, §8.6);
     - ``min_mc_temperature_K``: the lowest MC target temperature, K; the ΔE gate threshold
@@ -39,7 +40,8 @@ class Workload:
     - ``needs_per_atom``: per-atom outputs the run needs (``"energies"``, ``"charges"``, ...);
     - ``mc_moves``: declared move types (``"swap"``, ``"transmute"``, ``"displace"``);
     - ``reproducible``: bitwise within the scope of §9.3; the planner refuses what it cannot
-      guarantee (in 1b: everything, "no family qualified");
+      guarantee. Qualified (2-T16, ``planner.reproducible``): plain cuEq with the unfused convolution,
+      the MH-1 architecture and the pinned ``cuequivariance_ops`` version;
     - ``mc_energy_precision``: §10.4; ``"auto"`` = the force precision if the ΔE gate passes;
     - ``max_displacement_A``: the largest displacement δ, Å, any ``Displace`` move of the run may
       use (adaptive δ included). Required when ``"displace"`` is in ``mc_moves``; rule 11 adds 2δ

@@ -39,7 +39,9 @@ same text is in the run report and in `metadata.json`.
 - **Workload:** `fm.Workload(max_temperature_K=..., species_changes=...,
   mc_moves=..., host_callbacks_every=...)` tells the planner what the run
   will do. `fm.md` infers it from its arguments. A schedule above
-  `max_temperature_K` is refused, because the skin was sized for it.
+  `max_temperature_K` is refused. For runs with MC moves or species
+  changes the skin and buffer headroom are sized from it; plain MD keeps
+  the 0.3 Å skin.
 - **Mode:** `Simulation(mode=...)` asks for a tier; `None` lets the planner
   choose.
 - **Rewrites and precision** live on the force field:
@@ -69,7 +71,11 @@ periodic, a missing OpenEquivariance (`fastmace doctor` names the piece), a
 model outside the rewrite registry, padded edges that are not exactly zero,
 a failed self-check, or a fallback after a failed gate.
 
-For the full rule list see
-[SPEC section 9](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/SPEC.md)
-and the
-[planner design note](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/design/planner-5.md).
+The full rule list is on
+[Planner, gate and fallback](../reference/planner.md). The
+[planner design note](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/design/planner-5.md)
+in the repository explains the design.
+
+See also: [Planner, gate and fallback](../reference/planner.md),
+[Engine and neighbour list](../reference/engine.md),
+[Rewrites and precision](../reference/rewrites.md).

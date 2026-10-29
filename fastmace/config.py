@@ -127,15 +127,19 @@ class RewriteConfig:
     chunked_conv_backward: Toggle = "auto"
     # The folded layer fused into the streaming forward: one kernel builds the per-edge weights a @ [W, b].T and
     # the message and stores the weights for chunked_conv_backward (opt-8 OPT8-T02); exact (the same FP32 sums in
-    # the same order); float32 plans only; opt-in, auto = off.
+    # the same order); float32 plans only; auto = on for MH-1 labels in float32 plans that are not reproducible
+    # (owner decision 64), off for every other model.
     fused_folded_forward: Toggle = "auto"
     # Certified per-species-pair Chebyshev tables for the MH-1 radial chain (r -> [h c, c] and the edge density),
     # fitted and certified at setup against float64 (opt-6 OPT6-T05; exactness "certified", owner decision 61);
-    # float32 plans only; opt-in, auto = off.
+    # auto = on with fold_cutoff in float32 and float64 plans that are not reproducible; "on" is refused in
+    # reproducible float64 plans.
     radial_tables: Toggle = "auto"
     # Per-piece w-tables: the second MH-1 interaction's per-edge weights straight from the radial tables
     # (w = sum_k T_k(x) C_k W^T per piece) and their r-gradient without the dw W product (ideas-20261027 D2);
-    # rounding; float64 plans outside reproducible ones, with radial_tables and chunked_conv_backward; opt-in.
+    # rounding; float64 plans outside reproducible ones, with radial_tables and chunked_conv_backward; auto = on in
+    # float64 MH-1 plans with at most 3 species on the measured GPUs (owner decision 65,
+    # planner.fixed.DECISION_65_GPUS), off elsewhere.
     w_tables: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
@@ -165,14 +169,16 @@ class RewriteConfig:
     # float32, not reproducible (owner, 24 Oct 2026, decision 57).
     grouped_launch: Toggle = "auto"
     # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
-    # per-species tables gathered each step (opt-1 OPT-T08 C1); auto = on where the model takes it, in float32
-    # plans that are not reproducible (owner decision, 21 October 2026).
+    # per-species tables gathered each step (opt-1 OPT-T08 C1); auto = on where the model takes it, in plans that
+    # are not reproducible, float32 and float64 (owner decision, 21 October 2026).
     species_tables: Toggle = "auto"
     # The last readout's first linear folded into the last product's linear and skip_tp (OPT-T08 C2); auto = on
-    # with block_linear where the model takes it, float32, not reproducible (owner decision, 21 October 2026).
+    # with block_linear where the model takes it, in plans that are not reproducible (owner decision, 21 October
+    # 2026).
     fold_readout_tail: Toggle = "auto"
     # products.0.linear folded into the linear consumers of layer 0's output, with the species carried next to
-    # the contraction (OPT-T08 C3); auto = on with species_tables and block_linear (owner, 21 October 2026).
+    # the contraction (OPT-T08 C3); auto = on with species_tables and block_linear, so off in reproducible plans
+    # (owner, 21 October 2026).
     fold_product_linear: Toggle = "auto"
     # Inductor's combo kernels, pointwise only, in the compiled model: independent adjacent pointwise kernels in
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
@@ -180,7 +186,8 @@ class RewriteConfig:
     combo_kernels: Toggle = "auto"
     # A custom AOTAutograd partitioner for the compiled model that saves transcendental ops (exp, tanh, sigmoid,
     # ...) for the backward instead of recomputing them there (ideas-20261027 D3; fastmace.rewrites.inductor):
-    # float64 MD step 0.970-0.979 on the RTX 5060 Ti; exact; opt-in, auto = off.
+    # float64 MD step 0.970-0.979 on the RTX 5060 Ti; exact; auto = on in float64 MH-1 plans that are not
+    # reproducible on the measured GPUs (owner decision 65, planner.fixed.DECISION_65_GPUS), off elsewhere.
     save_transcendentals: Toggle = "auto"
     # Every atom GEMM (block linears, segment_gemm, species skip, reassociated first interaction) and its input
     # gradients as 3xTF32 through Triton's tf32x3 (opt-4 OPT4-T03 stage 1, fastmace.rewrites.precision); rounding,
@@ -201,10 +208,6 @@ class RewriteConfig:
     single_graph_strain: Toggle = "auto"
     # PolarMACE: reassociated SparseUvuTensorProduct, MACE PR 1711 (polar_gpu.REASSOCIATE_UVU).
     polar_uvu: bool = True
-    # Self-check results cached by checkpoint, sources, rewrite set, versions and device kind (2-T19):
-    # "use" reads and writes the cache, "off" neither, "refresh" runs every check and rewrites it.
-    # No effect until 2-T19.
-    selfcheck_cache: Literal["use", "off", "refresh"] = "use"
 
     def __post_init__(self):
         _check_choices(self)
@@ -276,8 +279,9 @@ class EngineConfig:
     # default (owner decision, 21 October 2026; OPT3-T03).
     fused_integrator: bool = True
     # Re-captures of the graphs one run may make (bucket growth, overflow redos, events that drop graphs)
-    # before the run warns, records it and the report recommends the compiled tier (SPEC §8.1; no mid-run
-    # downgrade, phase 3 conductor decision). "auto": a rule from the workload (3-T04, 3-T05); 0: none.
+    # before the run warns, records it and the report recommends the compiled tier (SPEC §8.1); past it,
+    # runtime adaptation (AdaptationConfig) may switch to the compiled tier at a committed step. "auto":
+    # graph_variant_cap; 0: none.
     recapture_budget: int | Literal["auto"] = "auto"
     # Captured graph variants kept at once, oldest dropped first (SPEC §8.1: dynamo's limit, at most 64).
     graph_variant_cap: int = 64
@@ -313,7 +317,9 @@ class PrecisionConfig:
 
     # Model and force precision (--dtype).
     dtype: Literal["auto", "float32", "float64"] = "auto"
-    # TF32 matrix products; off everywhere in the research engine (main.py: "TF32 off").
+    # TF32 matrix products; off everywhere in the research engine (main.py: "TF32 off"). A label of the plan only:
+    # FastMACE never sets PyTorch's TF32 flag; metadata.json records that flag (precision.tf32) next to this one
+    # (precision.tf32_requested).
     tf32: bool = False
     # Potential energy accumulated in float64 (SPEC §7.3; a reference treatment, not a rewrite).
     # False reproduces phase 1a's float32 sum, for A/B against the research engine only (1b-T03).
@@ -331,8 +337,9 @@ class PrecisionConfig:
 class NeighbourConfig:
     """Skin neighbour list and padded edge buckets (SPEC §8.1; fastmace.neighbors)."""
 
-    # Neighbour-list skin in Angstrom (--skin). "auto": rule 11 from the workload (3-T05; until then
-    # DEFAULT_SKIN_A, phase 1a's 0.3).
+    # Neighbour-list skin in Angstrom (--skin). "auto": rule 11 sizes it from the workload for MC and
+    # species-change workloads (3-T05), a relaxation gets 3 x maxstep_A (at least DEFAULT_SKIN_A), and plain
+    # MD keeps DEFAULT_SKIN_A, phase 1a's 0.3.
     skin: float | Literal["auto"] = "auto"
     # Order candidate edges by receiver at every rebuild (sort_by_receiver; --sort-receivers).
     sort_receivers: Toggle = "auto"
@@ -344,8 +351,8 @@ class NeighbourConfig:
     edge_bucket_fraction: float = 0.05
     # Pair-buffer capacity relative to the first build (SkinNeighbourList headroom).
     capacity_headroom: float = 1.15
-    # "fixed": capacity_headroom and edge_bucket_fraction as given; "auto": rule 11 sizes them from the
-    # workload (3-T05; until then "fixed").
+    # "fixed": capacity_headroom and edge_bucket_fraction as given; "auto": rule 11 sizes capacity_headroom
+    # from the skin for MC and species-change workloads (3-T05); edge_bucket_fraction always stays as given.
     headroom: Literal["auto", "fixed"] = "auto"
     # The D3 pair list's own skin in Angstrom (SPEC §11.2; 3b-T02). "auto": rule 11 from the workload and
     # the barostat when the force field has D3; without D3 it stays "auto" and nothing reads it.
@@ -428,8 +435,9 @@ class IntegratorConfig:
     # (its noise stream; right for equal masses only): plain mean of the displacements, P/(N m_i) of the
     # velocities, both scaled by sqrt(N/(N-1)). "mass_weighted": the Gaussian conditioned on a fixed centre
     # of mass, mass-weighted means, no scale factor: canonical with 3N-3 degrees of freedom, per species too.
-    # "auto" (3-T22b): the planner's rule, "mass_weighted" under NVT fixcm with MC moves declared (their
-    # redraw_all holds (3N-3) kT), else "ase"; outside a plan it reads as "ase".
+    # "auto" (3-T22b, 3-T22c): the planner's rule, "mass_weighted" under NVT fixcm, for MD as for MC (decision
+    # 37: every species holds the target, 3N-3 degrees of freedom; MC's redraw_all holds (3N-3) kT), else "ase";
+    # outside a plan it reads as "ase".
     fixcm_projection: Literal["auto", "ase", "mass_weighted"] = "auto"
     # Steps of random numbers drawn and copied to the GPU at once; same numbers and order (NOISE_BATCH).
     noise_batch: int = 256

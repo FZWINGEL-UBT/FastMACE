@@ -66,7 +66,6 @@ How to read the tables:
 | `INPLACE_BLOCK_LINEAR` (no flag) | `RewriteConfig.inplace_block_linear` | `False` | — | §6.2 opt-in "in-place block linear (slower)" |
 | `--single-graph-strain`; `upstream_mace.use_single_graph_strain` (process-wide patch of MACE) | `RewriteConfig.single_graph_strain` | `"auto"` | `on` | §6.2 `single_graph_strain` |
 | `--polar-uvu`; `polar_gpu.REASSOCIATE_UVU` | `RewriteConfig.polar_uvu` | `True` (flag `on`) | — | §6.2 `polar_uvu` |
-| none: the research engine runs every self-check (new in the library, 2-T01; filled by 2-T19) | `RewriteConfig.selfcheck_cache` | `"use"` | — | qualification cache (§6.4; no effect until 2-T19) |
 
 ## 2. Engine options → `EngineConfig`
 
@@ -359,7 +358,8 @@ model is an error with a reason, never a silent downgrade.
   records with 11 fields (section 10: `FallbackConfig` 3, `GateConfig` 3,
   `RunnerConfig` 5), 70 in all. OPT-T07 added `RunnerConfig.persistent` (71). Two admit `"auto"` (`FallbackConfig.fallback`,
   `GateConfig.reduced_cell`).
-  None comes from the research engine.
+  None comes from the research engine. `RewriteConfig.selfcheck_cache` was removed on 28 October 2026
+  (checkpoint 2 decided no self-check cache; nothing read it).
 - Optimisation round 1 (plan task OPT-T06) added `EngineConfig.model_template_cache`,
   71 in all. It does not come from the research engine, which loaded once per process.
 - Optimisation round 2 (plan task OPT2-T04) added `EngineConfig.overlap_rebuild` and

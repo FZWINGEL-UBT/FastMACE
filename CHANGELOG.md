@@ -8,6 +8,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `fm.md(initial_velocities=...)` (and the `fastmace run` key `initial_velocities`), opt-in: a
+  structure at rest starts with seeded Maxwell-Boltzmann velocities at the run's starting target
+  (`"maxwell_boltzmann"`) or at a given temperature in K; `"keep"` (default) leaves it at rest as before. Drawn
+  from `seed` on a stream of its own, never for a structure that already moves, and recorded in the report and
+  `metadata.json`'s warnings (owner, 28 October 2026: an option, documented clearly; `docs/guide/md.md`,
+  "Starting velocities").
 - Three float64 speed-ups, **on by default on the measured GPUs** (owner decision 65; `plans/ideas-20261027.md`):
   `EngineConfig.fp64_emulation_mantissa_bits` ("auto" = 56 fixed mantissa bits in cuBLAS's float64 emulation,
   "dynamic" or a bit count from 8 to 128 to choose), `RewriteConfig.w_tables` (per-piece folded radial tables,
@@ -44,6 +50,24 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   (a `ValueError`) that says how to draw velocities. Before, the integrator's refusal counted as a fallback
   candidate failure: each candidate compiled first, and the run ended in a misleading `FallbackExhausted`
   (NaMOCl4 report, 28 October 2026). The fallback search now passes every `InputError` through.
+- Documentation pass (`fastmace/docs-20261028`): a feature tour, a first-run tutorial and a complete option
+  reference (`docs/reference/`, checked by `tests/cpu/test_docs_options.py`), plus the fixes it found:
+  - `fastmace run`: a `steps` key in the file no longer crashes; it is the run's length, `--steps` only
+    shortens a piece, and `--resume` continues an unscheduled run to it.
+  - `fm.md` declares the largest `Displace` `delta_A` as `Workload.max_displacement_A` (MC with `Displace`
+    failed without it).
+  - `ForceField(polar=PolarConfig(...))` takes MACE PR 1762's PolarMACE options, recorded in the identity and
+    restarts; **not tested**: no run with them has been validated, and the report says so.
+
+### Changed
+
+- `LangevinBAOAB.fixcm` is `False` and only `False`: BAOAB, as ASE's, never removed the total momentum, so the
+  record no longer claims a fixed centre of mass. `fixcm=True` is refused; restarts recorded with it resume
+  with `False`.
+- `RewriteConfig.selfcheck_cache` is removed (it never had an effect); restarts that hold it still load.
+- `metadata.json`'s `precision.tf32` records PyTorch's real matmul TF32 flag when the record is made;
+  `precision.tf32_requested` holds the plan's `PrecisionConfig.tf32` label (FastMACE never sets the flag).
+- Help texts, `fastmace init` and error messages cite no SPEC sections or rule numbers.
 
 ## [1.0.0] - 2026-10-25
 

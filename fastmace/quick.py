@@ -34,6 +34,7 @@ or above ``min_mc_temperature_K`` (``mc_ranges``), through ``Simulation.run(mc=�
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, fields
 from pathlib import Path
@@ -90,7 +91,8 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
        pressure_GPa: float = 0.0, cell_mode: str = "hydrostatic", timestep_fs: float = 0.5,
        steps: int | None = None, mc: Any = None, min_mc_temperature_K: float | None = None,
        dispersion: Any = None, repeat: tuple[int, int, int] = (1, 1, 1), output: Any = None,
-       seed: int | None = None, check: str = "skip", integrator: Any = None, mode: str | None = None,
+       seed: int | None = None, initial_velocities: Any = "keep", check: str = "skip", integrator: Any = None,
+       mode: str | None = None,
        allow_reference: bool = False, fallback: Any = None, gate: Any = None, runner: Any = None,
        engine: Any = None, neighbours: Any = None, calibrate: bool = False) -> RunResult:
     """Run MD on ``structure`` (path or ``Atoms``) with ``model`` and return a ``RunResult``.
@@ -113,6 +115,13 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     - ``output``: a directory or an ``fm.Output``; default ``./<structure stem>.fastmace/``, or
       ``./fastmace-run/`` for an ``Atoms``;
     - ``seed``: the noise seed; ``None`` draws one, recorded in ``metadata.json``;
+    - ``initial_velocities``: what a structure **at rest** (zero kinetic energy) starts with. ``"keep"``
+      (default): its momenta as they are, so it starts at rest (as ASE; CSVR refuses that). ``"maxwell_boltzmann"``:
+      seeded Maxwell-Boltzmann momenta at the run's starting target (``temperature_K``, the integrator's, or the
+      schedule's first); refused when that is 0 K and for NVE. A temperature in K (a float above 0): Maxwell-Boltzmann
+      momenta at it, also for NVE and for a schedule that starts at 0 K. The draw uses ``seed`` (its own stream,
+      not the thermostat's), is not made when the structure already moves (its momenta are kept), and either way
+      the report and ``metadata.json``'s warnings say what happened. Opt-in;
     - ``check``: as ``Simulation`` (the gate is opt-in, ``check="gate"``);
     - ``mode``, ``allow_reference``, ``fallback``, ``gate``, ``runner``, ``engine``, ``neighbours``:
       the planner inputs, passed to ``Simulation`` as they are (``simulation.PlannerOptions``);
@@ -144,6 +153,7 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     ensemble = ensemble.upper()
     if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int) or seed < 0):
         raise ValueError(f"seed must be a nonnegative int or None, got {seed!r}")
+    initial_velocities = _initial_velocities(initial_velocities)
 
     # The model's name and training functional, from the label table where it is a label: the
     # multi-head ValueError and the dispersion checks need no checkpoint.
@@ -195,6 +205,9 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
             raise ValueError(f"ensemble='NVE' has no target temperature, so {', '.join(given)} cannot apply; the "
                              "momenta are the structure's (set them on the Atoms, for example with ASE's "
                              "MaxwellBoltzmannDistribution) (SPEC §7.7)")
+        if initial_velocities == "maxwell_boltzmann":
+            raise ValueError("initial_velocities='maxwell_boltzmann' draws at the starting target, and NVE has none; "
+                             "pass a temperature in K, for example initial_velocities=300.0")
 
     # The temperature: the start target, the highest and (for MC) the lowest of the run.
     if schedule is not None:
@@ -221,6 +234,22 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     atoms = _structure(structure)
     if repeat != (1, 1, 1):
         atoms = atoms.repeat(repeat)
+    velocity_note = None
+    if initial_velocities != "keep":
+        if initial_velocities == "maxwell_boltzmann" and not start > 0:
+            raise ValueError(f"initial_velocities='maxwell_boltzmann' draws at the starting target, which is {start:g} "
+                             "K; pass a temperature in K instead, for example initial_velocities=10.0")
+        if seed is None:  # drawn here so that the velocities' seed is the recorded one
+            import secrets
+
+            seed = secrets.randbelow(_SEED_BOUND)
+        velocities_K = start if initial_velocities == "maxwell_boltzmann" else initial_velocities
+        if draw_initial_velocities(atoms, velocities_K, seed):
+            velocity_note = (f"starting velocities: Maxwell-Boltzmann at {velocities_K:g} K, drawn from seed {seed} "
+                             f"(initial_velocities={initial_velocities!r}; the structure was at rest)")
+        else:
+            velocity_note = (f"starting velocities: the structure's own; initial_velocities={initial_velocities!r} "
+                             "draws only for a structure at rest")
     if nve:
         highest = nve_max_temperature_K(atoms)
 
@@ -237,7 +266,8 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
                 raise ValueError("temperature_K=0 with mc=: the MC temperature would be 0 K, which makes the ΔE "
                                  "floor 0.01 k_B T_min zero (SPEC §7.7, §12.3)")
             workload_fields["min_mc_temperature_K"] = start
-        workload_fields.update(mc_moves=moves, species_changes=any(move in SPECIES_MOVES for move in moves))
+        workload_fields.update(mc_moves=moves, species_changes=any(move in SPECIES_MOVES for move in moves),
+                               max_displacement_A=max_displacement_A(mc))
     workload = Workload(**workload_fields)
 
     record, d3_warnings = d3.expand(dispersion, functional=functional, model=name)
@@ -277,6 +307,8 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
                      seed=seed, check=check,
                      **{field.name: getattr(planner_inputs, field.name) for field in fields(planner_inputs)})
     sim.report.repeat = repeat
+    if velocity_note is not None:
+        sim.report.add_warning(velocity_note)
     if mc is None:
         sim.run(steps=steps, schedule=schedule)
     elif schedule is None:
@@ -296,6 +328,40 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
                      output=str(output.directory))
 
 
+INITIAL_VELOCITIES = ("keep", "maxwell_boltzmann")
+# The starting velocities' own random stream next to the seed ("vel"), apart from the thermostat noise.
+VELOCITY_STREAM = 0x76656C
+
+
+def _initial_velocities(value):
+    """``fm.md``'s ``initial_velocities``: ``"keep"``, ``"maxwell_boltzmann"`` or a temperature in K above 0."""
+    if isinstance(value, str):
+        if value not in INITIAL_VELOCITIES:
+            raise ValueError(f"initial_velocities={value!r} is not one of {INITIAL_VELOCITIES} or a temperature in K")
+        return value
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        raise ValueError(f"initial_velocities must be one of {INITIAL_VELOCITIES} or a temperature in K above 0, "
+                         f"got {value!r}")
+    return float(value)
+
+
+def draw_initial_velocities(atoms: Any, temperature_K: float, seed: int) -> bool:
+    """Seeded Maxwell-Boltzmann momenta at ``temperature_K`` on ``atoms`` if it is at rest (ASE's
+    ``thermalize_momenta``, ``MaxwellBoltzmannDistribution`` before 3.29; constraints such as ``FixAtoms``
+    apply). ``True`` when drawn, ``False`` when the structure already moves: its momenta are kept."""
+    if not math.isclose(float(atoms.get_kinetic_energy()), 0.0, rel_tol=0, abs_tol=1e-12):
+        return False
+    import numpy as np
+    from ase.md import velocitydistribution
+
+    rng = np.random.default_rng([seed, VELOCITY_STREAM])
+    if hasattr(velocitydistribution, "thermalize_momenta"):  # ASE >= 3.29
+        velocitydistribution.thermalize_momenta(atoms, temperature_K, rng=rng)
+    else:
+        velocitydistribution.MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K, rng=rng)
+    return True
+
+
 def _repeat(repeat):
     if isinstance(repeat, (str, bytes)) or not hasattr(repeat, "__len__") or len(repeat) != 3 \
             or any(isinstance(n, bool) or not isinstance(n, int) or n < 1 for n in repeat):
@@ -310,6 +376,15 @@ def _mc_moves(mc):
         if block.move not in moves:
             moves.append(block.move)
     return tuple(moves)
+
+
+def max_displacement_A(mc: Any) -> float | None:
+    """The largest ``delta_A`` of the ``Displace`` moves in a move set (``None`` without one), Å: the skin is
+    sized for it."""
+    from fastmace.simulation import mc_moves
+
+    deltas = [block.delta_A for block in mc_moves(mc) if block.move == "displace"]
+    return max(deltas) if deltas else None
 
 
 def mc_species(mc: Any) -> set[int]:

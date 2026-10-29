@@ -33,7 +33,10 @@ the next step runs, so writing does not slow the GPU.
 A restart file holds the **complete** state: positions, momenta, cell,
 barostat and thermostat state, the RNG state, species after MC exchanges,
 the schedule position, the MC counters and the plan revision. Restart
-points are written every `restart_every` steps and on a clean stop.
+points are written every `restart_every` steps, at the end of each
+protocol piece and by `save_restart`. A run whose `steps` is not a multiple
+of `restart_every` has no restart at its last step; see
+[Output files](../reference/output.md).
 
 ```python
 sim.save_restart("run/restart.npz")         # an extra one by hand
@@ -63,3 +66,5 @@ agreement set `restart_every=None` too.
 
 `fastmace run run.toml` writes the same files. To quench frames of a
 finished run, see [Relaxations and quenches](relax.md).
+
+See also: [Output files](../reference/output.md).

@@ -70,6 +70,9 @@ def test_options_not_chosen_are_refused(fields):
         planner_options(adaptation=AdaptationConfig(**fields))
     assert refused.value.codes == ("adaptation-unsupported",) == (PHASE_5_PENDING_CODES["adaptation"],)
     assert "decisions 52 and 53" in str(refused.value)
+    assert "or pass adapt='off'" not in str(refused.value)
+    with pytest.raises(PlanRefused):  # adapt="off" does not lift it, and the message says so
+        planner_options(adaptation=AdaptationConfig(adapt="off", **fields))
 
 
 def test_pending_is_no_longer_an_adaptation_value():

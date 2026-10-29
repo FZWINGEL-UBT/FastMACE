@@ -164,9 +164,10 @@ def default_planner(force_field) -> MinimalPlanner:
     """The planner of ``fm.ForceField.evaluate``: CUDA if available, else the CPU without compilation."""
     import torch
 
+    polar = getattr(force_field, "polar", None)  # ForceField(polar=), MACE PR 1762's options
     if torch.cuda.is_available():
-        return MinimalPlanner()
-    return MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"))
+        return MinimalPlanner(polar=polar)
+    return MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), polar=polar)
 
 
 def torch_device_type(device: str) -> str:

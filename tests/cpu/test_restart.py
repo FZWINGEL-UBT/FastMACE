@@ -515,3 +515,11 @@ def test_external_stress_units():
                                                      external_stress_GPa=(1.0, 2.0, 3.0, 0.1, 0.2, 0.3)))
     expected = np.array([[1.0, 0.3, 0.2], [0.3, 2.0, 0.1], [0.2, 0.1, 3.0]]) * units.GPa
     np.testing.assert_allclose(stressed.externalstress.numpy(), expected, rtol=1e-15)
+
+
+def test_a_rewrite_record_from_before_selfcheck_cache_was_removed_resumes():
+    from fastmace.config import RewriteConfig
+    from fastmace.simulation import _record_rewrites
+
+    assert _record_rewrites("auto") == "auto"
+    assert _record_rewrites({"fold_cutoff": "off", "selfcheck_cache": "use"}) == RewriteConfig(fold_cutoff="off")

@@ -95,3 +95,5 @@ per-GPU tables; every rule is general.
 
 FastMACE shows each model's licence once per process. Many MACE foundation
 models are non-commercial (ASL). See [Models and licences](guide/models.md).
+
+See also: [Environment and cache](reference/environment.md), [Planner, gate and fallback](reference/planner.md).

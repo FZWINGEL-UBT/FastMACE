@@ -503,3 +503,87 @@ def test_no_refusal_is_left_in_fm_md(tmp_path):
     with pytest.raises(Exception) as raised:
         md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, ensemble="NVE", steps=3, seed=1)
     assert not isinstance(raised.value, PlanRefused)
+
+
+def test_displace_declares_its_largest_delta(tmp_path):
+    """fm.md sets Workload.max_displacement_A from the Displace moves, so mc=Displace(...) plans."""
+    from fastmace import mc, quick
+
+    moves = [mc.Displace(delta_A=0.1, every=2, attempts=3), mc.Displace(delta_A=0.25, every=5, attempts=1), _swap()]
+    assert quick.max_displacement_A(moves) == 0.25
+    assert quick.max_displacement_A([_swap()]) is None
+    with pytest.raises(Exception) as raised:  # the absent model, not the workload
+        quick.md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, mc=moves[0], temperature_K=300.0,
+                 steps=3, seed=1)
+    assert "max_displacement_A" not in str(raised.value)
+
+
+
+# --------------------------------------------------------------------------- initial_velocities (owner, 28 Oct 2026)
+
+
+def test_initial_velocities_values():
+    from fastmace import quick
+
+    assert quick._initial_velocities("keep") == "keep"
+    assert quick._initial_velocities("maxwell_boltzmann") == "maxwell_boltzmann"
+    assert quick._initial_velocities(10) == 10.0
+    for bad in ("mb", 0.0, -5.0, float("nan"), True, None):
+        with pytest.raises(ValueError, match="initial_velocities"):
+            quick._initial_velocities(bad)
+
+
+def test_the_draw_is_seeded_and_only_for_a_structure_at_rest():
+    import numpy as np
+
+    from fastmace import quick
+
+    first, second, other = _atoms(), _atoms(), _atoms()
+    assert quick.draw_initial_velocities(first, 300.0, 7)
+    assert quick.draw_initial_velocities(second, 300.0, 7)
+    assert quick.draw_initial_velocities(other, 300.0, 8)
+    assert np.array_equal(first.get_momenta(), second.get_momenta())
+    assert not np.array_equal(first.get_momenta(), other.get_momenta())
+    moving = first.get_momenta().copy()
+    assert not quick.draw_initial_velocities(first, 1000.0, 9)  # already moves: kept
+    assert np.array_equal(first.get_momenta(), moving)
+
+
+def test_maxwell_boltzmann_needs_a_starting_target_above_zero(tmp_path):
+    """Refused before the model is loaded (the model path does not exist)."""
+    absent = str(tmp_path / "absent.model")
+    with pytest.raises(ValueError, match="starting target, which is 0 K"):
+        _md(absent, tmp_path, schedule=ramp(0, 300, ps=0.01), initial_velocities="maxwell_boltzmann")
+    with pytest.raises(ValueError, match="NVE has none"):
+        _md(absent, tmp_path, ensemble="NVE", temperature_K=None, initial_velocities="maxwell_boltzmann")
+
+
+def test_csvr_from_rest_starts_with_initial_velocities(loaded, tmp_path):
+    """A CSVR ramp from 0 K on a structure at rest: refused by default, runs with initial_velocities=10 K,
+    and the report and metadata say what was drawn."""
+    from fastmace.errors import InputError
+
+    csvr = integrators.CSVR(timestep_fs=0.5, temperature_K=0.0, tau_fs=10.0)
+    with pytest.raises(InputError, match="kinetic energy is zero"):
+        _md(loaded, tmp_path, integrator=csvr, schedule=ramp(0, 300, ps=0.002), output=tmp_path / "keep")
+    run = _md(loaded, tmp_path, integrator=csvr, schedule=ramp(0, 300, ps=0.002), initial_velocities=10.0,
+              output=tmp_path / "drawn")
+    note = "starting velocities: Maxwell-Boltzmann at 10 K, drawn from seed 5"
+    assert note in run.summary
+    assert note in json.dumps(run.metadata)
+
+
+def test_initial_velocities_keeps_a_moving_structure(loaded, tmp_path):
+    from fastmace import quick
+
+    atoms = _atoms()
+    quick.draw_initial_velocities(atoms, 300.0, 1)
+    run = _md(loaded, tmp_path, structure=atoms, initial_velocities="maxwell_boltzmann")
+    assert "starting velocities: the structure's own" in run.summary
+
+
+def test_fastmace_run_takes_initial_velocities():
+    """fastmace run passes every fm.md argument; fastmace md has no flag for it (SPEC §7.5's flag set)."""
+    from fastmace.cli import run as run_command
+
+    assert "initial_velocities" in run_command._md_parameters()
