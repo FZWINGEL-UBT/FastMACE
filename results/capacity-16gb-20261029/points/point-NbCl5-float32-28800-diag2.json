@@ -1,0 +1,523 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-29T13:58:10.495587+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "b7e37b8bf038deff6558b01cf55338d2a4145786",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "5x5x16",
+  "natoms": 28800,
+  "volume_A3": 828295.5330172131,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "oom",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0
+    },
+    "build": {
+      "max_allocated": 13137272832,
+      "max_reserved": 15286140928,
+      "allocated": 787484160,
+      "reserved": 14835253248
+    },
+    "warmup": {
+      "max_allocated": 13542409216,
+      "max_reserved": 15701377024,
+      "allocated": 787484160,
+      "reserved": 15449718784
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 920,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": "1",
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "plan": {
+    "engine": "GraphEngine",
+    "predicted_memory_bytes": 26624429148,
+    "memory": [
+      "memory",
+      "warn",
+      "rule 12: predicted 24.80 GiB (run; run 24.80, build 1.53) at 951331 edges, 28800 atoms, float32 (activations 34841 MiB, workspace 160 MiB, neighbour list 120 MiB); needs 24.80 of 14.80 GiB free, above 90% of the free memory after turning off streaming_conv, chunked_conv_backward, fused_folded_forward, wprime_backward; the run may run out of memory (decision 51)"
+    ],
+    "rule_12": [
+      [
+        "RewriteConfig.streaming_conv",
+        "off",
+        "off by rule 12: the estimate does not fit 90% of the free GPU memory; turning streaming_conv off saves about 7 MiB (decision 51)"
+      ],
+      [
+        "RewriteConfig.chunked_conv_backward",
+        "off",
+        "off by rule 12: the estimate does not fit 90% of the free GPU memory; turning off streaming_conv, which chunked_conv_backward requires (decision 51)"
+      ],
+      [
+        "RewriteConfig.fused_folded_forward",
+        "off",
+        "off by rule 12: the estimate does not fit 90% of the free GPU memory; turning off streaming_conv, which fused_folded_forward requires (decision 51)"
+      ],
+      [
+        "RewriteConfig.wprime_backward",
+        "off",
+        "off by rule 12: the estimate does not fit 90% of the free GPU memory; turning off streaming_conv, which wprime_backward requires (decision 51)"
+      ],
+      [
+        "memory",
+        "warn",
+        "rule 12: predicted 24.80 GiB (run; run 24.80, build 1.53) at 951331 edges, 28800 atoms, float32 (activations 34841 MiB, workspace 160 MiB, neighbour list 120 MiB); needs 24.80 of 14.80 GiB free, above 90% of the free memory after turning off streaming_conv, chunked_conv_backward, fused_folded_forward, wprime_backward; the run may run out of memory (decision 51)"
+      ]
+    ],
+    "text": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (20): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, radial_tables, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, grouped_launch, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, gate_epilogue, species_residual,\n      combo_kernels, tf32x3_gemms (only an explicit 'on' enables it); w_tables,\n      save_transcendentals (float32 plan, decision 65) (+8 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 24.80 GiB predicted (run; run 24.80, build 1.53), warn (14.80 GiB free); turned off streaming_conv,\u2026\n  workload: Langevin NVT, fixcm=True; 28800 atoms, 3D PBC, no constraints; up to 300 K\n  rules 8-11: superset Cl Nb (8), max_temperature_K 300 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)"
+  },
+  "edges": {},
+  "failure": {
+    "phase": "steady",
+    "type": "torch.AcceleratorError",
+    "message": "CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamSynchronize\n\n",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "tools/bench/capacity_scan.py:258 run_point: sim.run(steps=args.steps)",
+      "fastmace/simulation.py:902 run: self._advance(count)",
+      "fastmace/simulation.py:1139 _advance: if not self._mid_run_fallback(error, end):",
+      "fastmace/simulation.py:1483 _mid_run_fallback: self._drop_engine()",
+      "fastmace/simulation.py:1377 _drop_engine: torch.cuda.empty_cache()",
+      "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/memory.py:229 empty_cache: torch._C._cuda_emptyCache()"
+    ],
+    "memory": {
+      "max_allocated": 12413440000,
+      "max_reserved": 15917383680,
+      "allocated": 9309809152,
+      "reserved": 15917383680
+    },
+    "causes": [
+      {
+        "type": "builtins.RuntimeError",
+        "message": "CUDA driver error: device not ready\nThe CUDA driver logged these messages, which may provide useful details:\nFailed to create GPU mapping\n",
+        "stage": "capture",
+        "frames": [
+          "fastmace/engine/graph.py:1028 _validate_pipelined: self._run((\"B\", edges))",
+          "fastmace/engine/graph.py:1187 _run: self._captured(key)",
+          "fastmace/engine/graph.py:1213 _captured: self._capture(key)",
+          "fastmace/engine/graph.py:1294 _capture: stage()",
+          "fastmace/engine/graph.py:1139 _stage_b: self._force_stage()",
+          "fastmace/engine/graph.py:1102 _force_stage: out = self.force_field(self.state.positions)",
+          "fastmace/model/forces.py:730 __call__: out = self._outputs(positions)",
+          "fastmace/model/forces.py:742 _outputs: return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)",
+          "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:926 redispatch: return self._handle.redispatch_boxed(keyset, *args, **kwargs)  # type: ignore[return-value]"
+        ]
+      }
+    ],
+    "live": {
+      "largest": [
+        {
+          "bytes": 4267704320,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 943718400,
+          "site": "fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+          "frames": [
+            "fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture"
+          ]
+        },
+        {
+          "bytes": 589824000,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 412876800,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 353894400,
+          "site": "fastmace/integrators/langevin.py:42 allocate_noise",
+          "frames": [
+            "fastmace/integrators/langevin.py:42 allocate_noise",
+            "fastmace/integrators/langevin.py:105 __init__",
+            "fastmace/integrators/registry.py:462 build_integrator",
+            "fastmace/planner/fixed.py:266 build_stepper",
+            "fastmace/planner/fixed.py:1412 build",
+            "fastmace/planner/minimal.py:1100 build"
+          ]
+        },
+        {
+          "bytes": 353894400,
+          "site": "fastmace/engine/registry.py:222 <dictcomp>",
+          "frames": [
+            "fastmace/engine/registry.py:222 <dictcomp>",
+            "fastmace/engine/registry.py:222 snapshot",
+            "fastmace/engine/graph.py:1267 _capture",
+            "fastmace/engine/graph.py:1213 _captured",
+            "fastmace/engine/graph.py:1187 _run",
+            "fastmace/engine/graph.py:1028 _validate_pipelined"
+          ]
+        },
+        {
+          "bytes": 294912000,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 257241600,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 235929600,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 235929600,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 216719360,
+          "site": "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+          "frames": [
+            "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture"
+          ]
+        },
+        {
+          "bytes": 176947200,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 176947200,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 58982400,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 53346304,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 44236800,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 33554432,
+          "site": "fastmace/rewrites/mh1/__init__.py:597 _check_interactions",
+          "frames": [
+            "fastmace/rewrites/mh1/__init__.py:597 _check_interactions",
+            "fastmace/rewrites/mh1/__init__.py:616 _selfcheck",
+            "fastmace/rewrites/registry.py:659 selfcheck",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:380 prepare",
+            "fastmace/model/compile.py:295 compile_model"
+          ]
+        },
+        {
+          "bytes": 33554432,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 33554432,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 33554432,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1102 _force_stage",
+            "fastmace/engine/graph.py:1139 _stage_b",
+            "fastmace/engine/graph.py:1294 _capture",
+            "fastmace/engine/graph.py:1213 _captured"
+          ]
+        },
+        {
+          "bytes": 29491200,
+          "site": "fastmace/neighbors/pair_search.py:122 candidate_pairs",
+          "frames": [
+            "fastmace/neighbors/pair_search.py:122 candidate_pairs",
+            "fastmace/neighbors/skin.py:356 build_gpu",
+            "fastmace/neighbors/skin.py:243 build",
+            "fastmace/model/forces.py:875 rebuild",
+            "fastmace/model/forces.py:478 __init__",
+            "fastmace/planner/fixed.py:1406 build"
+          ]
+        },
+        {
+          "bytes": 26984448,
+          "site": "fastmace/engine/registry.py:222 <dictcomp>",
+          "frames": [
+            "fastmace/engine/registry.py:222 <dictcomp>",
+            "fastmace/engine/registry.py:222 snapshot",
+            "fastmace/engine/graph.py:1267 _capture",
+            "fastmace/engine/graph.py:1213 _captured",
+            "fastmace/engine/graph.py:1187 _run",
+            "fastmace/engine/graph.py:1028 _validate_pipelined"
+          ]
+        },
+        {
+          "bytes": 26984448,
+          "site": "fastmace/neighbors/skin.py:190 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:190 new",
+            "fastmace/neighbors/skin.py:196 _allocate_now",
+            "fastmace/neighbors/skin.py:183 _allocate",
+            "fastmace/neighbors/skin.py:378 build_gpu",
+            "fastmace/neighbors/skin.py:243 build",
+            "fastmace/model/forces.py:875 rebuild"
+          ]
+        },
+        {
+          "bytes": 17989632,
+          "site": "fastmace/engine/registry.py:222 <dictcomp>",
+          "frames": [
+            "fastmace/engine/registry.py:222 <dictcomp>",
+            "fastmace/engine/registry.py:222 snapshot",
+            "fastmace/engine/graph.py:1267 _capture",
+            "fastmace/engine/graph.py:1213 _captured",
+            "fastmace/engine/graph.py:1187 _run",
+            "fastmace/engine/graph.py:1028 _validate_pipelined"
+          ]
+        },
+        {
+          "bytes": 17989632,
+          "site": "fastmace/engine/registry.py:222 <dictcomp>",
+          "frames": [
+            "fastmace/engine/registry.py:222 <dictcomp>",
+            "fastmace/engine/registry.py:222 snapshot",
+            "fastmace/engine/graph.py:1267 _capture",
+            "fastmace/engine/graph.py:1213 _captured",
+            "fastmace/engine/graph.py:1187 _run",
+            "fastmace/engine/graph.py:1028 _validate_pipelined"
+          ]
+        }
+      ],
+      "by_site": [
+        [
+          "fastmace/model/forces.py:742 _outputs",
+          5815366144
+        ],
+        [
+          "outside FastMACE",
+          1157226496
+        ],
+        [
+          "fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+          943718400
+        ],
+        [
+          "fastmace/engine/registry.py:222 <dictcomp>",
+          489957888
+        ],
+        [
+          "fastmace/integrators/langevin.py:42 allocate_noise",
+          353894400
+        ],
+        [
+          "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+          216719360
+        ],
+        [
+          "fastmace/neighbors/skin.py:190 new",
+          116932608
+        ],
+        [
+          "fastmace/rewrites/mh1/__init__.py:597 _check_interactions",
+          33554432
+        ],
+        [
+          "fastmace/neighbors/pair_search.py:122 candidate_pairs",
+          29491200
+        ],
+        [
+          "fastmace/model/compile.py:141 private_copy",
+          26601984
+        ],
+        [
+          "fastmace/model/loading.py:696 load",
+          25817088
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:87 <listcomp>",
+          24007168
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:116 __init__",
+          24007168
+        ],
+        [
+          "fastmace/model/forces.py:337 __init__",
+          11071488
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:212 identity_attrs",
+          10252800
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:186 __init__",
+          8388608
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:188 __init__",
+          8388608
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:114 __init__",
+          1920512
+        ],
+        [
+          "fastmace/rewrites/species/modules.py:36 __init__",
+          1717760
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:45 __init__",
+          1048576
+        ],
+        [
+          "fastmace/state.py:267 from_atoms",
+          691200
+        ],
+        [
+          "fastmace/state.py:268 from_atoms",
+          691200
+        ],
+        [
+          "fastmace/state.py:282 from_atoms",
+          691200
+        ],
+        [
+          "fastmace/neighbors/skin.py:474 _set_reference",
+          691200
+        ],
+        [
+          "fastmace/integrators/langevin.py:99 __init__",
+          691200
+        ]
+      ],
+      "live_bytes": 9309809152,
+      "segments_bytes": 15917383680
+    }
+  },
+  "times": {
+    "load_s": 3.3853521649998584,
+    "build_s": 32.41403808400082,
+    "warmup_s": 8.91344912400018
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

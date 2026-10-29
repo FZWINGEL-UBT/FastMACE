@@ -1,0 +1,122 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-29T14:47:21.603465+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "b7e37b8bf038deff6558b01cf55338d2a4145786",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "5x5x16",
+  "natoms": 28800,
+  "volume_A3": 828295.5330172131,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "ok",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0
+    },
+    "build": {
+      "max_allocated": 12022835200,
+      "max_reserved": 13188988928,
+      "allocated": 798347264,
+      "reserved": 12759072768
+    },
+    "warmup": {
+      "max_allocated": 12231863296,
+      "max_reserved": 13394509824,
+      "allocated": 798347264,
+      "reserved": 13163823104
+    },
+    "steady": {
+      "max_allocated": 12440891392,
+      "max_reserved": 13841203200,
+      "allocated": 798347264,
+      "reserved": 13415481344
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 1032,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {
+    "streaming_conv": "on"
+  },
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "plan": {
+    "engine": "GraphEngine",
+    "predicted_memory_bytes": 26631278731,
+    "memory": [
+      "memory",
+      "warn",
+      "rule 12: predicted 24.80 GiB (run; run 24.80, build 1.53) at 951331 edges, 28800 atoms, float32 (activations 34841 MiB, workspace 160 MiB, neighbour list 120 MiB); needs 24.80 of 14.80 GiB free, above 90% of the free memory; kept as set: streaming_conv; the run may run out of memory (decision 51)"
+    ],
+    "rule_12": [
+      [
+        "memory",
+        "warn",
+        "rule 12: predicted 24.80 GiB (run; run 24.80, build 1.53) at 951331 edges, 28800 atoms, float32 (activations 34841 MiB, workspace 160 MiB, neighbour list 120 MiB); needs 24.80 of 14.80 GiB free, above 90% of the free memory; kept as set: streaming_conv; the run may run out of memory (decision 51)"
+      ]
+    ],
+    "text": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (24): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, chunked_conv_backward,\n      fused_folded_forward, radial_tables, wprime_backward, block_linear, grouped_linear, merged_residual, gated_rows,\n      segment_gemm, grouped_launch, single_graph_strain, species_tables (+3 more; describe(full=True) lists them)\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, gate_epilogue, species_residual,\n      combo_kernels, tf32x3_gemms (only an explicit 'on' enables it); w_tables,\n      save_transcendentals (float32 plan, decision 65) (+4 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 24.80 GiB predicted (run; run 24.80, build 1.53), warn (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 28800 atoms, 3D PBC, no constraints; up to 300 K\n  rules 8-11: superset Cl Nb (8), max_temperature_K 300 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)"
+  },
+  "edges": {
+    "at_cutoff_initial": 756800,
+    "at_cutoff_now": 797148,
+    "candidates_cutoff_plus_skin": 1005252,
+    "capacity": 1124352,
+    "skin_A": 0.3,
+    "cutoff_A": 6.0,
+    "edge_bucket": 37888,
+    "padded_sizes": [
+      757760,
+      795648,
+      833536
+    ],
+    "rebuilds": 20
+  },
+  "ms_per_step": 281.2860092999972,
+  "times": {
+    "load_s": 3.3185827119996247,
+    "build_s": 34.74000942299972,
+    "warmup_s": 7.011680384000101,
+    "steady_s": 56.25720185999944
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}
