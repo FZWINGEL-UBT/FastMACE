@@ -783,10 +783,12 @@ class GraphEngine(Engine):
         the force field's lists and cell inputs, and the energy-graph copies, all in place. The caller ends at a
         canonical point (``canonicalise(reevaluate=True)``; ``Simulation.update`` does), whose rebuild writes
         the new shifts into the buffers the captured graphs read: only a grown capacity or a new padded edge
-        size re-captures. A variable-cell engine is refused (its barostat state belongs to the cell)."""
-        if self.variable_cell:
-            raise ValueError("a host write of the cell is for fixed-cell engines; a variable-cell run moves its cell "
-                             "itself")
+        size re-captures. A cell-filter relaxation takes it too (relax-throughput A-T01): the canonical point's
+        ``integrator.start`` restarts the optimiser and the filter's reference cell, as a new engine would. A
+        barostat engine is refused (its barostat state belongs to the cell)."""
+        if self.variable_cell and self.optimizer is None:
+            raise ValueError("a host write of the cell is for fixed-cell engines and cell-filter relaxations; a "
+                             "barostat moves its cell itself")
         fields = [self.force_field] + [field for field in self._energy_fields.values() if field is not self.force_field]
         missing = [type(field).__name__ for field in fields if getattr(field, "reset_cell", None) is None]
         if missing:

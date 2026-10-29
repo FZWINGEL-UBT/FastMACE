@@ -212,6 +212,21 @@ class FrechetCellFilter(DOFView):
         return {"x": self._x, "log_deform": self.log_deform, "gradient": self._gradient, "energy": self._energy,
                 "cell_ok": self.cell_ok}
 
+    def reset_reference(self) -> None:
+        """Start again from the state's current cell, as construction does: the reference cell (``F = I``), ``x``'s
+        rows and ``cell_ok``, all in place, so captured graphs stay valid. Host side (one 3 x 3 inverse on the
+        host, as construction computes it), at a canonical point before ``refresh``; the optimiser's ``start``
+        follows (relax-throughput A-T01: another frame on the same engine)."""
+        state = self.state
+        with torch.no_grad():
+            self.orig_cell.copy_(state.cell)
+            self._orig_inverse.copy_(torch.as_tensor(np.linalg.inv(self.orig_cell.cpu().numpy()),
+                                                     dtype=torch.float64))
+            self.log_deform.zero_()
+            self.cell_ok.fill_(True)
+            self._x.view(self.rows, 3)[state.natoms:] = self.exp_cell_factor * (self.log_deform + self._log_cf_eye)
+            self._atom_rows()
+
     # ------------------------------------------------------------------ helpers
 
     def failure_reason(self) -> str:

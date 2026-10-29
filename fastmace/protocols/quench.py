@@ -134,14 +134,16 @@ class GPURelaxer:
     """``fm.optimize``'s LBFGS or FIRE on the graph engine (4-T05, 4-T07), as a relaxer (``ASERelaxer``'s calls).
 
     The first call builds a ``Simulation(optimizer=)`` on its structure; every later one moves that engine to the
-    new structure (``update(cell=, positions=)``: the same atoms, any cell, at fixed cell) and relaxes from a fresh
-    optimiser state, so a quench compiles and captures once. Another composition builds a new engine. ``builds``
-    counts the engines. ``engine`` is the run's ``EngineConfig`` (backend, device) or ``None``. The per-step
-    energies and max forces go to ``logfile``, not into the summary.
+    new structure (``update(cell=, positions=)``: the same atoms, any cell, at fixed cell or with a cell filter,
+    whose reference cell restarts at the new cell; relax-throughput A-T02) and relaxes from a fresh optimiser state,
+    so a quench or a series of frames compiles and captures once. Other atoms build a new engine. ``builds``
+    counts the engines. ``engine`` is the run's ``EngineConfig`` (backend, device) or ``None``, ``rewrites`` the
+    ``ForceField``'s (``"auto"`` or a ``RewriteConfig``). The per-step energies and max forces go to ``logfile``,
+    not into the summary; the summary's ``engine_built`` says whether this call built the engine.
     """
 
     def __init__(self, model, optimizer: str = "gpu-LBFGS", *, precision: str = "float32", dispersion=None,
-                 engine=None, cell_filter=None, seed: int = 0):
+                 engine=None, cell_filter=None, seed: int = 0, rewrites="auto"):
         from fastmace import optimize
 
         self.optimizer = resolve_optimizer(optimizer)
@@ -150,6 +152,7 @@ class GPURelaxer:
         record = {"gpu-LBFGS": optimize.LBFGS, "gpu-FIRE": optimize.FIRE}[self.optimizer]
         self.record = record(cell_filter=cell_filter)
         self.model, self.precision, self.dispersion, self.engine, self.seed = model, precision, dispersion, engine, seed
+        self.rewrites = rewrites
         self.builds = 0
         self._sim = None
         self._numbers = None
@@ -159,11 +162,13 @@ class GPURelaxer:
 
         if self._sim is not None and not np.array_equal(atoms.numbers, self._numbers):
             self.close()
-        if self._sim is None:
+        built = self._sim is None
+        if built:
             from fastmace.model.forcefield import ForceField
             from fastmace.simulation import Simulation
 
-            field = ForceField(self.model, atoms, precision=self.precision, dispersion=self.dispersion)
+            field = ForceField(self.model, atoms, precision=self.precision, dispersion=self.dispersion,
+                               rewrites=self.rewrites)
             self._sim = Simulation(atoms, field, optimizer=self.record, seed=self.seed, engine=self.engine)
             self._numbers = atoms.numbers.copy()
             self.builds += 1
@@ -177,6 +182,7 @@ class GPURelaxer:
                       for step, (energy, force) in enumerate(zip(energies, forces, strict=True))]
             Path(logfile).write_text("\n".join(lines) + "\n", encoding="utf-8")
         summary["optimizer"] = self.optimizer
+        summary["engine_built"] = built
         return relaxed, summary
 
     def close(self) -> None:
