@@ -53,7 +53,7 @@ drift() {  # job structure value
 note "fastmace=$(cat "$FM/.source_commit") source=$FM host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 for job in "$@"; do
   case $job in
-    check) run $job "$PY" -m pytest -p no:cacheprovider -q -rf -s "$FM/tests/gpu/test_gated_products_cuda.py" ;;
+    check) run $job "$REF" -m pytest -p no:cacheprovider -q -rf -s "$FM/tests/gpu/test_gated_products_cuda.py" ;;
     gate) run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate" --engine fastmace \
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --rewrites gate_epilogue=on --reference-command "$REF" --production-command "$PY" ;;
