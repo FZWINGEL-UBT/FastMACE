@@ -7,8 +7,9 @@
 # Phases:
 #   screen   check.py, then tc_gemm_screen.py (every mode) on NaCl NaNbO3 NbCl5, then overlap traces of the default
 #            and of tf32x3_gemms on the CUTLASS variants rz3 and rn3 (NaNbO3, NbCl5)
-#   ab V     same-process whole-step A/Bs (ab_tc.py over ab_rewrites.py, 12 blocks of 300 steps): a = the default
-#            plan, b = tf32x3_gemms=on with CUTLASS variant V; both build orders; NaNbO3 NbCl5 NaCl
+#   ab V     overlap traces with wprime_backward on (default and V), then same-process whole-step A/Bs (ab_tc.py
+#            over ab_rewrites.py, 12 blocks of 300 steps): a = the default plan, b = tf32x3_gemms=on with CUTLASS
+#            variant V, wprime_backward=on on both; both build orders; NaNbO3 NbCl5 NaCl
 #   acc V    the force/stress gate (b's configuration) and NVE drift (20 ps, 1 fs, 300 K) on NaCl and NbCl5, with
 #            and without it
 # A step starts only before LIMIT seconds (default 80 % of the job's own timeout argument), so the job returns what
@@ -44,23 +45,31 @@ screen)
   done
   rm -f "$OUT"/overlap-*/*.trace.json ;;
 ab)
+  # wprime_backward on both sides: decision 66 enables it by exact device name, and Modal's "A100-80GB" is an
+  # "NVIDIA A100 80GB PCIe", not the measured SXM4-80GB, so the baseline would otherwise lack it.
+  for s in NaNbO3 NbCl5; do
+    run "overlap-wprime-default-$s" python $W/overlap_trace.py --output "$OUT/overlap-wprime-default"       --checkpoint "$CK" --structure "$s" --rewrites wprime_backward=on
+    run "overlap-wprime-$variant-$s" env FASTMACE_SCREEN_TC_GEMM=cutlass-$variant python $W/run_with_backend.py       $W/overlap_trace.py --output "$OUT/overlap-wprime-$variant" --checkpoint "$CK" --structure "$s"       --rewrites wprime_backward=on tf32x3_gemms=on grouped_launch=off
+  done
+  rm -f "$OUT"/overlap-*/*.trace.json
   for s in NaNbO3 NbCl5 NaCl; do for order in ab ba; do
     if [ "$order" = ab ]; then pattern=abab; else pattern=abba; fi
     run "ab-$variant-$s-$order" python $W/ab_tc.py --b-backend "$variant" -- --output "$OUT/ab-$variant-$s-$order" \
-      --checkpoint "$CK" --model mh1-r2scan --structures "$s" --b tf32x3_gemms=on grouped_launch=off \
-      --order "$order" --pattern "$pattern"
+      --checkpoint "$CK" --model mh1-r2scan --structures "$s" --a wprime_backward=on \
+      --b wprime_backward=on tf32x3_gemms=on grouped_launch=off --order "$order" --pattern "$pattern"
   done; done ;;
 acc)
   run "gate-$variant" env FASTMACE_SCREEN_TC_GEMM=cutlass-$variant python tools/force_stress_gate.py \
     --output "$OUT/gate-$variant" --engine fastmace --checkpoint "$CK" --model mh1-r2scan \
-    --structures NaCl NbCl5 NaNbO3 --structures-root "$FASTMACE_STRUCTURES" --rewrites tf32x3_gemms=on grouped_launch=off \
+    --structures NaCl NbCl5 NaNbO3 --structures-root "$FASTMACE_STRUCTURES" \
+    --rewrites wprime_backward=on tf32x3_gemms=on grouped_launch=off \
     --production-command "python $W/run_with_backend.py"
   run gate-default python tools/force_stress_gate.py --output "$OUT/gate-default" --engine fastmace --checkpoint "$CK" \
-    --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$FASTMACE_STRUCTURES"
+    --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$FASTMACE_STRUCTURES" --rewrites wprime_backward=on
   for s in NaCl NbCl5; do
     run "nve-$variant-$s" env FASTMACE_SCREEN_TC_GEMM=cutlass-$variant python $W/run_with_backend.py \
-      tools/bench/nve_drift.py --structure "$s" --output "$OUT/nve-$variant" --rewrites tf32x3_gemms=on grouped_launch=off
-    run "nve-default-$s" python tools/bench/nve_drift.py --structure "$s" --output "$OUT/nve-default"
+      tools/bench/nve_drift.py --structure "$s" --output "$OUT/nve-$variant" --rewrites wprime_backward=on tf32x3_gemms=on grouped_launch=off
+    run "nve-default-$s" python tools/bench/nve_drift.py --structure "$s" --output "$OUT/nve-default"       --rewrites wprime_backward=on
   done ;;
 *) note "unknown phase $phase"; exit 2 ;;
 esac
