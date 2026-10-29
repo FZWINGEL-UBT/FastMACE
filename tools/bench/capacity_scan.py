@@ -49,7 +49,8 @@ def parse_args(argv=None):
     sub = p.add_subparsers(dest="command", required=True)
     for name in ("point", "scan"):
         q = sub.add_parser(name)
-        q.add_argument("--structure", default="NaCl", help="Benchmark name (under FASTMACE_STRUCTURES) or a file")
+        q.add_argument("--structure", default="NaCl",
+                       help="Benchmark name (under FASTMACE_STRUCTURES), a file, or SrTiO3 (cubic, a = 3.905 A)")
         q.add_argument("--model", default="mh1-r2scan", help="Label (its file under FASTMACE_MODELS)")
         q.add_argument("--precision", choices=("float32", "float64"), default="float32")
         q.add_argument("--output", required=True, type=Path, help="Directory (created if missing)")
@@ -80,7 +81,14 @@ def parse_args(argv=None):
 
 
 def base_cell(structure):
-    """(name, unit cell Atoms) of a benchmark name or file."""
+    """(name, unit cell Atoms) of a benchmark name or file, or ``SrTiO3``: cubic Pm-3m SrTiO3 with a = 3.905 A,
+    the cell of symmetrix-xl's capacity probe (benchmarks/srtio3_capacity_probe.py)."""
+    if structure == "SrTiO3":
+        from ase import Atoms
+
+        cell = Atoms("SrTiO3", scaled_positions=[(0, 0, 0), (0.5, 0.5, 0.5), (0.5, 0.5, 0), (0.5, 0, 0.5),
+                                                 (0, 0.5, 0.5)], cell=[3.905] * 3, pbc=True)
+        return "SrTiO3", cell
     sys.path.insert(0, str(TOOLS))
     import ab_step_time
 
@@ -298,7 +306,7 @@ def run_point(args):
             except Exception:  # noqa: BLE001
                 pass
     args.output.mkdir(parents=True, exist_ok=True)
-    path = args.output / f"point-{name}-{args.precision}-{len(atoms)}{args.tag}.json"
+    path = point_path(args.output, name, args.precision, len(atoms), args.tag)
     path.write_text(json.dumps(record, indent=2, default=str) + "\n")
     peak = record["phases"].get("steady", {}).get("max_reserved")
     print(f"point {name} {args.precision} {len(atoms)} atoms ({record['repeat']}): {record['status']}"
