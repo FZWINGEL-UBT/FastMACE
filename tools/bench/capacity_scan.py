@@ -234,7 +234,8 @@ def run_point(args):
                     capacity=int(ff.edge_capacity), skin_A=float(nl.skin), cutoff_A=float(nl.cutoff),
                     edge_bucket=getattr(engine, "edge_bucket", None),
                     padded_sizes=sorted(int(e) for e in getattr(engine, "edge_sizes_used", ())),
-                    rebuilds=int(getattr(nl, "rebuilds", 0)))
+                    rebuilds=int(getattr(nl, "rebuilds", 0)),
+                    captures=list(getattr(engine, "capture_memory", ())))
 
     try:
         with warnings.catch_warnings(record=True) as caught:
