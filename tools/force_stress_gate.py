@@ -446,6 +446,8 @@ def parse_args(argv=None):
     p.add_argument("--tiled-receivers", type=int, default=0, metavar="R",
                    help="FastMACE production through the tiled capacity prototype (fastmace.model.tiled, R "
                         "receivers per tile) on the eager evaluation plan, instead of the graph engine")
+    p.add_argument("--tiled-mode", choices=("eager", "padded", "graphs", "compiled"), default="eager",
+                   help="TileConfig.mode of --tiled-receivers; 'compiled' builds the compiled evaluation plan")
     p.add_argument("--reference-command", default=sys.executable,
                    help="Interpreter (with an optional launcher prefix) of the reference processes")
     p.add_argument("--production-command", default=sys.executable,
@@ -567,7 +569,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
                       backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
                       engine_config=args.engine_config, production_tf32=args.production_tf32,
-                      tiled_receivers=args.tiled_receivers)
+                      tiled_receivers=args.tiled_receivers, tiled_mode=args.tiled_mode)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # its structure's first hydrostatic configuration.
@@ -940,12 +942,15 @@ def tiled_production_child(job, result):
         rewrites = config.RewriteConfig(**job["rewrites"]) if job.get("rewrites") else "auto"
         force_field = ForceField(loaded, base, precision=precision, rewrites=rewrites)
         plan = planner.plan_evaluation(force_field, base)
-        plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
-                                                                      dynamic_edges=False))
+        mode = job.get("tiled_mode", "eager")
+        if mode != "compiled":  # the compiled mode runs the compiled plan's traceable model
+            plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
+                                                                          dynamic_edges=False))
         field = planner.build_evaluation(plan, force_field, base.copy())
-        tiled = TiledForceField(field, TileConfig(int(job["tiled_receivers"])))
+        tiled = TiledForceField(field, TileConfig(int(job["tiled_receivers"]), mode=mode))
         result["setup_s"][structure] = time.perf_counter() - started
-        result["plans"][structure] = dict(describe=plan.describe(full=True), tiled_receivers=job["tiled_receivers"])
+        result["plans"][structure] = dict(describe=plan.describe(full=True), tiled_receivers=job["tiled_receivers"],
+                                          tiled_mode=mode)
         result["force_fields"][structure] = dict(field.info())
         for key in entry["keys"]:
             energy, forces, stress = tiled.evaluate(configs[key], stress=True)

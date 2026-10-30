@@ -36,6 +36,9 @@ def parse_args(argv=None):
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--repeat", required=True)
     p.add_argument("--receivers", type=int, default=4096)
+    p.add_argument("--mode", choices=("eager", "padded", "graphs", "compiled"), default="eager",
+                   help="TileConfig.mode; 'compiled' builds the compiled evaluation plan (its whole-system call is "
+                        "then the compiled model's)")
     p.add_argument("--path", choices=("tiled", "whole", "both"), default="both")
     p.add_argument("--steps", type=int, default=200)
     p.add_argument("--timestep-fs", type=float, default=2.0)
@@ -101,11 +104,13 @@ def main(argv=None):
     user = fm.ForceField(fm.load(args.model), atoms, precision="float32")
     planner = minimal.default_planner(user)
     plan = planner.plan_evaluation(user, atoms)
-    eager = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
-                                                                   dynamic_edges=False))
-    field = planner.build_evaluation(eager, user, atoms)
-    tiled = TiledForceField(field, TileConfig(args.receivers))
+    if args.mode != "compiled":
+        plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
+                                                                      dynamic_edges=False))
+    field = planner.build_evaluation(plan, user, atoms)
+    tiled = TiledForceField(field, TileConfig(args.receivers, mode=args.mode))
     record = dict(structure=args.structure, repeat=list(repeat), atoms=len(atoms), receivers=args.receivers,
+                  mode=args.mode,
                   steps=args.steps, timestep_fs=args.timestep_fs, temperature_K=args.temperature,
                   device=torch.cuda.get_device_name(), source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"),
                   skin=float(getattr(plan.neighbours, "skin", float("nan"))), runs={})
