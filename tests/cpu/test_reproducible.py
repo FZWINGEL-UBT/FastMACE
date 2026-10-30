@@ -35,6 +35,7 @@ from fastmace.rewrites import registry as reg
 REPRODUCIBLE = Workload(max_temperature_K=300.0, reproducible=True)
 PINNED = {reproducible.CUEQ_OPS: reproducible.PINNED_CUEQ_OPS}
 NONDETERMINISTIC = {"streaming_conv", "chunked_conv_backward", "fused_folded_forward", "w_tables", "wprime_backward",
+                    "recompute_conv_weights",  # CAP-T07: wprime_backward's atomic sender additions, per edge chunk
                     "generic_streaming",
                     "segmented_first_sum", "generic_segmented_first_sum"}
 

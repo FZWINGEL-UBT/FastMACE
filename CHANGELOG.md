@@ -8,6 +8,15 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `RewriteConfig.recompute_conv_weights` (plans/capacity.md CAP-T07, exact): `wprime_backward`'s backward builds the
+  per-edge tensor-product weights again from the edge lengths in edge chunks instead of keeping them (1,280 floats
+  per edge for MH-1, about a third of a large cell's force-call memory). Off; on only when memory would not be enough:
+  rule 12 turns it on for a cell that cannot fit (its estimate divided by 1.34 does not fit 90 % of the free memory), and
+  `Simulation` rebuilds once with it on after an out-of-memory error at build or capture
+  (`fallback.memory_rescue`; a sticky CUDA context raises the error with the fix).
+- The graph engine keeps the large buffers of its capture and warm-up snapshots in pinned host memory (CAP-T05),
+  about 0.5 GiB less at the force stage's peak on large cells.
+
 - `EngineConfig.force_graphs` (`"auto"`, `"keep"`, `"fit"`, `"one"`): near the GPU memory limit the graph engine
   releases its captured graphs and their pool before capturing a force graph at a larger padded edge size, so one
   force evaluation's activations live at a time; `"auto"` is `"fit"` with CUDA graphs (plans/capacity.md CAP-T01).

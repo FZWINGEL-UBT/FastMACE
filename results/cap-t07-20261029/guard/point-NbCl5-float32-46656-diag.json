@@ -1,0 +1,511 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-29T23:53:31.871058+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "d317cf157a90cace10ac1f2e61540361811029c9",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "6x6x18",
+  "natoms": 46656,
+  "volume_A3": 1341838.7634878864,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "oom",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15894315008,
+      "outside_allocator": 1208549376
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 1543,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "engine": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": "1",
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "torch.AcceleratorError",
+    "message": "CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\n",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/planner/fixed.py:1440 build: return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,",
+      "fastmace/engine/graph.py:235 __init__: self._initial_forces()",
+      "fastmace/engine/graph.py:1123 _initial_forces: self._force_stage()",
+      "fastmace/engine/graph.py:1127 _force_stage: out = self.force_field(self.state.positions)",
+      "fastmace/model/forces.py:730 __call__: out = self._outputs(positions)",
+      "fastmace/model/forces.py:742 _outputs: return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)",
+      "fastmace/kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward: fused(a, weight, x, sh, senders.contiguous(), receivers.contiguous(), row_ptr.contiguous(), out, w)",
+      "fastmace/kernels/oeq_streaming/fused_forward.py:344 __call__: counters = torch.zeros(self.slices, dtype=torch.int32, device=x.device)"
+    ],
+    "memory": {
+      "max_allocated": 15823709696,
+      "max_reserved": 16072572928,
+      "allocated": 15823709184,
+      "reserved": 16072572928,
+      "inactive_split_bytes": 0,
+      "active_bytes": 15823709696,
+      "reserved_bytes": 16072572928,
+      "alloc_retries": 0,
+      "segments": 0
+    },
+    "causes": [],
+    "live": {
+      "largest": [
+        {
+          "bytes": 6277201920,
+          "site": "fastmace/kernels/oeq_streaming/fused_forward.py:363 fused_folded_forward",
+          "frames": [
+            "fastmace/kernels/oeq_streaming/fused_forward.py:363 fused_folded_forward",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__"
+          ]
+        },
+        {
+          "bytes": 1528823808,
+          "site": "fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+          "frames": [
+            "fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__"
+          ]
+        },
+        {
+          "bytes": 955514880,
+          "site": "fastmace/kernels/oeq_streaming/fused_forward.py:362 fused_folded_forward",
+          "frames": [
+            "fastmace/kernels/oeq_streaming/fused_forward.py:362 fused_folded_forward",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__"
+          ]
+        },
+        {
+          "bytes": 668860416,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 668860416,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 573308928,
+          "site": "fastmace/integrators/langevin.py:42 allocate_noise",
+          "frames": [
+            "fastmace/integrators/langevin.py:42 allocate_noise",
+            "fastmace/integrators/langevin.py:105 __init__",
+            "fastmace/integrators/registry.py:462 build_integrator",
+            "fastmace/planner/fixed.py:269 build_stepper",
+            "fastmace/planner/fixed.py:1432 build",
+            "fastmace/planner/minimal.py:1141 build"
+          ]
+        },
+        {
+          "bytes": 477757440,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 477757440,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 416731648,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 400121856,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 382205952,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 382205952,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 382205952,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 318764544,
+          "site": "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+          "frames": [
+            "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__"
+          ]
+        },
+        {
+          "bytes": 318764544,
+          "site": "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+          "frames": [
+            "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__"
+          ]
+        },
+        {
+          "bytes": 286654464,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 286654464,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 112161280,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 95551488,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 95551488,
+          "site": "fastmace/kernels/oeq_streaming/fused_forward.py:361 fused_folded_forward",
+          "frames": [
+            "fastmace/kernels/oeq_streaming/fused_forward.py:361 fused_folded_forward",
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__"
+          ]
+        },
+        {
+          "bytes": 78465024,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 71663616,
+          "site": "fastmace/model/forces.py:742 _outputs",
+          "frames": [
+            "fastmace/model/forces.py:742 _outputs",
+            "fastmace/model/forces.py:730 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage",
+            "fastmace/engine/graph.py:1123 _initial_forces",
+            "fastmace/engine/graph.py:235 __init__",
+            "fastmace/planner/fixed.py:1440 build"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/neighbors/pair_search.py:122 candidate_pairs",
+          "frames": [
+            "fastmace/neighbors/pair_search.py:122 candidate_pairs",
+            "fastmace/neighbors/skin.py:356 build_gpu",
+            "fastmace/neighbors/skin.py:243 build",
+            "fastmace/model/forces.py:875 rebuild",
+            "fastmace/model/forces.py:478 __init__",
+            "fastmace/planner/fixed.py:1426 build"
+          ]
+        },
+        {
+          "bytes": 43714560,
+          "site": "fastmace/neighbors/skin.py:190 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:190 new",
+            "fastmace/neighbors/skin.py:196 _allocate_now",
+            "fastmace/neighbors/skin.py:183 _allocate",
+            "fastmace/neighbors/skin.py:378 build_gpu",
+            "fastmace/neighbors/skin.py:243 build",
+            "fastmace/model/forces.py:875 rebuild"
+          ]
+        },
+        {
+          "bytes": 33554432,
+          "site": "fastmace/rewrites/mh1/__init__.py:597 _check_interactions",
+          "frames": [
+            "fastmace/rewrites/mh1/__init__.py:597 _check_interactions",
+            "fastmace/rewrites/mh1/__init__.py:616 _selfcheck",
+            "fastmace/rewrites/registry.py:659 selfcheck",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:380 prepare",
+            "fastmace/model/compile.py:295 compile_model"
+          ]
+        }
+      ],
+      "by_site": [
+        [
+          "fastmace/kernels/oeq_streaming/fused_forward.py:363 fused_folded_forward",
+          6277201920
+        ],
+        [
+          "fastmace/model/forces.py:742 _outputs",
+          5264428544
+        ],
+        [
+          "fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+          1528823808
+        ],
+        [
+          "fastmace/kernels/oeq_streaming/fused_forward.py:362 fused_folded_forward",
+          955514880
+        ],
+        [
+          "fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+          637529088
+        ],
+        [
+          "fastmace/integrators/langevin.py:42 allocate_noise",
+          573308928
+        ],
+        [
+          "fastmace/neighbors/skin.py:190 new",
+          189429760
+        ],
+        [
+          "fastmace/kernels/oeq_streaming/fused_forward.py:361 fused_folded_forward",
+          95551488
+        ],
+        [
+          "fastmace/neighbors/pair_search.py:122 candidate_pairs",
+          47775744
+        ],
+        [
+          "fastmace/rewrites/mh1/__init__.py:597 _check_interactions",
+          33554432
+        ],
+        [
+          "outside FastMACE",
+          33554432
+        ],
+        [
+          "fastmace/model/compile.py:141 private_copy",
+          26601984
+        ],
+        [
+          "fastmace/model/loading.py:696 load",
+          25817088
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:87 <listcomp>",
+          24007168
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:116 __init__",
+          24007168
+        ],
+        [
+          "fastmace/model/forces.py:337 __init__",
+          17929216
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:212 identity_attrs",
+          16609792
+        ],
+        [
+          "fastmace/kernels/oeq_streaming/wprime_backward.py:220 derivative_table",
+          10854400
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:186 __init__",
+          8388608
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:188 __init__",
+          8388608
+        ],
+        [
+          "fastmace/kernels/triton/radial_table.py:137 radial_table_forward",
+          4904448
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:115 __init__",
+          1920512
+        ],
+        [
+          "fastmace/rewrites/species/modules.py:36 __init__",
+          1717760
+        ],
+        [
+          "fastmace/integrators/langevin.py:99 __init__",
+          1119744
+        ],
+        [
+          "fastmace/integrators/langevin.py:100 __init__",
+          1119744
+        ]
+      ],
+      "live_bytes": 15823709184,
+      "segments_bytes": 16072572928
+    }
+  },
+  "times": {
+    "load_s": 3.230912001999968
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

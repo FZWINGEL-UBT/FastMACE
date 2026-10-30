@@ -496,7 +496,10 @@ def test_generators_are_hashed_never_stored():
     assert hashes["integrator"] != provenance.generator_digest(torch.Generator().manual_seed(8))
     assert hashes["host"] == provenance.generator_digest(host)
     assert hashes["mc"] == "d" * 64
-    assert len(json.dumps(record)) < 64_000  # a CPU generator state alone is 5,056 bytes, a batch more
+    # Hashes, not states: a CPU generator state alone is 5,056 bytes, so storing any state would add kilobytes
+    # over the same record with one generator. (An absolute size cap broke whenever the plan record grew.)
+    baseline = _full_record(generators={"integrator": torch.Generator().manual_seed(7)})
+    assert len(json.dumps(record)) - len(json.dumps(baseline)) < 1_000
 
 
 @pytest.mark.parametrize("where", ["integrator", "schedule", "counters", "report", "cursors"])

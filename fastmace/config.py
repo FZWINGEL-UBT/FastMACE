@@ -146,6 +146,10 @@ class RewriteConfig:
     # the table backward (opt-9 OPT9-T03); rounding; float32 plans outside reproducible ones, with radial_tables
     # and chunked_conv_backward; opt-in (a per-GPU default under decision 66 is the owner's).
     wprime_backward: Toggle = "auto"
+    # wprime_backward without the stored per-edge weights: its backward builds them again from the edge lengths in
+    # edge chunks (plans/capacity.md CAP-T07); exact (the same per-edge values, bitwise); needs wprime_backward;
+    # auto = off, turned on by rule 12 only when the plan would not fit the free memory without it.
+    recompute_conv_weights: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.

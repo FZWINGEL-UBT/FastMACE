@@ -227,6 +227,7 @@ def test_declared_terms():
                         "reassociate_first", "streaming_conv", "chunked_conv_backward", "generic_reassociate",
                         "generic_streaming"}
     assert radial.RECORDS["radial_tables"].memory is terms.radial_tables
+    assert radial.RECORDS["recompute_conv_weights"].memory is terms.recompute_conv_weights
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert terms.streaming_conv(dims, 4) == (8, 0)
     # Decision 67: MH-1's fused path keeps less per edge than the stock structure, so its terms are negative and
@@ -485,6 +486,55 @@ def test_rule_12_never_drops_a_group_that_saves_nothing(monkeypatch):
         tight = plan(memory_bytes=2**20, rewrites=RewriteConfig(factor_species="on", reassociate_first="on"))
     assert tight.rewrites.streaming_conv == "on" and tight.rewrites.chunked_conv_backward == "on"
     assert getattr(tight.decision("RewriteConfig.streaming_conv")[2], "code", None) != "rule-12-memory-drop"
+
+
+@pytest.mark.rule(12)
+def test_rule_12_turns_on_a_memory_rescue_only_when_the_plan_does_not_fit():
+    """CAP-T07: recompute_conv_weights ("auto") stays off while the plan fits; when it does not, rule 12 turns it on
+    if wprime_backward is on and it lowers the estimate, with its own reason; an explicit "off" is kept."""
+    from fastmace.planner.fixed import AUTO_RULES
+
+    assert "recompute_conv_weights" in memory.MEMORY_RESCUE
+    assert AUTO_RULES["RewriteConfig.recompute_conv_weights"] == "on_by_rule_12_when_the_plan_does_not_fit_without_it"
+    full = plan()
+    assert full.rewrites.recompute_conv_weights == "off"
+    if full.rewrites.wprime_backward != "on":
+        pytest.skip("wprime_backward is off in this plan (decision 66's GPUs)")
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20)
+    assert tight.rewrites.recompute_conv_weights == "on"
+    _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
+    assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(recompute_conv_weights="off"))
+    assert kept.rewrites.recompute_conv_weights == "off"
+
+
+@pytest.mark.rule(12)
+def test_rule_12_leaves_the_rescue_to_the_run_when_the_cell_may_fit():
+    """CAP-T07 (owner: only when memory would not be enough): the estimate overstates the peak by up to
+    RESCUE_OVERSTATEMENT, so a plan that does not fit 90 % of the free memory, but whose estimate divided by it
+    does, keeps recompute_conv_weights off; the run rebuilds with it after a real out-of-memory error."""
+    full = plan()
+    if full.rewrites.wprime_backward != "on":
+        pytest.skip("wprime_backward is off in this plan (decision 66's GPUs)")
+    pinned = RewriteConfig(**{f.name: "on" for f in dataclasses.fields(RewriteConfig)
+                              if getattr(full.rewrites, f.name) == "on"})  # explicit: decision 51 drops none
+    free = plan(rewrites=pinned).predicted_memory_bytes  # above the estimate / 1.34, below the estimate / 0.9
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=free, rewrites=pinned)
+    assert tight.decision("memory")[1] == "warn"
+    assert tight.rewrites.recompute_conv_weights == "off"
+    _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
+    assert choice == "off" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    assert "rebuilds once with recompute_conv_weights on" in reason
+    check(reason)
+    bound = type("Estimate", (), {})
+    bound.needed = free
+    assert not memory.short_by_far(bound, free)
+    bound.needed = 1.35 * free
+    assert memory.short_by_far(bound, free)
 
 
 @pytest.mark.rule(12)

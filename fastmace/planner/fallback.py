@@ -360,7 +360,7 @@ def _propagates(error) -> bool:
 
     if isinstance(error, (ProcessConstraintError, NonFiniteError, InputError, MemoryError)):
         return True
-    return type(error).__name__ == "OutOfMemoryError"  # torch.cuda.OutOfMemoryError, without importing torch
+    return _out_of_memory(error)
 
 
 def _with_estimate(error, plan):
@@ -368,6 +368,113 @@ def _with_estimate(error, plan):
     from fastmace.planner.memory import annotate_out_of_memory
 
     return annotate_out_of_memory(error, plan)
+
+
+def _out_of_memory(error) -> bool:
+    """The caching allocator's ``torch.cuda.OutOfMemoryError`` (without importing torch), a host ``MemoryError``,
+    or the driver's "CUDA error: out of memory" (``torch.AcceleratorError``, e.g. a launch or capture that could
+    not reserve its stack; CAP-T07): never a fallback trigger, since the search's re-plans read the free memory
+    (``cudaMemGetInfo``), which fails once such an error left the context sticky."""
+    if isinstance(error, MemoryError) or type(error).__name__ == "OutOfMemoryError":
+        return True
+    return "cuda error: out of memory" in str(error).lower()
+
+
+def _context_usable(device) -> bool:
+    """Can the process still use ``device`` after an error (CAP-T07)? A CUDA error during a capture can leave the
+    context sticky: every later call fails, ``cudaMemGetInfo`` included. ``True`` off CUDA."""
+    if not str(device).startswith("cuda"):
+        return True
+    try:
+        import torch
+
+        torch.cuda.synchronize(device)
+        torch.cuda.mem_get_info(torch.device(device))
+    except Exception:  # noqa: BLE001 - any failure here means the context cannot run a rebuild
+        return False
+    return True
+
+
+def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any, *, planner: Any, stage: str,
+                  usable: Callable[[Any], bool] = _context_usable) -> Any:
+    """The plan to rebuild with after ``error`` at ``stage`` (``"build"`` or ``"capture"``), or ``None``
+    (plans/capacity.md CAP-T07; the owner's rule: memory-saving records only when memory would not be enough).
+
+    ``None`` unless ``error`` is an out-of-memory error and the plan has a record of ``memory.MEMORY_RESCUE`` off
+    that the caller left "auto" and whose requirements are on. Then, if the device is still usable, a revision of
+    ``plan`` with those records on (``candidate``: "fallback: rewrites recompute_conv_weights on: out of memory at
+    build; ..."), which the run record keeps in ``Plan.revisions``. If the context is not usable (a sticky CUDA
+    error), ``error`` is raised again with a note naming the fix: the records set "on" in a fresh process.
+    """
+    from fastmace.planner.memory import MEMORY_RESCUE, annotate_out_of_memory
+
+    if not _out_of_memory(error):
+        return None
+    requested = getattr(force_field, "rewrites", "auto")
+    names = []
+    for name in MEMORY_RESCUE:
+        if requested != "auto" and getattr(requested, name, "auto") != "auto":
+            continue  # the caller's explicit value is kept
+        record = _record(name)
+        if not _off(getattr(plan.rewrites, name, "on")) or record is None:
+            continue
+        if all(not _off(getattr(plan.rewrites, other, "off")) for other in record.requires):
+            names.append(name)
+    if not names:
+        return None
+    if not usable(plan.engine.device):
+        fix = ", ".join(f'{name}="on"' for name in names)
+        note = (f"FastMACE (CAP-T07): out of memory at {stage}, and the CUDA context is not usable afterwards, so "
+                f"this process cannot rebuild with {', '.join(names)} on. Run again in a fresh process with "
+                f"fm.ForceField(..., rewrites=RewriteConfig({fix})).")
+        annotate_out_of_memory(error, plan)
+        message = str(error.args[0]) if error.args else ""
+        if note not in message:
+            error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
+        raise error
+    why = (f"out of memory at {stage}; {', '.join(names)} auto -> on (the memory rescue, rule 12; CAP-T07)")
+    return candidate(plan, {"rewrites": {name: "on" for name in names}, "reason": why}, force_field, atoms,
+                     planner=planner)
+
+
+def raise_if_context_unusable(failure: Any, force_field: Any, *,
+                              usable: Callable[[Any], bool] = _context_usable) -> None:
+    """Raise ``failure.error`` with an explanation when the CUDA context is not usable after it (CAP-T07).
+
+    A driver out-of-memory error during a launch can surface asynchronously as another error (on WSL2, NbCl5
+    46,656 atoms: ``CUBLAS_STATUS_EXECUTION_FAILED``) and leave the context sticky; the fallback search's re-plans
+    then fail in ``cudaMemGetInfo``. When rule 12 had warned that the plan may not fit, the note names the memory
+    rescue's records (set "on", when they are off) or a smaller cell as the fix."""
+    from fastmace.planner.memory import MEMORY_RESCUE
+
+    plan = failure.plan
+    if usable(plan.engine.device):
+        return
+    error = failure.error
+    try:
+        tight = plan.decision("memory")[1] == "warn"
+    except (KeyError, AttributeError, TypeError, ValueError):
+        tight = False
+    off = [name for name in MEMORY_RESCUE if _off(getattr(plan.rewrites, name, "on"))]
+    note = (f"FastMACE: the CUDA context is not usable after this {failure.stage} error, so the fallback cannot run "
+            "in this process.")
+    if tight:
+        fix = "a smaller cell"
+        if off:
+            fix = "fm.ForceField(..., rewrites=RewriteConfig(" + ", ".join(f'{name}="on"' for name in off) + "))"
+        note += (f" Rule 12 had warned that the plan may not fit the free GPU memory, so it is most likely out of "
+                 f"memory: run again in a fresh process with {fix}.")
+    message = str(error.args[0]) if error.args else ""
+    if note not in message:
+        error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
+    raise error
+
+
+def _record(name):
+    from fastmace.planner import minimal
+
+    registry = minimal._rewrite_registry()
+    return registry[name] if name in registry.names() else None
 
 
 def stage_of(error, default: str = "build") -> str:

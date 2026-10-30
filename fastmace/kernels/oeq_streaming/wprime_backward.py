@@ -329,13 +329,55 @@ def _(x, sh, weights, senders, receivers, dout, r, pair, gprime, starts, scales,
     return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
 
 
+@torch.library.custom_op("fastmace::streaming_conv_wprime_backward_recompute", mutates_args=())
+def streaming_conv_wprime_backward_recompute(x: torch.Tensor, sh: torch.Tensor, senders: torch.Tensor,
+                                             receivers: torch.Tensor, dout: torch.Tensor, r: torch.Tensor,
+                                             pair: torch.Tensor, gprime: torch.Tensor, coef: torch.Tensor,
+                                             weight: torch.Tensor, starts: torch.Tensor, scales: torch.Tensor,
+                                             bins: torch.Tensor, r_lo: float, bin_scale: float, r_max: float,
+                                             wprime_id: int, rows: int) -> tuple[torch.Tensor, torch.Tensor,
+                                                                                 torch.Tensor]:
+    """``streaming_conv_wprime_backward`` without the stored per-edge weights (``recompute_conv_weights``,
+    plans/capacity.md CAP-T07): the edges run in chunks of ``rows``, and each chunk's weights are built again from
+    its edge lengths (the radial table, then ``a @ weight.T``, as the forward's chain builds them) into a
+    chunk-sized buffer just before the kernel reads them. Per edge the kernel computes what the one-launch backward
+    does; only the order of the atomic sender additions differs, as between any two runs."""
+    from fastmace.kernels.triton.radial_table import radial_table_forward
+
+    kernel = _REGISTRY[wprime_id]
+    x, sh, dout = x.contiguous(), sh.contiguous(), dout.contiguous()
+    senders, receivers = senders.contiguous(), receivers.contiguous()
+    r, pair = r.reshape(-1).contiguous(), pair.contiguous()
+    edges = sh.shape[0]
+    dx = torch.zeros_like(x)  # sender gradients are added atomically, over all chunks
+    dsh = torch.empty_like(sh)
+    dr = sh.new_empty((edges,))
+    rows = max(1, min(int(rows), edges))
+    buffer = sh.new_empty((rows, weight.shape[0]))
+    for start in range(0, edges, rows):
+        stop = min(edges, start + rows)
+        a, _ = radial_table_forward(r[start:stop], pair[start:stop], coef, starts, scales, bins, r_lo, bin_scale,
+                                    r_max)
+        weights = torch.matmul(a, weight.t(), out=buffer[:stop - start])
+        kernel(x, sh[start:stop], weights, senders[start:stop], receivers[start:stop], dout, dx, dsh[start:stop],
+               r[start:stop], pair[start:stop], gprime, starts, scales, bins, r_lo, bin_scale, r_max,
+               dr[start:stop])
+    return dx, dsh, dr
+
+
+@streaming_conv_wprime_backward_recompute.register_fake
+def _(x, sh, senders, receivers, dout, r, pair, gprime, coef, weight, starts, scales, bins, r_lo, bin_scale, r_max,
+      wprime_id, rows):
+    return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
+
+
 class _WPrimeConvolution(torch.autograd.Function):
     """Edge lengths -> (message, edge density) through the radial table, the folded layer and the streaming
     convolution; the backward is ``streaming_conv_wprime_backward`` plus the density column's."""
 
     @staticmethod
     def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
-                sh, senders, receivers, row_ptr, kernel_id, fused_id, wprime_id):
+                sh, senders, receivers, row_ptr, kernel_id, fused_id, wprime_id, recompute_rows=0):
         from fastmace.kernels.oeq_streaming.runtime import streaming_conv_forward
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -346,22 +388,30 @@ class _WPrimeConvolution(torch.autograd.Function):
         else:
             weights = a @ weight.t()
             message = streaming_conv_forward(x, sh, weights, senders, row_ptr, kernel_id)
+        if recompute_rows:  # recompute_conv_weights (CAP-T07): the backward builds the weights again per chunk
+            weights = coef.new_empty((0,))
         ctx.save_for_backward(x, sh, weights, senders, receivers, r, pair, gprime, density_dcoef, starts, scales,
-                              bins)
-        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
+                              bins, coef, weight)
+        ctx.constants, ctx.wprime_id, ctx.recompute_rows = (r_lo, bin_scale, r_max), wprime_id, int(recompute_rows)
         return message, density
 
     @staticmethod
     def backward(ctx, dout, ddensity):
-        x, sh, weights, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins = ctx.saved_tensors
+        (x, sh, weights, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins, coef,
+         weight) = ctx.saved_tensors
         if dout is None:
             dout = x.new_zeros((x.shape[0], _REGISTRY[ctx.wprime_id].output_dim))
-        dx, dsh, dr = streaming_conv_wprime_backward(x, sh, weights, senders, receivers, dout, r, pair, gprime,
-                                                     starts, scales, bins, *ctx.constants, ctx.wprime_id)
+        if ctx.recompute_rows:
+            dx, dsh, dr = streaming_conv_wprime_backward_recompute(
+                x, sh, senders, receivers, dout, r, pair, gprime, coef, weight, starts, scales, bins, *ctx.constants,
+                ctx.wprime_id, ctx.recompute_rows)
+        else:
+            dx, dsh, dr = streaming_conv_wprime_backward(x, sh, weights, senders, receivers, dout, r, pair, gprime,
+                                                         starts, scales, bins, *ctx.constants, ctx.wprime_id)
         if ddensity is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, ddensity, *ctx.constants)
         return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
-                None, None, None, None, None, None)
+                None, None, None, None, None, None, None)
 
 
 class WPrime(torch.nn.Module):
@@ -374,18 +424,22 @@ class WPrime(torch.nn.Module):
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.gprime.shape[1], self.gprime.device)
 
-    def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None):
-        """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh)."""
+    def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None,
+                    recompute_rows=0):
+        """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh).
+        ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward, which builds
+        them again in chunks of that many edges."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
         return _WPrimeConvolution.apply(lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales,
                                         table.bins, float(table.r_lo), float(table.bin_scale), float(table.r_max),
                                         weight, self.gprime, x, sh, senders, receivers, row_ptr, kernels.id,
-                                        -1 if fused is None else fused.id, self.kernel.id)
+                                        -1 if fused is None else fused.id, self.kernel.id, int(recompute_rows))
 
     def extra_repr(self):
         return f"groups={self.gprime.shape[0]}, terms={self.gprime.shape[1]}, outputs={self.gprime.shape[2]}"
 
 
 __all__ = ["WPrime", "WPrimeBackward", "density_backward", "density_column", "derivative_table", "render",
-           "streaming_conv_wprime_backward", "wprime_arguments", "wprime_reference"]
+           "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_recompute", "wprime_arguments",
+           "wprime_reference"]

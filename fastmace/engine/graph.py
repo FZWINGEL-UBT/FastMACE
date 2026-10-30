@@ -112,6 +112,9 @@ MAX_REDOS = 3
 POOL_RESET = "graph pool retired"
 # Entries kept in ``recapture_log`` and ``overflow_log`` (the counters keep counting past it).
 LOG_LIMIT = 256
+# Captured buffers of at least this size go to pinned host memory in a capture's or warm-up's snapshot, which
+# would otherwise sit beside the warm-up's activations at the force stage's memory peak (CAP-T05).
+CAPTURE_SNAPSHOT_OFFLOAD_BYTES = 2**20
 # Stage kinds whose graphs hold a force evaluation's activations (``EngineConfig.force_graphs``, CAP-T01).
 FORCE_KINDS = ("B", "ACB", "ACPB")
 # ``force_graphs="fit"``: a new force variant must fit the free memory with this margin (its warm-up and
@@ -1317,7 +1320,7 @@ class GraphEngine(Engine):
     def _warm_up(self, key) -> None:
         """The warm-up runs of a capture without the capture: run ``key`` eagerly, then restore the state."""
         stage = self._stage(key)
-        saved = self.registry.snapshot()
+        saved = self.registry.snapshot(offload_bytes=CAPTURE_SNAPSHOT_OFFLOAD_BYTES)
         for _ in range(WARMUP_RUNS):
             stage()
         self.registry.restore(saved)
@@ -1330,7 +1333,7 @@ class GraphEngine(Engine):
             raise RuntimeError("CUDA graphs need a CUDA device")
         _patches.set_capture_safe_mask_head(True)
         stage = self._stage(key)
-        saved = self.registry.snapshot()
+        saved = self.registry.snapshot(offload_bytes=CAPTURE_SNAPSHOT_OFFLOAD_BYTES)
         if self._side_stream is None:  # one stream: library workspaces are made once
             self._side_stream = torch.cuda.Stream()
         side = self._side_stream

@@ -1,0 +1,113 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-29T23:39:18.333695+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "d317cf157a90cace10ac1f2e61540361811029c9",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "6x7x20",
+  "natoms": 60480,
+  "volume_A3": 1739420.6193361478,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "error",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15894315008,
+      "outside_allocator": 1208549376
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 1594,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "engine": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "fastmace.errors.GateUnavailable",
+    "message": "the gate's reference could not run\nWhy: no reference ran; tried cuda:0, production cell: device failure (reference device failure: GateJobError: the reference child process failed (exit code 1) (return self._call_impl(*args, **kwargs) | File \"/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1794, in _call_impl | return forward_call(*args, **kwargs) | File \"/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py\", line 1329, in forward | source_embedding[edge_index[0]], | RuntimeError: CUDA driver error: device not ready | The CUDA driver logged these messages, which may provide useful details: | Failed to create GPU mapping)); cpu, production cell: declined (estimated 7.6e+03 s above the limit of 300 s (GateConfig.cpu_float64_time_limit_s); estimated 1.41e+03 GiB x 1.25 above the 28.2 GiB available); cuda:0, reduced cell: skipped (no supercell of the primitive cell (repeat (1, 1, 1)) is smaller than the production cell with every height at least 2 x the cutoff 6 \u00c5)\nNext: Free GPU memory and retry, or pass check=\"allow_unavailable\" to run without the gate (recorded).\nRecord: run.gate",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/simulation.py:656 __init__: gate=options.gate, moves=moves).run(failure)",
+      "fastmace/planner/fallback.py:1181 run: outcome = self._round(mode, off, last)",
+      "fastmace/planner/fallback.py:1227 _round: dimension = diagnose(current, last, test=self._test)",
+      "fastmace/planner/fallback.py:881 diagnose: if not test(\"eager\", units):",
+      "fastmace/planner/fallback.py:1071 _test: passed, stage, error = self._evaluate(plan, self._reduced_references())",
+      "fastmace/planner/fallback.py:984 _reduced_references: return dataclasses.replace(self._single(), quantities=tuple(self.quantities))",
+      "fastmace/planner/fallback.py:977 _single: self._one_copy = selfcheck.references(self.failed, self.force_field, self.atoms, self.integrator,",
+      "fastmace/planner/selfcheck.py:1158 references: raise GateUnavailable("
+    ],
+    "memory": {
+      "max_allocated": 12315594752,
+      "max_reserved": 12633243648,
+      "allocated": 200134144,
+      "reserved": 12633243648,
+      "inactive_split_bytes": 0,
+      "active_bytes": 12315594752,
+      "reserved_bytes": 12633243648,
+      "alloc_retries": 0,
+      "segments": 0
+    },
+    "causes": [
+      {
+        "type": "fastmace.planner.selfcheck._Unavailable",
+        "message": "no reference ran; tried cuda:0, production cell: device failure (reference device failure: GateJobError: the reference child process failed (exit code 1) (return self._call_impl(*args, **kwargs) | File \"/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1794, in _call_impl | return forward_call(*args, **kwargs) | File \"/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py\", line 1329, in forward | source_embedding[edge_index[0]], | RuntimeError: CUDA driver error: device not ready | The CUDA driver logged these messages, which may provide useful details: | Failed to create GPU mapping)); cpu, production cell: declined (estimated 7.6e+03 s above the limit of 300 s (GateConfig.cpu_float64_time_limit_s); estimated 1.41e+03 GiB x 1.25 above the 28.2 GiB available); cuda:0, reduced cell: skipped (no supercell of the primitive cell (repeat (1, 1, 1)) is smaller than the production cell with every height at least 2 x the cutoff 6 \u00c5)",
+        "stage": null,
+        "frames": [
+          "fastmace/planner/selfcheck.py:1149 references: values, info, device, reduced, reference_copies = ladder.run()",
+          "fastmace/planner/selfcheck.py:1080 run: raise _Unavailable(self._summary())"
+        ]
+      }
+    ]
+  },
+  "times": {
+    "load_s": 3.28917363400069
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

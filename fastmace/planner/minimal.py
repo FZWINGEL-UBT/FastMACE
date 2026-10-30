@@ -963,6 +963,44 @@ class MinimalPlanner:
                     dropped.append((other, name, before.total - found.total))
                 if memory.fits(found, free):
                     break
+        rescued, deferred = [], []
+        if not memory.fits(found, free):
+            # CAP-T07: records that trade step time for memory. The estimate overstates the peak by up to
+            # RESCUE_OVERSTATEMENT, so a cell that merely does not fit runs without them and rebuilds with them after
+            # a real out-of-memory error (fallback.memory_rescue); only a cell that cannot fit turns them on here,
+            # while each lowers the estimate.
+            eligible = []
+            for name in memory.MEMORY_RESCUE:
+                if name in enabled or name in explicit or name not in registry.names():
+                    continue
+                record = registry[name]
+                if _family_applies(record, traits) and all(other in enabled for other in record.requires):
+                    eligible.append(name)
+            if not memory.short_by_far(found, free):
+                deferred, eligible = eligible, []
+            for name in eligible:
+                candidate = [*enabled, name]
+                raised = estimate(candidate)
+                if raised.total >= found.total:
+                    continue
+                rescued.append((name, found.total - raised.total))
+                enabled, found = candidate, raised
+                if memory.fits(found, free):
+                    break
+        for name, saved in rescued:
+            field = registry.config_field(name)
+            parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: "on"})
+            why = (f"on by rule 12: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory without it; "
+                   f"turning {name} on saves about {saved / 2**20:.0f} MiB (CAP-T07)")
+            book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
+            book.decide(f"RewriteConfig.{field}", "on", Reason(why, rule=12, code="rule-12-memory-rescue"))
+        for name in deferred:
+            field = registry.config_field(name)
+            why = (f"off: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory, but it overstates the "
+                   f"peak by up to {memory.RESCUE_OVERSTATEMENT}x, so the run tries without it; an out-of-memory "
+                   f"error at build or capture rebuilds once with {name} on (CAP-T07)")
+            book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
+            book.decide(f"RewriteConfig.{field}", "off", Reason(why, rule=12, code="rule-12-memory-rescue"))
         for name, cause, saved in dropped:
             field = registry.config_field(name)
             parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: "off"})
