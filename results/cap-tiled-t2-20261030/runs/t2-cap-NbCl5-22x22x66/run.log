@@ -1,0 +1,36 @@
+  import pynvml  # type: ignore[import]
+  value = original(*args, **kwargs)
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+  value = original(*args, **kwargs)
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+  value = original(*args, **kwargs)
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+Traceback (most recent call last):
+  File "/mnt/homes/zwingel/fm-tiled/src/tools/bench/tiled_capacity.py", line 187, in <module>
+    main()
+  File "/mnt/homes/zwingel/fm-tiled/src/tools/bench/tiled_capacity.py", line 108, in main
+    field = planner.build_evaluation(eager, user, atoms)
+  File "/mnt/homes/zwingel/fm-tiled/src/fastmace/planner/minimal.py", line 1257, in build_evaluation
+    field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
+  File "/mnt/homes/zwingel/fm-tiled/src/fastmace/model/forces.py", line 485, in __init__
+    self.rebuild(positions)
+  File "/mnt/homes/zwingel/fm-tiled/src/fastmace/model/forces.py", line 905, in rebuild
+    return self.neighbours.build(positions)
+  File "/mnt/homes/zwingel/fm-tiled/src/fastmace/neighbors/skin.py", line 247, in build
+    return self.build_gpu(positions)
+  File "/mnt/homes/zwingel/fm-tiled/src/fastmace/neighbors/skin.py", line 355, in build_gpu
+    codes = screen_codes(wrapped, image_vectors, r, self._pair_search_state)
+  File "/mnt/homes/zwingel/fm-tiled/src/fastmace/neighbors/pair_search.py", line 132, in screen_codes
+    _triton_kernel()[grid](positions, images, out, counter, natoms, nimages, screen, out.numel(),
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/triton/runtime/jit.py", line 374, in <lambda>
+    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/triton/runtime/jit.py", line 779, in run
+    kernel.run(grid_0, grid_1, grid_2, stream, kernel.function, kernel.packed_metadata, launch_metadata,
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/triton/backends/nvidia/driver.py", line 331, in __call__
+    self.launch(gridX, gridY, gridZ, stream, function, self.launch_cooperative_grid, self.launch_pdl,
+RuntimeError: Triton Error [CUDA]: invalid argument
+exit 1
