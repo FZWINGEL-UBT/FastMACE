@@ -25,8 +25,18 @@ import itertools
 
 import torch
 
-from fastmace.kernels.oeq_streaming.fused_forward import (BATCH, CHANNEL_BLOCK, MAX_WARPS, LaunchRule, _lit, _node,
-                                                          balanced_parts, check_problem, launch_rule, slice_floats)
+from fastmace.kernels.oeq_streaming.fused_forward import (
+    BATCH,
+    CHANNEL_BLOCK,
+    MAX_WARPS,
+    LaunchRule,
+    _lit,
+    _node,
+    balanced_parts,
+    check_problem,
+    launch_rule,
+    slice_floats,
+)
 
 EDGE_CHUNK = 64  # edges per work chunk (eight batches)
 
@@ -220,7 +230,8 @@ def _part(schedule, part, batch):
                     #pragma unroll
                     for (int offset = 16; offset > 0; offset >>= 1) {{
                         #pragma unroll
-                        for (int c = 0; c < ED; ++c) edge_gradient[c] += __shfl_down_sync(FULL, edge_gradient[c], offset);
+                        for (int c = 0; c < ED; ++c)
+                            edge_gradient[c] += __shfl_down_sync(FULL, edge_gradient[c], offset);
                         radial_gradient += __shfl_down_sync(FULL, radial_gradient, offset);
                     }}
                     if (lane == 0) {{
