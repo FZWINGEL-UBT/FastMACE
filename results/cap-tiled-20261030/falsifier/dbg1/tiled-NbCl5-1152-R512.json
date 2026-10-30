@@ -1,0 +1,153 @@
+{
+ "structure": "NbCl5",
+ "repeat": [
+  2,
+  2,
+  4
+ ],
+ "atoms": 1152,
+ "receivers": 512,
+ "edges": null,
+ "rattle": 0.05,
+ "strain": 0.02,
+ "model": "mh1-r2scan",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "source_commit": "dbba2310",
+ "phases": {
+  "build": {
+   "seconds": 46.95391403802205,
+   "allocated": 157335552,
+   "reserved": 2042626048,
+   "peak_above_before": 1748242432
+  },
+  "neighbours": {
+   "allocated": 157363200,
+   "reserved": 2042626048,
+   "peak_above_before": 5125632
+  }
+ },
+ "phase": "done",
+ "rewrites": [
+  "AppliedRewrite(name='factor_species', result=CheckResult(passed=True, max_relative_error=1.199649098195633e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='fold_cutoff', result=CheckResult(passed=True, max_relative_error=6.271804319705225e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='density_first', result=CheckResult(passed=True, max_relative_error=8.293870308513018e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='joint_radial_input', result=CheckResult(passed=True, max_relative_error=1.1367647111857178e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='fused_folded_backward', result=CheckResult(passed=True, max_relative_error=1.777257291523869e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='folded_backward_tiles', result=CheckResult(passed=True, max_relative_error=1.5402900176529084e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='streaming_conv', result=CheckResult(passed=True, max_relative_error=2.1327084971371945e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=1.777257712676433e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='fused_folded_forward', result=CheckResult(passed=True, max_relative_error=1.5402902001524176e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='reassociate_first', result=CheckResult(passed=True, max_relative_error=1.282403830273702e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=(16, 40))",
+  "AppliedRewrite(name='segmented_first_sum', result=CheckResult(passed=True, max_relative_error=1.55900073484254e-06, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=6.039514733043886e-07, threshold=0.0001, modules=20, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.skip_tp', 'interactions.0.linear_res', 'interactions.0.linear_1', 'interactions.0.linear_2', 'interactions.0.source_embedding.embedding', 'interactions.0.target_embedding.embedding', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'interactions.1.linear_res', 'interactions.1.linear_1', 'interactions.1.linear_2', 'interactions.1.source_embedding.embedding', 'interactions.1.target_embedding.embedding', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=6.039514733043886e-07, threshold=0.0001, modules=20, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.skip_tp', 'interactions.0.linear_res', 'interactions.0.linear_1', 'interactions.0.linear_2', 'interactions.0.source_embedding.embedding', 'interactions.0.target_embedding.embedding', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'interactions.1.linear_res', 'interactions.1.linear_1', 'interactions.1.linear_2', 'interactions.1.source_embedding.embedding', 'interactions.1.target_embedding.embedding', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='merged_residual', result=CheckResult(passed=True, max_relative_error=2.7917198334199386e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='gated_rows', result=CheckResult(passed=True, max_relative_error=5.287709056788073e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='segment_gemm', result=CheckResult(passed=True, max_relative_error=1.1048531097790548e-06, threshold=0.0001, modules=6, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='species_tables', result=CheckResult(passed=True, max_relative_error=1.0809885790230508e-06, threshold=0.0001, modules=6, detail='ok', dtype='float32'), detail=['interactions.0.skip_tp', 'interactions.0.linear_up', 'interactions.0.source_embedding', 'interactions.0.target_embedding', 'interactions.1.source_embedding', 'interactions.1.target_embedding', 'node_embedding'])",
+  "AppliedRewrite(name='fold_readout_tail', result=CheckResult(passed=True, max_relative_error=3.2029163450137925e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['products.1.linear', 'interactions.1.skip_tp', 'readouts.1.linear_1'])",
+  "AppliedRewrite(name='fold_product_linear', result=CheckResult(passed=True, max_relative_error=8.468751231818361e-07, threshold=0.0001, modules=3, detail='ok', dtype='float32'), detail=['products.0.linear', 'interactions.0.skip_tp', 'skip_tp', 'linear_up', 'linear'])",
+  "AppliedRewrite(name='radial_tables', result=CheckResult(passed=True, max_relative_error=3.499250452138939e-06, threshold=0.0001, modules=24, detail='ok', dtype='float32'), detail=['interactions.0 (32 pieces, 4 pairs, certificate 0.18, fitted)', 'interactions.1 (53 pieces, 4 pairs, certificate 0.14, fitted)'])",
+  "AppliedRewrite(name='wprime_backward', result=CheckResult(passed=True, max_relative_error=5.142157242061768e-07, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (256 groups, 10 terms, 12 MiB)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "edges_within_cutoff": 29972,
+ "calls": [
+  {
+   "seconds": 5.923203213023953,
+   "allocated": 157396480,
+   "reserved": 2042626048,
+   "peak_above_before": 204780544,
+   "tiles": 4,
+   "grid": [
+    2,
+    1,
+    1
+   ],
+   "edge_cap": 26642,
+   "max_receivers": 512,
+   "max_halo": 351,
+   "max_edges": 13367
+  },
+  {
+   "seconds": 0.08062641299329698,
+   "allocated": 157396480,
+   "reserved": 2042626048,
+   "peak_above_before": 204762112,
+   "tiles": 4,
+   "grid": [
+    2,
+    1,
+    1
+   ],
+   "edge_cap": 26642,
+   "max_receivers": 512,
+   "max_halo": 351,
+   "max_edges": 13367
+  }
+ ],
+ "tiled": {
+  "energy_eV": -12218.929346323013,
+  "energy_per_atom_eV": -10.606709502016505,
+  "max_abs_force": 2.4090073108673096,
+  "stress": [
+   [
+    -0.004219911526888609,
+    0.005807776935398579,
+    0.0033993052784353495
+   ],
+   [
+    0.005807776935398579,
+    -0.00526107894256711,
+    -0.006201944779604673
+   ],
+   [
+    0.0033993052784353495,
+    -0.006201944779604673,
+    -0.0037987709511071444
+   ]
+  ]
+ },
+ "reference": {
+  "kind": "eager",
+  "calls": [
+   {
+    "seconds": 0.3336557369912043,
+    "allocated": 157439488,
+    "reserved": 2042626048,
+    "peak_above_before": 491877888
+   },
+   {
+    "seconds": 0.02251353400060907,
+    "allocated": 157439488,
+    "reserved": 2042626048,
+    "peak_above_before": 491877888
+   }
+  ],
+  "energy_eV": -12218.929335355759,
+  "energy_diff_meV_per_atom": -9.520186318291559e-06,
+  "max_force_diff": 1.3887882232666016e-05,
+  "rms_force_diff": 6.123012538088399e-07,
+  "max_abs_force": 2.4090065956115723,
+  "max_stress_diff": 0.01240388909354806,
+  "stress": [
+   [
+    0.004219908267259598,
+    -0.005807778798043728,
+    -0.003399304114282131
+   ],
+   [
+    -0.005807778798043728,
+    0.005261072888970375,
+    0.006201944313943386
+   ],
+   [
+    -0.003399304114282131,
+    0.006201944313943386,
+    0.003798770485445857
+   ]
+  ]
+ }
+}

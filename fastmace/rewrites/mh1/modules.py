@@ -316,6 +316,8 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     sc = self.truncate_ghosts(sc, n_real)
     # species_residual: the residual products are per-species rows, read from the one-hot node_attrs.
     residual_input = node_attrs if getattr(self, "species_residual", False) else node_feats
+    # Ghost rows (fastmace.model.tiled's halo) are cut as stock MACE cuts node_feats_res.
+    residual_input = self.truncate_ghosts(residual_input, n_real)
     gated_rows = getattr(self, "gated_rows", None)  # gated_rows: residual products, gate and linear_2 on rows
     if gated_rows is not None:
         message = gated_rows(message / (density * self.beta + self.alpha), residual_input)
