@@ -50,7 +50,6 @@ step() {  # label command...
 }
 cell() {  # name structure steps ncu(0/1)
   local name=$1 structure=$2 steps=$3 ncu=$4 dir=$ROOT/$1
-  mkdir -p "$dir"
   idle "$name" &&  # main pass: wall time, stages, the eager call's kernel sequence (the ncu join reads it)
   step "$name" "$PY" "$TOOL" --output "$dir" "${COMMON[@]}" --structure "$structure" --equilibrate-steps 100 \
     --steps 300 || return 1
