@@ -154,3 +154,18 @@ them correct.
 - **Less padding waste.** Tiles of more equal size (the binning's last block of each row is short), or two slot
   sizes.
 - **No double host planning.** Keep each tile's local graph between the sizing pass and the sweeps.
+
+## Checks
+
+- Ruff is clean on every changed file.
+- **CPU tests** on murphy (GPU hidden, `-n 8`, `mace_cueq_latest`, basetemp under `/mnt/homes/zwingel`), branch tip
+  `8ad56972`: `test_tiled.py`, `test_layering.py` and `test_acceptance_tools.py`, **113 passed**.
+
+## Setup
+
+- **Machine:** murphy, RTX 4000 Ada Generation 20 GB (driver 595.99.02), NAS `mace_cueq_oeq`.
+- **Idle check** before every job (`results/cap-tiled-20261030/run.sh`).
+- **Model:** MH-1 float32 hybrid.
+- **FastMACE:** branch `fastmace/cap-tiled-t1t2` from main `7185a492`. Sources per run are in the records: T2
+  `7ab718dc`, T1 `69d0334f`.
+- **When:** 30-31 October 2026, evening CET.
