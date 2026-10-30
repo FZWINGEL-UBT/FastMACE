@@ -177,9 +177,19 @@ def main(argv=None):
 
     def add(owner, kind, source, options, attributes=None):
         report, _ = ptxas_report(source, capability, options)
-        spilled = ptxas_report(with_smem_spilling(source), capability, options)[0] if args.smem_spilling else {}
+        spilled, failure = {}, None
+        if args.smem_spilling:
+            try:
+                spilled = ptxas_report(with_smem_spilling(source), capability, options)[0]
+            except RuntimeError as error:  # kept with the record; the source and log go next to it
+                failure = str(error)[:2000]
+                args.output.mkdir(parents=True, exist_ok=True)
+                stem = args.output / f"smem-failed-{owner.replace('/', '_')}"
+                stem.with_suffix(".cu").write_text(with_smem_spilling(source))
         for kernel, numbers in report.items():
             row = dict(owner=owner, kind=kind, kernel=kernel, **numbers)
+            if failure:
+                row["smem_spilling_failed"] = failure
             if attributes:
                 match = [value for key, value in attributes.items() if key in kernel] or list(attributes.values())
                 row["loaded_local"] = match[0]["local"] if len(attributes) == 1 else None
