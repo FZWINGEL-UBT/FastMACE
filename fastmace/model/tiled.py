@@ -395,6 +395,9 @@ class TiledForceField:
             return
         graph = self._graphs.get(sweep)
         if graph is None:
+            from fastmace import _patches
+
+            _patches.set_capture_safe_mask_head(True)  # MACE's readout mask assigns by index (as GraphEngine)
             if self._stream is None:
                 self._stream = torch.cuda.Stream()
             self._stream.wait_stream(torch.cuda.current_stream())

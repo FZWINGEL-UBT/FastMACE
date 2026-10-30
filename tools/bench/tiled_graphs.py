@@ -91,6 +91,9 @@ def falsifier(args, torch, atoms, field, record):
     piece = max(pieces, key=lambda p: p[1].shape[0])
     record["tile"] = dict(receivers=piece[3], halo=piece[4], edges=int(piece[1].shape[0]))
     del pieces
+    from fastmace import _patches
+
+    _patches.set_capture_safe_mask_head(True)  # as GraphEngine before a capture
     saved = tiled._bind(slot["count"])
     try:
         tiled._fill(slot, piece)
