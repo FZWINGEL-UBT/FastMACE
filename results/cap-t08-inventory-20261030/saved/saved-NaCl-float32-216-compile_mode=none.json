@@ -1,0 +1,2340 @@
+{
+ "tool": "saved_tensors",
+ "structure": "NaCl",
+ "precision": "float32",
+ "natoms": 216,
+ "edges_at_cutoff": 6912,
+ "padded_edges": 7168,
+ "engine": {
+  "compile_mode": "none"
+ },
+ "rewrites": {},
+ "allocated_before": 270746112,
+ "peak_over_before": 106244636,
+ "live_at_peak": 106244636,
+ "saved_totals": {
+  "per-edge": 40205312,
+  "fixed (freed before the peak)": 28254668,
+  "per-atom": 42992640,
+  "fixed": 658516,
+  "per-edge (freed before the peak)": 225280,
+  "per-atom (freed before the peak)": 169344
+ },
+ "saved": [
+  {
+   "bytes": 36700160,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1280
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 5120.0
+  },
+  {
+   "bytes": 9625600,
+   "dtype": "float32",
+   "shape": [
+    188,
+    10,
+    1280
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 9625600.0
+  },
+  {
+   "bytes": 7077888,
+   "dtype": "float32",
+   "shape": [
+    216,
+    8192
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:1350 __call__",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:55 uniform_1d",
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:294 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 32768.0
+  },
+  {
+   "bytes": 7077888,
+   "dtype": "float32",
+   "shape": [
+    216,
+    8192
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:1350 __call__",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:55 uniform_1d",
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:294 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 32768.0
+  },
+  {
+   "bytes": 4423680,
+   "dtype": "float32",
+   "shape": [
+    216,
+    5120
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "_WPrimeConvolutionBackward",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 20480.0
+  },
+  {
+   "bytes": 3145728,
+   "dtype": "float32",
+   "shape": [
+    2048,
+    384
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 3145728.0
+  },
+  {
+   "bytes": 3096576,
+   "dtype": "float32",
+   "shape": [
+    216,
+    7,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 14336.0
+  },
+  {
+   "bytes": 3096576,
+   "dtype": "float32",
+   "shape": [
+    216,
+    7,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 14336.0
+  },
+  {
+   "bytes": 2211840,
+   "dtype": "float32",
+   "shape": [
+    216,
+    5,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 10240.0
+  },
+  {
+   "bytes": 2211840,
+   "dtype": "float32",
+   "shape": [
+    216,
+    5,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 10240.0
+  },
+  {
+   "bytes": 2097152,
+   "dtype": "float32",
+   "shape": [
+    2048,
+    256
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 2097152.0
+  },
+  {
+   "bytes": 1863680,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    65
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/edge_outer_sum.py:158 edge_outer_sum",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:179 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward"
+   ],
+   "grad_fn": "_RadialTableBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 260.0
+  },
+  {
+   "bytes": 1769472,
+   "dtype": "float32",
+   "shape": [
+    216,
+    2048
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "CatBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 8192.0
+  },
+  {
+   "bytes": 1769472,
+   "dtype": "float32",
+   "shape": [
+    216,
+    512
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:2451 silu",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward"
+   ],
+   "grad_fn": "SliceBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 8192.0
+  },
+  {
+   "bytes": 1769472,
+   "dtype": "float32",
+   "shape": [
+    216,
+    512
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:2451 silu",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward"
+   ],
+   "grad_fn": "SliceBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 8192.0
+  },
+  {
+   "bytes": 1327104,
+   "dtype": "float32",
+   "shape": [
+    216,
+    1536
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:2357 sigmoid",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:129 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward"
+   ],
+   "grad_fn": "SigmoidBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 6144.0
+  },
+  {
+   "bytes": 1327104,
+   "dtype": "float32",
+   "shape": [
+    216,
+    1,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "UnsqueezeBackward0",
+   "saves": 3,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 6144.0
+  },
+  {
+   "bytes": 1327104,
+   "dtype": "float32",
+   "shape": [
+    216,
+    3,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 6144.0
+  },
+  {
+   "bytes": 1327104,
+   "dtype": "float32",
+   "shape": [
+    216,
+    1536
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:2357 sigmoid",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:129 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward"
+   ],
+   "grad_fn": "SigmoidBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 6144.0
+  },
+  {
+   "bytes": 1327104,
+   "dtype": "float32",
+   "shape": [
+    216,
+    1,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "UnsqueezeBackward0",
+   "saves": 3,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 6144.0
+  },
+  {
+   "bytes": 1327104,
+   "dtype": "float32",
+   "shape": [
+    216,
+    3,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:135 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ViewBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 6144.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 1048576,
+   "dtype": "float32",
+   "shape": [
+    512,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:149 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 1048576.0
+  },
+  {
+   "bytes": 786432,
+   "dtype": "float32",
+   "shape": [
+    512,
+    384
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 786432.0
+  },
+  {
+   "bytes": 545952,
+   "dtype": "float32",
+   "shape": [
+    4,
+    47,
+    11,
+    66
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 545952.0
+  },
+  {
+   "bytes": 524288,
+   "dtype": "float32",
+   "shape": [
+    512,
+    256
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 524288.0
+  },
+  {
+   "bytes": 519264,
+   "dtype": "float32",
+   "shape": [
+    216,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "SliceBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 2404.0
+  },
+  {
+   "bytes": 458752,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    16
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/edge_outer_sum.py:158 edge_outer_sum",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:179 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward"
+   ],
+   "grad_fn": "MulBackward0",
+   "saves": 2,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 64.0
+  },
+  {
+   "bytes": 332800,
+   "dtype": "float32",
+   "shape": [
+    1280,
+    65
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 332800.0
+  },
+  {
+   "bytes": 306240,
+   "dtype": "float32",
+   "shape": [
+    4,
+    29,
+    10,
+    66
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/radial_table.py:199 radial_table",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/radial/__init__.py:131 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:265 cutoff_folded_forward"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 306240.0
+  },
+  {
+   "bytes": 262144,
+   "dtype": "float32",
+   "shape": [
+    512,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 262144.0
+  },
+  {
+   "bytes": 262144,
+   "dtype": "float32",
+   "shape": [
+    512,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 262144.0
+  },
+  {
+   "bytes": 262144,
+   "dtype": "float32",
+   "shape": [
+    512,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/grouped_gemm.py:146 grouped_products",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:74 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:203 output_rows",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/fusion/modules.py:119 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 262144.0
+  },
+  {
+   "bytes": 262144,
+   "dtype": "float32",
+   "shape": [
+    128,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 262144.0
+  },
+  {
+   "bytes": 262144,
+   "dtype": "float32",
+   "shape": [
+    128,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 262144.0
+  },
+  {
+   "bytes": 225280,
+   "dtype": "int64",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:270 get_edge_vectors_and_lengths",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:651 prepare_graph",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:742 _outputs"
+   ],
+   "grad_fn": "leaf",
+   "saves": 5,
+   "class": "per-edge",
+   "alive_at_peak": false,
+   "bytes_per_unit": 31.428571428571427
+  },
+  {
+   "bytes": 196608,
+   "dtype": "float32",
+   "shape": [
+    96,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 196608.0
+  },
+  {
+   "bytes": 196608,
+   "dtype": "float32",
+   "shape": [
+    96,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 196608.0
+  },
+  {
+   "bytes": 86016,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    3
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:271 get_edge_vectors_and_lengths",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:651 prepare_graph",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:742 _outputs"
+   ],
+   "grad_fn": "AddBackward0",
+   "saves": 3,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 12.0
+  },
+  {
+   "bytes": 86016,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 13,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 12.0
+  },
+  {
+   "bytes": 82944,
+   "dtype": "float32",
+   "shape": [
+    216,
+    96
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:2451 silu",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/math/_normalize_activation.py:50 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/nn/_activation.py:94 forward"
+   ],
+   "grad_fn": "SliceBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": false,
+   "bytes_per_unit": 384.0
+  },
+  {
+   "bytes": 82944,
+   "dtype": "float32",
+   "shape": [
+    216,
+    96
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/engine.py:87 capture_safe_mask_head",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py:114 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": false,
+   "bytes_per_unit": 384.0
+  },
+  {
+   "bytes": 66560,
+   "dtype": "float32",
+   "shape": [
+    130,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:194 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 66560.0
+  },
+  {
+   "bytes": 66560,
+   "dtype": "float32",
+   "shape": [
+    130,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:194 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 66560.0
+  },
+  {
+   "bytes": 66560,
+   "dtype": "float32",
+   "shape": [
+    130,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:194 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 66560.0
+  },
+  {
+   "bytes": 66560,
+   "dtype": "float32",
+   "shape": [
+    130,
+    128
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:194 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 66560.0
+  },
+  {
+   "bytes": 59392,
+   "dtype": "float32",
+   "shape": [
+    1,
+    14848
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:1350 __call__",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:55 uniform_1d",
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:294 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 59392.0
+  },
+  {
+   "bytes": 57344,
+   "dtype": "int64",
+   "shape": [
+    7168
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/edge_outer_sum.py:158 edge_outer_sum",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:179 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:304 cutoff_folded_forward"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 8.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:271 get_edge_vectors_and_lengths",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:651 prepare_graph",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:742 _outputs"
+   ],
+   "grad_fn": "LinalgVectorNormBackward0",
+   "saves": 4,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/functional.py:1888 norm",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/_tensor.py:900 norm",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:6126 normalize",
+    "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:80 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "LinalgVectorNormBackward0",
+   "saves": 2,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    3
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/functional.py:6127 normalize",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:80 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "ExpandBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 2,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 2,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 2,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:82 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "torch::jit::(anonymous namespace)::DifferentiableGraphBackward",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:206 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:208 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "ExpBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:209 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "ExpBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:210 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "ExpBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:211 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "ExpBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:213 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:213 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "AddBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:213 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "DivBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:135 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:138 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "DivBackward0",
+   "saves": 3,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:138 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "PowBackward1",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:139 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "PowBackward1",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:140 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "PowBackward1",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:216 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "MulBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "float32",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:216 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "MulBackward0",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "int32",
+   "shape": [
+    7168
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/radial_table.py:199 radial_table",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/radial/__init__.py:131 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:265 cutoff_folded_forward"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "int32",
+   "shape": [
+    7168
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "int32",
+   "shape": [
+    7168
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 28672,
+   "dtype": "int32",
+   "shape": [
+    7168
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 26624,
+   "dtype": "float32",
+   "shape": [
+    1,
+    6656
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:1350 __call__",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:55 uniform_1d",
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:294 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 26624.0
+  },
+  {
+   "bytes": 16384,
+   "dtype": "int32",
+   "shape": [
+    4096
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/radial_table.py:199 radial_table",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/radial/__init__.py:131 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:265 cutoff_folded_forward"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 16384.0
+  },
+  {
+   "bytes": 16384,
+   "dtype": "int32",
+   "shape": [
+    4096
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 16384.0
+  },
+  {
+   "bytes": 12288,
+   "dtype": "float32",
+   "shape": [
+    6,
+    512
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 12288.0
+  },
+  {
+   "bytes": 7520,
+   "dtype": "float32",
+   "shape": [
+    4,
+    47,
+    10,
+    1
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 7520.0
+  },
+  {
+   "bytes": 7168,
+   "dtype": "bool",
+   "shape": [
+    7168,
+    1
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:142 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-edge",
+   "alive_at_peak": true,
+   "bytes_per_unit": 1.0
+  },
+  {
+   "bytes": 2304,
+   "dtype": "float32",
+   "shape": [
+    6,
+    96
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 <listcomp>",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:78 block_products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:135 products",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/linear/modules.py:123 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 2304.0
+  },
+  {
+   "bytes": 1728,
+   "dtype": "int64",
+   "shape": [
+    216
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:742 _outputs",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:730 __call__"
+   ],
+   "grad_fn": "leaf",
+   "saves": 2,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 8.0
+  },
+  {
+   "bytes": 1728,
+   "dtype": "int64",
+   "shape": [
+    216
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:742 _outputs",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:730 __call__"
+   ],
+   "grad_fn": "leaf",
+   "saves": 2,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 8.0
+  },
+  {
+   "bytes": 1728,
+   "dtype": "int64",
+   "shape": [
+    216
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/scatter.py:46 scatter_sum",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:742 _outputs",
+    "fastmace-capacity/src-77d5e507/fastmace/model/forces.py:730 __call__"
+   ],
+   "grad_fn": "leaf",
+   "saves": 2,
+   "class": "per-atom",
+   "alive_at_peak": false,
+   "bytes_per_unit": 8.0
+  },
+  {
+   "bytes": 864,
+   "dtype": "float32",
+   "shape": [
+    216,
+    1
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "AddBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 864,
+   "dtype": "int32",
+   "shape": [
+    216
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:1350 __call__",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:55 uniform_1d",
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:294 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 864,
+   "dtype": "float32",
+   "shape": [
+    216,
+    1
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "AddBackward0",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 864,
+   "dtype": "int32",
+   "shape": [
+    216
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py:1350 __call__",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:55 uniform_1d",
+    "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py:294 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": false,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 864,
+   "dtype": "float32",
+   "shape": [
+    216
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py:1383 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "per-atom",
+   "alive_at_peak": false,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 188,
+   "dtype": "float32",
+   "shape": [
+    47
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 188.0
+  },
+  {
+   "bytes": 188,
+   "dtype": "float32",
+   "shape": [
+    47
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/oeq_streaming/wprime_backward.py:434 convolution",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:368 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 188.0
+  },
+  {
+   "bytes": 116,
+   "dtype": "float32",
+   "shape": [
+    29
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/radial_table.py:199 radial_table",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/radial/__init__.py:131 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:265 cutoff_folded_forward"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 116.0
+  },
+  {
+   "bytes": 116,
+   "dtype": "float32",
+   "shape": [
+    29
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/kernels/triton/radial_table.py:199 radial_table",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/radial/__init__.py:131 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:265 cutoff_folded_forward"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 116.0
+  },
+  {
+   "bytes": 64,
+   "dtype": "float32",
+   "shape": [
+    16
+   ],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/e3nn/o3/_spherical_harmonics.py:96 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 64.0
+  },
+  {
+   "bytes": 16,
+   "dtype": "float32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:208 forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 4,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 16.0
+  },
+  {
+   "bytes": 16,
+   "dtype": "int64",
+   "shape": [
+    2
+   ],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/radial/__init__.py:125 pair",
+   "above": [
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:369 streaming_message",
+    "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:298 cutoff_folded_forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 16.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "int32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:138 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "float32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:138 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "int32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:139 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "float32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:139 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "int32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:140 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "float32",
+   "shape": [],
+   "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:140 calculate_envelope",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/radial.py:215 forward",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": true,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "float32",
+   "shape": [],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 4.0
+  },
+  {
+   "bytes": 4,
+   "dtype": "float32",
+   "shape": [],
+   "site": "fastmace-capacity/src-77d5e507/fastmace/rewrites/mh1/modules.py:321 cutoff_folded_forward",
+   "above": [
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl",
+    "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl"
+   ],
+   "grad_fn": "leaf",
+   "saves": 1,
+   "class": "fixed",
+   "alive_at_peak": false,
+   "bytes_per_unit": 4.0
+  }
+ ],
+ "plan": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (24): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, chunked_conv_backward,\n      fused_folded_forward, radial_tables, wprime_backward, block_linear, grouped_linear, merged_residual, gated_rows,\n      segment_gemm, grouped_launch, single_graph_strain, species_tables (+3 more; describe(full=True) lists them)\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, gate_epilogue, species_residual,\n      combo_kernels, tf32x3_gemms (only an explicit 'on' enables it); w_tables,\n      save_transcendentals (float32 plan, decision 65) (+5 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 0.39, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints; up to 300 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 300 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)"
+}

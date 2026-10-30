@@ -125,8 +125,10 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
-def render(schedule, k, rule):
-    """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule."""
+def render(schedule, k, rule, store_w=True):
+    """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
+    ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
+    plans/capacity.md, the w-rebuild falsifier)."""
     check_problem(schedule)
     C, layout, paths = schedule.channels, schedule.layout, schedule.paths
     costs = [sum(len(o.terms) for o in p.outputs) for p in paths]
@@ -143,6 +145,7 @@ def render(schedule, k, rule):
                       for q, part in enumerate(parts))
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
+constexpr bool STORE_W = {"true" if store_w else "false"};
 constexpr int K = {k};
 constexpr int CB = {CHANNEL_BLOCK};
 constexpr int WS = {CHANNEL_BLOCK + 1};
@@ -249,7 +252,7 @@ def _part(schedule, part, slots, C, layout):
             }} else {{
                 r0 = r1 = N;
                 ebeg = tail_begin + (cc - receiver_chunks) * TAIL;
-                if (ebeg >= E) break;
+                if (ebeg >= E || !STORE_W) break;
                 eend = ebeg + TAIL < E ? ebeg + TAIL : E;
             }}
             float acc[{n}];
@@ -283,7 +286,7 @@ def _part(schedule, part, slots, C, layout):
                 for (int k = 0; k < K; ++k) {{
 {chr(10).join(gemm)}
                 }}
-                {{
+                if (STORE_W) {{
                     const int wst[{npl}] = {{{wst}}};
                     #pragma unroll
                     for (int b = 0; b < B; ++b)
@@ -310,7 +313,7 @@ class FusedFoldedForward:
     """Compiled ``fused_folded_forward`` for the streaming kernels of one interaction (``StreamingKernels``) and a
     folded input width ``k``; float32 only."""
 
-    def __init__(self, kernels, k, device=None):
+    def __init__(self, kernels, k, device=None, store_w=True):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
@@ -324,7 +327,8 @@ class FusedFoldedForward:
                                 int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
         self.k, self.channels, self.paths = int(k), schedule.channels, len(schedule.paths)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
-        self.source = render(schedule, self.k, self.rule)
+        self.store_w = bool(store_w)
+        self.source = render(schedule, self.k, self.rule, self.store_w)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
