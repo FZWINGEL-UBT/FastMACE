@@ -161,3 +161,112 @@ quantity's largest value. That is rounding: the same w, another summation order.
   `store_w=False` plus `WRebuildBackward` (1 part, 4 edges), in place of the chunked cuBLAS recompute. That needs
   the gate (rounding-class), the whole-step A/B in both orders and a new capacity scan.
 - **Not tried.** Holding `dsh`/`dr` partials in shared memory per chunk and reducing once per edge; float2 loads.
+
+## 3. CUDA 13 shared-memory spilling and the stack limit (check 2)
+
+**Why it was a candidate.** Under WSL2 the driver reserves a kernel's local memory (its stack frame) for every thread
+the GPU can hold, and keeps it for the process's lifetime (capacity-T03.md). CUDA 13's `enable_smem_spilling` PTX
+pragma moves register spills to shared memory, which would shrink that reservation.
+
+**Census** (`tools/bench/kernel_resources.py`, NbCl5 3×3×3, default float32 plan, after the build and two steps).
+For each NVRTC kernel the plan loaded, it reads:
+
+- ptxas's report for its source, with the options it was compiled with: stack frame, spill stores and loads,
+  registers;
+- `cuFuncGetAttribute` of the loaded function: local bytes per thread, registers.
+
+The kernels:
+
+| Kernels | Count | Largest stack frame | Spills | Registers |
+| --- | ---: | ---: | --- | --- |
+| FastMACE streaming convolution (forward, backward, receiver backward, JVPs), interactions 0 and 1 | 10 | 0 B | none | 40-102 |
+| `fused_folded_forward`, interactions 0 and 1 | 2 | 0 B | none | 126, 168 |
+| `oeq_projected_backward_wprime` | 1 | 0 B | none | 80 |
+| loaded functions, `LOCAL_SIZE_BYTES` | 8 | 0 B | | as above |
+| OpenEquivariance JIT convolution kernels (forward, backward, double backward, fixups), interactions 0 and 1, with OEq's options (`--use_fast_math`) | 14 | 0 B | none | 4-168 |
+
+The WSL2 reservation they add, local bytes × 55,296 resident threads (36 SMs × 1,536), is therefore 0 B. With the
+pragma, the 21 kernels that compiled show the same 0 B stack and the same registers.
+
+**Stack limit.** After setup it is 1,024 B, the CUDA default: nothing raised it. Setting it to 1,024 B again and
+running two more steps left the memory outside the allocator at 1,213 MiB before and after: the context and module
+images.
+
+**Verdict: stopped. There is no spilling NVRTC kernel in the float32 plan, so the pragma has nothing to move, and
+the stack limit is already the default.**
+
+- **Not measured, so not claimed:**
+  - The fused forward's and OEq's sources did not compile with the injected pragma; the failing sources are saved
+    in `results/cap-t08-inventory-20261030/kernels/`.
+  - No A/B or occupancy run was made, since without spills there is no candidate change.
+- **What CAP-T03 measured was elsewhere.** Its WSL2 stack reservations came from:
+  - OEq's own convolution kernels in float64, used only when rule 12 dropped `streaming_conv` (fixed by decision
+    67);
+  - Inductor's fused Triton kernels, which reach 5.3 KB, about 0.29 GiB reserved at 55,296 threads. Those are
+    Triton-generated and outside this pragma.
+- **The workstation step-time check was not run:** with no candidate, there is nothing to time.
+
+## A. Packed FP32 FMA (FFMA2) on sm_120
+
+`tools/bench/ffma2_probe.py` (CPU only) compiles an `fma.rn.f32x2` inline-PTX kernel with NVRTC 13.0 and reads the
+SASS with nvdisasm:
+
+| Target | `fma.rn.f32x2` becomes | Two scalar `fmaf` become |
+| --- | --- | --- |
+| `sm_120` (RTX 5060 Ti) | `FFMA R8, R2, R4, R6` + `FFMA R9, R3, R5, R7` | two `FFMA` |
+| `sm_120a` | two `FFMA` | two `FFMA` |
+| `sm_100a` (B200 class) | **`FFMA2 R2, R2.F32x2.HI_LO, R4.F32x2.HI_LO, R6.F32x2.HI_LO`** | two `FFMA` |
+
+**Verdict: stopped by its first rule.** ptxas accepts the instruction for sm_120 but splits it into two FFMAs.
+Consumer Blackwell has no packed FP32 FMA; only sm_100 does. So there is nothing to time on the RTX 5060 Ti, and
+grepping our cubins for FFMA2 is moot.
+
+## B. Interaction-boundary checkpointing (CAP-T08's per-atom side)
+
+**Candidate.** Keep only the node state between the interactions, and rebuild each interaction's intermediates in
+the backward. The first falsifier, as asked: in the eager tier, wrap interaction 1 (then interactions 0 and 1) and
+its product block in `torch.utils.checkpoint` (non-reentrant, no RNG stash).
+
+**Tool:** `tools/bench/checkpoint_falsifier.py`.
+
+- **What it times.** The wrappers go on the modules' bound forwards, which the MH-1 rewrites replace per instance.
+  The captured graphs were taken before any wrapper, so the measured unit is the eager force call (forward and the
+  force backward) of the engine's force field, not the step.
+- **How.** 8 alternating rounds in one process (medians), recording the call's time and its peak allocation above
+  the memory held before it.
+
+**NbCl5 4×4×13** (14,976 atoms, 397,256 edges at the cutoff), RTX 5060 Ti, `compile_mode=none`:
+
+| Variant | Force call | Peak above the call's start | Largest force difference |
+| --- | ---: | ---: | ---: |
+| none | 629.3 ms | 5.93 GiB | 0 |
+| interaction 1 + product 1 checkpointed | 673.0 ms, 1.07× | 6.53 GiB, **1.10×** | 1.0 × 10⁻⁶ eV/Å |
+| interactions 0 and 1 + products checkpointed | 640.0 ms, 1.02× | 5.71 GiB, **0.96×** | 1.0 × 10⁻⁶ eV/Å |
+
+**Verdict: stopped by the rule.** The peak falls by 3.6 % at best, and checkpointing one layer raises it by 10 %;
+the bar was a 40 % fall.
+
+- **Why the peak barely moves.** MH-1 has two interactions, and interaction 1 holds most of the node state, as
+  well as w when recompute is off. The force call's peak is in interaction 1's backward. Checkpointing at the
+  interaction boundary rebuilds exactly those intermediates at exactly that moment, beside the gradients already
+  alive there, so the peak barely changes.
+- **The extra 10 % with one checkpointed layer** is the checkpoint's own copy of the layer's inputs while the
+  recomputed intermediates are alive.
+- **What would be needed.** A per-atom memory mode would have to split inside interaction 1, keeping fewer of the
+  per-atom holders of section 1 (the symmetric contraction's inputs, the gated products). That is a finer
+  segmentation than the falsifier, and outside this check.
+- **The step-time cost** was small here (1.02-1.07× of an eager force call), but cost does not decide it: memory
+  does not fall.
+
+## Summary
+
+| Check | Result |
+| --- | --- |
+| 1. Saved-tensor inventory | **w is 93 % of the saved per-edge bytes** (5.1 GiB at 32k atoms); CAP-T07 removes it from the saved set. Per atom: 174.5 kB saved plus 134-139 kB of backward working set; four holder groups above 0.5 GiB each at 32k atoms, all for the feature adjoint |
+| 2. w rebuilt in the wprime backward | stopped: 1.16-1.20× today's forward plus backward (bar 1.08); dominates CAP-T07's 1.63-1.75× and also removes the forward's w transient. A follow-up could implement `recompute_conv_weights` with it |
+| 3. Shared-memory spilling, the stack limit | stopped: no NVRTC kernel in the float32 plan spills or uses stack; the limit is the 1,024 B default |
+| A. FFMA2 | stopped: sm_120 splits `fma.rn.f32x2` into two FFMAs; FFMA2 is sm_100 only |
+| B. Interaction-boundary checkpointing | stopped: the peak falls 3.6 % at best (bar 40 %) |
+
+No library default changed. The code added here is opt-in only: `FusedFoldedForward(store_w=False)` (default
+`True`), `wrebuild_backward.py`, and the tools.
