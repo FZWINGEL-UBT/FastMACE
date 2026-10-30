@@ -137,7 +137,8 @@ edge. That is about 20 MB at 1.4M edges, so it is not worth the extra captures. 
 ## Checks
 
 - Ruff is clean on both tools.
-- **CPU tests:** `test_layering.py` and `test_ab_rewrites_tool.py` on leto (GPU hidden), LETO_RESULT.
+- **CPU tests:** `test_layering.py` and `test_ab_rewrites_tool.py`, commit `eeff1079`: **34 passed**. They ran on coraline
+  (GPU hidden, `-n 2`), because leto had another user's job on its GPU.
 
 ## Setup
 
