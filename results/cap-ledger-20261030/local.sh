@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Ideas 4 and 5 of 30 October 2026 (memory ledger at the limit; the first padded edge size) on the local RTX 5060 Ti:
-#   python3 tools/ci/local_gpu.py run --purpose "fm cap-ledger JOB" -- #     env FM=<pinned branch copy> bash results/cap-ledger-20261030/local.sh ROOT JOB...
+#   python3 tools/ci/local_gpu.py run --purpose "fm cap-ledger JOB" -- \
+#     env FM=<pinned branch copy> [TAG=...] [POINT_ARGS=...] bash results/cap-ledger-20261030/local.sh ROOT JOB...
 # Jobs:
 #   ledger-<structure>-<repeat>: tools/bench/memory_ledger.py (20 warm-up and 20 steady steps);
 #   point-<structure>-<repeat>[-trace]: tools/bench/capacity_scan.py point (--trace: memory samples and FastMACE's
@@ -45,10 +46,13 @@ note "fastmace=$(cat "$FM/.source_commit") host=$(hostname) gpu=$(nvidia-smi --q
 for job in "$@"; do
   case $job in
     ledger-*) IFS=- read -r _ structure repeat <<< "$job"
-      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat"           --output "$ROOT/ledger" ;;
+      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat" \
+          --output "$ROOT/ledger" ;;
     point-*) IFS=- read -r _ structure repeat trace <<< "$job"
       # shellcheck disable=SC2086
-      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure"           --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points"           ${trace:+--trace} --tag="${TAG:-}${trace:+-trace}" ${POINT_ARGS:-} ;;
+      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
+          --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points" \
+          ${trace:+--trace} --tag="${TAG:-}${trace:+-trace}" ${POINT_ARGS:-} ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
 done
