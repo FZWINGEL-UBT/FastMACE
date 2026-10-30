@@ -139,6 +139,25 @@ def allocator_view(torch, engine):
                 unattributed_sites=dict(sorted(sites.items(), key=lambda kv: -kv[1])[:30]))
 
 
+def pool_view(snapshot, engine, trace):
+    """The graph pool after a capture: its segments, its free blocks, and the live peak of the allocations made in
+    it (the trace's events inside its segments). Reserved above that peak is the pool's fragmentation."""
+    pool = tuple(engine._pool) if engine._pool is not None else None
+    segments = [s for s in snapshot["segments"] if pool is not None and tuple(s.get("segment_pool_id", ())) == pool]
+    ranges = [(s["address"], s["address"] + s["total_size"]) for s in segments]
+    free = [b["size"] for s in segments for b in s["blocks"] if b["state"] != "active_allocated"]
+
+    def inside(address):
+        return any(lo <= address < hi for lo, hi in ranges)
+
+    events = [e for e in trace if e["action"] in ("alloc", "free_requested", "free_completed") and inside(e["addr"])]
+    live_peak, _ = activation_profile.live_at_peak(events)
+    sizes = sorted((s["total_size"] for s in segments), reverse=True)
+    return dict(reserved=int(sum(sizes)), segments=len(sizes), largest_segments=sizes[:10], live_peak=int(live_peak),
+                free=int(sum(free)), largest_free=int(max(free, default=0)), free_blocks=len(free),
+                events=len(events))
+
+
 def main(argv=None):
     args = parse_args(argv)
     from fastmace.model.compile import configure_allocator
@@ -209,6 +228,7 @@ def main(argv=None):
         sites[site][0] += size
         sites[site][1] += 1
     capture_sites = sorted(([s, b, c] for s, (b, c) in sites.items()), key=lambda row: -row[1])
+    pool_detail = pool_view(snapshot, engine, trace)
     natoms = len(atoms)
     padded = max(info["padded_sizes"]) if info["padded_sizes"] else int(edges)
 
@@ -231,7 +251,7 @@ def main(argv=None):
                   ledger=[dict(row=row, bytes=int(b)) for row, b in ledger],
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
                                  sites=[dict(site=s, bytes=int(b), blocks=c, per_edge=b / padded, per_atom=b / natoms)
-                                        for s, b, c in capture_sites[:80]]),
+                                        for s, b, c in capture_sites[:80]], pool=pool_detail),
                   plan=sim.plan.describe())
     sim.close()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -242,6 +262,9 @@ def main(argv=None):
           f"device {total / GIB:.2f} GiB, steady max reserved {steady['max_reserved'] / GIB:.2f} GiB")
     for row, size in ledger:
         print(f"  {size / GIB:7.3f} GiB  {row}")
+    print(f"graph pool after the re-capture: {pool_detail['reserved'] / GIB:.3f} GiB in {pool_detail['segments']} "
+          f"segments; its own allocations peaked at {pool_detail['live_peak'] / GIB:.3f} GiB live; "
+          f"free blocks {pool_detail['free'] / GIB:.3f} GiB (largest {pool_detail['largest_free'] / GIB:.3f} GiB)")
     print(f"re-capture: peak live {peak / GIB:.2f} GiB above {base / GIB:.2f} GiB; top sites:")
     for site, size, count in capture_sites[:args.top]:
         print(f"  {size / GIB:7.3f} GiB  {size / natoms / 1e3:7.1f} kB/atom  {count:5d} blocks  {site}")

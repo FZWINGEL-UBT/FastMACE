@@ -62,6 +62,8 @@ def parse_args(argv=None):
         q.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                        help="RewriteConfig overrides on the default plan (candidates; the scan itself takes none)")
         q.add_argument("--tag", default="", help="suffix of the point files (a candidate's points)")
+        q.add_argument("--neighbours", nargs="*", default=[], metavar="FIELD=VALUE",
+                       help="NeighbourConfig overrides on the default plan, e.g. edge_bucket_fraction=0.15")
         q.add_argument("--engine", nargs="*", default=[], metavar="FIELD=VALUE",
                        help="EngineConfig overrides on the default plan (candidates), e.g. force_graphs=one")
     point = sub.choices["point"]
@@ -199,13 +201,15 @@ class _Tracer:
 
 
 def _value(text):
-    """A command-line config value: true/false as bools, integers as ints, else the string."""
+    """A command-line config value: true/false as bools, integers as ints, decimals as floats, else the string."""
     if text.lower() in ("true", "false"):
         return text.lower() == "true"
-    try:
-        return int(text)
-    except ValueError:
-        return text
+    for kind in (int, float):
+        try:
+            return kind(text)
+        except ValueError:
+            pass
+    return text
 
 
 def _tried(message):
@@ -265,6 +269,7 @@ def run_point(args):
     record["start"] = dict(cuda_free_bytes=int(free), cuda_total_bytes=int(total), windows=windows_memory())
     record["rewrites"] = dict(item.split("=", 1) for item in args.rewrites)
     record["engine"] = {key: _value(value) for key, value in (item.split("=", 1) for item in args.engine)}
+    record["neighbours"] = {key: _value(value) for key, value in (item.split("=", 1) for item in args.neighbours)}
     record["environment"] = {key: os.environ.get(key) for key in ("CUDA_LAUNCH_BLOCKING", "PYTORCH_CUDA_ALLOC_CONF")}
     if args.diagnose:
         torch.cuda.memory._record_memory_history(max_entries=200_000)
@@ -345,11 +350,12 @@ def run_point(args):
             record["phases"]["load"] = peaks()
             phase = "build"
             started = time.perf_counter()
-            from fastmace.config import EngineConfig, FallbackConfig
+            from fastmace.config import EngineConfig, FallbackConfig, NeighbourConfig
 
             sim = fm.Simulation(atoms, field, seed=args.seed,
                                 **({"fallback": FallbackConfig(fallback="refuse")} if args.diagnose else {}),
                                 **({"engine": EngineConfig(**record["engine"])} if args.engine else {}),
+                                **({"neighbours": NeighbourConfig(**record["neighbours"])} if args.neighbours else {}),
                                 integrator=fm.integrators.Langevin(
                 timestep_fs=args.timestep_fs, temperature_K=args.temperature_K, friction_per_fs=0.002))
             torch.cuda.synchronize()

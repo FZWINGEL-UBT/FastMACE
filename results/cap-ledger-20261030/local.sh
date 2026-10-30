@@ -48,7 +48,7 @@ for job in "$@"; do
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat"           --output "$ROOT/ledger" ;;
     point-*) IFS=- read -r _ structure repeat trace <<< "$job"
       # shellcheck disable=SC2086
-      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure"           --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points"           ${trace:+--trace} --tag "${TAG:-}${trace:+-trace}" ${POINT_ARGS:-} ;;
+      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure"           --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points"           ${trace:+--trace} --tag="${TAG:-}${trace:+-trace}" ${POINT_ARGS:-} ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
 done
