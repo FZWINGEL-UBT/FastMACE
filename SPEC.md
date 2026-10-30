@@ -541,13 +541,15 @@ e, f, s = ff.evaluate(atoms, stress=True)               # one-off evaluation
 ```
 
 **Execution copies and templates** (opt-1 OPT-T06). Each plan converts its own copy of the pristine model
-(decision 24). On CUDA with the cuEq or hybrid backend, the `ForceField` keeps the first conversion of each kind
-as a template: checkpoint hash, head, backend, dtype, device, conversion options, process patches and package
-versions. Every later plan of that kind gets a private deep copy of the template instead of a reload and
-conversion; this includes the gate's reduced cell and fallback candidates. No module, tensor or calculator state
-is shared between plans (§8.7). Self-checks run on every copy as before.
-- A `ForceField` keeps at most two templates.
-- `ff.release_templates()` frees them.
+(decision 24). On CUDA with the cuEq or hybrid backend, the first conversion of each kind is kept as a template:
+checkpoint hash, head, backend, dtype, device, conversion options, process patches and package versions. The
+templates belong to the `LoadedModel` that `fm.load` returned (`LoadedModel.template_cache()`, since setup fix
+F3), so every `ForceField` made from it shares them, including one built for a new composition. Every later
+plan of that kind gets a private deep copy of the template instead of a reload and conversion; this includes the
+gate's reduced cell and fallback candidates. No module, tensor or calculator state is shared between plans
+(§8.7). Self-checks run on every copy as before.
+- A `LoadedModel` keeps at most two templates.
+- `ff.release_templates()` frees them for every `ForceField` of that `LoadedModel`.
 - `EngineConfig(model_template_cache=False)` turns the cache off.
 
 ### 7.2 Simulation
@@ -3292,3 +3294,8 @@ measured and fitted per-edge savings, so the estimate predicts the capacity scan
 **Decision 66 (29 October 2026, owner):** per-GPU defaults allowed. Goal 2 and §9.1 now permit a default that
 names the GPU models where same-process A/Bs measured a whole-step speed-up (exact device names, as in decision
 65); per-structure and shape-keyed tables stay forbidden. See §18, decision 66.
+
+**Template ownership (30 October 2026, setup fix F3, conductor):** §7.1 amended. The converted-model templates
+belong to the `LoadedModel`, not to each `ForceField`, so a new composition from the same `fm.load` result copies
+the conversion instead of loading and converting again (about 3.1 s per composition after the first). Isolation
+between plans is unchanged. See `docs/validation/setup-fixes.md`.
