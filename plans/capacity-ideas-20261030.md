@@ -11,6 +11,20 @@ Context on main at the time:
 - The tiled prototype (`fastmace.model.tiled`, `docs/design/tiled-backend.md`, `docs/validation/capacity-tiled.md`)
   fits 884,736 NbCl5 and 778,688 NaCl atoms on murphy's 20 GB, but runs eager, about 2.1x slower than main's step.
 
+Owner scope (30 October 2026): no multi-GPU work for now; it is for later. Float32 only.
+
+## Where FastMACE stands against Symmetrix-XL (conductor's assessment)
+
+- **Speed at normal cell sizes, measured:**
+  - The 14 October screen found Symmetrix-XL 1.9-2.5x slower than the hybrid default.
+  - The 23 October LAMMPS rematch (MACE-OMAT-0 medium) found its native GPU path 1.1-2.5x slower per step than FastMACE's default.
+- **Capacity:** the tiled path is the same class of design, with a flat 1.2-1.7 GiB workspace and 23-26 kB/atom.
+  - Fits 884,736 NbCl5 atoms with MH-1 on 20 GB.
+  - The paper's 11.24M atoms is MACE-OMAT-0 on an 80 GB A100, a much smaller per-atom state than MH-1's 16 kB/atom h1 and adjoint. Scaled crudely, MH-1 gives about 3.5M atoms on 80 GB, before freeing h1 (T2).
+  - Expected to be in the same range as Symmetrix-XL on a matched model and GPU, perhaps somewhat below.
+- **Speed at large sizes, the open point:** the tiled path is eager, about 2.1x main's step. With graph tile bodies (T1) the estimate is 1.3-1.5x main's per-atom cost, which would put it about even with Symmetrix-XL or a bit ahead. This is not measured.
+- **To settle it:** a matched benchmark, MACE-OMAT-0 medium on the same structures and GPU, measuring largest cell and step time. It needs T1 and a tiled path for models whose first interaction is not species-only.
+
 ## Taken up
 
 | # | Idea | Why | First check | Owner |
@@ -43,13 +57,13 @@ From the earlier review (same day):
 
 | Idea | Assessment | Status |
 | --- | --- | --- |
-| **Edge-virial stress** (sum r_e ⊗ dE/dr_e in the edge backward epilogue) instead of the strain graph (`single_graph_strain`) | Sound for models whose energy depends on positions only through edge vectors; the tiled path already assembles stress this way. Rounding class, not bitwise as claimed. Gains only where stress is computed (NPT, cell relaxations). Models with cell-dependent terms (PolarMACE k-space, D3 on the cell) keep the strain path | Worth a falsifier: stress against the strain path on 20 configurations, and NPT step time with and without |
+| **Edge-virial stress** (sum r_e ⊗ dE/dr_e in the edge backward epilogue) instead of the strain graph (`single_graph_strain`) | Sound for models whose energy depends on positions only through edge vectors; the tiled path already assembles stress this way. Rounding class, not bitwise as claimed. Gains only where stress is computed (NPT, cell relaxations). Models with cell-dependent terms (PolarMACE k-space, D3 on the cell) keep the strain path | Taken up (owner, 30 October): falsifier queued for the capacity worker after C1 |
 | **Static liveness slab for graph activations** | The capture-time allocator from the pool study, reached via FX. FX does not see allocations inside external ops (OEq, cuEq, cuBLAS workspaces), which hold the largest blocks. Up to 1.47 GiB in the offline replay, but a process-wide allocator constraint. Less urgent now that the tiled path exists | Owner decision (SPEC 18), not started |
 | **Morton or Hilbert tile order** in the tiled path | Tiles come from spatial blocks in index order. A tile's halo working set (about 4,096 + H atoms at 8 kB) is larger than the 32-48 MB L2, so cross-tile L2 reuse is small. The 15-22 % claim is unlikely, but it is cheap to try | Optional quick A/B inside T1 |
 | **Packed shifts and CSR neighbour list** | The list is about 1 % of the whole-system peak since CAP-T09, so there is no capacity gain there. Shift values are bounded only for cells larger than the cutoff, so packing must handle small cells. Becomes relevant when the tiled path with host-staged h1 (T3) makes the list the limit | Revisit with T3 |
 | **Co-scheduled irrep tiles in segment_gemm** | segment_gemm already launches one 2D grid per call. Whether irreps are separate calls, and whether a tail dip exists, needs a profile look before any work | Check the profile first |
 | **Skipping the displacement check for K steps after a rebuild** | Langevin noise is unbounded, so there is no kinematic certainty. The check is already inside the captured step and its flag read is pipelined, so the saving is small. A wrong skip gives silently wrong forces | Not taken up |
-| **Peer-to-peer multi-GPU tiling across workstations** | leto, murphy and trillian each have one GPU. Peer-to-peer copies need GPUs in one machine, and cross-machine exchange would be networking. Spreading one production run over several GPUs is also not wanted (Langevin production is sequential) | Not taken up |
+| **Peer-to-peer multi-GPU tiling across workstations** | leto, murphy and trillian each have one GPU. Peer-to-peer copies need GPUs in one machine, and cross-machine exchange would be networking | Deferred: the owner wants no multi-GPU work for now (30 October 2026), "this is for later" |
 | **cuMemMap growth for edge buffers on recapture** | The premise does not hold here. Idea 5 showed the limit failure is the larger capture's own peak, not two graphs resident at once, and expandable segments already map memory on demand | Not taken up |
 
 ## Not taken up
