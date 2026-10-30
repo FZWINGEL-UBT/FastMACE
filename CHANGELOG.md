@@ -8,9 +8,11 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
-- `RewriteConfig.recompute_conv_weights` (plans/capacity.md CAP-T07, exact): `wprime_backward`'s backward builds the
-  per-edge tensor-product weights again from the edge lengths in edge chunks instead of keeping them (1,280 floats
-  per edge for MH-1, about a third of a large cell's force-call memory). Off; on only when memory would not be enough:
+- `RewriteConfig.recompute_conv_weights` (plans/capacity.md CAP-T07 and CAP-T07b, rounding): the per-edge
+  tensor-product weights are not kept for the backward (1,280 floats per edge for MH-1, about a third of a large
+  cell's force-call memory). With `fused_folded_forward` the forward builds them on chip without storing them and the
+  backward builds them on chip again (1-4 % step time); otherwise the backward rebuilds them with cuBLAS in edge
+  chunks. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 34,200 to 49,248 atoms, NaCl 27,000 to 46,656. Off; on only when memory would not be enough:
   rule 12 turns it on for a cell that cannot fit (its estimate divided by 1.34 does not fit 90 % of the free memory), and
   `Simulation` rebuilds once with it on after an out-of-memory error at build or capture
   (`fallback.memory_rescue`; a sticky CUDA context raises the error with the fix).

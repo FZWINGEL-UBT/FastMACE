@@ -300,4 +300,26 @@ class WRebuildBackward:
         return dx, dsh, dr
 
 
-__all__ = ["EDGE_CHUNK", "WRebuildBackward", "render", "rule_for", "staging_floats"]
+@torch.library.custom_op("fastmace::wrebuild_backward", mutates_args=())
+def wrebuild_backward(x: torch.Tensor, sh: torch.Tensor, senders: torch.Tensor, receivers: torch.Tensor,
+                      dout: torch.Tensor, r: torch.Tensor, pair: torch.Tensor, gprime: torch.Tensor,
+                      coef: torch.Tensor, weight: torch.Tensor, starts: torch.Tensor, scales: torch.Tensor,
+                      bins: torch.Tensor, r_lo: float, bin_scale: float, r_max: float,
+                      rebuild_id: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """(dx, dsh, dL/dr [E] of the radial path) with ``w`` built on chip (``recompute_conv_weights``): the radial
+    basis ``a`` again from the edge lengths (the forward's table, bitwise), then the kernel ``rebuild_id``."""
+    from fastmace.kernels.triton.radial_table import radial_table_forward
+
+    r = r.reshape(-1).contiguous()
+    a, _ = radial_table_forward(r, pair.contiguous(), coef, starts, scales, bins, r_lo, bin_scale, r_max)
+    return _REGISTRY[rebuild_id](a, weight, x, sh, senders, receivers, dout, r, pair, gprime, starts, scales, bins,
+                                 r_lo, bin_scale, r_max)
+
+
+@wrebuild_backward.register_fake
+def _(x, sh, senders, receivers, dout, r, pair, gprime, coef, weight, starts, scales, bins, r_lo, bin_scale, r_max,
+      rebuild_id):
+    return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
+
+
+__all__ = ["EDGE_CHUNK", "WRebuildBackward", "render", "rule_for", "staging_floats", "wrebuild_backward"]

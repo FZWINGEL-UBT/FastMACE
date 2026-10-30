@@ -32,6 +32,10 @@ import torch
 
 _REGISTRY = {}
 _IDS = itertools.count()
+# The w-rebuilding backward's launch for recompute_conv_weights: one path part, four edges per batch (the fastest of
+# the shapes timed in docs/validation/capacity-T08-inventory.md section 2).
+REBUILD_PARTS = 1
+REBUILD_BATCH = 4
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -377,22 +381,28 @@ class _WPrimeConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
-                sh, senders, receivers, row_ptr, kernel_id, fused_id, wprime_id, recompute_rows=0):
+                sh, senders, receivers, row_ptr, kernel_id, fused_id, wprime_id, recompute_rows=0, message_id=-1,
+                rebuild_id=-1):
         from fastmace.kernels.oeq_streaming.runtime import streaming_conv_forward
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
-        if fused_id >= 0:  # fused_folded_forward (opt-8 OPT8-T02): w stored by the message kernel
+        if rebuild_id >= 0:  # recompute_conv_weights on the fused kernels: w built on chip, never stored
+            from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message
+            message = fused_folded_message(a, weight, x, sh, senders, receivers, row_ptr, message_id)
+            weights = None
+        elif fused_id >= 0:  # fused_folded_forward (opt-8 OPT8-T02): w stored by the message kernel
             from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_forward
             message, weights = fused_folded_forward(a, weight, x, sh, senders, receivers, row_ptr, fused_id)
         else:
             weights = a @ weight.t()
             message = streaming_conv_forward(x, sh, weights, senders, row_ptr, kernel_id)
-        if recompute_rows:  # recompute_conv_weights (CAP-T07): the backward builds the weights again per chunk
+        if recompute_rows or weights is None:  # recompute_conv_weights (CAP-T07): no stored weights
             weights = coef.new_empty((0,))
         ctx.save_for_backward(x, sh, weights, senders, receivers, r, pair, gprime, density_dcoef, starts, scales,
                               bins, coef, weight)
         ctx.constants, ctx.wprime_id, ctx.recompute_rows = (r_lo, bin_scale, r_max), wprime_id, int(recompute_rows)
+        ctx.rebuild_id = int(rebuild_id)
         return message, density
 
     @staticmethod
@@ -401,7 +411,11 @@ class _WPrimeConvolution(torch.autograd.Function):
          weight) = ctx.saved_tensors
         if dout is None:
             dout = x.new_zeros((x.shape[0], _REGISTRY[ctx.wprime_id].output_dim))
-        if ctx.recompute_rows:
+        if ctx.rebuild_id >= 0:
+            from fastmace.kernels.oeq_streaming.wrebuild_backward import wrebuild_backward
+            dx, dsh, dr = wrebuild_backward(x, sh, senders, receivers, dout, r, pair, gprime, coef, weight, starts,
+                                            scales, bins, *ctx.constants, ctx.rebuild_id)
+        elif ctx.recompute_rows:
             dx, dsh, dr = streaming_conv_wprime_backward_recompute(
                 x, sh, senders, receivers, dout, r, pair, gprime, coef, weight, starts, scales, bins, *ctx.constants,
                 ctx.wprime_id, ctx.recompute_rows)
@@ -411,7 +425,7 @@ class _WPrimeConvolution(torch.autograd.Function):
         if ddensity is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, ddensity, *ctx.constants)
         return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
-                None, None, None, None, None, None, None)
+                None, None, None, None, None, None, None, None, None)
 
 
 class WPrime(torch.nn.Module):
@@ -423,18 +437,36 @@ class WPrime(torch.nn.Module):
         self.register_buffer("gprime", derivative_table(table.dcoef, weight), persistent=False)
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.gprime.shape[1], self.gprime.device)
+        # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
+        # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
+        self.rebuild = None
+
+    def attach_rebuild(self, kernels, fused):
+        """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
+        (float32, the interaction's ``fused_folded_forward`` of width ``fused.k``)."""
+        from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+        from fastmace.kernels.oeq_streaming.wrebuild_backward import WRebuildBackward
+
+        device = self.gprime.device
+        self.rebuild = (FusedFoldedForward(kernels, fused.k, device, store_w=False),
+                        WRebuildBackward(kernels, fused.k, self.gprime.shape[1], device, parts=REBUILD_PARTS,
+                                         batch=REBUILD_BATCH))
 
     def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None,
                     recompute_rows=0):
         """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh).
-        ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward, which builds
-        them again in chunks of that many edges."""
+        ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward. With the rebuild
+        kernels attached (``attach_rebuild``) and ``fused``, the forward stores no ``w`` and the backward builds it on
+        chip; otherwise the backward builds it again in chunks of that many edges."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
+        rebuild = (self.rebuild[0].id, self.rebuild[1].id) if recompute_rows and fused is not None and self.rebuild \
+            else None
         return _WPrimeConvolution.apply(lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales,
                                         table.bins, float(table.r_lo), float(table.bin_scale), float(table.r_max),
                                         weight, self.gprime, x, sh, senders, receivers, row_ptr, kernels.id,
-                                        -1 if fused is None else fused.id, self.kernel.id, int(recompute_rows))
+                                        -1 if fused is None else fused.id, self.kernel.id, int(recompute_rows),
+                                        *(rebuild if rebuild else (-1, -1)))
 
     def extra_repr(self):
         return f"groups={self.gprime.shape[0]}, terms={self.gprime.shape[1]}, outputs={self.gprime.shape[2]}"
