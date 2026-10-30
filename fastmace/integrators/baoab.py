@@ -32,7 +32,7 @@ from fastmace.config import external_stress as stress_components
 from fastmace.neighbors.skin import det_3x3, matmul_small, times_3x3
 
 from .base import Integrator
-from .langevin import allocate_noise, base_output_values, check_ensemble
+from .langevin import allocate_noise, base_output_values, check_ensemble, noise_steps, refill_noise
 
 if TYPE_CHECKING:
     from fastmace.state import SimulationState
@@ -154,7 +154,7 @@ class LangevinBAOAB(Integrator):
         self.set_temperature(temperature_K)
 
         self.cell_numbers = 0 if self.barostat_gamma == 0 else (1 if self.hydrostatic else 9)
-        self.noise_batch = config.noise_batch
+        self.noise_batch = noise_steps(config.noise_batch, 3 * self.natoms + self.cell_numbers)
         allocate_noise(state, (self.noise_batch, 3 * self.natoms + self.cell_numbers))
         self.xi = torch.zeros((self.natoms, 3), **f64)
         self.zeta = torch.zeros(max(self.cell_numbers, 1), **f64)
@@ -248,9 +248,7 @@ class LangevinBAOAB(Integrator):
         rng = state.rng
         if rng.cursor == self.noise_batch:
             # rng.normal(size=(N, 3)) then rng.normal() or rng.normal(size=(3, 3)) per step, as ASE.
-            draws = rng.generator.normal(size=(self.noise_batch, rng.batch.shape[1]))
-            rng.batch.copy_(torch.from_numpy(draws))
-            rng.cursor = 0
+            refill_noise(rng, lambda steps: rng.generator.normal(size=(steps, rng.batch.shape[1])))
         row = rng.batch[rng.cursor]
         self.xi.copy_(row[:3 * self.natoms].view(self.natoms, 3))
         if self.cell_numbers:

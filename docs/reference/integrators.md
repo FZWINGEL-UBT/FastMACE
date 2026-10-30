@@ -292,7 +292,7 @@ friction in inverse ASE time units (not 1/fs as on the records).
 | `seed` | int ≥ 0 | 20261001 | Noise seed. | Always the `Simulation`'s seed when built from a record. |
 | `fixcm` | bool | `True` | Remove centre-of-mass motion. | Resolved from the record's `"auto"`. |
 | `fixcm_projection` | `"auto"`, `"ase"`, `"mass_weighted"` | `"auto"` | Langevin's projection of the noise under `fixcm`. | The planner resolves `"auto"`. |
-| `noise_batch` | int > 0 | 256 | Steps of random numbers drawn and copied to the GPU at once. | Same numbers in the same order for any value. Not set by any record. |
+| `noise_batch` | int > 0 | 256 | Steps of random numbers drawn and copied to the GPU at once, at most 64 MiB of them (fewer steps above about 5,500 atoms; CAP-T06). | Same numbers in the same order for any value. A restart written with another batch size resumes bitwise. Not set by any record. |
 | `pressure_GPa` | GPa | 0.0 | NPT target pressure (ASE `externalstress` = −pressure). | |
 | `cell_mode` | `"hydrostatic"`, `"full"` | `"hydrostatic"` | NPT cell mode. | |
 | `barostat_tau_fs` | fs, > 0, or `None` | `None` | BAOAB's `P_tau`. | `None`: 20 `T_tau`. |

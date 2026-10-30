@@ -109,6 +109,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- The drawn-ahead Langevin/BAOAB/CSVR noise batch holds at most 64 MiB (CAP-T06): `IntegratorConfig.noise_batch`
+  is still the most steps, but above about 5,500 atoms the batch is shorter (26 steps at 51,840 atoms, 0.53 GiB
+  less at the peak). The random numbers and their order are unchanged. A restart written with another batch size,
+  including every restart from before this change, resumes bitwise.
 - Setup across compositions (fixes F1, F2, F3, F5; `docs/validation/setup-fixes.md`):
   - The converted-model templates belong to the `LoadedModel`, so every `ForceField` of one `fm.load` result
     shares them.

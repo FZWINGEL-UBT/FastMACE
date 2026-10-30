@@ -410,7 +410,7 @@ class Transaction:
         engine, state = self.engine, self.engine.state
         self._snapshot = {
             "buffers": engine.registry.snapshot(),
-            "rng": (copy.deepcopy(state.rng.generator), state.rng.cursor),
+            "rng": (copy.deepcopy(state.rng.generator), state.rng.cursor, state.rng.queued),
             "state": {name: getattr(state, name) for name in ("total_charge", "spin_multiplicity")},
             "integrator": dict(vars(engine.integrator)),
         }
@@ -510,7 +510,7 @@ class Transaction:
         if "total_charge" in self._snapshot:  # the force field's host base, before its buffers come back
             engine.force_field.set_total_charge(self._snapshot["total_charge"])
         engine.registry.restore(self._snapshot["buffers"])
-        state.rng.generator, state.rng.cursor = self._snapshot["rng"]
+        state.rng.generator, state.rng.cursor, state.rng.queued = self._snapshot["rng"]
         for name, value in self._snapshot["state"].items():
             setattr(state, name, value)
         integrator = engine.integrator

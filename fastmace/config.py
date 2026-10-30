@@ -464,7 +464,8 @@ class IntegratorConfig:
     # 37: every species holds the target, 3N-3 degrees of freedom; MC's redraw_all holds (3N-3) kT), else "ase";
     # outside a plan it reads as "ase".
     fixcm_projection: Literal["auto", "ase", "mass_weighted"] = "auto"
-    # Steps of random numbers drawn and copied to the GPU at once; same numbers and order (NOISE_BATCH).
+    # Steps of random numbers drawn and copied to the GPU at once, at most 64 MiB of them (CAP-T06,
+    # integrators.langevin.NOISE_BATCH_BYTES); same numbers and order for any size (NOISE_BATCH).
     noise_batch: int = 256
     # NPT: external pressure (ASE externalstress = -pressure).
     pressure_GPa: float = 0.0
