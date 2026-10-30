@@ -66,6 +66,16 @@ From the earlier review (same day):
 | **Peer-to-peer multi-GPU tiling across workstations** | leto, murphy and trillian each have one GPU. Peer-to-peer copies need GPUs in one machine, and cross-machine exchange would be networking | Deferred: the owner wants no multi-GPU work for now (30 October 2026), "this is for later" |
 | **cuMemMap growth for edge buffers on recapture** | The premise does not hold here. Idea 5 showed the limit failure is the larger capture's own peak, not two graphs resident at once, and expandable segments already map memory on demand | Not taken up |
 
+## Fourth list (same day)
+
+| Idea | Assessment | Status |
+| --- | --- | --- |
+| **Fused pair repulsion (ZBL)** | The 28 October profile shows pair_repulsion_fn at 59 forward and 58 backward launches. Per step that is 157 µs on NaCl (4.7 % of kernel time), 168 µs on NbCl5 (0.6 %) and 188 µs on NaNbO3 (0.9 %), so the claimed 2 % on NaNbO3 is high. First check whether the compiled default graph still runs it unfused; the 59 launches may be eager or a fusion break. Prefer one exact fused kernel computing ZBL analytically (rounding class) over a Chebyshev table. A table is a `certified` approximation, and folding it into the radial tables only works where `radial_tables` (opt-in) is on | Worth a falsifier: small cells gain most |
+| **Spherical-harmonic gradient on chip in wprime_backward** (write the edge force, not dsh[E,16]) | Sound: the l <= 3 harmonic gradient is a short closed form, rounding class. dsh is a transient of 64 B/edge, so the gain is bandwidth plus one backward kernel. Check the SH-backward kernel time in the profile first | Measure first |
+| **segment_gemm with D as constexpr** | Confirmed in `fastmace/kernels/triton/segment_gemm.py`: D (1, 3, 5, 7) is a runtime argument and `r // D`, `r % D` run per row tile. A constexpr D gives one compiled variant per irrep, a general rule. The joined products also run one launch per irrep (a loop over dims), which bears on the third list's co-scheduling idea. Cheap, exact | Worth a quick A/B |
+| **Host-staged h1/dh1** | Same as T3 | Already taken up (after T1, T2) |
+| **Receivers from row_ptr instead of a stored array** | 4 B/edge. The neighbour list is about 1 % of the peak, and a row_ptr search adds work in the edge-owned kernels | Not taken up for now; revisit with the packed list under T3 |
+
 ## Not taken up
 
 | Idea | Reason |
