@@ -4,8 +4,8 @@
 # Jobs:
 #   bitwise: results/cap-t06-20261030/bitwise.py, reproducible float64 MH-1 NbCl5, each run a fresh process:
 #     2x2x2 (288 atoms), 300 steps with a restart at 150, before and after (after: the cap set to 16 steps); after,
-#     resumed from before's restart and from its own; 4x4x8 (9,216 atoms, the cap's own 151 steps), 200 steps with a
-#     restart at 100, before and after, and after resumed from before's restart;
+#     resumed from before's restart and from its own; 5x5x7 (6,300 atoms, the cap's own 221 steps), 300 steps with a
+#     restart at 270 (242 unused rows, more than one batch), before and after, and after resumed from before's restart (4x4x8 runs out of memory in float64);
 #   point-<side>-<structure>-<repeat>: tools/bench/capacity_scan.py point on side "after" (FM) or "before" (BEFORE);
 #   ab-<cell>-<order>: tools/ab_rewrites.py, a = NOISE_BATCH_BYTES 2**62 (256 steps, as before), b = the default;
 #     cell nbcl5 (3x3x3, 12 blocks of 300 steps) or big (NbCl5 4x4x8, 8 blocks of 100 steps after 100 warm-up
@@ -59,13 +59,14 @@ for job in "$@"; do
     bitwise) B0=${BEFORE:?set BEFORE}; D=$ROOT/bitwise; mkdir -p "$D"
       bitwise small-before "$B0" new "$D/r-small-before" NbCl5 2x2x2 300 150
       bitwise small-after "$FM" new "$D/r-small-after" NbCl5 2x2x2 300 150 16
+      rm -rf "$D/r-small-before-copy" "$D/r-small-after-copy"
       cp -r "$D/r-small-before" "$D/r-small-before-copy"; cp -r "$D/r-small-after" "$D/r-small-after-copy"
       bitwise small-after-from-before "$FM" resume "$D/r-small-before-copy" 150 16
       bitwise small-after-from-after "$FM" resume "$D/r-small-after-copy" 150 16
-      bitwise big-before "$B0" new "$D/r-big-before" NbCl5 4x4x8 200 100
-      bitwise big-after "$FM" new "$D/r-big-after" NbCl5 4x4x8 200 100
-      cp -r "$D/r-big-before" "$D/r-big-before-copy"
-      bitwise big-after-from-before "$FM" resume "$D/r-big-before-copy" 100 ;;
+      bitwise big-before "$B0" new "$D/r-big-before" NbCl5 5x5x7 300 270
+      bitwise big-after "$FM" new "$D/r-big-after" NbCl5 5x5x7 300 270
+      rm -rf "$D/r-big-before-copy"; cp -r "$D/r-big-before" "$D/r-big-before-copy"
+      bitwise big-after-from-before "$FM" resume "$D/r-big-before-copy" 30 ;;
     point-*) IFS=- read -r _ side structure repeat <<< "$job"
       pkg=$FM; [ "$side" = before ] && pkg=${BEFORE:?set BEFORE for before points}
       PYTHONPATH=$pkg run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure"           --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points" --tag "$side" ;;
