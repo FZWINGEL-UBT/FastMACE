@@ -19,6 +19,11 @@ saving anything but its inputs, and its backward recomputes one chunk at a time 
 input whose first dimension is the atom count is chunked, the others pass whole; the output must be one per-atom
 tensor. A plain call first gives the reference forces, then the measured call runs chunked.
 
+``--chunk-op`` is the production-shaped variant of the prototype: the chunked segment is an opaque custom op
+(``fastmace_probe::atom_chunked``, with a registered backward op), so the outer compiled graph stays whole, and each
+chunk runs through its own ``torch.compile``'d function (forward under ``no_grad``; recompute and backward with
+autograd).
+
 ``--compiled`` keeps the default compile mode and drops the markers (a hook would break the compiled graph): the
 call's peak only, measured on a second call after a first one compiled. ``--timing N`` then times N more calls
 (median, CUDA events).
@@ -53,6 +58,7 @@ def parse_args(argv=None):
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE", help="RewriteConfig overrides")
     p.add_argument("--chunk", nargs="*", default=[], metavar="MODULE", help="e.g. interaction1.gated_rows product1")
     p.add_argument("--chunks", type=int, default=8)
+    p.add_argument("--chunk-op", action="store_true", help="the custom-op variant with compiled chunks")
     p.add_argument("--compiled", action="store_true", help="default compile mode, no markers")
     p.add_argument("--timing", type=int, default=0, metavar="N", help="time N more force calls")
     return p.parse_args(argv)
@@ -60,6 +66,100 @@ def parse_args(argv=None):
 
 def forces_of(out):
     return out["forces"] if isinstance(out, dict) else out[1] if isinstance(out, tuple) else out
+
+
+_SEGMENTS = {}  # key -> (compiled chunk function, chunks, output trailing shape): the --chunk-op registry
+_OPS = {}
+
+
+def _chunk_ops():
+    """Register ``fastmace_probe::atom_chunked`` and its backward once."""
+    import torch
+
+    if _OPS:
+        return _OPS["forward"]
+
+    def bounds(natoms, chunks):
+        size = -(-natoms // chunks)
+        return [(start, min(start + size, natoms)) for start in range(0, natoms, size)]
+
+    def pieces(inputs, natoms, start, stop):
+        return [x[start:stop] if x.dim() and x.shape[0] == natoms else x for x in inputs]
+
+    @torch.library.custom_op("fastmace_probe::atom_chunked", mutates_args=())
+    def forward(inputs: list[torch.Tensor], key: int) -> torch.Tensor:
+        run, chunks, _ = _SEGMENTS[key]
+        natoms = inputs[0].shape[0]
+        with torch.no_grad():
+            return torch.cat([run(*pieces(inputs, natoms, a, b)) for a, b in bounds(natoms, chunks)])
+
+    @forward.register_fake
+    def _(inputs, key):
+        return inputs[0].new_empty((inputs[0].shape[0], *_SEGMENTS[key][2]))
+
+    @torch.library.custom_op("fastmace_probe::atom_chunked_backward", mutates_args=())
+    def backward(inputs: list[torch.Tensor], grad: torch.Tensor, wanted: list[bool], key: int) -> list[torch.Tensor]:
+        run, chunks, _ = _SEGMENTS[key]
+        natoms = inputs[0].shape[0]
+        grads = [torch.zeros_like(x) for x in inputs]
+        for a, b in bounds(natoms, chunks):
+            with torch.enable_grad():
+                part = [x.detach().requires_grad_(want) for x, want in zip(pieces(inputs, natoms, a, b), wanted)]
+                leaves = [x for x, want in zip(part, wanted) if want]
+                got = iter(torch.autograd.grad(run(*part), leaves, grad[a:b]))
+            for i, want in enumerate(wanted):
+                if want:
+                    g = next(got)
+                    if grads[i].dim() and grads[i].shape[0] == natoms:
+                        grads[i][a:b] += g
+                    else:
+                        grads[i] += g
+        return grads
+
+    @backward.register_fake
+    def _(inputs, grad, wanted, key):
+        return [torch.empty_like(x) for x in inputs]
+
+    def setup_context(ctx, inputs, output):
+        tensors, key = inputs
+        ctx.key = key
+        ctx.wanted = [bool(x.requires_grad and x.is_floating_point()) for x in tensors]
+        ctx.save_for_backward(*tensors)
+
+    def grad_fn(ctx, grad):
+        grads = backward(list(ctx.saved_tensors), grad, ctx.wanted, ctx.key)
+        return [g if want else None for g, want in zip(grads, ctx.wanted)], None
+
+    forward.register_autograd(grad_fn, setup_context=setup_context)
+    _OPS["forward"] = forward
+    return forward
+
+
+def atom_chunked_op(module, natoms, chunks):
+    """``module``'s forward through ``fastmace_probe::atom_chunked`` with a ``torch.compile``'d chunk function."""
+    import inspect
+
+    import torch
+
+    forward = module.forward
+    names = list(inspect.signature(forward).parameters)
+    op = _chunk_ops()
+    key = len(_SEGMENTS)
+    compiled = torch.compile(lambda *values: forward(**dict(zip(names, values))), dynamic=True)
+    _SEGMENTS[key] = [compiled, chunks, None]
+
+    def run(*args, **kwargs):
+        bound = inspect.signature(forward).bind(*args, **kwargs)
+        bound.apply_defaults()
+        values = [bound.arguments[name] for name in names]
+        assert all(torch.is_tensor(v) for v in values), names
+        if _SEGMENTS[key][2] is None:  # the output's trailing shape, from two atoms (outside any compile)
+            with torch.no_grad():
+                _SEGMENTS[key][2] = tuple(forward(**{n: v[:2] if v.dim() and v.shape[0] == natoms else v
+                                                     for n, v in zip(names, values)}).shape[1:])
+        return op(values, key)
+
+    return run
 
 
 def atom_chunked(module, natoms, chunks):
@@ -169,7 +269,7 @@ def main(argv=None):
             module = model
             for part in label.replace("interaction", "interactions.").replace("product", "products.").split("."):
                 module = module[int(part)] if part.isdigit() else getattr(module, part)
-            module.forward = atom_chunked(module, natoms, args.chunks)
+            module.forward = (atom_chunked_op if args.chunk_op else atom_chunked)(module, natoms, args.chunks)
     if args.compiled:  # the first call with the wrappers compiles; the measured call is the next one
         forces_of(engine.force_field(engine.state.positions))
 
@@ -256,7 +356,8 @@ def main(argv=None):
     peak = max(event["peak_since_previous"] for event in timeline)
     record = dict(tool="segment_peaks", structure=name, natoms=natoms, edges=int(engine.force_field.edge_count),
                   rewrites=rewrites, chunk=args.chunk, chunks=args.chunks if args.chunk else None,
-                  force_max_abs_difference=difference, compiled=args.compiled, call_ms=call_ms, call_times_ms=times,
+                  force_max_abs_difference=difference, compiled=args.compiled, chunk_op=args.chunk_op,
+                  call_ms=call_ms, call_times_ms=times,
                   gpu=torch.cuda.get_device_name(), allocated_before=base,
                   peak=peak, peak_over_before=peak - base, timeline=timeline,
                   saved_by_module={key: dict(value, per_atom_kB_per_atom=value["per_atom_bytes"] / natoms / 1e3)
@@ -266,6 +367,7 @@ def main(argv=None):
     tag = "".join(f"-{k}={v}" for k, v in rewrites.items())
     tag += (f"-chunks{args.chunks}-" + "+".join(args.chunk)) if args.chunk else ""
     tag += "-compiled" if args.compiled else ""
+    tag += "-op" if args.chunk_op else ""
     path = args.output / f"segments-{name}-{natoms}{tag}.json"
     path.write_text(json.dumps(record, indent=1, default=str) + "\n")
     gib = 2**30
