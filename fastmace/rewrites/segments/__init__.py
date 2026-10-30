@@ -40,6 +40,9 @@ from fastmace.rewrites.registry import CaseErrors, Rewrite, Support
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
 _PROBE_ROWS = 7
+# "combined": one checkpoint region per interaction from its gated_rows chain through its product block, so the joined
+# product basis between them is not kept (modules.join_region); "separate": each segment its own region (A/Bs).
+SEGMENT_REGION = "combined"
 
 
 def _modules():
@@ -73,10 +76,20 @@ def _support(model):
 
 
 def recompute_segments(model):
-    """Recompute every node-local segment of ``model`` in the backward; returns their names."""
+    """Recompute every node-local segment of ``model`` in the backward, in one region per interaction where it has a
+    ``gated_rows`` chain and ``SEGMENT_REGION`` is "combined"; returns their names."""
     m = _modules()
     names = []
+    joined = set()
+    if SEGMENT_REGION == "combined":
+        for index, interaction in enumerate(getattr(model, "interactions", ())):
+            if getattr(interaction, "gated_rows", None) is not None:
+                m.join_region(interaction, model.products[index])
+                joined.add(index)
+                names.append(f"interactions.{index}.gated_rows..products.{index} (one region)")
     for name, module in segments(model):
+        if int(name.split(".")[1]) in joined:
+            continue
         m.recompute(module)
         names.append(name)
     if not names:
@@ -90,6 +103,41 @@ def _probe(generator, rows, width, like):
     return torch.randn((rows, width), generator=generator, dtype=torch.float64).to(like)
 
 
+def _region_cases(rewritten, generator, cases):
+    """Each combined region against its stored chain, reshape and product block, on probe rows: the output and the
+    gradients of the chain's inputs and the skip term."""
+    import torch
+
+    elements = len(getattr(rewritten, "atomic_numbers", ())) or 1
+    dtype = None
+    for index, product in enumerate(getattr(rewritten, "products", ())):
+        if getattr(product, "region_widths", None) is None:
+            continue
+        like = rewritten.interactions[index].gated_rows.first.weight_0
+        x, y = (_probe(generator, _PROBE_ROWS, width, like) for width in product.region_widths)
+        species = torch.randint(0, elements, (_PROBE_ROWS,), generator=generator)
+        attrs = torch.nn.functional.one_hot(species, elements).to(like)
+
+        def stock(x, y, sc, product=product):
+            return product.recomputed_inner(product.region_reshape(product.region_chain(x, y)), sc, attrs)
+
+        with torch.no_grad():
+            shape = stock(x, y, None).shape
+        sc = _probe(generator, _PROBE_ROWS, math.prod(shape[1:]), like).view(shape)
+        leaves = [t.detach().requires_grad_() for t in (x, y, sc)]
+        grad = torch.randn(shape, generator=generator, dtype=torch.float64).to(like)
+        values = []
+        with torch.enable_grad():
+            joined = torch.cat(leaves[:2], dim=1)
+            for out in (stock(*leaves), product(node_feats=joined, sc=leaves[2], node_attrs=attrs)):
+                values.append((out.detach(), *torch.autograd.grad(out, leaves, grad)))
+        for a, b in zip(*values):
+            cases.add(f"interactions.{index}.gated_rows..products.{index}", a, b)
+        dtype = dtype or like.dtype
+        del values, leaves
+    return dtype
+
+
 def _selfcheck(original, rewritten, context):
     """Each recomputed segment against its stored forward on probe rows: the output and the gradients of its floating
     inputs. A product block's input is the reshaped output of its interaction's ``gated_rows`` probe."""
@@ -99,10 +147,12 @@ def _selfcheck(original, rewritten, context):
     generator = torch.Generator().manual_seed(context.seed + 41)
     cases, dtype = CaseErrors(), None
     elements = len(getattr(rewritten, "atomic_numbers", ())) or 1
+    dtype = _region_cases(rewritten, generator, cases)
     for name, module in segments(rewritten):
-        if getattr(module, "recomputed_inner", None) is None:
-            continue
         index = int(name.split(".")[1])
+        if (getattr(module, "recomputed_inner", None) is None
+                or getattr(rewritten.products[index], "region_widths", None) is not None):
+            continue
         chain = getattr(rewritten.interactions[index], "gated_rows", None)
         if chain is None:
             continue  # a product block's probe comes from its interaction's gated_rows chain
@@ -149,4 +199,4 @@ RECORDS = {
         workload_constraints=(), apply=_apply, selfcheck=_selfcheck, memory=memory_terms.recompute_node_segments),
 }
 
-__all__ = ["RECORDS", "recompute_segments", "segments"]
+__all__ = ["RECORDS", "SEGMENT_REGION", "recompute_segments", "segments"]

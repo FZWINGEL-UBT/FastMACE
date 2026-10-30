@@ -5,9 +5,9 @@ On the CPU in float64:
 - ``modules.recomputed_forward`` against the stored forward of a node-local module, values and input gradients,
   with arguments passed by keyword and a ``None``; it keeps fewer tensors for the backward;
 - a deep copy rebinds the recomputed forward and the stored one to the copy;
-- the record on a tiny MH-1-class cuEquivariance model (naive kernels): it recomputes every ``gated_rows`` chain
-  and product block, passes its self-check (and fails it for a wrong segment), and keeps the model's energy and
-  forces bitwise in eager.
+- the record on a tiny MH-1-class cuEquivariance model (naive kernels), with one region per interaction (the default)
+  and with separate segments: it recomputes every ``gated_rows`` chain and product block, survives a deep copy,
+  passes its self-check (and fails it for a wrong segment), and keeps the model's energy and forces bitwise in eager.
 """
 
 import copy
@@ -119,23 +119,40 @@ def _rewritten(recompute):
     return model, out, batch, resolution, applied
 
 
+REGIONS = pytest.mark.parametrize("region", ["combined", "separate"])
+
+
 @CUEQ
-def test_the_record_recomputes_every_segment_and_passes_its_selfcheck():
+@REGIONS
+def test_the_record_recomputes_every_segment_and_passes_its_selfcheck(monkeypatch, region):
+    monkeypatch.setattr(segments, "SEGMENT_REGION", region)
     original, model, _, resolution, applied = _rewritten("on")
     assert resolution.decision("recompute_node_segments").enabled
     entry = next(entry for entry in applied if entry.name == "recompute_node_segments")
     assert entry.result.passed and entry.result.max_relative_error == 0
-    names = [name for name, _ in segments.segments(model)]
-    assert names == [*(f"interactions.{i}.gated_rows" for i in range(len(model.interactions))),
-                     *(f"products.{i}" for i in range(len(model.products)))]
-    assert all(getattr(module, "recomputed_inner", None) is not None for _, module in segments.segments(model))
+    if region == "combined":  # one region per interaction: the chain and the reshape run inside the product's
+        for interaction, product in zip(model.interactions, model.products):
+            assert getattr(product, "region_widths", None) is not None
+            assert interaction.gated_rows.forward.__func__ is sm.joined_inputs
+            assert interaction.reshape.forward.__func__ is sm.passed_through
+            assert product.forward.__func__ is sm.region_forward
+    else:
+        assert all(module.forward.__func__ is sm.recomputed_forward for _, module in segments.segments(model))
+    twin = copy.deepcopy(model)  # the stored forwards rebind to the copy
+    for module in (twin.products[1], twin.interactions[1].gated_rows):
+        for name in ("recomputed_inner", "region_chain", "region_reshape"):
+            bound = getattr(module, name, None)
+            assert bound is None or bound.__self__ in set(twin.modules())
     product = model.products[1]
-    product.forward = lambda *args, **kwargs: sm.recomputed_forward(product, *args, **kwargs).roll(1, 0)  # rows mixed
+    wrapped = product.forward
+    product.forward = lambda *args, **kwargs: wrapped(*args, **kwargs).roll(1, 0)  # rows mixed
     assert not segments.RECORDS["recompute_node_segments"].selfcheck(original, model, reg.Context()).passed
 
 
 @CUEQ
-def test_energy_and_forces_are_bitwise_unchanged_in_eager():
+@REGIONS
+def test_energy_and_forces_are_bitwise_unchanged_in_eager(monkeypatch, region):
+    monkeypatch.setattr(segments, "SEGMENT_REGION", region)
     _, without, batch, _, _ = _rewritten("off")
     _, recomputed, _, _, _ = _rewritten("on")
     energy_and_forces(without, batch)  # throwaway evaluation (docs/development.md)

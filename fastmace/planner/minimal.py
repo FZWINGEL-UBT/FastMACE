@@ -996,7 +996,7 @@ class MinimalPlanner:
             parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: "on"})
             why = (f"on by rule 12: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory without it"
                    + ("" if name == memory.MEMORY_RESCUE[0] else
-                      f" and {', '.join(memory.MEMORY_RESCUE[:memory.MEMORY_RESCUE.index(name)])}")
+                      f", with {', '.join(memory.MEMORY_RESCUE[:memory.MEMORY_RESCUE.index(name)])} on")
                    + f"; turning {name} on saves about {saved / 2**20:.0f} MiB (CAP-T07, CAP-T08)")
             book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
             book.decide(f"RewriteConfig.{field}", "on", Reason(why, rule=12, code="rule-12-memory-rescue"))

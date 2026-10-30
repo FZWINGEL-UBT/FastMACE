@@ -9,8 +9,13 @@
 #   ab-<cell>-<order>: tools/ab_rewrites.py, a = the default plan (the record off), b = recompute_node_segments on;
 #     cell nbcl5 (3x3x3, 12 blocks of 300 steps) or big (NbCl5 4x4x8, 8 blocks of 100 steps after 100 warm-up
 #     steps); order ab (pattern abab) or ba (abba);
-#   point-<side>-<structure>-<repeat>: tools/bench/capacity_scan.py point, default plan, on side "after" (FM) or
-#     "before" (BEFORE): rule 12 and the memory rescue decide.
+#   region-ab-<cell>-<order>: as ab-*, both sides with the record on, a = SEGMENT_REGION "separate", b = "combined";
+#   point-<side>-<structure>-<repeat>[-separate]: tools/bench/capacity_scan.py point, default plan, on side "after"
+#     (FM) or "before" (BEFORE): rule 12 and the memory rescue decide; "-separate" sets SEGMENT_REGION "separate";
+#   saved-<region>: tools/bench/saved_tensors.py, compiled default plan with the record on, NbCl5 5x5x12;
+#   timeline-<region>: tools/bench/segment_peaks.py (eager), recompute_conv_weights on and the record on (region
+#     "none": the record off), NbCl5 5x5x12.
+# <region> is "combined" (the default) or "separate".
 # Before each job: no WSL compute process and utilisation <= 10 % in both nvidia-smi views for 30 s.
 # Template: results/cap-t06-20261030/local.sh.
 set -u -o pipefail
@@ -50,6 +55,13 @@ run() {  # name command...
   "$@" > "$ROOT/$name.log" 2>&1 < /dev/null
   note "end $name exit=$?"
 }
+launcher() {  # L: the Python command that runs a tool with SEGMENT_REGION set ("separate"; otherwise the default)
+  L=("$PY")
+  if [ "${1:-}" = separate ]; then
+    L=("$PY" -c "import runpy, sys; import fastmace; from fastmace.rewrites import segments; \
+segments.SEGMENT_REGION = 'separate'; sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')")
+  fi
+}
 note "fastmace=$(cat "$FM/.source_commit") before=$([ -n "$BEFORE" ] && cat "$BEFORE/.source_commit") host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 for job in "$@"; do
   case $job in
@@ -57,17 +69,30 @@ for job in "$@"; do
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --reference-command "$REF" --production-command "$PY" --rewrites recompute_node_segments=on ;;
     replay) PYTHONPATH=$FM run $job "$PY" "$FM/results/cap-t08-chunks-20261030/replay.py" "$ROOT/replay.json" 3x3x3 200 ;;
-    point-*) IFS=- read -r _ side structure repeat <<< "$job"
+    point-*) IFS=- read -r _ side structure repeat region <<< "$job"
       pkg=$FM; [ "$side" = before ] && pkg=${BEFORE:?set BEFORE for before points}
-      PYTHONPATH=$pkg run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
-          --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points" --tag "$side" ;;
-    ab-*-ab|ab-*-ba) IFS=- read -r _ cell order <<< "$job"
+      launcher "${region:-}"
+      PYTHONPATH=$pkg run "$job" "${L[@]}" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
+          --model mh1-r2scan --precision float32 --repeat "$repeat" --output "$ROOT/points" \
+          --tag "$side${region:+-$region}" ;;
+    ab-*-ab|ab-*-ba|region-ab-*-ab|region-ab-*-ba)
+      region=; [ "${job#region-}" != "$job" ] && region=yes
+      IFS=- read -r cell order <<< "${job#*ab-}"
       pattern=$([ "$order" = ab ] && echo abab || echo abba)
       structure=NbCl5; extra=()
       [ "$cell" = big ] && structure=NbCl5@4x4x8 && extra=(--warmup 100 --block 100 --blocks 8)
+      sides=(--b recompute_node_segments=on)
+      [ -n "$region" ] && sides=(--a recompute_node_segments=on --b recompute_node_segments=on
+                                 --a-constant "fastmace.rewrites.segments:SEGMENT_REGION='separate'")
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/ab/$job" --checkpoint "$CK" \
-          --model mh1-r2scan --structures "$structure" --b recompute_node_segments=on \
+          --model mh1-r2scan --structures "$structure" "${sides[@]}" \
           --order "$order" --pattern "$pattern" --prepare "${extra[@]}" ;;
+    saved-*) region=${job#saved-}; launcher "$region"
+      PYTHONPATH=$FM run "$job" "${L[@]}" "$FM/tools/bench/saved_tensors.py" --structure NbCl5 --repeat 5x5x12 \
+          --output "$ROOT/saved-$region" --rewrites recompute_conv_weights=on recompute_node_segments=on ;;
+    timeline-*) region=${job#timeline-}; on=on; [ "$region" = none ] && on=off; launcher "$region"
+      PYTHONPATH=$FM run "$job" "${L[@]}" "$FM/tools/bench/segment_peaks.py" --repeat 5x5x12 \
+          --output "$ROOT/timeline-$region" --rewrites recompute_conv_weights=on recompute_node_segments=$on ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
 done
