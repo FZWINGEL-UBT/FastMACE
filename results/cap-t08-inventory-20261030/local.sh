@@ -3,7 +3,8 @@
 #   python3 tools/ci/local_gpu.py run --purpose "fm CAP-T08 inventory (<15 min)" -- \
 #     env FM=<pinned source copy> bash results/cap-t08-inventory-20261030/local.sh ROOT JOB...
 # Jobs: saved:<structure>:<NXxNYxNZ>:<mode>[:<rewrites>] (tools/bench/saved_tensors.py, float32; mode default or
-# eager = compile_mode=none; rewrites FIELD=VALUE[,FIELD=VALUE]).
+# eager = compile_mode=none; rewrites FIELD=VALUE[,FIELD=VALUE]); kernels:<structure>:<NXxNYxNZ> (the conductor's
+# check 2: tools/bench/kernel_resources.py --smem-spilling, the plan's NVRTC kernels' local memory).
 # Before each job: no WSL compute process and utilisation <= 10 % in both nvidia-smi views for 30 s.
 # Template: results/capacity-16gb-20261029/local.sh.
 set -u -o pipefail
@@ -43,6 +44,8 @@ for job in "$@"; do
   case $kind in
     saved) "$PY" "$FM/tools/bench/saved_tensors.py" --structure "$structure" --repeat "$repeat" \
              --output "$ROOT/saved" "${opts[@]}" > "$ROOT/saved-$structure-$repeat-$mode${rewrites:+-$rewrites}.log" 2>&1 < /dev/null ;;
+    kernels) "$PY" "$FM/tools/bench/kernel_resources.py" --structure "$structure" --repeat "$repeat" \
+               --output "$ROOT/kernels" --smem-spilling > "$ROOT/kernels-$structure-$repeat.log" 2>&1 < /dev/null ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
   note "end $job exit=$?"
