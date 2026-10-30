@@ -34,7 +34,6 @@ Launch rule (``launch_rule``), from the device and the problem only:
 from __future__ import annotations
 
 import ctypes
-import itertools
 from dataclasses import dataclass
 
 import torch
@@ -49,7 +48,6 @@ CHANNEL_BLOCK = 32
 BLOCKS_PER_SM = 2  # blocks per SM over all slices of the grid (the persistent grid's size)
 
 _REGISTRY = {}
-_IDS = itertools.count()
 
 
 def _lit(value):
@@ -316,7 +314,7 @@ class FusedFoldedForward:
     def __init__(self, kernels, k, device=None, store_w=True):
         from cuda.bindings import driver
 
-        from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+        from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
         if "using scalar_t = float;" not in kernels.source:
             raise ValueError("fused_folded_forward needs float32 streaming kernels")
         schedule = kernels.schedule
@@ -336,7 +334,7 @@ class FusedFoldedForward:
         attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
         _check(driver.cuFuncSetAttribute(self._function, attribute, self.rule.shared_bytes))
         self.slices = (self.channels // CHANNEL_BLOCK) * self.rule.parts
-        self.id = next(_IDS)
+        self.id = content_id("FusedFoldedForward", self.source, self.rule, _device_key(device))
         _REGISTRY[self.id] = self
 
     def __call__(self, a, weight, x, sh, senders, receivers, row_ptr, out, w):

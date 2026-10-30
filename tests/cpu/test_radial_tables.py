@@ -186,3 +186,26 @@ def test_w_tables_equal_the_table_and_folded_product():
     with pytest.raises(PlanRefused, match="w_tables='on' requires radial_tables"):
         plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"),
                  rewrites=RewriteConfig(w_tables="on", radial_tables="off"))
+
+
+def test_padded_pieces_change_no_bit(monkeypatch):
+    """setup-across-compositions F1: the installed tables' pieces are rounded up to ``PIECE_BUCKET``; the padding
+    repeats the last piece, no bin reaches it, and values and gradients are bitwise the unpadded tables'."""
+    results = {}
+    for bucket in (1, radial.PIECE_BUCKET):
+        monkeypatch.setattr(radial, "PIECE_BUCKET", bucket)
+        _, model, batch, _, _ = _rewritten(True)
+        table = model.interactions[0].radial_table
+        assert table.coef.shape[1] % bucket == 0 and table.starts.shape[0] == table.coef.shape[1]
+        assert table.coef.shape[1] - table.pieces < bucket and int(table.bins.max()) < table.pieces
+        generator = torch.Generator().manual_seed(7)
+        edges = 500
+        lengths = (0.2 + 6.5 * torch.rand((edges, 1), generator=generator)).requires_grad_()
+        index = torch.randint(0, batch["node_attrs"].shape[0], (2, edges), generator=generator)
+        out, density = table(lengths, batch["node_attrs"], index)
+        grad, = torch.autograd.grad((out.sum() + density.sum()), lengths)
+        results[bucket] = (out.detach(), density.detach(), grad, table.pieces, table.coef.shape[1])
+    plain, padded = results[1], results[radial.PIECE_BUCKET]
+    assert plain[3] == padded[3] and plain[4] == plain[3]
+    for a, b in zip(plain[:3], padded[:3]):
+        assert torch.equal(a, b)

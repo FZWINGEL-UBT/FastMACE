@@ -8,7 +8,7 @@ Nothing here imports OpenEquivariance or ``cuda.bindings`` at module import.
 """
 
 import ctypes
-import itertools
+import hashlib
 
 import numpy as np
 import torch
@@ -19,7 +19,21 @@ LAYOUTS = ("mul_ir", "ir_mul")
 # custom op's arguments must be tensors or plain values. Entries are compiled kernels,
 # added by StreamingKernels and never changed; this is a registry, not a switch.
 _REGISTRY = {}
-_IDS = itertools.count()
+
+
+def content_id(*parts) -> int:
+    """A kernel registry id from what the kernel object computes: its class, CUDA source, launch settings and
+    device (``parts``). The compiled graphs pass the id as a constant, so an id that counted objects made every
+    build's graph differ and miss Inductor's FX cache (setup-across-compositions F1); equal kernels now get equal
+    ids, across builds and processes. A later object with the same content replaces the earlier one in its
+    registry, which is safe because both run the same code on the same device. Below 2**56: a plain int64."""
+    return int.from_bytes(hashlib.sha256(repr(parts).encode()).digest()[:7], "little")
+
+
+def _device_key(device=None):
+    device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
+    index = torch.cuda.current_device() if device.index is None else device.index
+    return index, torch.cuda.get_device_capability(index)
 
 
 def _check(result):
@@ -95,7 +109,8 @@ class StreamingKernels:
         self._forward = _check(driver.cuModuleGetFunction(self._module, b"oeq_projected_forward"))
         self._backward = _check(driver.cuModuleGetFunction(self._module, b"oeq_projected_backward"))
         self._backward_receiver = _check(driver.cuModuleGetFunction(self._module, b"oeq_projected_backward_receiver"))
-        self.id = next(_IDS)
+        self.id = content_id("StreamingKernels", self.source, layout, num_threads, self.receiver_backward,
+                             tuple(extra_options), _device_key())
         _REGISTRY[self.id] = self
 
     def _launch(self, function, blocks, values, types):

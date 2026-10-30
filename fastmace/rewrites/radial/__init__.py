@@ -53,6 +53,11 @@ CERTIFY_BOUND_64 = 1e-12
 # Their domain's lower end: exact in float32, as Triton passes the kernels' scalar bounds in float32 (0.3 rounds
 # up, and an edge at exactly 0.3 Å then reads as below the domain, with a zero slope).
 R_LO_64 = 0.25
+# The installed tables' piece count is rounded up to a multiple of this (setup-across-compositions F1). The table
+# shapes are static in the compiled graph, so compositions whose fits differ by a few pieces (NbCl5 53, TaCl5 52)
+# generated different code; padded, they share it. The extra pieces repeat the last one and no bin maps to them, so
+# every result is bitwise the same. 1: no padding (A/Bs).
+PIECE_BUCKET = 16
 CERTIFY_POINTS = 6000  # uniform and as many random lengths; the w-level tensors are [12000, 1280] float64
 FIXED_SPECIES_SUPERSET = "fixed_species_superset"
 
@@ -103,8 +108,30 @@ def _lengths_embedding(original):
     return LengthsEmbedding(original)
 
 
+def _padded(tables):
+    """``tables`` with the pieces rounded up to a multiple of ``PIECE_BUCKET`` by repeating the last piece (``coef``
+    and ``dcoef`` along their piece axis, ``starts`` and ``scales``); ``bins`` still maps only to the real pieces."""
+    import torch
+
+    pieces = tables["coef"].shape[1]
+    extra = -pieces % max(int(PIECE_BUCKET), 1)
+    if not extra:
+        return tables
+
+    def repeat_last(tensor, axis):
+        last = tensor.narrow(axis, tensor.shape[axis] - 1, 1)
+        return torch.cat([tensor, last.expand(*[extra if i == axis else n for i, n in enumerate(tensor.shape)])],
+                         dim=axis).contiguous()
+
+    return dict(tables, coef=repeat_last(tables["coef"], 1), dcoef=repeat_last(tables["dcoef"], 1),
+                starts=repeat_last(tables["starts"], 0), scales=repeat_last(tables["scales"], 0))
+
+
 def _table_module(tables, columns, device):
     import torch
+
+    pieces = tables["coef"].shape[1]
+    tables = _padded(tables)
 
     class RadialTableModule(torch.nn.Module):
         """One interaction's tables: ``forward(lengths, node_attrs, edge_index) -> (folded input, edge density)``."""
@@ -116,6 +143,7 @@ def _table_module(tables, columns, device):
             self.register_buffer("columns", torch.as_tensor(columns, dtype=torch.long, device=device),
                                  persistent=False)
             self.species = len(columns)
+            self.pieces = pieces  # fitted; coef.shape[1] is padded to PIECE_BUCKET
             self.r_lo, self.bin_scale, self.r_max = tables["r_lo"], tables["bin_scale"], tables["r_max"]
             self.fit_error = tables["fit_error"]
             self.certificate = {}
@@ -132,8 +160,8 @@ def _table_module(tables, columns, device):
                                 self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max)
 
         def extra_repr(self):
-            return (f"pairs={self.coef.shape[0]}, pieces={self.coef.shape[1]}, degree={self.coef.shape[2] - 1}, "
-                    f"r=[{self.r_lo}, {self.r_max})")
+            return (f"pairs={self.coef.shape[0]}, pieces={self.pieces} (padded to {self.coef.shape[1]}), "
+                    f"degree={self.coef.shape[2] - 1}, r=[{self.r_lo}, {self.r_max})")
 
     return RadialTableModule()
 
@@ -520,7 +548,7 @@ def tabulate_radials(model, context):
         table = _table_module(tables, columns, parameter.device)
         table.certificate = certificate
         interaction.radial_table = table
-        names.append(f"interactions.{index} ({table.coef.shape[1]} pieces, {len(pairs)} pairs, "
+        names.append(f"interactions.{index} ({table.pieces} pieces, {len(pairs)} pairs, "
                      f"certificate {table.certificate['worst']:.2f}, {source})")
     model.radial_embedding = _lengths_embedding(model.radial_embedding)
     return names
@@ -843,5 +871,5 @@ RECORDS = {
         memory=memory_terms.recompute_conv_weights),
 }
 
-__all__ = ["DEGREE", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
+__all__ = ["DEGREE", "PIECE_BUCKET", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
            "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]

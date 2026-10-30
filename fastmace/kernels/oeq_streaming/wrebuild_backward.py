@@ -21,7 +21,6 @@ receiver is outside ``[0, N)`` (the neighbour list's padding) contribute nothing
 from __future__ import annotations
 
 import ctypes
-import itertools
 
 import torch
 
@@ -41,7 +40,6 @@ from fastmace.kernels.oeq_streaming.fused_forward import (
 EDGE_CHUNK = 64  # edges per work chunk (eight batches)
 
 _REGISTRY = {}
-_IDS = itertools.count()
 
 
 def staging_floats(k, edge_dim, batch=BATCH):
@@ -252,7 +250,7 @@ class WRebuildBackward:
     def __init__(self, kernels, k, terms, device=None, parts=None, batch=BATCH):
         from cuda.bindings import driver
 
-        from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+        from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
         if "using scalar_t = float;" not in kernels.source:
             raise ValueError("wrebuild_backward needs float32 streaming kernels")
         schedule = kernels.schedule
@@ -270,7 +268,7 @@ class WRebuildBackward:
         attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
         _check(driver.cuFuncSetAttribute(self._function, attribute, self.rule.shared_bytes))
         self.slices = (self.channels // CHANNEL_BLOCK) * self.rule.parts
-        self.id = next(_IDS)
+        self.id = content_id("WRebuildBackward", self.source, self.rule, _device_key(device))
         _REGISTRY[self.id] = self
 
     def __call__(self, a, weight, x, sh, senders, receivers, dout, r, pair, gprime, starts, scales, bins, r_lo,
