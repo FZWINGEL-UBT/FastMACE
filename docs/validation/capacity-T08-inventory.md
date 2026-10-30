@@ -220,3 +220,53 @@ SASS with nvdisasm:
 **Verdict: stopped by its first rule.** ptxas accepts the instruction for sm_120 but splits it into two FFMAs.
 Consumer Blackwell has no packed FP32 FMA; only sm_100 does. So there is nothing to time on the RTX 5060 Ti, and
 grepping our cubins for FFMA2 is moot.
+
+## B. Interaction-boundary checkpointing (CAP-T08's per-atom side)
+
+**Candidate.** Keep only the node state between the interactions, and rebuild each interaction's intermediates in
+the backward. The first falsifier, as asked: in the eager tier, wrap interaction 1 (then interactions 0 and 1) and
+its product block in `torch.utils.checkpoint` (non-reentrant, no RNG stash).
+
+**Tool:** `tools/bench/checkpoint_falsifier.py`.
+
+- **What it times.** The wrappers go on the modules' bound forwards, which the MH-1 rewrites replace per instance.
+  The captured graphs were taken before any wrapper, so the measured unit is the eager force call (forward and the
+  force backward) of the engine's force field, not the step.
+- **How.** 8 alternating rounds in one process (medians), recording the call's time and its peak allocation above
+  the memory held before it.
+
+**NbCl5 4×4×13** (14,976 atoms, 397,256 edges at the cutoff), RTX 5060 Ti, `compile_mode=none`:
+
+| Variant | Force call | Peak above the call's start | Largest force difference |
+| --- | ---: | ---: | ---: |
+| none | 629.3 ms | 5.93 GiB | 0 |
+| interaction 1 + product 1 checkpointed | 673.0 ms, 1.07× | 6.53 GiB, **1.10×** | 1.0 × 10⁻⁶ eV/Å |
+| interactions 0 and 1 + products checkpointed | 640.0 ms, 1.02× | 5.71 GiB, **0.96×** | 1.0 × 10⁻⁶ eV/Å |
+
+**Verdict: stopped by the rule.** The peak falls by 3.6 % at best, and checkpointing one layer raises it by 10 %;
+the bar was a 40 % fall.
+
+- **Why the peak barely moves.** MH-1 has two interactions, and interaction 1 holds most of the node state, as
+  well as w when recompute is off. The force call's peak is in interaction 1's backward. Checkpointing at the
+  interaction boundary rebuilds exactly those intermediates at exactly that moment, beside the gradients already
+  alive there, so the peak barely changes.
+- **The extra 10 % with one checkpointed layer** is the checkpoint's own copy of the layer's inputs while the
+  recomputed intermediates are alive.
+- **What would be needed.** A per-atom memory mode would have to split inside interaction 1, keeping fewer of the
+  per-atom holders of section 1 (the symmetric contraction's inputs, the gated products). That is a finer
+  segmentation than the falsifier, and outside this check.
+- **The step-time cost** was small here (1.02-1.07× of an eager force call), but cost does not decide it: memory
+  does not fall.
+
+## Summary
+
+| Check | Result |
+| --- | --- |
+| 1. Saved-tensor inventory | **w is 93 % of the saved per-edge bytes** (5.1 GiB at 32k atoms); CAP-T07 removes it from the saved set. Per atom: 174.5 kB saved plus 134-139 kB of backward working set; four holder groups above 0.5 GiB each at 32k atoms, all for the feature adjoint |
+| 2. w rebuilt in the wprime backward | stopped: 1.16-1.20× today's forward plus backward (bar 1.08); dominates CAP-T07's 1.63-1.75× and also removes the forward's w transient. A follow-up could implement `recompute_conv_weights` with it |
+| 3. Shared-memory spilling, the stack limit | stopped: no NVRTC kernel in the float32 plan spills or uses stack; the limit is the 1,024 B default |
+| A. FFMA2 | stopped: sm_120 splits `fma.rn.f32x2` into two FFMAs; FFMA2 is sm_100 only |
+| B. Interaction-boundary checkpointing | stopped: the peak falls 3.6 % at best (bar 40 %) |
+
+No library default changed. The code added here is opt-in only: `FusedFoldedForward(store_w=False)` (default
+`True`), `wrebuild_backward.py`, and the tools.
