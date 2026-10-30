@@ -39,6 +39,19 @@ From the earlier review (same day):
 - **Unused model outputs held through the backward:** screen running in the neighbour-list session.
 - **Inductor `memory_planning`:** screen running in the neighbour-list session.
 
+## Third list (same day, all claimed exact on the existing models)
+
+| Idea | Assessment | Status |
+| --- | --- | --- |
+| **Edge-virial stress** (sum r_e ⊗ dE/dr_e in the edge backward epilogue) instead of the strain graph (`single_graph_strain`) | Sound for models whose energy depends on positions only through edge vectors; the tiled path already assembles stress this way. Rounding class, not bitwise as claimed. Gains only where stress is computed (NPT, cell relaxations). Models with cell-dependent terms (PolarMACE k-space, D3 on the cell) keep the strain path | Worth a falsifier: stress against the strain path on 20 configurations, and NPT step time with and without |
+| **Static liveness slab for graph activations** | The capture-time allocator from the pool study, reached via FX. FX does not see allocations inside external ops (OEq, cuEq, cuBLAS workspaces), which hold the largest blocks. Up to 1.47 GiB in the offline replay, but a process-wide allocator constraint. Less urgent now that the tiled path exists | Owner decision (SPEC 18), not started |
+| **Morton or Hilbert tile order** in the tiled path | Tiles come from spatial blocks in index order. A tile's halo working set (about 4,096 + H atoms at 8 kB) is larger than the 32-48 MB L2, so cross-tile L2 reuse is small. The 15-22 % claim is unlikely, but it is cheap to try | Optional quick A/B inside T1 |
+| **Packed shifts and CSR neighbour list** | The list is about 1 % of the whole-system peak since CAP-T09, so there is no capacity gain there. Shift values are bounded only for cells larger than the cutoff, so packing must handle small cells. Becomes relevant when the tiled path with host-staged h1 (T3) makes the list the limit | Revisit with T3 |
+| **Co-scheduled irrep tiles in segment_gemm** | segment_gemm already launches one 2D grid per call. Whether irreps are separate calls, and whether a tail dip exists, needs a profile look before any work | Check the profile first |
+| **Skipping the displacement check for K steps after a rebuild** | Langevin noise is unbounded, so there is no kinematic certainty. The check is already inside the captured step and its flag read is pipelined, so the saving is small. A wrong skip gives silently wrong forces | Not taken up |
+| **Peer-to-peer multi-GPU tiling across workstations** | leto, murphy and trillian each have one GPU. Peer-to-peer copies need GPUs in one machine, and cross-machine exchange would be networking. Spreading one production run over several GPUs is also not wanted (Langevin production is sequential) | Not taken up |
+| **cuMemMap growth for edge buffers on recapture** | The premise does not hold here. Idea 5 showed the limit failure is the larger capture's own peak, not two graphs resident at once, and expandable segments already map memory on demand | Not taken up |
+
 ## Not taken up
 
 | Idea | Reason |
