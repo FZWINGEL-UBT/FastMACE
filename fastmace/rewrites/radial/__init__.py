@@ -843,5 +843,5 @@ RECORDS = {
         memory=memory_terms.recompute_conv_weights),
 }
 
-__all__ = ["DEGREE", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES", "attach_recompute",
-           "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]
+__all__ = ["DEGREE", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
+           "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]
