@@ -18,6 +18,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   (`fallback.memory_rescue`; a sticky CUDA context raises the error with the fix).
 - The graph engine keeps the large buffers of its capture and warm-up snapshots in pinned host memory (CAP-T05),
   about 0.5 GiB less at the force stage's peak on large cells.
+- Leaner neighbour list (plans/capacity.md CAP-T09, exact): int32 candidate indices, and no stored candidate
+  shifts (compaction computes them from the unit shifts and the build cell, bitwise); 60 instead of 104 bytes per
+  slot in float32. The GPU build decides its screened pairs in chunks, so a rebuild's temporaries drop from about
+  170 to about 50 bytes per pair. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 49,248 to 51,840 atoms.
 
 - `EngineConfig.force_graphs` (`"auto"`, `"keep"`, `"fit"`, `"one"`): near the GPU memory limit the graph engine
   releases its captured graphs and their pool before capturing a force graph at a larger padded edge size, so one

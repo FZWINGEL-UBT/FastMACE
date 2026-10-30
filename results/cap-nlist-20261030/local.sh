@@ -22,7 +22,7 @@ PYT=$HOME/environments/mace_cueq_latest/bin/python
 CACHE=$HOME/fastmace-cache/cap-nlist-local
 WSMI=/mnt/c/Windows/System32/nvidia-smi.exe
 CK=$HOME/models/mace-mh-1.model
-mkdir -p "$ROOT/tmp" "$CACHE"
+mkdir -p "$ROOT/tmp" "$ROOT/ab" "$CACHE"
 export PYTHONDONTWRITEBYTECODE=1 FASTMACE_CACHE=$CACHE FASTMACE_MODELS=$HOME/models \
   FASTMACE_STRUCTURES=$B TORCHINDUCTOR_CACHE_DIR=$CACHE/inductor TRITON_CACHE_DIR=$CACHE/triton \
   MACE_COMPILE_CACHE=$CACHE/compile XDG_CACHE_HOME=$CACHE/xdg TMPDIR=$ROOT/tmp TMP=$ROOT/tmp TEMP=$ROOT/tmp \
