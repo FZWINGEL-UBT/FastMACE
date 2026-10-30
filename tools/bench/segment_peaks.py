@@ -58,9 +58,12 @@ def forces_of(out):
 
 def atom_chunked(module, natoms, chunks):
     """``module``'s forward on atom chunks, saving only its inputs; the backward recomputes chunk by chunk."""
+    import inspect
+
     import torch
 
     forward = module.forward
+    names = list(inspect.signature(forward).parameters)
     size = -(-natoms // chunks)
     bounds = [(start, min(start + size, natoms)) for start in range(0, natoms, size)]
 
@@ -73,7 +76,7 @@ def atom_chunked(module, natoms, chunks):
             ctx.save_for_backward(*[x if torch.is_tensor(x) else None for x in inputs])
             ctx.others = [None if torch.is_tensor(x) else x for x in inputs]
             with torch.no_grad():
-                out = torch.cat([forward(*pieces(inputs, a, b)) for a, b in bounds])
+                out = torch.cat([call(pieces(inputs, a, b)) for a, b in bounds])
             assert out.shape[0] == natoms
             return out
 
@@ -86,7 +89,7 @@ def atom_chunked(module, natoms, chunks):
                 with torch.enable_grad():
                     part = [x.detach().requires_grad_(want) if torch.is_tensor(x) else x
                             for x, want in zip(pieces(inputs, a, b), wanted)]
-                    out = forward(*part)
+                    out = call(part)
                     leaves = [x for x, want in zip(part, wanted) if want]
                     got = iter(torch.autograd.grad(out, leaves, grad[a:b]))
                 for i, want in enumerate(wanted):
@@ -98,8 +101,13 @@ def atom_chunked(module, natoms, chunks):
                             grads[i] += g
             return tuple(grads)
 
-    def run(*inputs):
-        return AtomChunked.apply(*inputs)
+    def call(values):
+        return forward(**dict(zip(names, values)))
+
+    def run(*args, **kwargs):
+        bound = inspect.signature(forward).bind(*args, **kwargs)
+        bound.apply_defaults()
+        return AtomChunked.apply(*(bound.arguments[name] for name in names))
 
     return run
 
