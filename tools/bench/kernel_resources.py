@@ -12,7 +12,10 @@ steps, then lists
   options (``--use_fast_math``); OEq keeps its function handles in C++.
 
 The WSL2 reservation of a kernel is its local bytes per thread times the threads per SM times the SMs
-(``reservation_bytes``); the tool ranks by it. With ``--smem-spilling`` it compiles each source again with the PTX
+(``reservation_bytes``); the tool ranks by it. It also reads the stack limit (``cudaLimitStackSize``) after the
+build and the steps, sets it down to the largest local size of the loaded FastMACE kernels, and records the device
+memory outside PyTorch's allocator (``total - free - reserved``) before and after (``stack``). With
+``--smem-spilling`` it compiles each source again with the PTX
 pragma ``enable_smem_spilling`` at the start of every kernel (CUDA 13) and reports the same numbers. Writes
 ``<output>/kernels-<name>-<precision>-<atoms>.json``. Run inside a local GPU reservation.
 """
@@ -98,6 +101,26 @@ def function_attributes(function):
     return {key: int(driver.cuFuncGetAttribute(attribute, function)[1]) for key, attribute in names.items()}
 
 
+def outside_allocator():
+    import torch
+
+    free, total = torch.cuda.mem_get_info()
+    return int(total - free - torch.cuda.memory_reserved())
+
+
+def stack_limit():
+    from cuda.bindings import runtime
+
+    error, value = runtime.cudaDeviceGetLimit(runtime.cudaLimit.cudaLimitStackSize)
+    return int(value) if int(error) == 0 else None
+
+
+def set_stack_limit(value):
+    from cuda.bindings import runtime
+
+    return int(runtime.cudaDeviceSetLimit(runtime.cudaLimit.cudaLimitStackSize, int(value))[0])
+
+
 def fastmace_kernels():
     """(owner label, object with ``.source``, {attribute name: CUfunction}) of every compiled FastMACE kernel."""
     from cuda.bindings import driver
@@ -175,13 +198,25 @@ def main(argv=None):
     for path, kind, source in oeq_kernels(model):
         add(path, f"oeq:{kind}", source, ("--split-compile=0", "--use_fast_math"))
     rows.sort(key=lambda row: -row["reservation_bytes"])
+    # The conductor's stack-limit check: down to what the loaded FastMACE kernels need, after setup.
+    torch.cuda.synchronize()
+    loaded = max((row["local"] for row in rows if row["kind"] == "loaded"), default=0)
+    stack = dict(limit_after_setup=stack_limit(), outside_before=outside_allocator(), set_to=max(loaded, 1024))
+    stack["set_error"] = set_stack_limit(stack["set_to"])
+    torch.cuda.synchronize()
+    sim.run(steps=2)
+    torch.cuda.synchronize()
+    stack.update(limit_after=stack_limit(), outside_after=outside_allocator())
     record = dict(tool="kernel_resources", structure=name, natoms=len(atoms), precision=args.precision,
                   gpu=properties.name, capability=capability, threads=threads, rewrites=rewrites,
-                  smem_spilling=args.smem_spilling, kernels=rows)
+                  smem_spilling=args.smem_spilling, stack=stack, kernels=rows)
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"kernels-{name}-{args.precision}-{len(atoms)}.json"
     path.write_text(json.dumps(record, indent=1, default=str) + "\n")
     print(f"{properties.name}: {threads} resident threads; {len(rows)} kernels ({path})")
+    print(f"stack limit after setup {stack['limit_after_setup']} B; set to {stack['set_to']} B (error "
+          f"{stack['set_error']}), now {stack['limit_after']} B; outside the allocator "
+          f"{stack['outside_before'] / 2**20:.0f} -> {stack['outside_after'] / 2**20:.0f} MiB")
     for row in rows[:40]:
         extra = row.get("smem_spilling")
         after = (f" | pragma: stack {extra.get('stack')} B, spills {extra.get('spill_stores')}/"
