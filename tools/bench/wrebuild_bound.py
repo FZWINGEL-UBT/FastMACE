@@ -56,6 +56,7 @@ def main(argv=None):
     import fastmace as fm
     from fastmace.kernels.oeq_streaming import wprime_backward as wp
     from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward, fused_folded_forward
+    from fastmace.kernels.oeq_streaming.wrebuild_backward import WRebuildBackward
     from fastmace.kernels.triton.radial_table import radial_table_forward
 
     name, cell = capacity_scan.base_cell(args.structure)
@@ -96,6 +97,7 @@ def main(argv=None):
         a, _ = radial_table_forward(r, pair, table.coef, table.starts, table.scales, table.bins, *consts)
         senders32, receivers32 = senders.to(torch.int32), receivers.to(torch.int32)
         nostore = FusedFoldedForward(kernels, a.shape[1], x.device, store_w=False)
+        rebuild = WRebuildBackward(kernels, a.shape[1], module.gprime.shape[1], x.device)
         out = x.new_empty((x.shape[0], nostore.output_dim))
         dummy = x.new_empty((1,))
         _, w = fused_folded_forward(a, weight, x, sh, senders32, receivers32, row_ptr, fused.id)
@@ -112,9 +114,20 @@ def main(argv=None):
             "backward_recompute": lambda: wp.streaming_conv_wprime_backward_recompute(
                 x, sh, senders32, receivers32, dout, r, pair, module.gprime, table.coef, weight, table.starts,
                 table.scales, table.bins, *consts, module.kernel.id, interaction_rows),
+            "backward_rebuild": lambda: rebuild(a, weight, x, sh, senders32, receivers32, dout, r, pair,
+                                                module.gprime, table.starts, table.scales, table.bins, *consts),
             "w_read": lambda: w.sum(),
             "gemm": lambda: torch.matmul(a, weight.t(), out=wbuf),
         }
+        # The candidate against today's backward on the stored w: dx, dsh and dL/dr (rounding-class: another
+        # summation order; w itself is bitwise the forward's).
+        reference = parts["backward"]()
+        candidate = parts["backward_rebuild"]()
+        errors = {}
+        for label, ref, got in zip(("dx", "dsh", "dr"), reference, candidate):
+            scale = float(ref.abs().max())
+            errors[label] = dict(max_abs=float((got - ref).abs().max()), scale=scale,
+                                 relative=float((got - ref).abs().max()) / scale if scale else 0.0)
         times = {key: [] for key in parts}
         for fn in parts.values():
             fn()
@@ -132,10 +145,12 @@ def main(argv=None):
     today = med["forward"] + med["backward"]
     recompute = med["forward"] + med["backward_recompute"]
     bound = med["forward_nostore"] + max(0.0, med["backward"] - med["w_read"]) + med["gemm"]
+    candidate_ms = med["forward_nostore"] + med["backward_rebuild"]
     record = dict(tool="wrebuild_bound", structure=name, natoms=len(atoms), edges=int(w.shape[0]),
                   q=int(w.shape[1]), k=int(a.shape[1]), gpu=torch.cuda.get_device_name(), rounds=args.rounds,
                   chunk_rows=interaction_rows, median_ms=med, today_ms=today, recompute_ms=recompute,
                   bound_ms=bound, recompute_ratio=recompute / today, bound_ratio=bound / today,
+                  candidate_ms=candidate_ms, candidate_ratio=candidate_ms / today, errors=errors,
                   times_ms=times)
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"wrebuild-{name}-{len(atoms)}.json"
@@ -146,6 +161,10 @@ def main(argv=None):
     print(f"  today (forward + backward)            {today:8.3f} ms")
     print(f"  CAP-T07 (forward + backward_recompute) {recompute:8.3f} ms = {recompute / today:.3f} x today")
     print(f"  rebuild bound (nostore + backward - w_read + gemm) {bound:8.3f} ms = {bound / today:.3f} x today")
+    print(f"  candidate (forward_nostore + backward_rebuild) {candidate_ms:8.3f} ms = {candidate_ms / today:.3f} x today")
+    for label, values in errors.items():
+        print(f"  {label}: max |candidate - today| {values['max_abs']:.3e} of max |today| {values['scale']:.3e} "
+              f"({values['relative']:.2e})")
     sim.close()
     sys.stdout.flush()  # os._exit skips the buffers of a redirected stdout
     os._exit(0)
