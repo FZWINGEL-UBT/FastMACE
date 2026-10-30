@@ -48,7 +48,8 @@ def parse_args(argv=None):
 
 
 def _site(stack):
-    """The innermost frame inside the model's packages (not this tool, not torch's autograd), and the next four."""
+    """The innermost frame inside the model's packages (not this tool, nor torch's autograd and custom-op wrappers), and
+    the next four."""
     def short(frame):
         name = frame.filename
         for package in PACKAGES:
@@ -59,7 +60,8 @@ def _site(stack):
         return f"{name}:{frame.lineno} {frame.name}"
 
     inner = [f for f in reversed(stack) if any("/" + p in f.filename for p in PACKAGES)
-             and "tools/bench" not in f.filename and "torch/autograd" not in f.filename]
+             and "tools/bench" not in f.filename and "torch/autograd" not in f.filename
+             and "torch/_library" not in f.filename]
     if not inner:
         return "unattributed", []
     return short(inner[0]), [short(f) for f in inner[1:5]]
@@ -180,6 +182,7 @@ def main(argv=None):
               f"{'peak' if row['alive_at_peak'] else '    '} {row['dtype']:8s} {str(row['shape']):22s} "
               f"{row['grad_fn'][:24]:24s} {row['site']}")
     sim.close()
+    sys.stdout.flush()  # os._exit skips the buffers of a redirected stdout
     os._exit(0)
 
 
