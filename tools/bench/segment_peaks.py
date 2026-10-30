@@ -19,6 +19,10 @@ saving anything but its inputs, and its backward recomputes one chunk at a time 
 input whose first dimension is the atom count is chunked, the others pass whole; the output must be one per-atom
 tensor. A plain call first gives the reference forces, then the measured call runs chunked.
 
+``--compiled`` keeps the default compile mode and drops the markers (a hook would break the compiled graph): the
+call's peak only, measured on a second call after a first one compiled. ``--timing N`` then times N more calls
+(median, CUDA events).
+
 Writes ``<output>/segments-<name>-<atoms><tag>.json`` and prints the timeline with its peaks. Run inside a local GPU
 reservation.
 """
@@ -49,6 +53,8 @@ def parse_args(argv=None):
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE", help="RewriteConfig overrides")
     p.add_argument("--chunk", nargs="*", default=[], metavar="MODULE", help="e.g. interaction1.gated_rows product1")
     p.add_argument("--chunks", type=int, default=8)
+    p.add_argument("--compiled", action="store_true", help="default compile mode, no markers")
+    p.add_argument("--timing", type=int, default=0, metavar="N", help="time N more force calls")
     return p.parse_args(argv)
 
 
@@ -147,7 +153,8 @@ def main(argv=None):
     rewrites = {k: capacity_scan._value(v) for k, v in (item.split("=", 1) for item in args.rewrites)}
     field = fm.ForceField(fm.load(args.model), atoms, precision="float32",
                           **({"rewrites": RewriteConfig(**rewrites)} if rewrites else {}))
-    sim = fm.Simulation(atoms, field, seed=1, engine=EngineConfig(compile_mode="none"),
+    engine_config = EngineConfig() if args.compiled else EngineConfig(compile_mode="none")
+    sim = fm.Simulation(atoms, field, seed=1, engine=engine_config,
                         integrator=fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0,
                                                            friction_per_fs=0.002))
     sim.run(steps=2)
@@ -163,6 +170,8 @@ def main(argv=None):
             for part in label.replace("interaction", "interactions.").replace("product", "products.").split("."):
                 module = module[int(part)] if part.isdigit() else getattr(module, part)
             module.forward = atom_chunked(module, natoms, args.chunks)
+    if args.compiled:  # the first call with the wrappers compiles; the measured call is the next one
+        forces_of(engine.force_field(engine.state.positions))
 
     marked = []
     for i, interaction in enumerate(model.interactions):
@@ -200,7 +209,8 @@ def main(argv=None):
             for t in ins[:1]:
                 t.register_hook(lambda grad, label=label: mark(f"{label} backward end"))
 
-        handles += [module.register_forward_pre_hook(pre), module.register_forward_hook(post)]
+        if not args.compiled:
+            handles += [module.register_forward_pre_hook(pre), module.register_forward_hook(post)]
 
     def pack(tensor):
         if active["on"] and tensor.device.type == "cuda":
@@ -225,6 +235,15 @@ def main(argv=None):
     active["on"] = False
     difference = None if reference is None else float((forces_of(out) - reference).abs().max())
     del out
+    times = []
+    for _ in range(args.timing):
+        start, stop = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        start.record()
+        forces_of(engine.force_field(engine.state.positions))
+        stop.record()
+        stop.synchronize()
+        times.append(start.elapsed_time(stop))
+    call_ms = sorted(times)[len(times) // 2] if times else None
     for handle in handles:
         handle.remove()
 
@@ -237,7 +256,8 @@ def main(argv=None):
     peak = max(event["peak_since_previous"] for event in timeline)
     record = dict(tool="segment_peaks", structure=name, natoms=natoms, edges=int(engine.force_field.edge_count),
                   rewrites=rewrites, chunk=args.chunk, chunks=args.chunks if args.chunk else None,
-                  force_max_abs_difference=difference, gpu=torch.cuda.get_device_name(), allocated_before=base,
+                  force_max_abs_difference=difference, compiled=args.compiled, call_ms=call_ms, call_times_ms=times,
+                  gpu=torch.cuda.get_device_name(), allocated_before=base,
                   peak=peak, peak_over_before=peak - base, timeline=timeline,
                   saved_by_module={key: dict(value, per_atom_kB_per_atom=value["per_atom_bytes"] / natoms / 1e3)
                                    for key, value in by_module.items()},
@@ -245,11 +265,14 @@ def main(argv=None):
     args.output.mkdir(parents=True, exist_ok=True)
     tag = "".join(f"-{k}={v}" for k, v in rewrites.items())
     tag += (f"-chunks{args.chunks}-" + "+".join(args.chunk)) if args.chunk else ""
+    tag += "-compiled" if args.compiled else ""
     path = args.output / f"segments-{name}-{natoms}{tag}.json"
     path.write_text(json.dumps(record, indent=1, default=str) + "\n")
     gib = 2**30
     print(f"{name} {natoms} atoms, {record['edges']} edges, eager: before {base / gib:.3f} GiB, peak "
           f"{peak / gib:.3f} GiB ({(peak - base) / gib:.3f} above) ({path})")
+    if call_ms is not None:
+        print(f"force call {call_ms:.2f} ms (median of {len(times)})")
     if args.chunk:
         print(f"chunked on {args.chunks} atom chunks: {', '.join(args.chunk)}; max |dF| {difference:.2e} eV/A")
     for event in timeline:
