@@ -497,12 +497,18 @@ def test_buckets_equal_baseline(baseline):
     assert torch.equal(inverse_3x3(m), baseline.inverse_3x3(m))
 
 
-def test_pair_screen_raises_when_its_launch_did_not_run():
-    """The screen's first program sets ``launched``; a launch that was skipped (Triton's launcher dropped grids
-    above 2**31 blocks without an error) raises instead of giving a list without pairs."""
-    from fastmace.neighbors.pair_search import check_launched
+def test_an_empty_screen_with_pairs_in_range_raises():
+    """An empty screen result is checked by brute force from atom 0: a launch that did not run (Triton's launcher
+    skipped grids above 2**31 blocks without an error) raises instead of giving a list without pairs, while a
+    cell that really has no pair within range passes."""
+    from fastmace.neighbors.pair_search import check_found
 
-    check_launched(torch.ones(1, dtype=torch.int32), 10)
+    atoms = nacl()
+    wrapped = torch.tensor(atoms.get_positions(wrap=True))
+    images = torch.tensor(np.stack(np.meshgrid(*[np.arange(-1, 2)] * 3, indexing="ij"), -1).reshape(-1, 3),
+                          dtype=F64) @ torch.tensor(atoms.cell.array)
+    check_found(10, wrapped, images, 4.0)  # pairs found: nothing to check
     with pytest.raises(RuntimeError, match="did not run"):
-        check_launched(torch.zeros(1, dtype=torch.int32), 1_728_000)
-
+        check_found(0, wrapped, images, 4.0)
+    check_found(0, wrapped, images, 0.5)  # no pair within 0.5 Angstrom: an empty list is right
+    check_found(0, wrapped[:1], images[13:14], 4.0)  # one atom, its own zero image only
