@@ -46,6 +46,9 @@ def parse_args(argv=None):
     p.add_argument("--strain", type=float, default=0.0)
     p.add_argument("--calls", type=int, default=2, help="tiled force calls (the first one warms up)")
     p.add_argument("--tag", default="")
+    p.add_argument("--neighbours", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="NeighbourConfig overrides of the plan, e.g. gpu_neighbour_list=off (the host build: O(N) "
+                        "against the GPU screen's O(N^2) at millions of atoms)")
     p.add_argument("--output", required=True, type=Path)
     return p.parse_args(argv)
 
@@ -105,6 +108,11 @@ def main(argv=None):
         record["phases"]["plan"] = mem()
         eager = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                        dynamic_edges=False))
+        if args.neighbours:
+            overrides = {key: capacity_scan._value(value) for key, value in
+                         (item.split("=", 1) for item in args.neighbours)}
+            record["neighbours"] = overrides
+            eager = dataclasses.replace(eager, neighbours=dataclasses.replace(eager.neighbours, **overrides))
         field = planner.build_evaluation(eager, user, atoms)
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
