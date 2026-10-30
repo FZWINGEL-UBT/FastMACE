@@ -1,0 +1,1567 @@
+{
+ "tool": "setup_compositions",
+ "created_utc": "2026-10-30T00:12:14.022750+00:00",
+ "host": "Fabi-PC",
+ "label": "pre-base",
+ "fastmace_commit": "c5cca71b08098a6af573d0cc75f5318d36e90306",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "torch": "2.14.1+cu130",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "environment": {
+  "FASTMACE_CACHE": "/home/fzwin/fastmace-runs/setup-compositions-20261030/cache-precompile",
+  "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-runs/setup-compositions-20261030/cache-precompile/inductor",
+  "TRITON_CACHE_DIR": "/home/fzwin/fastmace-runs/setup-compositions-20261030/cache-precompile/triton",
+  "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-runs/setup-compositions-20261030/cache-precompile/compile",
+  "TORCHINDUCTOR_COMPILE_THREADS": "4",
+  "CUDA_VISIBLE_DEVICES": null
+ },
+ "args": {
+  "output": "/home/fzwin/fastmace-runs/setup-compositions-20261030/pre-base",
+  "structures": [
+   "NaCl-0.97=/mnt/d/Margraf/fm-setup-compositions/results/setup-across-compositions/structures/mp-22862_NaCl.cif:0.97"
+  ],
+  "repeat": "3x3x3",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "head": "matpes_r2scan",
+  "precision": "float32",
+  "steps": 5,
+  "label": "pre-base",
+  "graph_dump": false,
+  "dynamo_config": [],
+  "allow_busy_gpu": false
+ },
+ "wrapped": {
+  "fm.md (total)": true,
+  "load: load_pristine": true,
+  "load: sha256_of": true,
+  "load: resolve_checkpoint": true,
+  "load: loading.load (MACE calculator, conversion)": true,
+  "load: check_oeq": true,
+  "load: check_cueq": true,
+  "OEq: prepare_hybrid": true,
+  "OEq: prepare_hybrid_if_possible": true,
+  "OEq: reuse_extension (build or cache hit)": true,
+  "OEq: load_prebuilt_module": true,
+  "Simulation.__init__": true,
+  "Simulation._build_for": true,
+  "Simulation._validate": true,
+  "output: open": true,
+  "output: metadata": true,
+  "Simulation.run": true,
+  "plan: detect_software": true,
+  "plan: hardware": true,
+  "plan: MinimalPlanner.plan": true,
+  "plan: revise_memory": true,
+  "build: MinimalPlanner.build": true,
+  "build: execution model": true,
+  "ForceField.__init__": true,
+  "build: ForceField.execution_model": true,
+  "build: template cache": true,
+  "build: templates.private (copy)": true,
+  "build: MACEForceField.__init__": true,
+  "build: species setup": true,
+  "build: species tables": true,
+  "rewrites: resolve": true,
+  "rewrites: apply (incl. self-checks)": true,
+  "rewrites: self-checks": true,
+  "radial tables: fit": true,
+  "radial tables: certify": true,
+  "OEq streaming: render": true,
+  "OEq streaming: NVRTC compile_cubin": true,
+  "fused forward: render": true,
+  "compile: private_copy": true,
+  "compile: simplify_traceable": true,
+  "compile: compile_model (wrap; compiles lazily)": true,
+  "engine: GraphEngine.__init__": true,
+  "engine: prepare (captures)": true,
+  "engine: first compiled force call": true,
+  "engine: neighbour-list rebuild": true,
+  "engine: eager warm-up": true,
+  "engine: graph capture": true,
+  "build: check_engine": true,
+  "build: SimulationState.from_atoms": true,
+  "provenance: collect": true
+ },
+ "cuda_allocator": "expandable_segments:True",
+ "structures": [
+  {
+   "name": "NaCl-0.97",
+   "path": "/mnt/d/Margraf/fm-setup-compositions/results/setup-across-compositions/structures/mp-22862_NaCl.cif",
+   "strain": 0.97,
+   "natoms": 54,
+   "formula": "Cl27Na27",
+   "species": [
+    "Cl",
+    "Na"
+   ],
+   "forcefield_s": 0.047255218001737376,
+   "simulation_s": 25.88693941100064,
+   "setup_parts_s": {
+    "plan": 1.0380023589987104,
+    "build": 24.28800157600017,
+    "capture": 0.26055917000121553,
+    "provenance": 0.1066653319994657
+   },
+   "relax_s": 0.013466272999721696,
+   "build_to_steps_s": 25.947663004000788,
+   "relax": {
+    "steps": 5,
+    "seconds": 0.010971600000630133,
+    "recaptures": 0,
+    "neighbour_rebuilds": 0
+   },
+   "engine_info": {
+    "rebuilds_beside": 0,
+    "fused_integrator": "variable cell (LangevinBAOAB keeps the PyTorch stage)",
+    "optimizer": "lbfgs",
+    "engine": "graph",
+    "mode": "checked",
+    "capture": true,
+    "pad_edges": true,
+    "variable_cell": true,
+    "initial_edges": 1728,
+    "edge_bucket": 256,
+    "neighbour_rebuilds": 0,
+    "pool_resets": 0,
+    "speculative_launches": 0,
+    "speculative_rollbacks": 0,
+    "speculative_rebuild_rollbacks": 0,
+    "speculative_bucket_rollbacks": 0,
+    "pipelined_redos": 0,
+    "pipelined_rebuild_redos": 0,
+    "pipelined_early_rebuilds": 0,
+    "canonical_points": 0,
+    "overflow_check": "edges",
+    "overflows_redone": 0,
+    "recaptures": 0,
+    "recapture_budget": 64,
+    "recapture_budget_exceeded_at": null,
+    "graph_variant_cap": 64,
+    "graph_evictions": 0,
+    "force_graphs": "fit",
+    "force_graph_releases": 0,
+    "force_graph_floor": 0,
+    "captures": 2,
+    "capture_seconds": 0.20960173099956592,
+    "recapture_seconds": 0.0
+   },
+   "plan": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (24): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, chunked_conv_backward,\n      fused_folded_forward, radial_tables, wprime_backward, block_linear, grouped_linear, merged_residual, gated_rows,\n      segment_gemm, grouped_launch, single_graph_strain, species_tables (+3 more; describe(full=True) lists them)\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, gate_epilogue, species_residual,\n      combo_kernels, tf32x3_gemms (only an explicit 'on' enables it); w_tables,\n      save_transcendentals (float32 plan, decision 65) (+4 more; describe(full=True) lists them)\n  sizes: skin 0.6 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 0.30, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: relaxation lbfgs with the frechet cell filter; 54 atoms, 3D PBC, no constraints; up to 0 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 0 K (11), host_callbacks_every none (9), species_changes off (8),\n      compute_stress on (10), skin 0.6 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+   "stages": {
+    "Simulation.__init__": {
+     "total_s": 25.8868052680009,
+     "calls": 1,
+     "parents": [
+      ""
+     ]
+    },
+    "build: MinimalPlanner.build": {
+     "total_s": 24.23217749200012,
+     "calls": 1,
+     "parents": [
+      "Simulation.__init__"
+     ]
+    },
+    "engine: GraphEngine.__init__": {
+     "total_s": 15.200568523001493,
+     "calls": 1,
+     "parents": [
+      "build: MinimalPlanner.build"
+     ]
+    },
+    "engine: first compiled force call": {
+     "total_s": 15.107121143999393,
+     "calls": 1,
+     "parents": [
+      "engine: GraphEngine.__init__"
+     ]
+    },
+    "build: MACEForceField.__init__": {
+     "total_s": 4.034938458000397,
+     "calls": 1,
+     "parents": [
+      "build: MinimalPlanner.build"
+     ]
+    },
+    "compile: compile_model (wrap; compiles lazily)": {
+     "total_s": 3.850985426999614,
+     "calls": 1,
+     "parents": [
+      "build: MACEForceField.__init__"
+     ]
+    },
+    "build: execution model": {
+     "total_s": 3.7570881390001887,
+     "calls": 1,
+     "parents": [
+      "build: MinimalPlanner.build"
+     ]
+    },
+    "build: ForceField.execution_model": {
+     "total_s": 3.757075858000462,
+     "calls": 1,
+     "parents": [
+      "build: execution model"
+     ]
+    },
+    "build: template cache": {
+     "total_s": 3.747646617999635,
+     "calls": 1,
+     "parents": [
+      "build: ForceField.execution_model"
+     ]
+    },
+    "load: loading.load (MACE calculator, conversion)": {
+     "total_s": 3.289145897999333,
+     "calls": 1,
+     "parents": [
+      "build: template cache"
+     ]
+    },
+    "rewrites: apply (incl. self-checks)": {
+     "total_s": 2.935486458000014,
+     "calls": 1,
+     "parents": [
+      "compile: compile_model (wrap; compiles lazily)"
+     ]
+    },
+    "rewrites: self-checks": {
+     "total_s": 2.400380047996805,
+     "calls": 23,
+     "parents": [
+      "rewrites: apply (incl. self-checks)"
+     ]
+    },
+    "rewrites: resolve": {
+     "total_s": 1.1111860780001734,
+     "calls": 1,
+     "parents": [
+      "build: MinimalPlanner.build"
+     ]
+    },
+    "plan: MinimalPlanner.plan": {
+     "total_s": 1.0379411279991473,
+     "calls": 1,
+     "parents": [
+      "Simulation.__init__"
+     ]
+    },
+    "compile: private_copy": {
+     "total_s": 0.9276559109985101,
+     "calls": 2,
+     "parents": [
+      "build: templates.private (copy)",
+      "compile: compile_model (wrap; compiles lazily)"
+     ]
+    },
+    "build: templates.private (copy)": {
+     "total_s": 0.45800911500009533,
+     "calls": 1,
+     "parents": [
+      "build: template cache"
+     ]
+    },
+    "engine: prepare (captures)": {
+     "total_s": 0.26048869700025534,
+     "calls": 1,
+     "parents": [
+      "Simulation.__init__"
+     ]
+    },
+    "engine: graph capture": {
+     "total_s": 0.2599544490003609,
+     "calls": 2,
+     "parents": [
+      "engine: prepare (captures)"
+     ]
+    },
+    "OEq streaming: render": {
+     "total_s": 0.10476442099934502,
+     "calls": 2,
+     "parents": [
+      "rewrites: apply (incl. self-checks)"
+     ]
+    },
+    "OEq streaming: NVRTC compile_cubin": {
+     "total_s": 0.10306867400140618,
+     "calls": 5,
+     "parents": [
+      "rewrites: apply (incl. self-checks)"
+     ]
+    },
+    "plan: hardware": {
+     "total_s": 0.07606334800038894,
+     "calls": 1,
+     "parents": [
+      "plan: MinimalPlanner.plan"
+     ]
+    },
+    "ForceField.__init__": {
+     "total_s": 0.04722950399991532,
+     "calls": 1,
+     "parents": [
+      ""
+     ]
+    },
+    "load: sha256_of": {
+     "total_s": 0.015337392000219552,
+     "calls": 1,
+     "parents": [
+      "load: loading.load (MACE calculator, conversion)"
+     ]
+    },
+    "compile: simplify_traceable": {
+     "total_s": 0.0020928539997839835,
+     "calls": 1,
+     "parents": [
+      "compile: compile_model (wrap; compiles lazily)"
+     ]
+    },
+    "plan: detect_software": {
+     "total_s": 0.0014257950006140163,
+     "calls": 1,
+     "parents": [
+      "plan: MinimalPlanner.plan"
+     ]
+    },
+    "build: species setup": {
+     "total_s": 0.001001388000076986,
+     "calls": 1,
+     "parents": [
+      "build: MACEForceField.__init__"
+     ]
+    },
+    "build: check_engine": {
+     "total_s": 0.000832984998851316,
+     "calls": 1,
+     "parents": [
+      "engine: GraphEngine.__init__"
+     ]
+    },
+    "build: SimulationState.from_atoms": {
+     "total_s": 0.00042196499998681247,
+     "calls": 1,
+     "parents": [
+      "build: MinimalPlanner.build"
+     ]
+    },
+    "build: species tables": {
+     "total_s": 0.00041968499863287434,
+     "calls": 1,
+     "parents": [
+      "build: MACEForceField.__init__"
+     ]
+    },
+    "fused forward: render": {
+     "total_s": 0.0003244120016461238,
+     "calls": 2,
+     "parents": [
+      "rewrites: apply (incl. self-checks)"
+     ]
+    },
+    "load: check_cueq": {
+     "total_s": 0.00012124699969717767,
+     "calls": 1,
+     "parents": [
+      "load: loading.load (MACE calculator, conversion)"
+     ]
+    },
+    "load: check_oeq": {
+     "total_s": 0.00011497800005599856,
+     "calls": 1,
+     "parents": [
+      "load: loading.load (MACE calculator, conversion)"
+     ]
+    },
+    "load: resolve_checkpoint": {
+     "total_s": 5.816699922434054e-05,
+     "calls": 1,
+     "parents": [
+      "load: loading.load (MACE calculator, conversion)"
+     ]
+    },
+    "OEq: prepare_hybrid": {
+     "total_s": 9.490000593359582e-06,
+     "calls": 1,
+     "parents": [
+      "load: loading.load (MACE calculator, conversion)"
+     ]
+    },
+    "output: metadata": {
+     "total_s": 8.734001312404871e-06,
+     "calls": 1,
+     "parents": [
+      "Simulation.__init__"
+     ]
+    }
+   },
+   "extra_stages": {
+    "self-check: factor_species": {
+     "total_s": 0.5571790519989008,
+     "calls": 1
+    },
+    "self-check: fold_cutoff": {
+     "total_s": 0.058938068001225474,
+     "calls": 1
+    },
+    "self-check: density_first": {
+     "total_s": 0.047064828000657144,
+     "calls": 1
+    },
+    "self-check: joint_radial_input": {
+     "total_s": 0.04419586400035769,
+     "calls": 1
+    },
+    "self-check: fused_folded_backward": {
+     "total_s": 0.2324189449991536,
+     "calls": 1
+    },
+    "self-check: folded_backward_tiles": {
+     "total_s": 0.05926459500005876,
+     "calls": 1
+    },
+    "OEq streaming: NVRTC compile_cubin (all)": {
+     "total_s": 0.10315810300016892,
+     "calls": 5
+    },
+    "self-check: streaming_conv": {
+     "total_s": 0.07826097299948742,
+     "calls": 1
+    },
+    "self-check: chunked_conv_backward": {
+     "total_s": 0.0562869210007193,
+     "calls": 1
+    },
+    "fused forward: render (all)": {
+     "total_s": 0.0006213119995663874,
+     "calls": 2
+    },
+    "self-check: fused_folded_forward": {
+     "total_s": 0.0576239660003921,
+     "calls": 1
+    },
+    "self-check: reassociate_first": {
+     "total_s": 0.07043738199899963,
+     "calls": 1
+    },
+    "self-check: segmented_first_sum": {
+     "total_s": 0.07271064500127977,
+     "calls": 1
+    },
+    "self-check: block_linear": {
+     "total_s": 0.07179764600005001,
+     "calls": 1
+    },
+    "self-check: grouped_linear": {
+     "total_s": 0.07329657599984785,
+     "calls": 1
+    },
+    "self-check: merged_residual": {
+     "total_s": 0.01895898600014334,
+     "calls": 1
+    },
+    "self-check: gated_rows": {
+     "total_s": 0.022962299999562674,
+     "calls": 1
+    },
+    "self-check: segment_gemm": {
+     "total_s": 0.3426490179990651,
+     "calls": 1
+    },
+    "self-check: grouped_launch": {
+     "total_s": 0.18975279900041642,
+     "calls": 1
+    },
+    "self-check: species_tables": {
+     "total_s": 0.003902481999830343,
+     "calls": 1
+    },
+    "self-check: fold_readout_tail": {
+     "total_s": 0.0059263690000079805,
+     "calls": 1
+    },
+    "self-check: fold_product_linear": {
+     "total_s": 0.020964683999409317,
+     "calls": 1
+    },
+    "self-check: radial_tables": {
+     "total_s": 0.2913293750007142,
+     "calls": 1
+    },
+    "self-check: wprime_backward": {
+     "total_s": 0.024827859000652097,
+     "calls": 1
+    },
+    "self-check: single_graph_strain": {
+     "total_s": 0.0012737190008920152,
+     "calls": 1
+    },
+    "module load: PyCodeCache.load_by_key_path": {
+     "total_s": 0.2965883369997755,
+     "calls": 4
+    },
+    "graph: capture_end (end capture + instantiate)": {
+     "total_s": 0.0028921229986735852,
+     "calls": 2
+    }
+   },
+   "timeline": [
+    {
+     "label": "ForceField.__init__",
+     "parent": "",
+     "start_s": 8.4432,
+     "seconds": 0.0472,
+     "depth": 0
+    },
+    {
+     "label": "Simulation.__init__",
+     "parent": "",
+     "start_s": 8.4906,
+     "seconds": 25.8868,
+     "depth": 0
+    },
+    {
+     "label": "plan: MinimalPlanner.plan",
+     "parent": "Simulation.__init__",
+     "start_s": 8.6647,
+     "seconds": 1.0379,
+     "depth": 1
+    },
+    {
+     "label": "plan: hardware",
+     "parent": "plan: MinimalPlanner.plan",
+     "start_s": 8.6647,
+     "seconds": 0.0761,
+     "depth": 2
+    },
+    {
+     "label": "plan: detect_software",
+     "parent": "plan: MinimalPlanner.plan",
+     "start_s": 8.7408,
+     "seconds": 0.0014,
+     "depth": 2
+    },
+    {
+     "label": "build: MinimalPlanner.build",
+     "parent": "Simulation.__init__",
+     "start_s": 9.7026,
+     "seconds": 24.2322,
+     "depth": 1
+    },
+    {
+     "label": "build: execution model",
+     "parent": "build: MinimalPlanner.build",
+     "start_s": 9.7027,
+     "seconds": 3.7571,
+     "depth": 2
+    },
+    {
+     "label": "build: ForceField.execution_model",
+     "parent": "build: execution model",
+     "start_s": 9.7027,
+     "seconds": 3.7571,
+     "depth": 3
+    },
+    {
+     "label": "build: template cache",
+     "parent": "build: ForceField.execution_model",
+     "start_s": 9.7121,
+     "seconds": 3.7476,
+     "depth": 4
+    },
+    {
+     "label": "load: loading.load (MACE calculator, conversion)",
+     "parent": "build: template cache",
+     "start_s": 9.7121,
+     "seconds": 3.2891,
+     "depth": 5
+    },
+    {
+     "label": "load: resolve_checkpoint",
+     "parent": "load: loading.load (MACE calculator, conversion)",
+     "start_s": 9.7121,
+     "seconds": 0.0001,
+     "depth": 6
+    },
+    {
+     "label": "load: sha256_of",
+     "parent": "load: loading.load (MACE calculator, conversion)",
+     "start_s": 9.7122,
+     "seconds": 0.0153,
+     "depth": 6
+    },
+    {
+     "label": "OEq: prepare_hybrid",
+     "parent": "load: loading.load (MACE calculator, conversion)",
+     "start_s": 9.7275,
+     "seconds": 0.0,
+     "depth": 6
+    },
+    {
+     "label": "load: check_cueq",
+     "parent": "load: loading.load (MACE calculator, conversion)",
+     "start_s": 9.7275,
+     "seconds": 0.0001,
+     "depth": 6
+    },
+    {
+     "label": "load: check_oeq",
+     "parent": "load: loading.load (MACE calculator, conversion)",
+     "start_s": 9.7277,
+     "seconds": 0.0001,
+     "depth": 6
+    },
+    {
+     "label": "build: templates.private (copy)",
+     "parent": "build: template cache",
+     "start_s": 13.0013,
+     "seconds": 0.458,
+     "depth": 5
+    },
+    {
+     "label": "compile: private_copy",
+     "parent": "build: templates.private (copy)",
+     "start_s": 13.0013,
+     "seconds": 0.4579,
+     "depth": 6
+    },
+    {
+     "label": "rewrites: resolve",
+     "parent": "build: MinimalPlanner.build",
+     "start_s": 13.4605,
+     "seconds": 1.1112,
+     "depth": 2
+    },
+    {
+     "label": "build: MACEForceField.__init__",
+     "parent": "build: MinimalPlanner.build",
+     "start_s": 14.5717,
+     "seconds": 4.0349,
+     "depth": 2
+    },
+    {
+     "label": "compile: compile_model (wrap; compiles lazily)",
+     "parent": "build: MACEForceField.__init__",
+     "start_s": 14.6446,
+     "seconds": 3.851,
+     "depth": 3
+    },
+    {
+     "label": "compile: private_copy",
+     "parent": "compile: compile_model (wrap; compiles lazily)",
+     "start_s": 15.0808,
+     "seconds": 0.4697,
+     "depth": 4
+    },
+    {
+     "label": "rewrites: apply (incl. self-checks)",
+     "parent": "compile: compile_model (wrap; compiles lazily)",
+     "start_s": 15.5508,
+     "seconds": 2.9355,
+     "depth": 4
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 15.5527,
+     "seconds": 0.5571,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.1114,
+     "seconds": 0.0589,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.1704,
+     "seconds": 0.047,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.2176,
+     "seconds": 0.0441,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.2618,
+     "seconds": 0.2324,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.4943,
+     "seconds": 0.0592,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: render",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.5536,
+     "seconds": 0.0927,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: NVRTC compile_cubin",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.6463,
+     "seconds": 0.0164,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: render",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.6657,
+     "seconds": 0.0121,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: NVRTC compile_cubin",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.6778,
+     "seconds": 0.0442,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.723,
+     "seconds": 0.0782,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.8014,
+     "seconds": 0.0562,
+     "depth": 5
+    },
+    {
+     "label": "fused forward: render",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.8578,
+     "seconds": 0.0001,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: NVRTC compile_cubin",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.858,
+     "seconds": 0.0111,
+     "depth": 5
+    },
+    {
+     "label": "fused forward: render",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.87,
+     "seconds": 0.0002,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: NVRTC compile_cubin",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.8702,
+     "seconds": 0.0123,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.8833,
+     "seconds": 0.0575,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 16.9433,
+     "seconds": 0.0704,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.0138,
+     "seconds": 0.0727,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.1504,
+     "seconds": 0.0717,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.2313,
+     "seconds": 0.0733,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.3052,
+     "seconds": 0.0188,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.3456,
+     "seconds": 0.0229,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.3686,
+     "seconds": 0.3426,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.7118,
+     "seconds": 0.1896,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 17.9288,
+     "seconds": 0.0039,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 18.0139,
+     "seconds": 0.0057,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 18.0219,
+     "seconds": 0.0209,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 18.1205,
+     "seconds": 0.2913,
+     "depth": 5
+    },
+    {
+     "label": "OEq streaming: NVRTC compile_cubin",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 18.4404,
+     "seconds": 0.019,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 18.4603,
+     "seconds": 0.0247,
+     "depth": 5
+    },
+    {
+     "label": "rewrites: self-checks",
+     "parent": "rewrites: apply (incl. self-checks)",
+     "start_s": 18.485,
+     "seconds": 0.0013,
+     "depth": 5
+    },
+    {
+     "label": "compile: simplify_traceable",
+     "parent": "compile: compile_model (wrap; compiles lazily)",
+     "start_s": 18.4864,
+     "seconds": 0.0021,
+     "depth": 4
+    },
+    {
+     "label": "build: species setup",
+     "parent": "build: MACEForceField.__init__",
+     "start_s": 18.4965,
+     "seconds": 0.001,
+     "depth": 3
+    },
+    {
+     "label": "build: species tables",
+     "parent": "build: MACEForceField.__init__",
+     "start_s": 18.4978,
+     "seconds": 0.0004,
+     "depth": 3
+    },
+    {
+     "label": "build: SimulationState.from_atoms",
+     "parent": "build: MinimalPlanner.build",
+     "start_s": 18.6067,
+     "seconds": 0.0004,
+     "depth": 2
+    },
+    {
+     "label": "engine: GraphEngine.__init__",
+     "parent": "build: MinimalPlanner.build",
+     "start_s": 18.7341,
+     "seconds": 15.2006,
+     "depth": 2
+    },
+    {
+     "label": "build: check_engine",
+     "parent": "engine: GraphEngine.__init__",
+     "start_s": 18.7344,
+     "seconds": 0.0008,
+     "depth": 3
+    },
+    {
+     "label": "engine: first compiled force call",
+     "parent": "engine: GraphEngine.__init__",
+     "start_s": 18.7389,
+     "seconds": 15.1071,
+     "depth": 3
+    },
+    {
+     "label": "engine: prepare (captures)",
+     "parent": "Simulation.__init__",
+     "start_s": 33.9907,
+     "seconds": 0.2605,
+     "depth": 1
+    },
+    {
+     "label": "engine: graph capture",
+     "parent": "engine: prepare (captures)",
+     "start_s": 33.9907,
+     "seconds": 0.1467,
+     "depth": 2
+    },
+    {
+     "label": "engine: graph capture",
+     "parent": "engine: prepare (captures)",
+     "start_s": 34.1376,
+     "seconds": 0.1132,
+     "depth": 2
+    },
+    {
+     "label": "output: metadata",
+     "parent": "Simulation.__init__",
+     "start_s": 34.3773,
+     "seconds": 0.0,
+     "depth": 1
+    }
+   ],
+   "compile_metrics": {
+    "_compile.compile_inner": {
+     "total_s": 9.679341705999999,
+     "calls": 6
+    },
+    "compile_attempt_1": {
+     "total_s": 5.3535187099999995,
+     "calls": 3
+    },
+    "bytecode_tracing": {
+     "total_s": 4.418134277000001,
+     "calls": 9
+    },
+    "CachingAutotuner.benchmark_all_configs": {
+     "total_s": 3.4913939700000003,
+     "calls": 72
+    },
+    "OutputGraph.call_user_compiler": {
+     "total_s": 3.303667929,
+     "calls": 3
+    },
+    "create_aot_dispatcher_function": {
+     "total_s": 3.158819293,
+     "calls": 3
+    },
+    "compile_attempt_0": {
+     "total_s": 2.672219309,
+     "calls": 6
+    },
+    "variable_builder_call": {
+     "total_s": 2.2129459459999996,
+     "calls": 12
+    },
+    "build_guards": {
+     "total_s": 1.5341138360000002,
+     "calls": 4
+    },
+    "aot_trace_joint_graph": {
+     "total_s": 1.29546742,
+     "calls": 1
+    },
+    "get_fake_value": {
+     "total_s": 0.8274275079999999,
+     "calls": 6
+    },
+    "compile_fx_inner": {
+     "total_s": 0.631486529,
+     "calls": 4
+    },
+    "fx_codegen_and_compile": {
+     "total_s": 0.5954807129999999,
+     "calls": 4
+    },
+    "compile_fx.<locals>.fw_compiler_base": {
+     "total_s": 0.48798206899999996,
+     "calls": 3
+    },
+    "_recursive_joint_graph_passes": {
+     "total_s": 0.412558988,
+     "calls": 3
+    },
+    "aot_collect_metadata": {
+     "total_s": 0.34215808999999997,
+     "calls": 3
+    },
+    "PyCodeCache.load_by_key_path": {
+     "total_s": 0.296756056,
+     "calls": 4
+    },
+    "min_cut_rematerialization_partition": {
+     "total_s": 0.288471666,
+     "calls": 1
+    },
+    "create_proxy": {
+     "total_s": 0.25213124200000003,
+     "calls": 11
+    },
+    "async_compile.wait": {
+     "total_s": 0.251877012,
+     "calls": 4
+    },
+    "GraphLowering.compile_to_fn": {
+     "total_s": 0.23532783000000002,
+     "calls": 2
+    },
+    "GraphLowering.compile_to_module": {
+     "total_s": 0.235265108,
+     "calls": 2
+    },
+    "pass.joint_graph_passes.pass_pattern_0": {
+     "total_s": 0.184846884,
+     "calls": 3
+    },
+    "compile_fx.<locals>.bw_compiler": {
+     "total_s": 0.147634433,
+     "calls": 1
+    },
+    "_recursive_pre_grad_passes": {
+     "total_s": 0.11328006000000003,
+     "calls": 37
+    },
+    "wrap_to_fake_tensor_and_record": {
+     "total_s": 0.106304467,
+     "calls": 11
+    },
+    "inductor_codecache_torch_key": {
+     "total_s": 0.059305028,
+     "calls": 1
+    },
+    "StaticAutotunerFuture.warm_precompile": {
+     "total_s": 0.055086836,
+     "calls": 87
+    },
+    "pass.joint_graph_passes.constant_fold_uniform_value": {
+     "total_s": 0.049667667000000006,
+     "calls": 3
+    },
+    "insert_deferred_runtime_asserts": {
+     "total_s": 0.048605622,
+     "calls": 3
+    },
+    "GraphLowering.codegen": {
+     "total_s": 0.037619555,
+     "calls": 2
+    },
+    "_recursive_post_grad_passes": {
+     "total_s": 0.028957188000000002,
+     "calls": 2
+    },
+    "Scheduler.codegen": {
+     "total_s": 0.020275145,
+     "calls": 2
+    },
+    "Scheduler.__init__": {
+     "total_s": 0.013867831,
+     "calls": 2
+    },
+    "pass.joint_graph_passes.remove_noop_ops": {
+     "total_s": 0.010507398,
+     "calls": 3
+    },
+    "GraphLowering.run": {
+     "total_s": 0.008667517,
+     "calls": 2
+    },
+    "TritonBundler.read_and_emit": {
+     "total_s": 0.002858536,
+     "calls": 2
+    },
+    "Scheduler.fused_nodes": {
+     "total_s": 0.00227992,
+     "calls": 2
+    },
+    "PythonWrapperCodegen.generate": {
+     "total_s": 0.0020771319999999998,
+     "calls": 2
+    },
+    "additional_fake_tensor_prop": {
+     "total_s": 0.002054336,
+     "calls": 2
+    },
+    "pass.pre_grad_passes.efficient_conv_bn_eval_pass": {
+     "total_s": 0.0018991260000000001,
+     "calls": 37
+    },
+    "TritonBundler.load_cached_static_autotuners": {
+     "total_s": 0.001368298,
+     "calls": 2
+    },
+    "gc": {
+     "total_s": 0.0011687860000000002,
+     "calls": 6
+    },
+    "pass.joint_graph_passes.pass_pattern_1": {
+     "total_s": 0.000842916,
+     "calls": 3
+    },
+    "pass.pre_grad_passes.apply_gumbel_max_trick_pass": {
+     "total_s": 0.0006320990000000001,
+     "calls": 37
+    },
+    "pass.post_grad_passes.reinplace_inplaceable_ops": {
+     "total_s": 0.0005874610000000001,
+     "calls": 2
+    },
+    "pass.pre_grad_passes.group_batch_fusion_passes": {
+     "total_s": 0.0005052119999999999,
+     "calls": 37
+    },
+    "pass.post_grad_passes.pass_pattern_1": {
+     "total_s": 0.000497652,
+     "calls": 2
+    },
+    "TritonBundler.collect": {
+     "total_s": 0.00044215599999999997,
+     "calls": 2
+    },
+    "pass.post_grad_passes.pass_pattern_0": {
+     "total_s": 0.000122108,
+     "calls": 2
+    },
+    "pass.post_grad_passes.pass_pattern_2": {
+     "total_s": 0.000107902,
+     "calls": 2
+    },
+    "pass.post_grad_passes.decompose_triton_kernel_wrapper_functional": {
+     "total_s": 9.233200000000001e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.decompose_auto_functionalized": {
+     "total_s": 8.313400000000001e-05,
+     "calls": 2
+    },
+    "Scheduler.simple_overlap": {
+     "total_s": 8.3128e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.move_constructors_to_cuda": {
+     "total_s": 8.0559e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.reorder_for_locality": {
+     "total_s": 7.8959e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.respecialize_current_device": {
+     "total_s": 7.507299999999999e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.post_grad_custom_pre_pass": {
+     "total_s": 6.8092e-05,
+     "calls": 4
+    },
+    "CacheBase.get_system.triton_key": {
+     "total_s": 5.1981e-05,
+     "calls": 1
+    },
+    "pass.post_grad_passes.stable_sort": {
+     "total_s": 5.0827999999999995e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.remove_noop_ops": {
+     "total_s": 4.4937e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.decompose_scan_to_while_loop": {
+     "total_s": 4.3048e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.decompose_map_to_while_loop": {
+     "total_s": 3.7233e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.remove_profiler_ops": {
+     "total_s": 3.2115e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.fix_auto_functionalized_dtype_views": {
+     "total_s": 2.9736e-05,
+     "calls": 2
+    },
+    "pass.post_grad_passes.remove_assert_ops": {
+     "total_s": 2.3065e-05,
+     "calls": 2
+    }
+   },
+   "dynamo_counters": {
+    "frames.total": 8,
+    "frames.ok": 8,
+    "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x7c3b394a27a0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": 3,
+    "stats.calls_captured": 528,
+    "stats.unique_graphs": 3,
+    "aot_autograd.total": 3,
+    "aot_autograd.autograd_cache_bypass": 1,
+    "aot_autograd.ok": 3,
+    "aot_autograd.autograd_cache_miss": 2,
+    "aot_autograd.autograd_cache_saved": 2,
+    "inductor.pattern_matcher_count": 164,
+    "inductor.pattern_matcher_nodes": 186,
+    "inductor.removed_pointless_view_pair": 6,
+    "inductor.triton_bundler_load_static_autotuner": 87,
+    "inductor.async_compile_cache_miss": 267,
+    "inductor.async_compile_cache_hit": 177,
+    "inductor.pad_rewritten_as_cat": 1,
+    "inductor.extern_calls": 97,
+    "inductor.fxgraph_cache_hit": 2,
+    "inductor.benchmarking.InductorBenchmarker.benchmark": 151,
+    "inductor.benchmarking.InductorBenchmarker.benchmark_gpu": 151,
+    "inductor.fxgraph_cache_miss": 2,
+    "inductor.triton_bundler_save_kernel": 32,
+    "inductor.triton_bundler_save_static_autotuner": 2,
+    "resumes.torch_dynamo_resume_in_forward_at_136": 1,
+    "resumes.torch_dynamo_resume_in_get_outputs_at_187": 1,
+    "resumes.torch_dynamo_resume_in_compute_forces_virials_at_50": 1
+   },
+   "cache_new_files": {
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.ptx": 5471,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.cubin": 9200,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/__grp__triton_poi_fused_mul_1.json": 1374,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.source": 4051,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.ttir": 3443,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.ttgir": 3806,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.llir": 3561,
+    "FASTMACE_CACHE:triton/IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.json": 1134,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.ptx": 5669,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.cubin": 9392,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/__grp__triton_poi_fused_mul_1.json": 1374,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.source": 4051,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.ttir": 3443,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.ttgir": 3806,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.llir": 3882,
+    "FASTMACE_CACHE:triton/ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.json": 1134,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.ttgir": 6468,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.llir": 5540,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.source": 7772,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.json": 1177,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.ptx": 7732,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/__grp__triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.json": 1976,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.ttir": 5995,
+    "FASTMACE_CACHE:triton/E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.cubin": 11368,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/__grp__triton_poi_fused_ones_like_0.json": 1458,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.cubin": 8440,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.json": 1140,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.llir": 2288,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.source": 3105,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.ptx": 4258,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.ttir": 1121,
+    "FASTMACE_CACHE:triton/HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.ttgir": 1210,
+    "FASTMACE_CACHE:inductor/7m/c7mqzwuyjtqfs7bkhrghs5w42crkjiera463uhfjgwgge2ncmpmu.py": 2167,
+    "FASTMACE_CACHE:inductor/t4/cac4d4f9f091cb9de9f26800909ac93fc6a2155ec8625d60398e45c9e980263c.best_config": 258,
+    "FASTMACE_CACHE:inductor/34/a5426bb72dc3f777ea1a88c72ff157258b4b1a7db492c13d3c2f7c7534379eb8.best_config": 272,
+    "FASTMACE_CACHE:inductor/i4/daca420bc1bbc92363d7e29cfbe96e59691856276e9d17d6dbbb450056c79f6f.best_config": 258,
+    "FASTMACE_CACHE:inductor/e4/b66c151be9fcd531b28571e9769303493f3f9e5734976488cc803d2abf311afb.best_config": 258,
+    "FASTMACE_CACHE:inductor/e4/b15bc213fd836281c3ff12b448b83481a414db1bd9d3a45ed3d6610a1271beac.best_config": 259,
+    "FASTMACE_CACHE:inductor/s5/248878df511116d339fa3d7a47502df615be4b78b06fa77008bc27c3c759a0e7.best_config": 258,
+    "FASTMACE_CACHE:inductor/4z/1e08c144300a8c0ce17529b1faff5c38f5a5800dcd5d35474eda75205190106c.best_config": 258,
+    "FASTMACE_CACHE:inductor/ws/e475a0b450f8f1b8aa44cd53c28b08eaa587747865b7acdfc7566566c2596b60.best_config": 258,
+    "FASTMACE_CACHE:inductor/im/14aa2d6d3b264b6b0701c47f839fa9f04da344d0159293d6e894b0489b3a0947.best_config": 258,
+    "FASTMACE_CACHE:inductor/rx/fd4bda1348f4b487891fa8ab815c2f1bbce3ff9b903385571119c9f908111226.best_config": 258,
+    "FASTMACE_CACHE:inductor/lu/ec56a375b3aa150e97f2855e829f572a9c54829a09f40cf601b14c50e94754e2.best_config": 258,
+    "FASTMACE_CACHE:inductor/pf/c241427d1b9e5a1fd8b3a33b816d46cf9f73ea81932ee17df645b9895ef69312.best_config": 258,
+    "FASTMACE_CACHE:inductor/yw/838f48b2ca784ade3ba222fa193fe5da51f05bc79ed6916db9816ef81f52909a.best_config": 257,
+    "FASTMACE_CACHE:inductor/nc/e43baf313a45b06243ea0ec86d9dc48da9045bc1e013b6d1f1b362866b00eba5.best_config": 258,
+    "FASTMACE_CACHE:inductor/sw/12e9268ab05f78786a5b390ab1a07953e5e3f6dffe421b07d2be8a6fce962250.best_config": 256,
+    "FASTMACE_CACHE:inductor/yh/235ce158f04ac25c8fccbfaf21311ab3dddb6c8cbae6c383d5033622153ef36e.best_config": 259,
+    "FASTMACE_CACHE:inductor/dl/d85f42b987ec5f828b56671cb77b56abf05702969ce4cf77ec504c4ff890b549.best_config": 258,
+    "FASTMACE_CACHE:inductor/g7/cg7hocjushnld2gw65d4h5hqv2zu65r6z74edp5chjbsyxcjfmig.py": 5977,
+    "FASTMACE_CACHE:inductor/2d/883d1de94a9df19ff32dedbd516c793f03d50eaffd5d786f7016a9c28d6c8afe.best_config": 258,
+    "FASTMACE_CACHE:inductor/el/4577bab08398479450c1c7d7b1b9b5a99d4dac9ff4b203c245c6117b4d44fe08.best_config": 258,
+    "FASTMACE_CACHE:inductor/3v/5cc30b2f1f7a0ea8291eecac5fada142b7c0f27e37d14c7d33dabd19612d2d7e.best_config": 256,
+    "FASTMACE_CACHE:inductor/v2/692b241bdbb0294bbad30689e888a9c0371ec1de6a58d1cbbc2a1fc070a9092d.best_config": 258,
+    "FASTMACE_CACHE:inductor/qs/fb9104ee8d3ec33cb468e31f8d391ede6bb6c421e209f0afa95bb560644f9165.best_config": 258,
+    "FASTMACE_CACHE:inductor/j4/7635281e42d8e917b43b77fb6011cb7f50fe3ced9ad5afaa8e004f2dec67cf94.best_config": 258,
+    "FASTMACE_CACHE:inductor/fxgraph/or/forg7y4wvbn363dbwq3i2v76grl3jcc7ycm4hoawin6qcdxlqnx3/el4ohhufsesivhx7chxdsztffaobhfgpzeywhow3ogy5o2mdoyl": 113691,
+    "FASTMACE_CACHE:inductor/fxgraph/aw/faw4rrm5cr2relsxkvrilbsinhkd25zsvhyijz4kpmr6hf4nlaam/2tmmlomsi5eleu2mekyoqg6d6rjydq5dtelnlmokodoykpg3y2k": 224835,
+    "FASTMACE_CACHE:inductor/qc/6045d84e15e3c259fa5379a92da9e43801c6a2f4e24797941db5011da87ac1aa.best_config": 258,
+    "FASTMACE_CACHE:inductor/yk/6dd2c2cc8c82c5d49a7ef02479afe697d922fa69c8f8c2c6625360b277170182.best_config": 258,
+    "FASTMACE_CACHE:inductor/v6/2bbe65863e06f1d654b17b00017eb5e326c0da3b47d2ea339625ded52dfd0e7b.best_config": 259,
+    "FASTMACE_CACHE:inductor/4g/fd382e2c4ea315dd7b389b340796b775d2a4af4f15d423c7634d75ab03954b27.best_config": 258,
+    "FASTMACE_CACHE:inductor/6w/680552412bf2027fbe415f03f8f8f5f8fd42c5ecc3fdc3b12ca10d60c01fa6ba.best_config": 259,
+    "FASTMACE_CACHE:inductor/b7/ed1498cd411a97d06dce2a860b758d38af50dc2787f4edcfc4c7964e1897253e.best_config": 258,
+    "FASTMACE_CACHE:inductor/sk/b0b5acc77c780400fbd9bd8af2fdc587caa24451de8b9c299507dc7c8ec72ba3.best_config": 259,
+    "FASTMACE_CACHE:inductor/no/cnoqzogb7ofngr2vezfkiesgcezlhlyrexcqmwqvbezhwutn7pp7.py": 2837,
+    "FASTMACE_CACHE:inductor/nx/e6dea7e1b4c867822fce58de8c0f6441c7546cb2b7012740797f0a418c374131.best_config": 258,
+    "FASTMACE_CACHE:inductor/ak/959907651fa2a00cc955701d74b671a69d17f5de0c7ca308c8948105dfbc776f.best_config": 258,
+    "FASTMACE_CACHE:inductor/k2/fb623765ded75d526628becac248428d50481ca01084274653dea69c2fc15f90.best_config": 258,
+    "FASTMACE_CACHE:inductor/k2/f9334ce716b0a8d0218015b85283d882278b870776ec949aa36a3ba7c0a5df6f.best_config": 258,
+    "FASTMACE_CACHE:inductor/kj/f6838e2fc1fc604e24883c27d3d478f1d440530226f5031f9e10b633a02832ea.best_config": 259,
+    "FASTMACE_CACHE:inductor/6b/0e957ac4976205428c7a1a2198e6aef15cec1e328dabe5d4e5f7c2e01d78189c.best_config": 258,
+    "FASTMACE_CACHE:inductor/jl/7bbb1faa5cc46646e862446b4466b6b9467091f4d83e72bd26b6926f13f58cb9.best_config": 258,
+    "FASTMACE_CACHE:inductor/rd/684e579ed31e3e390a5a362fe9b9c40bf70c6c4624dcdc5056f3a42261448941.best_config": 258,
+    "FASTMACE_CACHE:inductor/jb/6cf1123d526a4763abc34ba27137660db3f355795b4249525581e04f2baeec9b.best_config": 259,
+    "FASTMACE_CACHE:inductor/6i/abb2d1b7c1a350e0170f1fd15b18581d37c973bbf23360ea882344dd44ecae89.best_config": 259,
+    "FASTMACE_CACHE:inductor/2u/d517975f6dfe3b2b0773433e60fb330b5a870b6cf14ddadc8192537527e42f68.best_config": 257,
+    "FASTMACE_CACHE:inductor/yi/adfce58b008353bb5c3eb31079b4b36fcef5495a8a7270cb40d9eac466cd9944.best_config": 258,
+    "FASTMACE_CACHE:inductor/5p/35d1e68566499da2b6bbf920f4a84e8800d57b7ee56e8347eb80267730d214b6.best_config": 258,
+    "FASTMACE_CACHE:inductor/aotautograd/a5cm4xkw7psrvedrkdzwhueqi62sbktn3aom335ql65jv2jflb24/ewtwtg3kdoyvkigox6vlwytnvhnf5minasdum7rmudfxmhwf6ee": 84280,
+    "FASTMACE_CACHE:inductor/aotautograd/a2eehe67ooxgnl7f775aoh6qtnrjbygsawq4cgtoohgiceiazte7/7ldyknogz55m2huf3frptfr7df2pgsg5czhbqfwkhzlfak22t3a": 78998,
+    "FASTMACE_CACHE:inductor/nd/23e1d86b408f3691578f68c567584e45733e948229632b4f467c0bdae6dd72ca.best_config": 258,
+    "FASTMACE_CACHE:inductor/nd/cndqzqoylyx4a7dewfet73rfqsbcsj6i5s26aklvshrp6z2tatfe.py": 2269,
+    "FASTMACE_CACHE:inductor/ii/7be174ee35071dedd894124deb15d0f569908ec15cbb6e92043030bd2459c504.best_config": 258,
+    "FASTMACE_CACHE:inductor/ii/c1ccf2c4d596d3cb6ef4ae8779857c1fab993e82d83f6990f283571aae67a816.best_config": 258,
+    "FASTMACE_CACHE:inductor/r2/cr2itnsyc2u2zdzrv6zoknealoopcjtw4hyyzbwp2sjwqviac5lh.py": 13122,
+    "FASTMACE_CACHE:inductor/hn/c0acce1c1974e29529f82c46e4a925ef3485be0d36dbb849d784b9a9d0fc22dc.best_config": 258,
+    "FASTMACE_CACHE:inductor/kf/bcf15a4e712eb978e09d3b94504c421ee5301e2807b189532903bce0aa36cae1.best_config": 258,
+    "FASTMACE_CACHE:inductor/kf/714a16c18e85f13f56a89d072595cbe752d55ca0718b0f2ba5c7302cce3673b3.best_config": 258,
+    "FASTMACE_CACHE:inductor/kl/75c031edbaf1562e54fc8a8811f4f376eca8bccdf596f44d171f0ed8fb8b267b.best_config": 258,
+    "FASTMACE_CACHE:inductor/dy/e0d3f0a23b632261d94403ef1104084ccd0b69b64fbe5ba6b52fa9484899a075.best_config": 258,
+    "FASTMACE_CACHE:inductor/6k/3fc507f8202341d9e1c34ae8838c38fa5f3dbc2d1a27ca67e6b1388c5d48c479.best_config": 258,
+    "FASTMACE_CACHE:inductor/hv/3ea822ca8f61004da3ddafe8292fa8e5bf84aae7a1ebd6c4aae2f402e9481648.best_config": 258,
+    "FASTMACE_CACHE:inductor/x5/a4ced5b00dfdbf584ecdb13967030651b0a9f20bd38e04d61796f39b2937eb83.best_config": 259,
+    "FASTMACE_CACHE:inductor/4a/e933b7af483cd7b44cc6b6da0f5576d6de9bc6dae2c849f7a6155777c2395923.best_config": 258,
+    "FASTMACE_CACHE:inductor/mu/7ad68e7085909a20405a036c2825d2e9c1efbd8c7fea3bc72971070ab9334f1d.best_config": 259,
+    "FASTMACE_CACHE:inductor/dp/f5ca15f28689ada206a91d08664b12834974200759f4c6f742b945c3e79fb90e.best_config": 258,
+    "FASTMACE_CACHE:inductor/6y/7f3508466e2e110737776a051d1fd7b78bc4e7677b5d24ed6dd2b2186af07831.best_config": 258,
+    "FASTMACE_CACHE:inductor/qn/0b5a8d13565ae23981236688fcf381a88682ec99a352509f80cda88530500bd2.best_config": 258,
+    "FASTMACE_CACHE:inductor/cd/822bcc9bf95bef9041731cc2a30ca2c9def43a796d5048fefd0c32f9c40e11dc.best_config": 258,
+    "FASTMACE_CACHE:inductor/nz/0831760c31673bd14c399dba97a6c9aebfc1f02092a3134842f331c35e4938d4.best_config": 258,
+    "FASTMACE_CACHE:inductor/73/8165cd8037cfa85413dcf09c8724acd1fbe700065016f206af802464d1e5c39a.best_config": 258,
+    "FASTMACE_CACHE:inductor/zx/3a1037f2fc2ad96752e3f6e9bdc336c4fad22f8a7dc2899ba04e88486eea0970.best_config": 258,
+    "FASTMACE_CACHE:inductor/is/2db93391a1152420a00f1bf87d1683c6f24e3c51665f2d32c36b73a630d9594b.best_config": 258,
+    "FASTMACE_CACHE:inductor/nj/3767288ab8d218b0ee191320e59658ea0b56bc1df1aaeaacc723a97354c1cc79.best_config": 258,
+    "FASTMACE_CACHE:inductor/wx/cd1706f3019d41d1e9765d101f8c5eb7b84020ec68bc85c5e2cea977cac61292.best_config": 258,
+    "FASTMACE_CACHE:inductor/xg/c7266a160c252be3d60bd66bb8584394f208b0cab226df0eaf99e327c02d4846.best_config": 258,
+    "FASTMACE_CACHE:inductor/m6/14cca9467d18cabd260b7b1a1b87059c19b55c25805cb89f2e000ecabaac6d5e.best_config": 259,
+    "FASTMACE_CACHE:inductor/rt/70f861404208b2f76fb06e7372ab5ade82f5b5fbd1aa192390b16a94fc755855.best_config": 258,
+    "FASTMACE_CACHE:inductor/wc/44530fe36636b588958917d52804e039cb7e5956e9bdb6a09a45eef8c10b09ff.best_config": 258,
+    "FASTMACE_CACHE:inductor/em/38c701a0554b488d47ab3b1b65eb721d9a785f767984f0adcb3ec3a9f77c6a9d.best_config": 258,
+    "FASTMACE_CACHE:inductor/we/c8954b0e2502adc97e4a84c8500d8c90be9e8aabb05fe813eeaf91876a236b3b.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:7m/c7mqzwuyjtqfs7bkhrghs5w42crkjiera463uhfjgwgge2ncmpmu.py": 2167,
+    "TORCHINDUCTOR_CACHE_DIR:t4/cac4d4f9f091cb9de9f26800909ac93fc6a2155ec8625d60398e45c9e980263c.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:34/a5426bb72dc3f777ea1a88c72ff157258b4b1a7db492c13d3c2f7c7534379eb8.best_config": 272,
+    "TORCHINDUCTOR_CACHE_DIR:i4/daca420bc1bbc92363d7e29cfbe96e59691856276e9d17d6dbbb450056c79f6f.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:e4/b66c151be9fcd531b28571e9769303493f3f9e5734976488cc803d2abf311afb.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:e4/b15bc213fd836281c3ff12b448b83481a414db1bd9d3a45ed3d6610a1271beac.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:s5/248878df511116d339fa3d7a47502df615be4b78b06fa77008bc27c3c759a0e7.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:4z/1e08c144300a8c0ce17529b1faff5c38f5a5800dcd5d35474eda75205190106c.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:ws/e475a0b450f8f1b8aa44cd53c28b08eaa587747865b7acdfc7566566c2596b60.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:im/14aa2d6d3b264b6b0701c47f839fa9f04da344d0159293d6e894b0489b3a0947.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:rx/fd4bda1348f4b487891fa8ab815c2f1bbce3ff9b903385571119c9f908111226.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:lu/ec56a375b3aa150e97f2855e829f572a9c54829a09f40cf601b14c50e94754e2.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:pf/c241427d1b9e5a1fd8b3a33b816d46cf9f73ea81932ee17df645b9895ef69312.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:yw/838f48b2ca784ade3ba222fa193fe5da51f05bc79ed6916db9816ef81f52909a.best_config": 257,
+    "TORCHINDUCTOR_CACHE_DIR:nc/e43baf313a45b06243ea0ec86d9dc48da9045bc1e013b6d1f1b362866b00eba5.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:sw/12e9268ab05f78786a5b390ab1a07953e5e3f6dffe421b07d2be8a6fce962250.best_config": 256,
+    "TORCHINDUCTOR_CACHE_DIR:yh/235ce158f04ac25c8fccbfaf21311ab3dddb6c8cbae6c383d5033622153ef36e.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:dl/d85f42b987ec5f828b56671cb77b56abf05702969ce4cf77ec504c4ff890b549.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:g7/cg7hocjushnld2gw65d4h5hqv2zu65r6z74edp5chjbsyxcjfmig.py": 5977,
+    "TORCHINDUCTOR_CACHE_DIR:2d/883d1de94a9df19ff32dedbd516c793f03d50eaffd5d786f7016a9c28d6c8afe.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:el/4577bab08398479450c1c7d7b1b9b5a99d4dac9ff4b203c245c6117b4d44fe08.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:3v/5cc30b2f1f7a0ea8291eecac5fada142b7c0f27e37d14c7d33dabd19612d2d7e.best_config": 256,
+    "TORCHINDUCTOR_CACHE_DIR:v2/692b241bdbb0294bbad30689e888a9c0371ec1de6a58d1cbbc2a1fc070a9092d.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:qs/fb9104ee8d3ec33cb468e31f8d391ede6bb6c421e209f0afa95bb560644f9165.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:j4/7635281e42d8e917b43b77fb6011cb7f50fe3ced9ad5afaa8e004f2dec67cf94.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:fxgraph/or/forg7y4wvbn363dbwq3i2v76grl3jcc7ycm4hoawin6qcdxlqnx3/el4ohhufsesivhx7chxdsztffaobhfgpzeywhow3ogy5o2mdoyl": 113691,
+    "TORCHINDUCTOR_CACHE_DIR:fxgraph/aw/faw4rrm5cr2relsxkvrilbsinhkd25zsvhyijz4kpmr6hf4nlaam/2tmmlomsi5eleu2mekyoqg6d6rjydq5dtelnlmokodoykpg3y2k": 224835,
+    "TORCHINDUCTOR_CACHE_DIR:qc/6045d84e15e3c259fa5379a92da9e43801c6a2f4e24797941db5011da87ac1aa.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:yk/6dd2c2cc8c82c5d49a7ef02479afe697d922fa69c8f8c2c6625360b277170182.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:v6/2bbe65863e06f1d654b17b00017eb5e326c0da3b47d2ea339625ded52dfd0e7b.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:4g/fd382e2c4ea315dd7b389b340796b775d2a4af4f15d423c7634d75ab03954b27.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:6w/680552412bf2027fbe415f03f8f8f5f8fd42c5ecc3fdc3b12ca10d60c01fa6ba.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:b7/ed1498cd411a97d06dce2a860b758d38af50dc2787f4edcfc4c7964e1897253e.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:sk/b0b5acc77c780400fbd9bd8af2fdc587caa24451de8b9c299507dc7c8ec72ba3.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:no/cnoqzogb7ofngr2vezfkiesgcezlhlyrexcqmwqvbezhwutn7pp7.py": 2837,
+    "TORCHINDUCTOR_CACHE_DIR:nx/e6dea7e1b4c867822fce58de8c0f6441c7546cb2b7012740797f0a418c374131.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:ak/959907651fa2a00cc955701d74b671a69d17f5de0c7ca308c8948105dfbc776f.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:k2/fb623765ded75d526628becac248428d50481ca01084274653dea69c2fc15f90.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:k2/f9334ce716b0a8d0218015b85283d882278b870776ec949aa36a3ba7c0a5df6f.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:kj/f6838e2fc1fc604e24883c27d3d478f1d440530226f5031f9e10b633a02832ea.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:6b/0e957ac4976205428c7a1a2198e6aef15cec1e328dabe5d4e5f7c2e01d78189c.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:jl/7bbb1faa5cc46646e862446b4466b6b9467091f4d83e72bd26b6926f13f58cb9.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:rd/684e579ed31e3e390a5a362fe9b9c40bf70c6c4624dcdc5056f3a42261448941.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:jb/6cf1123d526a4763abc34ba27137660db3f355795b4249525581e04f2baeec9b.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:6i/abb2d1b7c1a350e0170f1fd15b18581d37c973bbf23360ea882344dd44ecae89.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:2u/d517975f6dfe3b2b0773433e60fb330b5a870b6cf14ddadc8192537527e42f68.best_config": 257,
+    "TORCHINDUCTOR_CACHE_DIR:yi/adfce58b008353bb5c3eb31079b4b36fcef5495a8a7270cb40d9eac466cd9944.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:5p/35d1e68566499da2b6bbf920f4a84e8800d57b7ee56e8347eb80267730d214b6.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:aotautograd/a5cm4xkw7psrvedrkdzwhueqi62sbktn3aom335ql65jv2jflb24/ewtwtg3kdoyvkigox6vlwytnvhnf5minasdum7rmudfxmhwf6ee": 84280,
+    "TORCHINDUCTOR_CACHE_DIR:aotautograd/a2eehe67ooxgnl7f775aoh6qtnrjbygsawq4cgtoohgiceiazte7/7ldyknogz55m2huf3frptfr7df2pgsg5czhbqfwkhzlfak22t3a": 78998,
+    "TORCHINDUCTOR_CACHE_DIR:nd/23e1d86b408f3691578f68c567584e45733e948229632b4f467c0bdae6dd72ca.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:nd/cndqzqoylyx4a7dewfet73rfqsbcsj6i5s26aklvshrp6z2tatfe.py": 2269,
+    "TORCHINDUCTOR_CACHE_DIR:ii/7be174ee35071dedd894124deb15d0f569908ec15cbb6e92043030bd2459c504.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:ii/c1ccf2c4d596d3cb6ef4ae8779857c1fab993e82d83f6990f283571aae67a816.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:r2/cr2itnsyc2u2zdzrv6zoknealoopcjtw4hyyzbwp2sjwqviac5lh.py": 13122,
+    "TORCHINDUCTOR_CACHE_DIR:hn/c0acce1c1974e29529f82c46e4a925ef3485be0d36dbb849d784b9a9d0fc22dc.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:kf/bcf15a4e712eb978e09d3b94504c421ee5301e2807b189532903bce0aa36cae1.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:kf/714a16c18e85f13f56a89d072595cbe752d55ca0718b0f2ba5c7302cce3673b3.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:kl/75c031edbaf1562e54fc8a8811f4f376eca8bccdf596f44d171f0ed8fb8b267b.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:dy/e0d3f0a23b632261d94403ef1104084ccd0b69b64fbe5ba6b52fa9484899a075.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:6k/3fc507f8202341d9e1c34ae8838c38fa5f3dbc2d1a27ca67e6b1388c5d48c479.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:hv/3ea822ca8f61004da3ddafe8292fa8e5bf84aae7a1ebd6c4aae2f402e9481648.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:x5/a4ced5b00dfdbf584ecdb13967030651b0a9f20bd38e04d61796f39b2937eb83.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:4a/e933b7af483cd7b44cc6b6da0f5576d6de9bc6dae2c849f7a6155777c2395923.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:mu/7ad68e7085909a20405a036c2825d2e9c1efbd8c7fea3bc72971070ab9334f1d.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:dp/f5ca15f28689ada206a91d08664b12834974200759f4c6f742b945c3e79fb90e.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:6y/7f3508466e2e110737776a051d1fd7b78bc4e7677b5d24ed6dd2b2186af07831.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:qn/0b5a8d13565ae23981236688fcf381a88682ec99a352509f80cda88530500bd2.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:cd/822bcc9bf95bef9041731cc2a30ca2c9def43a796d5048fefd0c32f9c40e11dc.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:nz/0831760c31673bd14c399dba97a6c9aebfc1f02092a3134842f331c35e4938d4.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:73/8165cd8037cfa85413dcf09c8724acd1fbe700065016f206af802464d1e5c39a.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:zx/3a1037f2fc2ad96752e3f6e9bdc336c4fad22f8a7dc2899ba04e88486eea0970.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:is/2db93391a1152420a00f1bf87d1683c6f24e3c51665f2d32c36b73a630d9594b.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:nj/3767288ab8d218b0ee191320e59658ea0b56bc1df1aaeaacc723a97354c1cc79.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:wx/cd1706f3019d41d1e9765d101f8c5eb7b84020ec68bc85c5e2cea977cac61292.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:xg/c7266a160c252be3d60bd66bb8584394f208b0cab226df0eaf99e327c02d4846.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:m6/14cca9467d18cabd260b7b1a1b87059c19b55c25805cb89f2e000ecabaac6d5e.best_config": 259,
+    "TORCHINDUCTOR_CACHE_DIR:rt/70f861404208b2f76fb06e7372ab5ade82f5b5fbd1aa192390b16a94fc755855.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:wc/44530fe36636b588958917d52804e039cb7e5956e9bdb6a09a45eef8c10b09ff.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:em/38c701a0554b488d47ab3b1b65eb721d9a785f767984f0adcb3ec3a9f77c6a9d.best_config": 258,
+    "TORCHINDUCTOR_CACHE_DIR:we/c8954b0e2502adc97e4a84c8500d8c90be9e8aabb05fe813eeaf91876a236b3b.best_config": 259,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.ptx": 5471,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.cubin": 9200,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/__grp__triton_poi_fused_mul_1.json": 1374,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.source": 4051,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.ttir": 3443,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.ttgir": 3806,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.llir": 3561,
+    "TRITON_CACHE_DIR:IL7ZF5JLIXZ7RNRWQBWNOXRJNYUR7HG3D56VRMBMYH2WYY22TLCQ/triton_poi_fused_mul_1.json": 1134,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.ptx": 5669,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.cubin": 9392,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/__grp__triton_poi_fused_mul_1.json": 1374,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.source": 4051,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.ttir": 3443,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.ttgir": 3806,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.llir": 3882,
+    "TRITON_CACHE_DIR:ZSXPWIO35HQO6IO2IZHUG2U7TE2SEX54IABW73OMBY6FZHC37KYA/triton_poi_fused_mul_1.json": 1134,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.ttgir": 6468,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.llir": 5540,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.source": 7772,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.json": 1177,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.ptx": 7732,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/__grp__triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.json": 1976,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.ttir": 5995,
+    "TRITON_CACHE_DIR:E3FK2ZSQB44OFNFSDVJNDR7WO37CRNJKPWCWEA4CMSHVGMNFC47A/triton_poi_fused_abs_div_lt_mul_unsqueeze_view_where_zeros_like_0.cubin": 11368,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/__grp__triton_poi_fused_ones_like_0.json": 1458,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.cubin": 8440,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.json": 1140,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.llir": 2288,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.source": 3105,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.ptx": 4258,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.ttir": 1121,
+    "TRITON_CACHE_DIR:HWW5GG2WGUQEBUHVCX7XOABTMXVIVR5C3ADC4GGGHVGHLFPUMYIA/triton_poi_fused_ones_like_0.ttgir": 1210
+   },
+   "cache_new_by_variable": {
+    "FASTMACE_CACHE": {
+     "files": 113,
+     "bytes": 682611
+    },
+    "TORCHINDUCTOR_CACHE_DIR": {
+     "files": 81,
+     "bytes": 546772
+    },
+    "TRITON_CACHE_DIR": {
+     "files": 32,
+     "bytes": 135839
+    },
+    "MACE_COMPILE_CACHE": {
+     "files": 0,
+     "bytes": 0
+    }
+   },
+   "generated": [
+    {
+     "kind": "nvrtc_source",
+     "key": "83f7e42f70132752aa3ec0ee529387666a04aa0c1082e51b0ac0075623e0ae56",
+     "detail": 140768
+    },
+    {
+     "kind": "nvrtc_source",
+     "key": "6900da7d9c077583fcffbaf2d1d5764516844bb19c414f3c6977c487f13e740f",
+     "detail": 614372
+    },
+    {
+     "kind": "fused_forward_source",
+     "key": "424c6294f82a8f990e6cae74bdea3fd7db223be095f1cbdf3ddbe8fa3126eae4",
+     "detail": 11789
+    },
+    {
+     "kind": "nvrtc_source",
+     "key": "424c6294f82a8f990e6cae74bdea3fd7db223be095f1cbdf3ddbe8fa3126eae4",
+     "detail": 11789
+    },
+    {
+     "kind": "fused_forward_source",
+     "key": "402d234064838771fb32375b62e268d8c47d1ed3067829112fc402690197da18",
+     "detail": 27973
+    },
+    {
+     "kind": "nvrtc_source",
+     "key": "402d234064838771fb32375b62e268d8c47d1ed3067829112fc402690197da18",
+     "detail": 27973
+    },
+    {
+     "kind": "nvrtc_source",
+     "key": "b2dc6821f57feb0f72d25c4ce9c2426c7cf1e7c4f587fe2fd1d693ad53242c14",
+     "detail": 107818
+    },
+    {
+     "kind": "inductor_module",
+     "key": "cwjkth2efgchrc62fzgv6b5armfchx3htm2qbqu3g4nhbnn6ii6k",
+     "detail": "cwjkth2efgchrc62fzgv6b5armfchx3htm2qbqu3g4nhbnn6ii6k.py"
+    },
+    {
+     "kind": "inductor_module",
+     "key": "cqee5kpqugva6kp5vdsfzguzyiu3hqybp5xrscsrqfqv3wft4pou",
+     "detail": "cqee5kpqugva6kp5vdsfzguzyiu3hqybp5xrscsrqfqv3wft4pou.py"
+    },
+    {
+     "kind": "inductor_module",
+     "key": "cg7hocjushnld2gw65d4h5hqv2zu65r6z74edp5chjbsyxcjfmig",
+     "detail": "cg7hocjushnld2gw65d4h5hqv2zu65r6z74edp5chjbsyxcjfmig.py"
+    },
+    {
+     "kind": "inductor_module",
+     "key": "cr2itnsyc2u2zdzrv6zoknealoopcjtw4hyyzbwp2sjwqviac5lh",
+     "detail": "cr2itnsyc2u2zdzrv6zoknealoopcjtw4hyyzbwp2sjwqviac5lh.py"
+    }
+   ]
+  }
+ ],
+ "model_load_s": 3.416177843000696,
+ "process_to_model_s": 8.326408910999817,
+ "process_total_s": 34.50670152899875
+}

@@ -92,6 +92,20 @@ def instrument_generation(graph_dump):
     _timed_extra(fused_forward, "render", "fused forward: render (all)",
                  lambda a, k, r: GENERATED.append(("fused_forward_source", _sha(r), len(r))))
 
+    from fastmace.rewrites import registry
+
+    original_check = registry.Registry.selfcheck
+
+    def selfcheck(self, name, *args, **kwargs):  # per record: which checks cost what
+        started = time.perf_counter()
+        try:
+            return original_check(self, name, *args, **kwargs)
+        finally:
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            EXTRA.append((f"self-check: {name}", started - PROCESS_T0, time.perf_counter() - started))
+
+    registry.Registry.selfcheck = selfcheck
     graphs = torch.cuda.graphs
     original_init = graphs.CUDAGraph.__init__
     original_end = graphs.CUDAGraph.capture_end
@@ -209,17 +223,30 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=5, help="relaxation steps after the build")
     p.add_argument("--label", default="")
     p.add_argument("--graph-dump", action="store_true")
+    p.add_argument("--dynamo-config", action="append", default=[], metavar="NAME=VALUE",
+                   help="set torch._dynamo.config.NAME (a Python literal) before the first build, e.g. "
+                        "caching_precompile=True (the compile-cache probe)")
     p.add_argument("--allow-busy-gpu", action="store_true")
     return p.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
+    from fastmace.model import compile as compiling
+
+    allocator = compiling.configure_allocator()  # before anything initialises CUDA (the engine checks it)
     import ab_step_time
     import numpy as np
     import torch
     from ase.io import read
 
+    import ast
+
+    import torch._dynamo.config as dynamo_config
+
+    for item in args.dynamo_config:
+        name, _, value = item.partition("=")
+        setattr(dynamo_config, name, ast.literal_eval(value))
     if not args.allow_busy_gpu and ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=False)
@@ -236,7 +263,7 @@ def main(argv=None):
                environment={k: os.environ.get(k) for k in CACHE_VARIABLES + (
                    "TORCHINDUCTOR_COMPILE_THREADS", "CUDA_VISIBLE_DEVICES")},
                args={k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
-               wrapped=wrapped, structures=[])
+               wrapped=wrapped, cuda_allocator=allocator, structures=[])
     started = time.perf_counter()
     model = fm.load("mh1", head=args.head, checkpoint=args.checkpoint)
     out["model_load_s"] = time.perf_counter() - started

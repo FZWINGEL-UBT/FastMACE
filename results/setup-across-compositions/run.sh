@@ -11,6 +11,7 @@
 #   chain-warm        the same again in a new process (the shared cache now warm)
 #   graphs            NaCl, NaCl compressed 0.97 (another edge size), NbCl5, NaNbO3 in one process, warm shared
 #                     cache, every CUDA graph dumped as DOT (no timing)
+#   graphs-edges      NaCl and NaCl compressed 0.90, NbCl5 and NbCl5 compressed 0.95 (other edge buckets), as graphs
 set -u -o pipefail
 MODE=$1
 ROOT=$2
@@ -28,11 +29,12 @@ cache_env() {
 declare -A CIF=([NaCl]=mp-22862_NaCl [Na2O]=mp-2352_Na2O [NaNbO3]=mp-4514_NaNbO3 [NbOCl3]=mp-556422_NbCl3O
   [NbCl5]=mp-23307_NbCl5 [TaCl5]=mp-29831_TaCl5 [NaTaCl6]=mp-28179_NaTaCl6 [NaClO4]=mp-22968_NaClO4)
 ORDER=(NaCl Na2O NaNbO3 NbOCl3 NbCl5 TaCl5 NaTaCl6 NaClO4)
-spec() { echo "$1=$S/${CIF[$1]}.cif$2"; }
+spec() { echo "$1=$S/${CIF[$1]}.cif${2:-}"; }
 run() {  # name label structures...
   local name=$1 label=$2; shift 2
   [ -e "$ROOT/$name" ] && { echo "$ROOT/$name exists; skipped"; return 0; }
   echo "$(date -u +%FT%TZ) start $name (FASTMACE_CACHE=$FASTMACE_CACHE)" | tee -a "$ROOT/run.log"
+  echo "  structures: $*" >> "$ROOT/run.log"
   "$PY" -W ignore "$FM/tools/bench/setup_compositions.py" --output "$ROOT/$name" --checkpoint "$CKPT" \
     --label "$label" --structures "$@" ${EXTRA:-} > "$ROOT/$name.log" 2>&1
   echo "$(date -u +%FT%TZ) exit $? $name" | tee -a "$ROOT/run.log"
@@ -51,5 +53,8 @@ case $MODE in
   graphs)
     cache_env "$ROOT/cache-chain"; EXTRA=--graph-dump
     run graphs graphs "$(spec NaCl)" "NaCl-0.97=$S/${CIF[NaCl]}.cif:0.97" "$(spec NbCl5)" "$(spec NaNbO3)" ;;
+  graphs-edges)  # two padded edge sizes of one composition: compressed cells have more edges
+    cache_env "$ROOT/cache-chain"; EXTRA=--graph-dump
+    run graphs-edges graphs-edges "$(spec NaCl)" "NaCl-0.90=$S/${CIF[NaCl]}.cif:0.90" "$(spec NbCl5)"       "NbCl5-0.95=$S/${CIF[NbCl5]}.cif:0.95" ;;
   *) echo "unknown mode $MODE"; exit 2 ;;
 esac
