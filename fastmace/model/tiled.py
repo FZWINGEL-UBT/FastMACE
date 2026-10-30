@@ -320,9 +320,10 @@ class TiledForceField:
                 node_inter = self.model.scale_shift(node_es, self.heads)
                 from fastmace.model import energy as energy64
 
-                e0 = energy64.node_e0(data, None) if energy64.NODE_E0_KEY in data else None
-                if e0 is None:
-                    raise ValueError("TiledForceField needs the float64 energy treatment (float64_energy=True)")
+                if energy64.NODE_E0_KEY in data:
+                    e0 = data[energy64.NODE_E0_KEY]
+                else:  # a float64 model summed natively: its own table
+                    e0 = self.model.atomic_energies_fn(self.node_attrs)[self.arange, self.heads].double()
                 energy = (e0 + node_inter.double()).sum().reshape(1)
                 out_stress = None
                 if stress:
