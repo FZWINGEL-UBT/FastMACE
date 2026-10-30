@@ -86,7 +86,9 @@ def _chunk_ops():
     def pieces(inputs, natoms, start, stop):
         return [x[start:stop] if x.dim() and x.shape[0] == natoms else x for x in inputs]
 
-    @torch.library.custom_op("fastmace_probe::atom_chunked", mutates_args=())
+    # Explicit schemas: this module's annotations are strings (from __future__ import annotations).
+    @torch.library.custom_op("fastmace_probe::atom_chunked", mutates_args=(),
+                             schema="(Tensor[] inputs, int key) -> Tensor")
     def forward(inputs: list[torch.Tensor], key: int) -> torch.Tensor:
         run, chunks, _ = _SEGMENTS[key]
         natoms = inputs[0].shape[0]
@@ -97,7 +99,8 @@ def _chunk_ops():
     def _(inputs, key):
         return inputs[0].new_empty((inputs[0].shape[0], *_SEGMENTS[key][2]))
 
-    @torch.library.custom_op("fastmace_probe::atom_chunked_backward", mutates_args=())
+    @torch.library.custom_op("fastmace_probe::atom_chunked_backward", mutates_args=(),
+                             schema="(Tensor[] inputs, Tensor grad, bool[] wanted, int key) -> Tensor[]")
     def backward(inputs: list[torch.Tensor], grad: torch.Tensor, wanted: list[bool], key: int) -> list[torch.Tensor]:
         run, chunks, _ = _SEGMENTS[key]
         natoms = inputs[0].shape[0]
