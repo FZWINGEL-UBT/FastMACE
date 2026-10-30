@@ -39,6 +39,7 @@ def parse_args(argv=None):
     p.add_argument("--mode", choices=("eager", "padded", "graphs", "compiled"), default="eager",
                    help="TileConfig.mode; 'compiled' builds the compiled evaluation plan (its whole-system call is "
                         "then the compiled model's)")
+    p.add_argument("--bucket", type=float, default=None, help="TileConfig.bucket (default: TileConfig's)")
     p.add_argument("--path", choices=("tiled", "whole", "both"), default="both")
     p.add_argument("--steps", type=int, default=200)
     p.add_argument("--timestep-fs", type=float, default=2.0)
@@ -108,9 +109,12 @@ def main(argv=None):
         plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                       dynamic_edges=False))
     field = planner.build_evaluation(plan, user, atoms)
-    tiled = TiledForceField(field, TileConfig(args.receivers, mode=args.mode))
+    config = TileConfig(args.receivers, mode=args.mode)
+    if args.bucket is not None:
+        config = dataclasses.replace(config, bucket=args.bucket)
+    tiled = TiledForceField(field, config)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=len(atoms), receivers=args.receivers,
-                  mode=args.mode,
+                  mode=args.mode, bucket=config.bucket,
                   steps=args.steps, timestep_fs=args.timestep_fs, temperature_K=args.temperature,
                   device=torch.cuda.get_device_name(), source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"),
                   skin=float(getattr(plan.neighbours, "skin", float("nan"))), runs={})
