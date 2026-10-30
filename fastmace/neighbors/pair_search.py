@@ -16,9 +16,12 @@ import functools
 import torch
 
 BLOCK = 32  # atoms per tile side (fixed for every crystal and GPU)
-# CUDA's largest grid y and z dimensions. Receiver tiles beyond it continue on the z axis, so the screen launches
-# for any atom count up to BLOCK * MAX_GRID_Y**2 (the 2-D grid stopped at BLOCK * 65,535, about 2.1M atoms).
+# CUDA's largest grid y dimension.
 MAX_GRID_Y = 65535
+# The most blocks one screen launch may have. Triton's launcher multiplies gridX * gridY * gridZ as 32-bit ints and
+# launches only if the product is positive: above 2**31 - 1 blocks it overflowed and the screen silently did not
+# run (no pairs, no error: NbCl5 at 1.73M and 2.0M atoms, 31 October 2026).
+MAX_GRID_BLOCKS = 2**31 - 1
 SCREEN_MARGIN = 0.01  # Å, float32 screen above the float64 decision
 CPU_CHUNK = 1 << 22  # elements of the (images, rows, atoms) distance block per CPU chunk
 
@@ -30,9 +33,9 @@ def _triton_kernel():
     import triton.language as tl
 
     @triton.jit
-    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, grid_y,
-               BLOCK: tl.constexpr, HALF: tl.constexpr):
-        tile = tl.program_id(1) + tl.program_id(2) * grid_y  # receiver tile (``_grid``)
+    def screen_tile(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, tile,
+                    BLOCK: tl.constexpr, HALF: tl.constexpr):
+        """Screen sender tile ``program_id(0)`` against receiver tile ``tile`` over every image."""
         senders = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         receivers = tile * BLOCK + tl.arange(0, BLOCK)
         valid = (senders < natoms)[:, None] & (receivers < natoms)[None, :]
@@ -64,18 +67,34 @@ def _triton_kernel():
                 code = tl.reshape(image * pairs + pair, [BLOCK * BLOCK])
                 tl.store(out_ptr + slot, code, mask=(flat > 0) & (slot < capacity))
 
+    @triton.jit
+    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, grid_y, rounds,
+               BLOCK: tl.constexpr, HALF: tl.constexpr, SINGLE: tl.constexpr):
+        if SINGLE:  # one receiver tile per program (up to 46,340 tiles): the 2-D grid's code
+            screen_tile(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity,
+                        tl.program_id(1), BLOCK, HALF)
+        else:  # receiver tiles program_id(1) + k * grid_y (``_grid``)
+            for k in range(rounds):
+                screen_tile(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity,
+                            tl.program_id(1) + k * grid_y, BLOCK, HALF)
+
     return kernel
 
 
 def _grid(natoms, max_grid_y=MAX_GRID_Y):
-    """(grid, grid_y) of the screen: sender tiles on x, receiver tiles ``y + z * grid_y`` on y and z.
+    """(grid, grid_y, rounds) of the screen: sender tiles on x; a program on y screens receiver tiles
+    ``y + k * grid_y`` for ``k < rounds`` (tiles past the end hold no receiver: masked).
 
-    Up to ``max_grid_y`` receiver tiles the grid is the 2-D one, (tiles, tiles, 1). Beyond, the receiver tiles
-    take ``ceil(tiles / max_grid_y)`` z layers; the last layer's tiles past the end hold no receiver (masked).
+    ``grid_y`` is the receiver tile count unless that exceeds CUDA's y limit (``max_grid_y``) or would make the
+    launch more than ``MAX_GRID_BLOCKS`` blocks, which Triton's launcher would skip without an error. Up to 46,340
+    tiles (1.48M atoms) the grid is the 2-D one, ``(tiles, tiles, 1)`` with one round, as before.
     """
     tiles = max(1, -(-natoms // BLOCK))
-    grid_y = min(tiles, int(max_grid_y))
-    return (tiles, grid_y, -(-tiles // grid_y)), grid_y
+    grid_y = max(1, min(tiles, int(max_grid_y), MAX_GRID_BLOCKS // tiles))
+    if tiles * grid_y > MAX_GRID_BLOCKS or tiles > MAX_GRID_BLOCKS:
+        raise ValueError(f"the pair screen of {natoms} atoms needs {tiles} x {grid_y} blocks, more than one launch "
+                         f"takes ({MAX_GRID_BLOCKS})")
+    return (tiles, grid_y, 1), grid_y, -(-tiles // grid_y)
 
 
 def _candidate_pairs_cpu(wrapped, image_vectors, screen, half=False):
@@ -100,16 +119,34 @@ def _candidate_pairs_cpu(wrapped, image_vectors, screen, half=False):
     return hits[:, 0], hits[:, 1], hits[:, 2]
 
 
+def check_found(found, wrapped, image_vectors, radius):
+    """Raise if the screen found no pair although atom 0 has a neighbour within ``radius`` (a brute-force test
+    of atom 0 against every atom and image, run only for an empty result). A launch that did not run looks like
+    a list without pairs (31 October 2026: Triton's launcher skipped grids above 2**31 blocks without an error);
+    ``_grid`` keeps launches below that, and this catches any other way the screen could come back empty."""
+    if found or wrapped.shape[0] == 0:
+        return
+    screen = (radius + SCREEN_MARGIN) ** 2
+    d = wrapped[None, :, :].float() - wrapped[None, 0:1, :].float() + image_vectors[:, None, :].float()
+    squared = (d * d).sum(dim=-1)
+    squared[:, 0] = torch.where((image_vectors.abs().sum(dim=1) == 0), float("inf"), squared[:, 0])  # no self pair
+    if bool((squared < screen).any()):
+        raise RuntimeError(f"the GPU pair screen of {wrapped.shape[0]} atoms found no pairs, but atom 0 has "
+                           "neighbours within range: the screen's launch did not run")
+
+
 def screen_into(wrapped, image_vectors, radius, out, counter, half=False, max_grid_y=MAX_GRID_Y):
     """Launch the CUDA screen into ``out`` (int64 codes) behind ``counter`` (int32, zeroed by the caller); no
     host synchronisation. Codes past ``out.numel()`` are dropped while ``counter`` still counts them, so
-    ``counter > out.numel()`` means the buffer was too small (``SkinNeighbourList.build_gpu_async``)."""
+    ``counter > out.numel()`` means the buffer was too small (``SkinNeighbourList.build_gpu_async``). The caller
+    checks an empty result with ``check_found`` when it reads the count."""
 
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
     screen = (radius + SCREEN_MARGIN) ** 2
-    grid, grid_y = _grid(natoms, max_grid_y)
+    grid, grid_y, rounds = _grid(natoms, max_grid_y)
     _triton_kernel()[grid](wrapped.float().contiguous(), image_vectors.float().contiguous(), out, counter, natoms,
-                           nimages, screen, out.numel(), grid_y, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+                           nimages, screen, out.numel(), grid_y, rounds, BLOCK=BLOCK, HALF=bool(half),
+                           SINGLE=rounds == 1, num_warps=4)
 
 
 def decode_codes(code, natoms):
@@ -123,8 +160,8 @@ def decode_codes(code, natoms):
 def screen_codes(wrapped, image_vectors, radius, state=None, half=False, max_grid_y=MAX_GRID_Y):
     """The screened pairs as int64 codes (``decode_codes``), unordered on CUDA: a view of the kept output buffer.
 
-    Arguments as ``candidate_pairs``; ``max_grid_y`` (CUDA) splits the receiver tiles over the grid's y and z
-    axes beyond that many tiles (``_grid``; smaller in tests). The codes take 8 bytes per pair; decoding them in
+    Arguments as ``candidate_pairs``; ``max_grid_y`` (CUDA) caps the receiver programs, each then screening
+    several receiver tiles (``_grid``; smaller in tests). The codes take 8 bytes per pair; decoding them in
     chunks bounds the caller's temporaries (``SkinNeighbourList.build_gpu``).
     """
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
@@ -137,15 +174,16 @@ def screen_codes(wrapped, image_vectors, radius, state=None, half=False, max_gri
     positions = wrapped.float().contiguous()
     images = image_vectors.float().contiguous()
     counter = torch.zeros(1, dtype=torch.int32, device=wrapped.device)
-    grid, grid_y = _grid(natoms, max_grid_y)
+    grid, grid_y, rounds = _grid(natoms, max_grid_y)
     while True:
         out = state.get("buffer")
         if out is None:
             out = state["buffer"] = torch.empty(max(1 << 16, 128 * natoms), dtype=torch.int64,
                                                 device=wrapped.device)
         _triton_kernel()[grid](positions, images, out, counter, natoms, nimages, screen, out.numel(), grid_y,
-                               BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+                               rounds, BLOCK=BLOCK, HALF=bool(half), SINGLE=rounds == 1, num_warps=4)
         found = int(counter.item())  # host sync (rebuild steps only)
+        check_found(found, wrapped, image_vectors, radius)
         if found <= out.numel():
             break
         out = state["buffer"] = None  # the old buffer is freed before its larger replacement

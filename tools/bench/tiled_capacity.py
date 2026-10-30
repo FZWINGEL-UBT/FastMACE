@@ -132,7 +132,11 @@ def main(argv=None):
             started = time.perf_counter()
             out = tiled(positions)
             torch.cuda.synchronize()
-            calls.append(dict(seconds=time.perf_counter() - started, **mem(before), **tiled.last))
+            entry = dict(seconds=time.perf_counter() - started, **mem(before), **tiled.last)
+            # ``allocated`` is after the call (the tiled field keeps its global state between calls); the call's
+            # true peak is what was allocated before it plus its peak above that.
+            entry.update(allocated_before=int(before), total_peak=int(before) + entry["peak_above_before"])
+            calls.append(entry)
             record["calls"] = calls
             save()
         energy = float(out.energy.reshape(-1)[0])
@@ -170,7 +174,13 @@ def main(argv=None):
                 max_abs_force=float(r_forces.abs().max()),
                 max_stress_diff=None if stress is None else float((stress - r_stress).abs().max()),
                 stress=None if r_stress is None else r_stress.cpu().tolist())
-        record["phase"] = "done"
+        # A list without pairs (or zero forces) is a failed build, not a capacity point (31 October 2026: the
+        # pair screen silently did not launch at 1.73M and 2.0M atoms).
+        valid, detail = capacity_scan.check_point(args.structure, float(field.neighbours.cutoff), n,
+                                                  int(record.get("edges_within_cutoff") or 0),
+                                                  record["tiled"]["max_abs_force"])
+        record["valid"], record["check"] = valid, detail
+        record["phase"] = "done" if record["valid"] else "invalid"
     except torch.cuda.OutOfMemoryError as error:
         record["error"] = f"OutOfMemoryError: {str(error).splitlines()[0]}"
         record["oom_at"] = record["phase"]

@@ -87,6 +87,37 @@ def parse_args(argv=None):
 # --------------------------------------------------------------------------- supercells
 
 
+# A capacity point counts only if its list has the structure's edges per atom to within this share, and its
+# forces are not all zero (31 October 2026: the GPU pair screen silently did not launch at 1.73M and 2.0M atoms,
+# and those points "ran" with no edges).
+EDGES_PER_ATOM_TOLERANCE = 0.05
+
+
+def reference_edges_per_atom(structure, cutoff):
+    """Directed edges within ``cutoff`` per atom of ``structure``'s unit cell repeated to at least 2 * cutoff + 1
+    Angstrom per lattice plane spacing (ASE's neighbour list on the CPU): the value a correct list must have."""
+    import math
+
+    import numpy as np
+    from ase.neighborlist import neighbor_list
+
+    _, cell = base_cell(structure)
+    spacings = 1.0 / np.linalg.norm(np.linalg.inv(cell.cell.array), axis=0)
+    small = cell.repeat([max(1, math.ceil((2 * cutoff + 1) / s)) for s in spacings])
+    return len(neighbor_list("i", small, cutoff)) / len(small)
+
+
+def check_point(structure, cutoff, natoms, edges, max_abs_force, reference=None):
+    """``(valid, detail)`` of a capacity point: its edges per atom against ``reference_edges_per_atom`` (within
+    ``EDGES_PER_ATOM_TOLERANCE``; thermal or rattled cells differ by a few per cent) and a nonzero largest force."""
+    reference = reference_edges_per_atom(structure, cutoff) if reference is None else reference
+    per_atom = edges / natoms if natoms else 0.0
+    deviation = abs(per_atom - reference) / reference if reference else float("inf")
+    valid = deviation <= EDGES_PER_ATOM_TOLERANCE and max_abs_force is not None and max_abs_force > 0
+    return valid, dict(edges_per_atom=per_atom, reference_edges_per_atom=reference, deviation=deviation,
+                       max_abs_force=max_abs_force, tolerance=EDGES_PER_ATOM_TOLERANCE)
+
+
 def base_cell(structure):
     """(name, unit cell Atoms) of a benchmark name or file, or ``SrTiO3``: cubic Pm-3m SrTiO3 with a = 3.905 A,
     the cell of symmetrix-xl's capacity probe (benchmarks/srtio3_capacity_probe.py)."""
@@ -384,7 +415,12 @@ def run_point(args):
             record["phases"]["steady"] = peaks()
             record["ms_per_step"] = 1e3 * seconds / args.steps
             record["edges"] = edges()
-            record["status"] = "ok"
+            ff = sim._engine.force_field
+            state_forces = getattr(getattr(sim._engine, "state", None), "forces", None)
+            valid, detail = check_point(args.structure, float(ff.neighbours.cutoff), len(atoms), int(ff.edge_count),
+                                        None if state_forces is None else float(state_forces.abs().max()))
+            record["check"] = detail
+            record["status"] = "ok" if valid else "invalid"
             try:
                 record["rebuild_transient"] = rebuild_transient()
             except Exception as problem:  # noqa: BLE001  (a measurement after the result)

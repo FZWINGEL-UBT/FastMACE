@@ -5,7 +5,7 @@
 # output is kept with the run. Everything under /mnt/homes/zwingel/fm-tiled (outputs, caches, TMPDIR).
 set -u
 W=/mnt/homes/zwingel/fm-tiled
-SRC=$W/src
+SRC=${SRC:-$W/src}  # SRC: another source copy (one a running job does not read)
 RUN=$W/runs/$1
 shift
 mkdir -p "$RUN/tmp" "$W/cache"
