@@ -4,7 +4,7 @@ The second MH-1 interaction's streaming convolution with ``fused_folded_forward`
 per-edge weights ``w = a @ W.T`` (``[E, Q]``, ``Q = 1280``) in the forward and reads them in the backward. The
 candidate never stores ``w``: the forward builds it on chip for the message only, and the backward builds it again
 per tile from ``a`` and ``W``. Before writing that backward kernel, this tool bounds its cost from parts timed on the
-real interaction's arguments (captured from one force call of the default plan):
+real interaction's arguments (captured from one eager force call of the default plan):
 
 - ``forward``: today's ``fused_folded_forward`` (``w`` stored); ``forward_nostore``: the same kernel without the
   ``w`` store (``store_w=False``);
@@ -65,9 +65,13 @@ def main(argv=None):
     frontends = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(frontends)
     frontends.thermalize(atoms, 300.0, 1)
+    from fastmace.config import EngineConfig
+
+    # Eager, so that the force call reaches WPrime.convolution in Python (the kernels are the compiled plan's).
     sim = fm.Simulation(atoms, fm.ForceField(fm.load(args.model), atoms, precision="float32"), seed=1,
                         integrator=fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0,
-                                                           friction_per_fs=0.002))
+                                                           friction_per_fs=0.002),
+                        engine=EngineConfig(compile_mode="none"))
     sim.run(steps=2)
     captured = []
     original = wp.WPrime.convolution
