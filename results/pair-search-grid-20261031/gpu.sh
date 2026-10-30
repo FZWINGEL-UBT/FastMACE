@@ -1,6 +1,7 @@
 #!/bin/bash
 # Pair-search grid fix on murphy: the GPU neighbour tests, then the same-process A/B against main's screen.
 # Idle check (run.sh's rule) before each job; everything under /mnt/homes/zwingel/fm-tiled.
+# The tests run with mace_cueq_latest (pytest); the A/B with mace_cueq_oeq.
 set -u
 W=/mnt/homes/zwingel/fm-tiled
 SRC=$W/src
@@ -21,7 +22,7 @@ site=$ENV/lib/python3.10/site-packages
 export LD_LIBRARY_PATH=$site/nvidia/cu13/lib:$site/cuequivariance_ops/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 cd "$SRC"
 idle
-"$ENV/bin/python" -m pytest -p no:cacheprovider -q -W ignore --basetemp="$OUT/bt" tests/gpu/test_neighbors_gpu.py \
+/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -m pytest -p no:cacheprovider -q -W ignore --basetemp="$OUT/bt" tests/gpu/test_neighbors_gpu.py \
   tests/gpu/test_neighbors_lean_gpu.py tests/gpu/test_d3_list_gpu.py tests/gpu/test_async_rebuild_gpu.py \
   > "$OUT/gpu-tests.log" 2>&1
 echo "gpu tests exit $?"; tail -3 "$OUT/gpu-tests.log"
