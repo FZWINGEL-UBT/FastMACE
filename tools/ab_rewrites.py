@@ -61,8 +61,9 @@ def parse_args(argv=None):
                    help="Side a's NeighbourConfig fields (e.g. skin=0.66, edge_bucket_fraction=0.025)")
     p.add_argument("--b-neighbours", nargs="*", default=[], metavar="FIELD=VALUE", help="Side b's, as --a-neighbours")
     p.add_argument("--a-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
-                   help="Module constants set while side a is built (screens; e.g. "
-                        "fastmace.kernels.oeq_streaming.fused_forward:BLOCKS_PER_SM=4), restored after")
+                   help="Module constants set while side a is built and before each of its steps (screens; e.g. "
+                        "fastmace.kernels.oeq_streaming.fused_forward:BLOCKS_PER_SM=4): what it captures again in "
+                        "warm-up (new edge sizes) reads them too")
     p.add_argument("--b-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side b's, as --a-constant")
     p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"])
@@ -145,6 +146,26 @@ class _Constants:
             setattr(importlib.import_module(module), name, value)
 
 
+class ConstantsSide:
+    """A TimedEngine whose module constants are set before every step, as ``Tf32Side`` sets its matmul mode: a
+    graph captured again outside the build (a new edge size in warm-up) reads the side's own values, not the other
+    side's (segment_gemm tile order, 30 October 2026: side a's re-captures had read side b's TILE_ORDER).
+    ``values`` holds every constant either side sets, the defaults for the ones this side leaves alone."""
+
+    def __init__(self, side, values):
+        import importlib
+        self.side = side
+        self.values = [(importlib.import_module(module), name, value) for (module, name), value in values.items()]
+
+    def step(self):
+        for owner, name, value in self.values:
+            setattr(owner, name, value)
+        self.side.step()
+
+    def __getattr__(self, name):
+        return getattr(self.side, name)
+
+
 def engine_overrides(items):
     """{field: value} of ``FIELD=VALUE`` items: a boolean EngineConfig field with true|false, a float one, or a
     string one (a choice such as ``force_graphs=keep``; EngineConfig validates it)."""
@@ -223,6 +244,8 @@ def main(argv=None):
                 recapture_sides={"a": args.a_recapture, "b": args.b_recapture}, timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
                 prepare=args.prepare, load=list(os.getloadavg()), structures={})
+    import importlib
+    defaults = {key: getattr(importlib.import_module(key[0]), key[1]) for key in {**args.a_constant, **args.b_constant}}
     for spec in args.structures:
         name, base = ab_step_time.read_structure(spec, None)
         sides, setup, lines = {}, {}, {}
@@ -245,6 +268,9 @@ def main(argv=None):
             elif args.a_recapture if side == "a" else args.b_recapture:
                 engine.invalidate_graphs("TF32 screen control: re-capture in IEEE")
             sides[side] = ab_step_time.Tf32Side(ab_step_time.FastMACESide(engine, torch), tf32, torch)
+            if defaults:
+                sides[side] = ConstantsSide(sides[side], {**defaults, **(args.a_constant if side == "a" else
+                                                                         args.b_constant)})
             setup[side] = time.perf_counter() - started
             lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()
                            if any(f"RewriteConfig.{f} " in line for f in {**args.a, **args.b})]

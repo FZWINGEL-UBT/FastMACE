@@ -36,3 +36,24 @@ def test_engine_sides_take_booleans_floats_and_choices():
     for bad in (["step_graph=on"], ["no_such_field=1"], ["force_graphs="]):
         with pytest.raises(ValueError):
             tool.engine_overrides(bad)
+
+
+def test_each_step_sets_its_sides_constants():
+    from fastmace.kernels.triton import tile_rule
+
+    seen = []
+
+    class Side:
+        engine = "engine"
+
+        def step(self):
+            seen.append(tile_rule.TRITON_NUM_WARPS)
+
+    key = ("fastmace.kernels.triton.tile_rule", "TRITON_NUM_WARPS")
+    before = tile_rule.TRITON_NUM_WARPS
+    try:
+        a, b = tool.ConstantsSide(Side(), {key: 8}), tool.ConstantsSide(Side(), {key: 4})
+        a.step(), b.step(), a.step()
+        assert seen == [8, 4, 8] and a.engine == "engine"
+    finally:
+        tile_rule.TRITON_NUM_WARPS = before
