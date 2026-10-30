@@ -112,8 +112,12 @@ class InPlaceIntoSaved(CustomGraphPass):
             if any(k.startswith("_space_") for k in kwargs) or len(bases) != 1:
                 continue  # the space is a view of its base: not handled
             base = bases[index]
+            values = {**kwargs, "space": base}
+            # Positional, in schema order: with keyword-only inputs Inductor did not free ``grad`` after the call
+            # (no ``del``), which kept the symmetric contraction's 1.6 GiB gradient alive to the end of the backward.
+            arguments = tuple(values[a.name] for a in target._schema.arguments)
             with graph.inserting_before(node):
-                graph.call_function(target, (), {**kwargs, "space": base})
+                graph.call_function(target, arguments, {})
             for user in list(node.users):
                 for use in list(user.users):
                     if use.target is torch.ops.aten.copy_.default and use.args[1] is user:
