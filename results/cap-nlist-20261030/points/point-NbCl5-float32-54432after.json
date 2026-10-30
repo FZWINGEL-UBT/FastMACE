@@ -1,0 +1,104 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-30T10:50:31.735249+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "b53e0ed9e59b06645ee7fba6a744943bdff65332",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "6x6x21",
+  "natoms": 54432,
+  "volume_A3": 1565478.557402535,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "oom",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15894315008,
+      "outside_allocator": 1208549376
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 1318,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "engine": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "builtins.RuntimeError",
+    "message": "CUDA error encountered at: file=/builds/clara-discovery/kernelcatcher/cuequivariance_ops/cuda/equivariance/uniform1d/../common/kernel.cuh line=720: call='cudaFree(nullptr)', Reason=cudaErrorMemoryAllocation:out of memory\nObtained 63 stack frames\n#1 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x3add9) [0x72d69e63add9]\n#2 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x99bc1) [0x72d69e699bc1]\n#3 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x78625) [0x72d69e678625]\n#4 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x5c5d6) [0x72d69e65c5d6]\n#5 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x69b00) [0x72d69e669b00]\n#6 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so: kernelcatcher::equivariance::uniform_1d::run_uniform_1d_cuda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, kernelcatcher::utils::Datatype, int, int, int, int, std::vector<kernelcatcher::equivariance::uniform_1d::Dimension, std::allocator<kernelcatcher::equivariance::uniform_1d::Dimension> > const&, std::vector<int, std::allocator<int> > const&, std::vector<std::vector<kernelcatcher::utils::BatchDimension, std::allocator<kernelcatcher::utils::BatchDimension> >, std::allocator<std::vector<kernelcatcher::utils::BatchDimension, std::allocator<kernelcatcher::utils::BatchDimension> > > > const&, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > > const&, std::vector<int, std::allocator<int> > const&, std::vector<kernelcatcher::utils::Datatype, std::allocator<kernelcatcher::utils::Datatype> > const&, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > > const&, std::vector<int, std::allocator<int> > const&, std::vector<int, std::allocator<int> > const&, std::vector<int, std::allocator<int> > const&, std::vector<int, std::allocator<int> > const&, std::vector<double, std::allocator<double> > const&, std::vector<int, std::allocator<int> > const&, std::vector<void*, std::allocator<void*> > const&, std::vector<unsigned long, std::allocator<unsigned long> > const&, bool, bool, void*) +0x131c [0x72d69e64fc9c]\n#7 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/_ext/cuequivariance_ops_torch_ext.cpython-310-x86_64-linux-gnu.so(+0x2aea6) [0x72d69e22aea6]\n#8 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/_ext/cuequivariance_ops_torch_ext.cpython-310-x86_64-linux-gnu.so(+0x2c40c) [0x72d69e22c40c]\n#9 in /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/_ext/cuequivariance_ops_torch_ext.cpython-310-x86_64-linux-gnu.so(+0x4ae13) [0x72d69e24ae13]\n#10 in /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/../lib/libpython3.10.so.1.0: _PyEval_EvalFrameDefault +0xacf1 [0x72da0bee0491]\n#11 in /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/../lib/libpython3.10.so.1.0: _PyFunction_Vectorcall +0x21c [0x72da0be81cdc]\n#12 in /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/../lib/libpython3.10.so.1.0: _PyEval_EvalFrameDefault +0x8344 [0x72da0beddae4]\n#13 in /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/../lib/libpython3.10.so.1.0: _PyFunction_Vectorcall +0x21c [0x72da0be81cdc]\n#14 in /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/../lib/libpython3.10.so.1.0: _PyEval_EvalFrameDefault +0x8344 [0x72da0beddae4]\n#15 in /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/../lib/libpython3.10.so.1.0: _PyFunction",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/simulation.py:696 _build_and_prepare: self._engine = planner.build(self._plan, ff, atoms)",
+      "fastmace/planner/minimal.py:1141 build: engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(",
+      "fastmace/planner/fixed.py:1440 build: return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,",
+      "fastmace/engine/graph.py:235 __init__: self._initial_forces()",
+      "fastmace/engine/graph.py:1123 _initial_forces: self._force_stage()",
+      "fastmace/engine/graph.py:1127 _force_stage: out = self.force_field(self.state.positions)",
+      "fastmace/model/forces.py:730 __call__: out = self._outputs(positions)",
+      "fastmace/model/forces.py:742 _outputs: return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)",
+      "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:179 _: ext.uniform_1d.run("
+    ],
+    "memory": {
+      "max_allocated": 14064401408,
+      "max_reserved": 16156459008,
+      "allocated": 13577341952,
+      "reserved": 16156459008,
+      "inactive_split_bytes": 0,
+      "active_bytes": 14064401408,
+      "reserved_bytes": 16156459008,
+      "alloc_retries": 0,
+      "segments": 0
+    },
+    "causes": []
+  },
+  "times": {
+    "load_s": 2.9465565499999684
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

@@ -20,8 +20,11 @@ artefact: its scan went from 18³ straight to 19³. At 49,248 atoms the branch's
 14.69 GiB reserved). On `main`, one more rebuild after the run ran out of memory. 51,984 atoms (18×19×19) fails in
 the warm-up with the change.
 
-**Step time: no change.** In the same-process A/B the ratio is RESULT_AB. The work per step is the compaction, and
-it now reads 3 unit-shift floats per slot instead of 3 float64 shifts and 3 float32 shifts.
+**Step time: no change.** In the same-process A/B, in both build orders, b/a is 0.997–0.998 at 1,944 NbCl5 atoms and
+1.000–1.004 at 9,216. The work per step is the compaction. It now reads 3 unit-shift floats per slot, instead of
+3 float64 shifts and 3 float32 shifts, and computes the shifts from them.
+
+**The force/stress gate passed** on NaCl, NbCl5 and NaNbO3 with the default plan.
 
 ## Where the neighbour list's memory was
 
@@ -105,7 +108,25 @@ shell, so the per-slot saving counts double per edge. That rule is not changed h
 Median step in ms. Order `ab` uses the abab block pattern and order `ba` uses abba. Ratios are b/a, with the range over
 block pairs in brackets.
 
-RESULT_TABLE
+| Cell | Blocks | order ab: a / b, b/a | order ba: a / b, b/a |
+| --- | --- | --- | --- |
+| NbCl5 3×3×3, 1,944 atoms | 12 × 300 steps | 17.91 / 17.87, **0.997** (0.992–1.007) | 17.80 / 17.76, **0.998** (0.986–1.016) |
+| NbCl5 4×4×8, 9,216 atoms | 8 × 100 steps | 88.25 / 88.24, **1.000** (0.995–1.011) | 88.35 / 88.73, **1.004** (0.993–1.011) |
+
+Every run was valid: nothing compiled while timed, and no other process used the GPU.
+
+- **Rebuilds** happen in the timed steps on both sides, every 10–20 steps at 300 K. Before the timing, the
+  constant is restored, so both sides' rebuilds take the chunked path. Each list keeps its layout from
+  construction. The rebuild's cost against the one-chunk build was not timed separately; at these sizes it is one
+  or two chunks.
+- **Setup** (build plus `prepare`, the side built second, one sample each):
+  - 3×3×3: 13.0 s lean, 13.3 s before;
+  - 4×4×8: 20.0 s lean, 14.8 s before.
+  - The 4×4×8 difference is a single pair of samples. The lean list adds no work at build: the chunked build is
+    two chunks there, and the captures are the same. It is noted, not explained.
+
+The separate-process step times of the capacity points (625 against 528 ms at 49,248 NbCl5 atoms) are not a
+comparison. Those are single processes near the memory limit, and the A/B is the measurement.
 
 ## Exactness and tests
 
@@ -133,7 +154,16 @@ RESULT_TABLE
   - **One test fixed along the way:** the first run of that MD test used the float32 default plan. Its atomic
     additions differ between processes, so the trajectories differed with the option on and off. The test now uses
     the deterministic process, like `test_fused_integrator_gpu.py`.
-- No force/stress gate or NVE drift: nothing changes numerically.
+- **Force/stress gate, default plan** (`tools/force_stress_gate.py --engine fastmace`, commit `70830c01`): **passed** on
+  all three cells. Error against float64, with its ratio to the float32 ASE calculator's error in brackets:
+
+  | Cell | energy (eV) | forces (eV/Å) | stress (eV/Å³) |
+  | --- | ---: | ---: | ---: |
+  | NaCl | 1.3e-4 (0.17) | 3.6e-6 (0.92) | 3.5e-8 (0.38) |
+  | NbCl5 | 5.6e-5 (0.08) | 8.3e-5 (1.04) | 3.9e-8 (0.37) |
+  | NaNbO3 | 6.1e-4 (0.49) | 1.4e-4 (1.02) | 2.1e-7 (0.69) |
+
+- **NVE drift: not run.** The trajectories are bitwise those of the layout before.
 
 ## Setup
 
@@ -147,5 +177,7 @@ RESULT_TABLE
 - **Model:** MH-1 (`mh1-r2scan`), hybrid backend, float32, Langevin NVT at 300 K.
 - **Raw records** in `results/cap-nlist-20261030/`:
   - the capacity points: `points/`;
+  - the gate: `gate-metadata.json` and `gate-summary.txt`;
+  - the job log of every reservation: `jobs.log`;
   - the A/Bs: `ab/`;
   - the run script: `local.sh`.
