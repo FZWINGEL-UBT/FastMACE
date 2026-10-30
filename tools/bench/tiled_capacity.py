@@ -99,8 +99,10 @@ def main(argv=None):
         record["phase"] = "build"
         started = time.perf_counter()
         user = fm.ForceField(fm.load(args.model), atoms, precision="float32")
+        record["phases"]["user"] = mem()
         planner = minimal.default_planner(user)
         plan = planner.plan_evaluation(user, atoms)
+        record["phases"]["plan"] = mem()
         eager = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                        dynamic_edges=False))
         field = planner.build_evaluation(eager, user, atoms)
@@ -172,6 +174,10 @@ def main(argv=None):
     except torch.cuda.OutOfMemoryError as error:
         record["error"] = f"OutOfMemoryError: {str(error).splitlines()[0]}"
         record["oom_at"] = record["phase"]
+        import traceback
+
+        record["traceback"] = [f"{frame.filename}:{frame.lineno} {frame.name}: {frame.line}"
+                               for frame in traceback.extract_tb(error.__traceback__)][-25:]
     save()
     print(json.dumps({k: record.get(k) for k in ("atoms", "phase", "error", "calls", "tiled", "reference")},
                      default=str)[:3000])
