@@ -127,6 +127,19 @@ class LoadedModel:
         """The (converted) torch model."""
         return self.calculator.models[0]
 
+    def template_cache(self, create=True):
+        """The converted-model templates of this pristine model (``fastmace.model.templates``), shared by every
+        ``ForceField`` made from it, so a new composition copies the conversion instead of converting again
+        (setup-across-compositions F3). Kept in the instance, outside the dataclass fields: ``dataclasses.replace``
+        (a plan's private copy) does not carry it. ``create=False``: None until the first plan made one."""
+        cache = self.__dict__.get("_templates")
+        if cache is None and create:
+            from fastmace.model import templates
+
+            cache = templates.TemplateCache()
+            object.__setattr__(self, "_templates", cache)  # frozen dataclass: the cache is not a field
+        return cache
+
     def provenance(self):
         """The model block of metadata.json."""
         return {

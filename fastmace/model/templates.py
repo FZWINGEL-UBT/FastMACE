@@ -13,8 +13,10 @@ plans (SPEC §8.7). The template itself never reaches a plan. Design and measure
 - **Key:** checkpoint hash, head, backend, dtype, device, the conversion options, the process
   patches that act on the conversion (``CONVERSION_PATCHES``) and the package versions
   (``conversion_key``).
-- **Owner:** each ``ForceField`` holds its own cache; nothing is module-level. At most
-  ``MAX_TEMPLATES`` templates, least recently used out; ``release`` frees them.
+- **Owner:** the pristine ``LoadedModel`` (``LoadedModel.template_cache``), so every ``ForceField`` of
+  one ``fm.load`` result shares it: a new composition copies the conversion instead of converting
+  again (setup-across-compositions F3). Nothing is module-level. At most ``MAX_TEMPLATES``
+  templates, least recently used out; ``release`` frees them.
 - **Guard:** a template that changed since it was stored (a tensor replaced or changed in place)
   raises ``TemplateChangedError`` instead of being copied.
 
@@ -90,7 +92,7 @@ def private(loaded):
 
 
 class TemplateCache:
-    """The templates of one ``ForceField``: conversion key -> (template, fingerprint), at most ``limit``."""
+    """The templates of one pristine model: conversion key -> (template, fingerprint), at most ``limit``."""
 
     def __init__(self, limit: int = MAX_TEMPLATES):
         self.limit = int(limit)

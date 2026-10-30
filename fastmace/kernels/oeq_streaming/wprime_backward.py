@@ -26,12 +26,10 @@ gradients are added atomically, as in the vendored backward.
 from __future__ import annotations
 
 import ctypes
-import itertools
 
 import torch
 
 _REGISTRY = {}
-_IDS = itertools.count()
 # The w-rebuilding backward's launch for recompute_conv_weights: one path part, four edges per batch (the fastest of
 # the shapes timed in docs/validation/capacity-T08-inventory.md section 2).
 REBUILD_PARTS = 1
@@ -273,7 +271,7 @@ class WPrimeBackward:
     def __init__(self, kernels, terms, device=None):
         from cuda.bindings import driver
 
-        from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+        from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
         scalar = "float" if "using scalar_t = float;" in kernels.source else "double"
         device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
         self.terms = int(terms)
@@ -285,7 +283,7 @@ class WPrimeBackward:
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
         self._function = _check(driver.cuModuleGetFunction(self._module, b"oeq_projected_backward_wprime"))
-        self.id = next(_IDS)
+        self.id = content_id("WPrimeBackward", self.source, _device_key(device))
         _REGISTRY[self.id] = self
 
     def __call__(self, x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins,

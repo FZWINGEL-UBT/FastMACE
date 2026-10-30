@@ -120,3 +120,19 @@ def test_l2_chunk_edges_float32_and_float64(monkeypatch):
     want = runtime.UNCHUNKED_L2_MULTIPLE * 32 * 2**20 // (1280 * 8) // 128 * 128
     assert runtime.l2_chunk_edges("cuda:0", 1280, 8) == want
     assert runtime.l2_chunk_edges("cuda:0", 1280, 8) == 13056
+
+
+def test_kernel_ids_follow_the_content():
+    """setup-across-compositions F1: the registry id a compiled graph passes as a constant depends on what the
+    kernel computes, not on how many kernel objects the process made before, and fits an int64."""
+    from fastmace.kernels.oeq_streaming.runtime import content_id
+
+    source = "extern \"C\" __global__ void k() {}"
+    first = content_id("FusedFoldedForward", source, ("rule", 3), (0, (12, 0)))
+    assert first == content_id("FusedFoldedForward", source, ("rule", 3), (0, (12, 0)))
+    assert 0 <= first < 2**56
+    others = {content_id("FusedFoldedForward", source + " ", ("rule", 3), (0, (12, 0))),
+              content_id("FusedFoldedForward", source, ("rule", 4), (0, (12, 0))),
+              content_id("FusedFoldedForward", source, ("rule", 3), (1, (12, 0))),
+              content_id("WPrimeBackward", source, ("rule", 3), (0, (12, 0)))}
+    assert first not in others and len(others) == 4

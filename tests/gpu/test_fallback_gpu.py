@@ -107,7 +107,7 @@ if SPEC.get("probe_memory"):
 
     def template_MiB(force_field):
         # The converted-model templates the force field keeps by design (opt-1 OPT-T06): resident, not a leak.
-        cache = force_field.__dict__.get("_templates")
+        cache = force_field.model.template_cache(create=False)
         if cache is None:
             return 0.0
         return sum(templates.nbytes(cache.template(key).model) for key in cache.keys()) / 2**20

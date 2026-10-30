@@ -368,6 +368,7 @@ class MACEForceField:
                 not self.is_polar and engine_rewrites.strain_problems(type(source).forward))):
             strain = None
         self.applied = ()
+        self.split_forces = False
         self.dynamo_reset = False
         self._polar_model = None
         self.polar_info = None
@@ -412,6 +413,12 @@ class MACEForceField:
             # OEq custom operators are opaque to AOTAutograd: MACE's OEq compile path
             # differentiates outside the compiled model.
             self.training = not self.oeq
+            # Compiled OEq models are called with forces and stress off, and MACE's gradient step runs after the
+            # call, outside the compiled frame (setup-across-compositions F2; _split_outputs). With it inside, Dynamo
+            # traced the frame up to torch.autograd.grad, restarted at the graph break and traced it again: 2.2-3.5 s
+            # per build. ScaleShiftMACE differentiates its interaction energy, which its output dict carries.
+            self.split_forces = (self.oeq and not self.is_polar
+                                 and energy64.class_name(source) == "ScaleShiftMACE")
         elif model_records or self.is_polar:
             self.model = prepare(compiling.private_copy(source))
             self.training = False
@@ -738,11 +745,34 @@ class MACEForceField:
         self._bind_streaming_count()
         with torch.no_grad():
             self.positions.copy_(positions)
+        if self.split_forces:
+            return self._split_outputs(self._compute_stress)
         if not self._compute_stress:
             return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)
         # MACE's stress path replaces "positions" and "shifts" in the dict it gets (strained
         # copies); a shallow copy keeps ours bound to the buffers.
         return self._model_call(dict(self.data), training=self.training, compute_force=True, compute_stress=True)
+
+    def _split_outputs(self, stress):
+        """The force call with MACE's gradient step after the compiled model instead of inside it (F2).
+
+        The compiled model runs with forces and stress off, so its frame holds no ``torch.autograd.grad``: Dynamo
+        traces it once, without the graph break and the restart. Then MACE's own ``get_outputs`` (with the
+        process's patched force functions) differentiates the scalar MACE differentiates (``ScaleShiftMACE``: the
+        interaction energy) with respect to the same input leaves, the positions and, with stress, the strain.
+        MACE's OEq compile path already ran this gradient outside the compiled graph, after the break.
+        """
+        from mace.modules import utils
+
+        # MACE's stress path replaces "positions" and "shifts" in the dict it gets (strained copies).
+        data = dict(self.data) if stress else self.data
+        out = self._model_call(data, training=self.training, compute_force=False, compute_stress=False,
+                               compute_displacement=stress)
+        forces, virials, stress_out, _, _ = utils.get_outputs(
+            energy=out["interaction_energy"], positions=self.positions,
+            displacement=self.data["displacement"] if stress else None, cell=self.data["cell"],
+            training=self.training, compute_force=True, compute_virials=False, compute_stress=stress)
+        return {**out, "forces": forces, "virials": virials, "stress": stress_out}
 
     def energy_only(self, positions):
         """The float64 energy [1] at float64 ``positions`` on the current edges: a forward pass only (SPEC §8.1).
@@ -897,6 +927,7 @@ class MACEForceField:
             from fastmace.model import compile as compiling
 
             compiling.mark_edges_dynamic(self.data)
+            compiling.mark_atoms_dynamic(self.data, self.positions.shape[0])
 
     # ------------------------------------------------------------------ one-off evaluation
 
