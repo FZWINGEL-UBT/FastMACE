@@ -29,7 +29,8 @@ SIDE = "b"  # the side being built or stepped; ab_rewrites sets it to "a" for si
 PHASE = "build"  # "build" while a side builds, "step" while a side steps (its warm-up re-captures included)
 _ENGINE_SIDES = {}
 # The trace: every Python call of a swapped attribute (captures and compiles; graph replays make none) by
-# (side, phase, the code that ran, attribute). Side a's entries must all be "reference", side b's "library".
+# (side, phase, the code that ran, attribute). Side a's entries must all be "reference", side b's "library". Calls
+# inside a forward Dynamo traces are not counted (a mutation there recompiles during capture).
 CALLS = {}
 
 
@@ -37,6 +38,7 @@ def install(swaps):
     """Dispatchers for ``swaps`` [(module, attr, reference name)], and each engine's side (recorded at its build,
     set before each of its steps)."""
     import reference_kernels
+    import torch
 
     from fastmace.planner import minimal
 
@@ -50,8 +52,9 @@ def install(swaps):
 
         def dispatch(*args, _library=library, _reference=reference, _attr=attr, **kwargs):
             code = "reference" if this.SIDE == "a" else "library"
-            key = (this.SIDE, this.PHASE, code, _attr)
-            this.CALLS[key] = this.CALLS.get(key, 0) + 1
+            if not torch.compiler.is_compiling():  # a traced forward: TORCH_LOGS=recompiles,graph_code shows its side
+                key = (this.SIDE, this.PHASE, code, _attr)
+                this.CALLS[key] = this.CALLS.get(key, 0) + 1
             return (_reference if code == "reference" else _library)(*args, **kwargs)
 
         setattr(owner, attr, dispatch)
