@@ -5,6 +5,10 @@ change) against D as ``tl.constexpr`` (side b, the library's kernel); plans/capa
 ``fastmace.kernels.triton.segment_gemm._kernel`` with a dispatcher that returns the runtime-D kernel while side a
 builds or steps (its CUDA graphs capture that kernel, also when a new edge size re-captures in the warm-up) and the
 library's kernel otherwise. Arguments are ``ab_rewrites.py``'s, without ``--a``/``--b`` options.
+
+A record of docs/validation/speed-small.md's A/B, run at ``54942faf``, where the library's kernel took D as
+``tl.constexpr``. The change was measured neutral and not adopted (reverted), so from then on both sides run the same
+kernel unless the candidate is restored.
 """
 
 from __future__ import annotations

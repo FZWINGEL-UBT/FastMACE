@@ -1,4 +1,4 @@
-# Three small speed items: pair repulsion, constexpr D, SH gradient (30 October 2026)
+# Three small speed items: pair repulsion, constexpr D, SH gradient (30 October 2026; none adopted)
 
 The fourth list of [plans/capacity-ideas-20261030.md](../../plans/capacity-ideas-20261030.md), approved by the owner
 through the conductor. MH-1 (`mh1-r2scan`) hybrid float32, default plan, local RTX 5060 Ti (sm_120, WSL2, driver
@@ -9,7 +9,7 @@ through the conductor. MH-1 (`mh1-r2scan`) hybrid float32, default plan, local R
 | Item | Result |
 | --- | --- |
 | **A. Fused pair repulsion (ZBL)** | **Stopped: already fused in the compiled step.** At most about 15 µs per step on NaCl, against the 100 µs threshold. No kernel written. |
-| **B. `segment_gemm` with D as `tl.constexpr`** | **Exact, and neutral in speed:** same-process A/B b/a 0.992–1.004. The only same-sign pair is NaNbO3 at 8,640 atoms, +0.2 % in both orders, inside its block range (0.973–1.011). Proposed for the default on the branch; the conductor decides. No tail gap between the per-irrep launches. |
+| **B. `segment_gemm` with D as `tl.constexpr`** | **Exact, neutral in speed, not adopted (reverted):** same-process A/B b/a 0.992–1.004. The only same-sign pair is NaNbO3 at 8,640 atoms, +0.2 % in both orders, inside its block range (0.973–1.011). Not adopted (conductor, 30 October): no gain, and the constexpr adds compiled variants (setup time); the code change is reverted. No tail gap between the per-irrep launches. |
 | **C. SH gradient on chip in `wprime_backward`** | **Not worth building:** the SH backward is one kernel of 1.2–8.1 µs per force call, under 0.1 % of the step. |
 
 ## The profile
@@ -56,7 +56,7 @@ ZBL kernel would therefore save launches the compiled step does not have, and no
 
 ## B. D as `tl.constexpr`
 
-**Change.** In `fastmace/kernels/triton/segment_gemm.py`, D (the irrep size 2l + 1) is a `tl.constexpr` of the
+**Change (measured at `54942faf`, then reverted).** In `fastmace/kernels/triton/segment_gemm.py`, D (the irrep size 2l + 1) is a `tl.constexpr` of the
 gathered-row GEMM. Triton compiles one variant per irrep (D = 3, 5, 7; D = 1 was already specialised), and `r // D`
 and `r % D` are by a constant. The arithmetic is the same, and the results are bitwise equal.
 
@@ -95,7 +95,7 @@ on the critical path; presumably these GEMMs are bound by their loads and `tl.do
 
 **Tests.**
 
-- `tests/gpu/test_segment_gemm_constexpr_gpu.py` passed (3 tests): the joined products and input gradients are bitwise
+- `tests/gpu/test_segment_gemm_constexpr_gpu.py` (at `54942faf`, removed with the revert) passed (3 tests): the joined products and input gradients are bitwise
   equal to the runtime-D kernel for D = 1, 3, 5, 7, with a full and a ragged last tile, and D is a constexpr of the
   kernel.
 - Gate (`tools/force_stress_gate.py`, NaCl, NbCl5, NaNbO3): passed.
