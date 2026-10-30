@@ -306,7 +306,31 @@ def run_point(args):
                     force_graph_floor=getattr(engine, "force_graph_floor", None),
                     recaptures=getattr(engine, "recaptures", None),
                     force_bytes_per_edge=getattr(engine, "_force_bytes_per_edge", None),
-                    pool_bytes=engine._pool_bytes() if hasattr(engine, "_pool_bytes") else None)
+                    pool_bytes=engine._pool_bytes() if hasattr(engine, "_pool_bytes") else None,
+                    neighbour_list=neighbour_memory(nl))
+
+    def neighbour_memory(nl):
+        """The neighbour list's device bytes: its buffers by name, per slot, and the screen's output buffer."""
+        sizes = {name: int(t.numel() * t.element_size()) for name, t in nl.buffers().items()}
+        screen = getattr(nl, "_pair_search_state", {}).get("buffer")
+        return dict(buffers_bytes=sum(sizes.values()), buffers=sizes,
+                    bytes_per_slot=sum(v for k, v in sizes.items() if k.startswith(("candidate", "edge", "unit",
+                                                                                      "shifts"))) / nl.capacity,
+                    screen_buffer_bytes=0 if screen is None else int(screen.numel() * screen.element_size()))
+
+    def rebuild_transient():
+        """One more neighbour build at the committed positions, after the timed steps: its peak above the live
+        memory (the build's temporaries) and the reserved memory it added."""
+        engine = sim._engine
+        nl = engine.force_field.neighbours
+        torch.cuda.synchronize()
+        allocated, reserved = torch.cuda.memory_allocated(), torch.cuda.memory_reserved()
+        torch.cuda.reset_peak_memory_stats()
+        grew = bool(nl.build(engine.state.positions))
+        torch.cuda.synchronize()
+        return dict(peak_above_live_bytes=int(torch.cuda.max_memory_allocated() - allocated),
+                    reserved_added_bytes=int(torch.cuda.memory_reserved() - reserved), grew=grew,
+                    candidates=int(nl.num_candidates))
 
     try:
         with warnings.catch_warnings(record=True) as caught:
@@ -355,9 +379,14 @@ def run_point(args):
             record["ms_per_step"] = 1e3 * seconds / args.steps
             record["edges"] = edges()
             record["status"] = "ok"
+            try:
+                record["rebuild_transient"] = rebuild_transient()
+            except Exception as problem:  # noqa: BLE001  (a measurement after the result)
+                record["rebuild_transient"] = f"failed: {type(problem).__name__}: {str(problem)[:300]}"
     except Exception as error:  # noqa: BLE001  (a failing size is a result)
         message = str(error)
-        record["status"] = "oom" if type(error).__name__ == "OutOfMemoryError" or "out of memory" in message else "error"
+        oom = type(error).__name__ == "OutOfMemoryError" or "out of memory" in message
+        record["status"] = "oom" if oom else "error"
         record["failure"] = dict(phase=phase, type=f"{type(error).__module__}.{type(error).__name__}",
                                  message=message[:4000], tried_to_allocate=_tried(message),
                                  stage=getattr(error, "fastmace_stage", None),

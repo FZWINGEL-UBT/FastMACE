@@ -61,6 +61,12 @@ def candidate_set(nl):
             zip(nl.candidate_index[:, :n].T.tolist(), nl.candidate_unit_shifts[:n].round().tolist())}
 
 
+def candidate_shifts(nl, dtype=F64):
+    """The candidates' image shifts as compact() computes them (not stored since cap-nlist)."""
+    cell = nl.cell_t if nl.variable_cell else nl.build_cell
+    return times_3x3(nl.candidate_unit_shifts.to(F64), cell).to(dtype)
+
+
 def edge_set(nl):
     n = int(nl.count)
     return {(int(i), int(j), *map(int, s)) for (i, j), s in
@@ -92,7 +98,7 @@ def test_candidates_and_edges_match_ase(atoms, gpu):
     rest = nl.edge_index[:, n:]
     r = torch.linalg.norm(x[rest[1]] - x[rest[0]] + nl.shifts[n:], dim=1)
     assert bool((r >= CUTOFF).all())
-    padding = nl.candidate_shifts[nl.num_candidates:]
+    padding = candidate_shifts(nl)[nl.num_candidates:]
     assert len(padding) > 0
     assert bool((torch.linalg.norm(padding, dim=1) > 2 * (CUTOFF + 0.4)).all())
     assert bool((nl.candidate_index[:, nl.num_candidates:] == 0).all())
@@ -198,7 +204,7 @@ def test_config_multiple_and_headroom():
 def rows(nl):
     n = nl.num_candidates
     return list(zip(nl.candidate_index[0, :n].tolist(), nl.candidate_index[1, :n].tolist(),
-                    map(tuple, nl.candidate_unit_shifts[:n].tolist()), map(tuple, nl.candidate_shifts[:n].tolist())))
+                    map(tuple, nl.candidate_unit_shifts[:n].tolist()), map(tuple, candidate_shifts(nl)[:n].tolist())))
 
 
 @pytest.mark.parametrize("name", list(STRUCTURES))
@@ -379,8 +385,7 @@ def baseline():
     return gpu_langevin
 
 
-BUFFERS = ("candidate_index", "candidate_unit_shifts", "candidate_shifts", "candidate_shifts64",
-           "edge_index", "unit_shifts", "shifts", "count", "reference_positions")
+BUFFERS = ("candidate_unit_shifts", "edge_index", "unit_shifts", "shifts", "count", "reference_positions")
 
 
 def assert_same_state(ours, theirs):
@@ -389,6 +394,10 @@ def assert_same_state(ours, theirs):
     for name in BUFFERS:
         a, b = getattr(ours, name), getattr(theirs, name)
         assert a.dtype == b.dtype and torch.equal(a, b), name
+    # Candidates (cap-nlist): int32 indices; the shifts compact() computes are the baseline's stored ones.
+    assert torch.equal(ours.candidate_index.to(torch.int64), theirs.candidate_index)
+    assert torch.equal(candidate_shifts(ours), theirs.candidate_shifts64)
+    assert torch.equal(candidate_shifts(ours, theirs.candidate_shifts.dtype), theirs.candidate_shifts)
 
 
 @needs_baseline

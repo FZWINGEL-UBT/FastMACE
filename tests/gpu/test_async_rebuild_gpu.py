@@ -42,8 +42,7 @@ def moved(atoms, seed, scale=0.15):
 
 
 def state(nl):
-    names = ("candidate_index", "candidate_unit_shifts", "candidate_shifts", "candidate_shifts64",
-             "reference_positions")
+    names = ("candidate_index", "candidate_unit_shifts", "reference_positions", "build_cell")
     return {name: getattr(nl, name).clone() for name in names}
 
 

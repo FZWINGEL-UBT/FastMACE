@@ -15,13 +15,16 @@ import torch
 
 from ..config import DEFAULT_SKIN_A, NeighbourConfig
 from .buckets import edge_capacity
-from .pair_search import candidate_pairs
+from .pair_search import decode_codes, screen_codes
 
 # Early rebuilds beside the force graph without a host synchronisation (``build_gpu_async``; fp32 profile,
 # 28 October 2026). Read when a list is constructed; off: every build is ``build_gpu``'s.
 ASYNC_EARLY_BUILD = False
 # How far an overflowed asynchronous build moves its reference positions (Angstrom): the next rebuild test fires.
 OVERFLOW_DISPLACEMENT_A = 1.0e6
+# Screened pairs per chunk of build_gpu's float64 test and sort key: bounds the build's temporaries (about 150 B
+# per pair at once otherwise). Elementwise work, so the result does not depend on it.
+BUILD_CHUNK = 1 << 18
 
 
 def times_3x3(rows, matrix):
@@ -147,9 +150,11 @@ class SkinNeighbourList:
         self.async_build = bool(ASYNC_EARLY_BUILD)
         self.async_builds = 0
         self.variable_cell = bool(variable_cell)
+        # The cell at the last build (h0): compact() computes the candidates' image shifts from their unit shifts
+        # and this cell (fixed cell) or the current one (variable cell, ``cell_t``).
+        self.build_cell = torch.tensor(self.cell, dtype=torch.float64, device=self.device)
         if self.variable_cell:
-            self.cell_t = torch.tensor(self.cell, dtype=torch.float64, device=self.device)  # current cell
-            self.build_cell = self.cell_t.clone()  # cell at the last build (h0)
+            self.cell_t = self.build_cell.clone()  # current cell
         self._set_padding()
         self._device_constants = None  # build_gpu's constants of the (build) cell
         self._pair_search_state = {}
@@ -189,11 +194,10 @@ class SkinNeighbourList:
         def new(*shape, dtype):
             return torch.zeros(shape, dtype=dtype, device=self.device)
 
-        # Candidates from the last build ...
-        self.candidate_index = new(2, capacity, dtype=torch.int64)
+        # Candidates from the last build (int32 indices; no stored shifts: compact() computes them from the unit
+        # shifts and the build cell with the build's times_3x3, bitwise the values stored before cap-nlist) ...
+        self.candidate_index = new(2, capacity, dtype=torch.int32)
         self.candidate_unit_shifts = new(capacity, 3, dtype=self.float_dtype)
-        self.candidate_shifts = new(capacity, 3, dtype=self.float_dtype)
-        self.candidate_shifts64 = new(capacity, 3, dtype=torch.float64)  # for the cutoff test
         # ... and the same pairs reordered by compact(); this is what the model reads.
         self.edge_index = new(2, capacity, dtype=torch.int64)
         self.unit_shifts = new(capacity, 3, dtype=self.float_dtype)
@@ -294,14 +298,10 @@ class SkinNeighbourList:
         index[0, :n], index[1, :n] = sender, receiver
         all_unit_shifts = np.tile(self._pad_unit_shift, (self.capacity, 1))
         all_unit_shifts[:n] = unit_shifts
-        candidate_shifts = np.asarray(unit_shifts) @ self.cell
-        shifts = np.tile(self._pad_unit_shift @ self.cell, (self.capacity, 1))
-        shifts[:n] = candidate_shifts
         # copy_ keeps the tensor addresses that captured CUDA graphs read.
         self.candidate_index.copy_(torch.from_numpy(index))
         self.candidate_unit_shifts.copy_(torch.from_numpy(all_unit_shifts))
-        self.candidate_shifts.copy_(torch.from_numpy(shifts))
-        self.candidate_shifts64.copy_(torch.from_numpy(shifts))
+        self.build_cell.copy_(torch.from_numpy(self.cell))  # compact()'s times_3x3 (not numpy's @) uses it
         self._set_reference(torch.from_numpy(positions))
         self.num_candidates = n
         self.rebuilds += 1
@@ -328,7 +328,6 @@ class SkinNeighbourList:
             "inverse": torch.as_tensor(np.linalg.inv(self.cell), dtype=torch.float64, device=device),
             "image_vectors": times_3x3(images, cell),
             "pad_unit": pad_unit,
-            "pad_shift": times_3x3(pad_unit[None], cell)[0],
         }
         return self._device_constants
 
@@ -353,45 +352,59 @@ class SkinNeighbourList:
         offsets = torch.floor(times_3x3(positions, inverse))  # integer cell of each atom
         wrapped = positions - times_3x3(offsets, cell)
         # float32 screen (pair_search; one Triton kernel on CUDA), float64 decision below
-        image, sender, receiver = candidate_pairs(wrapped, image_vectors, r, self._pair_search_state)
-        vectors = wrapped[receiver] - wrapped[sender] + image_vectors[image]
-        unit_shifts = images[image] - offsets[receiver] + offsets[sender]
-        keep = ((vectors * vectors).sum(dim=1) < r * r) & ~(
-            (sender == receiver) & (unit_shifts == 0).all(dim=1))
-        # The screen returns pairs in scheduling order; a unique key makes the order
-        # deterministic. Rejected pairs get the largest key and are cut off after the sort.
-        nimages = len(images)
-        if self.sort_receivers:
-            primary = receiver
-            if constants["groups"] is not None:  # receiver, then sender group
-                primary = receiver * constants["group_count"] + constants["groups"][sender]
-            key = (primary * natoms + sender) * nimages + image
-        else:
-            key = (image * natoms + sender) * natoms + receiver
-        key = torch.where(keep, key, torch.iinfo(torch.int64).max)
-        n = int(keep.sum())  # host sync (rebuild steps only)
+        codes = screen_codes(wrapped, image_vectors, r, self._pair_search_state)
+        found = codes.numel()
+        # The decision in chunks of BUILD_CHUNK pairs, so only the sort key lives for every screened pair.
+        chunk = max(1, BUILD_CHUNK)
+        key = torch.empty(found, dtype=torch.int64, device=device)
+        kept = torch.zeros((), dtype=torch.int64, device=device)
+        for start in range(0, found, chunk):
+            stop = min(found, start + chunk)
+            image, sender, receiver = decode_codes(codes[start:stop], natoms)
+            vectors = wrapped[receiver] - wrapped[sender] + image_vectors[image]
+            unit_shifts = images[image] - offsets[receiver] + offsets[sender]
+            keep = ((vectors * vectors).sum(dim=1) < r * r) & ~(
+                (sender == receiver) & (unit_shifts == 0).all(dim=1))
+            del vectors, unit_shifts
+            # The screen returns pairs in scheduling order; a unique key makes the order
+            # deterministic. Rejected pairs get the largest key and are cut off after the sort.
+            key[start:stop] = torch.where(keep, self._sort_key(image, sender, receiver, natoms, constants),
+                                          torch.iinfo(torch.int64).max)
+            kept += keep.sum()
+            del image, sender, receiver, keep
+        n = int(kept)  # host sync (rebuild steps only)
         order = torch.sort(key).indices[:n]
-        sender, receiver, unit_shifts = sender[order], receiver[order], unit_shifts[order]
+        del key
 
         grew = n > self.capacity or self.capacity == 0
         if grew:
             self._allocate(n)
         # Fill in place: captured CUDA graphs read these addresses.
-        pad_unit, pad_shift = constants["pad_unit"], constants["pad_shift"]
-        shifts = times_3x3(unit_shifts, cell)
-        self.candidate_index[0, :n].copy_(sender)
-        self.candidate_index[1, :n].copy_(receiver)
+        pad_unit = constants["pad_unit"]
+        for start in range(0, n, chunk):
+            stop = min(n, start + chunk)
+            image, sender, receiver = decode_codes(codes[order[start:stop]], natoms)
+            unit_shifts = images[image] - offsets[receiver] + offsets[sender]
+            self.candidate_index[0, start:stop].copy_(sender)
+            self.candidate_index[1, start:stop].copy_(receiver)
+            self.candidate_unit_shifts[start:stop].copy_(unit_shifts)
         self.candidate_index[:, n:].zero_()
-        self.candidate_unit_shifts[:n].copy_(unit_shifts)
         self.candidate_unit_shifts[n:].copy_(pad_unit)
-        self.candidate_shifts[:n].copy_(shifts)
-        self.candidate_shifts[n:].copy_(pad_shift)
-        self.candidate_shifts64[:n].copy_(shifts)
-        self.candidate_shifts64[n:].copy_(pad_shift)
+        self.build_cell.copy_(cell)
         self._set_reference(positions)
         self.num_candidates = n
         self.rebuilds += 1
         return grew
+
+    def _sort_key(self, image, sender, receiver, natoms, constants):
+        """The unique int64 order key of screened pairs: receiver (and sender group), sender, image if sorted."""
+        nimages = len(constants["images"])
+        if self.sort_receivers:
+            primary = receiver
+            if constants["groups"] is not None:  # receiver, then sender group
+                primary = receiver * constants["group_count"] + constants["groups"][sender]
+            return (primary * natoms + sender) * nimages + image
+        return (image * natoms + sender) * natoms + receiver
 
     def _async_ready(self) -> bool:
         """Whether ``build_gpu_async`` can run: switched on, fixed cell, a synchronous build done before."""
@@ -450,18 +463,14 @@ class SkinNeighbourList:
         k = min(slots, self.capacity)
         order = torch.sort(key).indices[:k]
         take = torch.arange(k, device=device) < n
-        pad_unit, pad_shift = constants["pad_unit"], constants["pad_shift"]
+        pad_unit = constants["pad_unit"]
         unit = torch.where(take[:, None], unit_shifts[order], pad_unit)
-        shifts = torch.where(take[:, None], times_3x3(unit_shifts[order], cell), pad_shift)
         self.candidate_index[0, :k].copy_(torch.where(take, sender[order], 0))
         self.candidate_index[1, :k].copy_(torch.where(take, receiver[order], 0))
         self.candidate_index[:, k:].zero_()
         self.candidate_unit_shifts[:k].copy_(unit)
         self.candidate_unit_shifts[k:].copy_(pad_unit)
-        self.candidate_shifts[:k].copy_(shifts)
-        self.candidate_shifts[k:].copy_(pad_shift)
-        self.candidate_shifts64[:k].copy_(shifts)
-        self.candidate_shifts64[k:].copy_(pad_shift)
+        self.build_cell.copy_(cell)
         overflow = (found > slots) | (n > self.capacity)
         self.reference_positions.copy_(positions + overflow.to(positions.dtype) * OVERFLOW_DISPLACEMENT_A)
         self._num_candidates = 0
@@ -485,12 +494,12 @@ class SkinNeighbourList:
         ``force_field.neighbours.<name>`` (``fastmace.engine.registry.POLICIES``): ``cell`` is
         derived from the state's cell, everything else is reset by a rebuild.
         """
-        names = ["candidate_index", "candidate_unit_shifts", "candidate_shifts", "candidate_shifts64",
-                 "edge_index", "unit_shifts", "shifts", "count", "reference_positions"]
+        names = ["candidate_index", "candidate_unit_shifts", "edge_index", "unit_shifts", "shifts", "count",
+                 "reference_positions"]
         out = {name: getattr(self, name) for name in names if getattr(self, name, None) is not None}
         if self.variable_cell:
             out["cell"] = self.cell_t
-            out["build_cell"] = self.build_cell
+        out["build_cell"] = self.build_cell
         return out
 
     # ------------------------------------------------------------------ trial lists (MC displacements)
@@ -576,17 +585,15 @@ class SkinNeighbourList:
         Uses only fixed-shape device operations, so it can be captured in a CUDA graph.
         """
         sender, receiver = self.candidate_index
-        if self.variable_cell:  # image shifts in the current cell
-            shifts64 = times_3x3(self.candidate_unit_shifts.to(torch.float64), self.cell_t)
-            shifts = shifts64.to(self.float_dtype)
-        else:
-            shifts64, shifts = self.candidate_shifts64, self.candidate_shifts
+        cell = self.cell_t if self.variable_cell else self.build_cell  # image shifts in the current cell
+        shifts64 = times_3x3(self.candidate_unit_shifts.to(torch.float64), cell)
+        shifts = shifts64.to(self.float_dtype)
         vectors = positions[receiver] - positions[sender] + shifts64
         inside = ((vectors * vectors).sum(dim=1) < self.cutoff ** 2).to(torch.int64)
         count = inside.sum()
         destination = torch.where(inside.bool(), torch.cumsum(inside, 0) - 1,
                                   count + torch.cumsum(1 - inside, 0) - 1)
-        self.edge_index.index_copy_(1, destination, self.candidate_index)
+        self.edge_index.index_copy_(1, destination, self.candidate_index.to(torch.int64))
         self.unit_shifts.index_copy_(0, destination, self.candidate_unit_shifts)
         self.shifts.index_copy_(0, destination, shifts)
         self.count.copy_(count)

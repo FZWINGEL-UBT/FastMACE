@@ -98,17 +98,25 @@ def screen_into(wrapped, image_vectors, radius, out, counter, half=False):
                            nimages, screen, out.numel(), BLOCK=BLOCK, HALF=bool(half), num_warps=4)
 
 
-def candidate_pairs(wrapped, image_vectors, radius, state=None, half=False):
-    """(image, sender, receiver) int64 tensors of the screened pairs (unordered on CUDA).
+def decode_codes(code, natoms):
+    """(image, sender, receiver) int64 tensors of screen codes ``image * N^2 + sender * N + receiver``."""
+    pairs = natoms * natoms
+    image = code // pairs
+    rest = code - image * pairs
+    return image, rest // natoms, rest % natoms
 
-    ``wrapped``: (N, 3) positions inside the cell; ``image_vectors``: (M, 3) Cartesian image
-    translations; ``state``: optional dict that keeps the CUDA output buffer between calls;
-    ``half``: only pairs with ``sender <= receiver``.
+
+def screen_codes(wrapped, image_vectors, radius, state=None, half=False):
+    """The screened pairs as int64 codes (``decode_codes``), unordered on CUDA: a view of the kept output buffer.
+
+    Arguments as ``candidate_pairs``. The codes take 8 bytes per pair; decoding them in chunks bounds the
+    caller's temporaries (``SkinNeighbourList.build_gpu``).
     """
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
     screen = (radius + SCREEN_MARGIN) ** 2
     if not wrapped.is_cuda:
-        return _candidate_pairs_cpu(wrapped, image_vectors, screen, half)
+        image, sender, receiver = _candidate_pairs_cpu(wrapped, image_vectors, screen, half)
+        return (image * natoms + sender) * natoms + receiver
     import triton
 
     state = {} if state is None else state
@@ -126,10 +134,17 @@ def candidate_pairs(wrapped, image_vectors, radius, state=None, half=False):
         found = int(counter.item())  # host sync (rebuild steps only)
         if found <= out.numel():
             break
+        out = state["buffer"] = None  # the old buffer is freed before its larger replacement
         state["buffer"] = torch.empty(int(found * 1.25) + 1, dtype=torch.int64, device=wrapped.device)
         counter.zero_()
-    code = out[:found]
-    pairs = natoms * natoms
-    image = code // pairs
-    rest = code - image * pairs
-    return image, rest // natoms, rest % natoms
+    return out[:found]
+
+
+def candidate_pairs(wrapped, image_vectors, radius, state=None, half=False):
+    """(image, sender, receiver) int64 tensors of the screened pairs (unordered on CUDA).
+
+    ``wrapped``: (N, 3) positions inside the cell; ``image_vectors``: (M, 3) Cartesian image
+    translations; ``state``: optional dict that keeps the CUDA output buffer between calls;
+    ``half``: only pairs with ``sender <= receiver``.
+    """
+    return decode_codes(screen_codes(wrapped, image_vectors, radius, state, half), wrapped.shape[0])
