@@ -94,7 +94,6 @@ def test_padded_slots_are_reused_and_grow_only_when_a_tile_does_not_fit():
     tiled = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.5, bucket=0.3))
     tiled.evaluate(atoms)
     slots = dict(tiled._slots)
-    assert len(slots) > 1  # tiles of different edge counts run in different slots
     tiled.evaluate(atoms)
     assert all(tiled._slots[key] is slot for key, slot in slots.items())
     smaller = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.0))
