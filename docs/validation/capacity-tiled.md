@@ -267,8 +267,11 @@ as well as it does.
 - Ruff is clean on every changed file.
 - **CPU tests** on murphy (GPU hidden, `-n 8`, basetemp under `/mnt/homes/zwingel`, `mace_cueq_latest`), commit
   `07714758`: `test_tiled.py` and `test_layering.py`, **44 passed**.
-- The species self-check change, which came later (`f07e7c52`), is covered by the GPU runs only: every build applied
-  and passed its 22 self-checks. The CPU species tests have not run on it. The conductor's full suite covers them.
+- **CPU tests** on murphy, same setup, commit `b5c60bc0`, after the species self-check change:
+  - the files: `test_tiled.py`, `test_layering.py`, `test_rewrites_species.py`, `test_rewrites_species_residual.py`,
+    `test_rewrites_mh1.py`, `test_rewrites_fusion.py`, `test_forces.py` and `test_acceptance_tools.py`;
+  - **280 passed, 24 skipped** (CUDA-only cases).
+- Every GPU build applied its 22 rewrites and passed their self-checks.
 
 ## Setup
 
