@@ -4,7 +4,9 @@ The backward builds the per-edge weights again in chunks (the radial table, then
 ``[E, W]`` tensor the forward stored. Against the stored-weights backward: the same forward (message and density
 bitwise), ``dsh`` and ``dL/dr`` to float32 rounding (bitwise where the recomputed weights equal the stored ones),
 ``dx`` to the atomics' order; chunks of 256 and 333 edges (a partial last chunk); both layouts, the cuBLAS and
-the fused forward, a CUDA graph. Runs in a fresh interpreter like test_wprime_backward_cuda.py.
+the fused forward, a CUDA graph. With the fused forward also the w-rebuilding backward (CAP-T07b: no ``w`` stored;
+the same forward bitwise, ``dsh`` and ``dL/dr`` to float32 rounding, added atomically over the channel slices).
+Runs in a fresh interpreter like test_wprime_backward_cuda.py.
 """
 
 import json
@@ -101,8 +103,13 @@ for layout in ("ir_mul", "mul_ir"):
     D = torch.randn((edges, 1), device="cuda", generator=g)
     for fused in (None, FusedFoldedForward(kernels, k)):
         stored = None
-        for chunk in (0, 256, 333):
-            chunk_rows = chunk
+        w_prime.rebuild = None
+        for chunk in (0, 256, 333, "rebuild"):
+            if chunk == "rebuild":  # CAP-T07b: the forward stores no w, the backward builds it on chip
+                if fused is None:
+                    continue
+                w_prime.attach_rebuild(kernels, fused)
+            chunk_rows = 256 if chunk == "rebuild" else chunk
             out = run(X, Y, G, D, kernels, weight, fused, w_prime, rows)
             name = f"{layout}-{'fused' if fused is not None else 'cublas'}-{chunk}"
             if stored is None:
@@ -120,8 +127,13 @@ for layout in ("ir_mul", "mul_ir"):
                 captured = run(X, Y, G, D, kernels, weight, fused, w_prime, rows)
             graph.replay()
             torch.cuda.synchronize()
-            assert torch.equal(captured[0], out[0]) and torch.equal(captured[4], out[4]), name
-            torch.testing.assert_close(captured[2], out[2], rtol=0, atol=0)
+            assert torch.equal(captured[0], out[0]), name
+            if chunk == "rebuild":  # dsh and dL/dr are added atomically over the channel slices
+                torch.testing.assert_close(captured[4], out[4], rtol=1e-6, atol=1e-7 * float(out[4].abs().max()))
+                torch.testing.assert_close(captured[2], out[2], rtol=1e-6, atol=1e-7 * float(out[2].abs().max()))
+            else:
+                assert torch.equal(captured[4], out[4]), name
+                torch.testing.assert_close(captured[2], out[2], rtol=0, atol=0)
 print(json.dumps(report))
 """
 
@@ -134,4 +146,4 @@ def test_recomputed_weights_match_the_stored_ones():
     assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-8000:]
     report = json.loads(result.stdout.strip().splitlines()[-1])
     print(json.dumps(report, indent=1))
-    assert len(report) == 8
+    assert len(report) == 10

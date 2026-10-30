@@ -766,18 +766,27 @@ def _apply_wprime(model, context):
 
 # Edges per chunk in the self-check: below its 720-edge graph, so the chunks and a partial last one run.
 RECOMPUTE_CHECK_ROWS = 256
+# recompute_conv_weights' kernel where fused_folded_forward is on: "rebuild" (the forward stores no w and the
+# backward builds it on chip, plans/capacity.md CAP-T07b) or "chunked" (cuBLAS per edge chunk; same-process A/Bs).
+RECOMPUTE_KERNEL = "rebuild"
 
 
 def attach_recompute(model):
-    """``recompute_conv_weights`` in every interaction with ``wprime_backward``: its backward builds the per-edge
-    weights again in chunks of the interaction's chunked-backward edges instead of keeping them (``[E, W]``);
-    returns their names."""
+    """``recompute_conv_weights`` in every interaction with ``wprime_backward``: the per-edge weights (``[E, W]``) are
+    not kept. With ``fused_folded_forward`` (and ``RECOMPUTE_KERNEL = "rebuild"``) the forward stores no ``w`` and the
+    backward builds it on chip (``WPrime.attach_rebuild``); otherwise the backward builds it again with cuBLAS in
+    chunks of the interaction's chunked-backward edges. Returns their names."""
     names = []
     for index, interaction in _factored(model):
         if getattr(interaction, "wprime_backward", None) is None:
             continue
         interaction.recompute_weight_rows = int(interaction.chunked_backward_edges)
-        names.append(f"interactions.{index} ({interaction.recompute_weight_rows} edges per chunk)")
+        fused = getattr(interaction, "fused_folded_forward", None)
+        if RECOMPUTE_KERNEL == "rebuild" and fused is not None:
+            interaction.wprime_backward.attach_rebuild(interaction.streaming_kernels, fused)
+            names.append(f"interactions.{index} (w built on chip in the backward)")
+        else:
+            names.append(f"interactions.{index} ({interaction.recompute_weight_rows} edges per chunk)")
     if not names:
         raise RewriteError("recompute_conv_weights: no interaction with wprime_backward")
     return names
@@ -824,14 +833,15 @@ RECORDS = {
         conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
         deterministic=False, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_wprime,
         selfcheck=_wprime_selfcheck),
-    # plans/capacity.md CAP-T07: exact (the recomputed weights equal the stored ones bitwise; only the atomic sender
-    # additions' order differs, as between any two runs); off unless rule 12 needs it (planner.memory.MEMORY_RESCUE).
+    # plans/capacity.md CAP-T07: rounding (the rebuilt weights equal the stored ones bitwise; dsh and dL/dr are summed
+    # over channel slices in another order, the sender additions are atomic); off unless memory requires it
+    # (planner.memory.MEMORY_RESCUE, fallback.memory_rescue).
     "recompute_conv_weights": Rewrite(
         name="recompute_conv_weights", applies_to=_w_support, requires=("wprime_backward",), conflicts=(),
-        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="exact", default="off", deterministic=False,
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_recompute, selfcheck=_recompute_selfcheck,
         memory=memory_terms.recompute_conv_weights),
 }
 
-__all__ = ["DEGREE", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECORDS", "W_TABLE_MAX_BYTES", "attach_recompute",
+__all__ = ["DEGREE", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES", "attach_recompute",
            "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]

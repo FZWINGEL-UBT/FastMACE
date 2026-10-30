@@ -374,3 +374,25 @@ def fused_folded_forward(a: torch.Tensor, weight: torch.Tensor, x: torch.Tensor,
 def _(a, weight, x, sh, senders, receivers, row_ptr, fused_id):
     return x.new_empty((x.shape[0], _REGISTRY[fused_id].output_dim)), x.new_empty((sh.shape[0], weight.shape[0]))
 
+
+@torch.library.custom_op("fastmace::fused_folded_message", mutates_args=())
+def fused_folded_message(a: torch.Tensor, weight: torch.Tensor, x: torch.Tensor, sh: torch.Tensor,
+                         senders: torch.Tensor, receivers: torch.Tensor, row_ptr: torch.Tensor,
+                         fused_id: int) -> torch.Tensor:
+    """The message [N, output_dim] alone, through a kernel built with ``store_w=False`` (``recompute_conv_weights``,
+    plans/capacity.md CAP-T07): ``w`` is built on chip and not stored."""
+    fused = _REGISTRY[fused_id]
+    if fused.store_w:
+        raise ValueError("fused_folded_message needs a FusedFoldedForward built with store_w=False")
+    a, weight, x, sh = a.contiguous(), weight.contiguous(), x.contiguous(), sh.contiguous()
+    out = x.new_empty((x.shape[0], fused.output_dim))
+    if sh.shape[0] or x.shape[0]:
+        fused(a, weight, x, sh, senders.contiguous(), receivers.contiguous(), row_ptr.contiguous(), out,
+              x.new_empty((1,)))
+    return out
+
+
+@fused_folded_message.register_fake
+def _(a, weight, x, sh, senders, receivers, row_ptr, fused_id):
+    return x.new_empty((x.shape[0], _REGISTRY[fused_id].output_dim))
+
