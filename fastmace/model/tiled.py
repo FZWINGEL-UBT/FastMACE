@@ -42,20 +42,27 @@ class TileConfig:
 
     ``edges=None`` caps the edges at ``receivers`` times twice the structure's mean degree, so a tile is split
     where its receivers are unusually crowded. ``mode``: ``"eager"`` (each tile at its own shape), ``"padded"``
-    (every tile in one padded slot, eagerly) or ``"graphs"`` (the padded slot, one CUDA graph per sweep).
-    ``headroom``: a padded slot's halo and edge counts above the largest tile's, as a fraction.
+    (every tile in one padded slot, eagerly), ``"graphs"`` (the padded slot, one CUDA graph per sweep) or
+    ``"compiled"`` (the padded slot, each sweep's forward compiled by Inductor at the slot's shapes; the force
+    derivative outside the compiled frame; needs a compiled force field, whose model is traceable).
+    ``headroom``: a padded slot's halo count above the largest of its tiles', as a fraction. ``bucket``: the padded
+    modes keep one slot per edge bucket, ``bucket`` times the largest tile's edges (rounded up to 256) wide, so a
+    small tile runs in a small slot; 1 or more gives one slot for every tile.
     """
 
     receivers: int = 8192
     edges: int | None = None
     mode: str = "eager"
     headroom: float = 0.1
+    bucket: float = 0.15
 
     def __post_init__(self):
-        if self.mode not in ("eager", "padded", "graphs"):
-            raise ValueError(f"TileConfig.mode must be 'eager', 'padded' or 'graphs', got {self.mode!r}")
+        if self.mode not in ("eager", "padded", "graphs", "compiled"):
+            raise ValueError(f"TileConfig.mode must be 'eager', 'padded', 'graphs' or 'compiled', got {self.mode!r}")
         if not 0 <= float(self.headroom) <= 10:
             raise ValueError(f"TileConfig.headroom must be in [0, 10], got {self.headroom!r}")
+        if not 0 < float(self.bucket) <= 10:
+            raise ValueError(f"TileConfig.bucket must be in (0, 10], got {self.bucket!r}")
         if int(self.receivers) < 1:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
@@ -70,15 +77,22 @@ class _Ghosts:
 _GHOSTS = _Ghosts()
 
 
-def _given(value):
-    """Stand-in for a module of interaction 1 in sweep 2: returns ``value``, whatever its input."""
+@functools.cache
+def _holder_class():
     import torch
 
-    class Given(torch.nn.Module):
-        def forward(self, *args, **kwargs):
-            return value
+    class Holder(torch.nn.Module):
+        """Stand-in for a module of interaction 1 in sweep 2: returns its ``value`` buffer, whatever its input
+        (a buffer, so a compiled tile body takes it as an input)."""
 
-    return Given()
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("value", None, persistent=False)
+
+        def forward(self, *args, **kwargs):
+            return self.value
+
+    return Holder
 
 
 def plan_tiles(positions, cell, row_ptr, receivers, edges):
@@ -141,8 +155,11 @@ class TiledForceField:
         self.field = field
         self.config = tiles or TileConfig()
         model = getattr(field.model, "_orig_mod", field.model)
-        if field.compile_mode != "none":
-            raise ValueError("TiledForceField needs an eager force field (compile_mode='none')")
+        # A compiled force field's model is the simplified, traceable copy (``compile_model``): the tile bodies
+        # run its modules (``_orig_mod``), eagerly or, in mode "compiled", under their own torch.compile. An eager
+        # field's e3nn modules cannot be compiled (their TorchScript parts would differentiate to zero).
+        if self.config.mode == "compiled" and field.compile_mode == "none":
+            raise ValueError("TileConfig.mode='compiled' needs a compiled force field (compile_mode='default')")
         if type(model).__name__ != "ScaleShiftMACE" or len(model.interactions) != 2:
             raise ValueError("TiledForceField supports two-interaction ScaleShiftMACE models only")
         if hasattr(model, "joint_embedding") or getattr(field, "is_polar", False):
@@ -160,9 +177,11 @@ class TiledForceField:
         # Padding edges: a vector beyond the cutoff, so their radial envelope, and every term it multiplies, is 0.
         r_max = float(getattr(model, "r_max", 10.0))
         self._far = torch.tensor([2.0 * r_max + 1.0, 0.0, 0.0], dtype=self.dtype, device=self.device)
-        self._slot = None
-        self._g_slot = None
-        self._graphs = {}
+        self._holders = (_holder_class()(), _holder_class()())
+        self._compiled = {}
+        self._slots = {}  # edge bucket -> padded slot (with its graphs)
+        self._edge_step = None
+        self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._graph_key = None
         self._pool = None
         self._stream = None
@@ -247,14 +266,8 @@ class TiledForceField:
             leaf = vectors.detach().requires_grad_(adjoint)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
                    if adjoint and strain is not None else None)
-            lengths, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
-            node_feats = model.node_embedding(attrs)
-            h1 = self._layer(0, node_feats, attrs, edge_attrs, edge_feats, cutoff, local, r)
+            es, x, sc = self._forward(3 if adjoint else 1)(leaf, eps, attrs, local, r)
             heads = self.heads[:r]
-            es = model.readouts[0](h1, heads)[self.arange[:r], heads]
-            if hasattr(model, "pair_repulsion"):
-                es = model.pair_repulsion_fn(lengths, attrs, local, model.atomic_numbers)[:r] + es
-            x, sc = self._consumers(h1, attrs[:r])
             if not adjoint:
                 return self._masked(es, recv_mask), self._masked(x, recv_mask), self._masked(sc, recv_mask)
             objective = (self._masked(model.scale_shift(es, heads), recv_mask).sum()
@@ -279,21 +292,62 @@ class TiledForceField:
                    if strain is not None else None)
             x = state["x"][nodes].detach().requires_grad_(True)
             sc = state["sc"][nodes[:r]].detach().requires_grad_(True)
-            _, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
             modules = interaction._modules
             saved = modules["linear_up"], modules["skip_tp"]
-            modules["linear_up"], modules["skip_tp"] = _given(x), _given(sc)
+            holder_x, holder_sc = self._holders
+            holder_x.value, holder_sc.value = x, sc
+            modules["linear_up"], modules["skip_tp"] = holder_x, holder_sc
             try:  # their real counterparts ran in sweep 1, on the h1 that is not kept
-                out = self._layer(1, x, attrs, edge_attrs, edge_feats, cutoff, local, r)
+                objective, es = self._forward(2)(leaf, x, eps, attrs, local, recv_mask, r)
             finally:
                 modules["linear_up"], modules["skip_tp"] = saved
-            heads = self.heads[:r]
-            es = model.readouts[1](out, heads)[self.arange[:r], heads]
-            objective = self._masked(model.scale_shift(es, heads), recv_mask).sum()
+                holder_x.value = holder_sc.value = None
             wanted = [leaf, x, sc] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
         return (self._masked(es.detach(), recv_mask), grads[0], self._masked(grads[1], node_mask),
                 self._masked(grads[2], recv_mask), grads[3] if eps is not None else None)
+
+    def _first_forward(self, leaf, eps, attrs, local, r):
+        """Interaction 0's forward on a tile: ``(es, x, sc)`` (sweeps 1 and 3; compiled in mode "compiled")."""
+        model = self.model
+        lengths, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
+        node_feats = model.node_embedding(attrs)
+        h1 = self._layer(0, node_feats, attrs, edge_attrs, edge_feats, cutoff, local, r)
+        heads = self.heads[:r]
+        es = model.readouts[0](h1, heads)[self.arange[:r], heads]
+        if hasattr(model, "pair_repulsion"):
+            es = model.pair_repulsion_fn(lengths, attrs, local, model.atomic_numbers)[:r] + es
+        x, sc = self._consumers(h1, attrs[:r])
+        return es, x, sc
+
+    def _second_forward(self, leaf, x, eps, attrs, local, recv_mask, r):
+        """Sweep 2's forward up to its objective (interaction 1 reads the holders' x and sc): ``(objective, es)``.
+        Compiled as one function in mode "compiled"."""
+        model = self.model
+        _, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
+        out = self._layer(1, x, attrs, edge_attrs, edge_feats, cutoff, local, r)
+        heads = self.heads[:r]
+        es = model.readouts[1](out, heads)[self.arange[:r], heads]
+        return self._masked(model.scale_shift(es, heads), recv_mask).sum(), es
+
+    def _forward(self, sweep):
+        """The sweep's forward: plain, or (mode "compiled") compiled on first use, once per sweep (sweeps 1 and 3
+        apart: without and with autograd); each slot's shapes are one specialisation."""
+        plain = {1: self._first_forward, 2: self._second_forward, 3: self._first_forward}[sweep]
+        if self.config.mode != "compiled":
+            return plain
+        compiled = self._compiled.get(sweep)
+        if compiled is None:
+            import torch
+
+            from fastmace.rewrites import inductor as inductor_records
+
+            # One specialisation per slot (edge bucket) and sweep; dynamo would run eager beyond its limit.
+            torch._dynamo.config.cache_size_limit = max(torch._dynamo.config.cache_size_limit, 64)
+            options = inductor_records.inductor_options(self.model)
+            compiled = torch.compile(plain, dynamic=False, fullgraph=False, **({"options": options} if options else {}))
+            self._compiled[sweep] = compiled
+        return compiled
 
     # ------------------------------------------------------------------ padded slot
 
@@ -308,7 +362,7 @@ class TiledForceField:
         return dict(sizes=sizes, nodes=new(receivers + halo, dtype=i64), node_mask=new(receivers + halo,
                     dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype), edge_ids=new(edges, dtype=i64),
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype), count=new((), dtype=i64),
-                    out={})
+                    out={}, graphs={})
 
     def _fill(self, slot, piece):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
@@ -393,7 +447,7 @@ class TiledForceField:
         if self.config.mode != "graphs":
             self._body(sweep, slot, g)
             return
-        graph = self._graphs.get(sweep)
+        graph = slot["graphs"].get(sweep)
         if graph is None:
             from fastmace import _patches
 
@@ -410,7 +464,7 @@ class TiledForceField:
             graph = torch.cuda.CUDAGraph()
             with torch.cuda.graph(graph, pool=self._pool, stream=self._stream):
                 self._body(sweep, slot, g)
-            self._graphs[sweep] = graph
+            slot["graphs"][sweep] = graph
         graph.replay()
 
     # ------------------------------------------------------------------ the call
@@ -450,12 +504,12 @@ class TiledForceField:
         local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      mode=caps.mode)
+        keys = self._slot_keys(tiles, row_ptr, edge_index, local_of) if padded else None
         if padded:
-            sizes = self._slot_sizes(tiles, row_ptr, edge_index, local_of, stats)
-            if self._slot is None or any(a > b for a, b in zip(sizes, self._slot["sizes"])):
-                self._slot = self._new_slot(sizes)
-            stats["slot"] = self._slot["sizes"]
-        saved = self._bind(self._slot["count"] if padded else None)
+            stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
+            stats["slot_changes"] = self.slot_changes
+        saved = self._bind()
+        bound = None
         try:
             # The neighbour list's full buffers (fixed addresses between capacity changes) for the padded path.
             base_index = field.neighbours.edge_index if padded else edge_index
@@ -463,24 +517,27 @@ class TiledForceField:
             g = self._globals(n, stress, pos, base_index, base_shifts, heads)
             self.heads, self.arange = g["heads"], g["arange"]
             if padded:
-                key = (n, self._slot["sizes"], base_index.data_ptr(), base_shifts.data_ptr(), pos.data_ptr(),
+                key = (id(g), base_index.data_ptr(), base_shifts.data_ptr(), pos.data_ptr(),
                        self.node_attrs.data_ptr(), stress)
-                if key != self._graph_key:
-                    self._graphs = {}
+                if key != self._graph_key:  # the graphs read these addresses
+                    for slot in self._slots.values():
+                        slot["graphs"].clear()
                     self._graph_key = key
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
-            if padded and self._g_slot is not self._slot:  # a new slot: its graphs are captured again
-                self._graphs = {}
-                self._g_slot = self._slot
             for sweep in (1, 2, 3):
-                for receivers in tiles:
+                for index, receivers in enumerate(tiles):
+                    slot = self._slots[keys[index]] if padded else None
                     piece = self._tile_graph(receivers, row_ptr, edge_index, local_of,
-                                             self._slot["sizes"][0] if padded else None)
+                                             slot["sizes"][0] if padded else None)
                     self._note(stats, piece)
                     if padded:
-                        self._fill(self._slot, piece)
-                        self._run_slot(sweep, self._slot, g)
-                        self._scatter(sweep, self._slot, g)
+                        if bound is not slot:  # the streaming kernels read this slot's edge count
+                            for module in field._streaming:
+                                module.register_buffer("streaming_count", slot["count"], persistent=False)
+                            bound = slot
+                        self._fill(slot, piece)
+                        self._run_slot(sweep, slot, g)
+                        self._scatter(sweep, slot, g)
                     else:
                         self._eager_tile(sweep, piece, g)
                     del piece
@@ -521,7 +578,6 @@ class TiledForceField:
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device), state={})
             self._g = g
-            self._graphs = {}
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))
         g["stress"] = stress
@@ -547,16 +603,42 @@ class TiledForceField:
         stats["max_halo"] = max(stats["max_halo"], h)
         stats["max_edges"] = max(stats["max_edges"], edge_ids.shape[0])
 
-    def _slot_sizes(self, tiles, row_ptr, edge_index, local_of, stats):
-        """(R, H, E) of a slot that holds every tile: one receiver slot more than the largest tile (the padding
-        receiver), halo and edges with ``TileConfig.headroom`` above the largest, so later calls (atoms move, the
-        list is rebuilt) rarely need a larger slot."""
-        largest = [0, 0, 0]
+    def _slot_keys(self, tiles, row_ptr, edge_index, local_of):
+        """Each tile's slot: the edge bucket ``ceil(edges / step)``, with ``step`` set on the first call from the
+        largest tile (``TileConfig.bucket`` of its edges, at least 256, a multiple of 256). A slot holds one
+        receiver row more than the largest of its tiles with ``TileConfig.headroom``, at most the receiver cap (the
+        extra row is the padding receiver), their halo with the same headroom and its bucket's edge count. A slot
+        grows (and its graphs and compiled shapes go) only when a tile does not fit it."""
+        sizes = []
         for receivers in tiles:
-            nodes, edge_ids, _, r, h = self._tile_graph(receivers, row_ptr, edge_index, local_of)
-            largest = [max(largest[0], r), max(largest[1], h), max(largest[2], edge_ids.shape[0])]
+            _, edge_ids, _, r, h = self._tile_graph(receivers, row_ptr, edge_index, local_of)
+            sizes.append((r, h, int(edge_ids.shape[0])))
+        if self._edge_step is None:
+            largest = max(e for _, _, e in sizes)
+            self._edge_step = max(256, 256 * math.ceil(float(self.config.bucket) * largest / 256))
+        step = self._edge_step
+        keys = [max(1, math.ceil(e / step)) for _, _, e in sizes]
         head = 1.0 + float(self.config.headroom)
-        return (largest[0] + 1, max(1, math.ceil(largest[1] * head)), max(1, math.ceil(largest[2] * head)))
+        for key in set(keys):
+            members = [size for size, k in zip(sizes, keys) if k == key]
+            # Receivers with headroom too (tiles are planned again every call, so their sizes move a little), but
+            # never past the cap, which no tile exceeds: full tiles keep their slot.
+            rows = min(int(self.config.receivers), row_ptr.shape[0] - 1,  # nor the atom count
+                       math.ceil(max(r for r, _, _ in members) * head))
+            need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
+                    key * step)
+            slot = self._slots.get(key)
+            if slot is None or any(a > b for a, b in zip(need, slot["sizes"])):
+                if slot is None:
+                    grown = need
+                else:  # an exceeded size grows by at least a quarter (receivers at most the cap), so a slot changes
+                    # a few times, not once per tile a little larger than the last
+                    rows_cap = min(int(self.config.receivers), row_ptr.shape[0] - 1) + 1
+                    grown = tuple(b if a <= b else max(a, math.ceil(1.25 * b)) for a, b in zip(need, slot["sizes"]))
+                    grown = (min(grown[0], max(rows_cap, need[0])), grown[1], grown[2])
+                self._slots[key] = self._new_slot(grown)
+                self.slot_changes += 1
+        return keys
 
     def _eager_tile(self, sweep, piece, g):
         """One sweep on one unpadded tile (``mode="eager"``)."""

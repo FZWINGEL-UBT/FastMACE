@@ -59,17 +59,17 @@ def relative(got, expected):
     return float(np.abs(got - expected).max()) / float(np.abs(expected).max())
 
 
-@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("mode, bucket", [("eager", 0.15), ("padded", 0.15), ("padded", 1.0)])
 @pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
 @pytest.mark.parametrize("receivers", [5, 16, 1000])
-def test_tiled_call_equals_the_whole_system_call(names, receivers, mode):
-    """Eager tiles at their own shapes, or every tile in one padded slot (masked receivers and halo rows,
-    padding edges beyond the cutoff and beyond the streaming count)."""
+def test_tiled_call_equals_the_whole_system_call(names, receivers, mode, bucket):
+    """Eager tiles at their own shapes, or every tile in a padded slot of its edge bucket (masked receivers and
+    halo rows, padding edges beyond the cutoff and beyond the streaming count); ``bucket=1``: one slot."""
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                            rewrites=only(*names))
     assert [entry.name for entry in field.applied] == list(names)
-    tiled = TiledForceField(field, TileConfig(receivers, mode=mode))
+    tiled = TiledForceField(field, TileConfig(receivers, mode=mode, bucket=bucket))
     for current in (atoms, strained(atoms)):
         expected = field.evaluate(current, stress=True)
         got = tiled.evaluate(current, stress=True)
@@ -80,24 +80,29 @@ def test_tiled_call_equals_the_whole_system_call(names, receivers, mode):
         if receivers < len(atoms):
             assert tiled.last["tiles"] > 1 and tiled.last["max_halo"] > 0
         if mode == "padded":
-            slot = tiled.last["slot"]
-            assert slot[0] == tiled.last["max_receivers"] + 1
-            assert slot[1] >= tiled.last["max_halo"] and slot[2] >= tiled.last["max_edges"]
+            slots = list(tiled.last["slots"].values())
+            assert tiled.last["max_receivers"] + 1 <= max(r for r, _, _ in slots) <= receivers + 1
+            assert max(h for _, h, _ in slots) >= tiled.last["max_halo"]
+            assert max(e for _, _, e in slots) >= tiled.last["max_edges"]
+            if bucket >= 1:
+                assert len(slots) == 1
 
 
-def test_padded_slot_is_reused_and_grows_only_when_a_tile_does_not_fit():
+def test_padded_slots_are_reused_and_grow_only_when_a_tile_does_not_fit():
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
-    tiled = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.5))
+    tiled = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.5, bucket=0.3))
     tiled.evaluate(atoms)
-    slot = tiled._slot
+    slots = dict(tiled._slots)
     tiled.evaluate(atoms)
-    assert tiled._slot is slot
+    assert all(tiled._slots[key] is slot for key, slot in slots.items())
     smaller = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.0))
-    smaller.evaluate(atoms)
-    smaller._slot = smaller._new_slot((2, 1, 1))  # too small for any tile
-    smaller.evaluate(atoms)
-    assert smaller._slot["sizes"][0] > 2
+    expected = smaller.evaluate(atoms)
+    key = next(iter(smaller._slots))
+    smaller._slots[key] = smaller._new_slot((2, 1, 1))  # too small for any tile
+    got = smaller.evaluate(atoms)
+    assert smaller._slots[key]["sizes"][0] > 2
+    assert relative(got[1], expected[1]) <= 1e-12
 
 
 def test_tiled_call_without_stress():
@@ -131,12 +136,13 @@ def test_plan_tiles_covers_every_atom_once_within_the_caps(receivers, edges):
 def test_refuses_compiled_and_unsupported_fields():
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
-    field.compile_mode = "default"
-    with pytest.raises(ValueError, match="eager"):
-        TiledForceField(field)
+    with pytest.raises(ValueError, match="compiled force field"):
+        TiledForceField(field, TileConfig(mode="compiled"))
     with pytest.raises(ValueError, match="receivers"):
         TileConfig(0)
     with pytest.raises(ValueError, match="mode"):
         TileConfig(mode="fast")
+    with pytest.raises(ValueError, match="bucket"):
+        TileConfig(bucket=0)
     with pytest.raises(ValueError, match="CUDA"):
         TiledForceField(MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER), TileConfig(mode="graphs"))
