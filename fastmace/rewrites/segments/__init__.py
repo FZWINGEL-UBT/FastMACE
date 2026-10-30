@@ -21,6 +21,10 @@ graph with Inductor's fusions.
 **Chunking was tried and left out.** Running the segments on 4, 8 or 16 atom chunks saved no more; 2 chunks once
 saved 0.24 GiB more, at 1.08 times this record's time. So the record recomputes each segment whole.
 
+**One region per interaction was tried and left out** (``SEGMENT_REGION``): checkpointing ``gated_rows`` through the
+product block as one region kept 62 instead of 97 kB per atom, but the compiled peak stayed at 3.5 GiB (the region's
+recomputation sets it), at 1.24 times the step time, and NbCl5 67,392 atoms no longer fitted.
+
 **Exactness and planning.** The record is ``rounding``: Inductor fuses the recomputed segments differently. It is
 deterministic.
 
@@ -40,9 +44,10 @@ from fastmace.rewrites.registry import CaseErrors, Rewrite, Support
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
 _PROBE_ROWS = 7
-# "combined": one checkpoint region per interaction from its gated_rows chain through its product block, so the joined
-# product basis between them is not kept (modules.join_region); "separate": each segment its own region (A/Bs).
-SEGMENT_REGION = "combined"
+# "separate": each segment its own region; "combined" (A/Bs): one checkpoint region per interaction from its gated_rows
+# chain through its product block (modules.join_region). Combined kept 35 kB per atom fewer, but its recomputation set
+# the same compiled peak, at 1.24 times separate's step time, and fitted fewer atoms (capacity-T08-chunks.md).
+SEGMENT_REGION = "separate"
 
 
 def _modules():
@@ -76,8 +81,8 @@ def _support(model):
 
 
 def recompute_segments(model):
-    """Recompute every node-local segment of ``model`` in the backward, in one region per interaction where it has a
-    ``gated_rows`` chain and ``SEGMENT_REGION`` is "combined"; returns their names."""
+    """Recompute every node-local segment of ``model`` in the backward, each its own region (or, with
+    ``SEGMENT_REGION`` "combined", one region per interaction that has a ``gated_rows`` chain); returns their names."""
     m = _modules()
     names = []
     joined = set()
