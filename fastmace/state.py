@@ -184,12 +184,16 @@ class RandomStream:
 
     def queue(self, rows: np.ndarray) -> None:
         """Put drawn rows before the ones already queued (they were drawn earlier)."""
+        import numpy as np  # here, as in from_atoms: importing the interfaces stays cheap
+
         rows = np.array(rows, dtype=np.float64)
         if len(rows):
             self.queued = rows if self.queued is None else np.concatenate([rows, self.queued])
 
     def unused(self) -> np.ndarray | None:
         """The drawn rows not used yet, in order: the batch's from the cursor on, then the queued ones."""
+        import numpy as np
+
         if self.batch is None:
             return None
         rows = self.batch[self.cursor:].cpu().numpy()
