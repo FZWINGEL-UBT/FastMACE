@@ -1,0 +1,55 @@
+# Capacity and speed ideas, 30 October 2026
+
+The conductor's assessment of the external idea lists the owner passed on during the capacity round. It records the
+ideas that make sense for FastMACE, what each would need first, and which session has it. It ends with the ideas
+that do not fit and why, so they are not proposed again without new evidence.
+
+Context on main at the time:
+- The leaner neighbour list (CAP-T09), the noise cap (CAP-T06) and the w rebuild (CAP-T07b) are merged.
+- Whole-system MH-1 float32 limits on the RTX 5060 Ti: 51,840 NbCl5 and 49,248 NaCl atoms. With
+  `recompute_node_segments` (CAP-T08, separate regions) they rise to 69,984 and 67,200.
+- The tiled prototype (`fastmace.model.tiled`, `docs/design/tiled-backend.md`, `docs/validation/capacity-tiled.md`)
+  fits 884,736 NbCl5 and 778,688 NaCl atoms on murphy's 20 GB, but runs eager, about 2.1x slower than main's step.
+
+## Taken up
+
+| # | Idea | Why | First check | Owner |
+| --- | --- | --- | --- | --- |
+| T1 | **One padded CUDA graph per tiled sweep**: tile slots padded to fixed receiver, halo and edge counts; padding edges beyond the cutoff (exact zero) or masked in the receiver scatter; each tile fed through static device buffers the graph reads, then replayed | The tiled path's 2x gap is eager execution, not tiling (tiling itself costs 40-45 %). One graph per sweep avoids a capture per tile shape | Sweep 2 on one padded tile, graph against eager, 16 iterations; target >= 1.8x | tiled-backend session |
+| T2 | **Free h1 after sweep 2** (sweep 3 recomputes interaction 0 anyway) | The 16 kB/atom global state (h1 and its adjoint) is the tiled limit; exact; about 1.4x more atoms | Peak at the current limit with and without | tiled-backend session |
+| T3 | **Host-staged h1 and dh1 in pinned memory**, double-buffered over PCIe behind tile compute | Workstations have 250 GB of RAM; per-tile copies are far shorter than tile compute. The dh1 halo contributions must be staged per tile and accumulated in a fixed order | After T1 and T2. The next limit is the neighbour list (about 3 kB/atom) plus positions, velocities and forces, so about 4-5M atoms on 16 GB, and the list build needs tiling too | later, tiled-backend session |
+| C1 | **Symmetric contraction fused into the following GEMM** (the contracted product is produced in registers and consumed by the linear, never written) | Removes the [N,8192] product tensor (1.58 GiB per interaction at 51,840 atoms) on the normal path. That helps capacity as well as the 4-8 % speed claim. Earlier own-GEMM and combined-kernel attempts gave no speed, so expect less on speed. It replaces a cuEquivariance kernel; the backward still needs the products or a recompute (see `docs/design/opt3-T02-symmetric-contraction.md`) | Falsifier: DRAM traffic of that tensor as a share of step time, from the step profile, and its share of saved state with `recompute_node_segments` on | capacity worker, after CAP-T08 merges |
+
+## Worth measuring before deciding
+
+- **Lossless compression of h1/dh1 between sweeps.** The claimed 2.2-2.8x is optimistic; float32 activations
+  usually compress 1.1-1.4x. Measure the ratio on a dumped h1 before writing an encoder. A lossy block-float
+  variant changes precision and would need a `certified` record (SPEC 6.1), outside the float32-only focus.
+- **Overlapping sweeps 2 and 3 across neighbouring tiles** on two streams. A 4,096-receiver tile (about 200k edges)
+  likely fills the GPU already, so measure in-tile utilisation first. It is not bitwise: the atomic-add order
+  changes. It doubles the tile workspace.
+- **One generated kernel for the elementwise chain.** Inductor already fuses most of it, and earlier combo kernels
+  gave nothing. About 300 kernels in a graph cost roughly 0.3-0.6 ms, which matters only for small cells. Profile
+  the idle gaps on NaCl first.
+
+From the earlier review (same day):
+- **Combined gated-rows-plus-product recompute region:** measured. Separate regions won (1.095x against 1.24x,
+  more atoms). See `docs/validation/capacity-T08-chunks.md`.
+- **Atom tiling of the node-local recompute:** open. The combined region's recompute is the compiled peak.
+- **Unused model outputs held through the backward:** screen running in the neighbour-list session.
+- **Inductor `memory_planning`:** screen running in the neighbour-list session.
+
+## Not taken up
+
+| Idea | Reason |
+| --- | --- |
+| Multiple time stepping (RESPA by rank or cutoff) | MH-1 has no separable cheap pair term, and stiff parts of the force are not confined to one. A 2-4 fs outer step risks resonance. It changes the dynamics, and the owner ruled out larger timesteps (1 fs production protocol). Only as a separate protocol study if the owner revisits that |
+| Reversible (RevNet) equivariant blocks | Needs a new architecture and retraining; the tiled path gives the capacity without it |
+| Short cutoff (3.5 A) plus a PME or multipole tail | A different model needing training and validation, not an optimisation of an existing one |
+| Directional JVP force stepping | The force rate along v is a Hessian-vector product, which still needs a reverse pass. Extrapolated forces are not conservative and drift |
+| Spatial tiling with discarded halo forces | Done properly as the three-sweep tiled path. Discarding halo forces is wrong for two message-passing layers unless the halo is doubled |
+| Wyckoff orbit folding | Thermal motion breaks the symmetry at the first MD step. Only exactly symmetric relaxations would gain, and they are not a bottleneck |
+| Stochastic-rounding FP8 absorbed into the thermostat | Rounding noise depends on the force values, is correlated and non-Gaussian, so fluctuation-dissipation breaks. NVE and relaxations have no thermostat. E4M3's 3 mantissa bits are far below BF16, which already failed the gate. Outside the float32 focus |
+| Distilled direct-force head | A different, non-conservative model; a curl-free projection on a grid does not recover MACE's forces |
+| Planned segment_gemm workspace | Falsified at the tracing spike (`docs/validation/capacity-workspace.md`) |
+| Capture-time allocator following the offline packing plan | Up to 1.47 GiB, but a process-wide allocator constraint. Needs a SPEC 18 decision; not started |
