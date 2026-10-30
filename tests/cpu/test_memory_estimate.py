@@ -512,6 +512,35 @@ def test_rule_12_turns_on_a_memory_rescue_only_when_the_plan_does_not_fit():
 
 
 @pytest.mark.rule(12)
+def test_rule_12_turns_on_atom_chunks_only_after_recompute_with_the_fewest_chunks_that_fit():
+    """CAP-T08: atom_chunks ("auto") stays off while the plan fits, and while it fits with recompute_conv_weights on;
+    otherwise rule 12 turns it on after recompute_conv_weights, with the fewest of ATOM_CHUNK_COUNTS whose estimate
+    fits (the most when none does), each with its reason."""
+    from fastmace.planner.fixed import AUTO_RULES
+
+    assert AUTO_RULES["RewriteConfig.atom_chunks"] == (
+        "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
+    full = plan()
+    assert full.rewrites.atom_chunks == "off" and full.rewrites.atom_chunk_count is None
+    if full.rewrites.wprime_backward != "on" or full.rewrites.gated_rows != "on":
+        pytest.skip("wprime_backward or gated_rows is off in this plan")
+    recompute = plan(rewrites=RewriteConfig(recompute_conv_weights="on"))
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20)  # nothing fits: both on, the most chunks
+    assert tight.rewrites.recompute_conv_weights == "on" and tight.rewrites.atom_chunks == "on"
+    assert tight.rewrites.atom_chunk_count == memory.ATOM_CHUNK_COUNTS[-1]
+    for field in ("atom_chunks", "atom_chunk_count"):
+        _, _, reason = tight.decision(f"RewriteConfig.{field}")
+        assert (reason.rule, reason.code) == (12, "rule-12-memory-rescue"), field
+        check(reason)
+    assert "recompute_conv_weights" in str(tight.decision("RewriteConfig.atom_chunks")[2])
+    # A cell that fits with recompute_conv_weights on keeps atom_chunks off.
+    free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001
+    fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
+    assert fits.rewrites.atom_chunks == "off"
+
+
+@pytest.mark.rule(12)
 def test_rule_12_leaves_the_rescue_to_the_run_when_the_cell_may_fit():
     """CAP-T07 (owner: only when memory would not be enough): the estimate overstates the peak by up to
     RESCUE_OVERSTATEMENT, so a plan that does not fit 90 % of the free memory, but whose estimate divided by it
@@ -528,7 +557,7 @@ def test_rule_12_leaves_the_rescue_to_the_run_when_the_cell_may_fit():
     assert tight.rewrites.recompute_conv_weights == "off"
     _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
     assert choice == "off" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
-    assert "rebuilds once with recompute_conv_weights on" in reason
+    assert "rebuilds with recompute_conv_weights on, one memory-rescue record per rebuild" in reason
     check(reason)
     bound = type("Estimate", (), {})
     bound.needed = free

@@ -150,6 +150,14 @@ class RewriteConfig:
     # edge chunks (plans/capacity.md CAP-T07); exact (the same per-edge values, bitwise); needs wprime_backward;
     # auto = off, turned on by rule 12 only when the plan would not fit the free memory without it.
     recompute_conv_weights: Toggle = "auto"
+    # Each interaction's gated_rows chain and product block on atom chunks, each chunk under non-reentrant
+    # checkpointing: the force call keeps only the chunks' inputs and rebuilds one chunk's intermediates at a time
+    # in the backward (plans/capacity.md CAP-T08, fastmace.rewrites.chunks); rounding; needs gated_rows; auto = off,
+    # turned on by rule 12 only when the plan would not fit with recompute_conv_weights on.
+    atom_chunks: Toggle = "auto"
+    # atom_chunks' chunk count: None = rule 12's (the fewest of rewrites.chunks.CHUNK_COUNTS that fit), or
+    # rewrites.chunks.DEFAULT_CHUNKS when atom_chunks is "on" outside a plan that chose one.
+    atom_chunk_count: int | None = None
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.
@@ -229,6 +237,8 @@ class RewriteConfig:
 
     def __post_init__(self):
         _check_choices(self)
+        if self.atom_chunk_count is not None:
+            _count(self, "atom_chunk_count", 1)
 
 
 @dataclass(frozen=True)

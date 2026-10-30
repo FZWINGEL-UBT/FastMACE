@@ -69,6 +69,21 @@ def test_a_recoverable_out_of_memory_error_turns_the_rescue_on(stubbed):
                                   "rule 12; CAP-T07)"}]
 
 
+def test_the_rescue_turns_on_one_record_per_rebuild_in_its_order(monkeypatch, stubbed):
+    """CAP-T08: atom_chunks only after recompute_conv_weights is on, one record per rebuild."""
+    requires = {"recompute_conv_weights": ("wprime_backward",), "atom_chunks": ("gated_rows",)}
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires[name]))
+    ff = types.SimpleNamespace(rewrites="auto")
+    for recompute, expected in (("off", "recompute_conv_weights"), ("on", "atom_chunks")):
+        plan = stub_plan(recompute_conv_weights=recompute, atom_chunks="off", gated_rows="on")
+        fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+        assert stubbed[-1]["rewrites"] == {expected: "on"}
+    stubbed.clear()
+    plan = stub_plan(recompute_conv_weights="on", atom_chunks="on", gated_rows="on")
+    assert fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build",
+                                  usable=lambda device: True) is None
+
+
 class AcceleratorError(RuntimeError):
     """As ``torch.AcceleratorError``: the driver's error, not the caching allocator's."""
 
@@ -156,7 +171,7 @@ def pristine(tmp_path, quiet_licences):
 class Injected:
     """The first engine fails at ``stage`` with an out-of-memory error; weakrefs to every built engine."""
 
-    def __init__(self, monkeypatch, stage, *, sticky=False):
+    def __init__(self, monkeypatch, stage, *, sticky=False, failures=1):
         self.refs, self.alive_at_build, self.stages = [], [], []
         original = minimal.MinimalPlanner.build
         probe = self
@@ -164,7 +179,7 @@ class Injected:
         def build(planner, plan, force_field, atoms, **kwargs):
             gc.collect()
             probe.alive_at_build.append(sum(ref() is not None for ref in probe.refs))
-            first = not probe.refs
+            first = len(probe.refs) < failures
             if first and stage == "build":
                 probe.refs.append(lambda: None)
                 raise oom()
@@ -181,7 +196,8 @@ class Injected:
             probe.stages.append(stage)
             if sticky:
                 raise error
-            return fallback.candidate(plan, {"rewrites": {"block_linear": "off"},
+            turned = ("block_linear", "grouped_linear")[len(probe.stages) - 1]
+            return fallback.candidate(plan, {"rewrites": {turned: "off"},
                                              "reason": f"out of memory at {stage} (injected)"},
                                       force_field, atoms, planner=planner)
 
@@ -203,6 +219,21 @@ def test_simulation_rebuilds_once_after_a_recoverable_out_of_memory_error(pristi
     assert sim.plan.revision == 1 and "block_linear" not in fallback.enabled_rewrites(sim.plan)
     assert f"out of memory at {stage} (injected)" in sim.plan.reason  # the run record keeps which path ran
     sim.run(steps=2)
+    sim.close()
+
+
+def test_simulation_rebuilds_again_while_the_rescue_has_a_record_left(pristine, monkeypatch):
+    """CAP-T08: a rebuild that runs out of memory again turns on the rescue's next record."""
+    from fastmace.model.forcefield import ForceField
+    from fastmace.simulation import Simulation
+
+    probe = Injected(monkeypatch, "build", failures=2)
+    atoms = nacl(repeat=1, rattle=0.05, seed=3)
+    sim = Simulation(atoms, ForceField(pristine, atoms, precision="float64", rewrites=REWRITES),
+                     integrator=LANGEVIN, seed=8, check="skip")
+    assert probe.stages == ["build", "build"] and len(probe.refs) == 3
+    assert sim.plan.revision == 2
+    sim.run(steps=1)
     sim.close()
 
 

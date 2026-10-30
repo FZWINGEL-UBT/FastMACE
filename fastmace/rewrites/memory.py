@@ -30,6 +30,8 @@ _STREAMING_INDEX_BYTES = 2 * 4
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
 _RADIAL_TABLES_SHARE = 576 / 8265
 _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
+# atom_chunks' saving per node as (A, B) shares of the stock per-node floats, saving = (A - B / chunks): PLACEHOLDER
+_ATOM_CHUNKS_SHARE = (0.21, 0.03)
 
 
 def _first_hidden(block) -> int:
@@ -120,6 +122,29 @@ def recompute_conv_weights(dims, width):
     return -sum(block.weight_numel for block in dims.interactions[1:]) * width, 0
 
 
+def _stock_node_floats(dims) -> int:
+    """The floats per node stock MACE keeps for the force backward over all interactions
+    (``planner.memory.interaction_floats``'s node term)."""
+    return sum(block.node_in + block.messages + block.target + block.correlation * block.target
+               + max(block.hidden, block.node_in) for block in dims.interactions)
+
+
+def atom_chunks_saving(dims, width, chunks):
+    """Bytes per node the force call's peak loses with ``atom_chunks`` on ``chunks`` chunks: the node-local
+    segments' saved tensors, less one chunk's rebuilt intermediates, ``(A - B / chunks)`` times the stock per-node
+    floats (``_ATOM_CHUNKS_SHARE``, fitted on the compiled default plan's peaks, CAP-T08)."""
+    full, chunk = _ATOM_CHUNKS_SHARE
+    return round((full - chunk / int(chunks)) * _stock_node_floats(dims)) * width
+
+
+def atom_chunks(dims, width):
+    """``atom_chunks`` at its default count (rewrites.chunks.DEFAULT_CHUNKS); rule 12 evaluates each count it
+    considers with ``atom_chunks_saving``."""
+    from fastmace.rewrites.chunks import DEFAULT_CHUNKS
+
+    return 0, -atom_chunks_saving(dims, width, DEFAULT_CHUNKS)
+
+
 def radial_tables(dims, width):
     """Tabulated radial networks keep no hidden activations per edge (measured)."""
     return -round(_RADIAL_TABLES_SHARE * _stock_edge_floats(dims)) * width, 0
@@ -154,7 +179,7 @@ def segment_gemm_selfcheck(dims, width, sms):
 _SEGMENT_SELFCHECK_TENSORS = 9
 
 
-__all__ = ["block_linear_resident", "chunked_conv_backward", "factor_species", "fold_cutoff", "fused_radial_hidden",
-           "generic_reassociate", "joint_radial_input", "merged_residual_resident", "mh1_streaming_conv",
-           "radial_tables", "reassociate_first", "recompute_conv_weights", "segment_gemm_selfcheck",
-           "streaming_conv"]
+__all__ = ["atom_chunks", "atom_chunks_saving", "block_linear_resident", "chunked_conv_backward", "factor_species",
+           "fold_cutoff", "fused_radial_hidden", "generic_reassociate", "joint_radial_input",
+           "merged_residual_resident", "mh1_streaming_conv", "radial_tables", "reassociate_first",
+           "recompute_conv_weights", "segment_gemm_selfcheck", "streaming_conv"]
