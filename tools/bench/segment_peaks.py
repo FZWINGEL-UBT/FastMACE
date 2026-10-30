@@ -68,7 +68,7 @@ def forces_of(out):
     return out["forces"] if isinstance(out, dict) else out[1] if isinstance(out, tuple) else out
 
 
-_SEGMENTS = {}  # key -> (compiled chunk function, chunks, output trailing shape): the --chunk-op registry
+_SEGMENTS = {}  # key -> (compiled chunk function, chunks, the plain forward): the --chunk-op registry
 _OPS = {}
 
 
@@ -96,8 +96,9 @@ def _chunk_ops():
             return torch.cat([run(*pieces(inputs, natoms, a, b)) for a, b in bounds(natoms, chunks)])
 
     @forward.register_fake
-    def _(inputs, key):
-        return inputs[0].new_empty((inputs[0].shape[0], *_SEGMENTS[key][2]))
+    def _(inputs, key):  # the plain forward on the fake inputs gives the output's shape
+        out = _SEGMENTS[key][2](*inputs)
+        return out.new_empty(out.shape)
 
     @torch.library.custom_op("fastmace_probe::atom_chunked_backward", mutates_args=(),
                              schema="(Tensor[] inputs, Tensor grad, bool[] wanted, int key) -> Tensor[]")
@@ -148,18 +149,16 @@ def atom_chunked_op(module, natoms, chunks):
     names = list(inspect.signature(forward).parameters)
     op = _chunk_ops()
     key = len(_SEGMENTS)
-    compiled = torch.compile(lambda *values: forward(**dict(zip(names, values))), dynamic=True)
-    _SEGMENTS[key] = [compiled, chunks, None]
+    def plain(*values):
+        return forward(**dict(zip(names, values)))
+
+    _SEGMENTS[key] = [torch.compile(plain, dynamic=True), chunks, plain]
 
     def run(*args, **kwargs):
         bound = inspect.signature(forward).bind(*args, **kwargs)
         bound.apply_defaults()
         values = [bound.arguments[name] for name in names]
         assert all(torch.is_tensor(v) for v in values), names
-        if _SEGMENTS[key][2] is None:  # the output's trailing shape, from two atoms (outside any compile)
-            with torch.no_grad():
-                _SEGMENTS[key][2] = tuple(forward(**{n: v[:2] if v.dim() and v.shape[0] == natoms else v
-                                                     for n, v in zip(names, values)}).shape[1:])
         return op(values, key)
 
     return run
