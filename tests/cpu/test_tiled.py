@@ -131,9 +131,8 @@ def test_plan_tiles_covers_every_atom_once_within_the_caps(receivers, edges):
 def test_refuses_compiled_and_unsupported_fields():
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
-    field.compile_mode = "default"
-    with pytest.raises(ValueError, match="eager"):
-        TiledForceField(field)
+    with pytest.raises(ValueError, match="compiled force field"):
+        TiledForceField(field, TileConfig(mode="compiled"))
     with pytest.raises(ValueError, match="receivers"):
         TileConfig(0)
     with pytest.raises(ValueError, match="mode"):

@@ -42,7 +42,9 @@ class TileConfig:
 
     ``edges=None`` caps the edges at ``receivers`` times twice the structure's mean degree, so a tile is split
     where its receivers are unusually crowded. ``mode``: ``"eager"`` (each tile at its own shape), ``"padded"``
-    (every tile in one padded slot, eagerly) or ``"graphs"`` (the padded slot, one CUDA graph per sweep).
+    (every tile in one padded slot, eagerly), ``"graphs"`` (the padded slot, one CUDA graph per sweep) or
+    ``"compiled"`` (the padded slot, each sweep's forward compiled by Inductor at the slot's shapes; the force
+    derivative outside the compiled frame; needs a compiled force field, whose model is traceable).
     ``headroom``: a padded slot's halo and edge counts above the largest tile's, as a fraction.
     """
 
@@ -52,8 +54,8 @@ class TileConfig:
     headroom: float = 0.1
 
     def __post_init__(self):
-        if self.mode not in ("eager", "padded", "graphs"):
-            raise ValueError(f"TileConfig.mode must be 'eager', 'padded' or 'graphs', got {self.mode!r}")
+        if self.mode not in ("eager", "padded", "graphs", "compiled"):
+            raise ValueError(f"TileConfig.mode must be 'eager', 'padded', 'graphs' or 'compiled', got {self.mode!r}")
         if not 0 <= float(self.headroom) <= 10:
             raise ValueError(f"TileConfig.headroom must be in [0, 10], got {self.headroom!r}")
         if int(self.receivers) < 1:
@@ -70,15 +72,22 @@ class _Ghosts:
 _GHOSTS = _Ghosts()
 
 
-def _given(value):
-    """Stand-in for a module of interaction 1 in sweep 2: returns ``value``, whatever its input."""
+@functools.cache
+def _holder_class():
     import torch
 
-    class Given(torch.nn.Module):
-        def forward(self, *args, **kwargs):
-            return value
+    class Holder(torch.nn.Module):
+        """Stand-in for a module of interaction 1 in sweep 2: returns its ``value`` buffer, whatever its input
+        (a buffer, so a compiled tile body takes it as an input)."""
 
-    return Given()
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("value", None, persistent=False)
+
+        def forward(self, *args, **kwargs):
+            return self.value
+
+    return Holder
 
 
 def plan_tiles(positions, cell, row_ptr, receivers, edges):
@@ -141,8 +150,11 @@ class TiledForceField:
         self.field = field
         self.config = tiles or TileConfig()
         model = getattr(field.model, "_orig_mod", field.model)
-        if field.compile_mode != "none":
-            raise ValueError("TiledForceField needs an eager force field (compile_mode='none')")
+        # A compiled force field's model is the simplified, traceable copy (``compile_model``): the tile bodies
+        # run its modules (``_orig_mod``), eagerly or, in mode "compiled", under their own torch.compile. An eager
+        # field's e3nn modules cannot be compiled (their TorchScript parts would differentiate to zero).
+        if self.config.mode == "compiled" and field.compile_mode == "none":
+            raise ValueError("TileConfig.mode='compiled' needs a compiled force field (compile_mode='default')")
         if type(model).__name__ != "ScaleShiftMACE" or len(model.interactions) != 2:
             raise ValueError("TiledForceField supports two-interaction ScaleShiftMACE models only")
         if hasattr(model, "joint_embedding") or getattr(field, "is_polar", False):
@@ -160,6 +172,8 @@ class TiledForceField:
         # Padding edges: a vector beyond the cutoff, so their radial envelope, and every term it multiplies, is 0.
         r_max = float(getattr(model, "r_max", 10.0))
         self._far = torch.tensor([2.0 * r_max + 1.0, 0.0, 0.0], dtype=self.dtype, device=self.device)
+        self._holders = (_holder_class()(), _holder_class()())
+        self._compiled = {}
         self._slot = None
         self._g_slot = None
         self._graphs = {}
@@ -279,21 +293,46 @@ class TiledForceField:
                    if strain is not None else None)
             x = state["x"][nodes].detach().requires_grad_(True)
             sc = state["sc"][nodes[:r]].detach().requires_grad_(True)
-            _, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
             modules = interaction._modules
             saved = modules["linear_up"], modules["skip_tp"]
-            modules["linear_up"], modules["skip_tp"] = _given(x), _given(sc)
+            holder_x, holder_sc = self._holders
+            holder_x.value, holder_sc.value = x, sc
+            modules["linear_up"], modules["skip_tp"] = holder_x, holder_sc
             try:  # their real counterparts ran in sweep 1, on the h1 that is not kept
-                out = self._layer(1, x, attrs, edge_attrs, edge_feats, cutoff, local, r)
+                objective, es = self._forward(2)(leaf, x, eps, attrs, local, recv_mask, r)
             finally:
                 modules["linear_up"], modules["skip_tp"] = saved
-            heads = self.heads[:r]
-            es = model.readouts[1](out, heads)[self.arange[:r], heads]
-            objective = self._masked(model.scale_shift(es, heads), recv_mask).sum()
+                holder_x.value = holder_sc.value = None
             wanted = [leaf, x, sc] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
         return (self._masked(es.detach(), recv_mask), grads[0], self._masked(grads[1], node_mask),
                 self._masked(grads[2], recv_mask), grads[3] if eps is not None else None)
+
+    def _second_forward(self, leaf, x, eps, attrs, local, recv_mask, r):
+        """Sweep 2's forward up to its objective (interaction 1 reads the holders' x and sc): ``(objective, es)``.
+        Compiled as one function in mode "compiled"."""
+        model = self.model
+        _, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
+        out = self._layer(1, x, attrs, edge_attrs, edge_feats, cutoff, local, r)
+        heads = self.heads[:r]
+        es = model.readouts[1](out, heads)[self.arange[:r], heads]
+        return self._masked(model.scale_shift(es, heads), recv_mask).sum(), es
+
+    def _forward(self, sweep):
+        """The sweep's forward: plain, or (mode "compiled") compiled on first use at the slot's shapes."""
+        plain = {2: self._second_forward}[sweep]
+        if self.config.mode != "compiled":
+            return plain
+        compiled = self._compiled.get(sweep)
+        if compiled is None:
+            import torch
+
+            from fastmace.rewrites import inductor as inductor_records
+
+            options = inductor_records.inductor_options(self.model)
+            compiled = torch.compile(plain, dynamic=False, fullgraph=False, **({"options": options} if options else {}))
+            self._compiled[sweep] = compiled
+        return compiled
 
     # ------------------------------------------------------------------ padded slot
 
