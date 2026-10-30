@@ -120,7 +120,11 @@ def tabulate(model):
 
 
 def _probe_attrs(model, context, generator):
-    """One-hot rows: the structure's (context) or random ones."""
+    """One-hot rows: the structure's (context) or random ones.
+
+    A structure with more than ``_PROBE_ROWS`` atoms gives its distinct rows, one per species present, so that
+    the checks' memory does not grow with the atom count (the tiled capacity path builds 300k+ atom cells).
+    """
     import torch
 
     attrs = (context.inputs or {}).get("node_attrs")
@@ -128,6 +132,8 @@ def _probe_attrs(model, context, generator):
     if attrs is None:
         species = torch.randint(0, width, (_PROBE_ROWS,), generator=generator)
         attrs = torch.nn.functional.one_hot(species, width)
+    elif attrs.shape[0] > _PROBE_ROWS:
+        attrs = torch.unique(attrs, dim=0)
     rows = _one_hot_rows(model)
     return attrs.to(dtype=rows.dtype, device=rows.device)
 
