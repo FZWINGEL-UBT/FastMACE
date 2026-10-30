@@ -168,11 +168,6 @@ STREAMING_RECORDS = ("streaming_conv", "generic_streaming")
 SEGMENTED_RECORDS = ("segmented_first_sum", "generic_segmented_first_sum")  # edges grouped by sender species
 # Workload constraint of the records whose rewritten model depends on the structure's species.
 SPECIES_DEPENDENT = "fixed_species_superset"
-# Compiled OEq models (hybrid backend) are called with forces and stress off, and MACE's gradient step runs after the
-# call, outside the compiled frame (setup-across-compositions F2; ``ForceField._split_outputs``). With it inside,
-# Dynamo traced the frame up to ``torch.autograd.grad``, restarted at the graph break and traced it again: 2.4-2.9 s
-# per build. False: MACE's call as before (A/Bs).
-SPLIT_FORCE_FRAME = True
 
 
 def _numbers(species):
@@ -418,8 +413,11 @@ class MACEForceField:
             # OEq custom operators are opaque to AOTAutograd: MACE's OEq compile path
             # differentiates outside the compiled model.
             self.training = not self.oeq
-            # ScaleShiftMACE differentiates its interaction energy, which its output dict carries.
-            self.split_forces = (self.oeq and SPLIT_FORCE_FRAME and not self.is_polar
+            # Compiled OEq models are called with forces and stress off, and MACE's gradient step runs after the
+            # call, outside the compiled frame (setup-across-compositions F2; _split_outputs). With it inside, Dynamo
+            # traced the frame up to torch.autograd.grad, restarted at the graph break and traced it again: 2.2-3.5 s
+            # per build. ScaleShiftMACE differentiates its interaction energy, which its output dict carries.
+            self.split_forces = (self.oeq and not self.is_polar
                                  and energy64.class_name(source) == "ScaleShiftMACE")
         elif model_records or self.is_polar:
             self.model = prepare(compiling.private_copy(source))

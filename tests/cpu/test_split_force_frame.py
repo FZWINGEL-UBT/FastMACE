@@ -14,7 +14,6 @@ pytest.importorskip("mace")
 from test_rewrites_mh1 import tiny  # noqa: E402
 
 from fastmace.model import energy as energy64  # noqa: E402
-from fastmace.model import forces as forces_module  # noqa: E402
 
 
 def _leaves(batch, stress):
@@ -53,6 +52,3 @@ def test_the_split_call_gives_mace_s_forces_and_stress_bitwise(stress):
     else:
         assert stress_out is None and expected["stress"] is None
 
-
-def test_the_split_is_on_by_default():
-    assert forces_module.SPLIT_FORCE_FRAME is True

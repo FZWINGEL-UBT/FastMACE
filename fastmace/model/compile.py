@@ -313,8 +313,6 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
 # The model inputs indexed by edge (mark_edges_dynamic); every other input whose first dimension is the atom count is
 # per atom (mark_atoms_dynamic).
 EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
-# mark_atoms_dynamic: the atom dimension dynamic from the first compile (setup-across-compositions F5); False for A/Bs.
-MARK_ATOMS_DYNAMIC = True
 
 
 def mark_edges_dynamic(data):
@@ -345,11 +343,10 @@ def mark_atoms_dynamic(data, atoms):
     Unmarked, the first compile in a process specialises to its atom count, and another atom count in a later
     process misses Inductor's FX cache; within a process Dynamo makes the dimension dynamic only after a second
     count recompiles. Per-atom inputs are the tensors of ``data`` whose first dimension is ``atoms``.
-    ``MARK_ATOMS_DYNAMIC = False`` leaves them as before (A/Bs).
     """
     import torch
 
-    if not MARK_ATOMS_DYNAMIC or atoms < 2:  # 0 and 1 are specialised anyway
+    if atoms < 2:  # 0 and 1 are specialised anyway
         return
     for key, tensor in data.items():
         if torch.is_tensor(tensor) and tensor.dim() and tensor.shape[0] == atoms and key not in EDGE_KEYS:
@@ -460,6 +457,6 @@ def configure_allocator(enabled=True, environ=None, torch_version=None):
 __all__ = [
     "ALLOCATOR_MIN_TORCH", "ALLOCATOR_SETTINGS", "CompiledEntry", "CompiledModelCache", "FP64_EMULATION_SETTINGS",
     "compile_model", "configure_allocator", "configure_fp64_emulation", "cpu_cueq_problems", "fp64_emulation_active",
-    "EDGE_KEYS", "MARK_ATOMS_DYNAMIC", "install_engine_patches", "mark_atoms_dynamic", "mark_edges_dynamic",
+    "EDGE_KEYS", "install_engine_patches", "mark_atoms_dynamic", "mark_edges_dynamic",
     "naive_cueq", "private_copy", "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
 ]

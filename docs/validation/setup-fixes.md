@@ -24,8 +24,13 @@ F4 (the self-check cache) waits for the owner and is not part of this branch.
 | --- | --- | --- |
 | F3 | `a495f5c5` | The converted-model templates belong to the `LoadedModel` (`LoadedModel.template_cache()`), so every `ForceField` of one `fm.load` result shares them. Each plan still gets its private copy, and the mutation guard still applies. |
 | F1 | `953b649d` | The OEq kernel registry ids come from each kernel's source, rule and device (`content_id`), not from a counter of objects; Inductor saw them as graph constants. The radial-table piece count is padded to a bucket of 16 pieces (`fastmace.rewrites.radial.PIECE_BUCKET`) by repeating the last piece; the padded pieces are never selected, and values and gradients are bitwise the same. |
-| F2 | `c20b4881` | A compiled OEq `ScaleShiftMACE` is called with forces and stress off, and MACE's own `get_outputs` takes the gradient after the call (`fastmace.model.forces.SPLIT_FORCE_FRAME`). The compiled frame holds no `torch.autograd.grad`, so there is no graph break and no Dynamo restart. |
-| F5 | `0d62d0c7` | The edge tensors' capacity buffers (their `_base`) are marked dynamic with the views, so their storage size no longer enters the FX cache key. The per-atom inputs are marked dynamic on the atom dimension from the first build (`fastmace.model.compile.MARK_ATOMS_DYNAMIC`). |
+| F2 | `c20b4881` | A compiled OEq `ScaleShiftMACE` is called with forces and stress off, and MACE's own `get_outputs` takes the gradient after the call. The compiled frame holds no `torch.autograd.grad`, so there is no graph break and no Dynamo restart. |
+| F5 | `0d62d0c7` | The edge tensors' capacity buffers (their `_base`) are marked dynamic with the views, so their storage size no longer enters the FX cache key. The per-atom inputs are marked dynamic on the atom dimension from the first build. |
+
+The measurements below ran at `0d62d0c7`, which had two module-level switches for the ablation and the A/B:
+`fastmace.model.forces.SPLIT_FORCE_FRAME` and `fastmace.model.compile.MARK_ATOMS_DYNAMIC`. The layering test forbids
+boolean module switches, so a later commit removed both. F2 and F5 are now unconditional, and the code paths are
+otherwise unchanged. `PIECE_BUCKET` is an integer constant and stays.
 
 Nothing here is a per-structure or shape-keyed table: the piece bucket is a fixed rounding, and the ids are content
 hashes.
