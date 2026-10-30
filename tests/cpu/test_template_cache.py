@@ -83,6 +83,11 @@ def storages(loaded):
     return {t.untyped_storage().data_ptr() for t in tensors(loaded.model)}
 
 
+def first_template(ff):
+    cache = ff.model.template_cache(create=False)
+    return cache.template(next(iter(cache.keys())))
+
+
 # --------------------------------------------------------------------------- the rule and the field
 
 
@@ -133,7 +138,7 @@ def test_first_plan_gets_the_load_and_later_plans_a_copy(loads, cuda_rule):
 def test_copies_share_no_storage_module_or_results(loads, cuda_rule):
     ff = ForceField(pristine())
     plans = [ff.execution_model(plan()) for _ in range(3)]
-    template = ff._templates.template(next(iter(ff._templates.keys())))
+    template = first_template(ff)
     everyone = plans + [template]
     for i, a in enumerate(everyone):
         for b in everyone[i + 1:]:
@@ -244,14 +249,68 @@ def test_release_templates_empties_the_cache_and_reports_bytes(loads, cuda_rule)
     assert len(loads) == 2
 
 
-def test_templates_die_with_their_force_field(loads, cuda_rule):
-    ff = ForceField(pristine())
+def test_templates_die_with_their_loaded_model(loads, cuda_rule):
+    model = pristine()
+    ff = ForceField(model)
     ff.execution_model(plan())
-    template = ff._templates.template(next(iter(ff._templates.keys())))
+    template = first_template(ff)
     alive = weakref.ref(template.model)
     del ff, template
     gc.collect()
+    assert alive() is not None  # the loaded model keeps them for its next force field
+    del model
+    gc.collect()
     assert alive() is None
+
+
+# --------------------------------------------------------------------------- across force fields (setup F3)
+
+
+def test_force_fields_of_one_loaded_model_share_the_templates(loads, cuda_rule):
+    """A new composition (a new ForceField of the same fm.load result) copies the template: one conversion."""
+    model = pristine()
+    first, second = ForceField(model), ForceField(model)
+    a = first.execution_model(plan())
+    b = second.execution_model(plan())
+    c = second.execution_model(plan())
+    assert len(loads) == 1 and first.template_count() == second.template_count() == 1
+    template = first_template(first)
+    assert len({id(m) for m in (a.model, b.model, c.model, template.model)}) == 4
+    assert not storages(b) & storages(a) and not storages(b) & storages(template) and not storages(b) & storages(c)
+    for got in (b, c):
+        for x, y in zip(tensors(got.model), tensors(template.model)):
+            assert torch.equal(x, y)
+
+
+def test_another_loaded_model_converts_again(loads, cuda_rule):
+    ForceField(pristine()).execution_model(plan())
+    ForceField(pristine()).execution_model(plan())
+    assert len(loads) == 2
+
+
+def test_a_change_from_one_force_field_is_caught_in_another(loads, cuda_rule):
+    model = pristine()
+    first, second = ForceField(model), ForceField(model)
+    first.execution_model(plan())
+    with torch.no_grad():
+        next(first_template(first).model.parameters()).add_(1.0)
+    with pytest.raises(templates.TemplateChangedError, match="changed"):
+        second.execution_model(plan())
+
+
+def test_release_from_one_force_field_drops_them_for_all(loads, cuda_rule):
+    model = pristine()
+    first, second = ForceField(model), ForceField(model)
+    first.execution_model(plan())
+    assert second.release_templates() > 0 and first.template_count() == 0
+    first.execution_model(plan())
+    assert len(loads) == 2
+
+
+def test_a_private_copy_carries_no_templates(loads, cuda_rule):
+    model = pristine()
+    ForceField(model).execution_model(plan())
+    assert dataclasses.replace(model).template_cache(create=False) is None
 
 
 # --------------------------------------------------------------------------- the mutation guard
@@ -260,7 +319,7 @@ def test_templates_die_with_their_force_field(loads, cuda_rule):
 def test_a_template_changed_in_place_raises(loads, cuda_rule):
     ff = ForceField(pristine())
     ff.execution_model(plan())
-    template = ff._templates.template(next(iter(ff._templates.keys())))
+    template = first_template(ff)
     with torch.no_grad():
         next(template.model.parameters()).add_(1.0)
     with pytest.raises(templates.TemplateChangedError, match="changed"):
@@ -270,7 +329,7 @@ def test_a_template_changed_in_place_raises(loads, cuda_rule):
 def test_a_template_tensor_replaced_raises(loads, cuda_rule):
     ff = ForceField(pristine())
     ff.execution_model(plan())
-    template = ff._templates.template(next(iter(ff._templates.keys())))
+    template = first_template(ff)
     template.model[0].weight = torch.nn.Parameter(template.model[0].weight.detach().clone())
     with pytest.raises(templates.TemplateChangedError):
         ff.execution_model(plan())

@@ -110,6 +110,12 @@ Not in the key, on purpose:
 - **Owner: the `ForceField`.** It already holds the pristine model and is plan-free (owner decision 12), so the
   templates live and die with it. No module-level state: no global cache and no switch (AGENTS.md). Two `ForceField`
   objects of one checkpoint do not share templates.
+  - **Superseded by setup-across-compositions F3 (30 October 2026).** The templates now belong to the pristine
+    `LoadedModel` (`LoadedModel.template_cache`). Every `ForceField` made from one `fm.load` result shares them, so
+    a new composition copies the conversion instead of converting again.
+    - Each plan still gets its own private copy, the mutation guard still applies, and nothing is module-level.
+    - `ForceField.template_count()` and `release_templates()` act on the shared cache.
+    - Two separate `fm.load` results still do not share.
 - **Bound:** at most 2 templates per `ForceField`, least recently used out. For MH-1 that is ~52 MB of parameters and
   buffers per template (measured on CPU; the GPU size is the same order).
 - **Clearing:** `ForceField.release_templates()` (new public method; it frees the templates and returns the bytes

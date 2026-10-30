@@ -152,7 +152,8 @@ class ForceField:
         a model (the per-model state that SPEC §8.7's instance isolation is about stays per plan).
         On CUDA with cuEq or hybrid, a later plan of the same conversion gets a private copy of the
         first plan's converted model instead (``fastmace.model.templates``; opt-1 OPT-T06), unless
-        ``EngineConfig.model_template_cache`` is False.
+        ``EngineConfig.model_template_cache`` is False. The templates belong to the loaded model, so a
+        later force field of the same ``fm.load`` result (another composition) copies them too.
         """
         from fastmace.model import loading, templates
 
@@ -172,28 +173,22 @@ class ForceField:
         # again (opt-1 OPT-T06); each plan still gets its own model, and the template is never handed out.
         if not (getattr(engine, "model_template_cache", True) and templates.applies(engine.backend, engine.device)):
             return load()
-        return self._template_cache().execution_model(templates.conversion_key(model, options), load)
-
-    def _template_cache(self):
-        from fastmace.model import templates
-
-        cache = self.__dict__.get("_templates")
-        if cache is None:
-            cache = self._templates = templates.TemplateCache()
-        return cache
+        return model.template_cache().execution_model(templates.conversion_key(model, options), load)
 
     def template_count(self) -> int:
-        """How many converted models this force field keeps as templates (opt-1 OPT-T06)."""
-        cache = self.__dict__.get("_templates")
+        """How many converted models are kept as templates for this force field's model (opt-1 OPT-T06). The
+        templates belong to the loaded model, so force fields of the same ``fm.load`` result share them."""
+        cache = self.model.template_cache(create=False)
         return 0 if cache is None else len(cache)
 
     def release_templates(self) -> int:
         """Drop the converted models kept as templates; returns the bytes their tensors held.
 
         The next plan of each conversion converts the checkpoint again. Use it to give the memory back,
-        for example before an out-of-memory retry (opt-1 OPT-T06).
+        for example before an out-of-memory retry (opt-1 OPT-T06). The templates belong to the loaded
+        model: this drops them for every force field made from it.
         """
-        cache = self.__dict__.get("_templates")
+        cache = self.model.template_cache(create=False)
         return 0 if cache is None else cache.release()
 
     # ------------------------------------------------------------------ one-off evaluation
