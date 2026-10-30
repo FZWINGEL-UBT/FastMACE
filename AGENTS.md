@@ -138,7 +138,7 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
   `results/<run-id>/` (JSON). Large files stay out of git.
 - After each completed task that produced results: update the docs, commit,
   push, and sync to the NAS checkout `/mnt/homes/zwingel/FastMACE`.
-- **NAS sync paused (owner, 26 October 2026):** do not sync anything to the
-  NAS or launch workstation jobs until the owner gives explicit permission.
-  Availability after the outage is not confirmed. Keep work and results local;
-  this overrides the sync requirement above.
+- **NAS and workstations available again (owner, 30 October 2026):** the
+  pause of 26 October is lifted. NAS syncs and workstation jobs follow the
+  rules above and ResearchModule's `AGENTS.md` (idle check before every job,
+  files only under `/mnt/homes/zwingel`).
