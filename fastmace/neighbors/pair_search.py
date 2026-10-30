@@ -33,42 +33,52 @@ def _triton_kernel():
     import triton.language as tl
 
     @triton.jit
-    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, launched_ptr, natoms, nimages, screen, capacity, grid_y,
-               rounds, BLOCK: tl.constexpr, HALF: tl.constexpr):
-        if (tl.program_id(0) == 0) & (tl.program_id(1) == 0):  # the launch ran (``check_launched``)
-            tl.store(launched_ptr, 1)
+    def screen_tile(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, tile,
+                    BLOCK: tl.constexpr, HALF: tl.constexpr):
+        """Screen sender tile ``program_id(0)`` against receiver tile ``tile`` over every image."""
         senders = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        receivers = tile * BLOCK + tl.arange(0, BLOCK)
+        valid = (senders < natoms)[:, None] & (receivers < natoms)[None, :]
+        loops = nimages
+        if HALF:  # tiles below the diagonal hold no sender <= receiver pair: no image loop
+            valid = valid & (senders[:, None] <= receivers[None, :])
+            loops = tl.where(tl.program_id(0) > tile, 0, nimages)
         sx = tl.load(pos_ptr + senders * 3, mask=senders < natoms, other=0.0)
         sy = tl.load(pos_ptr + senders * 3 + 1, mask=senders < natoms, other=0.0)
         sz = tl.load(pos_ptr + senders * 3 + 2, mask=senders < natoms, other=0.0)
+        rx = tl.load(pos_ptr + receivers * 3, mask=receivers < natoms, other=0.0)
+        ry = tl.load(pos_ptr + receivers * 3 + 1, mask=receivers < natoms, other=0.0)
+        rz = tl.load(pos_ptr + receivers * 3 + 2, mask=receivers < natoms, other=0.0)
+        pair = senders.to(tl.int64)[:, None] * natoms + receivers.to(tl.int64)[None, :]
         pairs = natoms.to(tl.int64) * natoms  # int64: image * N^2 overflows int32 for large lists
-        for k in range(rounds):  # receiver tiles program_id(1) + k * grid_y (``_grid``)
-            tile = tl.program_id(1) + k * grid_y
-            receivers = tile * BLOCK + tl.arange(0, BLOCK)
-            valid = (senders < natoms)[:, None] & (receivers < natoms)[None, :]
-            loops = nimages
-            if HALF:  # tiles below the diagonal hold no sender <= receiver pair: no image loop
-                valid = valid & (senders[:, None] <= receivers[None, :])
-                loops = tl.where(tl.program_id(0) > tile, 0, nimages)
-            rx = tl.load(pos_ptr + receivers * 3, mask=receivers < natoms, other=0.0)
-            ry = tl.load(pos_ptr + receivers * 3 + 1, mask=receivers < natoms, other=0.0)
-            rz = tl.load(pos_ptr + receivers * 3 + 2, mask=receivers < natoms, other=0.0)
-            pair = senders.to(tl.int64)[:, None] * natoms + receivers.to(tl.int64)[None, :]
-            for image in range(loops):
-                ix = tl.load(image_ptr + image * 3)
-                iy = tl.load(image_ptr + image * 3 + 1)
-                iz = tl.load(image_ptr + image * 3 + 2)
-                dx = rx[None, :] - sx[:, None] + ix
-                dy = ry[None, :] - sy[:, None] + iy
-                dz = rz[None, :] - sz[:, None] + iz
-                hit = ((dx * dx + dy * dy + dz * dz) < screen) & valid
-                flat = tl.reshape(hit.to(tl.int32), [BLOCK * BLOCK])
-                count = tl.sum(flat, axis=0)
-                if count > 0:
-                    base = tl.atomic_add(counter_ptr, count)
-                    slot = (base + tl.cumsum(flat, axis=0) - flat).to(tl.int64)
-                    code = tl.reshape(image * pairs + pair, [BLOCK * BLOCK])
-                    tl.store(out_ptr + slot, code, mask=(flat > 0) & (slot < capacity))
+        for image in range(loops):
+            ix = tl.load(image_ptr + image * 3)
+            iy = tl.load(image_ptr + image * 3 + 1)
+            iz = tl.load(image_ptr + image * 3 + 2)
+            dx = rx[None, :] - sx[:, None] + ix
+            dy = ry[None, :] - sy[:, None] + iy
+            dz = rz[None, :] - sz[:, None] + iz
+            hit = ((dx * dx + dy * dy + dz * dz) < screen) & valid
+            flat = tl.reshape(hit.to(tl.int32), [BLOCK * BLOCK])
+            count = tl.sum(flat, axis=0)
+            if count > 0:
+                base = tl.atomic_add(counter_ptr, count)
+                slot = (base + tl.cumsum(flat, axis=0) - flat).to(tl.int64)
+                code = tl.reshape(image * pairs + pair, [BLOCK * BLOCK])
+                tl.store(out_ptr + slot, code, mask=(flat > 0) & (slot < capacity))
+
+    @triton.jit
+    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, launched_ptr, natoms, nimages, screen, capacity, grid_y,
+               rounds, BLOCK: tl.constexpr, HALF: tl.constexpr, SINGLE: tl.constexpr):
+        if (tl.program_id(0) == 0) & (tl.program_id(1) == 0):  # the launch ran (``check_launched``)
+            tl.store(launched_ptr, 1)
+        if SINGLE:  # one receiver tile per program (up to 46,340 tiles): the 2-D grid's code
+            screen_tile(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity,
+                        tl.program_id(1), BLOCK, HALF)
+        else:  # receiver tiles program_id(1) + k * grid_y (``_grid``)
+            for k in range(rounds):
+                screen_tile(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity,
+                            tl.program_id(1) + k * grid_y, BLOCK, HALF)
 
     return kernel
 
@@ -130,7 +140,7 @@ def screen_into(wrapped, image_vectors, radius, out, counter, launched, half=Fal
     grid, grid_y, rounds = _grid(natoms, max_grid_y)
     _triton_kernel()[grid](wrapped.float().contiguous(), image_vectors.float().contiguous(), out, counter, launched,
                            natoms, nimages, screen, out.numel(), grid_y, rounds, BLOCK=BLOCK, HALF=bool(half),
-                           num_warps=4)
+                           SINGLE=rounds == 1, num_warps=4)
 
 
 def decode_codes(code, natoms):
@@ -166,7 +176,7 @@ def screen_codes(wrapped, image_vectors, radius, state=None, half=False, max_gri
                                                 device=wrapped.device)
         launched = torch.zeros(1, dtype=torch.int32, device=wrapped.device)
         _triton_kernel()[grid](positions, images, out, counter, launched, natoms, nimages, screen, out.numel(),
-                               grid_y, rounds, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+                               grid_y, rounds, BLOCK=BLOCK, HALF=bool(half), SINGLE=rounds == 1, num_warps=4)
         check_launched(launched, natoms)
         found = int(counter.item())  # host sync (rebuild steps only)
         if found <= out.numel():
