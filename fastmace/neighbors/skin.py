@@ -224,6 +224,11 @@ class SkinNeighbourList:
         if self._candidates_device is not None:
             self._num_candidates = int(self._candidates_device)
             self._candidates_device = None
+            if getattr(self, "_launch_marker", None) is not None:
+                from .pair_search import check_launched
+
+                check_launched(*self._launch_marker)
+                self._launch_marker = None
         return self._num_candidates
 
     @num_candidates.setter
@@ -436,8 +441,11 @@ class SkinNeighbourList:
         counter = state.get("async_counter")
         if counter is None:
             counter = state["async_counter"] = torch.zeros(1, dtype=torch.int32, device=device)
+            state["async_launched"] = torch.zeros(1, dtype=torch.int32, device=device)
         counter.zero_()
-        screen_into(wrapped, image_vectors, r, out, counter)
+        state["async_launched"].zero_()
+        screen_into(wrapped, image_vectors, r, out, counter, state["async_launched"])
+        self._launch_marker = (state["async_launched"], natoms)  # checked where the count is read
         slots = out.numel()
         found = counter.to(torch.int64)
         valid = torch.arange(slots, device=device) < found

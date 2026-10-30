@@ -33,8 +33,10 @@ def _triton_kernel():
     import triton.language as tl
 
     @triton.jit
-    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, grid_y, rounds,
-               BLOCK: tl.constexpr, HALF: tl.constexpr):
+    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, launched_ptr, natoms, nimages, screen, capacity, grid_y,
+               rounds, BLOCK: tl.constexpr, HALF: tl.constexpr):
+        if (tl.program_id(0) == 0) & (tl.program_id(1) == 0):  # the launch ran (``check_launched``)
+            tl.store(launched_ptr, 1)
         senders = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         sx = tl.load(pos_ptr + senders * 3, mask=senders < natoms, other=0.0)
         sy = tl.load(pos_ptr + senders * 3 + 1, mask=senders < natoms, other=0.0)
@@ -109,16 +111,26 @@ def _candidate_pairs_cpu(wrapped, image_vectors, screen, half=False):
     return hits[:, 0], hits[:, 1], hits[:, 2]
 
 
-def screen_into(wrapped, image_vectors, radius, out, counter, half=False, max_grid_y=MAX_GRID_Y):
+def check_launched(launched, natoms):
+    """Raise unless the screen's first program set ``launched`` (a host synchronisation): a launch that did not
+    run would otherwise look like a list without pairs (31 October 2026: Triton's int32 grid product)."""
+    if int(launched.reshape(-1)[0]) != 1:
+        raise RuntimeError(f"the GPU pair screen of {natoms} atoms did not run (its launch was skipped); "
+                           "the neighbour list would have no pairs")
+
+
+def screen_into(wrapped, image_vectors, radius, out, counter, launched, half=False, max_grid_y=MAX_GRID_Y):
     """Launch the CUDA screen into ``out`` (int64 codes) behind ``counter`` (int32, zeroed by the caller); no
     host synchronisation. Codes past ``out.numel()`` are dropped while ``counter`` still counts them, so
-    ``counter > out.numel()`` means the buffer was too small (``SkinNeighbourList.build_gpu_async``)."""
+    ``counter > out.numel()`` means the buffer was too small (``SkinNeighbourList.build_gpu_async``).
+    ``launched`` (int32, zeroed by the caller) is set to 1 by the launch; ``check_launched`` reads it."""
 
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
     screen = (radius + SCREEN_MARGIN) ** 2
     grid, grid_y, rounds = _grid(natoms, max_grid_y)
-    _triton_kernel()[grid](wrapped.float().contiguous(), image_vectors.float().contiguous(), out, counter, natoms,
-                           nimages, screen, out.numel(), grid_y, rounds, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+    _triton_kernel()[grid](wrapped.float().contiguous(), image_vectors.float().contiguous(), out, counter, launched,
+                           natoms, nimages, screen, out.numel(), grid_y, rounds, BLOCK=BLOCK, HALF=bool(half),
+                           num_warps=4)
 
 
 def decode_codes(code, natoms):
@@ -152,8 +164,10 @@ def screen_codes(wrapped, image_vectors, radius, state=None, half=False, max_gri
         if out is None:
             out = state["buffer"] = torch.empty(max(1 << 16, 128 * natoms), dtype=torch.int64,
                                                 device=wrapped.device)
-        _triton_kernel()[grid](positions, images, out, counter, natoms, nimages, screen, out.numel(), grid_y,
-                               rounds, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+        launched = torch.zeros(1, dtype=torch.int32, device=wrapped.device)
+        _triton_kernel()[grid](positions, images, out, counter, launched, natoms, nimages, screen, out.numel(),
+                               grid_y, rounds, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+        check_launched(launched, natoms)
         found = int(counter.item())  # host sync (rebuild steps only)
         if found <= out.numel():
             break

@@ -495,3 +495,14 @@ def test_buckets_equal_baseline(baseline):
     assert torch.equal(times_3x3(r, m), baseline._times_3x3(r, m))
     assert torch.equal(det_3x3(m), baseline.det_3x3(m))
     assert torch.equal(inverse_3x3(m), baseline.inverse_3x3(m))
+
+
+def test_pair_screen_raises_when_its_launch_did_not_run():
+    """The screen's first program sets ``launched``; a launch that was skipped (Triton's launcher dropped grids
+    above 2**31 blocks without an error) raises instead of giving a list without pairs."""
+    from fastmace.neighbors.pair_search import check_launched
+
+    check_launched(torch.ones(1, dtype=torch.int32), 10)
+    with pytest.raises(RuntimeError, match="did not run"):
+        check_launched(torch.zeros(1, dtype=torch.int32), 1_728_000)
+
