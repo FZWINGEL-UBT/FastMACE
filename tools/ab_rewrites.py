@@ -79,6 +79,10 @@ def parse_args(argv=None):
                    help="Side a drops its CUDA graphs after the build and re-captures them in IEEE (the control of "
                         "--a-tf32's re-capture)")
     p.add_argument("--b-recapture", action="store_true", help="Side b's, as --a-recapture")
+    p.add_argument("--prepare", action="store_true",
+                   help="Capture the first step's stages inside each side's build, with its --a/--b-constant values "
+                        "set, as Simulation does (engine.prepare); otherwise they are captured lazily in the warm-up "
+                        "(CAP-T05's snapshot A/B)")
     p.add_argument("--precision", choices=("float32", "float64"), default="float32",
                    help="Both sides' force precision (float64: the decision 63 package by default)")
     args = p.parse_args(argv)
@@ -218,7 +222,7 @@ def main(argv=None):
                 tf32_sides={"a": args.a_tf32, "b": args.b_tf32},
                 recapture_sides={"a": args.a_recapture, "b": args.b_recapture}, timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
-                load=list(os.getloadavg()), structures={})
+                prepare=args.prepare, load=list(os.getloadavg()), structures={})
     for spec in args.structures:
         name, base = ab_step_time.read_structure(spec, None)
         sides, setup, lines = {}, {}, {}
@@ -234,6 +238,8 @@ def main(argv=None):
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             with _Constants(args.a_constant if side == "a" else args.b_constant):
                 engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
+                if args.prepare:
+                    engine.prepare()
             if tf32:
                 ab_step_time.tf32_after_build(torch, engine)
             elif args.a_recapture if side == "a" else args.b_recapture:
