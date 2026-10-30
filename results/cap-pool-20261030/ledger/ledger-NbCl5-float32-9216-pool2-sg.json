@@ -1,0 +1,4179 @@
+{
+ "tool": "memory_ledger",
+ "structure": "NbCl5",
+ "precision": "float32",
+ "natoms": 9216,
+ "repeat": "4x4x8",
+ "fastmace_commit": "9c19ba94585f4e4048eab0239c865ae9ddc685f8",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "host": "Fabi-PC",
+ "seconds": 42.104611859000215,
+ "alloc_conf": "expandable_segments:True",
+ "second_pool": [
+  "segment_gemm"
+ ],
+ "edges": {
+  "edges_at_cutoff": 249460,
+  "padded_sizes": [
+   245760,
+   258048
+  ],
+  "capacity": 359936,
+  "graphs": [
+   "('B', 245760)",
+   "ACP",
+   "('B', 258048)"
+  ],
+  "captures": [
+   {
+    "key": "ACP",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 3828.0,
+    "max_reserved_after_capture_MiB": 3828.0
+   },
+   {
+    "key": "('B', 245760)",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 4514.0,
+    "max_reserved_after_capture_MiB": 4530.0
+   },
+   {
+    "key": "('B', 258048)",
+    "warmup_in_pool": true,
+    "max_reserved_after_warmup_MiB": 4594.0,
+    "max_reserved_after_capture_MiB": 4594.0
+   }
+  ],
+  "force_graph_releases": 0
+ },
+ "points": [
+  {
+   "label": "start (context created)",
+   "allocated": 0,
+   "reserved": 0,
+   "max_allocated": 0,
+   "max_reserved": 0,
+   "cuda_free": 15894315008,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1208549376,
+   "windows": {
+    "used_MiB": 1469,
+    "total_MiB": 16311
+   }
+  },
+  {
+   "label": "force field loaded",
+   "allocated": 0,
+   "reserved": 0,
+   "max_allocated": 0,
+   "max_reserved": 0,
+   "cuda_free": 15894315008,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1208549376
+  },
+  {
+   "label": "simulation built (first captures)",
+   "allocated": 377441792,
+   "reserved": 4750049280,
+   "max_allocated": 3827759616,
+   "max_reserved": 4750049280,
+   "cuda_free": 11081351168,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1271463936
+  },
+  {
+   "label": "after 20 warm-up steps",
+   "allocated": 377441792,
+   "reserved": 4863295488,
+   "max_allocated": 3895257600,
+   "max_reserved": 4863295488,
+   "cuda_free": 10968104960,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1271463936
+  },
+  {
+   "label": "after 20 steady steps",
+   "allocated": 377441792,
+   "reserved": 4863295488,
+   "max_allocated": 411991552,
+   "max_reserved": 4863295488,
+   "cuda_free": 10968104960,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1271463936
+  },
+  {
+   "label": "3 graphs released, cache emptied",
+   "allocated": 310332928,
+   "reserved": 1566572544,
+   "max_allocated": 411991552,
+   "max_reserved": 4863295488,
+   "cuda_free": 14264827904,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1271463936
+  },
+  {
+   "label": "one step, stages captured again",
+   "allocated": 377441792,
+   "reserved": 4836032512,
+   "max_allocated": 3895257600,
+   "max_reserved": 4836032512,
+   "cuda_free": 10995367936,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1271463936
+  }
+ ],
+ "allocator": {
+  "totals": {
+   "graph_pool_reserved": 3143630848,
+   "graph_pool_active": 0,
+   "default_reserved": 503316480,
+   "default_active": 377441792,
+   "second_pool_reserved": 1216348160,
+   "second_pool_active": 0
+  },
+  "rows": {
+   "default pool, live, not a named buffer": 203972096,
+   "MD state, integrator and engine buffers": 5721088,
+   "model parameters and buffers": 69511168,
+   "neighbour list (buffers and screen)": 31255552,
+   "force field buffers (model inputs, tables)": 184320,
+   "Langevin noise batch": 66797568
+  },
+  "owners": {
+   "state.rng.batch": 66797568,
+   "model._orig_mod.interactions.1.wprime_backward.gprime": 13107200,
+   "force_field.neighbours.screen_buffer": 9437184,
+   "force_field.neighbours.edge_index": 5758976,
+   "force_field.neighbours.candidate_unit_shifts": 4319232,
+   "force_field.neighbours.unit_shifts": 4319232,
+   "force_field.neighbours.shifts": 4319232,
+   "derived.force_field.node_attrs": 3280896,
+   "model._orig_mod.interactions.1.residual_linear.weight_0": 3145728,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_0": 3145728,
+   "force_field.neighbours.candidate_index": 2879488,
+   "model._orig_mod.interactions.1.linear_1.weight_0": 2097152,
+   "model._orig_mod.interactions.0.residual_linear.weight_0": 2097152,
+   "model._orig_mod.interactions.0.residual_linear.weight_t_0": 2097152,
+   "model._orig_mod.interactions.1.linear_1.weight_t_0": 2097152,
+   "model._orig_mod.interactions.0.linear_res.weight_t_0": 1048576,
+   "model._orig_mod.interactions.0.linear_1.weight_0": 1048576,
+   "model._orig_mod.interactions.0.linear_res.weight_0": 1048576,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_1": 1048576,
+   "model._orig_mod.interactions.1.residual_linear.weight_1": 1048576,
+   "model._orig_mod.interactions.0.linear_1.weight_t_0": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_0": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_1": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_2": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_3": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_0": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_1": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_2": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_3": 1048576,
+   "model._orig_mod.interactions.1.linear_res.weight_0": 1048576,
+   "model._orig_mod.interactions.1.linear_res.weight_t_0": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_0": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_1": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_2": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_3": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_0": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_1": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_2": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_3": 1048576,
+   "model._orig_mod.interactions.1.residual_linear.weight_2": 786432,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_2": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_1": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_2": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_t_1": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_t_2": 786432,
+   "model._orig_mod.interactions.0.skip_tp.table": 760832,
+   "model._orig_mod.interactions.1.radial_table.coef": 743424,
+   "model._orig_mod.interactions.1.radial_table.dcoef": 675840,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_3": 524288,
+   "model._orig_mod.interactions.1.residual_linear.weight_3": 524288,
+   "model._orig_mod.interactions.1.linear_1.weight_3": 524288,
+   "model._orig_mod.interactions.1.linear_1.weight_t_3": 524288,
+   "model._orig_mod.interactions.0.radial_table.coef": 371712,
+   "model._orig_mod.interactions.0.radial_table.dcoef": 337920,
+   "model._orig_mod.interactions.1.conv_tp_weights.rest.9.weight": 327680,
+   "model._orig_mod.interactions.0.linear_1.weight_1": 262144,
+   "model._orig_mod.interactions.0.linear_1.weight_2": 262144,
+   "model._orig_mod.interactions.0.linear_1.weight_3": 262144,
+   "model._orig_mod.interactions.0.linear_1.weight_t_1": 262144,
+   "model._orig_mod.interactions.0.residual_linear.weight_1": 262144
+  },
+  "unattributed_sites": {
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/_native/registry.py:958 eager_router": 67108864,
+   "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3156 call": 33554432,
+   "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3905 call": 33554432,
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1374 convert": 25835008,
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/parameter.py:79 __deepcopy__": 25769472,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/rewrites/linear/modules.py:87 <listcomp>": 6297600,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/rewrites/linear/modules.py:116 __init__": 6297600,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/rewrites/mh1/modules.py:212 identity_attrs": 3280896,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/rewrites/mh1/modules.py:45 __init__": 1048576,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/rewrites/species/modules.py:36 __init__": 729088,
+   "mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/torch_geometric/data.py:302 <lambda>": 269312,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:540 _setup_species": 73728,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:537 _setup_species": 73728,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:541 _setup_species": 36864,
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/storage.py:264 clone": 24576,
+   "mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/_torch/TensorProductConv.py:90 _init_class": 3072,
+   "mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/_torch/TensorProductConv.py:189 allocate_workspace": 3072,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:535 _setup_species": 2048,
+   "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86 __init__": 1024,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/neighbors/skin.py:320 _constants": 1024,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/neighbors/skin.py:32 times_3x3": 1024,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:465 __init__": 1024,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/rewrites/mh1/modules.py:47 __init__": 1024,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/neighbors/skin.py:328 _constants": 512,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/neighbors/skin.py:322 _constants": 512,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/neighbors/skin.py:321 _constants": 512,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:558 _setup_species": 512,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:550 _setup_species": 512,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/model/forces.py:549 _setup_species": 512,
+   "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:239 __init__": 512
+  }
+ },
+ "ledger": [
+  {
+   "row": "graph pool (captured stages: the force call's activations and transients)",
+   "bytes": 3143630848
+  },
+  {
+   "row": "outside the allocator: context, libraries, kernels (and other processes)",
+   "bytes": 1271463936
+  },
+  {
+   "row": "second pool (segment_gemm kernels' buffers)",
+   "bytes": 1216348160
+  },
+  {
+   "row": "default pool, live, not a named buffer",
+   "bytes": 203972096
+  },
+  {
+   "row": "default pool, cached (reserved, not live)",
+   "bytes": 125874688
+  },
+  {
+   "row": "model parameters and buffers",
+   "bytes": 69511168
+  },
+  {
+   "row": "Langevin noise batch",
+   "bytes": 66797568
+  },
+  {
+   "row": "neighbour list (buffers and screen)",
+   "bytes": 31255552
+  },
+  {
+   "row": "MD state, integrator and engine buffers",
+   "bytes": 5721088
+  },
+  {
+   "row": "force field buffers (model inputs, tables)",
+   "bytes": 184320
+  },
+  {
+   "row": "outside the allocator: graph executables (dropped on release)",
+   "bytes": 0
+  }
+ ],
+ "recapture": {
+  "allocated_before": 310332928,
+  "peak_live_over_before": 3584914861,
+  "sites": [
+   {
+    "site": "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward",
+    "bytes": 1321205760,
+    "blocks": 1,
+    "per_edge": 5120.0,
+    "per_atom": 143360.0
+   },
+   {
+    "site": "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/segment_gemm.py:95 joined_products_op",
+    "bytes": 603979776,
+    "blocks": 2,
+    "per_edge": 2340.5714285714284,
+    "per_atom": 65536.0
+   },
+   {
+    "site": "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _",
+    "bytes": 377487360,
+    "blocks": 2,
+    "per_edge": 1462.857142857143,
+    "per_atom": 40960.0
+   },
+   {
+    "site": "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/fused_forward.py:364 fused_folded_forward",
+    "bytes": 188743680,
+    "blocks": 1,
+    "per_edge": 731.4285714285714,
+    "per_atom": 20480.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4075 call",
+    "bytes": 132120576,
+    "blocks": 1,
+    "per_edge": 512.0,
+    "per_atom": 14336.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4080 call",
+    "bytes": 132120576,
+    "blocks": 1,
+    "per_edge": 512.0,
+    "per_atom": 14336.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4059 call",
+    "bytes": 94371840,
+    "blocks": 1,
+    "per_edge": 365.7142857142857,
+    "per_atom": 10240.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4064 call",
+    "bytes": 94371840,
+    "blocks": 1,
+    "per_edge": 365.7142857142857,
+    "per_atom": 10240.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4102 call",
+    "bytes": 82317312,
+    "blocks": 1,
+    "per_edge": 319.0,
+    "per_atom": 8932.0
+   },
+   {
+    "site": "unattributed",
+    "bytes": 82317312,
+    "blocks": 1,
+    "per_edge": 319.0,
+    "per_atom": 8932.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3972 call",
+    "bytes": 75497472,
+    "blocks": 1,
+    "per_edge": 292.57142857142856,
+    "per_atom": 8192.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4028 call",
+    "bytes": 75497472,
+    "blocks": 1,
+    "per_edge": 292.57142857142856,
+    "per_atom": 8192.0
+   },
+   {
+    "site": "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:136 radial_table_forward",
+    "bytes": 67092480,
+    "blocks": 1,
+    "per_edge": 260.0,
+    "per_atom": 7280.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4044 call",
+    "bytes": 56623104,
+    "blocks": 1,
+    "per_edge": 219.42857142857142,
+    "per_atom": 6144.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4219 call",
+    "bytes": 56623104,
+    "blocks": 1,
+    "per_edge": 219.42857142857142,
+    "per_atom": 6144.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3905 call",
+    "bytes": 33554432,
+    "blocks": 1,
+    "per_edge": 130.03174603174602,
+    "per_atom": 3640.8888888888887
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3156 call",
+    "bytes": 33554432,
+    "blocks": 1,
+    "per_edge": 130.03174603174602,
+    "per_atom": 3640.8888888888887
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3841 call",
+    "bytes": 22155264,
+    "blocks": 1,
+    "per_edge": 85.85714285714286,
+    "per_atom": 2404.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3169 call",
+    "bytes": 18874368,
+    "blocks": 1,
+    "per_edge": 73.14285714285714,
+    "per_atom": 2048.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3941 call",
+    "bytes": 16515072,
+    "blocks": 1,
+    "per_edge": 64.0,
+    "per_atom": 1792.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3154 call",
+    "bytes": 3538944,
+    "blocks": 1,
+    "per_edge": 13.714285714285714,
+    "per_atom": 384.0
+   },
+   {
+    "site": "fastmace-cap-ledger/src-9c19ba94/fastmace/engine/registry.py:227 copy",
+    "bytes": 2839857,
+    "blocks": 33,
+    "per_edge": 11.005150204613095,
+    "per_atom": 308.1442057291667
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3869 call",
+    "bytes": 2064384,
+    "blocks": 1,
+    "per_edge": 8.0,
+    "per_atom": 224.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3848 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3865 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3866 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3867 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3868 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3870 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3871 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4138 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4139 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4140 call",
+    "bytes": 1032192,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 112.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3872 call",
+    "bytes": 258048,
+    "blocks": 1,
+    "per_edge": 1.0,
+    "per_atom": 28.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3133 call",
+    "bytes": 221184,
+    "blocks": 1,
+    "per_edge": 0.8571428571428571,
+    "per_atom": 24.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4364 call",
+    "bytes": 73728,
+    "blocks": 1,
+    "per_edge": 0.2857142857142857,
+    "per_atom": 8.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4365 call",
+    "bytes": 73728,
+    "blocks": 1,
+    "per_edge": 0.2857142857142857,
+    "per_atom": 8.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3923 call",
+    "bytes": 66560,
+    "blocks": 1,
+    "per_edge": 0.25793650793650796,
+    "per_atom": 7.222222222222222
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3924 call",
+    "bytes": 66560,
+    "blocks": 1,
+    "per_edge": 0.25793650793650796,
+    "per_atom": 7.222222222222222
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3925 call",
+    "bytes": 66560,
+    "blocks": 1,
+    "per_edge": 0.25793650793650796,
+    "per_atom": 7.222222222222222
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3926 call",
+    "bytes": 66560,
+    "blocks": 1,
+    "per_edge": 0.25793650793650796,
+    "per_atom": 7.222222222222222
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3903 call",
+    "bytes": 59392,
+    "blocks": 1,
+    "per_edge": 0.23015873015873015,
+    "per_atom": 6.444444444444445
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3898 call",
+    "bytes": 36864,
+    "blocks": 1,
+    "per_edge": 0.14285714285714285,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3908 call",
+    "bytes": 36864,
+    "blocks": 1,
+    "per_edge": 0.14285714285714285,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3912 call",
+    "bytes": 36864,
+    "blocks": 1,
+    "per_edge": 0.14285714285714285,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4188 call",
+    "bytes": 36864,
+    "blocks": 1,
+    "per_edge": 0.14285714285714285,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4183 call",
+    "bytes": 26624,
+    "blocks": 1,
+    "per_edge": 0.10317460317460317,
+    "per_atom": 2.888888888888889
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3933 call",
+    "bytes": 64,
+    "blocks": 1,
+    "per_edge": 0.000248015873015873,
+    "per_atom": 0.006944444444444444
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4291 call",
+    "bytes": 36,
+    "blocks": 1,
+    "per_edge": 0.00013950892857142856,
+    "per_atom": 0.00390625
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4283 call",
+    "bytes": 8,
+    "blocks": 1,
+    "per_edge": 3.1001984126984125e-05,
+    "per_atom": 0.0008680555555555555
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4287 call",
+    "bytes": 8,
+    "blocks": 1,
+    "per_edge": 3.1001984126984125e-05,
+    "per_atom": 0.0008680555555555555
+   },
+   {
+    "site": "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4279 call",
+    "bytes": 4,
+    "blocks": 1,
+    "per_edge": 1.5500992063492063e-05,
+    "per_atom": 0.00043402777777777775
+   },
+   {
+    "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:25 compute_forces",
+    "bytes": 4,
+    "blocks": 1,
+    "per_edge": 1.5500992063492063e-05,
+    "per_atom": 0.00043402777777777775
+   }
+  ],
+  "pool": {
+   "reserved": 3143630848,
+   "segments": 2,
+   "largest_segments": [
+    3124756480,
+    18874368
+   ],
+   "live_peak": 2910986364,
+   "held_peak": 2910986364,
+   "held_at_peak": 0,
+   "free": 3143630848,
+   "largest_free": 3124756480,
+   "free_blocks": 2,
+   "events": 540,
+   "alloc_bytes_by_stream": {
+    "98481554980416": 5179071844
+   },
+   "segment_ranges": [
+    [
+     169315663872,
+     169334538240
+    ],
+    [
+     188575907840,
+     191700664320
+    ]
+   ],
+   "event_list": [
+    [
+     "segment_map",
+     169315663872,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     169315885056,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     169316106240,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     169316327424,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "alloc",
+     169316548608,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169316549120,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "segment_map",
+     188575907840,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188575907840,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "alloc",
+     188578787328,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169316549632,
+     7679,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_requested",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     169315885056,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     169316106240,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     169316327424,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "alloc",
+     169316548608,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169316549120,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     188575907840,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "alloc",
+     188578787328,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169316549632,
+     7679,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_requested",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     169315885056,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     169316106240,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     169316327424,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "alloc",
+     169316548608,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169316549120,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     188575907840,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "alloc",
+     188578787328,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169316549632,
+     7679,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_requested",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "segment_unmap",
+     188575907840,
+     20971520,
+     ""
+    ],
+    [
+     "segment_unmap",
+     169315663872,
+     2097152,
+     ""
+    ],
+    [
+     "segment_map",
+     169315663872,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     169315885056,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     169316106240,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     169316327424,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "alloc",
+     169316548608,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169316549120,
+     24,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "segment_map",
+     188575907840,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188575907840,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "alloc",
+     188578787328,
+     2879488,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169316549632,
+     7679,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549632,
+     7679,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316327424,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316548608,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169316549120,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     2879488,
+     ""
+    ],
+    [
+     "free_requested",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "free_completed",
+     188578787328,
+     2879488,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     73728,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3818 call"
+    ],
+    [
+     "alloc",
+     169315737600,
+     73728,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3819 call"
+    ],
+    [
+     "alloc",
+     188575907840,
+     3096576,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3827 call"
+    ],
+    [
+     "alloc",
+     188579004416,
+     7999488,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3833 call"
+    ],
+    [
+     "segment_map",
+     188596879360,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188587003904,
+     22155264,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3841 call"
+    ],
+    [
+     "alloc",
+     169315811328,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3848 call"
+    ],
+    [
+     "segment_map",
+     188617850880,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188609159168,
+     16515072,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3849 call"
+    ],
+    [
+     "segment_map",
+     169317761024,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169316843520,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3865 call"
+    ],
+    [
+     "alloc",
+     169317875712,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3866 call"
+    ],
+    [
+     "segment_map",
+     169319858176,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169318907904,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3867 call"
+    ],
+    [
+     "alloc",
+     169319940096,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3868 call"
+    ],
+    [
+     "alloc",
+     188625674240,
+     2064384,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3869 call"
+    ],
+    [
+     "segment_map",
+     169321955328,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169320972288,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3870 call"
+    ],
+    [
+     "alloc",
+     169322004480,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3871 call"
+    ],
+    [
+     "alloc",
+     169323036672,
+     258048,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3872 call"
+    ],
+    [
+     "segment_map",
+     169324052480,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169323294720,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3873 call"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     73728,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     3096576,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     3096576,
+     ""
+    ],
+    [
+     "segment_map",
+     188638822400,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     188627738624,
+     67092480,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:136 radial_table_forward"
+    ],
+    [
+     "alloc",
+     169324326912,
+     1032192,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:137 radial_table_forward"
+    ],
+    [
+     "alloc",
+     169315663872,
+     36864,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3898 call"
+    ],
+    [
+     "alloc",
+     169325359104,
+     59392,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3903 call"
+    ],
+    [
+     "alloc",
+     169315700736,
+     36864,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3908 call"
+    ],
+    [
+     "alloc",
+     169325418496,
+     36864,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3912 call"
+    ],
+    [
+     "free_requested",
+     169323294720,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169323294720,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169324326912,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169324326912,
+     1032192,
+     ""
+    ],
+    [
+     "alloc",
+     169323294720,
+     66560,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3923 call"
+    ],
+    [
+     "alloc",
+     169323361280,
+     66560,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3924 call"
+    ],
+    [
+     "alloc",
+     169323427840,
+     66560,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3925 call"
+    ],
+    [
+     "alloc",
+     169323494400,
+     66560,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3926 call"
+    ],
+    [
+     "alloc",
+     169323560960,
+     64,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3933 call"
+    ],
+    [
+     "segment_map",
+     188701736960,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188694831104,
+     16515072,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3941 call"
+    ],
+    [
+     "free_requested",
+     188609159168,
+     16515072,
+     ""
+    ],
+    [
+     "free_completed",
+     188609159168,
+     16515072,
+     ""
+    ],
+    [
+     "segment_map",
+     188722708480,
+     83886080,
+     ""
+    ],
+    [
+     "alloc",
+     188711346176,
+     76677120,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/edge_outer_sum.py:67 edge_outer_sum_forward"
+    ],
+    [
+     "alloc",
+     188609159168,
+     4792320,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3967 call"
+    ],
+    [
+     "segment_map",
+     188806594560,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     188788023296,
+     75497472,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3972 call"
+    ],
+    [
+     "free_requested",
+     188609159168,
+     4792320,
+     ""
+    ],
+    [
+     "free_completed",
+     188609159168,
+     4792320,
+     ""
+    ],
+    [
+     "alloc",
+     188609159168,
+     14376960,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3977 call"
+    ],
+    [
+     "segment_map",
+     188869509120,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188863520768,
+     14155776,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3982 call"
+    ],
+    [
+     "free_requested",
+     188609159168,
+     14376960,
+     ""
+    ],
+    [
+     "free_completed",
+     188609159168,
+     14376960,
+     ""
+    ],
+    [
+     "segment_map",
+     188890480640,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188877676544,
+     23961600,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3991 call"
+    ],
+    [
+     "segment_map",
+     188911452160,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     188901638144,
+     23592960,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:3996 call"
+    ],
+    [
+     "free_requested",
+     188877676544,
+     23961600,
+     ""
+    ],
+    [
+     "free_completed",
+     188877676544,
+     23961600,
+     ""
+    ],
+    [
+     "segment_map",
+     188932423680,
+     41943040,
+     ""
+    ],
+    [
+     "alloc",
+     188925231104,
+     33546240,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4005 call"
+    ],
+    [
+     "free_requested",
+     188711346176,
+     76677120,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     76677120,
+     ""
+    ],
+    [
+     "alloc",
+     188711346176,
+     33030144,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4011 call"
+    ],
+    [
+     "free_requested",
+     188925231104,
+     33546240,
+     ""
+    ],
+    [
+     "free_completed",
+     188925231104,
+     33546240,
+     ""
+    ],
+    [
+     "alloc",
+     188609159168,
+     9437184,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4021 call"
+    ],
+    [
+     "free_requested",
+     188579004416,
+     7999488,
+     ""
+    ],
+    [
+     "free_completed",
+     188579004416,
+     7999488,
+     ""
+    ],
+    [
+     "segment_map",
+     188974366720,
+     41943040,
+     ""
+    ],
+    [
+     "alloc",
+     188925231104,
+     75497472,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4028 call"
+    ],
+    [
+     "free_requested",
+     188609159168,
+     9437184,
+     ""
+    ],
+    [
+     "free_completed",
+     188609159168,
+     9437184,
+     ""
+    ],
+    [
+     "alloc",
+     188877676544,
+     18874368,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4033 call"
+    ],
+    [
+     "segment_map",
+     189016309760,
+     41943040,
+     ""
+    ],
+    [
+     "alloc",
+     189000728576,
+     56623104,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4044 call"
+    ],
+    [
+     "segment_map",
+     189058252800,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     189057351680,
+     56623104,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4048 call"
+    ],
+    [
+     "segment_map",
+     189121167360,
+     104857600,
+     ""
+    ],
+    [
+     "alloc",
+     189113974784,
+     94371840,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4059 call"
+    ],
+    [
+     "free_requested",
+     188901638144,
+     23592960,
+     ""
+    ],
+    [
+     "free_completed",
+     188901638144,
+     23592960,
+     ""
+    ],
+    [
+     "segment_map",
+     189226024960,
+     83886080,
+     ""
+    ],
+    [
+     "alloc",
+     189208346624,
+     94371840,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4064 call"
+    ],
+    [
+     "segment_map",
+     189309911040,
+     125829120,
+     ""
+    ],
+    [
+     "alloc",
+     189302718464,
+     132120576,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4075 call"
+    ],
+    [
+     "free_requested",
+     188711346176,
+     33030144,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     33030144,
+     ""
+    ],
+    [
+     "segment_map",
+     189435740160,
+     146800640,
+     ""
+    ],
+    [
+     "alloc",
+     189434839040,
+     132120576,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4080 call"
+    ],
+    [
+     "alloc",
+     188711346176,
+     75497472,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "segment_map",
+     189582540800,
+     83886080,
+     ""
+    ],
+    [
+     "alloc",
+     189566959616,
+     78778368,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4101 call"
+    ],
+    [
+     "segment_map",
+     189666426880,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     189645737984,
+     82317312,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4102 call"
+    ],
+    [
+     "alloc",
+     188575907840,
+     4718592,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4124 call"
+    ],
+    [
+     "free_requested",
+     188575907840,
+     4718592,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     4718592,
+     ""
+    ],
+    [
+     "alloc",
+     188575907840,
+     2064384,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4137 call"
+    ],
+    [
+     "alloc",
+     169323561472,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4138 call"
+    ],
+    [
+     "segment_map",
+     169326149632,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169325455360,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4139 call"
+    ],
+    [
+     "alloc",
+     169326487552,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4140 call"
+    ],
+    [
+     "segment_map",
+     189729341440,
+     83886080,
+     ""
+    ],
+    [
+     "alloc",
+     189728055296,
+     67092480,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:136 radial_table_forward"
+    ],
+    [
+     "segment_map",
+     169328246784,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169327519744,
+     1032192,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:137 radial_table_forward"
+    ],
+    [
+     "alloc",
+     169324593664,
+     332800,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4158 call"
+    ],
+    [
+     "alloc",
+     169324926464,
+     36868,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4164 call"
+    ],
+    [
+     "free_requested",
+     188575907840,
+     2064384,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     2064384,
+     ""
+    ],
+    [
+     "alloc",
+     188896550912,
+     18874368,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/fused_forward.py:363 fused_folded_forward"
+    ],
+    [
+     "segment_map",
+     189813227520,
+     188743680,
+     ""
+    ],
+    [
+     "alloc",
+     189795147776,
+     188743680,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/fused_forward.py:364 fused_folded_forward"
+    ],
+    [
+     "segment_map",
+     190001971200,
+     1321205760,
+     ""
+    ],
+    [
+     "alloc",
+     189983891456,
+     1321205760,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward"
+    ],
+    [
+     "alloc",
+     169324963840,
+     32,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/fused_forward.py:346 __call__"
+    ],
+    [
+     "free_requested",
+     169324963840,
+     32,
+     ""
+    ],
+    [
+     "free_completed",
+     169324963840,
+     32,
+     ""
+    ],
+    [
+     "free_requested",
+     188896550912,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     188896550912,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     169324593664,
+     332800,
+     ""
+    ],
+    [
+     "free_completed",
+     169324593664,
+     332800,
+     ""
+    ],
+    [
+     "free_requested",
+     169324926464,
+     36868,
+     ""
+    ],
+    [
+     "free_completed",
+     169324926464,
+     36868,
+     ""
+    ],
+    [
+     "free_requested",
+     189728055296,
+     67092480,
+     ""
+    ],
+    [
+     "free_completed",
+     189728055296,
+     67092480,
+     ""
+    ],
+    [
+     "alloc",
+     169324593664,
+     26624,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4183 call"
+    ],
+    [
+     "alloc",
+     169324620288,
+     36864,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4188 call"
+    ],
+    [
+     "free_requested",
+     169327519744,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169327519744,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     188863520768,
+     14155776,
+     ""
+    ],
+    [
+     "free_completed",
+     188863520768,
+     14155776,
+     ""
+    ],
+    [
+     "alloc",
+     189728055296,
+     56623104,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4219 call"
+    ],
+    [
+     "segment_map",
+     191323176960,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     191305097216,
+     70778880,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4228 call"
+    ],
+    [
+     "free_requested",
+     191305097216,
+     70778880,
+     ""
+    ],
+    [
+     "free_completed",
+     191305097216,
+     70778880,
+     ""
+    ],
+    [
+     "segment_map",
+     191386091520,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     191305097216,
+     94371840,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4239 call"
+    ],
+    [
+     "segment_map",
+     191407063040,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     191399469056,
+     66060288,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4244 call"
+    ],
+    [
+     "free_requested",
+     191399469056,
+     66060288,
+     ""
+    ],
+    [
+     "free_completed",
+     191399469056,
+     66060288,
+     ""
+    ],
+    [
+     "segment_map",
+     191469977600,
+     62914560,
+     ""
+    ],
+    [
+     "alloc",
+     191399469056,
+     132120576,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4255 call"
+    ],
+    [
+     "free_requested",
+     188877676544,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     188877676544,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     189057351680,
+     56623104,
+     ""
+    ],
+    [
+     "free_completed",
+     189057351680,
+     56623104,
+     ""
+    ],
+    [
+     "free_requested",
+     191305097216,
+     94371840,
+     ""
+    ],
+    [
+     "free_completed",
+     191305097216,
+     94371840,
+     ""
+    ],
+    [
+     "free_requested",
+     191399469056,
+     132120576,
+     ""
+    ],
+    [
+     "free_completed",
+     191399469056,
+     132120576,
+     ""
+    ],
+    [
+     "alloc",
+     189057351680,
+     18874368,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "alloc",
+     169324657152,
+     4,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4279 call"
+    ],
+    [
+     "alloc",
+     169324657664,
+     8,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4283 call"
+    ],
+    [
+     "alloc",
+     169324658176,
+     8,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4287 call"
+    ],
+    [
+     "alloc",
+     169324658688,
+     36,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4291 call"
+    ],
+    [
+     "alloc",
+     169324659200,
+     73728,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4298 call"
+    ],
+    [
+     "alloc",
+     169324732928,
+     73728,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4303 call"
+    ],
+    [
+     "alloc",
+     169324806656,
+     110592,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4307 call"
+    ],
+    [
+     "alloc",
+     169324917248,
+     221184,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4313 call"
+    ],
+    [
+     "alloc",
+     189784678400,
+     3538944,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4319 call"
+    ],
+    [
+     "free_requested",
+     189057351680,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     189057351680,
+     18874368,
+     ""
+    ],
+    [
+     "alloc",
+     189788217344,
+     3538944,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4325 call"
+    ],
+    [
+     "alloc",
+     188575907840,
+     3538944,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4331 call"
+    ],
+    [
+     "free_requested",
+     169315737600,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169315737600,
+     73728,
+     ""
+    ],
+    [
+     "free_requested",
+     189788217344,
+     3538944,
+     ""
+    ],
+    [
+     "free_completed",
+     189788217344,
+     3538944,
+     ""
+    ],
+    [
+     "alloc",
+     169327519744,
+     221184,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4341 call"
+    ],
+    [
+     "free_requested",
+     188575907840,
+     3538944,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     3538944,
+     ""
+    ],
+    [
+     "alloc",
+     169327740928,
+     221184,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4347 call"
+    ],
+    [
+     "free_requested",
+     169327740928,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169327740928,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169327519744,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169327519744,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     189566959616,
+     78778368,
+     ""
+    ],
+    [
+     "free_completed",
+     189566959616,
+     78778368,
+     ""
+    ],
+    [
+     "alloc",
+     169315737600,
+     73728,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4364 call"
+    ],
+    [
+     "alloc",
+     169325138432,
+     73728,
+     "fastmace-cache/cap-ledger-local/inductor/bs/cbsfbvnou6ezf6rutj6kmh64337aaghb6cswfs7bnmgjwtzjpdub.py:4365 call"
+    ],
+    [
+     "free_requested",
+     169324806656,
+     110592,
+     ""
+    ],
+    [
+     "free_completed",
+     169324806656,
+     110592,
+     ""
+    ],
+    [
+     "free_requested",
+     169324917248,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169324917248,
+     221184,
+     ""
+    ],
+    [
+     "alloc",
+     169325212160,
+     4,
+     "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:25 compute_forces"
+    ],
+    [
+     "alloc",
+     169325212672,
+     8,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     169325213184,
+     73728,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     169324806656,
+     73728,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     191305097216,
+     82317312,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     169324880384,
+     221184,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3128 call"
+    ],
+    [
+     "alloc",
+     169327519744,
+     221184,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3133 call"
+    ],
+    [
+     "free_requested",
+     169324732928,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169324732928,
+     73728,
+     ""
+    ],
+    [
+     "free_requested",
+     169325212672,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169325212672,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169325213184,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169325213184,
+     73728,
+     ""
+    ],
+    [
+     "free_requested",
+     169324806656,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169324806656,
+     73728,
+     ""
+    ],
+    [
+     "alloc",
+     189788217344,
+     3538944,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3154 call"
+    ],
+    [
+     "free_requested",
+     169324880384,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169324880384,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     189784678400,
+     3538944,
+     ""
+    ],
+    [
+     "free_completed",
+     189784678400,
+     3538944,
+     ""
+    ],
+    [
+     "free_requested",
+     169324659200,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169324659200,
+     73728,
+     ""
+    ],
+    [
+     "alloc",
+     189057351680,
+     18874368,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3169 call"
+    ],
+    [
+     "segment_map",
+     191532892160,
+     167772160,
+     ""
+    ],
+    [
+     "alloc",
+     191387414528,
+     301989888,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "free_requested",
+     169324593664,
+     26624,
+     ""
+    ],
+    [
+     "free_completed",
+     169324593664,
+     26624,
+     ""
+    ],
+    [
+     "free_requested",
+     191387414528,
+     301989888,
+     ""
+    ],
+    [
+     "free_completed",
+     191387414528,
+     301989888,
+     ""
+    ],
+    [
+     "free_requested",
+     189208346624,
+     94371840,
+     ""
+    ],
+    [
+     "free_completed",
+     189208346624,
+     94371840,
+     ""
+    ],
+    [
+     "alloc",
+     189076226048,
+     18874368,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3211 call"
+    ],
+    [
+     "free_requested",
+     189434839040,
+     132120576,
+     ""
+    ],
+    [
+     "free_completed",
+     189434839040,
+     132120576,
+     ""
+    ],
+    [
+     "alloc",
+     188863520768,
+     56623104,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3218 call"
+    ],
+    [
+     "free_requested",
+     189076226048,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     189076226048,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     189057351680,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     189057351680,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     189728055296,
+     56623104,
+     ""
+    ],
+    [
+     "free_completed",
+     189728055296,
+     56623104,
+     ""
+    ],
+    [
+     "alloc",
+     189208346624,
+     75497472,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3227 call"
+    ],
+    [
+     "alloc",
+     188609159168,
+     14155776,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3234 call"
+    ],
+    [
+     "free_requested",
+     189208346624,
+     75497472,
+     ""
+    ],
+    [
+     "free_completed",
+     189208346624,
+     75497472,
+     ""
+    ],
+    [
+     "alloc",
+     189208346624,
+     70778880,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3256 call"
+    ],
+    [
+     "free_requested",
+     188711346176,
+     75497472,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     75497472,
+     ""
+    ],
+    [
+     "alloc",
+     188711346176,
+     66060288,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3268 call"
+    ],
+    [
+     "alloc",
+     189434839040,
+     188743680,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3274 call"
+    ],
+    [
+     "alloc",
+     169325212672,
+     36864,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3275 call"
+    ],
+    [
+     "free_requested",
+     188711346176,
+     66060288,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     66060288,
+     ""
+    ],
+    [
+     "free_requested",
+     189208346624,
+     70778880,
+     ""
+    ],
+    [
+     "free_completed",
+     189208346624,
+     70778880,
+     ""
+    ],
+    [
+     "free_requested",
+     189795147776,
+     188743680,
+     ""
+    ],
+    [
+     "free_completed",
+     189795147776,
+     188743680,
+     ""
+    ],
+    [
+     "free_requested",
+     169324620288,
+     36864,
+     ""
+    ],
+    [
+     "free_completed",
+     169324620288,
+     36864,
+     ""
+    ],
+    [
+     "alloc",
+     189623582720,
+     18874368,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/wprime_backward.py:319 streaming_conv_wprime_backward"
+    ],
+    [
+     "alloc",
+     189057351680,
+     18874368,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/wprime_backward.py:320 streaming_conv_wprime_backward"
+    ],
+    [
+     "alloc",
+     189076226048,
+     16515072,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/wprime_backward.py:321 streaming_conv_wprime_backward"
+    ],
+    [
+     "alloc",
+     169327740928,
+     1032192,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/oeq_streaming/wprime_backward.py:322 streaming_conv_wprime_backward"
+    ],
+    [
+     "free_requested",
+     189623582720,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     189623582720,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     189434839040,
+     188743680,
+     ""
+    ],
+    [
+     "free_completed",
+     189434839040,
+     188743680,
+     ""
+    ],
+    [
+     "free_requested",
+     169325455360,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169325455360,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169326487552,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169326487552,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     189983891456,
+     1321205760,
+     ""
+    ],
+    [
+     "free_completed",
+     189983891456,
+     1321205760,
+     ""
+    ],
+    [
+     "free_requested",
+     188587003904,
+     22155264,
+     ""
+    ],
+    [
+     "free_completed",
+     188587003904,
+     22155264,
+     ""
+    ],
+    [
+     "alloc",
+     189092741120,
+     18874368,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3305 call"
+    ],
+    [
+     "free_requested",
+     169327519744,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169327519744,
+     221184,
+     ""
+    ],
+    [
+     "alloc",
+     188575907840,
+     18874368,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3311 call"
+    ],
+    [
+     "free_requested",
+     189788217344,
+     3538944,
+     ""
+    ],
+    [
+     "free_completed",
+     189788217344,
+     3538944,
+     ""
+    ],
+    [
+     "alloc",
+     188711346176,
+     22155264,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3316 call"
+    ],
+    [
+     "alloc",
+     188733501440,
+     18874368,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3322 call"
+    ],
+    [
+     "free_requested",
+     188711346176,
+     22155264,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     22155264,
+     ""
+    ],
+    [
+     "alloc",
+     188594782208,
+     14155776,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3327 call"
+    ],
+    [
+     "free_requested",
+     188609159168,
+     14155776,
+     ""
+    ],
+    [
+     "free_completed",
+     188609159168,
+     14155776,
+     ""
+    ],
+    [
+     "free_requested",
+     189057351680,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     189057351680,
+     18874368,
+     ""
+    ],
+    [
+     "alloc",
+     189208346624,
+     75497472,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3339 call"
+    ],
+    [
+     "free_requested",
+     188733501440,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     188733501440,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     191305097216,
+     82317312,
+     ""
+    ],
+    [
+     "free_completed",
+     191305097216,
+     82317312,
+     ""
+    ],
+    [
+     "alloc",
+     189728055296,
+     301989888,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     36864,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     36864,
+     ""
+    ],
+    [
+     "free_requested",
+     169325359104,
+     59392,
+     ""
+    ],
+    [
+     "free_completed",
+     169325359104,
+     59392,
+     ""
+    ],
+    [
+     "free_requested",
+     189728055296,
+     301989888,
+     ""
+    ],
+    [
+     "free_completed",
+     189728055296,
+     301989888,
+     ""
+    ],
+    [
+     "free_requested",
+     189113974784,
+     94371840,
+     ""
+    ],
+    [
+     "free_completed",
+     189113974784,
+     94371840,
+     ""
+    ],
+    [
+     "free_requested",
+     189302718464,
+     132120576,
+     ""
+    ],
+    [
+     "free_completed",
+     189302718464,
+     132120576,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     189092741120,
+     18874368,
+     ""
+    ],
+    [
+     "free_completed",
+     189092741120,
+     18874368,
+     ""
+    ],
+    [
+     "free_requested",
+     189000728576,
+     56623104,
+     ""
+    ],
+    [
+     "free_completed",
+     189000728576,
+     56623104,
+     ""
+    ],
+    [
+     "free_requested",
+     188863520768,
+     56623104,
+     ""
+    ],
+    [
+     "free_completed",
+     188863520768,
+     56623104,
+     ""
+    ],
+    [
+     "alloc",
+     188608937984,
+     9437184,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3420 call"
+    ],
+    [
+     "alloc",
+     188863520768,
+     23592960,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3430 call"
+    ],
+    [
+     "free_requested",
+     188925231104,
+     75497472,
+     ""
+    ],
+    [
+     "free_completed",
+     188925231104,
+     75497472,
+     ""
+    ],
+    [
+     "alloc",
+     188711346176,
+     33030144,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3442 call"
+    ],
+    [
+     "alloc",
+     169315663872,
+     36864,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3450 call"
+    ],
+    [
+     "free_requested",
+     188608937984,
+     9437184,
+     ""
+    ],
+    [
+     "free_completed",
+     188608937984,
+     9437184,
+     ""
+    ],
+    [
+     "free_requested",
+     188788023296,
+     75497472,
+     ""
+    ],
+    [
+     "free_completed",
+     188788023296,
+     75497472,
+     ""
+    ],
+    [
+     "free_requested",
+     169325418496,
+     36864,
+     ""
+    ],
+    [
+     "free_completed",
+     169325418496,
+     36864,
+     ""
+    ],
+    [
+     "alloc",
+     188608937984,
+     14376960,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3464 call"
+    ],
+    [
+     "free_requested",
+     188594782208,
+     14155776,
+     ""
+    ],
+    [
+     "free_completed",
+     188594782208,
+     14155776,
+     ""
+    ],
+    [
+     "free_requested",
+     169323361280,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169323361280,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     188575907840,
+     23961600,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3475 call"
+    ],
+    [
+     "free_requested",
+     188863520768,
+     23592960,
+     ""
+    ],
+    [
+     "free_completed",
+     188863520768,
+     23592960,
+     ""
+    ],
+    [
+     "free_requested",
+     169323427840,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169323427840,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     189092741120,
+     33546240,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3486 call"
+    ],
+    [
+     "free_requested",
+     188711346176,
+     33030144,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     33030144,
+     ""
+    ],
+    [
+     "free_requested",
+     169323494400,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169323494400,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     188599869440,
+     4792320,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3492 call"
+    ],
+    [
+     "free_requested",
+     189208346624,
+     75497472,
+     ""
+    ],
+    [
+     "free_completed",
+     189208346624,
+     75497472,
+     ""
+    ],
+    [
+     "free_requested",
+     169323294720,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169323294720,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     188711346176,
+     76677120,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3497 call"
+    ],
+    [
+     "free_requested",
+     189092741120,
+     33546240,
+     ""
+    ],
+    [
+     "free_completed",
+     189092741120,
+     33546240,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     23961600,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     23961600,
+     ""
+    ],
+    [
+     "free_requested",
+     188608937984,
+     14376960,
+     ""
+    ],
+    [
+     "free_completed",
+     188608937984,
+     14376960,
+     ""
+    ],
+    [
+     "free_requested",
+     188599869440,
+     4792320,
+     ""
+    ],
+    [
+     "free_completed",
+     188599869440,
+     4792320,
+     ""
+    ],
+    [
+     "alloc",
+     188788023296,
+     67092480,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/edge_outer_sum.py:122 edge_outer_sum_backward"
+    ],
+    [
+     "alloc",
+     188575907840,
+     16515072,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/edge_outer_sum.py:123 edge_outer_sum_backward"
+    ],
+    [
+     "free_requested",
+     188625674240,
+     2064384,
+     ""
+    ],
+    [
+     "free_completed",
+     188625674240,
+     2064384,
+     ""
+    ],
+    [
+     "free_requested",
+     188711346176,
+     76677120,
+     ""
+    ],
+    [
+     "free_completed",
+     188711346176,
+     76677120,
+     ""
+    ],
+    [
+     "free_requested",
+     188627738624,
+     67092480,
+     ""
+    ],
+    [
+     "free_completed",
+     188627738624,
+     67092480,
+     ""
+    ],
+    [
+     "free_requested",
+     188694831104,
+     16515072,
+     ""
+    ],
+    [
+     "free_completed",
+     188694831104,
+     16515072,
+     ""
+    ],
+    [
+     "alloc",
+     169323294720,
+     110592,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3520 call"
+    ],
+    [
+     "alloc",
+     169323405312,
+     110592,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3525 call"
+    ],
+    [
+     "alloc",
+     188592422912,
+     3096576,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3531 call"
+    ],
+    [
+     "alloc",
+     169325249536,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3539 call"
+    ],
+    [
+     "alloc",
+     169326281728,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3540 call"
+    ],
+    [
+     "alloc",
+     169328773120,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3541 call"
+    ],
+    [
+     "segment_map",
+     169330343936,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169329805312,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3542 call"
+    ],
+    [
+     "free_requested",
+     169325212672,
+     36864,
+     ""
+    ],
+    [
+     "free_completed",
+     169325212672,
+     36864,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     36864,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     36864,
+     ""
+    ],
+    [
+     "alloc",
+     169330837504,
+     1032192,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:165 radial_table_backward"
+    ],
+    [
+     "free_requested",
+     169323561472,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169323561472,
+     1032192,
+     ""
+    ],
+    [
+     "alloc",
+     169323561472,
+     1032192,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/kernels/triton/radial_table.py:165 radial_table_backward"
+    ],
+    [
+     "free_requested",
+     169319940096,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169319940096,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     188788023296,
+     67092480,
+     ""
+    ],
+    [
+     "free_completed",
+     188788023296,
+     67092480,
+     ""
+    ],
+    [
+     "alloc",
+     169319940096,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3577 call"
+    ],
+    [
+     "segment_map",
+     169332441088,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169331869696,
+     1032192,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3579 call"
+    ],
+    [
+     "free_requested",
+     169318907904,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169318907904,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169315700736,
+     36864,
+     ""
+    ],
+    [
+     "free_completed",
+     169315700736,
+     36864,
+     ""
+    ],
+    [
+     "free_requested",
+     169330837504,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169330837504,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169323561472,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169323561472,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169325249536,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169325249536,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169329805312,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169329805312,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169316843520,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169316843520,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169320972288,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169320972288,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169317875712,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169317875712,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169322004480,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169322004480,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169323036672,
+     258048,
+     ""
+    ],
+    [
+     "free_completed",
+     169323036672,
+     258048,
+     ""
+    ],
+    [
+     "alloc",
+     188595519488,
+     3096576,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3602 call"
+    ],
+    [
+     "free_requested",
+     169326281728,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169326281728,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169319940096,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169319940096,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169328773120,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169328773120,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     189076226048,
+     16515072,
+     ""
+    ],
+    [
+     "free_completed",
+     189076226048,
+     16515072,
+     ""
+    ],
+    [
+     "free_requested",
+     188575907840,
+     16515072,
+     ""
+    ],
+    [
+     "free_completed",
+     188575907840,
+     16515072,
+     ""
+    ],
+    [
+     "free_requested",
+     169331869696,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169331869696,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     169323560960,
+     64,
+     ""
+    ],
+    [
+     "free_completed",
+     169323560960,
+     64,
+     ""
+    ],
+    [
+     "free_requested",
+     188595519488,
+     3096576,
+     ""
+    ],
+    [
+     "free_completed",
+     188595519488,
+     3096576,
+     ""
+    ],
+    [
+     "free_requested",
+     169327740928,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169327740928,
+     1032192,
+     ""
+    ],
+    [
+     "free_requested",
+     188592422912,
+     3096576,
+     ""
+    ],
+    [
+     "free_completed",
+     188592422912,
+     3096576,
+     ""
+    ],
+    [
+     "free_requested",
+     169315811328,
+     1032192,
+     ""
+    ],
+    [
+     "free_completed",
+     169315811328,
+     1032192,
+     ""
+    ],
+    [
+     "alloc",
+     169324659200,
+     110592,
+     "fastmace-cache/cap-ledger-local/inductor/d3/cd3flxsp7zqt5lni23aekf3cuiwnep2mamtk7bjgv64sajmmb55y.py:3624 call"
+    ],
+    [
+     "free_requested",
+     169323294720,
+     110592,
+     ""
+    ],
+    [
+     "free_completed",
+     169323294720,
+     110592,
+     ""
+    ],
+    [
+     "free_requested",
+     169323405312,
+     110592,
+     ""
+    ],
+    [
+     "free_completed",
+     169323405312,
+     110592,
+     ""
+    ],
+    [
+     "alloc",
+     169324769792,
+     110592,
+     "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:38 compute_forces"
+    ],
+    [
+     "free_requested",
+     169325212160,
+     4,
+     ""
+    ],
+    [
+     "free_completed",
+     169325212160,
+     4,
+     ""
+    ],
+    [
+     "free_requested",
+     169324659200,
+     110592,
+     ""
+    ],
+    [
+     "free_completed",
+     169324659200,
+     110592,
+     ""
+    ],
+    [
+     "free_requested",
+     169325138432,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169325138432,
+     73728,
+     ""
+    ],
+    [
+     "free_requested",
+     169324658176,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169324658176,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315737600,
+     73728,
+     ""
+    ],
+    [
+     "free_completed",
+     169315737600,
+     73728,
+     ""
+    ],
+    [
+     "free_requested",
+     169324657152,
+     4,
+     ""
+    ],
+    [
+     "free_completed",
+     169324657152,
+     4,
+     ""
+    ],
+    [
+     "free_requested",
+     169324658688,
+     36,
+     ""
+    ],
+    [
+     "free_completed",
+     169324658688,
+     36,
+     ""
+    ],
+    [
+     "free_requested",
+     189645737984,
+     82317312,
+     ""
+    ],
+    [
+     "free_completed",
+     189645737984,
+     82317312,
+     ""
+    ],
+    [
+     "free_requested",
+     169324769792,
+     110592,
+     ""
+    ],
+    [
+     "free_completed",
+     169324769792,
+     110592,
+     ""
+    ],
+    [
+     "free_requested",
+     169324657664,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169324657664,
+     8,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "alloc",
+     169315885056,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "alloc",
+     169316106240,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315885056,
+     221184,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     221184,
+     "fastmace-cap-ledger/src-9c19ba94/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "free_requested",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169316106240,
+     221184,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     221184,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     221184,
+     ""
+    ]
+   ],
+   "second_pool_reserved": 1216348160
+  }
+ },
+ "plan": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (24): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, chunked_conv_backward,\n      fused_folded_forward, radial_tables, wprime_backward, block_linear, grouped_linear, merged_residual, gated_rows,\n      segment_gemm, grouped_launch, single_graph_strain, species_tables (+3 more; describe(full=True) lists them)\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, gate_epilogue, species_residual,\n      combo_kernels, tf32x3_gemms (only an explicit 'on' enables it); w_tables,\n      save_transcendentals (float32 plan, decision 65) (+5 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 4.96 GiB predicted (run; run 4.96, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 5060\u2026\n  workload: Langevin NVT, fixcm=True; 9216 atoms, 3D PBC, no constraints; up to 300 K\n  rules 8-11: superset Cl Nb (8), max_temperature_K 300 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)"
+}
