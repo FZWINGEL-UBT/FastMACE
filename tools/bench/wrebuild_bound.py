@@ -98,6 +98,9 @@ def main(argv=None):
         senders32, receivers32 = senders.to(torch.int32), receivers.to(torch.int32)
         nostore = FusedFoldedForward(kernels, a.shape[1], x.device, store_w=False)
         rebuild = WRebuildBackward(kernels, a.shape[1], module.gprime.shape[1], x.device)
+        variants = {f"backward_rebuild_p{parts}_b{batch}": WRebuildBackward(
+            kernels, a.shape[1], module.gprime.shape[1], x.device, parts=parts, batch=batch)
+            for parts, batch in ((1, 8), (1, 4), (2, 4))}
         out = x.new_empty((x.shape[0], nostore.output_dim))
         dummy = x.new_empty((1,))
         _, w = fused_folded_forward(a, weight, x, sh, senders32, receivers32, row_ptr, fused.id)
@@ -116,6 +119,9 @@ def main(argv=None):
                 table.scales, table.bins, *consts, module.kernel.id, interaction_rows),
             "backward_rebuild": lambda: rebuild(a, weight, x, sh, senders32, receivers32, dout, r, pair,
                                                 module.gprime, table.starts, table.scales, table.bins, *consts),
+            **{key: (lambda kernel=kernel: kernel(a, weight, x, sh, senders32, receivers32, dout, r, pair,
+                                                   module.gprime, table.starts, table.scales, table.bins, *consts))
+               for key, kernel in variants.items()},
             "w_read": lambda: w.sum(),
             "gemm": lambda: torch.matmul(a, weight.t(), out=wbuf),
         }
@@ -145,12 +151,13 @@ def main(argv=None):
     today = med["forward"] + med["backward"]
     recompute = med["forward"] + med["backward_recompute"]
     bound = med["forward_nostore"] + max(0.0, med["backward"] - med["w_read"]) + med["gemm"]
-    candidate_ms = med["forward_nostore"] + med["backward_rebuild"]
+    best = min((key for key in med if key.startswith("backward_rebuild")), key=med.get)
+    candidate_ms = med["forward_nostore"] + med[best]
     record = dict(tool="wrebuild_bound", structure=name, natoms=len(atoms), edges=int(w.shape[0]),
                   q=int(w.shape[1]), k=int(a.shape[1]), gpu=torch.cuda.get_device_name(), rounds=args.rounds,
                   chunk_rows=interaction_rows, median_ms=med, today_ms=today, recompute_ms=recompute,
                   bound_ms=bound, recompute_ratio=recompute / today, bound_ratio=bound / today,
-                  candidate_ms=candidate_ms, candidate_ratio=candidate_ms / today, errors=errors,
+                  candidate=best, candidate_ms=candidate_ms, candidate_ratio=candidate_ms / today, errors=errors,
                   times_ms=times)
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"wrebuild-{name}-{len(atoms)}.json"
@@ -161,7 +168,7 @@ def main(argv=None):
     print(f"  today (forward + backward)            {today:8.3f} ms")
     print(f"  CAP-T07 (forward + backward_recompute) {recompute:8.3f} ms = {recompute / today:.3f} x today")
     print(f"  rebuild bound (nostore + backward - w_read + gemm) {bound:8.3f} ms = {bound / today:.3f} x today")
-    print(f"  candidate (forward_nostore + backward_rebuild) {candidate_ms:8.3f} ms = {candidate_ms / today:.3f} x today")
+    print(f"  candidate (forward_nostore + {best}) {candidate_ms:8.3f} ms = {candidate_ms / today:.3f} x today")
     for label, values in errors.items():
         print(f"  {label}: max |candidate - today| {values['max_abs']:.3e} of max |today| {values['scale']:.3e} "
               f"({values['relative']:.2e})")

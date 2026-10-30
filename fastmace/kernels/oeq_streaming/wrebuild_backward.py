@@ -25,8 +25,8 @@ import itertools
 
 import torch
 
-from fastmace.kernels.oeq_streaming.fused_forward import (BATCH, CHANNEL_BLOCK, _lit, _node, balanced_parts,
-                                                          check_problem, launch_rule, slice_floats, staging_floats)
+from fastmace.kernels.oeq_streaming.fused_forward import (BATCH, CHANNEL_BLOCK, MAX_WARPS, LaunchRule, _lit, _node,
+                                                          balanced_parts, check_problem, launch_rule, slice_floats)
 
 EDGE_CHUNK = 64  # edges per work chunk (eight batches)
 
@@ -34,15 +34,37 @@ _REGISTRY = {}
 _IDS = itertools.count()
 
 
-def render(schedule, k, rule, terms):
+def staging_floats(k, edge_dim, batch=BATCH):
+    """Floats of one warp's staging: a [K][batch] and sh [batch][edge_dim]."""
+    return batch * (k + edge_dim)
+
+
+def rule_for(paths, k, edge_dim, channels, shared_optin, sms, parts=None, batch=BATCH):
+    """The fused forward's launch rule, or one with ``parts`` path parts and ``batch`` edges per batch (tuning)."""
+    if parts is None and batch == BATCH:
+        return launch_rule(paths, k, edge_dim, channels, shared_optin, sms)
+    parts = parts or 1
+    per = -(-paths // parts)
+    wbytes = 4 * slice_floats(per, k)
+    staging = 4 * staging_floats(k, edge_dim, batch)
+    warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
+    if warps < 1:
+        raise ValueError(f"wrebuild_backward: {parts} part(s) of {k}-wide rows do not fit {shared_optin} bytes")
+    slices = (channels // CHANNEL_BLOCK) * parts
+    return LaunchRule(parts, warps, max(1, -(-2 * sms // slices)), wbytes + warps * staging)
+
+
+def render(schedule, k, rule, terms, batch=BATCH):
     """CUDA source of ``wrebuild_backward`` for a schedule, the folded input width ``k``, a launch rule (the fused
-    forward's) and the derivative table's ``terms``."""
+    forward's, or ``rule_for``'s), the derivative table's ``terms`` and ``batch`` edges per batch (4 or 8)."""
     check_problem(schedule)
+    if batch % 4:
+        raise ValueError("wrebuild_backward: the batch is a multiple of 4 (float4 broadcasts of a)")
     paths = schedule.paths
     costs = [sum(len(o.terms) for o in p.outputs) for p in paths]
     parts = balanced_parts(costs, rule.parts)
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part)}    }} break;" for q, part in enumerate(parts))
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, batch)}    }} break;" for q, part in enumerate(parts))
     return f"""// wrebuild_backward (FastMACE): wprime_backward building w on chip (the fused forward's w, bitwise).
 using int64_t = long long;
 constexpr int K = {k};
@@ -52,7 +74,7 @@ constexpr int ED = {schedule.edge_dim};
 constexpr int IN_DIM = {schedule.input_dim};
 constexpr int OUT_DIM = {schedule.output_dim};
 constexpr int64_t Q = {len(paths) * schedule.channels};
-constexpr int B = {BATCH};
+constexpr int B = {batch};
 constexpr int CHUNK = {EDGE_CHUNK};
 constexpr int TERMS = {int(terms)};
 constexpr unsigned FULL = 0xffffffffu;
@@ -68,7 +90,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) wrebuild_back
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
-    float* a_s = Ws + {slice_floats(npp, k)} + warp * {staging_floats(k, schedule.edge_dim)};
+    float* a_s = Ws + {slice_floats(npp, k)} + warp * {staging_floats(k, schedule.edge_dim, batch)};
     float* sh_s = a_s + K * B;
     const int cb = blockIdx.y;
     const int ch = cb * CB + lane;
@@ -80,7 +102,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) wrebuild_back
 """
 
 
-def _part(schedule, part):
+def _part(schedule, part, batch):
     paths = schedule.paths
     C, layout = schedule.channels, schedule.layout
     npl = len(part)
@@ -89,12 +111,12 @@ def _part(schedule, part):
     slot_of = {t.input_accumulator.name: t.input_accumulator
                for pi in part for o in paths[pi].outputs for t in o.terms}
     gemm = []
-    for q in range(BATCH // 4):
+    for q in range(batch // 4):
         gemm.append(f"                    const float4 av{q} ="
                     f" *reinterpret_cast<const float4*>(&a_s[k * B + {4 * q}]);")
     for g in range(npl):
         gemm.append(f"                    {{ const float wk = Ws[({g} * K + k) * WS + lane];")
-        for q in range(BATCH // 4):
+        for q in range(batch // 4):
             for c, comp in enumerate("xyzw"):
                 b = 4 * q + c
                 gemm.append(f"                      w[{g}][{b}] = fmaf(av{q}.{comp}, wk, w[{g}][{b}]);")
@@ -216,7 +238,7 @@ class WRebuildBackward:
     """Compiled ``wrebuild_backward`` for the streaming kernels of one interaction (``StreamingKernels``), a folded
     input width ``k`` and a derivative table of ``terms`` terms; float32 only."""
 
-    def __init__(self, kernels, k, terms, device=None):
+    def __init__(self, kernels, k, terms, device=None, parts=None, batch=BATCH):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
@@ -226,10 +248,10 @@ class WRebuildBackward:
         check_problem(schedule)
         device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
         props = torch.cuda.get_device_properties(device)
-        self.rule = launch_rule(len(schedule.paths), int(k), schedule.edge_dim, schedule.channels,
-                                int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
-        self.k, self.terms, self.channels = int(k), int(terms), schedule.channels
-        self.source = render(schedule, self.k, self.rule, self.terms)
+        self.rule = rule_for(len(schedule.paths), int(k), schedule.edge_dim, schedule.channels,
+                             int(props.shared_memory_per_block_optin), int(props.multi_processor_count), parts, batch)
+        self.k, self.terms, self.channels, self.batch = int(k), int(terms), schedule.channels, int(batch)
+        self.source = render(schedule, self.k, self.rule, self.terms, self.batch)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -267,4 +289,4 @@ class WRebuildBackward:
         return dx, dsh, dr
 
 
-__all__ = ["EDGE_CHUNK", "WRebuildBackward", "render"]
+__all__ = ["EDGE_CHUNK", "WRebuildBackward", "render", "rule_for", "staging_floats"]
