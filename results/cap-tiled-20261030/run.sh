@@ -33,7 +33,8 @@ export LD_LIBRARY_PATH=$site/nvidia/cu13/lib:$site/cuequivariance_ops/lib${LD_LI
 cd "$SRC"
 script=$1
 shift
-"$ENV/bin/python" "$script" "$@" --output "$RUN" > "$RUN/run.log" 2>&1 < /dev/null
+# OUTSUB: a fresh subdirectory as the output (force_stress_gate.py refuses an existing one).
+"$ENV/bin/python" "$script" "$@" --output "$RUN${OUTSUB:+/$OUTSUB}" > "$RUN/run.log" 2>&1 < /dev/null
 code=$?
 echo "exit $code" >> "$RUN/run.log"
 tail -c 3000 "$RUN/run.log"
