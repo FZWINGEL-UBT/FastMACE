@@ -91,6 +91,8 @@ def parse_args(argv=None):
     p.add_argument("--second-pool", nargs="*", default=[], choices=sorted(SECOND_POOL_OPS),
                    help="experiment: run these ops' CUDA kernels with their allocations in a second MemPool "
                         "(torch.cuda.use_mem_pool), so their large buffers do not fragment the graph pool")
+    p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="RewriteConfig fields forced (e.g. recompute_node_segments=on)")
     p.add_argument("--tag", default="", help="suffix of the record's file name")
     return p.parse_args(argv)
 
@@ -352,7 +354,11 @@ def main(argv=None):
 
         dtype = torch.float32 if args.precision == "float32" else torch.float64
         workspaces = workspace_prototype.install(len(atoms), "cuda", dtype)
-    field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision)
+    from fastmace.config import RewriteConfig
+
+    rewrites = dict(item.split("=", 1) for item in args.rewrites)
+    field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision,
+                          **({"rewrites": RewriteConfig(**rewrites)} if rewrites else {}))
     torch.cuda.synchronize()
     points.append(memory_point(torch, "force field loaded"))
     from fastmace.config import FallbackConfig
@@ -438,7 +444,7 @@ def main(argv=None):
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
                                  sites=[dict(site=s, bytes=int(b), blocks=c, per_edge=b / padded, per_atom=b / natoms)
                                         for s, b, c in capture_sites[:80]], pool=pool_detail),
-                  plan=sim.plan.describe())
+                  rewrites=rewrites, plan=sim.plan.describe(full=True))
     sim.close()
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"ledger-{name}-{args.precision}-{natoms}{args.tag}.json"
