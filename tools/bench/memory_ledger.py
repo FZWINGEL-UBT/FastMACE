@@ -37,6 +37,31 @@ import activation_profile  # noqa: E402
 import capacity_scan  # noqa: E402
 
 GIB = 2 ** 30
+# --second-pool groups: the custom ops (module, attribute) whose CUDA kernels allocate in the second pool.
+SECOND_POOL_OPS = {
+    "segment_gemm": [("fastmace.kernels.triton.segment_gemm", "joined_products_op"),
+                     ("fastmace.kernels.triton.segment_gemm", "joined_products_input_grads")],
+    "fused_forward": [("fastmace.kernels.oeq_streaming.fused_forward", "fused_folded_message")],
+}
+
+
+def route_to_second_pool(torch, groups):
+    """Re-register the groups' custom ops' CUDA kernels to run inside ``torch.cuda.use_mem_pool(pool)`` (any
+    thread: the backward's ops run in autograd's), and return the pool. Experiment only."""
+    import importlib as _importlib
+
+    pool = torch.cuda.MemPool()
+    for group in groups:
+        for module_name, attribute in SECOND_POOL_OPS[group]:
+            op = getattr(_importlib.import_module(module_name), attribute)
+            original = op._init_fn
+
+            def kernel(*args, _original=original, **kwargs):
+                with torch.cuda.use_mem_pool(pool):
+                    return _original(*args, **kwargs)
+
+            op.register_kernel("cuda")(kernel)
+    return pool
 
 
 def parse_args(argv=None):
@@ -49,6 +74,9 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=20, help="steady steps after the warm-up")
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--top", type=int, default=25)
+    p.add_argument("--second-pool", nargs="*", default=[], choices=sorted(SECOND_POOL_OPS),
+                   help="experiment: run these ops' CUDA kernels with their allocations in a second MemPool "
+                        "(torch.cuda.use_mem_pool), so their large buffers do not fragment the graph pool")
     p.add_argument("--tag", default="", help="suffix of the record's file name")
     return p.parse_args(argv)
 
@@ -103,17 +131,21 @@ def group(name):
     return "other named"
 
 
-def allocator_view(torch, engine):
-    """The steady state's segments: graph pool, default pool live blocks by owner, and the cache."""
+def allocator_view(torch, engine, second=None):
+    """The steady state's segments: graph pool, the experiment's second pool, default pool live blocks by owner,
+    and the cache."""
     pool = tuple(engine._pool) if engine._pool is not None else None
+    second = tuple(second.id) if second is not None else None
     ranges = owner_ranges(torch, engine)
     rows = defaultdict(int)
     detail = defaultdict(int)
     unattributed = []
-    totals = dict(graph_pool_reserved=0, graph_pool_active=0, default_reserved=0, default_active=0)
+    totals = dict(graph_pool_reserved=0, graph_pool_active=0, default_reserved=0, default_active=0,
+                  second_pool_reserved=0, second_pool_active=0)
     for segment in torch.cuda.memory_snapshot():
-        in_pool = pool is not None and tuple(segment.get("segment_pool_id", ())) == pool
-        key = "graph_pool" if in_pool else "default"
+        segment_pool = tuple(segment.get("segment_pool_id", ()))
+        in_pool = pool is not None and segment_pool == pool
+        key = "graph_pool" if in_pool else "second_pool" if second is not None and segment_pool == second else "default"
         totals[f"{key}_reserved"] += segment["total_size"]
         address = segment["address"]
         for block in segment["blocks"]:
@@ -122,7 +154,7 @@ def allocator_view(torch, engine):
             if block["state"] != "active_allocated":
                 continue
             totals[f"{key}_active"] += size
-            if in_pool:
+            if key != "default":
                 continue
             owners = [name for lo, hi, name in ranges if lo < start + size and hi > start]
             if owners:
@@ -211,6 +243,7 @@ def main(argv=None):
     # Python frames on every block allocated from here on (the trace itself is kept short until step 3).
     torch.cuda.memory._record_memory_history(max_entries=1, stacks="python")
     started = time.perf_counter()
+    second = route_to_second_pool(torch, args.second_pool) if args.second_pool else None
     field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision)
     torch.cuda.synchronize()
     points.append(memory_point(torch, "force field loaded"))
@@ -227,7 +260,7 @@ def main(argv=None):
     torch.cuda.synchronize()
     steady = memory_point(torch, f"after {args.steps} steady steps")
     points.append(steady)
-    view = allocator_view(torch, engine)
+    view = allocator_view(torch, engine, second)
     edges = engine.force_field.edge_count
     info = dict(edges_at_cutoff=int(edges), padded_sizes=sorted(int(e) for e in engine.edge_sizes_used),
                 capacity=int(engine.force_field.edge_capacity), graphs=[str(k) for k in engine._graphs],
@@ -261,6 +294,9 @@ def main(argv=None):
         sites[site][1] += 1
     capture_sites = sorted(([s, b, c] for s, (b, c) in sites.items()), key=lambda row: -row[1])
     pool_detail = pool_view(snapshot, engine, trace)
+    if second is not None:
+        pool_detail["second_pool_reserved"] = int(sum(s["total_size"] for s in snapshot["segments"]
+                                                      if tuple(s.get("segment_pool_id", ())) == tuple(second.id)))
     natoms = len(atoms)
     padded = max(info["padded_sizes"]) if info["padded_sizes"] else int(edges)
 
@@ -268,6 +304,8 @@ def main(argv=None):
     totals = view["totals"]
     ledger = [("graph pool (captured stages: the force call's activations and transients)",
                totals["graph_pool_reserved"])]
+    if second is not None:
+        ledger.append((f"second pool ({', '.join(args.second_pool)} kernels' buffers)", totals["second_pool_reserved"]))
     ledger += sorted(view["rows"].items(), key=lambda kv: -kv[1])
     ledger.append(("default pool, cached (reserved, not live)", totals["default_reserved"] - totals["default_active"]))
     outside = steady["outside_allocator"]
@@ -279,7 +317,7 @@ def main(argv=None):
     record = dict(tool="memory_ledger", structure=name, precision=args.precision, natoms=natoms, repeat=args.repeat,
                   fastmace_commit=_commit(), gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                   host=__import__("os").uname().nodename, seconds=time.perf_counter() - started,
-                  alloc_conf=__import__("os").environ.get("PYTORCH_CUDA_ALLOC_CONF"),
+                  alloc_conf=__import__("os").environ.get("PYTORCH_CUDA_ALLOC_CONF"), second_pool=args.second_pool,
                   edges=info, points=points, allocator=view,
                   ledger=[dict(row=row, bytes=int(b)) for row, b in ledger],
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
