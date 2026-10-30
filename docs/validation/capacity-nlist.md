@@ -103,6 +103,32 @@ shell, so the per-slot saving counts double per edge. That rule is not changed h
 - **Smaller screen buffer** (128 codes per atom against about 35 used by NbCl5): about 35 MB. The asynchronous build
   relies on its size, and resizing it after the first build adds another reallocation path.
 
+### Other neighbour-list schemes (owner's question, 30 October 2026; not tried)
+
+**For capacity, the list is no longer worth redesigning.** After this task it holds about 1 % of the peak at 50k
+atoms:
+
+- 117 MB of buffers;
+- a 50 MB screen buffer;
+- about 90 MB of rebuild temporaries.
+
+Removing it altogether would give at most about 2 % more atoms. About 95 % of the force call's memory is per-atom
+node state (CAP-T08). The schemes below change the model's per-edge memory or the rebuild time instead. The sizes are
+estimates from this report's numbers, not measurements.
+
+| Scheme | What it would save | Cost and risk | Assessment |
+| --- | --- | --- | --- |
+| **Binned (cell-list) screen** in place of the all-pairs tile screen (`pair_search`) | Rebuild time. Today the screen tests every sender tile against every receiver tile over every image, so it grows with N²: at 50k atoms about 2.4M tiles of 32×32 pairs, times 27 images. Binning by cutoff + skin makes it O(N). No memory to speak of. | Moderate. Only the screen kernel changes. It finds the same pairs, and they are sorted by the same key, so the result is exact. | The one candidate worth keeping. It is a speed item for very large cells, and it needs the measurement below first. |
+| **Half list** (each pair once; the edge kernels handle both directions) | Halves the model's per-edge memory: about 385 B per edge saved for the backward, roughly 0.3 GB at 1.5M edges, about 2 % atoms. Also half the edge work in the screen and compaction. | Large. Every edge kernel needs a two-direction variant: the convolution, the `wprime` and w-rebuild backwards, the spherical harmonics (Y(−r) = (−1)^l Y(r)) and the radial basis. Summation orders change, so it is rounding class, not exact. | Not worth it for about 2 %. |
+| **No stored edges** (the fused kernels find neighbours on the fly from a cell list, as CAP-T07b rebuilds w on chip) | All per-edge storage, the list's and the model's: about 0.7 GB at 50k atoms, about 4–5 % atoms. | Very large. Neighbour lookup goes inside every fused kernel. The cuEquivariance and e3nn edge paths would need replacing. | A research project; poor gain per effort. |
+| **Receiver CSR** (int32 offsets in place of the receiver row of `edge_index`) | About 8 B per edge in the list, about 10 MB. | `edge_index` (int64, `[2, E]`) is the model's input contract, and every edge kernel indexes it. | Not worth it. |
+| **Smaller skin** (0.3 → 0.2 Å) | Fewer candidates, so a smaller list. | More rebuilds. The skin is the planner's (rule 11). | Tiny at 60 B per slot. |
+
+**Measurement before a binned screen.** The deciding number is the rebuild cost per MD step at 50k atoms: the time
+of one `build_gpu`, split into screen and sort, times the rebuild rate. CAP-T09's points record the rebuild count
+but not their time. If the rebuild cost is above about 2 % of the step time, a binned screen is a clean exact speed
+task. If it is below, the remaining capacity lever is per-atom state, not the neighbour list.
+
 ## Step time
 
 `tools/ab_rewrites.py --prepare`, same process, MH-1 hybrid float32 NVT at 300 K, default plan on both sides:
