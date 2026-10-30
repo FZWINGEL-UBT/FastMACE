@@ -16,13 +16,55 @@ when the plan would not fit otherwise, as in decision 67. It must also be exact 
 
 | Before (CAP-T05) | After | ms per step at the new limit |
 | --- | --- | --- |
-| 34,200 atoms | **36,720 atoms (0.96M edges at the cutoff), +7 %** | 417 |
+| 34,200 atoms | **36,720 atoms (0.96M edges at the cutoff), +7 %** | 411 |
 
-- At 36,720 atoms rule 12 turned `recompute_conv_weights` on by itself. Its reason in the plan: "on by rule 12:
-  the estimate does not fit 90% of the free GPU memory without it; turning recompute_conv_weights on saves about
-  5330 MiB".
-- The next size the scan tried, 44,064 atoms (6×6×17), failed during the build. The scan's grid has no repeat in
-  between, so the true limit lies somewhere from 36,720 to 44,064 atoms.
+- The next size the scan tried, 44,064 atoms (6×6×17), runs out of memory in the warm-up.
+- The scan's grid has no repeat in between, so the true limit lies somewhere from 36,720 to 44,064 atoms.
+
+**Recompute runs only where memory would not be enough without it** (owner, decision 67). In order:
+
+1. **The plan turns it on only for a cell that cannot fit.** That means rule 12's estimate, divided by its largest
+   overstatement in decision 67's fit (1.34), still does not fit 90 % of the free memory (`memory.short_by_far`).
+2. **A cell that merely does not fit runs without it.** If it then runs out of memory at build or capture, and the
+   CUDA context is still usable, `Simulation` releases the failed engine and rebuilds once with recompute on
+   (`fallback.memory_rescue`). The plan revision records it: "fallback: rewrites recompute_conv_weights on: out of
+   memory at …; recompute_conv_weights auto -> on".
+3. **If the error left the context unusable, the run stops with an explanation instead of crashing.** It names the
+   fix: `recompute_conv_weights="on"`, or a smaller cell if recompute was already on.
+
+**Default plans on the RTX 5060 Ti** (`tools/bench/rescue_plans.py`: planned as `fm.Simulation` plans, on the idle GPU's
+14.80 GiB free; the 28,800-36,720 points then ran with 20 warm-up and 200 timed steps):
+
+| Cell | Atoms | Edges | Plan's `recompute_conv_weights` | Ran |
+| --- | ---: | ---: | --- | --- |
+| NaCl 3×3×3 | 216 | 9,408 | off | |
+| NaNbO3 3×3×3 | 1,080 | 85,152 | off | |
+| NbCl5 3×3×3 | 1,944 | 64,215 | off | |
+| NbCl5 4×4×8 | 9,216 | 0.30M | off | |
+| NbCl5 5×5×12 to 5×5×15 | 21,600–27,000 | 0.71M–0.89M | off | 27,000: 281 ms |
+| NbCl5 5×5×16 | 28,800 | 0.95M | off | 302 ms, 12.51 GiB reserved |
+| NbCl5 5×5×18 | 32,400 | 1.07M | off | 320 ms, 13.80 GiB |
+| NbCl5 5×5×19 | 34,200 | 1.13M | off | 398–437 ms, 14.72 GiB |
+| NbCl5 5×6×17 | 36,720 | 1.21M | **on** (the plan) | 411 ms, 12.75 GiB |
+
+**Two other designs were tried first and failed:**
+
+- **The estimate-only rescue switched on too early.** Commit `c6c4099f` turned recompute on as soon as the plan did
+  not fit 90 % of the free memory. That happened from 27,000 atoms, while plans without recompute run up to 34,200.
+  The estimate overstates the peak by about 1.2× there, within decision 67's band.
+- **A retry alone does not reach 36,720 atoms.** With the floor compared against the whole free memory instead of
+  its 90 %, 36,720 atoms was planned with recompute off. Its build then ran out of memory in the driver: the error
+  arrived as a `CUDA error: out of memory` or, without blocking launches, as `CUBLAS_STATUS_EXECUTION_FAILED`, and it
+  left the CUDA context sticky.
+  - So the in-process retry could not run, and the fallback search then failed in `cudaMemGetInfo`.
+  - Both are fixed: the driver's out-of-memory error is never a fallback trigger, and `Simulation` checks the context
+    before the search (`fallback.raise_if_context_unusable`).
+  - The 46,656-atom cell now stops with "the CUDA context is not usable after this build error … run again in a
+    fresh process with a smaller cell".
+  - On this GPU under WSL2 an out-of-memory error in the build was always the driver's, so the in-process retry
+    (step 2) never ran on real hardware here. Its tests use injected errors
+    (`tests/cpu/test_memory_rescue_retry.py`). It covers the caching allocator's recoverable
+    `torch.cuda.OutOfMemoryError`, which native Linux raises for most allocations.
 
 **Memory at 32,400 atoms (5×5×18), recompute forced off and on, one process each:**
 
@@ -33,43 +75,13 @@ when the plan would not fit otherwise, as in decision 67. It must also be exact 
 | ms per step | 313 | 338 | +8 % (separate processes) |
 
 The measured saving is 3,409 B per edge, two thirds of the 5,120 B the weights take. Without them the peak moves to
-other tensors. Rule 12's term (`fastmace.rewrites.memory.recompute_conv_weights`) declares the full 5,120 B, so the
-estimate overstates the saving. This only matters once the rescue is already on. At 36,720 atoms the estimate after
-the rescue predicted 13.75 GiB, and the run reserved at most 13.69 GiB.
+other tensors. Rule 12's term (`fastmace.rewrites.memory.recompute_conv_weights`) declares the full 5,120 B. At
+36,720 atoms the estimate with recompute predicted 13.75 GiB, and the run reserved at most 13.69 GiB.
 
-**Step time:** the same-process A/B costs 9–10 %. The planner keeps recompute off at normal sizes, but it turns it on
-from 27,000 atoms, about 7,000 atoms before it is needed. That is still open (next section).
+**Step time:** recompute costs 9–10 % in the same-process A/B, so it stays a memory rescue, never a default.
 
-**Exact:** the recomputed weights equal the stored ones bitwise. The force/stress gate passed with recompute on.
-
-## Off wherever the plan fits
-
-**Open: the rescue turns on earlier than needed.** `tools/bench/rescue_plans.py` plans each cell as `fm.Simulation`
-does, on the idle GPU's free memory (14.80 GiB), without running it:
-
-| Cell | Atoms | Edges | Plan's `recompute_conv_weights` | Rule 12's prediction |
-| --- | ---: | ---: | --- | --- |
-| NaCl 3×3×3 | 216 | 9,408 | off | 1.53 GiB |
-| NaNbO3 3×3×3 | 1,080 | 85,152 | off | 1.53 GiB |
-| NbCl5 3×3×3 | 1,944 | 64,215 | off | 1.53 GiB |
-| NbCl5 4×4×8 | 9,216 | 0.30M | off | 4.96 GiB |
-| NbCl5 5×5×12 | 21,600 | 0.71M | off | 11.26 GiB |
-| NbCl5 5×5×13 | 23,400 | 0.77M | off | 12.18 GiB |
-| NbCl5 5×5×14 | 25,200 | 0.83M | off | 13.09 GiB |
-| NbCl5 5×5×15 | 27,000 | 0.89M | **on** | 10.18 GiB with it |
-| NbCl5 5×5×16 | 28,800 | 0.95M | **on** | 10.84 GiB with it |
-| NbCl5 5×5×18 | 32,400 | 1.07M | **on** | 12.16 GiB with it |
-| NbCl5 5×6×17 | 36,720 | 1.21M | **on** | 13.75 GiB with it |
-
-- **It stays off at normal sizes.** All cells up to 25,200 atoms keep it off.
-- **From 27,000 atoms it is on.** Without recompute, the plan runs up to 34,200 atoms: the CAP-T05 limit. At
-  32,400 atoms it ran at 313 ms per step with 13.92 GiB reserved.
-- **So from 27,000 to 34,200 atoms recompute costs 9 % for nothing.** The estimate without recompute overstates the
-  peak by about 1.2 there: about 16.8 GiB predicted at 32,400 atoms against 13.92 GiB reserved. That is within
-  decision 67's fitted band of 1.05–1.34, but it is enough to trip the rescue about 7,000 atoms early.
-
-This does not meet the condition that the cost applies only to sizes that would not run otherwise. Ways to close the
-gap are listed for the conductor (CAP-T07 is not pushed until one is chosen).
+**Exact:** the recomputed weights equal the stored ones bitwise. The force/stress gate passed with recompute on and
+with the default plan.
 
 ## Step-time cost
 
@@ -102,10 +114,23 @@ chunk instead of one in all. It does not shrink with size, so recompute stays a 
   `on_by_rule_12_when_the_plan_does_not_fit_without_it`.
 - **Fixed planner:** `"auto"` resolves to off, and `"on"` without `wprime_backward` is refused.
 - **Rule 12's memory rescue** (`planner.minimal._rule_12`, `planner.memory.MEMORY_RESCUE`):
-  - It runs only when the estimate does not fit 90 % of the free memory.
-  - It turns on each auto record in `MEMORY_RESCUE` whose family applies and whose requirements are on, if that
-    lowers the estimate, and stops as soon as the plan fits.
-  - It runs before decision 51's drops, and an explicit value is kept. Reason code `rule-12-memory-rescue`.
+  - It applies only to a plan that does not fit 90 % of the free memory after decision 51's drops. An explicit
+    value is kept. Reason code `rule-12-memory-rescue`.
+  - If even the estimate divided by `memory.RESCUE_OVERSTATEMENT` (1.34) does not fit (`memory.short_by_far`), it
+    turns on each auto record whose family applies and whose requirements are on, if that lowers the estimate. It
+    stops as soon as the plan fits.
+  - Otherwise it leaves them off, with a reason saying that an out-of-memory error rebuilds with them on.
+- **The rebuild** (`planner.fallback.memory_rescue`, `Simulation._build_and_prepare`):
+  - It applies to an out-of-memory error at build or capture, from the caching allocator or the driver's
+    `CUDA error: out of memory`.
+  - If a rescue record is off, was left "auto" and has its requirements on, and the context is usable,
+    `Simulation` drops the failed engine (its error is detached, its graphs and pools released) and builds the
+    revision with the records on, once.
+  - If the context is sticky, it raises the error with the fix.
+- **Out-of-memory errors are never fallback triggers** (`fallback._propagates`): this now includes the driver's
+  `CUDA error: out of memory`. Before the §9.4 search, `Simulation` checks that the context is usable
+  (`fallback.raise_if_context_unusable`). If not, it raises the failure with an explanation (and the fix when rule
+  12 had warned) instead of crashing in the search's `cudaMemGetInfo`.
 - **Docs:** switch map (field and rule rows), `docs/reference/rewrites.md`, `docs/design/planner-5.md` and the
   CHANGELOG.
 - **Tools:** `tools/bench/activation_profile.py` (what the force call keeps alive at its peak, by allocating site)
@@ -115,8 +140,10 @@ chunk instead of one in all. It does not shrink with size, so recompute stays a 
 
 - **GPU exactness** (`tests/gpu/test_recompute_conv_weights_cuda.py`, local RTX 5060 Ti): passed, 8 cases. dsh and
   dr are bitwise equal to the stored-weights backward; dx differs only by the atomic order.
-- **Force/stress gate** (`tools/force_stress_gate.py --engine fastmace --rewrites recompute_conv_weights=on`,
-  local RTX 5060 Ti, commit `47bb25a4`): **passed** on all three cells. The plan resolved
+- **Force/stress gate, default plan** (commit `f3ed415e`, the rescue off at these sizes): **passed** on NaCl, NbCl5
+  and NaNbO3 (forces 1.05× and 1.01× the float32 yardstick's error on NbCl5 and NaNbO3).
+- **Force/stress gate, recompute on** (`tools/force_stress_gate.py --engine fastmace --rewrites
+  recompute_conv_weights=on`, local RTX 5060 Ti, commit `47bb25a4`): **passed** on all three cells. The plan resolved
   `recompute_conv_weights = on` (requested). Error against float64, with its ratio to the float32 ASE calculator's
   error in brackets:
 
@@ -128,16 +155,27 @@ chunk instead of one in all. It does not shrink with size, so recompute stays a 
 
 - **NVE drift:** not run. The numerics do not change: the per-edge values are bitwise the same, and only the
   atomic order differs, as between any two runs.
-- **CPU tests on leto** (GPU hidden, `-n 8`, commit `4fa63838`): 589 passed in the targeted files (planner, memory
-  estimate, rewrites, report, config, docs options, plan texts). The golden plan texts were regenerated on leto
-  (commit `47bb25a4`): only the "+N more" count of rewrites off changed.
+- **CPU tests on leto** (GPU hidden, `-n 8`, commit `61d92a35`, merged with main): 702 passed, 30 skipped.
+  - The files: planner, memory estimate and fit, rewrites, report, config, docs options, plan texts, fallback
+    (memory, simulation, capture, candidates), rules and `test_memory_rescue_retry`.
+  - The golden plan texts were regenerated on leto (commit `47bb25a4`): only the "+N more" count of rewrites off
+    changed. They did not change again after the retry.
 
 ## Setup
 
 - **Local:** Fabi-PC, WSL2, RTX 5060 Ti 16 GB (driver 610.88), `mace_cueq_oeq` (torch 2.14.1+cu130),
-  `tools/ci/local_gpu.py run` reservations with the idle check before every job. FastMACE commit `47bb25a4`
-  (pinned source copy); no baseline, since both sides are FastMACE.
+  `tools/ci/local_gpu.py run` reservations with the idle check before every job. Pinned source copies of FastMACE:
+  - `47bb25a4`: the first points, the A/Bs and the gate with recompute on;
+  - `f3ed415e`: the retry, the default gate and the per-cell plans;
+  - `d317cf15`: the floor at 90 % and the scan;
+  - `61d92a35`: the unusable-context check at 46,656 atoms.
+
+  No baseline, since both sides are FastMACE.
 - **Model:** MH-1 (`mh1-r2scan`), hybrid backend, float32, Langevin NVT at 300 K.
 - **Capacity points:** 20 warm-up and 200 timed steps, one process per point (`tools/bench/capacity_scan.py`).
-- **Raw records:** `results/cap-t07-20261029/` (`points/`, `ab/`, `ab/gate/metadata.json`, `plans.json`) and the
-  run script `results/cap-t07-20261029/local.sh`.
+- **Raw records** in `results/cap-t07-20261029/`:
+  - the first design: `points/`, `ab/`, `ab/gate/metadata.json` and `plans.json`;
+  - the retry with the floor against the whole free memory: `retry/`, with the default gate;
+  - the final floor: `floor/`;
+  - the 46,656-atom failures: `guard/`;
+  - the run script: `local.sh`.
