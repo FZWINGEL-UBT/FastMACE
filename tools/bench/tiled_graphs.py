@@ -94,9 +94,10 @@ def falsifier(args, torch, atoms, field, record):
     tiles, _ = plan_tiles(tiled.field.positions.detach(), field.data["cell"].reshape(3, 3), row_ptr,
                           args.receivers, tiled.last["edge_cap"])
     local_of = torch.full((n,), -1, dtype=torch.int64, device=field.device)
-    pieces = [tiled._tile_graph(t, row_ptr, edge_index, local_of, slot["sizes"][0]) for t in tiles]
-    piece = max(pieces, key=lambda p: p[1].shape[0])
-    record["tile"] = dict(receivers=piece[3], halo=piece[4], edges=int(piece[1].shape[0]))
+    source = tiled._source(positions, n)[0]
+    pieces = [tiled._tile_graph(t, source, local_of, slot["sizes"][0]) for t in tiles]
+    piece = max(pieces, key=lambda p: p[1].shape[1])
+    record["tile"] = dict(receivers=piece[4], halo=piece[5], edges=int(piece[1].shape[1]))
     del pieces
     from fastmace import _patches
 
@@ -143,8 +144,9 @@ def largest_tile(torch, tiled, field, positions, receivers):
                           tiled.last["edge_cap"])
     local_of = torch.full((n,), -1, dtype=torch.int64, device=field.device)
     halo_start = tiled._slots[max(tiled._slots)]["sizes"][0]
-    pieces = [tiled._tile_graph(t, row_ptr, edge_index, local_of, halo_start) for t in tiles]
-    return max(pieces, key=lambda p: p[1].shape[0])
+    source = tiled._source(positions, n)[0]
+    pieces = [tiled._tile_graph(t, source, local_of, halo_start) for t in tiles]
+    return max(pieces, key=lambda p: p[1].shape[1])
 
 
 def compiled_falsifier(args, torch, atoms, field, record):
@@ -161,7 +163,7 @@ def compiled_falsifier(args, torch, atoms, field, record):
     record["slot"] = list(slot["sizes"])
     record["tiles"] = tiled.last["tiles"]
     piece = largest_tile(torch, tiled, field, positions, args.receivers)
-    record["tile"] = dict(receivers=piece[3], halo=piece[4], edges=int(piece[1].shape[0]))
+    record["tile"] = dict(receivers=piece[4], halo=piece[5], edges=int(piece[1].shape[1]))
     saved = tiled._bind(slot["count"])
     try:
         tiled._fill(slot, piece)
