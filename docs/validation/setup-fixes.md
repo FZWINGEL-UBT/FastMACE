@@ -130,6 +130,11 @@ with the same species count and different atom counts in one regime: NbCl5 3Ã—3Ã
 
 ## Step time
 
+**Audit, 30 October 2026** ([ab-constants-audit-20261030.md](ab-constants-audit-20261030.md)): the A/B tool set
+side a's constants only while it was built. `MARK_ATOMS_DYNAMIC` is read on every neighbour rebuild, so side a
+probably ran the default after warm-up. A short recheck with the fixed tool follows; the other two switches
+and the setup-time numbers are not affected.
+
 `tools/ab_rewrites.py --prepare`, same process, MH-1 hybrid float32 NVT at 300 K.
 
 - **Side a:** the three switches off while it is built and its first step's stages are captured:

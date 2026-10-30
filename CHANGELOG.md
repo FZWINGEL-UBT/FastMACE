@@ -119,6 +119,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- `segment_gemm` runs a row tile's column tiles next to each other when the product's A is larger than the
+  L2, on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, `tile_rule.COLUMN_ORDER_GPUS`): bitwise equal, A is
+  read from DRAM about once instead of once per column tile. MH-1 float32 step at NbCl5 9,216 atoms 0.94 times
+  (RTX 5060 Ti) and 0.92 times (RTX 4000 Ada); the A100-SXM4-80GB measured no gain and keeps the old order
+  (docs/validation/segment-gemm-order.md).
+- `tools/ab_rewrites.py` sets each side's `--a-constant` / `--b-constant` before every step, not only in its build:
+  graphs captured again in warm-up had read the other side's value (docs/validation/ab-constants-audit-20261030.md).
 - Measured, not adopted: `segment_gemm`'s irrep size D as a compile-time constant (bitwise equal, step time
   unchanged, more compiled variants; docs/validation/speed-small.md). No code change.
 
