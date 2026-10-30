@@ -68,7 +68,7 @@ for job in "$@"; do
       note "nsys summary exit=$?" ;;
     ledger-*) IFS=- read -r _ structure repeat mode <<< "$job"
       rw=(); [ "$mode" = nodeseg ] && rw=(--rewrites recompute_conv_weights=on recompute_node_segments=on)
-      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat"           --output "$ROOT/ledger" --tag "-$mode" "${rw[@]}" ;;
+      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat"           --output "$ROOT/ledger" --tag="-$mode" "${rw[@]}" ;;
     ab-*) IFS=- read -r _ item structure size order <<< "$job"
       pattern=$([ "$order" = ab ] && echo abab || echo abba)
       spec=$structure; extra=()
