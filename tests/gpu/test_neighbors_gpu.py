@@ -194,3 +194,23 @@ def test_gpu_build_equals_baseline(baseline, atoms, mode, dtype):
         assert torch.equal(derived.to(dtype), theirs.candidate_shifts)
         assert bool(ours.needs_rebuild(moved)) == bool(theirs.max_displacement_exceeded(moved))
         positions = moved.cpu().numpy() + rng.uniform(-0.3, 0.3, positions.shape)
+
+
+@pytest.mark.parametrize("half", [False, True])
+@pytest.mark.parametrize("max_grid_y", [1, 3, 7])
+def test_pair_search_split_grid_finds_the_same_pairs(half, max_grid_y):
+    """Receiver tiles split over the grid's y and z axes (as beyond 65,535 tiles, about 2.1M atoms) screen the
+    same pairs as the 2-D grid: the same codes as a set, each once (the order is the atomic append's)."""
+    from fastmace.neighbors.pair_search import screen_codes
+
+    atoms = nbcl5(repeat=2, rattle=0.05)  # 288 atoms, 9 receiver tiles
+    images = torch.tensor(np.stack(np.meshgrid(*[np.arange(-1, 2)] * 3, indexing="ij"), -1).reshape(-1, 3),
+                          dtype=torch.float64)
+    vectors = (images @ torch.tensor(atoms.cell.array)).cuda()
+    wrapped = torch.tensor(atoms.get_positions(wrap=True)).cuda()
+    assert -(-len(atoms) // 32) > max_grid_y  # the split is exercised
+    reference = torch.sort(screen_codes(wrapped, vectors, 5.0, half=half).clone()).values
+    split = torch.sort(screen_codes(wrapped, vectors, 5.0, half=half, max_grid_y=max_grid_y).clone()).values
+    assert reference.numel() > 0 and torch.equal(split, reference)
+    assert torch.unique(split).numel() == split.numel()
+
