@@ -3,9 +3,10 @@
 1. List level: the Triton build, chunked (``BUILD_CHUNK``) and lean, against the layout before in one chunk, on the
    test structures; the compacted edges after several builds and compactions, byte for byte. The build's peak
    allocation above the list's own buffers is below 64 B per screened pair.
-2. MD (MH-1, NaCl 3x3x3 at 1000 K, 400 steps with rebuilds, each in a fresh process): the default plan with
-   ``LEAN_BUFFERS`` on (the fused integrator's lean kernels) and off; also with the fused integrator off (the
-   PyTorch compaction). Positions and momenta bitwise equal.
+2. MD (MH-1, NaCl 3x3x3 at 1000 K, 400 steps with rebuilds, each in a fresh process; ``reproducible=True`` and
+   float64, the deterministic process, as test_fused_integrator_gpu.py): ``LEAN_BUFFERS`` on (the fused
+   integrator's lean kernels) and off; also with the fused integrator off (the PyTorch compaction). Positions and
+   momenta bitwise equal.
 """
 
 import importlib.util
@@ -96,8 +97,8 @@ skin.LEAN_BUFFERS = SPEC["lean"]
 atoms = nacl(repeat=3)
 MaxwellBoltzmannDistribution(atoms, temperature_K=1000.0, rng=np.random.default_rng(11))
 integrator = fm.integrators.Langevin(timestep_fs=2.0, temperature_K=1000.0, friction_per_fs=0.02 * units.fs)
-sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms), integrator=integrator, seed=20261030,
-                    workload=fm.Workload(max_temperature_K=1000.0),
+sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms, precision="float64"), integrator=integrator,
+                    seed=20261030, workload=fm.Workload(max_temperature_K=1000.0, reproducible=True),
                     engine=EngineConfig(**SPEC["engine"]))
 sim.run(steps=400)
 committed = sim.committed()

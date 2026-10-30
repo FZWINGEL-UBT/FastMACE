@@ -4,6 +4,7 @@
 #     env FM=<pinned branch copy> BEFORE=<pinned main copy> bash results/cap-nlist-20261030/local.sh ROOT JOB...
 # Jobs:
 #   gputests: the neighbour-list GPU tests (mace_cueq_latest's pytest, MH-1 drivers with the hybrid Python);
+#   leantests: tests/gpu/test_neighbors_lean_gpu.py alone;
 #   point-<side>-<structure>-<repeat>[-off]: tools/bench/capacity_scan.py point (the branch's tool) on the package
 #     of side "after" (FM) or "before" (BEFORE, main); "-off" sets LEAN_BUFFERS = False in the branch;
 #   ab-<cell>-<order>: tools/ab_rewrites.py, a = LEAN_BUFFERS False (the layout before), b = the default; cell nbcl5
@@ -55,6 +56,8 @@ for job in "$@"; do
         --basetemp="$ROOT/tmp/pytest" tests/gpu/test_neighbors_lean_gpu.py tests/gpu/test_neighbors_gpu.py \
         tests/gpu/test_async_rebuild_gpu.py tests/gpu/test_d3_list_gpu.py \
         "tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes") ;;
+    leantests) (cd "$FM" && PYTHONPATH=$FM run $job "$PYT" -m pytest -q -p no:cacheprovider -rs \
+        --basetemp="$ROOT/tmp/pytest" tests/gpu/test_neighbors_lean_gpu.py) ;;
     point-*) IFS=- read -r _ side structure repeat off <<< "$job"
       pkg=$FM; [ "$side" = before ] && pkg=${BEFORE:?set BEFORE for before points}
       launcher=("$PY" "$FM/tools/bench/capacity_scan.py")
