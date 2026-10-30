@@ -45,14 +45,12 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-def checkpointed(module):
-    """A forward that runs ``module``'s own forward under non-reentrant checkpointing."""
+def checkpointed(forward):
+    """``forward`` (a module's bound forward, which a rewrite may have replaced) under non-reentrant checkpointing."""
     from torch.utils.checkpoint import checkpoint
 
-    forward = type(module).forward
-
     def run(*args, **kwargs):
-        return checkpoint(forward, module, *args, use_reentrant=False, preserve_rng_state=False, **kwargs)
+        return checkpoint(forward, *args, use_reentrant=False, preserve_rng_state=False, **kwargs)
 
     return run
 
@@ -86,11 +84,17 @@ def main(argv=None):
     positions = engine.state.positions
     reference = None
 
+    # Each module's forward as built: the rewrites install instance-level forwards on some of them.
+    built = {id(module): (module, module.__dict__.get("forward"), module.forward) for pair in layers for module in pair}
+
     def install(indices):
         for i, pair in enumerate(layers):
             for module in pair:
+                _, own, bound = built[id(module)]
                 if i in indices:
-                    module.forward = checkpointed(module)
+                    module.forward = checkpointed(bound)
+                elif own is not None:
+                    module.forward = own
                 else:
                     module.__dict__.pop("forward", None)
 
