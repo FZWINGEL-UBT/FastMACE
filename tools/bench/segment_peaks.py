@@ -68,7 +68,7 @@ def forces_of(out):
     return out["forces"] if isinstance(out, dict) else out[1] if isinstance(out, tuple) else out
 
 
-_SEGMENTS = {}  # key -> (compiled chunk function, chunks, the plain forward): the --chunk-op registry
+_SEGMENTS = {}  # key -> (compiled chunk function, chunks, output trailing shape): the --chunk-op registry
 _OPS = {}
 
 
@@ -96,9 +96,8 @@ def _chunk_ops():
             return torch.cat([run(*pieces(inputs, natoms, a, b)) for a, b in bounds(natoms, chunks)])
 
     @forward.register_fake
-    def _(inputs, key):  # the plain forward on the fake inputs gives the output's shape
-        out = _SEGMENTS[key][2](*inputs)
-        return out.new_empty(out.shape)
+    def _(inputs, key):
+        return inputs[0].new_empty((inputs[0].shape[0], *_SEGMENTS[key][2]))
 
     @torch.library.custom_op("fastmace_probe::atom_chunked_backward", mutates_args=(),
                              schema="(Tensor[] inputs, Tensor grad, bool[] wanted, int key) -> Tensor[]")
@@ -139,7 +138,7 @@ def _chunk_ops():
     return forward
 
 
-def atom_chunked_op(module, natoms, chunks):
+def atom_chunked_op(module, natoms, chunks, trailing):
     """``module``'s forward through ``fastmace_probe::atom_chunked`` with a ``torch.compile``'d chunk function."""
     import inspect
 
@@ -152,7 +151,7 @@ def atom_chunked_op(module, natoms, chunks):
     def plain(*values):
         return forward(**dict(zip(names, values)))
 
-    _SEGMENTS[key] = [torch.compile(plain, dynamic=True), chunks, plain]
+    _SEGMENTS[key] = [torch.compile(plain, dynamic=True), chunks, tuple(trailing)]
 
     def run(*args, **kwargs):
         bound = inspect.signature(forward).bind(*args, **kwargs)
@@ -266,12 +265,22 @@ def main(argv=None):
     natoms = len(atoms)
     reference = None
     if args.chunk:
-        reference = forces_of(engine.force_field(engine.state.positions)).detach().clone()
+        targets = {}
         for label in args.chunk:
             module = model
             for part in label.replace("interaction", "interactions.").replace("product", "products.").split("."):
                 module = module[int(part)] if part.isdigit() else getattr(module, part)
-            module.forward = (atom_chunked_op if args.chunk_op else atom_chunked)(module, natoms, args.chunks)
+            targets[label] = module
+        shapes = {}  # each module's output trailing shape, from an eager reference call (the custom op's fake)
+        hooks = [module.register_forward_hook(lambda m, i, out, label=label: shapes.__setitem__(label, out.shape[1:]))
+                 for label, module in targets.items()]
+        with torch.compiler.set_stance("force_eager"):
+            reference = forces_of(engine.force_field(engine.state.positions)).detach().clone()
+        for hook in hooks:
+            hook.remove()
+        for label, module in targets.items():
+            module.forward = (atom_chunked_op(module, natoms, args.chunks, shapes[label]) if args.chunk_op
+                              else atom_chunked(module, natoms, args.chunks))
     if args.compiled:  # the first call with the wrappers compiles; the measured call is the next one
         forces_of(engine.force_field(engine.state.positions))
 
