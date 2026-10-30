@@ -128,7 +128,7 @@ class InPlaceIntoSaved(CustomGraphPass):
         graph.lint()
 
     def uuid(self):
-        return "fastmace-proto-in-place-into-saved-1"
+        return "fastmace-proto-in-place-into-saved-2"  # bump with every change: Inductor caches by it
 
 
 def _workspace_shape(module, natoms):
