@@ -37,8 +37,7 @@ import activation_profile  # noqa: E402
 import capacity_scan  # noqa: E402
 
 SMEM_PRAGMA = 'asm volatile (".pragma \\"enable_smem_spilling\\";");'
-PTXAS_LINE = re.compile(r"Function properties for (\S+)\s+(\d+) bytes stack frame, (\d+) bytes spill stores, "
-                        r"(\d+) bytes spill loads")
+PTXAS_LINE = re.compile(r"(\d+) bytes stack frame, (\d+) bytes spill stores, (\d+) bytes spill loads")
 
 
 def parse_args(argv=None):
@@ -78,16 +77,18 @@ def ptxas_report(source, capability, options):
     nvrtc.nvrtcGetProgramLog(program, log)
     text = log.decode(errors="replace")
     if int(result[0]) != 0:
-        raise RuntimeError("NVRTC compilation failed:\n" + text[-3000:])
+        errors = [line for line in text.splitlines() if "error" in line.lower()]
+        raise RuntimeError("NVRTC compilation failed:\n" + "\n".join(errors[:20] or [text[-3000:]]))
     kernels = {}
-    for name, stack, stores, loads in PTXAS_LINE.findall(text):
-        kernels.setdefault(name, {}).update(stack=int(stack), spill_stores=int(stores), spill_loads=int(loads))
-    for block in text.split("ptxas info    : Compiling entry function")[1:]:
+    for block in text.split("Compiling entry function")[1:]:
         name = block.split("'")[1]
+        frame = PTXAS_LINE.search(block)
         used = re.search(r"Used (\d+) registers", block)
         smem = re.search(r"(\d+) bytes smem", block)
-        kernels.setdefault(name, {}).update(registers=int(used.group(1)) if used else None,
-                                            smem=int(smem.group(1)) if smem else 0)
+        kernels[name] = dict(stack=int(frame.group(1)) if frame else None,
+                             spill_stores=int(frame.group(2)) if frame else None,
+                             spill_loads=int(frame.group(3)) if frame else None,
+                             registers=int(used.group(1)) if used else None, smem=int(smem.group(1)) if smem else 0)
     return kernels, text
 
 
@@ -190,7 +191,7 @@ def main(argv=None):
 
     for owner, obj, functions in fastmace_kernels():
         attributes = {key: function_attributes(function) for key, function in functions.items()}
-        add(owner, "fastmace-nvrtc", obj.source, (), attributes)
+        add(owner, "fastmace-nvrtc", obj.source, ("-default-device",), attributes)  # compile_cubin's options
         for key, values in attributes.items():
             rows.append(dict(owner=owner, kind="loaded", kernel=key, **values,
                              reservation_bytes=values["local"] * threads))
