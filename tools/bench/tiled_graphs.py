@@ -81,8 +81,8 @@ def falsifier(args, torch, atoms, field, record):
 
     tiled = TiledForceField(field, TileConfig(args.receivers, mode="padded"))
     positions = field._prepare_one_off(atoms)
-    tiled(positions)  # slot, globals and state of this structure
-    slot, g = tiled._slot, tiled._g
+    tiled(positions)  # slots, globals and state of this structure
+    slot, g = tiled._slots[max(tiled._slots)], tiled._g
     record["slot"] = list(slot["sizes"])
     record["tiles"] = tiled.last["tiles"]
     # The largest tile (by edges) in the slot, as the call fills it.
@@ -142,7 +142,8 @@ def largest_tile(torch, tiled, field, positions, receivers):
     tiles, _ = plan_tiles(tiled.field.positions.detach(), field.data["cell"].reshape(3, 3), row_ptr, receivers,
                           tiled.last["edge_cap"])
     local_of = torch.full((n,), -1, dtype=torch.int64, device=field.device)
-    pieces = [tiled._tile_graph(t, row_ptr, edge_index, local_of, tiled._slot["sizes"][0]) for t in tiles]
+    halo_start = tiled._slots[max(tiled._slots)]["sizes"][0]
+    pieces = [tiled._tile_graph(t, row_ptr, edge_index, local_of, halo_start) for t in tiles]
     return max(pieces, key=lambda p: p[1].shape[0])
 
 
@@ -156,7 +157,7 @@ def compiled_falsifier(args, torch, atoms, field, record):
     tiled(positions)  # slot, globals, state; compiles sweep 2 at the slot's shapes
     torch.cuda.synchronize()
     record["first_call_s"] = time.perf_counter() - started
-    slot, g = tiled._slot, tiled._g
+    slot, g = tiled._slots[max(tiled._slots)], tiled._g
     record["slot"] = list(slot["sizes"])
     record["tiles"] = tiled.last["tiles"]
     piece = largest_tile(torch, tiled, field, positions, args.receivers)
@@ -227,7 +228,7 @@ def main(argv=None):
     configure_allocator()
     import torch
 
-    atoms, field = build(args, compiled=args.kind == "compiled")
+    atoms, field = build(args, compiled=args.kind == "compiled" or "compiled" in args.modes)
     record = dict(kind=args.kind, structure=args.structure, repeat=args.repeat, atoms=len(atoms),
                   receivers=args.receivers, device=torch.cuda.get_device_name(),
                   source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"), edges=int(field.neighbours.count))
