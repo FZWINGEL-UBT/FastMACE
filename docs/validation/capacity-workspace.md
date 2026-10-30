@@ -65,10 +65,68 @@ capacity-pool.md stands. In principle 1.47 GiB is recoverable by placement. What
 - **An Inductor-level change:** a custom post-grad pass that reinplaces the backward mutation of a saved activation,
   or a supported way to declare the alias. That depends on torch internals.
 
-Neither is started.
+Both were tried afterwards; see the follow-up below.
+
+## Follow-up, 30 October: both remaining routes tried
+
+The owner asked for both routes above. **Neither gives memory. No library change.**
+
+### Route 2: an Inductor post-grad pass that writes the backward in place
+
+**Prototype:** `tools/bench/workspace_prototype.py`, measured with `tools/bench/memory_ledger.py
+--workspace-prototype` on branch `fastmace/cap-reinplace`. Records: `results/cap-reinplace-20261030/` (runs w1 to
+w4, `jobs.log`).
+
+- **The ops.** `segment_gemm`'s products and input gradients go through two out-argument custom ops into one
+  workspace per gated segment, of shape (atoms, width), outside the graph pool. The backward op writes the
+  gradients into the saved product's storage, which is layout B above.
+- **The pass.** `InPlaceIntoSaved`, a `CustomGraphPass` on `torch._inductor.config.post_grad_custom_post_pass`.
+  It rewrites the backward's `auto_functionalized_v2` of that op into a direct call on the saved product and drops
+  the copy back. That removes the fresh buffer layout B had.
+- **On the CPU** the rewritten backward runs in place and is bitwise equal to the original.
+- **In the real model** the pass also applies: the generated code writes the gradients into the workspace. But
+  Inductor keeps the incoming gradient buffer alive across the op, until the end of its scope. We tried passing
+  the arguments positionally, and an op that returns an empty tensor. Neither changed it.
+
+| NbCl5 float32 | `main` peak | prototype peak | `main` graph pool | prototype graph pool |
+| --- | ---: | ---: | ---: | ---: |
+| 4×4×8, 9,216 atoms | 4.100 GiB | 4.119 GiB | 3.631 GiB | 3.104 GiB |
+| 6×6×20, 51,840 atoms | 14.285 GiB | 14.793 GiB | 13.365 GiB | 10.436 GiB |
+
+The pool shrinks, because the products moved out of it. But the workspaces outside the pool cost more than the
+pool saves: +0.51 GiB at 51,840 atoms. capacity-pool.md's packing simulation, with the incoming gradient freed at
+the op, gives −0.75 GiB. Freeing it needs a change to Inductor's buffer lifetimes, not just a graph pass, so this
+route stops here.
+
+### Route 1: a capture-time allocator following the offline plan
+
+**Not reachable without a SPEC decision; not built.**
+
+- `torch.cuda.MemPool` with a pluggable allocator only supplies the pool's segments. Which block a tensor gets
+  inside those segments is still the caching allocator's choice. So the offline plan cannot be imposed that way.
+- A second `MemPool` for `segment_gemm`'s kernels (`use_mem_pool`, allowed during capture) was measured in
+  [capacity-pool.md](capacity-pool.md): 4.53–4.67 GiB peak at 9,216 atoms against 4.10, and the build fails at 51,840
+  atoms. Two pools cannot reuse each other's free blocks.
+- Placing every block by plan needs a native allocator for the whole process, installed with
+  `torch.cuda.memory.change_current_allocator` before the first CUDA allocation. That replaces the caching
+  allocator, and with it the graph pools and expandable segments FastMACE relies on (SPEC §14). That is a SPEC
+  decision for the owner, not a capacity task.
+
+### Caveat: a custom pass's `uuid()` is Inductor's cache key
+
+Inductor keys its FX graph cache on the custom pass's `uuid()`, not on the pass's code. The prototype's pass changed
+twice while keeping its uuid, so ledger runs w2 and w3 (`results/cap-reinplace-20261030`) may have been served
+code compiled with the earlier pass. The uuid was bumped (`fastmace-proto-in-place-into-saved-3`), and run w4 used a
+fresh compiler cache. w1 to w4 measure the same, so the verdict stands.
+
+For any future custom pass or partitioner, change its uuid with every change to its code, as
+`save_transcendentals` does with `SAVE_TRANSCENDENTALS_UUID`, and measure from a fresh compiler cache. The
+spike above did not use a custom pass, so its own results are not affected.
 
 ## What changed
 
 - `results/cap-workspace-20261030/`: the spike script and its two logs.
 - This report.
+- Follow-up: `tools/bench/workspace_prototype.py`, `tools/bench/memory_ledger.py --workspace-prototype`, and
+  `results/cap-reinplace-20261030/`.
 - No library code changed.

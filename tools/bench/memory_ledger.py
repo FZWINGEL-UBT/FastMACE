@@ -76,6 +76,16 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=20, help="steady steps after the warm-up")
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--top", type=int, default=25)
+    p.add_argument("--drop-node-feats", action="store_true",
+                   help="screen A: drop the model's node_feats output before the force backward (_split_outputs)")
+    p.add_argument("--output-wrapper", action="store_true",
+                   help="screen A: compile a wrapper that returns the model's outputs without node_feats")
+    p.add_argument("--inductor-option", nargs="*", default=[], metavar="KEY=VALUE",
+                   help="screen B: extra Inductor options merged into the model's torch.compile call "
+                        "(e.g. memory_planning=true memory_pool=intermediates)")
+    p.add_argument("--workspace-prototype", action="store_true",
+                   help="experiment: segment_gemm's products and input gradients in per-interaction workspaces "
+                        "(tools/bench/workspace_prototype.py)")
     p.add_argument("--refuse", action="store_true",
                    help="FallbackConfig(fallback='refuse'): the first failure is raised")
     p.add_argument("--second-pool", nargs="*", default=[], choices=sorted(SECOND_POOL_OPS),
@@ -95,9 +105,12 @@ def memory_point(torch, label):
                 outside_allocator=int(total - free - reserved))
 
 
+EXTRA_OWNERS = {}  # name -> tensor, named by experiments (--workspace-prototype)
+
+
 def owner_ranges(torch, engine):
     """(start, end, owner) of every named tensor the engine knows, for matching blocks by address."""
-    named = {}
+    named = dict(EXTRA_OWNERS)
     for name, tensor in engine._registered_buffers().items():
         named[name] = tensor
     rng = getattr(engine.state, "rng", None)
@@ -126,6 +139,8 @@ def group(name):
         return "model parameters and buffers"
     if name.startswith("force_field.neighbours."):
         return "neighbour list (buffers and screen)"
+    if name.startswith("prototype workspace"):
+        return "prototype workspaces (segment_gemm products and input gradients)"
     if name.startswith("state.rng.batch"):
         return "Langevin noise batch"
     if name.startswith(("integrator.", "state.", "engine.", "derived.")):
@@ -133,6 +148,85 @@ def group(name):
     if name.startswith("force_field."):
         return "force field buffers (model inputs, tables)"
     return "other named"
+
+
+def screen_a(torch, drop, wrapper):
+    """Screen A (experiment): keep MACE's concatenated ``node_feats`` output out of the force backward, by dropping it
+    from the output dict before ``get_outputs`` (``drop``) or by compiling a wrapper that never returns it
+    (``wrapper``: Inductor then has no use for the concatenation)."""
+    from fastmace.model import compile as compiling
+    from fastmace.model import forces
+
+    if drop:
+        owner = next(cls for cls in vars(forces).values()
+                     if isinstance(cls, type) and "_split_outputs" in vars(cls))
+        original_split = owner._split_outputs
+
+        def split(self, stress):
+            call = self._model_call
+
+            def model_call(*a, **k):
+                out = call(*a, **k)
+                out.pop("node_feats", None)
+                return out
+
+            self._model_call = model_call
+            try:
+                return original_split(self, stress)
+            finally:
+                self._model_call = call
+
+        owner._split_outputs = split
+    if wrapper:
+        original_compile = compiling.compile_model
+
+        class Outputs(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+
+            def forward(self, *a, **k):
+                out = self.model(*a, **k)
+                return {key: value for key, value in out.items() if key != "node_feats"}
+
+        def compile_model(*a, **k):
+            torch_compile = torch.compile
+
+            def wrapping_compile(model, *ca, **ck):  # the same options, on the wrapper
+                return torch_compile(Outputs(model), *ca, **ck)
+
+            torch.compile = wrapping_compile
+            try:
+                return original_compile(*a, **k)
+            finally:
+                torch.compile = torch_compile
+
+        compiling.compile_model = compile_model
+
+
+def extra_inductor_options(torch, extra):
+    """Screen B (experiment): merge ``extra`` into the options of the model's ``torch.compile`` call."""
+    from fastmace.model import compile as compiling
+
+    original_compile = compiling.compile_model
+
+    def compile_model(*a, **k):
+        torch_compile = torch.compile
+
+        def merging_compile(model, *ca, **ck):
+            mode = ck.pop("mode", None)
+            if mode not in (None, "default"):
+                raise ValueError(f"extra Inductor options need compile mode 'default', got {mode!r}")
+            ck["options"] = {**(ck.get("options") or {}), **extra}
+            return torch_compile(model, *ca, **ck)
+
+        torch.compile = merging_compile
+        try:
+            return original_compile(*a, **k)
+        finally:
+            torch.compile = torch_compile
+
+    compiling.compile_model = compile_model
 
 
 def allocator_view(torch, engine, second=None):
@@ -248,6 +342,16 @@ def main(argv=None):
     torch.cuda.memory._record_memory_history(max_entries=1, stacks="python")
     started = time.perf_counter()
     second = route_to_second_pool(torch, args.second_pool) if args.second_pool else None
+    if args.inductor_option:
+        extra_inductor_options(torch, {k: capacity_scan._value(v) for k, v in
+                                       (item.split("=", 1) for item in args.inductor_option)})
+    if args.drop_node_feats or args.output_wrapper:
+        screen_a(torch, drop=args.drop_node_feats, wrapper=args.output_wrapper)
+    if args.workspace_prototype:
+        import workspace_prototype
+
+        dtype = torch.float32 if args.precision == "float32" else torch.float64
+        workspaces = workspace_prototype.install(len(atoms), "cuda", dtype)
     field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision)
     torch.cuda.synchronize()
     points.append(memory_point(torch, "force field loaded"))
@@ -267,6 +371,8 @@ def main(argv=None):
     torch.cuda.synchronize()
     steady = memory_point(torch, f"after {args.steps} steady steps")
     points.append(steady)
+    if args.workspace_prototype:
+        EXTRA_OWNERS.update({f"prototype workspace {i}": w for i, w in enumerate(workspaces)})
     view = allocator_view(torch, engine, second)
     edges = engine.force_field.edge_count
     info = dict(edges_at_cutoff=int(edges), padded_sizes=sorted(int(e) for e in engine.edge_sizes_used),
@@ -325,6 +431,8 @@ def main(argv=None):
                   fastmace_commit=_commit(), gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                   host=__import__("os").uname().nodename, seconds=time.perf_counter() - started,
                   alloc_conf=__import__("os").environ.get("PYTORCH_CUDA_ALLOC_CONF"), second_pool=args.second_pool,
+                  workspace_prototype=args.workspace_prototype, drop_node_feats=args.drop_node_feats,
+                  output_wrapper=args.output_wrapper, inductor_option=args.inductor_option,
                   edges=info, points=points, allocator=view,
                   ledger=[dict(row=row, bytes=int(b)) for row, b in ledger],
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
