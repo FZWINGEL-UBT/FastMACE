@@ -78,4 +78,79 @@ That is the same as before T2: 2.3e-5 against the compiled plan
 
 ## T1: one padded CUDA graph per sweep
 
-(in progress)
+### What is built
+
+**The slot.** `TileConfig(mode="padded" | "graphs", headroom=0.1)` runs every tile in one slot of fixed size:
+
+- one receiver row more than the largest tile, so a padding receiver always exists;
+- halo and edges with 10 % headroom above the largest tile's.
+
+**Padding gives exact zeros:**
+
+- Padding receivers and halo rows read atom 0 and are masked.
+- Padding edges join the padding receiver to itself, after the tile's edges, so the receivers stay sorted.
+- Their vector lies beyond the cutoff, where the envelope is exactly 0, and they are past the tile's edge count,
+  which the slot's device buffer feeds to the streaming kernels as `streaming_count`.
+
+**The bodies and their graphs:**
+
+- **What a body touches.** Each sweep's body reads only the slot's static buffers and the persistent globals, and
+  writes the slot's outputs.
+- **Scatter after replay.** The scatter into the global buffers runs after each replay, so warm-ups and captures
+  have no side effects.
+- **One graph per sweep.** It is captured on first use and replayed for every tile. A tile is fed by copying its
+  indices and masks into the slot; no kernel parameters are patched.
+- **Recapture.** The graphs are captured again only when a tile does not fit the slot (it then grows), or when the
+  globals move (atom count, neighbour-list capacity).
+- **Readout mask.** The capture-safe readout mask is installed first, as `GraphEngine` does: MACE's `mask_head`
+  assigns by index and cannot be captured.
+
+**Tests.** The CPU tests run the padded slot against the whole-system call (float64, stock and MH-1 rewrites, 5,
+16 and 1,000 receivers per tile), plus the slot's reuse and growth.
+
+### Falsifier: fails, so T1 stops here
+
+**Tool:** `tools/bench/tiled_graphs.py falsifier`, NbCl5 5×5×12 (21,600 atoms). It runs sweep 2 on the largest tile
+in the slot: 4,096 receivers, 2,324 halo atoms, 107,690 edges, in a slot of (4,097, 2,620, 118,460). Each variant
+takes 16 iterations after two warm-ups, with CUDA events.
+
+| | Sweep 2 on one tile |
+| --- | ---: |
+| eager body | 43.38 ms |
+| captured graph, replayed | 43.20 ms |
+| **speed-up** | **1.00×** (target ≥ 1.8×) |
+| largest output difference, graph against eager | 1e-7 (atomic accumulation order) |
+
+**The tile body is GPU-bound, not launch-bound.** At 4,096 receivers and about 108k edges, kernel time dominates,
+and a graph saves only the launch gaps.
+
+- The tiled path's gap to main (2.1×) is in the eager kernels themselves, not in Python or launches.
+- Main's compiled path fuses the model with Inductor. The whole-system compiled evaluation call is 1.45× faster
+  than the eager one at 21,600 atoms (0.26 s against 0.38 s; [capacity-tiled.md](capacity-tiled.md)).
+
+**Whole calls in one process** (`tiled_graphs.py call`, the same cell, the third of three calls):
+
+| Mode | Call | Peak above before | max \|ΔF\| against eager |
+| --- | ---: | ---: | ---: |
+| eager (tiles at their own shapes) | 0.53 s | 1.28 GiB | |
+| padded, eager | 0.75 s | 1.38 GiB | 1.4e-6 eV/Å |
+| padded, graphs | 0.73 s | 0.01 GiB (the graph pool, kept since the first call) | 1.4e-6 eV/Å |
+
+**Padding makes the call slower.**
+
+- Every tile pays for the largest tile's slot: the eight tiles here vary in size.
+- The slot sizing builds every tile's local graph once more on the host.
+- The graphs then save the same 2 % as in the falsifier.
+
+**Not run, since the falsifier failed:** the gate, the NVE check and the timing against main for the graph mode.
+The padded and graph modes stay in the code as opt-in modes: the CPU tests cover them, and the GPU run above shows
+them correct.
+
+### What could close the gap instead (not tried)
+
+- **Compiled tile bodies** (Inductor at the slot's fixed shapes, the force derivative outside the compiled
+  frame as in the split-forces path). The ceiling is about the whole-system compiled/eager ratio, 1.45×. That
+  would put the tiled call at about 1.5× main's MD step, against 2.1× now.
+- **Less padding waste.** Tiles of more equal size (the binning's last block of each row is short), or two slot
+  sizes.
+- **No double host planning.** Keep each tile's local graph between the sizing pass and the sweeps.
