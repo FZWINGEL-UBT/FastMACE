@@ -443,6 +443,9 @@ def parse_args(argv=None):
     p.add_argument("--production-tf32", action="store_true",
                    help="The FastMACE production process runs with PyTorch's TF32 matmul mode (TF32 screen, 29 "
                         "October 2026; never default, SPEC §1.2); the references stay IEEE")
+    p.add_argument("--tiled-receivers", type=int, default=0, metavar="R",
+                   help="FastMACE production through the tiled capacity prototype (fastmace.model.tiled, R "
+                        "receivers per tile) on the eager evaluation plan, instead of the graph engine")
     p.add_argument("--reference-command", default=sys.executable,
                    help="Interpreter (with an optional launcher prefix) of the reference processes")
     p.add_argument("--production-command", default=sys.executable,
@@ -464,6 +467,8 @@ def parse_args(argv=None):
         p.error("--engine-config are EngineConfig fields of FastMACE's minimal planner (--engine fastmace)")
     if args.rewrites and (args.engine != "fastmace" or args.planner != "minimal"):
         p.error("--rewrites are RewriteConfig fields of FastMACE's minimal planner (--engine fastmace)")
+    if args.tiled_receivers and (args.engine != "fastmace" or args.planner != "minimal"):
+        p.error("--tiled-receivers applies to FastMACE's minimal planner (--engine fastmace)")
     if args.production_tf32 and args.engine != "fastmace":
         p.error("--production-tf32 applies to FastMACE's production process (--engine fastmace)")
     if args.engine == "baseline" and args.baseline is None:
@@ -561,7 +566,8 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         common = dict(model=args.model, label=args.model, checkpoint=str(checkpoint),
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
                       backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
-                      engine_config=args.engine_config, production_tf32=args.production_tf32)
+                      engine_config=args.engine_config, production_tf32=args.production_tf32,
+                      tiled_receivers=args.tiled_receivers)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # its structure's first hydrostatic configuration.
@@ -905,6 +911,55 @@ def _fastmace_build(job, result):
     return build
 
 
+def tiled_production_child(job, result):
+    """The tiled capacity prototype (docs/design/tiled-backend.md) as production: the minimal planner's one-off
+    evaluation plan (the graph plan's rewrite set, with stress) built eager and wrapped in ``TiledForceField``
+    with ``job["tiled_receivers"]`` receivers per tile; exact edge counts, no padding, one per structure."""
+    import dataclasses
+
+    import torch
+
+    import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
+    from fastmace import _patches, config
+    from fastmace.model import loading
+    from fastmace.model.forcefield import ForceField
+    from fastmace.model.tiled import TileConfig, TiledForceField
+    from fastmace.planner import minimal
+
+    backend = "hybrid" if job["backend"] == "auto" else "cueq"
+    precision = "float32" if job["md_dtype"] in ("auto", "float32") else "float64"
+    planner = minimal.MinimalPlanner(engine=config.EngineConfig(backend=backend, **job.get("engine_config", {})))
+    started = time.perf_counter()
+    loaded = loading.load_pristine(job["model"], checkpoint=job["checkpoint"], sha256=job["checkpoint_sha256"])
+    result.update(load_s=time.perf_counter() - started, planner="minimal", checkpoint_sha256=loaded.sha256,
+                  edges={}, setup_s={}, plans={}, force_fields={}, tiles={})
+    values = {}
+    for structure, entry in job["structures"].items():
+        base, configs = read_configurations(entry["configurations"])
+        started = time.perf_counter()
+        rewrites = config.RewriteConfig(**job["rewrites"]) if job.get("rewrites") else "auto"
+        force_field = ForceField(loaded, base, precision=precision, rewrites=rewrites)
+        plan = planner.plan_evaluation(force_field, base)
+        plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
+                                                                      dynamic_edges=False))
+        field = planner.build_evaluation(plan, force_field, base.copy())
+        tiled = TiledForceField(field, TileConfig(int(job["tiled_receivers"])))
+        result["setup_s"][structure] = time.perf_counter() - started
+        result["plans"][structure] = dict(describe=plan.describe(full=True), tiled_receivers=job["tiled_receivers"])
+        result["force_fields"][structure] = dict(field.info())
+        for key in entry["keys"]:
+            energy, forces, stress = tiled.evaluate(configs[key], stress=True)
+            values[f"{structure}/{key}"] = (energy, forces, stress)
+            result["edges"][f"{structure}/{key}"] = dict(edges=int(field.edge_count))
+            result["tiles"][f"{structure}/{key}"] = dict(tiled.last)
+            print(job["name"], structure, key, flush=True)
+        del tiled, field
+        torch.cuda.empty_cache()
+    result["patches"] = [str(record) for record in _patches.applied()]
+    _torch_record(torch, result)
+    return values
+
+
 def fastmace_production_child(job, result):
     """FastMACE's production force field through the job's planner (NPT, so with stress), on every configuration.
 
@@ -912,6 +967,8 @@ def fastmace_production_child(job, result):
     """
     import torch
 
+    if job.get("tiled_receivers"):
+        return tiled_production_child(job, result)
     build = _fastmace_build(job, result)
 
     from fastmace import _patches
