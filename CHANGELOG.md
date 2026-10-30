@@ -119,6 +119,9 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- `segment_gemm`'s gathered-row Triton GEMM takes the irrep size D as a compile-time constant (one variant per irrep;
+  bitwise equal, step time unchanged; docs/validation/speed-small.md).
+
 - The drawn-ahead Langevin/BAOAB/CSVR noise batch holds at most 64 MiB (CAP-T06): `IntegratorConfig.noise_batch`
   is still the most steps, but above about 5,500 atoms the batch is shorter (26 steps at 51,840 atoms, 0.53 GiB
   less at the peak). The random numbers and their order are unchanged. A restart written with another batch size,
