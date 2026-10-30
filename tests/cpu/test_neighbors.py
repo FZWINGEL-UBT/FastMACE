@@ -62,9 +62,7 @@ def candidate_set(nl):
 
 
 def candidate_shifts(nl, dtype=F64):
-    """The candidates' image shifts: stored (layout before cap-nlist) or as compact() computes them (lean)."""
-    if nl.candidate_shifts64 is not None:
-        return nl.candidate_shifts64 if dtype == F64 else nl.candidate_shifts
+    """The candidates' image shifts as compact() computes them (not stored since cap-nlist)."""
     cell = nl.cell_t if nl.variable_cell else nl.build_cell
     return times_3x3(nl.candidate_unit_shifts.to(F64), cell).to(dtype)
 
@@ -396,7 +394,7 @@ def assert_same_state(ours, theirs):
     for name in BUFFERS:
         a, b = getattr(ours, name), getattr(theirs, name)
         assert a.dtype == b.dtype and torch.equal(a, b), name
-    # Lean candidates (cap-nlist): int32 indices; the shifts compact() computes are the baseline's stored ones.
+    # Candidates (cap-nlist): int32 indices; the shifts compact() computes are the baseline's stored ones.
     assert torch.equal(ours.candidate_index.to(torch.int64), theirs.candidate_index)
     assert torch.equal(candidate_shifts(ours), theirs.candidate_shifts64)
     assert torch.equal(candidate_shifts(ours, theirs.candidate_shifts.dtype), theirs.candidate_shifts)

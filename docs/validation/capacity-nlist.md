@@ -60,7 +60,7 @@ shell, so the per-slot saving counts double per edge. That rule is not changed h
 
 ## What changed
 
-- **`SkinNeighbourList` with `LEAN_BUFFERS`** (`fastmace/neighbors/skin.py`, the default):
+- **`SkinNeighbourList`** (`fastmace/neighbors/skin.py`), unconditionally:
   - `candidate_index` is int32;
   - `candidate_shifts` and `candidate_shifts64` are gone;
   - each build writes the cell it used into `build_cell`, a new buffer for the fixed cell, registered like the other
@@ -68,16 +68,21 @@ shell, so the per-slot saving counts double per edge. That rule is not changed h
   - `compact` computes the float64 shifts as `times_3x3(unit_shifts, build_cell)`. That is the function and the
     operand order the build used to store them, so they are bitwise the stored ones. The variable-cell path already
     worked this way, with the current cell.
-  - `LEAN_BUFFERS = False` keeps the layout before. It is read when a list is constructed, for same-process A/Bs
-    only.
+  - **The A/B switch is removed.** Up to commit `787e44df`, a module constant `LEAN_BUFFERS = False` kept the layout
+    before, for the A/B and the trajectory comparison. The A/B and the bitwise comparisons below were measured
+    there. The constant was then removed (conductor, 30 October 2026), because the layering test forbids
+    module-level switches (`test_layering.py`, `no_module_switches`). There was no reason to keep the old layout,
+    so the lean path is unconditional and the old one is deleted, kernels included. Tests at the final commit check
+    the lean list against the research-engine baseline and against numpy's products, not against the deleted
+    layout.
 - **The chunked build** (`build_gpu`):
   - the screen's int64 codes (`pair_search.screen_codes`, `decode_codes`) are decided in float64 in chunks of
     `BUILD_CHUNK` = 2^18 pairs, into one int64 sort key;
   - after the sort, the kept pairs are decoded and written in chunks again;
   - elementwise work per pair, so the result does not depend on the chunk size (tested with 37 pairs).
 - **The fused integrator's compaction kernels** (`fastmace/kernels/triton/fused_integrator.py`):
-  - a `LEAN` variant reads the int32 indices and computes the shift from the unit shifts and `build_cell`, with FMA
-    contraction off, in `times_3x3`'s order;
+  - they read the int32 indices and compute the shift from the unit shifts and `build_cell`, with FMA contraction
+    off, in `times_3x3`'s order;
   - the float32 edge shifts are that value cast, as `compact` does.
 - **`pair_search`**: `candidate_pairs` is now `decode_codes(screen_codes(...))`. When its output buffer grows, the
   old one is freed before the new one is allocated.
@@ -103,7 +108,8 @@ shell, so the per-slot saving counts double per edge. That rule is not changed h
 `tools/ab_rewrites.py --prepare`, same process, MH-1 hybrid float32 NVT at 300 K, default plan on both sides:
 
 - side a: `fastmace.neighbors.skin:LEAN_BUFFERS = False` (the layout before; its build runs in one chunk);
-- side b: the default.
+- side b: the default;
+- source: commit `f7f0d176`, which still had the constant (removed since; see "What changed").
 
 Median step in ms. Order `ab` uses the abab block pattern and order `ba` uses abba. Ratios are b/a, with the range over
 block pairs in brackets.
@@ -132,6 +138,8 @@ comparison. Those are single processes near the memory limit, and the A/B is the
 
 - **Exact by construction**: the same integer unit shifts and the same `times_3x3` arithmetic, done in `compact`
   instead of the build. Every list test compares the compacted edges byte for byte.
+- **After the switch was removed:** FINAL_TESTS
+- **Up to commit `787e44df`, with the old layout still selectable.**
 - **CPU, on coraline** (GPU hidden, `-n 8`, commit `93a7cc6d`, with `FASTMACE_BASELINE` set): **465 passed, 0
   skipped**. The files: `test_neighbors.py` (including the research-engine baseline comparisons, now on the compacted
   edges, the candidates and the shifts `compact` computes), the new `test_neighbors_lean.py`, `test_d3_list`,

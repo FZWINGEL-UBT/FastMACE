@@ -11,6 +11,8 @@
 #   ab-<cell>-<order>: tools/ab_rewrites.py, a = LEAN_BUFFERS False (the layout before), b = the default; cell nbcl5
 #     (3x3x3, 12 blocks of 300 steps) or big (NbCl5 4x4x8, 8 blocks of 100 steps after 100 warm-up steps); order ab
 #     (pattern abab) or ba (abba).
+# LEAN_BUFFERS (the "-off" points and the A/Bs) exists up to commit 787e44df, where these jobs ran; it was removed
+# after the A/B (the lean layout is unconditional), so those jobs need a source copy of 787e44df or earlier.
 # Before each job: no WSL compute process and utilisation <= 10 % in both nvidia-smi views for 30 s.
 # Template: results/cap-t07b-20261030/local.sh.
 set -u -o pipefail

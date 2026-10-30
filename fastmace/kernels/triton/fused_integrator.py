@@ -133,11 +133,9 @@ def _kernels():
         tl.atomic_max(max_ptr, tl.max(s, axis=0).to(tl.int64, bitcast=True))
 
     @triton.jit
-    def inside_kernel(x_ptr, index_ptr, shifts64_ptr, unit_ptr, cell_ptr, inside_ptr, cut_ptr, capacity,
-                      LEAN: tl.constexpr, BLOCK: tl.constexpr):
-        """inside[e] = |x[receiver] - x[sender] + shift|^2 < cutoff^2 for every candidate pair.
-
-        LEAN (``SkinNeighbourList.lean``): the shift is times_3x3(unit shift, build cell), in its order."""
+    def inside_kernel(x_ptr, index_ptr, unit_ptr, cell_ptr, inside_ptr, cut_ptr, capacity, BLOCK: tl.constexpr):
+        """inside[e] = |x[receiver] - x[sender] + shift|^2 < cutoff^2 for every candidate pair, the shift
+        times_3x3(unit shift, build cell) in its order (``SkinNeighbourList.compact``)."""
         e = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         live = e < capacity
         sender = tl.load(index_ptr + e, mask=live, other=0)
@@ -146,13 +144,10 @@ def _kernels():
         s1 = tl.zeros([BLOCK], dtype=tl.float64)
         s2 = tl.zeros([BLOCK], dtype=tl.float64)
         for c in tl.static_range(3):
-            if LEAN:
-                shift = (tl.load(unit_ptr + e * 3, mask=live).to(tl.float64) * tl.load(cell_ptr + c)
-                         + tl.load(unit_ptr + e * 3 + 1, mask=live).to(tl.float64) * tl.load(cell_ptr + 3 + c)) \
-                    + tl.load(unit_ptr + e * 3 + 2, mask=live).to(tl.float64) * tl.load(cell_ptr + 6 + c)
-            else:
-                shift = tl.load(shifts64_ptr + e * 3 + c, mask=live)
-            d = (tl.load(x_ptr + receiver * 3 + c, mask=live) - tl.load(x_ptr + sender * 3 + c, mask=live)) \
+            shift = (tl.load(unit_ptr + e * 3, mask=live).to(tl.float64) * tl.load(cell_ptr + c)
+                     + tl.load(unit_ptr + e * 3 + 1, mask=live).to(tl.float64) * tl.load(cell_ptr + 3 + c)) \
+                + tl.load(unit_ptr + e * 3 + 2, mask=live).to(tl.float64) * tl.load(cell_ptr + 6 + c)
+            d =(tl.load(x_ptr + receiver * 3 + c, mask=live) - tl.load(x_ptr + sender * 3 + c, mask=live)) \
                 + shift
             if c == 0:
                 s0 = d * d
@@ -164,13 +159,13 @@ def _kernels():
         tl.store(inside_ptr + e, (s < tl.load(cut_ptr)).to(tl.int64), mask=live)
 
     @triton.jit
-    def scatter_kernel(inside_ptr, cum_ptr, index_ptr, unit_ptr, shifts_ptr, edge_index_ptr, edge_unit_ptr,
-                       edge_shifts_ptr, cell_ptr, count_ptr, max_ptr, thresholds_ptr, rebuild_ptr, flags_ptr, pipe_ptr,
-                       capacity, LEAN: tl.constexpr, PIPELINED: tl.constexpr, BLOCK: tl.constexpr):
+    def scatter_kernel(inside_ptr, cum_ptr, index_ptr, unit_ptr, edge_index_ptr, edge_unit_ptr, edge_shifts_ptr,
+                       cell_ptr, count_ptr, max_ptr, thresholds_ptr, rebuild_ptr, flags_ptr, pipe_ptr, capacity,
+                       PIPELINED: tl.constexpr, BLOCK: tl.constexpr):
         """Move each candidate to its destination (inside pairs first, stable), set the count and the flags.
 
-        LEAN: int32 candidate indices, and the shift times_3x3(unit shift, build cell) cast to the edge precision,
-        as ``SkinNeighbourList.compact``."""
+        int32 candidate indices; the shift times_3x3(unit shift, build cell) cast to the edge precision, as
+        ``SkinNeighbourList.compact``."""
         e = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         live = e < capacity
         count = tl.load(cum_ptr + capacity - 1)
@@ -180,20 +175,14 @@ def _kernels():
         for row in tl.static_range(2):
             tl.store(edge_index_ptr + row * capacity + destination,
                      tl.load(index_ptr + row * capacity + e, mask=live).to(tl.int64), mask=live)
-        if LEAN:
-            u0 = tl.load(unit_ptr + e * 3, mask=live)
-            u1 = tl.load(unit_ptr + e * 3 + 1, mask=live)
-            u2 = tl.load(unit_ptr + e * 3 + 2, mask=live)
+        u0 = tl.load(unit_ptr + e * 3, mask=live)
+        u1 = tl.load(unit_ptr + e * 3 + 1, mask=live)
+        u2 = tl.load(unit_ptr + e * 3 + 2, mask=live)
         for c in tl.static_range(3):
             tl.store(edge_unit_ptr + destination * 3 + c, tl.load(unit_ptr + e * 3 + c, mask=live), mask=live)
-            if LEAN:
-                shift = (u0.to(tl.float64) * tl.load(cell_ptr + c) + u1.to(tl.float64) * tl.load(cell_ptr + 3 + c)) \
-                    + u2.to(tl.float64) * tl.load(cell_ptr + 6 + c)
-                tl.store(edge_shifts_ptr + destination * 3 + c,
-                         shift.to(edge_shifts_ptr.dtype.element_ty), mask=live)
-            else:
-                tl.store(edge_shifts_ptr + destination * 3 + c, tl.load(shifts_ptr + e * 3 + c, mask=live),
-                         mask=live)
+            shift = (u0.to(tl.float64) * tl.load(cell_ptr + c) + u1.to(tl.float64) * tl.load(cell_ptr + 3 + c)) \
+                + u2.to(tl.float64) * tl.load(cell_ptr + 6 + c)
+            tl.store(edge_shifts_ptr + destination * 3 + c, shift.to(edge_shifts_ptr.dtype.element_ty), mask=live)
         if tl.program_id(0) == 0:
             largest = tl.load(max_ptr).to(tl.float64, bitcast=True)
             hard = largest > tl.load(thresholds_ptr)
@@ -301,21 +290,15 @@ class FusedIntegrator:
             BLOCK=BLOCK, enable_fp_fusion=False)
         capacity = neighbours.capacity
         inside = torch.empty(capacity, dtype=torch.int64, device=state.positions.device)
-        lean = bool(neighbours.lean)
-        unit = neighbours.candidate_unit_shifts
-        # Lean: the shifts come from the unit shifts and the build cell (the unused pointers get the unit shifts).
-        cell = neighbours.build_cell if lean else unit
-        shifts64 = unit if lean else neighbours.candidate_shifts64
-        shifts = unit if lean else neighbours.candidate_shifts
+        unit, cell = neighbours.candidate_unit_shifts, neighbours.build_cell
         inside_kernel[(triton.cdiv(capacity, BLOCK),)](
-            state.positions, neighbours.candidate_index, shifts64, unit, cell, inside, self.cutoff2,
-            capacity, LEAN=lean, BLOCK=BLOCK, enable_fp_fusion=False)
+            state.positions, neighbours.candidate_index, unit, cell, inside, self.cutoff2, capacity, BLOCK=BLOCK,
+            enable_fp_fusion=False)
         cum = torch.cumsum(inside, 0)
         scatter_kernel[(triton.cdiv(capacity, BLOCK),)](
-            inside, cum, neighbours.candidate_index, unit, shifts,
-            neighbours.edge_index, neighbours.unit_shifts, neighbours.shifts, cell, neighbours.count, self.largest,
-            self.thresholds, engine.rebuild_needed, engine._flags, engine._pipe_flags, capacity,
-            LEAN=lean, PIPELINED=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
+            inside, cum, neighbours.candidate_index, unit, neighbours.edge_index, neighbours.unit_shifts,
+            neighbours.shifts, cell, neighbours.count, self.largest, self.thresholds, engine.rebuild_needed,
+            engine._flags, engine._pipe_flags, capacity, PIPELINED=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
         d3_needs_rebuild = getattr(engine.force_field, "d3_needs_rebuild", None)
         if d3_needs_rebuild is not None:  # the D3 list's own test, OR-ed into the flags the kernels wrote (3b-T04)
             flag = d3_needs_rebuild(state.positions)

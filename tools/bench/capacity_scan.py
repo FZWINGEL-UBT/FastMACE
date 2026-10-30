@@ -313,7 +313,7 @@ def run_point(args):
         """The neighbour list's device bytes: its buffers by name, per slot, and the screen's output buffer."""
         sizes = {name: int(t.numel() * t.element_size()) for name, t in nl.buffers().items()}
         screen = getattr(nl, "_pair_search_state", {}).get("buffer")
-        return dict(lean=getattr(nl, "lean", False), buffers_bytes=sum(sizes.values()), buffers=sizes,
+        return dict(buffers_bytes=sum(sizes.values()), buffers=sizes,
                     bytes_per_slot=sum(v for k, v in sizes.items() if k.startswith(("candidate", "edge", "unit",
                                                                                       "shifts"))) / nl.capacity,
                     screen_buffer_bytes=0 if screen is None else int(screen.numel() * screen.element_size()))

@@ -187,7 +187,7 @@ def test_gpu_build_equals_baseline(baseline, atoms, mode, dtype):
         assert (ours.capacity, ours.num_candidates) == (theirs.capacity, theirs.num_candidates)
         for name in BUFFERS:
             assert torch.equal(getattr(ours, name), getattr(theirs, name)), name
-        # Lean candidates (cap-nlist): int32 indices, shifts computed from the unit shifts and the build cell.
+        # Candidates (cap-nlist): int32 indices, shifts computed from the unit shifts and the build cell.
         assert torch.equal(ours.candidate_index.to(torch.int64), theirs.candidate_index)
         derived = times_3x3(ours.candidate_unit_shifts.to(torch.float64), ours.build_cell)
         assert torch.equal(derived, theirs.candidate_shifts64)
