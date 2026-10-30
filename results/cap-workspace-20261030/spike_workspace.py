@@ -5,6 +5,7 @@ Checks (CPU, cuBLAS branch of the op):
 2. the product returned is a view of the workspace (no clone by functionalization);
 3. the input gradients are written into the workspace too.
 """
+import os
 from typing import List
 
 import torch
@@ -117,7 +118,6 @@ n, k0, k1, m0, m1 = 64, 16, 8, 32, 8
 inputs = [torch.randn(n, k0, dtype=torch.float64), torch.randn(3 * n, k1, dtype=torch.float64),
           torch.randn(k0, m0, dtype=torch.float64), torch.randn(k1, m1, dtype=torch.float64)]
 inputs += [inputs[2].t().contiguous(), inputs[3].t().contiguous()]
-import os
 VARIANT = os.environ.get("VARIANT", "into")
 VARIANT = True if VARIANT == "into" else VARIANT
 for compiled in (False, True):
@@ -138,4 +138,5 @@ for compiled in (False, True):
           "p nan", bool(torch.isnan(p).any()), "max |p - ref|", float((p.detach() - ref[1].detach()).abs().max()),
           "ws0 == ref", torch.equal(ws[0], ref[1].detach()), p.shape, ref[1].shape, p.stride(), ref[1].stride())
     diff = max(float((a - b).abs().max()) for a, b in zip(g, ref[2]))
-    print(f"compiled={compiled}: max grad diff {diff:.3g} bitwise={same} product_in_workspace={in_ws} grads_in_workspace={grads_in_ws}")
+    print(f"compiled={compiled}: max grad diff {diff:.3g} bitwise={same} product_in_workspace={in_ws} "
+          f"grads_in_workspace={grads_in_ws}")
