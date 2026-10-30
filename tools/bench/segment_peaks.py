@@ -59,6 +59,7 @@ def parse_args(argv=None):
     p.add_argument("--chunk", nargs="*", default=[], metavar="MODULE", help="e.g. interaction1.gated_rows product1")
     p.add_argument("--chunks", type=int, default=8)
     p.add_argument("--chunk-op", action="store_true", help="the custom-op variant with compiled chunks")
+    p.add_argument("--chunk-checkpoint", action="store_true", help="per-chunk torch.utils.checkpoint")
     p.add_argument("--compiled", action="store_true", help="default compile mode, no markers")
     p.add_argument("--timing", type=int, default=0, metavar="N", help="time N more force calls")
     return p.parse_args(argv)
@@ -167,6 +168,35 @@ def atom_chunked_op(module, natoms, chunks, trailing):
         values = [bound.arguments[name] for name in names]
         assert all(torch.is_tensor(v) for v in values), names
         return op(values, key)
+
+    return run
+
+
+def atom_chunked_checkpoint(module, natoms, chunks):
+    """``module``'s forward on atom chunks, each under non-reentrant ``torch.utils.checkpoint``, so AOT autograd
+    traces the chunks and their recomputation into the compiled graph (``--chunk-checkpoint``)."""
+    import inspect
+
+    import torch
+    from torch.utils.checkpoint import checkpoint
+
+    forward = module.forward
+    names = list(inspect.signature(forward).parameters)
+    size = -(-natoms // chunks)
+
+    def call(*values):
+        return forward(**dict(zip(names, values)))
+
+    def run(*args, **kwargs):
+        bound = inspect.signature(forward).bind(*args, **kwargs)
+        bound.apply_defaults()
+        values = [bound.arguments[name] for name in names]
+        outs = []
+        for start in range(0, natoms, size):
+            part = [v[start:start + size] if torch.is_tensor(v) and v.dim() and v.shape[0] == natoms else v
+                    for v in values]
+            outs.append(checkpoint(call, *part, use_reentrant=False, preserve_rng_state=False))
+        return torch.cat(outs)
 
     return run
 
@@ -288,6 +318,7 @@ def main(argv=None):
             hook.remove()
         for label, module in targets.items():
             module.forward = (atom_chunked_op(module, natoms, args.chunks, shapes[label]) if args.chunk_op
+                              else atom_chunked_checkpoint(module, natoms, args.chunks) if args.chunk_checkpoint
                               else atom_chunked(module, natoms, args.chunks))
     if args.compiled:  # the first call with the wrappers compiles; the measured call is the next one
         forces_of(engine.force_field(engine.state.positions))
@@ -386,7 +417,7 @@ def main(argv=None):
     tag = "".join(f"-{k}={v}" for k, v in rewrites.items())
     tag += (f"-chunks{args.chunks}-" + "+".join(args.chunk)) if args.chunk else ""
     tag += "-compiled" if args.compiled else ""
-    tag += "-op" if args.chunk_op else ""
+    tag += "-op" if args.chunk_op else "-checkpoint" if args.chunk_checkpoint else ""
     path = args.output / f"segments-{name}-{natoms}{tag}.json"
     path.write_text(json.dumps(record, indent=1, default=str) + "\n")
     gib = 2**30
