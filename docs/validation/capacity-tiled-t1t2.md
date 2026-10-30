@@ -46,34 +46,39 @@ That is the same as before T2: 2.3e-5 against the compiled plan
 **Tool:** `tiled_capacity.py point --calls 1`, R = 4,096, growing until a size fails
 (`results/cap-tiled-t2-20261030/t2.sh`). Records: `results/cap-tiled-t2-20261030/runs/`.
 
-| Cell | Atoms | Call peak (GiB) | Before (GiB) | **Total (GiB)** | Global state (GiB) | Neighbour build peak (GiB) | Call |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| NbCl5 16×16×48 | 884,736 | 5.57 | 3.65 | **9.22** (was 19.04) | 4.01 | 3.49 | 25.6 s |
-| NbCl5 18×18×54 | 1,259,712 | 7.26 | 5.13 | 12.39 | 5.71 | 4.97 | 33.0 s |
-| NbCl5 19×19×57 | 1,481,544 | 8.25 | 5.99 | 14.24 | 6.71 | 5.85 | 43.8 s |
-| NbCl5 20×20×60 | 1,728,000 | 8.72 | 3.22 | 11.94 | 7.83 | 0.19 | 39.9 s |
-| **NbCl5 21×21×63** | **2,000,376** | 10.05 | 3.68 | **13.73** | 9.06 | 0.22 | 40.2 s |
-| NbCl5 22×22×66 | 2,299,968 | | | the neighbour build fails | | | |
-| NaCl 50×50×50 | 1,000,000 | 6.25 | 5.53 | 11.79 | 4.53 | 6.50 | 29.0 s |
-| **NaCl 54×54×54** | **1,259,712** | 7.48 | 6.91 | **14.39** | 5.71 | 8.19 | 32.5 s |
-| NaCl 57×57×57 | 1,481,544 | | | out of memory in the neighbour list's compaction | | | |
+> **Correction (31 October 2026).** The 1,728,000 and 2,000,376-atom NbCl5 points below are **invalid**: their
+> neighbour lists had no pairs (0 edges, all forces and the stress exactly 0). The GPU pair screen's launch had
+> 54,000² and 62,512² blocks; Triton's launcher multiplies the grid as 32-bit ints and skipped the launch, without
+> an error, once the product passed 2³¹. The scan checked only that the call finished. The **valid NbCl5 limit of
+> T2 is 1,481,544 atoms (checked: 26.3 edges per atom, forces as at small sizes)**; the real limit lies between that
+> and about 2.2M atoms. The merge message of `218937d2` quotes the invalid 2,000,376. The fix (a bounded launch grid,
+> a launch marker that raises, and a correctness check in the capacity tools) is on `fastmace/pair-search-launch`;
+> see [pair-search-grid.md](pair-search-grid.md).
 
-- **NbCl5: from 884,736 to at least 2,000,376 atoms (2.3×), at 13.7 of 19.5 GiB.**
-  - The force call no longer sets the limit; the neighbour list does.
-  - At 2,299,968 atoms the GPU pair search fails at launch (`Triton Error [CUDA]: invalid argument`):
-    `pair_search.screen_codes` launches a 2-D grid of `cdiv(N, BLOCK)` × `cdiv(N, BLOCK)` blocks. CUDA's y
-    dimension stops at 65,535, which is 2.1M atoms with BLOCK = 32. A launch limit, not memory: a 1-D grid, or
-    the y dimension split, would lift it.
-  - Above 1.7M atoms the build's own peak fell to 0.2 GiB and the memory before the call to 3.2 GiB. The build path
-    there is not looked at here.
+| Cell | Atoms | Edges per atom | Call peak (GiB) | Before (GiB) | **Total (GiB)** | Global state (GiB) | Neighbour build peak (GiB) | Call |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| NbCl5 16×16×48 | 884,736 | 26.28 | 5.57 | 3.61 | **9.18** (was 19.04) | 4.01 | 3.49 | 25.6 s |
+| NbCl5 18×18×54 | 1,259,712 | 26.28 | 7.26 | 5.08 | 12.34 | 5.71 | 4.97 | 33.0 s |
+| **NbCl5 19×19×57** | **1,481,544** | 26.28 | 8.25 | 5.95 | **14.20** | 6.71 | 5.85 | 43.8 s |
+| NbCl5 20×20×60 | 1,728,000 | **0 (invalid)** | | | | | | |
+| NbCl5 21×21×63 | 2,000,376 | **0 (invalid)** | | | | | | |
+| NbCl5 22×22×66 | 2,299,968 | | | | the screen's launch fails (`invalid argument`) | | | |
+| NaCl 50×50×50 | 1,000,000 | 32.00 | 6.25 | 5.48 | 11.73 | 4.53 | 6.50 | 29.0 s |
+| **NaCl 54×54×54** | **1,259,712** | 32.00 | 7.48 | 6.86 | **14.35** | 5.71 | 8.19 | 32.5 s |
+| NaCl 57×57×57 | 1,481,544 | | | | out of memory in the neighbour list's compaction | | | |
+
+"Before" is the memory allocated before the call (after the neighbour build); the total is that plus the call's
+peak.
+
+- **NbCl5: from 884,736 to at least 1,481,544 atoms (1.7×), at 14.2 of 19.5 GiB.** Between 1.48M and 2.1M atoms
+  the screen's launch was silently skipped (above); at 2,299,968 atoms the 2-D grid's y dimension (65,535 blocks)
+  made it fail outright. Both are launch limits of `pair_search.screen_codes`, not memory.
 - **NaCl: from 778,688 to 1,259,712 atoms (1.6×).** At 1,481,544 atoms the build runs out of memory in
   `SkinNeighbourList.compact`, which forms float64 vectors for every candidate pair: 8.2 GiB peak at 1.26M atoms.
   NaCl has 32 edges per atom within the cutoff, more candidates within the skin, and a denser cell than NbCl5.
 - **Both next limits are the neighbour list**, which T3 already names as the next step ("the list build needs
-  tiling too"). These two cases make it concrete:
-  - the pair search's grid;
-  - the compaction's whole-candidate float64 vectors.
-- **Against main on the same GPU:** NbCl5 2.0M against 60,480-74,088 atoms (27-33×); NaCl 1.26M against
+  tiling too"): the pair screen's launch grid and the compaction's whole-candidate float64 vectors.
+- **Against main on the same GPU:** NbCl5 at least 1.48M against 60,480-74,088 atoms (20-24×); NaCl 1.26M against
   64,000-74,088 (17-20×).
 
 ## T1: one padded CUDA graph per sweep
