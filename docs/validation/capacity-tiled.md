@@ -95,7 +95,34 @@ plan, the path of `fm.ForceField.evaluate`.
 | NaNbO3 6×6×6 | 8,640 | −9.1e-6 | 1.8e-5 | 1.1e-6 | 3.77 | 1.9e-8 | 1.73 / 5.24 | 0.45 / 0.15 s |
 
 The differences are float32 rounding: about 1e-5 of the largest force component. The tiles' GEMMs see fewer rows,
-and the edge-force scatter order differs. The gate against float64 is below.
+and the edge-force scatter order differs.
+
+## Force/stress gate
+
+**The run.** `tools/force_stress_gate.py --engine fastmace --tiled-receivers 128`:
+
+- 3×3×3 cells: NaCl 216, NbCl5 1,944 and NaNbO3 1,080 atoms;
+- 3 rattled hydrostatic and 3 rattled full-strain configurations each;
+- references in their own processes, the float64 reference and the float32 yardstick with `mace_cueq_latest`;
+- R = 128, so every cell has several tiles and halos (NbCl5: about 16).
+
+The default production path (the graph engine, padded edges) ran in the same batch. Records:
+`results/cap-tiled-20261030/accuracy/gate-*/gate/metadata.json`.
+
+**Columns.** Each cell is the largest error against float64, then the ratio to the float32 yardstick's error. The
+gate's rule: a ratio at most 2, or the error under SPEC §12.3's floor.
+
+| Structure | Path | Energy (meV/atom) | Max force (eV/Å) | Max stress (eV/Å³) | Gate |
+| --- | --- | ---: | ---: | ---: | --- |
+| NaCl | tiled | 6.9e-5 (0.61) | 3.6e-6 (0.92) | 4.5e-8 (1.04) | pass |
+| NaCl | default | 9.0e-5 (0.75) | 3.7e-6 (0.93) | 4.0e-8 (0.96) | pass |
+| NbCl5 | tiled | 1.1e-4 (0.14) | 8.3e-5 (1.02) | 3.2e-8 (0.33) | pass |
+| NbCl5 | default | 9.6e-5 (0.12) | 8.4e-5 (1.03) | 3.5e-8 (0.35) | pass |
+| NaNbO3 | tiled | 2.4e-4 (0.23) | 1.3e-4 (0.99) | 1.9e-7 (0.56) | pass |
+| NaNbO3 | default | 3.3e-4 (0.30) | 1.3e-4 (0.99) | 1.8e-7 (0.56) | pass |
+
+**The tiled path is as accurate as the default path.** Its errors against float64 match the default production path's
+within the spread of float32 rounding.
 
 **For comparison, the whole-system eager call of the same force field** (`--compare eager`, the same modules on one
 graph) peaks at 3.59 GiB at 9,216 atoms and 8.40 GiB at 21,600 atoms: 408 kB per atom. Main's compiled graph path
