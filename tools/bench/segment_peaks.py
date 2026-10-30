@@ -12,8 +12,15 @@ modules) it builds the default plan's ``fm.Simulation`` for one supercell, runs 
 - ``saved_tensors_hooks`` attributing every saved storage to the innermost marked module running when it was saved.
 
 Marked modules: each interaction and its ``skip_tp``, ``linear_up`` and ``gated_rows`` (or ``linear_1``,
-``linear_2``), each product block, each readout. Writes ``<output>/segments-<name>-<atoms><tag>.json`` and prints the
-timeline with its peaks. Run inside a local GPU reservation.
+``linear_2``), each product block, each readout.
+
+``--chunk MODULE...`` is the prototype (eager only): each named module runs on ``--chunks`` atom chunks without
+saving anything but its inputs, and its backward recomputes one chunk at a time (``AtomChunked``). Every tensor
+input whose first dimension is the atom count is chunked, the others pass whole; the output must be one per-atom
+tensor. A plain call first gives the reference forces, then the measured call runs chunked.
+
+Writes ``<output>/segments-<name>-<atoms><tag>.json`` and prints the timeline with its peaks. Run inside a local GPU
+reservation.
 """
 
 from __future__ import annotations
@@ -40,7 +47,61 @@ def parse_args(argv=None):
     p.add_argument("--repeat", required=True, help="NXxNYxNZ")
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE", help="RewriteConfig overrides")
+    p.add_argument("--chunk", nargs="*", default=[], metavar="MODULE", help="e.g. interaction1.gated_rows product1")
+    p.add_argument("--chunks", type=int, default=8)
     return p.parse_args(argv)
+
+
+def forces_of(out):
+    return out["forces"] if isinstance(out, dict) else out[1] if isinstance(out, tuple) else out
+
+
+def atom_chunked(module, natoms, chunks):
+    """``module``'s forward on atom chunks, saving only its inputs; the backward recomputes chunk by chunk."""
+    import torch
+
+    forward = module.forward
+    size = -(-natoms // chunks)
+    bounds = [(start, min(start + size, natoms)) for start in range(0, natoms, size)]
+
+    def pieces(inputs, start, stop):
+        return [x[start:stop] if torch.is_tensor(x) and x.dim() and x.shape[0] == natoms else x for x in inputs]
+
+    class AtomChunked(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, *inputs):
+            ctx.save_for_backward(*[x if torch.is_tensor(x) else None for x in inputs])
+            ctx.others = [None if torch.is_tensor(x) else x for x in inputs]
+            with torch.no_grad():
+                out = torch.cat([forward(*pieces(inputs, a, b)) for a, b in bounds])
+            assert out.shape[0] == natoms
+            return out
+
+        @staticmethod
+        def backward(ctx, grad):
+            inputs = [x if x is not None else other for x, other in zip(ctx.saved_tensors, ctx.others)]
+            wanted = [torch.is_tensor(x) and ctx.needs_input_grad[i] for i, x in enumerate(inputs)]
+            grads = [torch.zeros_like(x) if want else None for x, want in zip(inputs, wanted)]
+            for a, b in bounds:
+                with torch.enable_grad():
+                    part = [x.detach().requires_grad_(want) if torch.is_tensor(x) else x
+                            for x, want in zip(pieces(inputs, a, b), wanted)]
+                    out = forward(*part)
+                    leaves = [x for x, want in zip(part, wanted) if want]
+                    got = iter(torch.autograd.grad(out, leaves, grad[a:b]))
+                for i, want in enumerate(wanted):
+                    if want:
+                        g = next(got)
+                        if grads[i].shape[0] == natoms:
+                            grads[i][a:b] += g
+                        else:
+                            grads[i] += g
+            return tuple(grads)
+
+    def run(*inputs):
+        return AtomChunked.apply(*inputs)
+
+    return run
 
 
 def tensors(value):
@@ -86,6 +147,14 @@ def main(argv=None):
     model = engine.force_field.model
     model = getattr(model, "_orig_mod", model)
     natoms = len(atoms)
+    reference = None
+    if args.chunk:
+        reference = forces_of(engine.force_field(engine.state.positions)).detach().clone()
+        for label in args.chunk:
+            module = model
+            for part in label.replace("interaction", "interactions.").replace("product", "products.").split("."):
+                module = module[int(part)] if part.isdigit() else getattr(module, part)
+            module.forward = atom_chunked(module, natoms, args.chunks)
 
     marked = []
     for i, interaction in enumerate(model.interactions):
@@ -146,6 +215,7 @@ def main(argv=None):
     torch.cuda.synchronize()
     mark("call end")
     active["on"] = False
+    difference = None if reference is None else float((forces_of(out) - reference).abs().max())
     del out
     for handle in handles:
         handle.remove()
@@ -158,18 +228,22 @@ def main(argv=None):
             row["per_atom_bytes"] += entry["bytes"]
     peak = max(event["peak_since_previous"] for event in timeline)
     record = dict(tool="segment_peaks", structure=name, natoms=natoms, edges=int(engine.force_field.edge_count),
-                  rewrites=rewrites, gpu=torch.cuda.get_device_name(), allocated_before=base,
+                  rewrites=rewrites, chunk=args.chunk, chunks=args.chunks if args.chunk else None,
+                  force_max_abs_difference=difference, gpu=torch.cuda.get_device_name(), allocated_before=base,
                   peak=peak, peak_over_before=peak - base, timeline=timeline,
                   saved_by_module={key: dict(value, per_atom_kB_per_atom=value["per_atom_bytes"] / natoms / 1e3)
                                    for key, value in by_module.items()},
                   plan=sim.plan.describe())
     args.output.mkdir(parents=True, exist_ok=True)
     tag = "".join(f"-{k}={v}" for k, v in rewrites.items())
+    tag += (f"-chunks{args.chunks}-" + "+".join(args.chunk)) if args.chunk else ""
     path = args.output / f"segments-{name}-{natoms}{tag}.json"
     path.write_text(json.dumps(record, indent=1, default=str) + "\n")
     gib = 2**30
     print(f"{name} {natoms} atoms, {record['edges']} edges, eager: before {base / gib:.3f} GiB, peak "
           f"{peak / gib:.3f} GiB ({(peak - base) / gib:.3f} above) ({path})")
+    if args.chunk:
+        print(f"chunked on {args.chunks} atom chunks: {', '.join(args.chunk)}; max |dF| {difference:.2e} eV/A")
     for event in timeline:
         flag = " <== peak" if event["peak_since_previous"] == peak else ""
         print(f"  {(event['peak_since_previous'] - base) / gib:7.3f} GiB peak before | "
