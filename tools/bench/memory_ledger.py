@@ -57,6 +57,8 @@ def route_to_second_pool(torch, groups):
             original = op._init_fn
 
             def kernel(*args, _original=original, **kwargs):
+                if not torch.cuda.is_current_stream_capturing():  # eager calls (warm-ups) keep the default pool
+                    return _original(*args, **kwargs)
                 with torch.cuda.use_mem_pool(pool):
                     return _original(*args, **kwargs)
 
