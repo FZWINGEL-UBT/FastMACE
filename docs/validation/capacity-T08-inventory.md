@@ -99,3 +99,65 @@ From the eager attribution at 9,216 atoms; compiled shapes in brackets:
 - **Per atom.** Four holder groups are each above 0.5 GiB at 32k atoms, about 5.8 GiB together, plus a backward
   working set of about 4.5 GiB. CAP-T08 stays open. Its lever is per-interaction recomputation (item B), not a
   single tensor.
+
+## 2. Rebuilding w inside the wprime backward (falsifier)
+
+**Candidate.** w is never stored:
+
+- the fused forward builds it on chip for the message only (`FusedFoldedForward(store_w=False)`: no `w` store, no
+  padding-edge chunks);
+- the backward builds it again per batch of edges, from the stored radial basis `a` (`[E, 65]`, kept anyway) and
+  the folded weight.
+
+**Stop rules** (conductor): at most 1.08× today's forward plus backward (CAP-T07's cost) makes it a capacity option
+ahead of CAP-T07; at most 1.00× makes it a default candidate.
+
+**Kernel** (`fastmace/kernels/oeq_streaming/wrebuild_backward.py`). The backward cannot keep the edge-owned layout
+of `wprime_backward`: rebuilding w there would read all of W (1,280 × 65 floats) for every edge. So it uses the
+fused forward's slice-owned layout:
+
+- a block owns 32 channels × a part of the paths, with that slice of W in shared memory;
+- a warp takes chunks of 64 edges and builds `w[part paths][batch]` with the forward's exact k-ordered `fmaf`
+  sequence from the same staged `a`, so w is bitwise the forward's;
+- per edge it computes the vendored backward's sums for its slice: `dx` added atomically (as today), and `dsh` and
+  `dL/dr` reduced over the warp and added atomically over the slices.
+
+**Measurement** (`tools/bench/wrebuild_bound.py`). The second interaction's real convolution arguments are captured
+from one eager force call of the default plan; the parts are timed with CUDA events in 30 alternating rounds
+(medians) on the RTX 5060 Ti:
+
+| | NbCl5 4×4×8 (9,216 atoms, 245,760 edges) | NaNbO3 4×4×4 (2,560 atoms, 199,680 edges) |
+| --- | ---: | ---: |
+| `fused_folded_forward`, w stored (today) | 6.40 ms | 4.75 ms |
+| the same without the w store | 4.68 ms | 3.67 ms |
+| `wprime_backward`, reads w (today) | 7.43 ms | 5.95 ms |
+| CAP-T07's chunked recompute backward | 16.14 ms | 13.95 ms |
+| one read of w | 3.18 ms | 2.57 ms |
+| `a @ W.T` by cuBLAS, all edges | 5.46 ms | 3.67 ms |
+| rebuild backward, the forward's launch rule (2 path parts, 8 edges) | 13.03 ms | 10.39 ms |
+| rebuild backward, 1 part, 8 edges | 16.81 ms | 13.61 ms |
+| **rebuild backward, 1 part, 4 edges** | **11.42 ms** | **9.18 ms** |
+| rebuild backward, 2 parts, 4 edges | 13.16 ms | 10.60 ms |
+| **today: forward + backward** | **13.83 ms** | **10.70 ms** |
+| CAP-T07: forward + recompute backward | 22.54 ms, **1.63×** | 18.70 ms, **1.75×** |
+| optimistic bound: no-store forward + (backward − w read) + cuBLAS GEMM | 14.40 ms, 1.04× | 10.72 ms, 1.00× |
+| **candidate: no-store forward + best rebuild backward** | **16.10 ms, 1.16×** | **12.85 ms, 1.20×** |
+
+**Exactness:** dx, dsh and dL/dr agree with today's backward on the stored w to within 1.8–4.3 × 10⁻⁷ of each
+quantity's largest value. That is rounding: the same w, another summation order.
+
+**Verdict: stopped by the rule. It is 1.16–1.20× today, above the 1.08 bar.**
+
+- **Where the time goes.** The cost above the bound is the slice split. Each of the four channel slices repeats the
+  per-edge warp reduction of 17 values and adds them atomically, where today one 32-lane group owns an edge and
+  writes it once.
+- **Why the slice split cannot simply go.** Holding all channels in one block would need all of W, 333 KB, in
+  shared memory.
+- **What it would still give.** It is not a default candidate, but it dominates CAP-T07's mechanism:
+  - it costs a third of CAP-T07's extra time (+2.3 ms against +8.7 ms for this subgraph at 9,216 atoms, about
+    +2.5 % against +9 % of the step);
+  - it also removes the forward's 5,120 B/edge transient.
+- **Recommended follow-up, not done here.** Implement `recompute_conv_weights` with it: the forward with
+  `store_w=False` plus `WRebuildBackward` (1 part, 4 edges), in place of the chunked cuBLAS recompute. That needs
+  the gate (rounding-class), the whole-step A/B in both orders and a new capacity scan.
+- **Not tried.** Holding `dsh`/`dr` partials in shared memory per chunk and reducing once per edge; float2 loads.
