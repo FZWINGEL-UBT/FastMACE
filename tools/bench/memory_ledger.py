@@ -152,10 +152,35 @@ def pool_view(snapshot, engine, trace):
 
     events = [e for e in trace if e["action"] in ("alloc", "free_requested", "free_completed") and inside(e["addr"])]
     live_peak, _ = activation_profile.live_at_peak(events)
+    held_peak, held = live_until_completed(events)
+    streams = defaultdict(int)
+    for e in events:
+        if e["action"] == "alloc":
+            streams[str(e.get("stream"))] += e["size"]
     sizes = sorted((s["total_size"] for s in segments), reverse=True)
     return dict(reserved=int(sum(sizes)), segments=len(sizes), largest_segments=sizes[:10], live_peak=int(live_peak),
-                free=int(sum(free)), largest_free=int(max(free, default=0)), free_blocks=len(free),
-                events=len(events))
+                held_peak=int(held_peak), held_at_peak=held, free=int(sum(free)),
+                largest_free=int(max(free, default=0)), free_blocks=len(free), events=len(events),
+                alloc_bytes_by_stream=dict(streams))
+
+
+def live_until_completed(events):
+    """The pool's live peak when a block counts until its free *completes* (a free deferred behind another stream's
+    use is not reusable before then), and how much of that peak was requested-but-not-completed frees."""
+    live, requested, total, best, best_requested = {}, set(), 0, 0, 0
+    for e in events:
+        action, addr, size = e["action"], e["addr"], e["size"]
+        if action == "alloc":
+            live[addr] = size
+            total += size
+            if total > best:
+                best, best_requested = total, sum(live[a] for a in requested if a in live)
+        elif action == "free_requested" and addr in live:
+            requested.add(addr)
+        elif action == "free_completed" and addr in live:
+            total -= live.pop(addr)
+            requested.discard(addr)
+    return best, int(best_requested)
 
 
 def main(argv=None):
@@ -263,7 +288,9 @@ def main(argv=None):
     for row, size in ledger:
         print(f"  {size / GIB:7.3f} GiB  {row}")
     print(f"graph pool after the re-capture: {pool_detail['reserved'] / GIB:.3f} GiB in {pool_detail['segments']} "
-          f"segments; its own allocations peaked at {pool_detail['live_peak'] / GIB:.3f} GiB live; "
+          f"segments; its own allocations peaked at {pool_detail['live_peak'] / GIB:.3f} GiB live "
+          f"({pool_detail['held_peak'] / GIB:.3f} GiB counting frees when they complete, "
+          f"{pool_detail['held_at_peak'] / GIB:.3f} GiB of it requested-not-completed); "
           f"free blocks {pool_detail['free'] / GIB:.3f} GiB (largest {pool_detail['largest_free'] / GIB:.3f} GiB)")
     print(f"re-capture: peak live {peak / GIB:.2f} GiB above {base / GIB:.2f} GiB; top sites:")
     for site, size, count in capture_sites[:args.top]:
