@@ -92,9 +92,9 @@ RECORD_SOURCES = (
     "fastmace.rewrites.radial",
     # OPT4-T02 (opt-in): e3nn's generated code as fx graphs, after every record that replaces e3nn modules.
     "fastmace.rewrites.codegen",
-    # plans/capacity.md CAP-T08 (memory only): the node-local segments on atom chunks, after every record that
-    # replaces their modules or forwards, so the chunks run the final segments.
-    "fastmace.rewrites.chunks",
+    # plans/capacity.md CAP-T08 (memory only): the node-local segments recomputed in the backward, after every
+    # record that replaces their modules or forwards, so the recomputation runs the final segments.
+    "fastmace.rewrites.segments",
     # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.
     "fastmace.rewrites.engine",
     # Optimisation round 3 (OPT3-T04): Inductor options of the compiled model, last (they change no module).

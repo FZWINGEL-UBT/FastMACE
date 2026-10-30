@@ -1,0 +1,152 @@
+"""``recompute_node_segments``: the node-local segments recomputed in the backward (plans/capacity.md CAP-T08).
+
+**Where the memory is.** The force call keeps per-atom state for the backward, and most of it comes from each
+interaction's node-local segments, which do not mix atoms (docs/validation/capacity-T08-chunks.md):
+
+- the ``gated_rows`` chain (residual products, gate and ``linear_2``);
+- the product block (symmetric contraction, linear and skip connection).
+
+At NbCl5 21,600 atoms they held 168 of the eager force call's 199 kB per atom.
+
+**What the record does.** Each of them runs under non-reentrant ``torch.utils.checkpoint``
+(``modules.recomputed_forward``): the forward keeps only the segments' inputs, and the backward rebuilds a
+segment's intermediates when it reaches it. AOT autograd traces the recomputation, so the compiled model stays one
+graph with Inductor's fusions.
+
+**Measured** in the compiled default plan (NbCl5, ``recompute_conv_weights`` on):
+
+- the force call's peak fell from 4.79 to 3.50 GiB at 21,600 atoms, 64 kB per atom, at 1.10 times the call's time;
+- 59 kB per atom at 9,216 atoms.
+
+**Chunking was tried and left out.** Running the segments on 4, 8 or 16 atom chunks saved no more; 2 chunks once
+saved 0.24 GiB more, at 1.08 times this record's time. So the record recomputes each segment whole.
+
+**Exactness and planning.** The record is ``rounding``: Inductor fuses the recomputed segments differently. It is
+deterministic.
+
+Off by default. Rule 12 turns it on only when the plan does not fit with ``recompute_conv_weights`` on
+(``planner.memory.MEMORY_RESCUE``, in that order).
+
+**Self-check.** Each recomputed segment against its stored forward, values and the input gradients, in the
+model's dtype.
+"""
+
+from __future__ import annotations
+
+import math
+
+from fastmace.rewrites import memory as memory_terms
+from fastmace.rewrites.registry import CaseErrors, Rewrite, Support
+
+MACE_VERSIONS = ">=0.3.16,<0.3.17"
+_PROBE_ROWS = 7
+
+
+def _modules():
+    from fastmace.rewrites.segments import modules
+
+    return modules
+
+
+def segments(model):
+    """``(name, module)`` of every node-local segment the record recomputes: each interaction's ``gated_rows`` chain
+    and each product block, in the model's order."""
+    found = []
+    for index, interaction in enumerate(getattr(model, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is not None:
+            found.append((f"interactions.{index}.gated_rows", chain))
+    for index, product in enumerate(getattr(model, "products", ())):
+        found.append((f"products.{index}", product))
+    return found
+
+
+def _support(model):
+    interactions = getattr(model, "interactions", ())
+    products = getattr(model, "products", ())
+    if not interactions or len(products) != len(interactions):
+        return Support(False, "no interaction and product blocks to recompute")
+    kinds = {type(product).__name__ for product in products}
+    if kinds != {"EquivariantProductBasisBlock"}:
+        return Support(False, f"product blocks {sorted(kinds)} are not MACE's EquivariantProductBasisBlock")
+    return Support(True, "ok")
+
+
+def recompute_segments(model):
+    """Recompute every node-local segment of ``model`` in the backward; returns their names."""
+    m = _modules()
+    names = []
+    for name, module in segments(model):
+        m.recompute(module)
+        names.append(name)
+    if not names:
+        raise ValueError("recompute_node_segments: no node-local segment")
+    return names
+
+
+def _probe(generator, rows, width, like):
+    import torch
+
+    return torch.randn((rows, width), generator=generator, dtype=torch.float64).to(like)
+
+
+def _selfcheck(original, rewritten, context):
+    """Each recomputed segment against its stored forward on probe rows: the output and the gradients of its floating
+    inputs. A product block's input is the reshaped output of its interaction's ``gated_rows`` probe."""
+    import torch
+
+    m = _modules()
+    generator = torch.Generator().manual_seed(context.seed + 41)
+    cases, dtype = CaseErrors(), None
+    elements = len(getattr(rewritten, "atomic_numbers", ())) or 1
+    for name, module in segments(rewritten):
+        if getattr(module, "recomputed_inner", None) is None:
+            continue
+        index = int(name.split(".")[1])
+        chain = getattr(rewritten.interactions[index], "gated_rows", None)
+        if chain is None:
+            continue  # a product block's probe comes from its interaction's gated_rows chain
+        like = chain.first.weight_0
+        if name.startswith("interactions."):
+            first = chain.first
+            widths = [sum(mul * dim for _, mul, dim in part)
+                      for part in (first.segments_in[:first.first_count], first.segments_in[first.first_count:])]
+            inputs = [_probe(generator, _PROBE_ROWS, width, like) for width in widths]
+        else:
+            width_out = sum(mul * dim for _, mul, dim in chain.second.segments_out)
+            node_feats = rewritten.interactions[index].reshape(_probe(generator, _PROBE_ROWS, width_out, like))
+            species = torch.randint(0, elements, (_PROBE_ROWS,), generator=generator)
+            attrs = torch.nn.functional.one_hot(species, elements).to(like)
+            with torch.no_grad():
+                shape = m.stored(module)(node_feats, None, attrs).shape
+            sc = _probe(generator, _PROBE_ROWS, math.prod(shape[1:]), like).view(shape)
+            inputs = [node_feats, sc, attrs]
+        wants = [x.is_floating_point() and not (name.startswith("products.") and j == 2) for j, x in enumerate(inputs)]
+        inputs = [x.detach().requires_grad_(want) for x, want in zip(inputs, wants)]
+        leaves = [x for x in inputs if x.requires_grad]
+        values = []
+        with torch.enable_grad():
+            for function in (m.stored(module), module):
+                out = function(*inputs)
+                if not values:
+                    grad = torch.randn(out.shape, generator=generator, dtype=torch.float64).to(out)
+                values.append((out.detach(), *torch.autograd.grad(out, leaves, grad)))
+        for a, b in zip(*values):
+            cases.add(name, a, b)
+        dtype = dtype or like.dtype
+        del values, inputs, leaves
+    return cases.result(dtype)
+
+
+def _apply(model, context):
+    return recompute_segments(model)
+
+
+RECORDS = {
+    "recompute_node_segments": Rewrite(
+        name="recompute_node_segments", applies_to=_support, requires=("gated_rows",), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
+        workload_constraints=(), apply=_apply, selfcheck=_selfcheck, memory=memory_terms.recompute_node_segments),
+}
+
+__all__ = ["RECORDS", "recompute_segments", "segments"]

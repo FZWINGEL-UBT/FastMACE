@@ -932,10 +932,8 @@ class MinimalPlanner:
         # OEq's convolution (hybrid) and cuEq's fused one keep neither gathered senders nor messages per edge.
         fused_conv = engine.backend == "hybrid" or engine.cueq_conv_fusion == "on"
 
-        def estimate(names, chunks=None):  # a rewrite turned off takes its run term and its self-check's transient
+        def estimate(names):  # a rewrite turned off takes its run term and its self-check's transient with it
             terms = memory.rewrite_memory_terms(registry, dims, names, dtype)
-            if chunks is not None:  # atom_chunks at this chunk count (rule 12 chooses it; CAP-T08)
-                terms = memory.with_atom_chunks(terms, dims, dtype, chunks)
             if traits.polar and "streaming_conv" in names:
                 terms += (memory.polar_streaming_backward_term(dims, dtype),)
             checks = memory.selfcheck_memory_terms(registry, dims, names, dtype, getattr(hardware, "sms", None))
@@ -965,10 +963,11 @@ class MinimalPlanner:
                     dropped.append((other, name, before.total - found.total))
                 if memory.fits(found, free):
                     break
-        rescued, deferred, chunks = [], [], None
+        rescued, deferred = [], []
         if not memory.fits(found, free):
             # CAP-T07, CAP-T08: records that trade step time for memory, in MEMORY_RESCUE's order, each only when the
-            # estimate still does not fit after the ones before it (recompute_conv_weights, then atom_chunks). The
+            # estimate still does not fit after the ones before it (recompute_conv_weights, then
+            # recompute_node_segments). The
             # estimate overstates the peak by up to RESCUE_OVERSTATEMENT, so a cell that merely does not fit runs
             # without them and rebuilds with them after a real out-of-memory error, one record per rebuild
             # (fallback.memory_rescue); only a cell that cannot fit turns them on here, while each lowers the estimate.
@@ -987,24 +986,11 @@ class MinimalPlanner:
                     if not eligible(name):
                         continue
                     candidate = [*enabled, name]
-                    if name == memory.ATOM_CHUNKS:  # the fewest chunks that fit, else the most
-                        counts = memory.ATOM_CHUNK_COUNTS
-                        trials = [(count, estimate(candidate, count)) for count in counts]
-                        count, raised = next(((c, e) for c, e in trials if memory.fits(e, free)), trials[-1])
-                    else:
-                        count, raised = None, estimate(candidate)
+                    raised = estimate(candidate)
                     if raised.total >= found.total:
                         continue
                     rescued.append((name, found.total - raised.total))
                     enabled, found = candidate, raised
-                    if count is not None:
-                        chunks = count
-        if chunks is not None:
-            parts["rewrites"] = dataclasses.replace(parts["rewrites"], atom_chunk_count=chunks)
-            why = (f"rule 12: the fewest of {', '.join(map(str, memory.ATOM_CHUNK_COUNTS))} atom chunks whose estimate "
-                   f"fits {memory.MARGIN:.0%} of the free GPU memory (the most when none fits; CAP-T08)")
-            book.decide("RewriteConfig.atom_chunk_count", str(chunks),
-                        Reason(why, rule=12, code="rule-12-memory-rescue"))
         for name, saved in rescued:
             field = registry.config_field(name)
             parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: "on"})

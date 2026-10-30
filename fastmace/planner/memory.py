@@ -51,13 +51,10 @@ MARGIN = 0.9
 # (planner.fallback.memory_rescue); rule 12 turns them on in the plan only for cells that cannot fit without them
 # (``short_by_far``).
 #
-# The order is the planning order (CAP-T08): atom_chunks (about 1.17x the force call) only after
+# The order is the planning order (CAP-T08): recompute_node_segments (about 1.10x the force call) only after
 # recompute_conv_weights (1.01-1.04x), so rule 12 turns it on only when the plan still does not fit with
 # recompute_conv_weights on, and the memory rescue turns on one record per rebuild in this order.
-MEMORY_RESCUE = ("recompute_conv_weights", "atom_chunks")
-ATOM_CHUNKS = "atom_chunks"
-# The chunk counts rule 12 tries for atom_chunks, fewest first (fastmace.rewrites.chunks.CHUNK_COUNTS).
-ATOM_CHUNK_COUNTS = (2, 4, 8, 16)
+MEMORY_RESCUE = ("recompute_conv_weights", "recompute_node_segments")
 # The estimate's largest overstatement of the measured peak in decision 67's fit (the capacity cells: 1.05 to 1.34
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
@@ -304,15 +301,6 @@ def rewrite_memory_terms(records: Any, dims, enabled: list[str], dtype: str) -> 
     return tuple(out)
 
 
-def with_atom_chunks(terms, dims, dtype: str, chunks: int):
-    """``terms`` (``rewrite_memory_terms``'s) with ``atom_chunks``' term at ``chunks`` chunks (CAP-T08)."""
-    from fastmace.rewrites.memory import atom_chunks_saving
-
-    width = DTYPE_BYTES[dtype]
-    return tuple((name, MemoryTerm(0, -atom_chunks_saving(dims, width, chunks)) if name == ATOM_CHUNKS else term)
-                 for name, term in terms)
-
-
 POLAR_STREAMING_BACKWARD = "PolarMACE: streaming convolution's weight gradient"
 
 
@@ -343,9 +331,9 @@ def annotate_out_of_memory(error, plan) -> Any:
     return error
 
 
-__all__ = ["ATOM_CHUNKS", "ATOM_CHUNK_COUNTS", "DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
+__all__ = ["DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
            "MemoryEstimate", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD", "RESCUE_OVERSTATEMENT",
            "SAFETY", "WORKSPACE_BYTES",
            "annotate_out_of_memory", "drop_order", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
-           "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms", "with_atom_chunks"]
+           "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]
