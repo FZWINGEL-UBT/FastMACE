@@ -168,7 +168,7 @@ These are MACE's edge forces (`compute_edge_forces`), assembled tile by tile.
 **Stress.** With strain, `v_e` is used as `v_e (I + sym(ε))` at ε = 0. That is the same linear map that MACE's
 `get_symmetric_displacement` applies to positions and shifts, so it is equal in exact arithmetic. Then
 
-    W = −Σ_e v_e ⊗ g_e   (symmetrised),   stress = W / V   (MACE's sign: σ = −(∂E/∂ε)/V),
+    stress = (∂E/∂ε) / V = sym(Σ_e v_e ⊗ g_e) / V   (MACE's sign, checked against its stress),
 
 accumulated per tile into a 3×3 float64 accumulator. Rounding: MACE's virial goes through the per-atom positions
 (large absolute values that cancel). The edge form sums `v ⊗ g` over short vectors, so it is at least as accurate.

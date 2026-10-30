@@ -14,8 +14,8 @@ interactions cut their outputs to the receivers themselves. Three sweeps:
 
 Only h1, its adjoint and per-atom outputs grow with the atom count; every other intermediate is bounded by the
 tile caps. Forces come from the edge-vector gradients (MACE's edge forces), the stress from the edge virial on a
-symmetric strain of the edge vectors. The result equals the whole-system call up to float32 rounding (the tiles'
-GEMMs see fewer rows; the force scatter is atomic).
+symmetric strain of the edge vectors (stress = dE/d(strain) / V, MACE's sign). The result equals the
+whole-system call up to float32 rounding (the tiles' GEMMs see fewer rows; the force scatter is atomic).
 
 Prototype scope: eager, no CUDA graphs, fixed cell per call, no PolarMACE, D3, joint embedding or embedding
 readout. Tiles are planned on the host from a spatial binning of the fractional coordinates.
@@ -327,7 +327,7 @@ class TiledForceField:
                 out_stress = None
                 if stress:
                     volume = torch.linalg.det(cell.to(torch.float64)).abs()
-                    out_stress = (-strain_grad / volume).to(self.dtype)
+                    out_stress = (strain_grad / volume).to(self.dtype)  # MACE: dE/d(strain) / V
             self.last = stats
             return ForceOutput(energy, forces, out_stress)
         finally:
