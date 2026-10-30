@@ -310,6 +310,13 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
     return torch.compile(private, mode=mode, fullgraph=False)
 
 
+# The model inputs indexed by edge (mark_edges_dynamic); every other input whose first dimension is the atom count is
+# per atom (mark_atoms_dynamic).
+EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
+# mark_atoms_dynamic: the atom dimension dynamic from the first compile (setup-across-compositions F5); False for A/Bs.
+MARK_ATOMS_DYNAMIC = True
+
+
 def mark_edges_dynamic(data):
     """Mark the edge dimension of a model input dict dynamic for torch.compile (plan task 2-T13).
 
@@ -322,9 +329,31 @@ def mark_edges_dynamic(data):
     """
     import torch
 
-    torch._dynamo.maybe_mark_dynamic(data["edge_index"], 1)
-    torch._dynamo.maybe_mark_dynamic(data["shifts"], 0)
-    torch._dynamo.maybe_mark_dynamic(data["unit_shifts"], 0)
+    for key, dim in (("edge_index", 1), ("shifts", 0), ("unit_shifts", 0)):
+        tensor = data[key]
+        torch._dynamo.maybe_mark_dynamic(tensor, dim)
+        # The edges are views of the neighbour list's capacity buffers. Unmarked, a buffer's size reached Inductor's
+        # FX-cache key as the views' storage size, so a cell with another capacity (a strained one) missed the cache
+        # (setup-across-compositions F5).
+        if tensor._base is not None:
+            torch._dynamo.maybe_mark_dynamic(tensor._base, dim)
+
+
+def mark_atoms_dynamic(data, atoms):
+    """Mark the atom dimension of the per-atom model inputs dynamic from the first compile (F5).
+
+    Unmarked, the first compile in a process specialises to its atom count, and another atom count in a later
+    process misses Inductor's FX cache; within a process Dynamo makes the dimension dynamic only after a second
+    count recompiles. Per-atom inputs are the tensors of ``data`` whose first dimension is ``atoms``.
+    ``MARK_ATOMS_DYNAMIC = False`` leaves them as before (A/Bs).
+    """
+    import torch
+
+    if not MARK_ATOMS_DYNAMIC or atoms < 2:  # 0 and 1 are specialised anyway
+        return
+    for key, tensor in data.items():
+        if torch.is_tensor(tensor) and tensor.dim() and tensor.shape[0] == atoms and key not in EDGE_KEYS:
+            torch._dynamo.maybe_mark_dynamic(tensor, 0)
 
 
 # --------------------------------------------------------------------------- the cache
@@ -431,6 +460,6 @@ def configure_allocator(enabled=True, environ=None, torch_version=None):
 __all__ = [
     "ALLOCATOR_MIN_TORCH", "ALLOCATOR_SETTINGS", "CompiledEntry", "CompiledModelCache", "FP64_EMULATION_SETTINGS",
     "compile_model", "configure_allocator", "configure_fp64_emulation", "cpu_cueq_problems", "fp64_emulation_active",
-    "install_engine_patches", "mark_edges_dynamic", "naive_cueq",
-    "private_copy", "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
+    "EDGE_KEYS", "MARK_ATOMS_DYNAMIC", "install_engine_patches", "mark_atoms_dynamic", "mark_edges_dynamic",
+    "naive_cueq", "private_copy", "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
 ]

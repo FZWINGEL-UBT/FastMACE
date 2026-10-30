@@ -929,6 +929,7 @@ class MACEForceField:
             from fastmace.model import compile as compiling
 
             compiling.mark_edges_dynamic(self.data)
+            compiling.mark_atoms_dynamic(self.data, self.positions.shape[0])
 
     # ------------------------------------------------------------------ one-off evaluation
 
