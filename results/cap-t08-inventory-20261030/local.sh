@@ -6,6 +6,7 @@
 # eager = compile_mode=none; rewrites FIELD=VALUE[,FIELD=VALUE]); kernels:<structure>:<NXxNYxNZ> (the conductor's
 # check 2: tools/bench/kernel_resources.py --smem-spilling, the plan's NVRTC kernels' local memory);
 # wrebuild:<structure>:<NXxNYxNZ> (tools/bench/wrebuild_bound.py, the w-rebuild falsifier's cost bound).
+# ckpt:<structure>:<NXxNYxNZ> (tools/bench/checkpoint_falsifier.py, item B: interaction-boundary checkpointing).
 # Before each job: no WSL compute process and utilisation <= 10 % in both nvidia-smi views for 30 s.
 # Template: results/capacity-16gb-20261029/local.sh.
 set -u -o pipefail
@@ -46,6 +47,8 @@ for job in "$@"; do
     saved) "$PY" "$FM/tools/bench/saved_tensors.py" --structure "$structure" --repeat "$repeat" \
              --output "$ROOT/saved" "${opts[@]}" > "$ROOT/saved-$structure-$repeat-$mode${rewrites:+-$rewrites}.log" 2>&1 < /dev/null ;;
     wrebuild) "$PY" "$FM/tools/bench/wrebuild_bound.py" --structure "$structure" --repeat "$repeat"                 --output "$ROOT/wrebuild" > "$ROOT/wrebuild-$structure-$repeat.log" 2>&1 < /dev/null ;;
+    ckpt) "$PY" "$FM/tools/bench/checkpoint_falsifier.py" --structure "$structure" --repeat "$repeat" \
+            --output "$ROOT/ckpt" > "$ROOT/ckpt-$structure-$repeat.log" 2>&1 < /dev/null ;;
     kernels) "$PY" "$FM/tools/bench/kernel_resources.py" --structure "$structure" --repeat "$repeat" \
                --output "$ROOT/kernels" --smem-spilling > "$ROOT/kernels-$structure-$repeat.log" 2>&1 < /dev/null ;;
     *) note "unknown job $job"; exit 2 ;;
