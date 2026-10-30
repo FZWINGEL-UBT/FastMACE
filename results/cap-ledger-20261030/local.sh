@@ -47,7 +47,7 @@ for job in "$@"; do
   case $job in
     ledger-*) IFS=- read -r _ structure repeat <<< "$job"
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat" \
-          --output "$ROOT/ledger" ;;
+          --output "$ROOT/ledger" --tag="${TAG:-}" ${LEDGER_ARGS:-} ;;
     point-*) IFS=- read -r _ structure repeat trace <<< "$job"
       # shellcheck disable=SC2086
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
