@@ -86,6 +86,14 @@ def _chunk_ops():
     def pieces(inputs, natoms, start, stop):
         return [x[start:stop] if x.dim() and x.shape[0] == natoms else x for x in inputs]
 
+    def with_autograd():
+        """A custom op's body runs below autograd's dispatch keys; the recompute needs them back."""
+        exclude = torch._C._dispatch_tls_local_exclude_set()
+        for key in torch._C.DispatchKey.__members__.values():
+            if exclude.has(key) and ("Autograd" in key.name or key.name == "ADInplaceOrView"):
+                exclude = exclude.remove(key)
+        return torch._C._ForceDispatchKeyGuard(torch._C._dispatch_tls_local_include_set(), exclude)
+
     # Explicit schemas: this module's annotations are strings (from __future__ import annotations).
     @torch.library.custom_op("fastmace_probe::atom_chunked", mutates_args=(),
                              schema="(Tensor[] inputs, int key) -> Tensor")
@@ -106,7 +114,7 @@ def _chunk_ops():
         natoms = inputs[0].shape[0]
         grads = [torch.zeros_like(x) for x in inputs]
         for a, b in bounds(natoms, chunks):
-            with torch.enable_grad():
+            with with_autograd(), torch.enable_grad():
                 part = [x.detach().requires_grad_(want) for x, want in zip(pieces(inputs, natoms, a, b), wanted)]
                 leaves = [x for x, want in zip(part, wanted) if want]
                 got = iter(torch.autograd.grad(run(*part), leaves, grad[a:b]))
