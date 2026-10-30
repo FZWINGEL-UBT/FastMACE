@@ -32,7 +32,15 @@ from ase import units
 from fastmace.config import IntegratorConfig
 
 from .base import CONSERVED_KEY, Integrator
-from .langevin import allocate_noise, base_output_values, check_ensemble, fixed_rows, kinetic_energy
+from .langevin import (
+    allocate_noise,
+    base_output_values,
+    check_ensemble,
+    fixed_rows,
+    kinetic_energy,
+    noise_steps,
+    refill_noise,
+)
 from .nve import constrained_drift, drift, half_kick, remove_momentum
 
 if TYPE_CHECKING:
@@ -78,7 +86,7 @@ class CSVR(Integrator):
             raise ValueError(f"CSVR needs a positive tau_fs parameter, got {tau_fs!r}")
         self.taut = tau_fs * units.fs
         self.fix_com = config.fixcm
-        self.noise_batch = config.noise_batch
+        self.noise_batch = noise_steps(config.noise_batch, 2)
         self.fixed_rows = fixed_rows(state)
         self.x_old = None if self.fixed_rows is None else torch.zeros_like(state.positions)
         if math.isclose(float(kinetic_energy(state)), 0.0, rel_tol=0, abs_tol=1e-12):
@@ -119,8 +127,7 @@ class CSVR(Integrator):
     def prepare_step(self, state: SimulationState) -> None:
         rng = state.rng
         if rng.cursor == self.noise_batch:
-            rng.batch.copy_(torch.from_numpy(self._draw(rng.generator, self.noise_batch)))
-            rng.cursor = 0
+            refill_noise(rng, lambda steps: self._draw(rng.generator, steps))
         self.noise.copy_(rng.batch[rng.cursor])
         rng.cursor += 1
 

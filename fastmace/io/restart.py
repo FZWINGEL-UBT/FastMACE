@@ -234,7 +234,9 @@ def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[
         plan_revision=_count(state.plan_revision, "plan_revision"),
         physical=_json(_physical(state), "physical"),
     )
-    if state.rng.batch is not None:
+    if state.rng.queued is not None:  # rows queued past the batch: the unused rows, from the start
+        arrays.update(noise=state.rng.unused(), noise_next=0)
+    elif state.rng.batch is not None:
         arrays["noise"] = _numpy(state.rng.batch)
     if state.stress is not None:
         arrays["stress"] = _numpy(state.stress)
@@ -594,12 +596,18 @@ def load_state(restart: Mapping[str, Any], state: SimulationState, integrator: A
             _copy(getattr(state, name), restart[name], name)
     rng = state.rng
     rng.generator.bit_generator.state = json.loads(str(restart["rng_state"]))
-    if "noise" in restart:
-        if rng.batch is None:
-            rng.batch = torch.from_numpy(np.array(restart["noise"])).to(state.positions.device)
-        else:
-            _copy(rng.batch, restart["noise"], "noise")
+    rng.queued = None
     rng.cursor = int(restart["noise_next"])
+    if "noise" in restart:
+        noise = np.array(restart["noise"])
+        if rng.batch is None:
+            rng.batch = torch.from_numpy(noise).to(state.positions.device)
+        elif noise.shape != tuple(rng.batch.shape) and noise.shape[1:] == tuple(rng.batch.shape[1:]):
+            # Written with another batch size (CAP-T06): its unused rows go first, then the generator.
+            rng.queue(noise[rng.cursor:])
+            rng.cursor = rng.batch.shape[0]
+        else:
+            _copy(rng.batch, noise, "noise")
     state.step = int(restart["step"])
     if "plan_revision" in restart:
         state.plan_revision = int(restart["plan_revision"])

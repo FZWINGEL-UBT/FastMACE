@@ -172,11 +172,28 @@ class RandomStream:
     a seed gives ASE's numbers. ``batch`` is allocated by the integrator, whose noise layout it is
     (Langevin: ``(noise_batch, 2, N, 3)``; BAOAB: ``(noise_batch, 3N + cell numbers)``).
     ``cursor`` is the index of the next unused step; ``cursor == len(batch)`` means "refill".
+    ``queued`` (host, float64) holds drawn rows that come before the generator's next draw but are not in the
+    batch yet: those of a restart written with another batch size (CAP-T06 caps the batch's bytes). Refills
+    take them first; ``None`` when there are none.
     """
 
     generator: np.random.Generator
     batch: torch.Tensor | None = None
     cursor: int = 0
+    queued: np.ndarray | None = None
+
+    def queue(self, rows: np.ndarray) -> None:
+        """Put drawn rows before the ones already queued (they were drawn earlier)."""
+        rows = np.array(rows, dtype=np.float64)
+        if len(rows):
+            self.queued = rows if self.queued is None else np.concatenate([rows, self.queued])
+
+    def unused(self) -> np.ndarray | None:
+        """The drawn rows not used yet, in order: the batch's from the cursor on, then the queued ones."""
+        if self.batch is None:
+            return None
+        rows = self.batch[self.cursor:].cpu().numpy()
+        return rows if self.queued is None else np.concatenate([rows, self.queued])
 
 
 @dataclass

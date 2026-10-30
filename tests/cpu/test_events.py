@@ -271,6 +271,24 @@ def test_a_forgotten_host_constant_fails_the_check(monkeypatch):
 # --------------------------------------------------------------------------- rejected events
 
 
+def test_a_rejected_event_restores_the_queued_noise_rows():
+    """Rows queued past the noise batch (a restart written with another batch size, CAP-T06) come back too."""
+    engine = build(mode="checked")
+    rng = engine.state.rng
+    rng.cursor = rng.batch.shape[0]
+    queued = np.random.default_rng(5).standard_normal(size=(3, *rng.batch.shape[1:]))
+    rng.queued = queued
+
+    def evaluate(eng):
+        for _ in range(2):  # the refill takes the queued rows
+            eng.integrator.prepare_step(eng.state)
+        assert eng.state.rng.queued is None
+        return "rejected"
+
+    assert Transaction(engine, [Event("friction", values=0.035)], evaluate=evaluate).run() == "rejected"
+    assert rng.queued is queued and rng.cursor == rng.batch.shape[0]
+
+
 @pytest.mark.parametrize(("mode", "npt", "cell_mode"), CASES)
 @pytest.mark.parametrize("kind", ["masses", "friction", "both"])
 def test_a_rejected_event_restores_the_state_exactly(mode, npt, cell_mode, kind):

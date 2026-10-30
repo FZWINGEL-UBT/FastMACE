@@ -10,6 +10,7 @@ non-smooth Lennard-Jones on the host for the ASE comparisons, a harmonic tether 
 engine's eager ``GPULangevin`` and ``GPULangevinBAOAB`` steps.
 """
 
+import dataclasses
 import importlib
 import os
 import sys
@@ -466,6 +467,120 @@ def test_restart_round_trip(tmp_path, which):
     run_md(state, dyn, field, 20, lambda step: heating(30)(10 + step))
     run_md(resumed, resumed_dyn, resumed_field, 20, lambda step: heating(30)(10 + step))
     assert_same_run(resumed, state)
+
+
+# -------------------------------------------------------------------------- the noise batch's size (CAP-T06)
+
+def test_noise_steps_cap_the_batch_bytes():
+    from fastmace.integrators.langevin import NOISE_BATCH_BYTES, noise_steps
+
+    assert noise_steps(256, 6 * 108) == 256
+    assert noise_steps(3, 6) == 3
+    per_step = 6 * 46_656  # Langevin, 46,656 atoms
+    assert noise_steps(256, per_step) == NOISE_BATCH_BYTES // (8 * per_step) < 256
+    assert noise_steps(256, NOISE_BATCH_BYTES) == 1  # more than the cap per step: one step at a time
+
+
+@pytest.mark.parametrize("which", ["nvt", "npt-full"])
+def test_a_capped_batch_draws_ases_stream(monkeypatch, which):
+    """Above the byte cap the batch is shorter; the numbers and their order are the same."""
+    from fastmace.integrators import langevin as langevin_module
+
+    monkeypatch.setattr(langevin_module, "NOISE_BATCH_BYTES", 8 * (6 * 108) * 3)
+    reference = np.random.default_rng(SEED)
+    if which == "nvt":
+        state = new_state(argon())
+        dyn = Langevin(state, nvt_config(noise_batch=256))
+        assert tuple(state.rng.batch.shape) == (3, 2, 108, 3)
+        for _ in range(11):
+            dyn.prepare_step(state)
+            np.testing.assert_array_equal(dyn.xi.numpy(), reference.standard_normal(size=(108, 3)))
+            np.testing.assert_array_equal(dyn.eta.numpy(), reference.standard_normal(size=(108, 3)))
+    else:
+        state = new_state(argon(), compute_stress=True)
+        dyn = LangevinBAOAB(state, npt_config(False, noise_batch=256))
+        assert tuple(state.rng.batch.shape) == (5, 3 * 108 + 9)  # 333 numbers per step
+        for _ in range(14):
+            dyn.prepare_step(state)
+            np.testing.assert_array_equal(dyn.xi.numpy(), reference.normal(size=(108, 3)))
+            np.testing.assert_array_equal(dyn.zeta.numpy().reshape(3, 3), reference.normal(size=(3, 3)))
+
+
+@pytest.mark.parametrize("which", ["nvt", "npt-full"])
+@pytest.mark.parametrize("resumed_batch", [2, 5, 64])
+def test_a_restart_resumes_with_another_noise_batch(tmp_path, which, resumed_batch):
+    """A restart written with one batch size (a file from before the cap, or another atom count's cap) resumes
+    bitwise with another: its drawn-ahead rows are queued and used before the generator draws again. A restart
+    written while rows are still queued resumes bitwise too."""
+    atoms = argon(seed=4)
+    (name, cls, state, config), = [case for case in integrators(atoms) if case[0] == which]
+    dyn = cls(state, config)  # noise_batch 7
+    field = HarmonicForces(state)
+    start(state, dyn, field)
+    run_md(state, dyn, field, 10, heating(40))
+    assert state.rng.cursor == 3  # 4 rows drawn ahead and unused
+    path = tmp_path / restart_io.RESTART_NAME
+    restart_io.write_restart(path, state, engine="gpu", integrator_state=dyn.state_dict(),
+                             variable_cell=dyn.variable_cell)
+
+    def resume(path, batch):
+        resumed = new_state(atoms, compute_stress=state.stress is not None, seed=123)
+        resumed_dyn = cls(resumed, dataclasses.replace(config, noise_batch=batch))
+        assert resumed.rng.batch.shape[0] == batch
+        resumed_field = HarmonicForces(resumed)
+        start(resumed, resumed_dyn, resumed_field)
+        restart_io.load_state(restart_io.read_restart(path, engine="gpu"), resumed, resumed_dyn)
+        return resumed, resumed_dyn, resumed_field
+
+    resumed, resumed_dyn, resumed_field = resume(path, resumed_batch)
+    assert_same_run(resumed, state)
+    run_md(state, dyn, field, 1, lambda step: heating(40)(10 + step))
+    run_md(resumed, resumed_dyn, resumed_field, 1, lambda step: heating(40)(10 + step))
+    assert_same_run(resumed, state)
+    if resumed_batch == 2:
+        assert resumed.rng.queued is not None and len(resumed.rng.queued) == 2  # 4 queued, 2 in the batch
+
+    second = tmp_path / "second"
+    second.mkdir()
+    restart_io.write_restart(second / restart_io.RESTART_NAME, resumed, engine="gpu",
+                             integrator_state=resumed_dyn.state_dict(), variable_cell=resumed_dyn.variable_cell)
+    again, again_dyn, again_field = resume(second / restart_io.RESTART_NAME, 7)
+    for run in ((state, dyn, field), (resumed, resumed_dyn, resumed_field), (again, again_dyn, again_field)):
+        run_md(*run, 25, lambda step: heating(40)(11 + step))
+    assert_same_run(resumed, state)
+    assert_same_run(again, state)
+
+
+def test_a_restart_loaded_before_the_integrator_resumes_with_another_batch(tmp_path):
+    """The other order: the restart's batch is in the state first, and the integrator's own size replaces it."""
+    atoms = argon(seed=4)
+    state = new_state(atoms)
+    dyn = Langevin(state, nvt_config(noise_batch=7))
+    field = HarmonicForces(state)
+    start(state, dyn, field)
+    run_md(state, dyn, field, 10, heating(40))
+    path = tmp_path / restart_io.RESTART_NAME
+    restart_io.write_restart(path, state, engine="gpu", integrator_state=dyn.state_dict(), variable_cell=False)
+
+    resumed = new_state(atoms, seed=123)
+    restart_io.load_state(restart_io.read_restart(path, engine="gpu"), resumed, None)
+    assert tuple(resumed.rng.batch.shape) == (7, 2, 108, 3) and resumed.rng.cursor == 3
+    resumed_dyn = Langevin(resumed, nvt_config(noise_batch=3))
+    assert tuple(resumed.rng.batch.shape) == (3, 2, 108, 3)
+    resumed_dyn.load_state_dict(dyn.state_dict())
+    resumed_dyn.start(resumed)
+    resumed_field = HarmonicForces(resumed)
+    resumed_field.x0 = field.x0
+    run_md(state, dyn, field, 20, lambda step: heating(40)(10 + step))
+    run_md(resumed, resumed_dyn, resumed_field, 20, lambda step: heating(40)(10 + step))
+    assert_same_run(resumed, state)
+
+
+def test_a_batch_of_another_layout_is_refused():
+    state = new_state(argon(), compute_stress=True)
+    Langevin(state, nvt_config(noise_batch=7))
+    with pytest.raises(ValueError, match="noise batch"):
+        LangevinBAOAB(state, npt_config(True, noise_batch=7))
 
 
 # -------------------------------------------------------------------------- 1b: barostat state and config

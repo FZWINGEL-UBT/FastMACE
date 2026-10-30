@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import dataclasses
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import torch
 from ase import units
 
@@ -24,23 +25,52 @@ from fastmace.config import IntegratorConfig
 from .base import Integrator
 
 if TYPE_CHECKING:
-    from fastmace.state import SimulationState
+    from fastmace.state import RandomStream, SimulationState
+
+
+# The drawn-ahead noise batch holds at most this many bytes of float64 (CAP-T06), so its device memory stops growing
+# with the atom count: 256 Langevin steps up to 5,461 atoms, 27 steps at 50,000 atoms (0.57 GiB at 256). The numbers
+# and their order do not depend on the batch size.
+NOISE_BATCH_BYTES = 64 * 2**20
+
+
+def noise_steps(limit: int, numbers: int) -> int:
+    """Steps per drawn-ahead batch: at most ``limit`` (``IntegratorConfig.noise_batch``) and at most
+    ``NOISE_BATCH_BYTES`` of float64 for ``numbers`` per step, but at least one."""
+    return max(1, min(limit, NOISE_BATCH_BYTES // (8 * numbers)))
 
 
 def allocate_noise(state: SimulationState, shape: tuple[int, ...]) -> None:
     """Give ``state.rng`` a drawn-ahead batch of ``shape`` (marked used up, so the first step refills it).
 
     A batch already there (a restart loaded before the integrator was built) is kept with its cursor
-    if it has the integrator's layout.
+    if it has the integrator's shape. One of another length with the same layout (a restart written with
+    another batch size) gives its unused rows to ``rng.queued``, which the next refills use first.
     """
     rng = state.rng
     if rng.batch is not None:
-        if tuple(rng.batch.shape) != shape:
+        if tuple(rng.batch.shape) == shape:
+            return
+        if tuple(rng.batch.shape[1:]) != shape[1:]:
             raise ValueError(f"the state's noise batch has shape {tuple(rng.batch.shape)}, the integrator "
                              f"draws {shape}")
-        return
+        rng.queue(rng.batch[rng.cursor:].cpu().numpy())
     rng.batch = torch.zeros(shape, dtype=torch.float64, device=state.positions.device)
     rng.cursor = shape[0]
+
+
+def refill_noise(rng: RandomStream, draw: Callable[[int], np.ndarray]) -> None:
+    """Refill the used-up ``rng.batch``: the queued rows first (at its end, so the cursor runs into them), else
+    ``draw(steps)`` new steps from the generator, in its order."""
+    size = rng.batch.shape[0]
+    if rng.queued is None:
+        rng.batch.copy_(torch.from_numpy(draw(size)))
+        rng.cursor = 0
+        return
+    rows, rest = rng.queued[:size], rng.queued[size:]
+    rng.queued = rest if len(rest) else None
+    rng.cursor = size - len(rows)
+    rng.batch[rng.cursor:].copy_(torch.from_numpy(np.ascontiguousarray(rows)))
 
 
 def fixed_rows(state: SimulationState) -> torch.Tensor | None:
@@ -94,7 +124,7 @@ class Langevin(Integrator):
         self.fix_com = config.fixcm
         self.mass_weighted_com = config.fixcm_projection == "mass_weighted"
         self.natoms = state.natoms
-        self.noise_batch = config.noise_batch
+        self.noise_batch = noise_steps(config.noise_batch, 6 * self.natoms)
         masses = state.masses
         self.x_old = torch.zeros_like(state.positions)
         self.xi = torch.zeros_like(state.positions)
@@ -155,9 +185,7 @@ class Langevin(Integrator):
     def prepare_step(self, state: SimulationState) -> None:
         rng = state.rng
         if rng.cursor == self.noise_batch:
-            draws = rng.generator.standard_normal(size=(self.noise_batch, 2, self.natoms, 3))
-            rng.batch.copy_(torch.from_numpy(draws))
-            rng.cursor = 0
+            refill_noise(rng, lambda steps: rng.generator.standard_normal(size=(steps, 2, self.natoms, 3)))
         self.xi.copy_(rng.batch[rng.cursor, 0])
         self.eta.copy_(rng.batch[rng.cursor, 1])
         rng.cursor += 1
