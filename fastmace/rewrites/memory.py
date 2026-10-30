@@ -30,6 +30,10 @@ _STREAMING_INDEX_BYTES = 2 * 4
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
 _RADIAL_TABLES_SHARE = 576 / 8265
 _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
+# recompute_node_segments: the force call's peak fell by 64.2 kB per atom at NbCl5 21,600 atoms and 63.3 kB at 9,216
+# (compiled default plan, recompute_conv_weights on; docs/validation/capacity-T08-chunks.md), 0.202 and 0.199 of
+# MH-1's stock 317,440 B per node in float32.
+_NODE_SEGMENTS_SHARE = 0.20
 
 
 def _first_hidden(block) -> int:
@@ -120,6 +124,19 @@ def recompute_conv_weights(dims, width):
     return -sum(block.weight_numel for block in dims.interactions[1:]) * width, 0
 
 
+def _stock_node_floats(dims) -> int:
+    """The floats per node stock MACE keeps for the force backward over all interactions
+    (``planner.memory.interaction_floats``'s node term)."""
+    return sum(block.node_in + block.messages + block.target + block.correlation * block.target
+               + max(block.hidden, block.node_in) for block in dims.interactions)
+
+
+def recompute_node_segments(dims, width):
+    """The node-local segments recomputed in the backward keep only their inputs: ``_NODE_SEGMENTS_SHARE`` of the
+    stock per-node floats less at the force call's peak (fitted on the compiled default plan's peaks, CAP-T08)."""
+    return 0, -round(_NODE_SEGMENTS_SHARE * _stock_node_floats(dims)) * width
+
+
 def radial_tables(dims, width):
     """Tabulated radial networks keep no hidden activations per edge (measured)."""
     return -round(_RADIAL_TABLES_SHARE * _stock_edge_floats(dims)) * width, 0
@@ -154,7 +171,7 @@ def segment_gemm_selfcheck(dims, width, sms):
 _SEGMENT_SELFCHECK_TENSORS = 9
 
 
-__all__ = ["block_linear_resident", "chunked_conv_backward", "factor_species", "fold_cutoff", "fused_radial_hidden",
-           "generic_reassociate", "joint_radial_input", "merged_residual_resident", "mh1_streaming_conv",
-           "radial_tables", "reassociate_first", "recompute_conv_weights", "segment_gemm_selfcheck",
-           "streaming_conv"]
+__all__ = ["block_linear_resident", "chunked_conv_backward", "factor_species",
+           "fold_cutoff", "fused_radial_hidden", "generic_reassociate", "joint_radial_input",
+           "merged_residual_resident", "mh1_streaming_conv", "radial_tables", "reassociate_first",
+           "recompute_conv_weights", "recompute_node_segments", "segment_gemm_selfcheck", "streaming_conv"]

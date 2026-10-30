@@ -16,6 +16,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   rule 12 turns it on for a cell that cannot fit (its estimate divided by 1.34 does not fit 90 % of the free memory), and
   `Simulation` rebuilds once with it on after an out-of-memory error at build or capture
   (`fallback.memory_rescue`; a sticky CUDA context raises the error with the fix).
+- `RewriteConfig.recompute_node_segments` (plans/capacity.md CAP-T08, rounding, deterministic): each interaction's
+  `gated_rows` chain and product block run under non-reentrant `torch.utils.checkpoint` inside the compiled graph,
+  so the force call keeps only their inputs (64 kB per atom less for MH-1) at 1.095 times the step time. MH-1 float32
+  on a 16 GB RTX 5060 Ti: NbCl5 51,840 to 69,984 atoms, NaCl 49,248 to 67,200. Off; rule 12 turns it on only when
+  the plan does not fit with `recompute_conv_weights` on (`planner.memory.MEMORY_RESCUE`), and `Simulation` rebuilds
+  with one more rescue record per out-of-memory error while one is left.
 - The graph engine keeps the large buffers of its capture and warm-up snapshots in pinned host memory (CAP-T05),
   about 0.5 GiB less at the force stage's peak on large cells.
 - Leaner neighbour list (plans/capacity.md CAP-T09, exact): int32 candidate indices, and no stored candidate

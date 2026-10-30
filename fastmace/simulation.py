@@ -610,8 +610,9 @@ class Simulation:
         try:
             failure = self._build_and_prepare(planner, ff, atoms, stored, setup)
         except Exception as error:
-            # CAP-T07: an out-of-memory error at build or capture rebuilds once with the memory rescue's records
-            # on, when the caller left them "auto"; any other error, or none to turn on, is raised as before.
+            # CAP-T07, CAP-T08: an out-of-memory error at build or capture rebuilds with the memory rescue's next
+            # record on (memory.MEMORY_RESCUE's order, one per rebuild), when the caller left it "auto"; any other
+            # error, or none left to turn on, is raised as before.
             if stored is not None or getattr(self, "_resuming", False):
                 raise
             rescue = fallback.memory_rescue(self._plan, error, ff, atoms, planner=planner,
@@ -619,11 +620,18 @@ class Simulation:
             if rescue is None:
                 raise
             fallback.detach(error)  # its frames hold the failed engine (2-T15c)
-        if rescue is not None:
+        while rescue is not None:
             self._engine = self._fill = None
             fallback._release()  # the failed engine's graphs and pools, before the rebuild
-            self._plan = rescue
-            failure = self._build_and_prepare(planner, ff, atoms, stored, setup)
+            self._plan, rescue = rescue, None
+            try:
+                failure = self._build_and_prepare(planner, ff, atoms, stored, setup)
+            except Exception as error:
+                rescue = fallback.memory_rescue(self._plan, error, ff, atoms, planner=planner,
+                                                stage=getattr(error, "fastmace_build_step", "build"))
+                if rescue is None:
+                    raise
+                fallback.detach(error)
 
         # The production half through this engine; GateFailed (and the unavailable record under
         # check="allow_unavailable") come from selfcheck. The record is final: sim.gate.

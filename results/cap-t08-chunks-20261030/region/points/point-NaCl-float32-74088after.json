@@ -1,0 +1,105 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-30T17:33:38.621675+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "bc1df9ab1451b41049fc373433281ce4c28ea85b",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "mh1-r2scan",
+  "structure": "NaCl",
+  "precision": "float32",
+  "repeat": "21x21x21",
+  "natoms": 74088,
+  "volume_A3": 1616056.560500496,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "oom",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15894315008,
+      "outside_allocator": 1208549376
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 1507,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "builtins.RuntimeError",
+    "message": "CUDA driver error: device not ready\nThe CUDA driver logged these messages, which may provide useful details:\nFailed to create GPU mapping\n\nFastMACE: the CUDA context is not usable after this build error, so the fallback cannot run in this process. Rule 12 had warned that the plan may not fit the free GPU memory, so it is most likely out of memory: run again in a fresh process with a smaller cell.",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/planner/minimal.py:1148 build: engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(",
+      "fastmace/planner/fixed.py:1449 build: return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,",
+      "fastmace/engine/graph.py:235 __init__: self._initial_forces()",
+      "fastmace/engine/graph.py:1123 _initial_forces: self._force_stage()",
+      "fastmace/engine/graph.py:1127 _force_stage: out = self.force_field(self.state.positions)",
+      "fastmace/model/forces.py:737 __call__: out = self._outputs(positions)",
+      "fastmace/model/forces.py:749 _outputs: return self._split_outputs(self._compute_stress)",
+      "fastmace/model/forces.py:771 _split_outputs: forces, virials, stress_out, _, _ = utils.get_outputs(",
+      "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _: torch.empty((size_0, size_1), dtype=dtype, device=tensors[0].device)"
+    ],
+    "memory": {
+      "max_allocated": 13732546560,
+      "max_reserved": 15485370368,
+      "allocated": 10671553024,
+      "reserved": 15485370368,
+      "inactive_split_bytes": 0,
+      "active_bytes": 13732546560,
+      "reserved_bytes": 15485370368,
+      "alloc_retries": 0,
+      "segments": 0
+    },
+    "causes": []
+  },
+  "times": {
+    "load_s": 3.2212960130000283
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

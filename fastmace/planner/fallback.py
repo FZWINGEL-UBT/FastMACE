@@ -402,9 +402,11 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
 
     ``None`` unless ``error`` is an out-of-memory error and the plan has a record of ``memory.MEMORY_RESCUE`` off
     that the caller left "auto" and whose requirements are on. Then, if the device is still usable, a revision of
-    ``plan`` with those records on (``candidate``: "fallback: rewrites recompute_conv_weights on: out of memory at
-    build; ..."), which the run record keeps in ``Plan.revisions``. If the context is not usable (a sticky CUDA
-    error), ``error`` is raised again with a note naming the fix: the records set "on" in a fresh process.
+    ``plan`` with the first such record in ``MEMORY_RESCUE``'s order on (``candidate``: "fallback: rewrites
+    recompute_conv_weights on: out of memory at build; ..."), which the run record keeps in ``Plan.revisions``.
+    One record per rebuild (CAP-T08): ``recompute_node_segments`` only after ``recompute_conv_weights`` is on. If the
+    context is not usable (a sticky CUDA error), ``error`` is raised again with a note naming the fix: the records set
+    "on" in a fresh process.
     """
     from fastmace.planner.memory import MEMORY_RESCUE, annotate_out_of_memory
 
@@ -420,6 +422,7 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
             continue
         if all(not _off(getattr(plan.rewrites, other, "off")) for other in record.requires):
             names.append(name)
+            break  # one record per rebuild, in MEMORY_RESCUE's order
     if not names:
         return None
     if not usable(plan.engine.device):
