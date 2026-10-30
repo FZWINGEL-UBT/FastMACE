@@ -629,7 +629,13 @@ class TiledForceField:
                     key * step)
             slot = self._slots.get(key)
             if slot is None or any(a > b for a, b in zip(need, slot["sizes"])):
-                grown = need if slot is None else tuple(max(a, b) for a, b in zip(need, slot["sizes"]))
+                if slot is None:
+                    grown = need
+                else:  # an exceeded size grows by at least a quarter (receivers at most the cap), so a slot changes
+                    # a few times, not once per tile a little larger than the last
+                    rows_cap = min(int(self.config.receivers), row_ptr.shape[0] - 1) + 1
+                    grown = tuple(b if a <= b else max(a, math.ceil(1.25 * b)) for a, b in zip(need, slot["sizes"]))
+                    grown = (min(grown[0], max(rows_cap, need[0])), grown[1], grown[2])
                 self._slots[key] = self._new_slot(grown)
                 self.slot_changes += 1
         return keys
