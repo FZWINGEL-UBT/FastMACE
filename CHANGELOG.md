@@ -119,6 +119,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- `segment_gemm` uses 128-row tiles with 8 warps on the RTX 4000 Ada (decision 66,
+  `tile_rule.LARGE_TILE_GPUS`; bitwise equal): MH-1 float32 step 0.986-0.995 times on NbCl5 and NaNbO3. The
+  28 October screen that called them neutral had measured the default against itself; the RTX 5060 Ti and the
+  A100 keep 64-row tiles (docs/validation/ab-constants-audit-20261030.md).
 - `segment_gemm` runs a row tile's column tiles next to each other when the product's A is larger than the
   L2, on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, `tile_rule.COLUMN_ORDER_GPUS`): bitwise equal, A is
   read from DRAM about once instead of once per column tile. MH-1 float32 step at NbCl5 9,216 atoms 0.94 times

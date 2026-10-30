@@ -105,13 +105,26 @@ only file that differs). Setup:
 
 ### tiles128 (128 rows and 8 warps against 64 and 4)
 
-Same-process A/Bs with the fixed tool, MH-1 hybrid float32 NVT 300 K, b/a in build order ab / ba
-(`results/segment-gemm-order-20261030/tiles128.sh`):
+Same-process A/Bs with the fixed tool, MH-1 hybrid float32 NVT 300 K, side b `TRITON_BLOCK_M=128`,
+`TRITON_NUM_WARPS=8`. Each side ran in one tile order: the old row-first order, or the new column order.
+`results/segment-gemm-order-20261030/tiles128.sh`. Figures are b/a, build order ab / ba.
 
-| Cell | RTX 4000 Ada, row order | RTX 4000 Ada, column order | RTX 5060 Ti | A100 |
+| Cell | Tile order | RTX 4000 Ada (leto) | RTX 5060 Ti (local) | A100-SXM4-40GB (Modal) |
 |---|---|---|---|---|
-| NbCl5 4×4×8, 9,216 atoms | 0.999 / 0.996 | 0.987 / 0.986 | pending | pending |
-| NbCl5 3×3×3, 1,944 atoms | 0.990 / 0.989 | 0.989 / 0.989 | pending | pending |
-| NaNbO3 3×3×3, 1,080 atoms | 0.994 / 0.994 | 0.995 / 0.994 | pending | pending |
+| NbCl5 4×4×8, 9,216 atoms | rows | 0.999 / 0.996 | 1.001 / 1.002 | 1.021 / 1.021 |
+| | columns | **0.987 / 0.986** | 0.996 / 0.994 | 1.021 / 1.021 |
+| NbCl5 3×3×3, 1,944 atoms | rows | **0.990 / 0.989** | 1.017 / 1.004 | 1.000 / 1.000 |
+| | columns | **0.989 / 0.989** | 1.020 / 1.007 | 1.000 / 1.000 |
+| NaNbO3 3×3×3, 1,080 atoms | rows | **0.994 / 0.994** | 1.004 / 0.992 | 0.999 / 0.999 |
+| | columns | **0.995 / 0.994** | 1.001 / 0.996 | 0.999 / 1.000 |
 
-The 28 October screen's "neutral" was the bug: on Ada the 128-row tiles gain 0.5–1.4 % in both build orders.
+- **The 28 October verdict was the bug.** The screen called the tiles neutral, but on the RTX 4000 Ada they gain
+  0.5–1.4 % on every cell in both build orders.
+- **Elsewhere they do not.** The RTX 5060 Ti loses at NbCl5 1,944 atoms in both build orders. The A100 loses 2.1 %
+  at 9,216 atoms.
+- **The default (decision 66):** 128/8 is on for `NVIDIA RTX 4000 Ada Generation` only (`tile_rule.LARGE_TILE_GPUS`,
+  8b074e61). Every other GPU keeps 64/4. The products are bitwise equal: the new GPU test
+  `test_large_tiles_equal_the_default_tiles_bitwise` passed on the Ada.
+- **The A100:** Modal served an A100-SXM4-40GB for this run. The tile-order A/Bs had run on the 80 GB card, which
+  is the one `wprime_backward` defaults to.
+- **Records:** results/ab-constants-audit-20261030/tiles128/.
