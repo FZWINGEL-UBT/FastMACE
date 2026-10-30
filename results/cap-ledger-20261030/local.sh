@@ -13,7 +13,7 @@ ROOT=$1; shift
 FM=${FM:?set FM to a pinned source copy}
 B=$HOME/fastmace-baseline/1a-T18
 PY=$HOME/environments/mace_cueq_oeq/bin/python
-CACHE=$HOME/fastmace-cache/cap-ledger-local
+CACHE=${LEDGER_CACHE:-$HOME/fastmace-cache/cap-ledger-local}  # a fresh compiler cache per screen: LEDGER_CACHE
 WSMI=/mnt/c/Windows/System32/nvidia-smi.exe
 mkdir -p "$ROOT/tmp" "$CACHE"
 export PYTHONDONTWRITEBYTECODE=1 FASTMACE_CACHE=$CACHE FASTMACE_MODELS=$HOME/models \
