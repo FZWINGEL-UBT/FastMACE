@@ -105,6 +105,17 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- Setup across compositions (fixes F1, F2, F3, F5; `docs/validation/setup-fixes.md`):
+  - The converted-model templates belong to the `LoadedModel`, so every `ForceField` of one `fm.load` result
+    shares them.
+  - The OEq kernel ids come from the kernel's content, and radial-table pieces are padded to a bucket of 16.
+  - A compiled OEq `ScaleShiftMACE` takes MACE's gradient step after the compiled call, which removes the graph
+    break and the Dynamo restart.
+  - The edge capacity buffers and the per-atom inputs are marked dynamic.
+  - Effect on the RTX 5060 Ti: a later composition in the same process builds in about 11 s, down from 16 s; a
+    same-species-count composition on a cold cache in 11–15 s, down from 23–26 s; a new atom count across
+    processes in 18.7 s, down from 30.4 s.
+  - Step time is unchanged.
 - Rule 12 (decision 67, owner): the memory estimate predicts the measured peak of MH-1's fused path (1.0-1.4x,
   was 1.5-2.3x), and a rewrite is turned off for memory only when the plan would not fit with it on and turning it
   off lowers the estimate. Large MH-1 cells keep `streaming_conv` and its dependants: on the RTX 5060 Ti NaCl float32
