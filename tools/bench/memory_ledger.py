@@ -158,10 +158,16 @@ def pool_view(snapshot, engine, trace):
         if e["action"] == "alloc":
             streams[str(e.get("stream"))] += e["size"]
     sizes = sorted((s["total_size"] for s in segments), reverse=True)
+    # Every event inside the pool's segments, segment mappings included, compactly: [action, address, size, site]
+    # in trace order (pool_packing.py replays them offline).
+    compact = [[e["action"], int(e["addr"]), int(e["size"]),
+                activation_profile._site(e.get("frames") or [])[0] if e["action"] == "alloc" else ""]
+               for e in trace if inside(e["addr"])]
     return dict(reserved=int(sum(sizes)), segments=len(sizes), largest_segments=sizes[:10], live_peak=int(live_peak),
                 held_peak=int(held_peak), held_at_peak=held, free=int(sum(free)),
                 largest_free=int(max(free, default=0)), free_blocks=len(free), events=len(events),
-                alloc_bytes_by_stream=dict(streams))
+                alloc_bytes_by_stream=dict(streams), segment_ranges=[[lo, hi] for lo, hi in ranges],
+                event_list=compact)
 
 
 def live_until_completed(events):
