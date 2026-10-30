@@ -5,7 +5,7 @@
 # Jobs:
 #   gputest: tests/gpu/test_kernels_triton_cuda.py (edge_outer_sum's backward bitwise against the research engine's,
 #     FASTMACE_BASELINE set) and tests/gpu/test_gated_products_cuda.py (the K-outer kernel, no register spills);
-#   gate: tools/force_stress_gate.py, default plan (NaCl NbCl5 NaNbO3);
+#   gate: tools/force_stress_gate.py, default plan (NaCl NbCl5 NaNbO3); gate-epi: the same with gate_epilogue on;
 #   ab-<item>-<structure>-<size>-<order>: a same-process A/B, size small (NaCl and NbCl5 3x3x3, NaNbO3 4x4x3:
 #     216, 1,944, 1,920 atoms; 12 blocks of 300 steps) or big (NbCl5 4x4x8, NaNbO3 6x6x6: 9,216, 8,640 atoms;
 #     8 blocks of 100 steps after 100 warm-up steps), order ab (pattern abab) or ba (abba); item
@@ -59,6 +59,9 @@ for job in "$@"; do
     gate) PYTHONPATH=$FM run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate" --engine fastmace \
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --reference-command "$PYT" --production-command "$PY" ;;
+    gate-epi) PYTHONPATH=$FM run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate-epi" --engine fastmace \
+              --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
+              --reference-command "$PYT" --production-command "$PY" --rewrites gate_epilogue=on ;;
     ab-*) IFS=- read -r _ item structure size order <<< "$job"
       pattern=$([ "$order" = ab ] && echo abab || echo abba)
       spec=$structure; extra=()

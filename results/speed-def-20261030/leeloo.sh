@@ -55,6 +55,9 @@ for job in "$@"; do
     gate) PYTHONPATH=$FM run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate" --engine fastmace \
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --reference-command "$PYT" --production-command "$PY" ;;
+    gate-epi) PYTHONPATH=$FM run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate-epi" --engine fastmace \
+              --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
+              --reference-command "$PYT" --production-command "$PY" --rewrites gate_epilogue=on ;;
     profile-*) IFS=- read -r _ structure repeat <<< "$job"; dir=$ROOT/profile/$structure-$repeat
       mkdir -p "$ROOT/profile"
       PYTHONPATH=$FM TORCH_LOGS=output_code run "$job" "$PY" "$FM/tools/step_breakdown.py" --output "$dir"           "${COMMON[@]}" --structure "$structure@$repeat"
