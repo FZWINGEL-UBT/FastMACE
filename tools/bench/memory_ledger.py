@@ -74,6 +74,8 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=20, help="steady steps after the warm-up")
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--top", type=int, default=25)
+    p.add_argument("--refuse", action="store_true",
+                   help="FallbackConfig(fallback='refuse'): the first failure is raised")
     p.add_argument("--second-pool", nargs="*", default=[], choices=sorted(SECOND_POOL_OPS),
                    help="experiment: run these ops' CUDA kernels with their allocations in a second MemPool "
                         "(torch.cuda.use_mem_pool), so their large buffers do not fragment the graph pool")
@@ -247,7 +249,10 @@ def main(argv=None):
     field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision)
     torch.cuda.synchronize()
     points.append(memory_point(torch, "force field loaded"))
-    sim = fm.Simulation(atoms, field, seed=1, integrator=fm.integrators.Langevin(
+    from fastmace.config import FallbackConfig
+
+    fallback = {"fallback": FallbackConfig(fallback="refuse")} if args.refuse else {}
+    sim = fm.Simulation(atoms, field, seed=1, **fallback, integrator=fm.integrators.Langevin(
         timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.002))
     torch.cuda.synchronize()
     points.append(memory_point(torch, "simulation built (first captures)"))
