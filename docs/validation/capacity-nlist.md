@@ -138,7 +138,18 @@ comparison. Those are single processes near the memory limit, and the A/B is the
 
 - **Exact by construction**: the same integer unit shifts and the same `times_3x3` arithmetic, done in `compact`
   instead of the build. Every list test compares the compacted edges byte for byte.
-- **After the switch was removed:** FINAL_TESTS
+- **After the switch was removed** (commit `6f802986`):
+  - **CPU, on leto** (busy check 0, GPU hidden, `-n 8`, `FASTMACE_BASELINE` set): **438 passed, 0 skipped**. The
+    files are those listed below plus `test_layering.py`.
+    - `test_neighbors_lean.py` checks the layout (60 B per slot, int32 indices, `build_cell`).
+    - It also checks that the compacted shifts equal numpy's `unit_shifts @ cell`, cast, on every test structure, both
+      builds and both precisions, padding included.
+    - It also checks chunk independence and MC trial lists.
+    - The baseline tests in `test_neighbors.py` compare the shifts `compact` computes with the research engine's
+      stored ones.
+  - **GPU, local RTX 5060 Ti:** **89 passed**, 60 skipped (the GPU baseline comparisons). The fused stage still
+    writes the PyTorch stage's bytes. The chunked Triton build equals the build in one chunk, and the build's peak
+    stays below 64 B per pair.
 - **Up to commit `787e44df`, with the old layout still selectable.**
 - **CPU, on coraline** (GPU hidden, `-n 8`, commit `93a7cc6d`, with `FASTMACE_BASELINE` set): **465 passed, 0
   skipped**. The files: `test_neighbors.py` (including the research-engine baseline comparisons, now on the compacted
