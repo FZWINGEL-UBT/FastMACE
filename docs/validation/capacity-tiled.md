@@ -92,6 +92,7 @@ plan, the path of `fm.ForceField.evaluate`.
 | NbCl5 4×4×8 | 9,216 | 8.5e-7 | 2.3e-5 | 8.6e-7 | 2.50 | 2.8e-9 | 1.37 / 3.19 | 0.25 / 0.10 s |
 | NbCl5 5×5×12 | 21,600 | 1.9e-6 | 3.3e-5 | 9.0e-7 | 2.74 | 2.6e-9 | 1.61 / 7.47 | 0.52 / 0.26 s |
 | NaCl 8×8×8 | 4,096 | 6.9e-6 | 5.0e-6 | 2.1e-7 | 0.25 | 1.9e-9 | 1.37 / 1.54 | 0.42 / 0.05 s |
+| NaNbO3 6×6×6 | 8,640 | −9.1e-6 | 1.8e-5 | 1.1e-6 | 3.77 | 1.9e-8 | 1.73 / 5.24 | 0.45 / 0.15 s |
 
 The differences are float32 rounding: about 1e-5 of the largest force component. The tiles' GEMMs see fewer rows,
 and the edge-force scatter order differs. The gate against float64 is below.
