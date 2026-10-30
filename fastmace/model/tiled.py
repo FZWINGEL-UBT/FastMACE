@@ -6,15 +6,19 @@ interaction's input is the species embedding). One force call runs the rewritten
 of receivers, the edges into them and the halo of their senders, laid out as MACE's LAMMPS ghosts so that the
 interactions cut their outputs to the receivers themselves. Three sweeps:
 
-1. interaction 0 forward without autograd: the inter-layer features h1 of every atom, kept globally;
-2. interaction 1 forward and backward: the adjoint dE/dh1, scattered over the tile and its halo, and the edge
-   gradients of the second interaction;
-3. interaction 0 again, with autograd, backward of its own energy terms plus <dE/dh1, h1>: the remaining edge
-   gradients.
+1. interaction 0 forward without autograd. Of the inter-layer features h1 only interaction 1's two reads of
+   them are kept globally: x = linear_up(h1) and sc = skip_tp(h1), both linear (MH-1: 512 columns each, against
+   about 2,100 for h1);
+2. interaction 1 forward and backward on x and sc (its linear_up and skip_tp stand in for the stored values): the
+   adjoints dE/dx, scattered over the tile and its halo, and dE/dsc of the receivers, and the edge gradients of
+   the second interaction;
+3. interaction 0 again, with autograd, backward of its own energy terms plus <dE/dx, x> + <dE/dsc, sc> of the
+   recomputed h1: the remaining edge gradients.
 
-Only h1, its adjoint and per-atom outputs grow with the atom count; every other intermediate is bounded by the
-tile caps. Forces come from the edge-vector gradients (MACE's edge forces), the stress from the edge virial on a
-symmetric strain of the edge vectors (stress = dE/d(strain) / V, MACE's sign). The result equals the
+Only x, sc, their adjoints and per-atom outputs grow with the atom count (MH-1: 8 kB per atom); every other
+intermediate is bounded by the tile caps. Forces come from the edge-vector gradients (MACE's edge forces), the
+stress from the edge virial on a symmetric strain of the edge vectors (stress = dE/d(strain) / V, MACE's sign).
+The result equals the
 whole-system call up to float32 rounding (the tiles' GEMMs see fewer rows; the force scatter is atomic).
 
 Prototype scope: eager, no CUDA graphs, fixed cell per call, no PolarMACE, D3, joint embedding or embedding
@@ -24,6 +28,7 @@ readout. Tiles are planned on the host from a spatial binning of the fractional 
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import math
 from typing import Any
 
@@ -54,6 +59,17 @@ class _Ghosts:
 
 
 _GHOSTS = _Ghosts()
+
+
+def _given(value):
+    """Stand-in for a module of interaction 1 in sweep 2: returns ``value``, whatever its input."""
+    import torch
+
+    class Given(torch.nn.Module):
+        def forward(self, *args, **kwargs):
+            return value
+
+    return Given()
 
 
 def plan_tiles(positions, cell, row_ptr, receivers, edges):
@@ -121,6 +137,10 @@ class TiledForceField:
         self.device = field.device
         self.dtype = field.dtype
         self._big = torch.tensor(torch.iinfo(torch.int64).max, device=self.device)
+        skip = model.interactions[1].skip_tp
+        required = [p for p in inspect.signature(skip.forward).parameters.values()
+                    if p.default is p.empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+        self._skip_takes_attrs = len(required) >= 2
         self.last = {}
 
     @property
@@ -172,8 +192,16 @@ class TiledForceField:
             lammps_natoms=(r, node_feats.shape[0] - r))
         return model.products[index](node_feats=feats, sc=sc, node_attrs=node_attrs[:r])
 
-    def _first(self, tile, h1=None, adjoint=None, strain=None):
-        """Sweep 1 (``h1`` given: write it, no autograd) or sweep 3 (``adjoint`` given: edge gradients).
+    def _consumers(self, h1, attrs):
+        """Interaction 1's two reads of h1: ``(linear_up(h1), skip_tp(h1))`` (``skip_tp`` with the species when
+        it takes them)."""
+        interaction = self.model.interactions[1]
+        sc = interaction.skip_tp(h1, attrs) if self._skip_takes_attrs else interaction.skip_tp(h1)
+        return interaction.linear_up(h1), sc
+
+    def _first(self, tile, state, adjoint=False, strain=None):
+        """Sweep 1 (``adjoint`` False: interaction 1's inputs of the receivers into ``state``, no autograd) or
+        sweep 3 (``adjoint`` True: the edge gradients of interaction 0's energy and of the adjoints).
 
         Returns (node energy of the receivers before scale and shift, edge-vector gradient or None,
         strain gradient or None).
@@ -183,50 +211,64 @@ class TiledForceField:
         model = self.model
         nodes, edge_ids, local, r, vectors = tile
         attrs = self.node_attrs[nodes]
-        grad = adjoint is not None
-        with torch.enable_grad() if grad else torch.no_grad():
-            leaf = vectors.detach().requires_grad_(grad)
+        receivers = nodes[:r]
+        with torch.enable_grad() if adjoint else torch.no_grad():
+            leaf = vectors.detach().requires_grad_(adjoint)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
-                   if grad and strain is not None else None)
+                   if adjoint and strain is not None else None)
             lengths, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
             node_feats = model.node_embedding(attrs)
-            out = self._layer(0, node_feats, attrs, edge_attrs, edge_feats, cutoff, local, r)
+            h1 = self._layer(0, node_feats, attrs, edge_attrs, edge_feats, cutoff, local, r)
             heads = self.heads[:r]
-            arange = self.arange[:r]
-            es = model.readouts[0](out, heads)[arange, heads]
+            es = model.readouts[0](h1, heads)[self.arange[:r], heads]
             if hasattr(model, "pair_repulsion"):
                 es = model.pair_repulsion_fn(lengths, attrs, local, model.atomic_numbers)[:r] + es
-            if not grad:
-                if h1 is True:  # the first tile: the caller allocates h1 from the output's width
-                    return es, out, None
-                h1[nodes[:r]] = out
+            x, sc = self._consumers(h1, attrs[:r])
+            if not adjoint:
+                if "x" not in state:  # the first tile gives the widths
+                    n = self.arange.shape[0]
+                    state["x"] = torch.empty((n, x.shape[1]), dtype=self.dtype, device=self.device)
+                    state["sc"] = torch.empty((n, sc.shape[1]), dtype=self.dtype, device=self.device)
+                state["x"][receivers] = x
+                state["sc"][receivers] = sc
                 return es, None, None
-            objective = model.scale_shift(es, heads).sum() + (adjoint[nodes[:r]] * out).sum()
+            objective = (model.scale_shift(es, heads).sum() + (state["gx"][receivers] * x).sum()
+                         + (state["gsc"][receivers] * sc).sum())
             wanted = [leaf] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
         return es.detach(), grads[0], grads[1] if eps is not None else None
 
-    def _second(self, tile, h1, adjoint, strain):
-        """Sweep 2: interaction 1 forward and backward; adds dE/dh1 into ``adjoint``."""
+    def _second(self, tile, state, strain):
+        """Sweep 2: interaction 1 forward and backward on the stored ``linear_up(h1)`` and ``skip_tp(h1)``; adds
+        their adjoints into ``state["gx"]`` (receivers and halo) and writes ``state["gsc"]`` (receivers)."""
         import torch
 
         model = self.model
+        interaction = model.interactions[1]
         nodes, edge_ids, local, r, vectors = tile
         attrs = self.node_attrs[nodes]
         with torch.enable_grad():
             leaf = vectors.detach().requires_grad_(True)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
                    if strain is not None else None)
-            feats = h1[nodes].detach().requires_grad_(True)
+            x = state["x"][nodes].detach().requires_grad_(True)
+            sc = state["sc"][nodes[:r]].detach().requires_grad_(True)
             _, edge_attrs, edge_feats, cutoff = self._edges(leaf, attrs, local, eps)
-            out = self._layer(1, feats, attrs, edge_attrs, edge_feats, cutoff, local, r)
+            modules = interaction._modules
+            saved = modules["linear_up"], modules["skip_tp"]
+            modules["linear_up"], modules["skip_tp"] = _given(x), _given(sc)
+            try:  # their real counterparts ran in sweep 1, on the h1 that is not kept
+                out = self._layer(1, x, attrs, edge_attrs, edge_feats, cutoff, local, r)
+            finally:
+                modules["linear_up"], modules["skip_tp"] = saved
             heads = self.heads[:r]
             es = model.readouts[1](out, heads)[self.arange[:r], heads]
             objective = model.scale_shift(es, heads).sum()
-            wanted = [leaf, feats] + ([eps] if eps is not None else [])
+            wanted = [leaf, x, sc] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
-        adjoint.index_add_(0, nodes, grads[1])
-        return es.detach(), grads[0], grads[2] if eps is not None else None
+        state["gx"].index_add_(0, nodes, grads[1])
+        state["gsc"][nodes[:r]] = grads[2]
+        return es.detach(), grads[0], grads[3] if eps is not None else None
 
     # ------------------------------------------------------------------ the call
 
@@ -288,34 +330,31 @@ class TiledForceField:
                 if g_eps is not None:
                     strain_grad.add_(g_eps.to(torch.float64))
 
-            # Sweep 1: h1 of every atom.
-            h1 = None
+            # Sweep 1: interaction 1's inputs, linear_up(h1) and skip_tp(h1), of every atom.
+            state = {}
             for receivers in tiles:
                 tile = build(receivers)
-                if h1 is None:
-                    es, out, _ = self._first(tile, h1=True)
-                    h1 = torch.empty((n, out.shape[1]), dtype=self.dtype, device=self.device)
-                    h1[tile[0][:tile[3]]] = out
-                    del out
-                else:
-                    es, _, _ = self._first(tile, h1=h1)
+                es, _, _ = self._first(tile, state)
                 node_es[tile[0][:tile[3]]] += es
                 del tile
             # Sweep 2: interaction 1 forward and backward.
-            adjoint = torch.zeros_like(h1)
+            state["gx"] = torch.zeros_like(state["x"])
+            state["gsc"] = torch.zeros_like(state["sc"])
+            stats["global_bytes"] = int(sum(t.numel() * t.element_size() for t in state.values()))
             for receivers in tiles:
                 tile = build(receivers)
-                es, g_vec, g_eps = self._second(tile, h1, adjoint, True if stress else None)
+                es, g_vec, g_eps = self._second(tile, state, True if stress else None)
                 node_es[tile[0][:tile[3]]] += es
                 scatter(tile, g_vec, g_eps)
                 del tile, g_vec
+            del state["x"], state["sc"]  # sweep 3 recomputes them from interaction 0
             # Sweep 3: interaction 0 replay and backward.
             for receivers in tiles:
                 tile = build(receivers)
-                _, g_vec, g_eps = self._first(tile, adjoint=adjoint, strain=True if stress else None)
+                _, g_vec, g_eps = self._first(tile, state, adjoint=True, strain=True if stress else None)
                 scatter(tile, g_vec, g_eps)
                 del tile, g_vec
-            del h1, adjoint
+            del state
             with torch.no_grad():
                 node_inter = self.model.scale_shift(node_es, self.heads)
                 from fastmace.model import energy as energy64
