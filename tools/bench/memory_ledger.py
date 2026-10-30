@@ -76,6 +76,9 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=20, help="steady steps after the warm-up")
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--top", type=int, default=25)
+    p.add_argument("--workspace-prototype", action="store_true",
+                   help="experiment: segment_gemm's products and input gradients in per-interaction workspaces "
+                        "(tools/bench/workspace_prototype.py)")
     p.add_argument("--refuse", action="store_true",
                    help="FallbackConfig(fallback='refuse'): the first failure is raised")
     p.add_argument("--second-pool", nargs="*", default=[], choices=sorted(SECOND_POOL_OPS),
@@ -95,9 +98,12 @@ def memory_point(torch, label):
                 outside_allocator=int(total - free - reserved))
 
 
+EXTRA_OWNERS = {}  # name -> tensor, named by experiments (--workspace-prototype)
+
+
 def owner_ranges(torch, engine):
     """(start, end, owner) of every named tensor the engine knows, for matching blocks by address."""
-    named = {}
+    named = dict(EXTRA_OWNERS)
     for name, tensor in engine._registered_buffers().items():
         named[name] = tensor
     rng = getattr(engine.state, "rng", None)
@@ -126,6 +132,8 @@ def group(name):
         return "model parameters and buffers"
     if name.startswith("force_field.neighbours."):
         return "neighbour list (buffers and screen)"
+    if name.startswith("prototype workspace"):
+        return "prototype workspaces (segment_gemm products and input gradients)"
     if name.startswith("state.rng.batch"):
         return "Langevin noise batch"
     if name.startswith(("integrator.", "state.", "engine.", "derived.")):
@@ -248,6 +256,11 @@ def main(argv=None):
     torch.cuda.memory._record_memory_history(max_entries=1, stacks="python")
     started = time.perf_counter()
     second = route_to_second_pool(torch, args.second_pool) if args.second_pool else None
+    if args.workspace_prototype:
+        import workspace_prototype
+
+        dtype = torch.float32 if args.precision == "float32" else torch.float64
+        workspaces = workspace_prototype.install(len(atoms), "cuda", dtype)
     field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision)
     torch.cuda.synchronize()
     points.append(memory_point(torch, "force field loaded"))
@@ -267,6 +280,8 @@ def main(argv=None):
     torch.cuda.synchronize()
     steady = memory_point(torch, f"after {args.steps} steady steps")
     points.append(steady)
+    if args.workspace_prototype:
+        EXTRA_OWNERS.update({f"prototype workspace {i}": w for i, w in enumerate(workspaces)})
     view = allocator_view(torch, engine, second)
     edges = engine.force_field.edge_count
     info = dict(edges_at_cutoff=int(edges), padded_sizes=sorted(int(e) for e in engine.edge_sizes_used),
@@ -325,6 +340,7 @@ def main(argv=None):
                   fastmace_commit=_commit(), gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                   host=__import__("os").uname().nodename, seconds=time.perf_counter() - started,
                   alloc_conf=__import__("os").environ.get("PYTORCH_CUDA_ALLOC_CONF"), second_pool=args.second_pool,
+                  workspace_prototype=args.workspace_prototype,
                   edges=info, points=points, allocator=view,
                   ledger=[dict(row=row, bytes=int(b)) for row, b in ledger],
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
