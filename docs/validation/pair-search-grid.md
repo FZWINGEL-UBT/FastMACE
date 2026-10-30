@@ -56,4 +56,39 @@ split on a small cell.
 
 ## NbCl5 past 2.1M atoms with the tiled path
 
-(running)
+**The run.** `tiled_capacity.py point`, NbCl5 22×22×66 (2,299,968 atoms), R = 4,096, on murphy. The source is
+`fastmace/cap-tiled-t1t2` (`f7125bcc`, the tiled path with T2) with this branch's `pair_search.py`
+(`results/pair-search-grid-20261031/scan.sh`; records in `scan/`).
+
+**The screen now launches.** The rebuild of the candidate pairs completes at 2,299,968 atoms, where it failed before
+with `invalid argument`.
+
+**The build then runs out of memory one step later**, in `SkinNeighbourList.compact`:
+
+- `shifts64 = times_3x3(candidate_unit_shifts.to(float64), cell)` asks for 2.01 GiB with 1.75 GiB free;
+- 17.5 GiB is allocated by then.
+- `compact` forms float64 shifts and vectors for every candidate pair (within cutoff + skin).
+
+That is the compaction part the conductor left for T3 ("the list build needs tiling too"). So:
+
+- **The NbCl5 limit of the tiled path stays at 2,000,376 atoms on 20 GB.** It is set by the compaction now, not
+  the launch.
+- **The next step** is a chunked compaction, or one in float32 with a float64 decision near the cutoff only.
+  It belongs to T3 and is not done here.
+
+## What changed
+
+- `fastmace/neighbors/pair_search.py`: `MAX_GRID_Y` and `_grid`; the kernel's receiver tile is `y + z × grid_y`.
+  `screen_codes`, `screen_into` and `candidate_pairs` take `max_grid_y`.
+- Tests: `tests/cpu/test_neighbors.py` (the grid mapping) and `tests/gpu/test_neighbors_gpu.py` (the same pairs
+  with the split forced).
+- `tools/bench/pair_search_ab.py` (new): the same-process A/B against main's screen.
+- `results/pair-search-grid-20261031/`: the job scripts, the A/B record, the idle checks and the scan record.
+
+## Setup
+
+- **Machine:** murphy, RTX 4000 Ada Generation 20 GB (driver 595.99.02).
+- **Environments:** NAS `mace_cueq_oeq` for the A/B and the scan, `mace_cueq_latest` for the tests.
+- **Idle check** before every job.
+- **FastMACE:** branch `fastmace/pair-search-grid` from main `48af40c6`.
+- **When:** 31 October 2026, night CET.
