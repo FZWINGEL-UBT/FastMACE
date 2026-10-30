@@ -39,23 +39,30 @@ def lifetimes(events):
     return sorted(out)
 
 
-def replay(events, base):
-    """The allocator's footprint above ``base`` and every allocation that grew it, with the holes below it then."""
-    live, top, growth, peak_live, now = {}, 0, [], 0, 0
+def replay(events, ranges):
+    """The allocator's footprint (the highest address used in each segment, summed) and every allocation that grew
+    it, with the holes below the segment's mark then."""
+    def segment(address):
+        return next(i for i, (lo, hi) in enumerate(ranges) if lo <= address < hi)
+
+    live, tops, growth, peak_live, now = {}, [0] * len(ranges), [], 0, 0
     for action, address, size, site in events:
         if action == "alloc":
+            index = segment(address)
+            base, top = ranges[index][0], tops[index]
             offset = address - base
             if offset + size > top:
-                holes = gaps(sorted((a - base, s) for a, (s, _) in live.items()), top)
-                growth.append(dict(site=site, size=size, offset=offset, top_before=top, grew_by=offset + size - top,
-                                   free_below=sum(holes), largest_hole=max(holes, default=0), holes=len(holes)))
-                top = offset + size
-            live[address] = (size, site)
+                holes = gaps(sorted((a - base, s) for a, (s, _, i) in live.items() if i == index), top)
+                growth.append(dict(site=site, size=size, segment=index, offset=offset, top_before=top,
+                                   grew_by=offset + size - top, free_below=sum(holes),
+                                   largest_hole=max(holes, default=0), holes=len(holes)))
+                tops[index] = offset + size
+            live[address] = (size, site, index)
             now += size
             peak_live = max(peak_live, now)
         elif action == "free_requested" and address in live:
             now -= live.pop(address)[0]
-    return top, peak_live, growth
+    return sum(tops), peak_live, growth
 
 
 def gaps(blocks, top):
@@ -94,8 +101,8 @@ def main(argv=None):
     record = json.loads(args.ledger.read_text())
     pool = record["recapture"]["pool"]
     events = pool["event_list"]
-    base = min(lo for lo, _ in pool["segment_ranges"])
-    top, peak_live, growth = replay(events, base)
+    events = [e for e in events if e[0] in ("alloc", "free_requested", "free_completed")]
+    top, peak_live, growth = replay(events, pool["segment_ranges"])
     blocks = lifetimes(events)
     packed, placement = pack_offline(blocks)
     big = sorted(blocks, key=lambda b: -b[2])[:args.top]

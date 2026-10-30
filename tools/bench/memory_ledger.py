@@ -49,6 +49,7 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=20, help="steady steps after the warm-up")
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--top", type=int, default=25)
+    p.add_argument("--tag", default="", help="suffix of the record's file name")
     return p.parse_args(argv)
 
 
@@ -278,6 +279,7 @@ def main(argv=None):
     record = dict(tool="memory_ledger", structure=name, precision=args.precision, natoms=natoms, repeat=args.repeat,
                   fastmace_commit=_commit(), gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                   host=__import__("os").uname().nodename, seconds=time.perf_counter() - started,
+                  alloc_conf=__import__("os").environ.get("PYTORCH_CUDA_ALLOC_CONF"),
                   edges=info, points=points, allocator=view,
                   ledger=[dict(row=row, bytes=int(b)) for row, b in ledger],
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
@@ -286,7 +288,7 @@ def main(argv=None):
                   plan=sim.plan.describe())
     sim.close()
     args.output.mkdir(parents=True, exist_ok=True)
-    path = args.output / f"ledger-{name}-{args.precision}-{natoms}.json"
+    path = args.output / f"ledger-{name}-{args.precision}-{natoms}{args.tag}.json"
     path.write_text(json.dumps(record, indent=1, default=str) + "\n")
     total = steady["cuda_total"]
     print(f"{name} {args.precision} {natoms} atoms, {int(edges)} edges at the cutoff, padded {padded}; "
