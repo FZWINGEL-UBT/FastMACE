@@ -143,8 +143,9 @@ def main(argv=None):
     path.write_text(json.dumps(record, indent=1) + "\n")
     print(f"{name} {len(atoms)} atoms, {record['edges']} edges, eager force calls ({path})")
     for key, value in summary.items():
-        print(f"  {key:7s} {value['ms']:8.2f} ms ({value['time_ratio']:.3f}x)  peak {value['peak_bytes'] / 2**30:6.3f} GiB "
-              f"({value['peak_ratio']:.3f}x)  max |dF| {errors.get(key, 0.0):.2e}")
+        print(f"  {key:7s} {value['ms']:8.2f} ms ({value['time_ratio']:.3f}x)  peak "
+              f"{value['peak_bytes'] / 2**30:6.3f} GiB ({value['peak_ratio']:.3f}x)  "
+              f"max |dF| {errors.get(key, 0.0):.2e}")
     sim.close()
     sys.stdout.flush()  # os._exit skips the buffers of a redirected stdout
     os._exit(0)

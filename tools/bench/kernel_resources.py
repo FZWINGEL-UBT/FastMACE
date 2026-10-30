@@ -231,7 +231,8 @@ def main(argv=None):
     for row in rows[:40]:
         extra = row.get("smem_spilling")
         after = (f" | pragma: stack {extra.get('stack')} B, spills {extra.get('spill_stores')}/"
-                 f"{extra.get('spill_loads')} B, {extra.get('registers')} regs, smem {extra.get('smem')} B") if extra else ""
+                 f"{extra.get('spill_loads')} B, {extra.get('registers')} regs, smem {extra.get('smem')} B"
+                 ) if extra else ""
         print(f"{row['reservation_bytes'] / 2**30:6.3f} GiB  {row['kind']:18s} {row['owner'][:28]:28s} "
               f"{row['kernel'][:44]:44s} stack {row.get('stack', row.get('local'))} B, spills "
               f"{row.get('spill_stores')}/{row.get('spill_loads')} B, {row.get('registers')} regs{after}")

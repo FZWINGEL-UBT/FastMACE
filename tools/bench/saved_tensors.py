@@ -10,10 +10,10 @@ then calls the engine's force field once (forward and the force backward) with
   moment of the call's largest live total, and what else is.
 
 Each storage gets a shape class from its leading dimensions: ``per-edge`` (the padded or the actual edge count),
-``per-atom`` (a multiple of the atom count: irrep-major node features) or ``fixed`` (weights, tables). Prints the largest saved storages and the totals per
-class, and writes ``<output>/saved-<name>-<precision>-<atoms><tag>.json``. ``--engine compile_mode=none`` keeps the
-model eager, so the frames name the modules (compiled graphs save through ``CompiledFunction``). Run inside a local
-GPU reservation.
+``per-atom`` (a multiple of the atom count: irrep-major node features) or ``fixed`` (weights, tables). Prints the
+largest saved storages and the totals per class, and writes ``<output>/saved-<name>-<precision>-<atoms><tag>.json``.
+``--engine compile_mode=none`` keeps the model eager, so the frames name the modules (compiled graphs save through
+``CompiledFunction``). Run inside a local GPU reservation.
 """
 
 from __future__ import annotations
