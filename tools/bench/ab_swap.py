@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -25,7 +26,11 @@ import ab_rewrites  # noqa: E402
 import ab_step_time  # noqa: E402
 
 SIDE = "b"  # the side being built or stepped; ab_rewrites sets it to "a" for side a's build (--a-constant)
+PHASE = "build"  # "build" while a side builds, "step" while a side steps (its warm-up re-captures included)
 _ENGINE_SIDES = {}
+# The trace: every Python call of a swapped attribute (captures and compiles; graph replays make none) by
+# (side, phase, the code that ran, attribute). Side a's entries must all be "reference", side b's "library".
+CALLS = {}
 
 
 def install(swaps):
@@ -43,8 +48,11 @@ def install(swaps):
             owner = getattr(owner, part)
         library, reference = getattr(owner, attr), getattr(reference_kernels, name)
 
-        def dispatch(*args, _library=library, _reference=reference, **kwargs):
-            return (_reference if this.SIDE == "a" else _library)(*args, **kwargs)
+        def dispatch(*args, _library=library, _reference=reference, _attr=attr, **kwargs):
+            code = "reference" if this.SIDE == "a" else "library"
+            key = (this.SIDE, this.PHASE, code, _attr)
+            this.CALLS[key] = this.CALLS.get(key, 0) + 1
+            return (_reference if code == "reference" else _library)(*args, **kwargs)
 
         setattr(owner, attr, dispatch)
     build = minimal.MinimalPlanner.build
@@ -58,11 +66,11 @@ def install(swaps):
     step = ab_step_time.Tf32Side.step
 
     def sided_step(self):
-        this.SIDE = _ENGINE_SIDES[id(self.side.engine)]
+        this.SIDE, this.PHASE = _ENGINE_SIDES[id(self.side.engine)], "step"
         try:
             step(self)
         finally:
-            this.SIDE = "b"
+            this.SIDE, this.PHASE = "b", "build"
 
     ab_step_time.Tf32Side.step = sided_step
 
@@ -81,7 +89,15 @@ def main(argv=None):
         swaps.append((module, attr, name))
     ab_step_time.prepare_fastmace_hybrid()  # before anything imports MACE
     install(swaps)
-    return ab_rewrites.main([*rest, "--a-constant", "ab_swap:SIDE='a'"])
+    result = ab_rewrites.main([*rest, "--a-constant", "ab_swap:SIDE='a'"])
+    trace = [dict(side=side, phase=phase, code=code, attribute=attr, calls=n)
+             for (side, phase, code, attr), n in sorted(CALLS.items())]
+    wrong = [t for t in trace if (t["side"] == "a") != (t["code"] == "reference")]
+    print("ab_swap trace:", json.dumps(trace), "wrong side:", len(wrong))
+    out = rest[rest.index("--output") + 1] if "--output" in rest else None
+    if out:
+        Path(f"{out}.swap_trace.json").write_text(json.dumps(dict(swaps=swaps, trace=trace, wrong=wrong), indent=1))
+    return result
 
 
 if __name__ == "__main__":
