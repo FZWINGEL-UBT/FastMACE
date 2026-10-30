@@ -28,11 +28,15 @@ from dataclasses import dataclass
 BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 64, 32, 4, 3
 # Triton only where M covers at least this many waves of BLOCK_M-row tiles over the SMs (one column of tiles).
 MIN_TRITON_WAVES = 2
-# The Triton products' tile rows and warps (the waves rule above keeps BLOCK_M): one configuration for every
-# device; screens set them per A/B side (fp32 profile, 28 October 2026: 128 rows with 8 warps were bit-identical
-# and 3.8 % faster on sm_89, neutral on sm_120, in tools/bench/segment_gemm_tiles.py).
-TRITON_BLOCK_M = BLOCK_M
-TRITON_NUM_WARPS = NUM_WARPS
+# The Triton products' tile rows and warps (the waves rule above keeps BLOCK_M). None: by GPU, 128 rows with 8 warps
+# on LARGE_TILE_GPUS, else BLOCK_M and NUM_WARPS; an int is an A/B side's override on every GPU.
+TRITON_BLOCK_M = None
+TRITON_NUM_WARPS = None
+# Decision 66 (owner, 29 October 2026): 128-row tiles with 8 warps (bitwise equal) only where same-process whole-step
+# A/Bs gained in both build orders (docs/validation/ab-constants-audit-20261030.md, "tiles128"). RTX 4000 Ada: NbCl5
+# 9,216 atoms 0.987 / 0.986 (column order), 1,944 atoms 0.989 / 0.989, NaNbO3 0.995 / 0.994. The RTX 5060 Ti lost
+# at NbCl5 1,944 atoms (1.020 / 1.007), the A100-SXM4-40GB at 9,216 atoms (1.021 / 1.021).
+LARGE_TILE_GPUS = ("NVIDIA RTX 4000 Ada Generation",)
 # The tile order: "auto" (columns_together's L2 rule), or "rows" / "columns" for an A/B side.
 TILE_ORDER = "auto"
 # Decision 66 (owner, 29 October 2026): the column order is a default only where same-process whole-step A/Bs in
@@ -69,9 +73,9 @@ def uses_triton(m, sms) -> bool:
     return (m + BLOCK_M - 1) // BLOCK_M >= MIN_TRITON_WAVES * sms
 
 
-def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
+def segment_gemm_choice(m: int, n: int, k: int, sms: int | None, gpu: str | None = None) -> GemmChoice:
     """The backend and tiles of a gathered-row product ``[m, k] @ [k, n]`` on a device with ``sms`` SMs
-    (None: not a CUDA device, so cuBLAS/PyTorch)."""
+    (None: not a CUDA device, so cuBLAS/PyTorch) named ``gpu`` (the tile shape, ``LARGE_TILE_GPUS``)."""
     if not sms:
         return GemmChoice("cublas", reason="not a CUDA device")
     m, n, k, sms = int(m), int(n), int(k), int(sms)
@@ -79,7 +83,10 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
     if waves < MIN_TRITON_WAVES:
         return GemmChoice("cublas", reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs "
                                            f"(< {MIN_TRITON_WAVES})")
-    return GemmChoice("triton", block_m=TRITON_BLOCK_M, num_warps=TRITON_NUM_WARPS,
+    large = gpu in LARGE_TILE_GPUS
+    block_m = TRITON_BLOCK_M if TRITON_BLOCK_M is not None else (128 if large else BLOCK_M)
+    num_warps = TRITON_NUM_WARPS if TRITON_NUM_WARPS is not None else (8 if large else NUM_WARPS)
+    return GemmChoice("triton", block_m=block_m, num_warps=num_warps,
                       reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs")
 
 
@@ -142,6 +149,6 @@ def _sms(index: int) -> int:
     return torch.cuda.get_device_properties(index).multi_processor_count
 
 
-__all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "COLUMN_ORDER_GPUS", "GemmChoice", "MIN_TRITON_WAVES", "NUM_STAGES",
-           "NUM_WARPS", "TILE_ORDER", "columns_together", "device_l2_bytes", "device_name", "device_sms", "row_waves",
-           "segment_gemm_choice"]
+__all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "COLUMN_ORDER_GPUS", "GemmChoice", "LARGE_TILE_GPUS", "MIN_TRITON_WAVES",
+           "NUM_STAGES", "NUM_WARPS", "TILE_ORDER", "columns_together", "device_l2_bytes", "device_name", "device_sms",
+           "row_waves", "segment_gemm_choice"]
