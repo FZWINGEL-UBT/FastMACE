@@ -534,7 +534,7 @@ class TiledForceField:
         tiles, grid = plan_tiles(pos, cell, row_ptr, caps.receivers, edge_cap)
         local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
-                     mode=caps.mode)
+                     edges=0, mode=caps.mode, neighbours=caps.neighbours)
         keys = self._slot_keys(tiles, source, local_of, n) if padded else None
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
@@ -556,6 +556,8 @@ class TiledForceField:
                     slot = self._slots[keys[index]] if padded else None
                     piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
                     self._note(stats, piece)
+                    if sweep == 1:
+                        stats["edges"] += piece[1].shape[1]
                     if padded:
                         if bound is not slot:  # the streaming kernels read this slot's edge count
                             for module in field._streaming:

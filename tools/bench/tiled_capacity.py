@@ -21,6 +21,7 @@ Writes ``<output>/tiled-<name>-<atoms>-R<receivers><tag>.json``.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
 import os
@@ -46,6 +47,9 @@ def parse_args(argv=None):
     p.add_argument("--strain", type=float, default=0.0)
     p.add_argument("--calls", type=int, default=2, help="tiled force calls (the first one warms up)")
     p.add_argument("--tag", default="")
+    p.add_argument("--tile-list", action="store_true",
+                   help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
+                        "left empty, so it costs no memory")
     p.add_argument("--output", required=True, type=Path)
     return p.parse_args(argv)
 
@@ -64,6 +68,34 @@ def supercell(structure, repeat, rattle, strain):
         atoms.positions = atoms.positions + rng.uniform(-rattle, rattle, atoms.positions.shape)
     atoms.wrap()
     return atoms
+
+
+@contextlib.contextmanager
+def no_global_list(active):
+    """With ``active``, ``SkinNeighbourList.build`` and ``compact`` leave the force field's list empty (one slot,
+    no pairs): the tiled call's per-tile lists replace it, and its build would be the largest memory term."""
+    if not active:
+        yield
+        return
+    from fastmace.neighbors.skin import SkinNeighbourList
+
+    build, compact = SkinNeighbourList.build, SkinNeighbourList.compact
+
+    def empty_build(self, positions):
+        grew = self.capacity == 0
+        if grew:
+            self._allocate(1, exact=True)
+        self.num_candidates = 0
+        return grew
+
+    def empty_compact(self, positions):
+        self.count.zero_()
+
+    SkinNeighbourList.build, SkinNeighbourList.compact = empty_build, empty_compact
+    try:
+        yield
+    finally:
+        SkinNeighbourList.build, SkinNeighbourList.compact = build, compact
 
 
 def main(argv=None):
@@ -95,6 +127,8 @@ def main(argv=None):
         return dict(allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()),
                     peak_above_before=int(torch.cuda.max_memory_allocated() - before))
 
+    lists = contextlib.ExitStack()
+    lists.enter_context(no_global_list(args.tile_list))
     try:
         record["phase"] = "build"
         started = time.perf_counter()
@@ -108,7 +142,8 @@ def main(argv=None):
         field = planner.build_evaluation(eager, user, atoms)
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
-        tiled = TiledForceField(field, TileConfig(args.receivers, args.edges))
+        tiled = TiledForceField(field, TileConfig(args.receivers, args.edges,
+                                                  neighbours="tiles" if args.tile_list else "global"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
 
@@ -142,6 +177,8 @@ def main(argv=None):
         energy = float(out.energy.reshape(-1)[0])
         forces = out.forces.detach().double()
         stress = out.stress.detach().double() if out.stress is not None else None
+        if args.tile_list:  # the force field's list is empty: the edges the tiles built
+            record["edges_within_cutoff"] = int(tiled.last["edges"])
         record["tiled"] = dict(energy_eV=energy, energy_per_atom_eV=energy / n,
                                max_abs_force=float(forces.abs().max()),
                                stress=None if stress is None else stress.cpu().tolist())
@@ -188,6 +225,7 @@ def main(argv=None):
 
         record["traceback"] = [f"{frame.filename}:{frame.lineno} {frame.name}: {frame.line}"
                                for frame in traceback.extract_tb(error.__traceback__)][-25:]
+    lists.close()
     save()
     print(json.dumps({k: record.get(k) for k in ("atoms", "phase", "error", "calls", "tiled", "reference")},
                      default=str)[:3000])
