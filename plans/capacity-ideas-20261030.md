@@ -77,6 +77,18 @@ From the earlier review (same day):
 | **Host-staged h1/dh1** | Same as T3 | Already taken up (after T1, T2) |
 | **Receivers from row_ptr instead of a stored array** | 4 B/edge. The neighbour list is about 1 % of the peak, and a row_ptr search adds work in the edge-owned kernels | Not taken up for now; revisit with the packed list under T3 |
 
+## Fifth list (same day)
+
+Lesson from the fourth list: `results/fp32-profile-20261028/*/parts/*.csv` time the eager tier (fp32_parts), not the compiled graph-tier step. Launch counts and µs there do not carry over to production; check the compiled step's kernels (nsys node trace plus Inductor output_code) first.
+
+| Idea | Assessment | Status |
+| --- | --- | --- |
+| **One grouped GEMM for FirstInteractionReassociation** (4 per-l GEMMs plus cat into one kernel, forward and backward) | The 189 µs and 49 launches on NaCl are the eager tier's (`parts.csv`). The compiled step still runs per-l matmuls plus copies, at an unknown cost. Structurally it is a grouped GEMM over irrep row blocks with per-l weights, which is what `segment_gemm`'s joined products already do, so reuse that kernel rather than writing a new one. Rounding class, not bitwise (different accumulation order) | Measure first: compiled-step kernel time of this region on NaCl, NbCl5 and NaNbO3. Build with segment_gemm only if ≥60 µs/step on NaCl |
+| **Loop inversion in gated_products** (K outer, m inner, weight tile loaded once per K block) | Confirmed in `fastmace/kernels/triton/gated_products.py`: the m loop is outer (line 53) and the K loop inner (55), so each weight tile is loaded D times. Inverting needs D accumulators of BLOCK_M x BLOCK_N (7 for l=3), so register pressure or spills may be why it is written this way. Could rescue `gate_epilogue` (OPT10-T01, rejected at -0.3 to -0.9 %) | Worth an A/B: inverted against current, both orders, NbCl5 and NaNbO3, including `gate_epilogue` on |
+| **Warp broadcast of sender and SH loads** in the OEq streaming forward | Loads of one address by all lanes of a warp are already served as a single broadcast transaction by the hardware. The gain is only issue slots, if the kernel is LSU-bound. It is vendored OEq code | Low priority: only if ncu shows the forward LSU-bound |
+| **Coalesced 2D store in edge_outer_sum backward** | Valid micro-optimisation, exact. 20-30 µs claimed from the eager-tier profile | Cheap check: its kernel time in the compiled step, then a quick A/B if ≥10 µs |
+| **Displacement max fused into the integrator** | Already implemented: `fused_integrator.py` computes the squared displacement against the reference positions as an exact atomic max (lines 19, 81, 95) | Already done |
+
 ## Not taken up
 
 | Idea | Reason |
