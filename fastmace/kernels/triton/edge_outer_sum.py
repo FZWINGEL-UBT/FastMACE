@@ -88,28 +88,21 @@ def _triton_backward():
 
     @triton.jit
     def kernel(grad_ptr, a_ptr, y_ptr, key_ptr, grad_a_ptr, grad_y_ptr, num_edges,
-               K: tl.constexpr, D: tl.constexpr, BLOCK_E: tl.constexpr, BLOCK_K: tl.constexpr,
-               BLOCK_D: tl.constexpr):
+               K: tl.constexpr, D: tl.constexpr, BLOCK_E: tl.constexpr, BLOCK_K: tl.constexpr):
         edges = tl.program_id(0) * BLOCK_E + tl.arange(0, BLOCK_E)
         edge_mask = edges < num_edges
         edges = edges.to(tl.int64)
         k = tl.arange(0, BLOCK_K)
-        dd = tl.arange(0, BLOCK_D)
         mask = edge_mask[:, None] & (k < K)[None, :]
         key = tl.load(key_ptr + edges, mask=edge_mask, other=0).to(tl.int64)
         a = tl.load(a_ptr + edges[:, None] * K + k[None, :], mask=mask, other=0.0)
         rows = grad_ptr + key[:, None] * (D * K) + k[None, :]
         grad_a = a * 0
-        # grad_y is gathered as [BLOCK_E, BLOCK_D] in registers and stored once, row-contiguous, instead of D
-        # strided column stores (one 4-byte element per edge each).
-        grad_y = tl.zeros((BLOCK_E, BLOCK_D), dtype=tl.float32)
         for d in tl.static_range(D):
             g = tl.load(rows + d * K, mask=mask, other=0.0)
             y = tl.load(y_ptr + edges * D + d, mask=edge_mask, other=0.0)
             grad_a += g * y[:, None]
-            grad_y = tl.where(dd[None, :] == d, tl.sum(g * a, axis=1)[:, None], grad_y)
-        tl.store(grad_y_ptr + edges[:, None] * D + dd[None, :], grad_y,
-                 mask=edge_mask[:, None] & (dd < D)[None, :])
+            tl.store(grad_y_ptr + edges * D + d, tl.sum(g * a, axis=1), mask=edge_mask)
         tl.store(grad_a_ptr + edges[:, None] * K + k[None, :], grad_a, mask=mask)
 
     return kernel
@@ -131,8 +124,7 @@ def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor
     if num_edges:
         _triton_backward()[(triton.cdiv(num_edges, BACKWARD_BLOCK_EDGES),)](
             grad, a, y, key, grad_a, grad_y, num_edges,
-            K=k, D=d, BLOCK_E=BACKWARD_BLOCK_EDGES, BLOCK_K=triton.next_power_of_2(k),
-            BLOCK_D=triton.next_power_of_2(d))
+            K=k, D=d, BLOCK_E=BACKWARD_BLOCK_EDGES, BLOCK_K=triton.next_power_of_2(k))
     return grad_a, grad_y
 
 
