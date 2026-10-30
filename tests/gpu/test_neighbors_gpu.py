@@ -214,3 +214,37 @@ def test_pair_search_split_grid_finds_the_same_pairs(half, max_grid_y):
     assert reference.numel() > 0 and torch.equal(split, reference)
     assert torch.unique(split).numel() == split.numel()
 
+
+@pytest.mark.parametrize("variable_cell", [False, True])
+def test_chunked_compact_on_gpu_is_bitwise_the_one_chunk_compact(variable_cell, monkeypatch):
+    """As tests/cpu/test_neighbors.py's chunked-compact test, on the GPU build, and inside a CUDA graph."""
+    from fastmace.neighbors import skin
+
+    atoms = nbcl5(repeat=2, rattle=0.05)
+    moved = torch.tensor(atoms.positions + np.random.default_rng(5).uniform(-0.1, 0.1, atoms.positions.shape),
+                         device="cuda")
+    lists = []
+    for size in (skin.COMPACT_CHUNK, 777):
+        monkeypatch.setattr(skin, "COMPACT_CHUNK", size)
+        nl = make(atoms, "cuda", "groups", variable_cell=variable_cell)
+        nl.build(torch.tensor(atoms.positions, device="cuda"))
+        nl.compact(moved)
+        lists.append((nl.edge_index.clone(), nl.unit_shifts.clone(), nl.shifts.clone(), int(nl.count)))
+        if size == 777:  # the chunked compaction captured and replayed
+            static = moved.clone()
+            graph = torch.cuda.CUDAGraph()
+            stream = torch.cuda.Stream()
+            stream.wait_stream(torch.cuda.current_stream())
+            with torch.cuda.stream(stream):
+                nl.compact(static)
+            torch.cuda.current_stream().wait_stream(stream)
+            with torch.cuda.graph(graph, stream=stream):
+                nl.compact(static)
+            nl.edge_index.zero_()
+            graph.replay()
+            torch.cuda.synchronize()
+            assert torch.equal(nl.edge_index, lists[-1][0]) and int(nl.count) == lists[-1][3]
+    (index, unit, shifts, count), (index_c, unit_c, shifts_c, count_c) = lists
+    assert count == count_c > 0
+    assert torch.equal(index, index_c) and torch.equal(unit, unit_c) and torch.equal(shifts, shifts_c)
+

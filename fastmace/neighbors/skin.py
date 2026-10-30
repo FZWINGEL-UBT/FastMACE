@@ -25,6 +25,11 @@ OVERFLOW_DISPLACEMENT_A = 1.0e6
 # Screened pairs per chunk of build_gpu's float64 test and sort key: bounds the build's temporaries (about 150 B
 # per pair at once otherwise). Elementwise work, so the result does not depend on it.
 BUILD_CHUNK = 1 << 18
+# Candidate pairs per chunk of ``compact``: its float64 shifts, vectors and masks exist for one chunk at a time
+# (about 150 B per candidate at once otherwise: 11 GiB of candidates' temporaries at 2.3M NbCl5 atoms). Lists up
+# to this many candidates (about 150k MH-1 atoms) compact in one chunk, as before; the result is the same for any
+# chunk size (elementwise tests, offsets from exact integer counts).
+COMPACT_CHUNK = 1 << 22
 
 
 def times_3x3(rows, matrix):
@@ -591,16 +596,44 @@ class SkinNeighbourList:
 
         Uses only fixed-shape device operations, so it can be captured in a CUDA graph.
         """
-        sender, receiver = self.candidate_index
         cell = self.cell_t if self.variable_cell else self.build_cell  # image shifts in the current cell
-        shifts64 = times_3x3(self.candidate_unit_shifts.to(torch.float64), cell)
-        shifts = shifts64.to(self.float_dtype)
-        vectors = positions[receiver] - positions[sender] + shifts64
-        inside = ((vectors * vectors).sum(dim=1) < self.cutoff ** 2).to(torch.int64)
-        count = inside.sum()
-        destination = torch.where(inside.bool(), torch.cumsum(inside, 0) - 1,
-                                  count + torch.cumsum(1 - inside, 0) - 1)
-        self.edge_index.index_copy_(1, destination, self.candidate_index.to(torch.int64))
-        self.unit_shifts.index_copy_(0, destination, self.candidate_unit_shifts)
-        self.shifts.index_copy_(0, destination, shifts)
+        capacity = self.candidate_index.shape[1]
+        chunks = [(start, min(start + COMPACT_CHUNK, capacity)) for start in range(0, capacity, COMPACT_CHUNK)]
+
+        def shifts_of(start, stop):
+            return times_3x3(self.candidate_unit_shifts[start:stop].to(torch.float64), cell)
+
+        def inside_of(start, stop, shifts64):
+            sender, receiver = self.candidate_index[:, start:stop]
+            vectors = positions[receiver] - positions[sender] + shifts64
+            return (vectors * vectors).sum(dim=1) < self.cutoff ** 2
+
+        if len(chunks) <= 1:  # one chunk: the whole list at once
+            shifts64 = shifts_of(0, capacity)
+            inside = inside_of(0, capacity, shifts64).to(torch.int64)
+            count = inside.sum()
+            destination = torch.where(inside.bool(), torch.cumsum(inside, 0) - 1,
+                                      count + torch.cumsum(1 - inside, 0) - 1)
+            self.edge_index.index_copy_(1, destination, self.candidate_index.to(torch.int64))
+            self.unit_shifts.index_copy_(0, destination, self.candidate_unit_shifts)
+            self.shifts.index_copy_(0, destination, shifts64.to(self.float_dtype))
+            self.count.copy_(count)
+            return
+        # Pass 1: each candidate's test (one byte each) and the count. Pass 2: each chunk's destinations from the
+        # counts before it, the same integers as the one-chunk cumulative sums, and its copies.
+        inside = torch.empty(capacity, dtype=torch.bool, device=positions.device)
+        count = torch.zeros((), dtype=torch.int64, device=positions.device)
+        for start, stop in chunks:
+            inside[start:stop] = inside_of(start, stop, shifts_of(start, stop))
+            count += inside[start:stop].sum()
+        before = torch.zeros((), dtype=torch.int64, device=positions.device)  # inside pairs before the chunk
+        for start, stop in chunks:
+            here = inside[start:stop].to(torch.int64)
+            within = torch.cumsum(here, 0)
+            outside = count + (start - before) + torch.cumsum(1 - here, 0) - 1
+            destination = torch.where(here.bool(), before + within - 1, outside)
+            self.edge_index.index_copy_(1, destination, self.candidate_index[:, start:stop].to(torch.int64))
+            self.unit_shifts.index_copy_(0, destination, self.candidate_unit_shifts[start:stop])
+            self.shifts.index_copy_(0, destination, shifts_of(start, stop).to(self.float_dtype))
+            before += within[-1]
         self.count.copy_(count)
