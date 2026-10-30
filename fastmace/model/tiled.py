@@ -181,6 +181,7 @@ class TiledForceField:
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
+        self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._graph_key = None
         self._pool = None
         self._stream = None
@@ -506,6 +507,7 @@ class TiledForceField:
         keys = self._slot_keys(tiles, row_ptr, edge_index, local_of) if padded else None
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
+            stats["slot_changes"] = self.slot_changes
         saved = self._bind()
         bound = None
         try:
@@ -628,6 +630,7 @@ class TiledForceField:
             if slot is None or any(a > b for a, b in zip(need, slot["sizes"])):
                 grown = need if slot is None else tuple(max(a, b) for a, b in zip(need, slot["sizes"]))
                 self._slots[key] = self._new_slot(grown)
+                self.slot_changes += 1
         return keys
 
     def _eager_tile(self, sweep, piece, g):

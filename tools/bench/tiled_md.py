@@ -124,6 +124,9 @@ def main(argv=None):
         result["drift_meV_per_atom"] = float(1e3 * (etot[-1] - etot[0]) / len(atoms))
         result["etot_spread_meV_per_atom"] = float(1e3 * (etot.max() - etot.min()) / len(atoms))
         result["seconds_per_step"] = result["seconds"] / args.steps
+        if path == "tiled":
+            result["last_call"] = {k: v for k, v in tiled.last.items() if k != "slots"}
+            result["slots"] = {str(k): list(v) for k, v in tiled.last.get("slots", {}).items()}
         record["runs"][path] = result
     if len(paths) == 2:
         a, b = record["runs"]["tiled"]["rows"], record["runs"]["whole"]["rows"]
