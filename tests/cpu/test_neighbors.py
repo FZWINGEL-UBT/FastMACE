@@ -512,3 +512,27 @@ def test_an_empty_screen_with_pairs_in_range_raises():
         check_found(0, wrapped, images, 4.0)
     check_found(0, wrapped, images, 0.5)  # no pair within 0.5 Angstrom: an empty list is right
     check_found(0, wrapped[:1], images[13:14], 4.0)  # one atom, its own zero image only
+
+
+@pytest.mark.parametrize("chunk", [1, 7, 1000])
+@pytest.mark.parametrize("variable_cell", [False, True])
+def test_chunked_compact_is_bitwise_the_one_chunk_compact(chunk, variable_cell, monkeypatch):
+    """``compact`` in chunks of ``COMPACT_CHUNK`` candidates (pass 1: the tests and the count; pass 2: the
+    destinations from the counts before each chunk) writes bitwise the same list as the one-chunk compaction,
+    padding and order included."""
+    from fastmace.neighbors import skin
+
+    atoms = nbcl5(repeat=2, rattle=0.05)
+    moved = torch.tensor(atoms.positions + np.random.default_rng(5).uniform(-0.1, 0.1, atoms.positions.shape))
+    lists = []
+    for size in (skin.COMPACT_CHUNK, chunk):
+        monkeypatch.setattr(skin, "COMPACT_CHUNK", size)
+        nl = make(atoms, skin=0.4, sort=True, variable_cell=variable_cell)
+        nl.build_cpu(torch.tensor(atoms.positions))
+        assert nl.candidate_index.shape[1] > 1000  # several chunks for chunk <= 1000
+        nl.compact(moved)
+        lists.append((nl.edge_index.clone(), nl.unit_shifts.clone(), nl.shifts.clone(), int(nl.count)))
+    (index, unit, shifts, count), (index_c, unit_c, shifts_c, count_c) = lists
+    assert count == count_c > 0
+    assert torch.equal(index, index_c) and torch.equal(unit, unit_c) and torch.equal(shifts, shifts_c)
+
