@@ -14,7 +14,7 @@ import torch
 
 from _support.structures import STRUCTURES, nbcl5
 from fastmace.config import NeighbourConfig
-from fastmace.neighbors.skin import SkinNeighbourList
+from fastmace.neighbors.skin import SkinNeighbourList, times_3x3
 
 CUTOFF = 5.0
 SHEAR = np.array([[1.0, 0.02, 0.0], [0.02, 0.98, 0.01], [0.0, 0.01, 1.015]])
@@ -165,8 +165,7 @@ def baseline():
     return gpu_langevin
 
 
-BUFFERS = ("candidate_index", "candidate_unit_shifts", "candidate_shifts", "candidate_shifts64",
-           "edge_index", "unit_shifts", "shifts", "count", "reference_positions")
+BUFFERS = ("candidate_unit_shifts", "edge_index", "unit_shifts", "shifts", "count", "reference_positions")
 
 
 @pytest.mark.parametrize("dtype", [torch.float64, torch.float32], ids=["f64", "f32"])
@@ -188,5 +187,10 @@ def test_gpu_build_equals_baseline(baseline, atoms, mode, dtype):
         assert (ours.capacity, ours.num_candidates) == (theirs.capacity, theirs.num_candidates)
         for name in BUFFERS:
             assert torch.equal(getattr(ours, name), getattr(theirs, name)), name
+        # Lean candidates (cap-nlist): int32 indices, shifts computed from the unit shifts and the build cell.
+        assert torch.equal(ours.candidate_index.to(torch.int64), theirs.candidate_index)
+        derived = times_3x3(ours.candidate_unit_shifts.to(torch.float64), ours.build_cell)
+        assert torch.equal(derived, theirs.candidate_shifts64)
+        assert torch.equal(derived.to(dtype), theirs.candidate_shifts)
         assert bool(ours.needs_rebuild(moved)) == bool(theirs.max_displacement_exceeded(moved))
         positions = moved.cpu().numpy() + rng.uniform(-0.3, 0.3, positions.shape)
