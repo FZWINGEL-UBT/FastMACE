@@ -623,7 +623,8 @@ class TiledForceField:
             members = [size for size, k in zip(sizes, keys) if k == key]
             # Receivers with headroom too (tiles are planned again every call, so their sizes move a little), but
             # never past the cap, which no tile exceeds: full tiles keep their slot.
-            rows = min(int(self.config.receivers), math.ceil(max(r for r, _, _ in members) * head))
+            rows = min(int(self.config.receivers), row_ptr.shape[0] - 1,  # nor the atom count
+                       math.ceil(max(r for r, _, _ in members) * head))
             need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
                     key * step)
             slot = self._slots.get(key)
