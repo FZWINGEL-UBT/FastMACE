@@ -89,6 +89,16 @@ Lesson from the fourth list: `results/fp32-profile-20261028/*/parts/*.csv` time 
 | **Coalesced 2D store in edge_outer_sum backward** | Valid micro-optimisation, exact. 20-30 µs claimed from the eager-tier profile | Cheap check: its kernel time in the compiled step, then a quick A/B if ≥10 µs. Sent to the neighbour-list session |
 | **Displacement max fused into the integrator** | Already implemented: `fused_integrator.py` computes the squared displacement against the reference positions as an exact atomic max (lines 19, 81, 95) | Already done |
 
+## Sixth list (same day)
+
+| Idea | Assessment | Status |
+| --- | --- | --- |
+| **Sort-free pair placement** (count per receiver tile, prefix sum, write each tile's pairs into its own range instead of a global atomic append plus `torch.sort(key)`) | Confirmed: `skin.py` sorts a 64-bit key over every found pair (lines 371-376 and 464; also `d3_list.py:211`). At 2M+ atoms that is a transient of key + sorted copy + indices + CUB workspace, a capacity term for the tiled path once compact is lean (compact is the current limit at 2.3M NbCl5). The two-pass placement groups by receiver tile only; the list's order (the sort key) must still match exactly, so the within-tile order needs a defined rule or a small segmented sort. The "2.4 GB at 100M pairs" figure is not measured | Taken up together with the compact work in the tiled session: measure the rebuild peak with compact fixed first, then build if the sort is the next limit |
+| **Density derivative in the wprime_backward epilogue** (fold `density_backward` and the `dr +` add into the kernel's single dr store) | Confirmed at `wprime_backward.py:424`; it runs only where the density rewrite is on. It saves one small kernel, one add and one [E] read and write. Rounding class (summation order changes) | Measure first: those kernels' time in the compiled step; low priority |
+| **Single-pass fused compaction** (one Triton stream-compaction kernel instead of cumsums, where and three index_copy) | Valid, and it overlaps the compact memory work already in the tiled session. The speed gain is per rebuild (every few to tens of steps), so small. Its value is memory: no [C] destination and int64 temporaries | Folded into the tiled session's compact work |
+| **Readout scale and shift folded into the readout weights** | Saves at most a couple of elementwise nodes, which Inductor likely fuses into neighbours already. Folding changes rounding (W·scale) and touches checkpoint semantics (per-head scale and shift, PolarMACE and OMOL variants) | Not taken up: negligible gain, accuracy and generality cost |
+| **Cutoff multiplied in on load instead of storing augmented [E,65]** | `augmented` exists on the MH-1 path (`rewrites/mh1/modules.py`, edge_outer_sum input). The "13 GB at 2M atoms" assumes 25 edges/atom; NbCl5 has about 6.4 (58,880 edges at 9,216 atoms), and the tiled path holds it per tile only. On the whole-system path at the NbCl5 limit it is about 0.1 GB; NaCl (denser) is larger. Exact if the product is formed identically | Measure first: its bytes in the memory ledger at the NbCl5 and NaCl limits; build only if ≥0.3 GiB |
+
 ## Not taken up
 
 | Idea | Reason |
