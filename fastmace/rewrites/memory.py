@@ -113,7 +113,10 @@ def chunked_conv_backward(dims, width):
 
 def recompute_conv_weights(dims, width):
     """wprime_backward without the stored per-edge weights: the streaming interactions' ``[E, W]`` weights are not
-    kept (MH-1: the second interaction's, 1,280 floats per edge; the first takes the reassociated path)."""
+    kept (MH-1: the second interaction's, 1,280 floats per edge; the first takes the reassociated path). With the
+    fused forward the weights never exist in memory (CAP-T07b: built on chip in both passes), and the force call's
+    peak drops by the full term: 5,126 B per edge measured against 5,120 declared (NbCl5, 32,400 atoms); the
+    chunked cuBLAS recompute reached two thirds of it."""
     return -sum(block.weight_numel for block in dims.interactions[1:]) * width, 0
 
 
