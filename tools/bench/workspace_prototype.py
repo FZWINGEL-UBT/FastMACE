@@ -51,8 +51,9 @@ def _(rows, weights, offsets, dims, width, precision, out):
 
 @torch.library.custom_op("fastmace_proto::input_grads_into", mutates_args=("space",))
 def input_grads_into(grad: torch.Tensor, weights_t: List[torch.Tensor], offsets: List[int], dims: List[int],
-                     precision: str, space: torch.Tensor) -> None:
-    """``joined_products_input_grads`` written into consecutive views of ``space``."""
+                     precision: str, space: torch.Tensor) -> torch.Tensor:
+    """``joined_products_input_grads`` written into consecutive views of ``space``. Returns an empty tensor: a
+    fallback op with no output kept its inputs alive to the end of Inductor's backward (no ``del``)."""
     atoms, width = grad.shape
     choices = sg._choices([atoms * d for d in dims], [w.t() for w in weights_t], grad.device, grad.dtype, precision)
     flat, start = space.view(-1), 0
@@ -66,11 +67,12 @@ def input_grads_into(grad: torch.Tensor, weights_t: List[torch.Tensor], offsets:
         else:
             dx.copy_(grad[:, offset:offset + dim * mul_out].reshape(n, mul_out) @ wt)
         start += n * mul_in
+    return grad.new_empty(0)
 
 
 @input_grads_into.register_fake
 def _(grad, weights_t, offsets, dims, precision, space):
-    return None
+    return grad.new_empty(0)
 
 
 class _IntoWorkspace(torch.autograd.Function):
@@ -113,12 +115,14 @@ class InPlaceIntoSaved(CustomGraphPass):
                 continue  # the space is a view of its base: not handled
             base = bases[index]
             values = {**kwargs, "space": base}
-            # Positional, in schema order: with keyword-only inputs Inductor did not free ``grad`` after the call
-            # (no ``del``), which kept the symmetric contraction's 1.6 GiB gradient alive to the end of the backward.
-            arguments = tuple(values[a.name] for a in target._schema.arguments)
+            arguments = tuple(values[a.name] for a in target._schema.arguments)  # positional, in schema order
             with graph.inserting_before(node):
-                graph.call_function(target, arguments, {})
-            for user in list(node.users):
+                call = graph.call_function(target, arguments, {})
+            for user in list(node.users):  # getitem(node, 0): the op's output; getitem(node, 1 + i): base i's new value
+                if user.args[1] == 0:
+                    user.replace_all_uses_with(call)
+                    graph.erase_node(user)
+                    continue
                 for use in list(user.users):
                     if use.target is torch.ops.aten.copy_.default and use.args[1] is user:
                         graph.erase_node(use)
@@ -128,7 +132,7 @@ class InPlaceIntoSaved(CustomGraphPass):
         graph.lint()
 
     def uuid(self):
-        return "fastmace-proto-in-place-into-saved-2"  # bump with every change: Inductor caches by it
+        return "fastmace-proto-in-place-into-saved-3"  # bump with every change: Inductor caches by it
 
 
 def _workspace_shape(module, natoms):
