@@ -303,11 +303,37 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
         options = inductor_records.inductor_options(private)
     for parameter in private.parameters():
         parameter.requires_grad_(False)
+    drop_unused_outputs(private)
     if options:  # a record's Inductor options (fastmace.rewrites.inductor; OPT3-T04)
         if mode not in (None, "default"):
             raise ValueError(f"Inductor options {sorted(options)} need compile mode 'default', got {mode!r}")
         return torch.compile(private, options=options, fullgraph=False)
     return torch.compile(private, mode=mode, fullgraph=False)
+
+
+# Model outputs no FastMACE evaluation reads (capacity screen A, 30 October 2026): MACE's concatenated node features,
+# about 11 kB per atom for MH-1, materialised by the compiled forward and alive through the force backward when
+# returned. A tuple of output names, read when a model is compiled; () returns every output (A/Bs only).
+UNUSED_OUTPUTS = ("node_feats",)
+
+
+def drop_unused_outputs(model, names=None):
+    """Let ``model`` (a private copy about to be compiled) return its output dict without ``names`` (default
+    ``UNUSED_OUTPUTS``): its instance ``forward`` filters the class forward's dict, so Inductor has no use for those
+    tensors and does not compute them. The other outputs are the class forward's own tensors. Returns ``model``."""
+    names = tuple(UNUSED_OUTPUTS if names is None else names)
+    if not names:
+        return model
+    forward = model.forward
+
+    def lean_forward(*args, **kwargs):
+        out = forward(*args, **kwargs)
+        if not isinstance(out, dict):
+            return out
+        return {key: value for key, value in out.items() if key not in names}
+
+    model.forward = lean_forward
+    return model
 
 
 # The model inputs indexed by edge (mark_edges_dynamic); every other input whose first dimension is the atom count is
@@ -456,7 +482,8 @@ def configure_allocator(enabled=True, environ=None, torch_version=None):
 
 __all__ = [
     "ALLOCATOR_MIN_TORCH", "ALLOCATOR_SETTINGS", "CompiledEntry", "CompiledModelCache", "FP64_EMULATION_SETTINGS",
-    "compile_model", "configure_allocator", "configure_fp64_emulation", "cpu_cueq_problems", "fp64_emulation_active",
+    "UNUSED_OUTPUTS", "compile_model", "configure_allocator", "configure_fp64_emulation", "cpu_cueq_problems",
+    "drop_unused_outputs", "fp64_emulation_active",
     "EDGE_KEYS", "install_engine_patches", "mark_atoms_dynamic", "mark_edges_dynamic",
     "naive_cueq", "private_copy", "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
 ]

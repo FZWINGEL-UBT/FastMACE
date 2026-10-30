@@ -28,6 +28,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   shifts (compaction computes them from the unit shifts and the build cell, bitwise); 60 instead of 104 bytes per
   slot in float32. The GPU build decides its screened pairs in chunks, so a rebuild's temporaries drop from about
   170 to about 50 bytes per pair. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 49,248 to 51,840 atoms.
+- The compiled model leaves out outputs no FastMACE evaluation reads (`fastmace.model.compile.UNUSED_OUTPUTS`:
+  MACE's concatenated `node_feats`; plans/capacity.md CAP-T12, exact), so Inductor no longer keeps them through the
+  force backward: about 9 kB per atom less at the peak. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 51,840 to 54,432 atoms, NaCl 49,248 to
+  51,984.
 
 - `EngineConfig.force_graphs` (`"auto"`, `"keep"`, `"fit"`, `"one"`): near the GPU memory limit the graph engine
   releases its captured graphs and their pool before capturing a force graph at a larger padded edge size, so one

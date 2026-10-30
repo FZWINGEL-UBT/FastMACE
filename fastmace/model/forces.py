@@ -397,7 +397,8 @@ class MACEForceField:
                 id(source), self.compile_mode, self.backend, self.oeq, accelerated, tuple(enabled),
                 self.species_columns if species_dependent else None, engine.first_derivative_only,
                 engine.unfuse_full_addmm, self.energy_treatment, self.dynamic_edges,
-                torch.are_deterministic_algorithms_enabled())  # reproducible plans compile apart (2-T16)
+                torch.are_deterministic_algorithms_enabled(),  # reproducible plans compile apart (2-T16)
+                compiling.UNUSED_OUTPUTS)
             entry = cache.get(key, source) if key is not None else None
             if entry is None:
                 if self.is_polar:
