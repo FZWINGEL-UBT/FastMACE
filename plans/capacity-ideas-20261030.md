@@ -127,6 +127,22 @@ measurements settle ideas 1, 2, 4 and 5 before anything is built.
 | **Morton-voxel atom order with TMA bulk copies** | A species/Morton order gave no gain in the research engine; supercells are already spatially ordered. Ada (sm_89) has no TMA. A receiver's senders do not form contiguous blocks even in Morton order | Not taken up; the gathers' cache behaviour is covered by M1 |
 | **Pure-SIMT cooperative megakernel** (one kernel per force call, grid syncs) | Means rewriting the cuEquivariance, OpenEquivariance and Triton kernels and the backward into one kernel; a fused heterogeneous kernel was rejected in round 4. The ceiling is the inter-kernel gaps of 230-320 nodes, about 2-4 µs each, under 1 ms per step | Measure first, M2 (same trace: gap total inside the force graph); reuse the fp32-profile numbers if they already contain it |
 
+M1 runs on sm_120 only: the workstations restrict GPU performance counters to admins (RmProfilingAdminOnly=1),
+Modal's image has no Nsight tools, and the Colab account had no compute units on 31 October.
+
+## Ninth list (31 October 2026)
+
+| Idea | Assessment | Status |
+| --- | --- | --- |
+| **Group-ordered wprime_backward** (edges permuted by (pair, piece) so a block reuses one G′ table) | Well grounded. OPT9-T01 measured receiver-order 2.46 vs group-sorted 0.46 ms (Ada, NaNbO3) for this term in isolation and stopped only because the fused kernel was receiver-owned. If the built kernel is edge-owned (per-edge arrays, atomic dx), the order is free. dsh/dr stay bitwise per edge; dx is already an atomic sum, so it stays in the existing rounding class. The permutation must be rebuilt per step inside the graph (counting sort over a few hundred groups) | Taken up: falsifier on captured real operands (1000 K), both GPUs, as proposed (GO ≤ 0.80x NaNbO3 / ≤ 0.90x NbCl5 with sort ≤ 50 µs; STOP ≥ 0.92x everywhere). Capacity worker, after tiles128 |
+| **Atom-chunked checkpointing of the combined node region** | The fix CAP-T08 named but did not build: the combined region saves 62 vs 97.5 kB/atom, but its whole-region recompute is the backward peak. Capacity is the priority, and it is a decision-67 memory mode (planned only when the plan does not fit). Risk: AOT keeps every chunk's output alive, or the chunked call is slower than the 1.24x combined region | Taken up: prototype and falsifier at NbCl5 21,600 atoms (GO peak ≤ 3.0 GiB and call ≤ 1.35x separate-on; STOP peak ≥ 3.3 GiB or ≥ 1.45x). Neighbour-list session, with the rebuild-`a` memory mode (same peak, same planner rule) |
+| **Tiled tile size and slot bucket from the workspace budget** | Cheap screen of R ∈ {4096, 8192, 16384} x bucket ∈ {0.15, 0.05} on the compiled tiled call; padding and halo work are real. The rule must come from the memory model and stay under Dynamo's recompile cap; no per-structure table | Taken up: screen at NbCl5 21,600 and 51,840 atoms (GO ≤ 0.92x with workspace ≤ 2 GiB and ≤ 5 slot changes in 300 steps). Tiled session, after the rescan, alongside T3 |
+| **dr fused into the interaction-0 edge_outer_sum backward** | Ceiling about 0.5-1 % of the step; item F (a store change in the same kernel) just measured neutral on both GPUs | Measure first: edge_outer_sum backward plus the interaction-0 table backward from the M2 trace; STOP below 100 µs/step |
+| **Certified float64 tables for D3(BJ)** | Plausible (smooth 1-D and 2-D functions, the radial-table certificate machinery exists), but only for --dispersion d3bj runs, which are not the capacity or default path, and D3's reference status needs a ≤ 1e-10 certificate | Deferred: profile a D3-on step first when D3 production runs start |
+
+Note on the proposal's premises: gate epilogues are not dead after wprime_backward. With the K-outer kernel, gate_epilogue=on measured
+1.2-4.3 % faster on sm_120 (speed-def E2, Ada pending).
+
 ## Not taken up
 
 | Idea | Reason |
