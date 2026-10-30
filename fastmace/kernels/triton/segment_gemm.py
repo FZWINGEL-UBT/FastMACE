@@ -35,9 +35,11 @@ def _kernel():
     import triton.language as tl
 
     @triton.jit
-    def gemm(a_ptr, b_ptr, c_ptr, rows, N, K, D, a_n, a_m, b_k, b_n, c_n, c_m,
+    def gemm(a_ptr, b_ptr, c_ptr, rows, N, K, D: tl.constexpr, a_n, a_m, b_k, b_n, c_n, c_m,
              BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr, PRECISION: tl.constexpr):
         # Row r of A and C is (atom r // D, component r % D); A's and C's rows are gathered and scattered.
+        # D (the irrep size 2l + 1) is a compile-time constant: one variant per irrep, and // and % by a
+        # constant need no 64-bit integer division per row tile.
         pm, pn = tl.program_id(0), tl.program_id(1)
         r = (pm * BLOCK_M + tl.arange(0, BLOCK_M)).to(tl.int64)
         j = (pn * BLOCK_N + tl.arange(0, BLOCK_N)).to(tl.int64)
