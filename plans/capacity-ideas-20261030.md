@@ -114,6 +114,19 @@ Lesson from the fourth list: `results/fp32-profile-20261028/*/parts/*.csv` time 
 | **Warp specialisation in wprime_backward** (producer and consumer warps) | High complexity. Only worth it if ncu shows the kernel neither memory- nor compute-bound but latency-bound with both pipes idle | Measure first (ncu), low priority |
 | **In-place ballot compaction** | Same as the sixth list's fused compaction. The chunked compact already removed the memory term (one byte of mask per candidate), and a fused kernel would mostly save time while risking exactness through FMA contraction | Not needed after the chunked compact |
 
+## Eighth list (31 October 2026)
+
+None of these adds capacity except GPUDirect Storage, which conflicts with the workstation file rule. Two cheap
+measurements settle ideas 1, 2, 4 and 5 before anything is built.
+
+| Idea | Assessment | Status |
+| --- | --- | --- |
+| **L2-locked micro-tiles** (512-768-atom tiles sized to L2, pinned with the CUDA access-policy window) | The proposal's own budget has w at 61 MB per tile, above the 32 MB (5060 Ti) and 48 MB (Ada) L2; rebuilding w costs 8-16 % (C1). The receptive field (about 12 Å over two interactions) makes the halo several times a 22 Å tile, so most work becomes halo recompute, and small tiles were launch-bound in the tiled path. Cells that already fit in L2 gained nothing from the tile-order change, so residency alone is not the bottleneck; fixing one kernel that rereads beyond L2 was (segment_gemm, 5-8 %) | Not as proposed. Taken up as measurement M1: ncu L2 hit-rate audit of the top 10-15 kernels at about 9,000 atoms on sm_120 and Ada, to find other segment_gemm-like kernels; persistence windows may be one per-kernel fix |
+| **GPU-resident MD loop with conditional graph nodes** | Feasible with CUDA 13, but rebuilds change edge counts (fixed edge-capacity buckets needed), and output and thermostat noise would have to move onto the device. The only gain is the host gap between steps, which matters for small cells, not production sizes | Measure first, M2: nsys GPU idle time between steps at about 1,000 and 9,000 atoms; stop if under 2 % of the step |
+| **GPUDirect Storage tile streaming from NVMe** (50M atoms) | At 50M atoms the per-atom state and list are about 9 kB/atom (about 450 GB), read and written over three sweeps per step: minutes per step at 7-14 GB/s, not hidden behind tile compute. Workstation runs may write only under /mnt/homes/zwingel (no local disks), and WSL has no GDS. Host RAM staging (T3) is the next step | Not taken up; revisit only if a target needs more than about 25M atoms |
+| **Morton-voxel atom order with TMA bulk copies** | A species/Morton order gave no gain in the research engine; supercells are already spatially ordered. Ada (sm_89) has no TMA. A receiver's senders do not form contiguous blocks even in Morton order | Not taken up; the gathers' cache behaviour is covered by M1 |
+| **Pure-SIMT cooperative megakernel** (one kernel per force call, grid syncs) | Means rewriting the cuEquivariance, OpenEquivariance and Triton kernels and the backward into one kernel; a fused heterogeneous kernel was rejected in round 4. The ceiling is the inter-kernel gaps of 230-320 nodes, about 2-4 µs each, under 1 ms per step | Measure first, M2 (same trace: gap total inside the force graph); reuse the fp32-profile numbers if they already contain it |
+
 ## Not taken up
 
 | Idea | Reason |
