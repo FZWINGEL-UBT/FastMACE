@@ -126,6 +126,12 @@ described.
 - `results/cap-pool-20261030/`: the ledger records.
 - No library code changed.
 
+## Checks
+
+- Ruff is clean on the three tools.
+- `test_layering.py` and `test_ab_rewrites_tool.py`, commit `25aebda0`: **34 passed**. They ran on coraline (GPU
+  hidden, `-n 2`), because leto had another user's job on its GPU.
+
 ## Setup
 
 - **Machine:** Fabi-PC, WSL2, RTX 5060 Ti 16 GB (driver 610.88), `mace_cueq_oeq` (torch 2.14.1+cu130).
