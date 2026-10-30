@@ -16,9 +16,12 @@ import functools
 import torch
 
 BLOCK = 32  # atoms per tile side (fixed for every crystal and GPU)
-# CUDA's largest grid y and z dimensions. Receiver tiles beyond it continue on the z axis, so the screen launches
-# for any atom count up to BLOCK * MAX_GRID_Y**2 (the 2-D grid stopped at BLOCK * 65,535, about 2.1M atoms).
+# CUDA's largest grid y dimension.
 MAX_GRID_Y = 65535
+# The most blocks one screen launch may have. Triton's launcher multiplies gridX * gridY * gridZ as 32-bit ints and
+# launches only if the product is positive: above 2**31 - 1 blocks it overflowed and the screen silently did not
+# run (no pairs, no error: NbCl5 at 1.73M and 2.0M atoms, 31 October 2026).
+MAX_GRID_BLOCKS = 2**31 - 1
 SCREEN_MARGIN = 0.01  # Å, float32 screen above the float64 decision
 CPU_CHUNK = 1 << 22  # elements of the (images, rows, atoms) distance block per CPU chunk
 
@@ -30,52 +33,58 @@ def _triton_kernel():
     import triton.language as tl
 
     @triton.jit
-    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, grid_y,
+    def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity, grid_y, rounds,
                BLOCK: tl.constexpr, HALF: tl.constexpr):
-        tile = tl.program_id(1) + tl.program_id(2) * grid_y  # receiver tile (``_grid``)
         senders = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
-        receivers = tile * BLOCK + tl.arange(0, BLOCK)
-        valid = (senders < natoms)[:, None] & (receivers < natoms)[None, :]
-        loops = nimages
-        if HALF:  # tiles below the diagonal hold no sender <= receiver pair: no image loop
-            valid = valid & (senders[:, None] <= receivers[None, :])
-            loops = tl.where(tl.program_id(0) > tile, 0, nimages)
         sx = tl.load(pos_ptr + senders * 3, mask=senders < natoms, other=0.0)
         sy = tl.load(pos_ptr + senders * 3 + 1, mask=senders < natoms, other=0.0)
         sz = tl.load(pos_ptr + senders * 3 + 2, mask=senders < natoms, other=0.0)
-        rx = tl.load(pos_ptr + receivers * 3, mask=receivers < natoms, other=0.0)
-        ry = tl.load(pos_ptr + receivers * 3 + 1, mask=receivers < natoms, other=0.0)
-        rz = tl.load(pos_ptr + receivers * 3 + 2, mask=receivers < natoms, other=0.0)
-        pair = senders.to(tl.int64)[:, None] * natoms + receivers.to(tl.int64)[None, :]
         pairs = natoms.to(tl.int64) * natoms  # int64: image * N^2 overflows int32 for large lists
-        for image in range(loops):
-            ix = tl.load(image_ptr + image * 3)
-            iy = tl.load(image_ptr + image * 3 + 1)
-            iz = tl.load(image_ptr + image * 3 + 2)
-            dx = rx[None, :] - sx[:, None] + ix
-            dy = ry[None, :] - sy[:, None] + iy
-            dz = rz[None, :] - sz[:, None] + iz
-            hit = ((dx * dx + dy * dy + dz * dz) < screen) & valid
-            flat = tl.reshape(hit.to(tl.int32), [BLOCK * BLOCK])
-            count = tl.sum(flat, axis=0)
-            if count > 0:
-                base = tl.atomic_add(counter_ptr, count)
-                slot = (base + tl.cumsum(flat, axis=0) - flat).to(tl.int64)
-                code = tl.reshape(image * pairs + pair, [BLOCK * BLOCK])
-                tl.store(out_ptr + slot, code, mask=(flat > 0) & (slot < capacity))
+        for k in range(rounds):  # receiver tiles program_id(1) + k * grid_y (``_grid``)
+            tile = tl.program_id(1) + k * grid_y
+            receivers = tile * BLOCK + tl.arange(0, BLOCK)
+            valid = (senders < natoms)[:, None] & (receivers < natoms)[None, :]
+            loops = nimages
+            if HALF:  # tiles below the diagonal hold no sender <= receiver pair: no image loop
+                valid = valid & (senders[:, None] <= receivers[None, :])
+                loops = tl.where(tl.program_id(0) > tile, 0, nimages)
+            rx = tl.load(pos_ptr + receivers * 3, mask=receivers < natoms, other=0.0)
+            ry = tl.load(pos_ptr + receivers * 3 + 1, mask=receivers < natoms, other=0.0)
+            rz = tl.load(pos_ptr + receivers * 3 + 2, mask=receivers < natoms, other=0.0)
+            pair = senders.to(tl.int64)[:, None] * natoms + receivers.to(tl.int64)[None, :]
+            for image in range(loops):
+                ix = tl.load(image_ptr + image * 3)
+                iy = tl.load(image_ptr + image * 3 + 1)
+                iz = tl.load(image_ptr + image * 3 + 2)
+                dx = rx[None, :] - sx[:, None] + ix
+                dy = ry[None, :] - sy[:, None] + iy
+                dz = rz[None, :] - sz[:, None] + iz
+                hit = ((dx * dx + dy * dy + dz * dz) < screen) & valid
+                flat = tl.reshape(hit.to(tl.int32), [BLOCK * BLOCK])
+                count = tl.sum(flat, axis=0)
+                if count > 0:
+                    base = tl.atomic_add(counter_ptr, count)
+                    slot = (base + tl.cumsum(flat, axis=0) - flat).to(tl.int64)
+                    code = tl.reshape(image * pairs + pair, [BLOCK * BLOCK])
+                    tl.store(out_ptr + slot, code, mask=(flat > 0) & (slot < capacity))
 
     return kernel
 
 
 def _grid(natoms, max_grid_y=MAX_GRID_Y):
-    """(grid, grid_y) of the screen: sender tiles on x, receiver tiles ``y + z * grid_y`` on y and z.
+    """(grid, grid_y, rounds) of the screen: sender tiles on x; a program on y screens receiver tiles
+    ``y + k * grid_y`` for ``k < rounds`` (tiles past the end hold no receiver: masked).
 
-    Up to ``max_grid_y`` receiver tiles the grid is the 2-D one, (tiles, tiles, 1). Beyond, the receiver tiles
-    take ``ceil(tiles / max_grid_y)`` z layers; the last layer's tiles past the end hold no receiver (masked).
+    ``grid_y`` is the receiver tile count unless that exceeds CUDA's y limit (``max_grid_y``) or would make the
+    launch more than ``MAX_GRID_BLOCKS`` blocks, which Triton's launcher would skip without an error. Up to 46,340
+    tiles (1.48M atoms) the grid is the 2-D one, ``(tiles, tiles, 1)`` with one round, as before.
     """
     tiles = max(1, -(-natoms // BLOCK))
-    grid_y = min(tiles, int(max_grid_y))
-    return (tiles, grid_y, -(-tiles // grid_y)), grid_y
+    grid_y = max(1, min(tiles, int(max_grid_y), MAX_GRID_BLOCKS // tiles))
+    if tiles * grid_y > MAX_GRID_BLOCKS or tiles > MAX_GRID_BLOCKS:
+        raise ValueError(f"the pair screen of {natoms} atoms needs {tiles} x {grid_y} blocks, more than one launch "
+                         f"takes ({MAX_GRID_BLOCKS})")
+    return (tiles, grid_y, 1), grid_y, -(-tiles // grid_y)
 
 
 def _candidate_pairs_cpu(wrapped, image_vectors, screen, half=False):
@@ -107,9 +116,9 @@ def screen_into(wrapped, image_vectors, radius, out, counter, half=False, max_gr
 
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
     screen = (radius + SCREEN_MARGIN) ** 2
-    grid, grid_y = _grid(natoms, max_grid_y)
+    grid, grid_y, rounds = _grid(natoms, max_grid_y)
     _triton_kernel()[grid](wrapped.float().contiguous(), image_vectors.float().contiguous(), out, counter, natoms,
-                           nimages, screen, out.numel(), grid_y, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+                           nimages, screen, out.numel(), grid_y, rounds, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
 
 
 def decode_codes(code, natoms):
@@ -123,8 +132,8 @@ def decode_codes(code, natoms):
 def screen_codes(wrapped, image_vectors, radius, state=None, half=False, max_grid_y=MAX_GRID_Y):
     """The screened pairs as int64 codes (``decode_codes``), unordered on CUDA: a view of the kept output buffer.
 
-    Arguments as ``candidate_pairs``; ``max_grid_y`` (CUDA) splits the receiver tiles over the grid's y and z
-    axes beyond that many tiles (``_grid``; smaller in tests). The codes take 8 bytes per pair; decoding them in
+    Arguments as ``candidate_pairs``; ``max_grid_y`` (CUDA) caps the receiver programs, each then screening
+    several receiver tiles (``_grid``; smaller in tests). The codes take 8 bytes per pair; decoding them in
     chunks bounds the caller's temporaries (``SkinNeighbourList.build_gpu``).
     """
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
@@ -137,14 +146,14 @@ def screen_codes(wrapped, image_vectors, radius, state=None, half=False, max_gri
     positions = wrapped.float().contiguous()
     images = image_vectors.float().contiguous()
     counter = torch.zeros(1, dtype=torch.int32, device=wrapped.device)
-    grid, grid_y = _grid(natoms, max_grid_y)
+    grid, grid_y, rounds = _grid(natoms, max_grid_y)
     while True:
         out = state.get("buffer")
         if out is None:
             out = state["buffer"] = torch.empty(max(1 << 16, 128 * natoms), dtype=torch.int64,
                                                 device=wrapped.device)
         _triton_kernel()[grid](positions, images, out, counter, natoms, nimages, screen, out.numel(), grid_y,
-                               BLOCK=BLOCK, HALF=bool(half), num_warps=4)
+                               rounds, BLOCK=BLOCK, HALF=bool(half), num_warps=4)
         found = int(counter.item())  # host sync (rebuild steps only)
         if found <= out.numel():
             break

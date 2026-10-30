@@ -5,7 +5,7 @@
 set -u
 W=/mnt/homes/zwingel/fm-tiled
 SRC=$W/src
-OUT=$W/runs/pair-search-grid
+OUT=$W/runs/${RUN:-pair-search-grid}
 ENV=/mnt/homes/zwingel/environments/mace_cueq_oeq
 mkdir -p "$OUT/tmp" "$W/cache"
 idle() {
@@ -27,6 +27,6 @@ idle
   > "$OUT/gpu-tests.log" 2>&1
 echo "gpu tests exit $?"; tail -3 "$OUT/gpu-tests.log"
 idle
-"$ENV/bin/python" tools/bench/pair_search_ab.py --baseline "$W/main-48af40c6" --repeat 4x4x8 6x6x20 --rounds 10 \
+"$ENV/bin/python" tools/bench/pair_search_ab.py --baseline "$W/${BASE:-main-48af40c6}" --repeat ${REPEATS:-4x4x8 6x6x20} --rounds 10 \
   --output "$OUT" > "$OUT/ab.log" 2>&1
 echo "ab exit $?"; grep '^{' "$OUT/ab.log"

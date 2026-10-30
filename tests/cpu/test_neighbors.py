@@ -150,25 +150,26 @@ def test_pair_search_cpu_screen():
     assert set(map(tuple, torch.nonzero(every < 4.0).tolist())) <= found  # every pair within range
 
 
-@pytest.mark.parametrize("natoms, max_grid_y", [(1, 65535), (32, 65535), (2_000_000, 65535),
-                                                (2_097_120, 65535), (2_097_121, 65535), (2_299_968, 65535),
-                                                (1000, 3), (1000, 7), (1000, 32), (1000, 1)])
+@pytest.mark.parametrize("natoms, max_grid_y", [(1, 65535), (32, 65535), (1_481_544, 65535), (1_482_880, 65535),
+                                                (1_728_000, 65535), (2_000_376, 65535), (2_299_968, 65535),
+                                                (10_000_000, 65535), (1000, 3), (1000, 7), (1000, 32), (1000, 1)])
 def test_pair_search_grid_covers_every_receiver_tile_once(natoms, max_grid_y):
-    """The screen's receiver tiles ``y + z * grid_y`` on CUDA: within the y limit, every tile exactly once,
-    and the grid is the 2-D one up to 65,535 tiles (about 2.1M atoms), so the launch is unchanged there."""
-    from fastmace.neighbors.pair_search import BLOCK, _grid
+    """The screen's receiver tiles ``y + k * grid_y`` on CUDA cover every tile exactly once, and the launch stays
+    within CUDA's y limit and below 2**31 blocks: Triton's launcher multiplies the grid as 32-bit ints and skipped
+    larger launches without an error (no pairs at 1.73M and 2.0M atoms). Up to 46,340 tiles it is the 2-D grid of
+    before, one round."""
+    from fastmace.neighbors.pair_search import BLOCK, MAX_GRID_BLOCKS, _grid
 
-    (x, y, z), grid_y = _grid(natoms, max_grid_y)
+    (x, y, z), grid_y, rounds = _grid(natoms, max_grid_y)
     tiles = -(-natoms // BLOCK)
-    assert x == tiles and grid_y == y and y <= max_grid_y and z <= 65535
-    covered = [j + k * grid_y for k in range(z) for j in range(y)] if y * z < 10**6 else None
-    if covered is not None:
-        inside = [t for t in covered if t < tiles]
-        assert sorted(inside) == list(range(tiles))  # every receiver tile once
-        assert len(covered) - len(inside) < grid_y  # only the last z layer runs past the end
-    assert y * z >= tiles and (z - 1) * y < tiles
-    if tiles <= 65535 and max_grid_y == 65535:
-        assert (y, z) == (tiles, 1)  # the 2-D grid of before
+    assert x == tiles and grid_y == y and z == 1 and y <= max_grid_y
+    assert x * y * z <= MAX_GRID_BLOCKS  # the int32 product stays positive
+    assert y * rounds >= tiles and (rounds - 1) * y < tiles
+    if y * rounds < 10**6:
+        covered = [j + k * grid_y for k in range(rounds) for j in range(y)]
+        assert sorted(t for t in covered if t < tiles) == list(range(tiles))  # every receiver tile once
+    if tiles <= 46340 and max_grid_y == 65535:
+        assert (y, rounds) == (tiles, 1)  # the 2-D grid of before
 
 
 # --------------------------------------------------------------------------- buckets and capacity
