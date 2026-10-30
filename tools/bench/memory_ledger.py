@@ -80,6 +80,9 @@ def parse_args(argv=None):
                    help="screen A: drop the model's node_feats output before the force backward (_split_outputs)")
     p.add_argument("--output-wrapper", action="store_true",
                    help="screen A: compile a wrapper that returns the model's outputs without node_feats")
+    p.add_argument("--inductor-option", nargs="*", default=[], metavar="KEY=VALUE",
+                   help="screen B: extra Inductor options merged into the model's torch.compile call "
+                        "(e.g. memory_planning=true memory_pool=intermediates)")
     p.add_argument("--workspace-prototype", action="store_true",
                    help="experiment: segment_gemm's products and input gradients in per-interaction workspaces "
                         "(tools/bench/workspace_prototype.py)")
@@ -201,6 +204,31 @@ def screen_a(torch, drop, wrapper):
         compiling.compile_model = compile_model
 
 
+def extra_inductor_options(torch, extra):
+    """Screen B (experiment): merge ``extra`` into the options of the model's ``torch.compile`` call."""
+    from fastmace.model import compile as compiling
+
+    original_compile = compiling.compile_model
+
+    def compile_model(*a, **k):
+        torch_compile = torch.compile
+
+        def merging_compile(model, *ca, **ck):
+            mode = ck.pop("mode", None)
+            if mode not in (None, "default"):
+                raise ValueError(f"extra Inductor options need compile mode 'default', got {mode!r}")
+            ck["options"] = {**(ck.get("options") or {}), **extra}
+            return torch_compile(model, *ca, **ck)
+
+        torch.compile = merging_compile
+        try:
+            return original_compile(*a, **k)
+        finally:
+            torch.compile = torch_compile
+
+    compiling.compile_model = compile_model
+
+
 def allocator_view(torch, engine, second=None):
     """The steady state's segments: graph pool, the experiment's second pool, default pool live blocks by owner,
     and the cache."""
@@ -314,6 +342,9 @@ def main(argv=None):
     torch.cuda.memory._record_memory_history(max_entries=1, stacks="python")
     started = time.perf_counter()
     second = route_to_second_pool(torch, args.second_pool) if args.second_pool else None
+    if args.inductor_option:
+        extra_inductor_options(torch, {k: capacity_scan._value(v) for k, v in
+                                       (item.split("=", 1) for item in args.inductor_option)})
     if args.drop_node_feats or args.output_wrapper:
         screen_a(torch, drop=args.drop_node_feats, wrapper=args.output_wrapper)
     if args.workspace_prototype:
@@ -401,7 +432,7 @@ def main(argv=None):
                   host=__import__("os").uname().nodename, seconds=time.perf_counter() - started,
                   alloc_conf=__import__("os").environ.get("PYTORCH_CUDA_ALLOC_CONF"), second_pool=args.second_pool,
                   workspace_prototype=args.workspace_prototype, drop_node_feats=args.drop_node_feats,
-                  output_wrapper=args.output_wrapper,
+                  output_wrapper=args.output_wrapper, inductor_option=args.inductor_option,
                   edges=info, points=points, allocator=view,
                   ledger=[dict(row=row, bytes=int(b)) for row, b in ledger],
                   recapture=dict(allocated_before=int(base), peak_live_over_before=int(peak),
