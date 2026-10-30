@@ -81,7 +81,7 @@ def test_tiled_call_equals_the_whole_system_call(names, receivers, mode, bucket)
             assert tiled.last["tiles"] > 1 and tiled.last["max_halo"] > 0
         if mode == "padded":
             slots = list(tiled.last["slots"].values())
-            assert max(r for r, _, _ in slots) == tiled.last["max_receivers"] + 1
+            assert tiled.last["max_receivers"] + 1 <= max(r for r, _, _ in slots) <= receivers + 1
             assert max(h for _, h, _ in slots) >= tiled.last["max_halo"]
             assert max(e for _, _, e in slots) >= tiled.last["max_edges"]
             if bucket >= 1:

@@ -604,9 +604,9 @@ class TiledForceField:
     def _slot_keys(self, tiles, row_ptr, edge_index, local_of):
         """Each tile's slot: the edge bucket ``ceil(edges / step)``, with ``step`` set on the first call from the
         largest tile (``TileConfig.bucket`` of its edges, at least 256, a multiple of 256). A slot holds one
-        receiver row more than the largest of its tiles (the padding receiver), their halo with
-        ``TileConfig.headroom`` and its bucket's edge count. A slot grows (and its graphs and compiled shapes go)
-        only when a tile does not fit it."""
+        receiver row more than the largest of its tiles with ``TileConfig.headroom``, at most the receiver cap (the
+        extra row is the padding receiver), their halo with the same headroom and its bucket's edge count. A slot
+        grows (and its graphs and compiled shapes go) only when a tile does not fit it."""
         sizes = []
         for receivers in tiles:
             _, edge_ids, _, r, h = self._tile_graph(receivers, row_ptr, edge_index, local_of)
@@ -619,7 +619,10 @@ class TiledForceField:
         head = 1.0 + float(self.config.headroom)
         for key in set(keys):
             members = [size for size, k in zip(sizes, keys) if k == key]
-            need = (max(r for r, _, _ in members) + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
+            # Receivers with headroom too (tiles are planned again every call, so their sizes move a little), but
+            # never past the cap, which no tile exceeds: full tiles keep their slot.
+            rows = min(int(self.config.receivers), math.ceil(max(r for r, _, _ in members) * head))
+            need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
                     key * step)
             slot = self._slots.get(key)
             if slot is None or any(a > b for a, b in zip(need, slot["sizes"])):
