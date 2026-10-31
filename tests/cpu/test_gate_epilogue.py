@@ -98,7 +98,9 @@ def test_fake_kernel_gives_the_shapes_of_the_gradients():
 
 def test_record_is_rounding_deterministic_after_segment_gemm():
     record = fusion.RECORDS["gate_epilogue"]
-    assert record.default == "auto" and record.exactness == "rounding" and record.deterministic
+    # off at the registry: the planner turns it on (decision 66), as grouped_launch, so a registry "auto" resolve
+    # never lets it take tf32x3_gemms' place
+    assert record.default == "off" and record.exactness == "rounding" and record.deterministic
     assert record.requires == ("segment_gemm",) and record.conflicts == ("tf32x3_gemms",)
     regs = reg.default_registry()
     assert regs.config_field("gate_epilogue") == "gate_epilogue"

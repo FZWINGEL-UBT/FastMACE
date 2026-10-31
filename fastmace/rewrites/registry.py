@@ -603,11 +603,10 @@ class Registry:
             raise ValueError(f"unknown rewrite(s) {sorted(unknown)}; registered: {list(self._records)}")
         requested = {name: _toggle(name, value) for name, value in requested.items()}
         enabled, decisions, misfits = [], [], set()
-        asked_on = {name for name, value in requested.items() if value == "on"}
         for candidate in self.candidates(model, mace_version):
             name = candidate.name
             want = requested.get(name, "auto")
-            reason = self._blocker(candidate, want, enabled, asked_on)
+            reason = self._blocker(candidate, want, enabled)
             if reason is None:
                 enabled.append(name)
                 decisions.append(Decision(name, want, True, "on" if want == "on" else f"default {candidate.default}"))
@@ -632,9 +631,8 @@ class Registry:
         return dataclasses.replace(
             decision, refused=False, reason=f"{decision.reason} (field {field} honoured by {', '.join(honoured_by)})")
 
-    def _blocker(self, candidate, want, enabled, asked_on=frozenset()):
-        """Why ``candidate`` stays off given the records enabled so far, or None. An "auto" record also stays off
-        when a record it conflicts with is requested "on", whichever comes first in application order."""
+    def _blocker(self, candidate, want, enabled):
+        """Why ``candidate`` stays off given the records enabled so far, or None."""
         if want == "off":
             return "off"
         if not candidate.qualified.supported:
@@ -646,9 +644,6 @@ class Registry:
                 return "approximate rewrites are never default (SPEC §6.1)"
             if candidate.default == "off":
                 return "default off; only an explicit 'on' enables it"
-            for other in sorted(asked_on):
-                if other in candidate.conflicts or candidate.name in self._records[other].conflicts:
-                    return f"conflicts with {other}, requested on"
         for required in candidate.requires:
             if required not in self._records:
                 return f"requires {required}, which is not registered"

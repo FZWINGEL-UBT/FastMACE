@@ -145,8 +145,9 @@ def test_planner_refuses_it_below_sm80_in_float64_and_with_grouped_launch():
 
 @cueq
 def test_an_explicit_on_wins_over_an_auto_record_it_conflicts_with():
-    """gate_epilogue (default auto since decision 66's E2 default) comes before tf32x3_gemms in application order and
-    conflicts with it: an explicit tf32x3_gemms "on" keeps it, and the auto gate_epilogue stays off."""
+    """gate_epilogue comes before tf32x3_gemms in application order and conflicts with it; its record stays default
+    off (the planner's decision 66 rule turns it on), so a registry resolve with tf32x3_gemms "on" and the rest
+    "auto" keeps tf32x3_gemms and leaves gate_epilogue off, not refused (leto suite, e2-default's first version)."""
     model, _ = tiny("mh1", backend="cueq")
     regs = reg.default_registry()
     assert regs.order().index("gate_epilogue") < regs.order().index("tf32x3_gemms")
@@ -154,4 +155,4 @@ def test_an_explicit_on_wins_over_an_auto_record_it_conflicts_with():
     resolution = regs.resolve(copy.deepcopy(model), asked, strict=True)
     assert resolution.decision("tf32x3_gemms").enabled
     gate = resolution.decision("gate_epilogue")
-    assert not gate.enabled and not gate.refused and "tf32x3_gemms" in gate.reason
+    assert not gate.enabled and not gate.refused
