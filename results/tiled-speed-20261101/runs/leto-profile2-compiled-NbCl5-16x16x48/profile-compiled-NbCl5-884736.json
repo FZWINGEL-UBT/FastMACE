@@ -1,0 +1,165 @@
+{
+ "structure": "NbCl5",
+ "atoms": 884736,
+ "mode": "compiled",
+ "receivers": 4096,
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "host": "leto",
+ "source_commit": "2990be9f",
+ "warm": [
+  47.11610483599361,
+  18.578468107036315
+ ],
+ "plain_call": 18.45338337897556,
+ "timed_call": 18.658530901011545,
+ "stages": {
+  "interaction 0 (sweeps 1, 3)": 7.137,
+  "interaction 1 (sweep 2)": 5.738,
+  "tile list (per-tile neighbour list)": 2.542,
+  "call (rest)": 0.841,
+  "host state: add rows / window": 0.815,
+  "host state: read rows": 0.767,
+  "tile graph (rest)": 0.303,
+  "padded: body (rest)": 0.118,
+  "padded: scatter (rest)": 0.1,
+  "host state: close": 0.099,
+  "padded: fill": 0.098,
+  "host state: put rows": 0.055,
+  "host state: touch": 0.034,
+  "host state: plan": 0.011
+ },
+ "stage_counts": {
+  "call (rest)": 1,
+  "tile graph (rest)": 1248,
+  "tile list (per-tile neighbour list)": 1248,
+  "host state: touch": 312,
+  "padded: fill": 936,
+  "padded: body (rest)": 936,
+  "interaction 0 (sweeps 1, 3)": 624,
+  "padded: scatter (rest)": 936,
+  "host state: add rows / window": 936,
+  "host state: plan": 1,
+  "interaction 1 (sweep 2)": 312,
+  "host state: read rows": 1248,
+  "host state: put rows": 312,
+  "host state: close": 312
+ },
+ "profiled_call": 21.545286740991287,
+ "device_seconds": 14.174164426999734,
+ "device_busy_share": 0.6578777343460683,
+ "kernel_groups": {
+  "gemm": 3.949,
+  "other": 3.76,
+  "triton": 1.986,
+  "elementwise": 1.654,
+  "convolution": 0.922,
+  "copies": 0.89,
+  "index/scatter": 0.75,
+  "reduce": 0.149,
+  "sort/unique": 0.114,
+  "cuequivariance": 0.0
+ },
+ "top_kernels": [
+  [
+   "ampere_sgemm_128x64_nn",
+   2.046
+  ],
+  [
+   "gated_input_grads",
+   1.688
+  ],
+  [
+   "gemm",
+   1.589
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std::array<char*, 3ul>, false>(in",
+   0.834
+  ],
+  [
+   "oeq_projected_backward_wprime",
+   0.819
+  ],
+  [
+   "fused_folded_forward",
+   0.657
+  ],
+  [
+   "Memcpy HtoD (Pageable -> Device)",
+   0.465
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native:",
+   0.445
+  ],
+  [
+   "Memcpy DtoH (Device -> Pageable)",
+   0.374
+  ],
+  [
+   "kernel",
+   0.301
+  ],
+  [
+   "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<double, double,",
+   0.256
+  ],
+  [
+   "segmented_polynomial_algo1_4",
+   0.242
+  ],
+  [
+   "segmented_polynomial_bwd_algo4_2",
+   0.23
+  ],
+  [
+   "segmented_polynomial_bwd_algo6_4",
+   0.183
+  ],
+  [
+   "triton_red_fused__unsafe_view_add_clone_mul_neg_slice_slice_backward_sum_6",
+   0.167
+  ],
+  [
+   "triton_poi_fused_add_div_slice_slice_backward_streaming_conv_wprime_backward_7",
+   0.157
+  ],
+  [
+   "triton_poi_fused_joined_products_mul_silu_slice_unsqueeze_view_28",
+   0.128
+  ],
+  [
+   "forward",
+   0.116
+  ],
+  [
+   "triton_poi_fused_div_slice_23",
+   0.114
+  ],
+  [
+   "segmented_polynomial_algo1_1",
+   0.107
+  ],
+  [
+   "triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_21",
+   0.09
+  ],
+  [
+   "triton_poi_fused_joined_products_mul_silu_slice_unsqueeze_view_30",
+   0.088
+  ],
+  [
+   "ampere_sgemm_32x128_nn",
+   0.085
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at",
+   0.084
+  ],
+  [
+   "backward",
+   0.084
+  ]
+ ],
+ "tiles": 312
+}

@@ -93,6 +93,11 @@ class TileNeighbours:
         order = torch.sort(primary * natoms + sender).indices
         return sender[order], receiver[order], unit[order], shifts64[order].to(self.float_dtype)
 
+    def shifts(self, unit):
+        """The shifts of unit shifts ``unit`` (the float dtype), as ``edges`` gives them: ``times_3x3`` with the
+        float64 cell, element-wise per row, then the float dtype."""
+        return times_3x3(unit.to(torch.float64), self.cell).to(self.float_dtype)
+
     @classmethod
     def like(cls, neighbours, cell=None):
         """A ``TileNeighbours`` with a ``SkinNeighbourList``'s cutoff, float dtype, sender groups and current cell."""

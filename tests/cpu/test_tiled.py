@@ -430,3 +430,38 @@ def test_aliased_host_state_is_bitwise_the_host_state(names, mode):
 def test_aliased_state_needs_the_host_state():
     with pytest.raises(ValueError, match="alias_state"):
         TileConfig(5, alias_state=True)
+
+
+# ---------------------------------------------------------------- the tile lists built once per call
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_tile_lists_built_once_per_call_are_bitwise_the_rebuilt_ones(mode, monkeypatch):
+    """``TileConfig.list_cache``: each tile's edges are found once per call (``TileNeighbours.edges``) and kept on
+    the host in a compact form (sender, receiver counts, unit shifts), from which the later sweeps rebuild them
+    exactly: bitwise the call that searches them in every sweep."""
+    from fastmace.neighbors.tile_list import TileNeighbours
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    searches = []
+    edges = TileNeighbours.edges
+    monkeypatch.setattr(TileNeighbours, "edges", lambda self, receivers: searches.append(1) or edges(self, receivers))
+    results = []
+    for cache in (False, True):
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_cache=cache))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        searches.clear()
+        results.append(tiled.evaluate(strained(atoms), stress=True))
+        tiles = tiled.last["tiles"]
+        assert len(searches) == (tiles if cache else (3 + (mode == "padded")) * tiles)
+        assert (tiled.last["list_cache_bytes"] > 0) == cache
+    assert results[0][0] == results[1][0]
+    assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+def test_compiled_tiles_default_to_the_workspace_budget():
+    assert TileConfig(4096, mode="compiled").budget_receivers == (8192, 16384)
+    assert TileConfig(4096).budget_receivers == ()
+    assert TileConfig(4096, mode="compiled", budget_receivers=()).budget_receivers == ()
