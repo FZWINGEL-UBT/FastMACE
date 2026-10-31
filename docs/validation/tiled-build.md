@@ -70,7 +70,7 @@ force.
 | 22,425,768 | 8a2e7b3d, murphy | 9.83 GiB | 17.27 GiB | 13.60 GiB | 692 s | valid, **limit** |
 | 25,412,184 | 8a2e7b3d, leto | | | | | out of memory in the build (allocating the positions, 292 MiB) |
 
-**NaCl** (8a2e7b3d, murphy; the larger points follow as a results-only commit):
+**NaCl** (8a2e7b3d, murphy):
 
 | Atoms | Before | Build peak | Call total peak | Call | Result |
 | ---: | ---: | ---: | ---: | ---: | --- |
@@ -78,7 +78,8 @@ force.
 | 12,812,904 | 5.68 GiB | 9.93 GiB | 8.48 GiB | 351 s | valid |
 | 14,886,936 | 6.57 GiB | 11.51 GiB | 9.61 GiB | 441 s | valid |
 | 17,173,512 | 7.56 GiB | 13.26 GiB | 10.85 GiB | 495 s | valid |
-| 19,683,000 | | 15.17 GiB | | | running |
+| 19,683,000 | 8.65 GiB | 15.17 GiB | 12.22 GiB | 543 s | valid |
+| 22,425,768 | 9.83 GiB | 17.27 GiB | 13.71 GiB | 611 s | valid (the largest size scanned) |
 
 **The NbCl5 limit on 20 GB rises from 7.76M to 22.43M atoms.**
 
