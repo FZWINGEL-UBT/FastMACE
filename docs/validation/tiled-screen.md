@@ -9,7 +9,10 @@ The compiled tiled call over R ∈ {4,096, 8,192, 16,384} × bucket ∈ {0.15, 0
   `tiled_md` run.
 - STOP if all are within 0.97×.
 
-## Verdict: no GO; not a STOP either
+## Verdict: STOP (the conductor's ruling); the tiled call keeps R = 4,096, bucket 0.15
+
+No configuration meets GO. The R = 16,384 configurations, at about 0.90×, are outside the 0.97× STOP band, but
+their workspace (about 4.2 GiB) fails GO whatever their time. So the conductor called STOP.
 
 | NbCl5 atoms | R | Bucket | Time / current | Workspace | Slots |
 | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -37,8 +40,8 @@ What the screen shows:
     (two slots), 1.8 GiB at 51,840 (one slot).
   - The workspace grows about linearly with R: about 0.26 MiB per receiver.
 - No configuration meets GO, so no 300-step slot-change run was made.
-- The R = 16,384 configurations are about 0.90×, outside 0.97×, so the result is not a STOP either. The gain is
-  real, but it costs workspace.
+- The R = 16,384 configurations are about 0.90×, outside 0.97×. The gain is real, but it costs workspace that
+  GO does not allow.
 
 **Reading for a rule (not done here; the conductor's call).** The gain comes from fewer, larger tiles:
 
