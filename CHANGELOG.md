@@ -17,11 +17,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   order (`docs/validation/rebuild-a.md`).
 - `RewriteConfig.recompute_node_region` (ninth list item 2, rounding, deterministic): `recompute_node_segments`'
   chain and product block of each interaction as one checkpoint region in 4 atom chunks, so the backward rebuilds one
-  chunk at a time: the force call's peak is 0.77 times the separate segments' (35 kB per atom less) at 1.22-1.24
-  times their force call. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 82,944 to 101,088 atoms, NaCl 70,400 to
-  97,336. Off; the last memory-rescue record (rule 12 or the out-of-memory rebuild, only when the plan does not fit
-  with `recompute_node_segments` on). The combined region no longer breaks the compiled graph
-  (docs/validation/chunked-region.md).
+  chunk at a time. Each interaction's message normalization runs inside the chunks too, so the divided message is
+  not kept (M3 target 1): the force call's peak is 57 kB per atom below the separate segments' at 1.2 times their
+  force call. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 82,944 to 114,048 atoms, NaCl 70,400 to 115,200. Off; the
+  last memory-rescue record (rule 12 or the out-of-memory rebuild, only when the plan does not fit with
+  `recompute_node_segments` on). The combined region no longer breaks the compiled graph
+  (docs/validation/chunked-region.md, docs/validation/region-norm.md).
 - `RewriteConfig.recompute_conv_weights` (plans/capacity.md CAP-T07 and CAP-T07b, rounding): the per-edge
   tensor-product weights are not kept for the backward (1,280 floats per edge for MH-1, about a third of a large
   cell's force-call memory). With `fused_folded_forward` the forward builds them on chip without storing them and the

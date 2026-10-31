@@ -52,7 +52,7 @@ def main():
                                    sha256=ab_step_time._sha256(args.checkpoint))
     name, base = ab_step_time.read_structure(args.structure, None)
     extra = dict(item.split("=", 1) for item in args.rewrites)
-    rewrites = RewriteConfig(recompute_conv_weights="on", recompute_node_segments="on", **extra)
+    rewrites = RewriteConfig(**{"recompute_conv_weights": "on", "recompute_node_segments": "on", **extra})
     field = ForceField(loaded, base, precision="float32", rewrites=rewrites)
     integrator = IntegratorConfig(temperature_K=300.0)
     plan = planner.plan(field, base, integrator, Workload(max_temperature_K=300.0), hardware)

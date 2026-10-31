@@ -1,0 +1,27 @@
+{
+ "host": "leto",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "36ced3e2",
+ "structure": "NbCl5@5x5x12",
+ "atoms": 21600,
+ "region": "combined",
+ "chunks": 4,
+ "peak_above_start_GiB": 1.98466157913208,
+ "allocated_before_GiB": 0.30947160720825195,
+ "reserved_GiB": 5.240234375,
+ "call_ms": 288.8026428222656,
+ "call_ms_all": [
+  287.4439697265625,
+  289.35064697265625,
+  288.9635925292969,
+  287.8238830566406,
+  288.8026428222656
+ ],
+ "plan_rewrites": [
+  "RewriteConfig.recompute_conv_weights = on  (requested 'on': on: requested)",
+  "RewriteConfig.recompute_node_segments = on  (requested 'on': stage 1: on (with gated_rows); stage 2: supported (ok))",
+  "RewriteConfig.recompute_node_region = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments): off: on only when memory would not be enough with recompute_node_segments on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (ninth list item 2))",
+  "requested: RewriteConfig.recompute_conv_weights=on, RewriteConfig.recompute_node_segments=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+ ]
+}
