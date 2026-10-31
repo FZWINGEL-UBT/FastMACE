@@ -342,7 +342,11 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     residual_input = self.truncate_ghosts(residual_input, n_real)
     gated_rows = getattr(self, "gated_rows", None)  # gated_rows: residual products, gate and linear_2 on rows
     if gated_rows is not None:
-        message = gated_rows(message / (density * self.beta + self.alpha), residual_input)
+        divisor = density * self.beta + self.alpha
+        if getattr(gated_rows, "region_divides", False):  # recompute_node_region: divided inside the region's chunks
+            message = gated_rows(message, residual_input, divisor)
+        else:
+            message = gated_rows(message / divisor, residual_input)
         return (self.reshape(message), sc)
     if residual_linear is not None:  # with density_first (merge_residual_linears)
         message = residual_linear(message / (density * self.beta + self.alpha), residual_input)

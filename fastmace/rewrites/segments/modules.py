@@ -41,11 +41,13 @@ def stored(module):
 
 # --------------------------------------------------------------------------- one region per interaction
 
-def joined_inputs(self, x, y):
-    """The ``gated_rows`` chain deferred to the product block's region: its two inputs, joined by columns."""
+def joined_inputs(self, x, y, divisor=None):
+    """The ``gated_rows`` chain deferred to the product block's region: its two inputs, joined by columns, and the
+    interaction's message divisor (``density * beta + alpha``, one column) when it passes one: the region divides,
+    so the divided message is never kept for the backward."""
     import torch
 
-    return torch.cat([x, y], dim=1)
+    return torch.cat([x, y] if divisor is None else [x, y, divisor.to(x.dtype)], dim=1)
 
 
 def passed_through(self, tensor):
@@ -53,8 +55,11 @@ def passed_through(self, tensor):
     return tensor
 
 
-def region(self, x, y, sc, node_attrs):
-    """``gated_rows`` -> reshape -> product block, the interaction's whole node-local tail."""
+def region(self, x, y, sc, node_attrs, divisor=None):
+    """``gated_rows`` -> reshape -> product block, the interaction's whole node-local tail (the message divided
+    first, when the region takes the divisor)."""
+    if divisor is not None:
+        x = x / divisor
     return self.recomputed_inner(self.region_reshape(self.region_chain(x, y)), sc, node_attrs)
 
 
@@ -65,19 +70,22 @@ def region_forward(self, node_feats, sc, node_attrs):
     import torch
     from torch.utils.checkpoint import checkpoint
 
-    x, y = node_feats.split(self.region_widths, dim=1)
+    x, y, *rest = node_feats.split(self.region_widths, dim=1)
+    divisor = rest[0] if rest else None
     body = self.region_body  # bound in join_region: a MethodType made while tracing breaks the graph
     chunks = self.region_chunks
     if chunks <= 1:
-        return checkpoint(body, x, y, sc, node_attrs, use_reentrant=False, preserve_rng_state=False)
+        return checkpoint(body, x, y, sc, node_attrs, divisor, use_reentrant=False, preserve_rng_state=False)
     # The region does not mix atoms: each atom chunk is its own checkpoint, so the backward rebuilds one chunk's
     # intermediates at a time (the recomputation's working set divided by the chunk count).
     xs, ys = torch.tensor_split(x, chunks, dim=0), torch.tensor_split(y, chunks, dim=0)
     attrs = torch.tensor_split(node_attrs, chunks, dim=0)
     scs = torch.tensor_split(sc, chunks, dim=0) if sc is not None else (None,) * chunks
+    divisors = torch.tensor_split(divisor, chunks, dim=0) if divisor is not None else (None,) * chunks
     outs = []
     for i in range(chunks):
-        outs.append(checkpoint(body, xs[i], ys[i], scs[i], attrs[i], use_reentrant=False, preserve_rng_state=False))
+        outs.append(checkpoint(body, xs[i], ys[i], scs[i], attrs[i], divisors[i], use_reentrant=False,
+                               preserve_rng_state=False))
     return torch.cat(outs, dim=0)
 
 
@@ -89,12 +97,13 @@ def join_region(interaction, product, chunks=1):
     first = chain.first
     product.region_widths = tuple(sum(mul * dim for _, mul, dim in part)
                                   for part in (first.segments_in[:first.first_count],
-                                               first.segments_in[first.first_count:]))
+                                               first.segments_in[first.first_count:])) + (1,)
     product.region_chain, product.region_reshape = chain.forward, reshape.forward
     product.region_chunks = max(1, int(chunks))
     product.region_body = types.MethodType(region, product)
     product.recomputed_inner = product.forward
     chain.forward = types.MethodType(joined_inputs, chain)
+    chain.region_divides = True  # the interaction passes its divisor (rewrites.mh1.modules)
     reshape.forward = types.MethodType(passed_through, reshape)
     product.forward = types.MethodType(region_forward, product)
     return product

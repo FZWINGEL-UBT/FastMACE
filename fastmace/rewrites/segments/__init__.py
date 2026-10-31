@@ -145,21 +145,22 @@ def _region_cases(rewritten, generator, cases):
         if getattr(product, "region_widths", None) is None:
             continue
         like = rewritten.interactions[index].gated_rows.first.weight_0
-        x, y = (_probe(generator, _PROBE_ROWS, width, like) for width in product.region_widths)
+        x, y = (_probe(generator, _PROBE_ROWS, width, like) for width in product.region_widths[:2])
+        divisor = 1.0 + _probe(generator, _PROBE_ROWS, 1, like).abs()  # density * beta + alpha > 0
         species = torch.randint(0, elements, (_PROBE_ROWS,), generator=generator)
         attrs = torch.nn.functional.one_hot(species, elements).to(like)
 
-        def stock(x, y, sc, product=product):
-            return product.recomputed_inner(product.region_reshape(product.region_chain(x, y)), sc, attrs)
+        def stock(x, y, sc, divisor, product=product):
+            return product.recomputed_inner(product.region_reshape(product.region_chain(x / divisor, y)), sc, attrs)
 
         with torch.no_grad():
-            shape = stock(x, y, None).shape
+            shape = stock(x, y, None, divisor).shape
         sc = _probe(generator, _PROBE_ROWS, math.prod(shape[1:]), like).view(shape)
-        leaves = [t.detach().requires_grad_() for t in (x, y, sc)]
+        leaves = [t.detach().requires_grad_() for t in (x, y, sc, divisor)]
         grad = torch.randn(shape, generator=generator, dtype=torch.float64).to(like)
         values = []
         with torch.enable_grad():
-            joined = torch.cat(leaves[:2], dim=1)
+            joined = torch.cat([leaves[0], leaves[1], leaves[3]], dim=1)
             for out in (stock(*leaves), product(node_feats=joined, sc=leaves[2], node_attrs=attrs)):
                 values.append((out.detach(), *torch.autograd.grad(out, leaves, grad)))
         for a, b in zip(*values):
