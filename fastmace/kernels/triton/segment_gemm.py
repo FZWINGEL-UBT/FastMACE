@@ -21,6 +21,7 @@ deterministic, rounding-level against cuBLAS. The weights get no gradient (MD fo
 
 from __future__ import annotations
 
+import dataclasses
 from functools import cache
 from typing import List
 
@@ -36,9 +37,14 @@ def _kernel():
 
     @triton.jit
     def gemm(a_ptr, b_ptr, c_ptr, rows, N, K, D, a_n, a_m, b_k, b_n, c_n, c_m,
-             BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr, PRECISION: tl.constexpr):
+             BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr, PRECISION: tl.constexpr,
+             COLUMN_FASTEST: tl.constexpr):
         # Row r of A and C is (atom r // D, component r % D); A's and C's rows are gathered and scattered.
-        pm, pn = tl.program_id(0), tl.program_id(1)
+        if COLUMN_FASTEST:  # one-dimensional grid: a row tile's column tiles run together (A read about once)
+            tiles_n = tl.cdiv(N, BLOCK_N)
+            pm, pn = tl.program_id(0) // tiles_n, tl.program_id(0) % tiles_n
+        else:
+            pm, pn = tl.program_id(0), tl.program_id(1)
         r = (pm * BLOCK_M + tl.arange(0, BLOCK_M)).to(tl.int64)
         j = (pn * BLOCK_N + tl.arange(0, BLOCK_N)).to(tl.int64)
         atom, comp = r // D, r % D
@@ -62,14 +68,26 @@ def _gemm(a, a_offset, a_n, a_m, b, c, c_offset, c_n, c_m, rows, dim, choice, pr
     import triton
 
     k, n = b.shape
-    grid = (triton.cdiv(rows, choice.block_m), triton.cdiv(n, choice.block_n))
+    tiles_m, tiles_n = triton.cdiv(rows, choice.block_m), triton.cdiv(n, choice.block_n)
+    grid = (tiles_m * tiles_n,) if choice.column_fastest else (tiles_m, tiles_n)
     _kernel()[grid](a.reshape(-1)[a_offset:], b, c.reshape(-1)[c_offset:], rows, n, k, dim, a_n, a_m,
                     b.stride(0), b.stride(1), c_n, c_m, BLOCK_M=choice.block_m, BLOCK_N=choice.block_n,
-                    BLOCK_K=choice.block_k, PRECISION=precision, num_warps=choice.num_warps,
-                    num_stages=choice.num_stages)
+                    BLOCK_K=choice.block_k, PRECISION=precision, COLUMN_FASTEST=choice.column_fastest,
+                    num_warps=choice.num_warps, num_stages=choice.num_stages)
 
 
 def _choices(rows_per_product, weights, device, dtype, precision="ieee"):
+    """Each product's backend and tiles (``tile_rule``), with the tile order of its A ``[rows, K]``."""
+    l2, gpu = tile_rule.device_l2_bytes(device), tile_rule.device_name(device)
+    element = torch.empty((), dtype=dtype).element_size()
+    return [dataclasses.replace(choice, column_fastest=tile_rule.columns_together(rows, int(w.shape[0]), element, l2,
+                                                                                   gpu))
+            if choice.backend == "triton" else choice
+            for rows, w, choice in zip(rows_per_product, weights,
+                                       _backends(rows_per_product, weights, device, dtype, precision))]
+
+
+def _backends(rows_per_product, weights, device, dtype, precision):
     sms = tile_rule.device_sms(device) if dtype == torch.float32 else None
     if precision != "ieee" and sms:  # tf32x3_gemms: 3xTF32 where K, N >= BLOCK_K, SIMT IEEE below (OPT4-T03, OPT5-T05)
         return [

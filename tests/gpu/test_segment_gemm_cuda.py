@@ -45,6 +45,45 @@ def test_triton_path_matches_cublas_and_join():
     assert torch.equal(again, joined)
 
 
+@pytest.mark.parametrize("dim", [1, 7])
+def test_column_tiles_together_equal_the_row_order_bitwise(dim):
+    """The same tiles and K order in either launch order: products and input gradients bitwise equal, with
+    edge tiles in both directions (rows and columns not multiples of the tile)."""
+    import dataclasses
+
+    sms = tile_rule.device_sms("cuda")
+    atoms, k, n = 4 * sms * tile_rule.BLOCK_M // dim + 5, 96, 200
+    g = torch.Generator(device="cuda").manual_seed(3)
+    a = torch.randn((atoms * dim, k), generator=g, device="cuda")
+    b = torch.randn((k, n), generator=g, device="cuda") / k ** 0.5
+    choice = tile_rule.segment_gemm_choice(atoms * dim, n, k, sms)
+    assert choice.backend == "triton"
+    outs = []
+    for together in (False, True):
+        c = torch.full((atoms, dim * n), float("nan"), device="cuda")
+        sg._gemm(a, 0, dim * k, k, b, c, 0, dim * n, n, atoms * dim, dim,
+                 dataclasses.replace(choice, column_fastest=together))
+        outs.append(c)
+    assert not outs[0].isnan().any()
+    assert torch.equal(outs[0], outs[1])
+
+
+def test_joined_products_order_columns_by_the_l2_rule(monkeypatch):
+    sms = tile_rule.device_sms("cuda")
+    atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(DIMS))
+    rows, weights, weights_t, offsets, width = _case(atoms, seed=2)
+    grad = torch.randn((atoms, width), device="cuda")
+    results = []
+    for order in ("rows", "columns"):
+        monkeypatch.setattr(tile_rule, "TILE_ORDER", order)
+        choices = sg._choices([atoms * d for d in DIMS], weights, torch.device("cuda"), torch.float32)
+        assert {c.column_fastest for c in choices} == {order == "columns"}
+        joined = sg.joined_products(rows, weights, weights_t, offsets, list(DIMS), width)
+        results.append((joined, *torch.autograd.grad(joined, rows, grad)))
+    for x, y in zip(*results):
+        assert torch.equal(x, y)
+
+
 def test_small_cells_keep_cublas_and_equal_the_join_bitwise():
     rows, weights, weights_t, offsets, width = _case(8, seed=1)
     joined = sg.joined_products(rows, weights, weights_t, offsets, list(DIMS), width)

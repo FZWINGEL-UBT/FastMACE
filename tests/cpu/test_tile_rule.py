@@ -1,4 +1,5 @@
-"""The shared GEMM shape rule (fastmace/kernels/triton/tile_rule.py): a rule of M, N, K and the SM count only."""
+"""The shared GEMM shape rule (fastmace/kernels/triton/tile_rule.py): a rule of M, N, K, the SM count and the L2
+size only."""
 
 from fastmace.kernels.triton import tile_rule as tr
 
@@ -23,6 +24,32 @@ def test_one_fixed_configuration_and_a_reason():
     assert "waves" in choice.reason
     assert tr.segment_gemm_choice(13608, 512, 512, 48) == choice  # deterministic
     assert tr.row_waves(6144, 48) == 2.0
+
+
+def test_column_tiles_run_together_only_when_a_exceeds_l2(monkeypatch):
+    # MH-1 linear_2 at NbCl5 9,216 atoms on a 32 MiB L2: l = 0 (18.9 MB) fits, l = 1..3 do not.
+    l2, gpu = 32 * 2**20, "NVIDIA GeForce RTX 5060 Ti"
+    assert [tr.columns_together(9216 * d, 512, 4, l2, gpu) for d in (1, 3, 5, 7)] == [False, True, True, True]
+    assert tr.columns_together(51840, 512, 4, l2, gpu)  # 106 MB: l = 0 at 51,840 atoms
+    assert not tr.columns_together(51840, 512, 4, None, gpu)  # no L2 size known: the order before
+    assert tr.columns_together(l2 // 2048 + 1, 512, 4, l2, gpu) and not tr.columns_together(l2 // 2048, 512, 4, l2, gpu)
+    monkeypatch.setattr(tr, "TILE_ORDER", "rows")
+    assert not tr.columns_together(51840, 512, 4, l2, gpu)
+    monkeypatch.setattr(tr, "TILE_ORDER", "columns")
+    assert tr.columns_together(16, 512, 4, l2, "NVIDIA A100-SXM4-80GB")
+
+
+def test_column_tiles_together_only_on_the_measured_gpus():
+    # Decision 66: the order is a default only where whole-step A/Bs measured a speed-up, by exact device name.
+    l2 = 40 * 2**20
+    assert set(tr.COLUMN_ORDER_GPUS) == {"NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"}
+    assert tr.columns_together(51840, 512, 4, l2, "NVIDIA RTX 4000 Ada Generation")
+    for other in ("NVIDIA A100-SXM4-80GB", "NVIDIA L4", "NVIDIA GeForce RTX 4090", None):
+        assert not tr.columns_together(51840, 512, 4, l2, other)
+
+
+def test_no_cuda_device_has_no_l2_size():
+    assert tr.device_l2_bytes("cpu") is None
 
 
 def test_uses_triton_agrees_with_the_choice():
