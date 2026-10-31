@@ -204,3 +204,22 @@ def test_planner_refuses_it_in_float64_without_segment_gemm_and_with_tf32x3():
         _plan(RewriteConfig(gate_epilogue="on", segment_gemm="off"))
     with pytest.raises(PlanRefused, match="gate_epilogue and tf32x3_gemms"):
         _plan(RewriteConfig(gate_epilogue="on", tf32x3_gemms="on"))
+
+
+def test_the_unpadded_kernel_is_chosen_by_the_launch_s_atoms_per_sm(monkeypatch):
+    """docs/validation/gated-unpadded.md: the unpadded kernel from UNPADDED_ATOMS_PER_SM atoms per SM in the launch (a
+    call's atoms or a tile's), only on UNPADDED_GPUS (decision 66); "on" and "off" are an A/B side's choice."""
+    from fastmace.kernels.triton import gated_products as gp
+
+    assert gp.UNPADDED == "auto" and gp.UNPADDED_ATOMS_PER_SM > 0
+    gpu = gp.UNPADDED_GPUS[0] if gp.UNPADDED_GPUS else "NVIDIA RTX 4000 Ada Generation"
+    monkeypatch.setattr(gp, "UNPADDED_GPUS", (gpu,))
+    sms = 48
+    edge = gp.UNPADDED_ATOMS_PER_SM * sms
+    assert gp.unpadded(edge, sms, gpu) and not gp.unpadded(edge - 1, sms, gpu)
+    assert not gp.unpadded(10 * edge, sms, "NVIDIA A100-SXM4-80GB")  # not measured: the padded kernel
+    assert not gp.unpadded(10 * edge, None, gpu)  # not a CUDA device
+    monkeypatch.setattr(gp, "UNPADDED", "on")
+    assert gp.unpadded(1, sms, "NVIDIA A100-SXM4-80GB")
+    monkeypatch.setattr(gp, "UNPADDED", "off")
+    assert not gp.unpadded(10 * edge, sms, gpu)

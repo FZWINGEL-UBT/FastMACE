@@ -289,6 +289,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [elt-gate-backward-epilogue](#elt-gate-backward-epilogue) | Gate backward in the input-gradient epilogue (stage D) | none | FM | REJECTED | 2026-10-20 | not measured (est. 1.0–1.4 ms NbCl5) | [rewrites](rewrites.md) |
 | [elt-density-prologue](#elt-density-prologue) | Density division in the residual GEMM prologue (stage E) | none | FM | NOT BUILT | 2026-10-20 | est. 0.34 ms NbCl5 | [BC go/no-go](design/opt-T02-BC-go-no-go.md) |
 | [elt-gated-segment-gemm](#elt-gated-segment-gemm) | Gate scaling in the `segment_gemm` prologue (round 5) | none | FM | CUT | 2026-10-26 | NbCl5 forward replay 0.9626× (< 5 % bar) | [opt-5](validation/opt-5.md) |
+| [elt-gated-unpadded](#elt-gated-unpadded) | `gate_epilogue`'s input-gradient kernel without row padding (whole atoms per tile, m-sum by a selection `tl.dot`) | constants `gated_products.UNPADDED`, `UNPADDED_GPUS`, `UNPADDED_ATOMS_PER_SM` | FM | DEFAULT (RTX 5060 Ti, RTX 4000 Ada) | 2026-10-31 | Ada NbCl5 21,600 0.947 / 0.951, region path 43,200 0.964 / 0.964; 5060 Ti 14,400 0.959 / 0.956 | [gated-unpadded](validation/gated-unpadded.md) |
 | [elt-direct-node-feats](#elt-direct-node-feats) | Skip the LAMMPS `[node_feats, node_attrs]` join | `direct_node_feats` | FM | NEVER-AUTOMATIC | 2026-10-21 | local NaCl 0.9921 / 0.9948, NbCl5 1.0020 / 1.0020 | [opt3-T05](validation/opt3-T05-layout-audit.md) |
 
 ### Radial networks and tables
@@ -1164,6 +1165,16 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Measured: jointly with `folded_constants`: NaCl pure data movement 59.4 → 47.8 µs per force call; force gate NaCl 0.05 / 1.15 / 0.32, NbCl5 0.19 / 1.00 / 0.70; local (pinned `3aff996`) NaCl 0.9921 / 0.9948, NbCl5 1.0020 / 1.0020; Modal L4 NaCl 1.0034 / 1.0005, NbCl5 1.0008 / 0.9950. Expected about 11 µs NaCl (0.4 %), 31 µs NbCl5, 50 µs NaNbO3.
 - Why: exact but no gain resolved above noise.
 - Sources: [opt3-T05](validation/opt3-T05-layout-audit.md); [opt3-T05 design](design/opt3-T05-layout-audit.md); [opt-3 plan](../plans/opt-3.md); [rewrites](rewrites.md).
+
+<a id="elt-gated-unpadded"></a>
+#### elt-gated-unpadded: `gate_epilogue`'s input-gradient kernel without row padding
+- Switch: constants `kernels.triton.gated_products.UNPADDED` ("auto"; "on" / "off" for A/B sides), `UNPADDED_GPUS`, `UNPADDED_ATOMS_PER_SM` (96)
+- Engine: FM
+- Date/round: 31 October 2026 (step roofline follow-up)
+- What: the padded kernel stacks each atom's D = 3, 5, 7 rows in 4, 8, 8 rows of `tl.dot` (25 % of the rows masked). The unpadded kernel packs whole atoms atom-major into 64-row tiles and sums `dgate` over an atom's rows with a second `tl.dot` by a 0/1 selection matrix.
+- Status: DEFAULT on the RTX 5060 Ti and the RTX 4000 Ada (decision 66) for launches of at least 96 atoms per SM; the padded kernel elsewhere and below.
+- Measured: kernel 0.77-0.81x (Ada), 0.79-0.81x (A4000), 0.81x (5060 Ti) at 21,600-25,920 atoms; whole step Ada NbCl5 21,600 0.947 / 0.951, region path 43,200 0.964 / 0.964; 5060 Ti 14,400 0.959 / 0.956. Rounding class; the force/stress gate passed.
+- Sources: [gated-unpadded](validation/gated-unpadded.md); [step roofline](validation/step-roofline.md).
 
 ### Radial networks and tables
 

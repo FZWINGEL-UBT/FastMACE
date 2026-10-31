@@ -140,6 +140,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- `gate_epilogue`'s input-gradient kernel packs each launch's atoms without padding their D = 3, 5, 7 rows to 4, 8, 8
+  (`kernels.triton.gated_products`, the unpadded kernel): whole atoms per 64-row tile, the gate read per row, the
+  m-sum by a second `tl.dot` with a 0/1 selection matrix (deterministic, rounding class). It runs for launches of at
+  least 96 atoms per SM (`UNPADDED_ATOMS_PER_SM`; a call's atoms, or a tile's in the tiled path) on the RTX 5060 Ti
+  and the RTX 4000 Ada (decision 66, `UNPADDED_GPUS`): kernel 1.24-1.30 times faster at large launches; whole step
+  0.947-0.951 at NbCl5 21,600 atoms and 0.964 on the region path at 43,200 (Ada), 0.956-0.959 at 14,400 (5060 Ti); a
+  14.9M-atom tiled call 0.978 (Ada) (docs/validation/gated-unpadded.md).
 - Rule 12's memory estimate:
   - it counts the structure's edges (`planner.memory.counted_edges`) instead of assuming uniform density, which was
     1.26–1.36 times too many for NbCl5 and NaCl;

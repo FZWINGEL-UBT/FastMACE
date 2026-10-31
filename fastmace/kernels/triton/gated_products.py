@@ -17,6 +17,14 @@ scalars' product, the CPU and other dtypes keep the stock operations.
 Not bitwise the stock backward: the K-sums run in ``tl.dot`` with another tile shape, and the m-sum is in another
 order (7-8e-7 relative on the RTX 4000 Ada, docs/validation/opt10-T01.md). Deterministic. The weights get no
 gradient (MD forces only).
+
+**Unpadded rows** (``unpadded``; docs/validation/gated-unpadded.md). The tile above pads each atom's D rows to a power
+of two DP, so 1, 3 and 1 of every 4, 8 and 8 rows of ``tl.dot`` are masked (D = 3, 5, 7). The unpadded kernel packs
+``UNPADDED_ROWS // D`` whole atoms atom-major into one tile (at most D - 1 rows masked, no atom across tiles), reads
+the gate through each row's atom and sums ``dgate`` over an atom's rows with a second ``tl.dot`` by a 0/1 selection
+matrix: in registers, deterministic, no atomics. Rounding class as the padded kernel (another blocking). It runs where
+a launch has at least ``UNPADDED_ATOMS_PER_SM`` atoms per SM (one rule from the launch's atoms and the SM count:
+below it the padded kernel was as fast or faster), on ``UNPADDED_GPUS`` (decision 66).
 """
 
 from __future__ import annotations
@@ -27,11 +35,25 @@ from typing import List
 import torch
 
 from fastmace.kernels.triton import segment_gemm as sg
+from fastmace.kernels.triton import tile_rule
 
 # The fused kernel's tile: ROWS stacked gradient rows (BLOCK_A atoms times the D components padded to a power of two)
 # x columns x K, warps, stages. One fixed configuration for every crystal and GPU (SPEC §9.1); OPT10-T01's tile had
 # 32 atoms x 64 columns x 32, which ROWS = 128 keeps for D = 3 (32 atoms x 4 rows).
 ROWS, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 128, 64, 32, 4, 3
+# The unpadded kernel's tile (docs/validation/gated-unpadded.md: the best of 16 on the RTX 4000 Ada, the RTX A4000 and
+# the RTX 5060 Ti at 21,600 and 25,920 atoms; 128-row tiles exceed the shared memory).
+UNPADDED_ROWS, UNPADDED_BLOCK_N, UNPADDED_BLOCK_K, UNPADDED_WARPS, UNPADDED_STAGES = 64, 128, 32, 4, 3
+# The unpadded kernel from this many atoms per SM in the launch (the call's atoms, or a tile's in the tiled path).
+UNPADDED_ATOMS_PER_SM = 96
+# "auto": the unpadded kernel on UNPADDED_GPUS from UNPADDED_ATOMS_PER_SM; "on" / "off": an A/B side's choice on
+# every GPU.
+UNPADDED = "auto"
+# Decision 66: a default only where same-process whole-step A/Bs in both build orders gained at least 3 %
+# (docs/validation/gated-unpadded.md). RTX 4000 Ada: NbCl5 21,600 atoms 0.947 / 0.951. RTX 5060 Ti: NbCl5 14,400
+# atoms 0.959 / 0.956 (two 21,600-atom sides do not fit its 16 GB). The RTX A4000 keeps gate_epilogue off by default;
+# the A100 is not measured.
+UNPADDED_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
 @cache
@@ -72,6 +94,71 @@ def _kernel():
                  mask=(first < atoms_n)[:, None] & jmask[None, :])
 
     return gated_input_grads
+
+
+@cache
+def _unpadded_kernel():
+    import triton
+    import triton.language as tl
+
+    @triton.jit
+    def unpadded_input_grads(g_ptr, wt_ptr, gated_ptr, gate_ptr, dgated_ptr, dgate_ptr, atoms_n, N, K, g_n, g_m,
+                             gate_n, dgate_n, D: tl.constexpr, A: tl.constexpr, AP: tl.constexpr, R: tl.constexpr,
+                             BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr, PRECISION: tl.constexpr):
+        # Row r of the tile is component r % D of atom r // D: A whole atoms, rows A * D..R-1 masked.
+        pa, pn = tl.program_id(0), tl.program_id(1)
+        r = tl.arange(0, R)
+        local = r // D
+        m = r - local * D
+        atom = (pa * A + local).to(tl.int64)
+        j = (pn * BLOCK_N + tl.arange(0, BLOCK_N)).to(tl.int64)
+        rmask = (local < A) & (atom < atoms_n)
+        jmask = j < N
+        tile = rmask[:, None] & jmask[None, :]
+        g_row = atom * g_n + m * g_m
+        kk = tl.arange(0, BLOCK_K)
+        acc = tl.zeros((R, BLOCK_N), dtype=tl.float32)
+        for start in range(0, K, BLOCK_K):
+            k = start + kk
+            a = tl.load(g_ptr + g_row[:, None] + k[None, :], mask=rmask[:, None] & (k < K)[None, :], other=0.0)
+            b = tl.load(wt_ptr + k[:, None] * N + j[None, :], mask=(k < K)[:, None] & jmask[None, :], other=0.0)
+            acc += tl.dot(a, b, input_precision=PRECISION)
+        row = atom * D + m
+        gate = tl.load(gate_ptr + atom[:, None] * gate_n + j[None, :], mask=tile, other=0.0)
+        gated = tl.load(gated_ptr + row[:, None] * N + j[None, :], mask=tile, other=0.0)
+        tl.store(dgated_ptr + row[:, None] * N + j[None, :], acc * gate, mask=tile)
+        # dgate[a] = the sum over atom a's rows: the 0/1 selection matrix times acc * gated
+        sel = tl.arange(0, AP)
+        select = ((local[None, :] == sel[:, None]) & rmask[None, :]).to(tl.float32)
+        dgate = tl.dot(select, acc * gated, input_precision=PRECISION)
+        first = (pa * A + sel).to(tl.int64)
+        tl.store(dgate_ptr + first[:, None] * dgate_n + j[None, :], dgate,
+                 mask=((sel < A) & (first < atoms_n))[:, None] & jmask[None, :])
+
+    return unpadded_input_grads
+
+
+def unpadded(atoms, sms, gpu) -> bool:
+    """Whether a launch over ``atoms`` atoms on a device with ``sms`` SMs named ``gpu`` takes the unpadded kernel."""
+    if UNPADDED != "auto":
+        return UNPADDED == "on"
+    return gpu in UNPADDED_GPUS and bool(sms) and int(atoms) >= UNPADDED_ATOMS_PER_SM * int(sms)
+
+
+def _fused_unpadded(grad, offset, mul_out, wt, gated, gates, gate_offset, dgated, dgates, dim, precision):
+    """``_fused`` with the unpadded kernel."""
+    import triton
+
+    atoms, width = grad.shape
+    mul_in = int(wt.shape[1])
+    per = UNPADDED_ROWS // dim
+    grid = (triton.cdiv(atoms, per), triton.cdiv(mul_in, UNPADDED_BLOCK_N))
+    return _unpadded_kernel()[grid](grad.reshape(-1)[offset:], wt, gated, gates.reshape(-1)[gate_offset:], dgated,
+                                    dgates.reshape(-1)[gate_offset:], atoms, mul_in, mul_out, width, mul_out,
+                                    gates.stride(0), dgates.stride(0), D=dim, A=per,
+                                    AP=max(16, triton.next_power_of_2(per)), R=UNPADDED_ROWS,
+                                    BLOCK_N=UNPADDED_BLOCK_N, BLOCK_K=UNPADDED_BLOCK_K, PRECISION=precision,
+                                    num_warps=UNPADDED_WARPS, num_stages=UNPADDED_STAGES)
 
 
 def _fused(grad, offset, mul_out, wt, gated, gates, gate_offset, dgated, dgates, dim, precision):
@@ -117,6 +204,8 @@ def gated_products_input_grads(grad: torch.Tensor, gated: List[torch.Tensor], ga
         (atoms, gates.shape[1]))
     out: List[torch.Tensor] = [grad.new_empty(0)] * (1 + len(gated))
     g = grad.contiguous()
+    fused = (_fused_unpadded if unpadded(atoms, tile_rule.device_sms(grad.device), tile_rule.device_name(grad.device))
+             else _fused)
     for wt, offset, dim, index, choice in zip(weights_t, offsets, dims, inputs, choices):
         mul_out, mul_in = int(wt.shape[0]), int(wt.shape[1])
         if index == 0:
@@ -131,7 +220,7 @@ def gated_products_input_grads(grad: torch.Tensor, gated: List[torch.Tensor], ga
         x, gate_offset = gated[index - 1], gate_offsets[index - 1]
         if choice.backend == "triton" and atoms:
             dgated = grad.new_empty((atoms * dim, mul_in))
-            _fused(g, offset, mul_out, wt, x.contiguous(), gates, gate_offset, dgated, dgates, dim, precision)
+            fused(g, offset, mul_out, wt, x.contiguous(), gates, gate_offset, dgated, dgates, dim, precision)
         else:
             drows = (grad[:, offset:offset + dim * mul_out].reshape(atoms * dim, mul_out) @ wt).view(atoms, dim, mul_in)
             gate = gates.narrow(-1, gate_offset, mul_in)
@@ -181,4 +270,5 @@ def gated_joined_products(scalars, gated, gates, gate_offsets, weights, weights_
                                       str(precision), len(gated), scalars, gates, *gated, *weights, *weights_t)
 
 
-__all__ = ["BLOCK_K", "BLOCK_N", "ROWS", "gated_joined_products", "gated_products_input_grads"]
+__all__ = ["BLOCK_K", "BLOCK_N", "ROWS", "UNPADDED", "UNPADDED_ATOMS_PER_SM", "UNPADDED_GPUS", "UNPADDED_ROWS",
+           "gated_joined_products", "gated_products_input_grads", "unpadded"]

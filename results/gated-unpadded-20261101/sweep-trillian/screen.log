@@ -1,0 +1,156 @@
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+
+256 atoms (48 SMs): today 0.340 ms (5.91 TFLOP/s)
+  unpadded        (64, 64, 32, 4, 3)  0.277 ms  0.814x  7.27 TFLOP/s  err 1.1e-07
+  unpadded        (64, 64, 32, 4, 2)  0.307 ms  0.903x  6.55 TFLOP/s  err 1.1e-07
+  unpadded        (64, 64, 32, 8, 3)  0.319 ms  0.937x  6.32 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 8, 3)  0.326 ms  0.958x  6.17 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 4, 2)  0.327 ms  0.961x  6.16 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 4, 3)  0.330 ms  0.971x  6.09 TFLOP/s  err 1.1e-07
+  today           (128, 64, 32, 4, 3)  0.340 ms  1.000x  5.91 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 2)  0.363 ms  1.068x  5.54 TFLOP/s  err 1.1e-07
+  padded 128x128 tile: 1.090x
+
+512 atoms (48 SMs): today 0.488 ms (8.25 TFLOP/s)
+  unpadded        (64, 64, 32, 4, 3)  0.481 ms  0.985x  8.37 TFLOP/s  err 9.9e-08
+  today           (128, 64, 32, 4, 3)  0.488 ms  1.000x  8.25 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 4, 2)  0.500 ms  1.025x  8.05 TFLOP/s  err 9.9e-08
+  padded-128x128  (128, 128, 32, 8, 3)  0.533 ms  1.092x  7.55 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 3)  0.601 ms  1.230x  6.70 TFLOP/s  err 9.9e-08
+  unpadded        (64, 128, 32, 4, 3)  0.680 ms  1.393x  5.92 TFLOP/s  err 9.9e-08
+  unpadded        (64, 64, 32, 8, 3)  0.687 ms  1.407x  5.86 TFLOP/s  err 9.9e-08
+  unpadded        (64, 128, 32, 4, 2)  0.690 ms  1.413x  5.84 TFLOP/s  err 9.9e-08
+  padded 128x128 tile: 1.092x
+
+768 atoms (48 SMs): today 0.694 ms (8.71 TFLOP/s)
+  today           (128, 64, 32, 4, 3)  0.694 ms  1.000x  8.71 TFLOP/s  err 0.0e+00
+  padded-128x128  (128, 128, 32, 8, 3)  0.695 ms  1.003x  8.68 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 4, 2)  0.771 ms  1.112x  7.83 TFLOP/s  err 1.1e-07
+  unpadded        (64, 64, 32, 4, 3)  0.783 ms  1.128x  7.72 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 8, 3)  0.887 ms  1.279x  6.81 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 4, 3)  0.928 ms  1.338x  6.51 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 4, 2)  0.944 ms  1.362x  6.40 TFLOP/s  err 1.1e-07
+  unpadded        (64, 128, 32, 8, 2)  1.054 ms  1.520x  5.73 TFLOP/s  err 1.1e-07
+  padded 128x128 tile: 1.003x
+
+1024 atoms (48 SMs): today 0.941 ms (8.56 TFLOP/s)
+  today           (128, 64, 32, 4, 3)  0.941 ms  1.000x  8.56 TFLOP/s  err 0.0e+00
+  padded-128x128  (128, 128, 32, 8, 3)  1.023 ms  1.087x  7.87 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 4, 2)  1.077 ms  1.145x  7.47 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 4, 3)  1.094 ms  1.162x  7.36 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 8, 3)  1.126 ms  1.196x  7.15 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 3)  1.208 ms  1.283x  6.67 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 2)  1.243 ms  1.320x  6.48 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 8, 2)  1.339 ms  1.423x  6.01 TFLOP/s  err 1.3e-07
+  padded 128x128 tile: 1.087x
+
+1536 atoms (48 SMs): today 1.393 ms (8.67 TFLOP/s)
+  today           (128, 64, 32, 4, 3)  1.393 ms  1.000x  8.67 TFLOP/s  err 0.0e+00
+  padded-128x128  (128, 128, 32, 8, 3)  1.419 ms  1.018x  8.51 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 3)  1.615 ms  1.159x  7.48 TFLOP/s  err 1.5e-07
+  unpadded        (64, 128, 32, 4, 3)  1.696 ms  1.217x  7.12 TFLOP/s  err 1.5e-07
+  unpadded        (64, 128, 32, 4, 2)  1.749 ms  1.255x  6.91 TFLOP/s  err 1.5e-07
+  unpadded        (64, 64, 32, 4, 3)  1.822 ms  1.308x  6.63 TFLOP/s  err 1.5e-07
+  unpadded        (64, 128, 32, 8, 2)  1.939 ms  1.392x  6.23 TFLOP/s  err 1.5e-07
+  unpadded        (64, 64, 32, 4, 2)  1.997 ms  1.433x  6.05 TFLOP/s  err 1.5e-07
+  padded 128x128 tile: 1.018x
+
+1944 atoms (48 SMs): today 1.772 ms (8.63 TFLOP/s)
+  today           (128, 64, 32, 4, 3)  1.772 ms  1.000x  8.63 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 3)  1.984 ms  1.119x  7.71 TFLOP/s  err 9.8e-08
+  unpadded        (64, 128, 32, 4, 3)  2.070 ms  1.168x  7.39 TFLOP/s  err 9.8e-08
+  unpadded        (64, 128, 32, 4, 2)  2.115 ms  1.193x  7.23 TFLOP/s  err 9.8e-08
+  unpadded        (64, 64, 32, 4, 3)  2.187 ms  1.234x  6.99 TFLOP/s  err 9.8e-08
+  unpadded        (64, 64, 32, 4, 2)  2.305 ms  1.301x  6.63 TFLOP/s  err 9.8e-08
+  padded-128x128  (128, 128, 32, 8, 3)  2.349 ms  1.326x  6.51 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 2)  2.401 ms  1.355x  6.37 TFLOP/s  err 9.8e-08
+  padded 128x128 tile: 1.326x
+
+2592 atoms (48 SMs): today 2.368 ms (8.61 TFLOP/s)
+  today           (128, 64, 32, 4, 3)  2.368 ms  1.000x  8.61 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 3)  2.628 ms  1.110x  7.76 TFLOP/s  err 1.9e-07
+  unpadded        (64, 128, 32, 4, 3)  2.688 ms  1.135x  7.58 TFLOP/s  err 1.9e-07
+  unpadded        (64, 128, 32, 4, 2)  2.770 ms  1.170x  7.36 TFLOP/s  err 1.9e-07
+  unpadded        (64, 64, 32, 4, 3)  2.861 ms  1.208x  7.13 TFLOP/s  err 1.9e-07
+  unpadded        (64, 64, 32, 4, 2)  3.157 ms  1.333x  6.46 TFLOP/s  err 1.9e-07
+  unpadded        (64, 128, 32, 8, 2)  3.163 ms  1.336x  6.44 TFLOP/s  err 1.9e-07
+  unpadded        (64, 64, 32, 8, 3)  3.391 ms  1.432x  6.01 TFLOP/s  err 1.9e-07
+  padded 128x128 tile: 1.504x
+
+3456 atoms (48 SMs): today 3.192 ms (8.52 TFLOP/s)
+  today           (128, 64, 32, 4, 3)  3.192 ms  1.000x  8.52 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 3)  3.540 ms  1.109x  7.68 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 3)  3.732 ms  1.169x  7.28 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 2)  3.759 ms  1.178x  7.23 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 4, 2)  4.083 ms  1.279x  6.66 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 4, 3)  4.096 ms  1.283x  6.64 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 8, 2)  4.329 ms  1.356x  6.28 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 8, 3)  4.589 ms  1.438x  5.92 TFLOP/s  err 1.3e-07
+  padded 128x128 tile: 1.503x
+
+4608 atoms (48 SMs): today 5.606 ms (6.46 TFLOP/s)
+  unpadded        (64, 128, 32, 8, 3)  4.811 ms  0.858x  7.53 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 2)  4.900 ms  0.874x  7.40 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 3)  5.031 ms  0.897x  7.20 TFLOP/s  err 1.3e-07
+  today           (128, 64, 32, 4, 3)  5.606 ms  1.000x  6.46 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 4, 2)  5.712 ms  1.019x  6.34 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 4, 3)  5.771 ms  1.029x  6.28 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 8, 2)  5.918 ms  1.056x  6.12 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 8, 3)  6.083 ms  1.085x  5.96 TFLOP/s  err 1.3e-07
+  padded 128x128 tile: 1.228x
+
+6144 atoms (48 SMs): today 7.843 ms (6.16 TFLOP/s)
+  unpadded        (64, 128, 32, 8, 3)  6.476 ms  0.826x  7.46 TFLOP/s  err 2.0e-07
+  unpadded        (64, 128, 32, 4, 3)  6.480 ms  0.826x  7.46 TFLOP/s  err 2.0e-07
+  unpadded        (64, 128, 32, 4, 2)  6.532 ms  0.833x  7.40 TFLOP/s  err 2.0e-07
+  unpadded        (64, 128, 32, 8, 2)  7.605 ms  0.970x  6.35 TFLOP/s  err 2.0e-07
+  unpadded        (64, 64, 32, 4, 2)  7.614 ms  0.971x  6.35 TFLOP/s  err 2.0e-07
+  today           (128, 64, 32, 4, 3)  7.843 ms  1.000x  6.16 TFLOP/s  err 0.0e+00
+  padded-128x128  (128, 128, 32, 8, 3)  8.015 ms  1.022x  6.03 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 8, 3)  8.259 ms  1.053x  5.85 TFLOP/s  err 2.0e-07
+  padded 128x128 tile: 1.022x
+
+8192 atoms (48 SMs): today 12.038 ms (5.35 TFLOP/s)
+  unpadded        (64, 128, 32, 4, 2)  8.835 ms  0.734x  7.29 TFLOP/s  err 1.6e-07
+  unpadded        (64, 128, 32, 4, 3)  8.877 ms  0.737x  7.26 TFLOP/s  err 1.6e-07
+  unpadded        (64, 128, 32, 8, 3)  8.943 ms  0.743x  7.20 TFLOP/s  err 1.6e-07
+  unpadded        (64, 128, 32, 8, 2)  10.190 ms  0.846x  6.32 TFLOP/s  err 1.6e-07
+  unpadded        (64, 64, 32, 4, 2)  10.517 ms  0.874x  6.13 TFLOP/s  err 1.6e-07
+  padded-128x128  (128, 128, 32, 8, 3)  10.700 ms  0.889x  6.02 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 4, 3)  10.882 ms  0.904x  5.92 TFLOP/s  err 1.6e-07
+  unpadded        (64, 64, 32, 8, 3)  11.202 ms  0.931x  5.75 TFLOP/s  err 1.6e-07
+  padded 128x128 tile: 0.889x
+
+12288 atoms (48 SMs): today 16.952 ms (5.70 TFLOP/s)
+  unpadded        (64, 128, 32, 4, 3)  13.846 ms  0.817x  6.98 TFLOP/s  err 1.8e-07
+  unpadded        (64, 128, 32, 8, 3)  13.982 ms  0.825x  6.91 TFLOP/s  err 1.8e-07
+  unpadded        (64, 128, 32, 4, 2)  14.125 ms  0.833x  6.84 TFLOP/s  err 1.8e-07
+  padded-128x128  (128, 128, 32, 8, 3)  14.883 ms  0.878x  6.49 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 2)  15.283 ms  0.902x  6.32 TFLOP/s  err 1.8e-07
+  unpadded        (64, 64, 32, 4, 2)  15.635 ms  0.922x  6.18 TFLOP/s  err 1.8e-07
+  today           (128, 64, 32, 4, 3)  16.952 ms  1.000x  5.70 TFLOP/s  err 0.0e+00
+  unpadded        (64, 64, 32, 8, 3)  16.989 ms  1.002x  5.69 TFLOP/s  err 1.8e-07
+  padded 128x128 tile: 0.878x
+
+16384 atoms (48 SMs): today 23.430 ms (5.50 TFLOP/s)
+  unpadded        (64, 128, 32, 8, 3)  18.468 ms  0.788x  6.98 TFLOP/s  err 1.2e-07
+  unpadded        (64, 128, 32, 4, 3)  18.709 ms  0.798x  6.89 TFLOP/s  err 1.2e-07
+  unpadded        (64, 128, 32, 4, 2)  18.799 ms  0.802x  6.85 TFLOP/s  err 1.2e-07
+  padded-128x128  (128, 128, 32, 8, 3)  20.189 ms  0.862x  6.38 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 2)  20.627 ms  0.880x  6.25 TFLOP/s  err 1.2e-07
+  unpadded        (64, 64, 32, 4, 2)  21.923 ms  0.936x  5.88 TFLOP/s  err 1.2e-07
+  unpadded        (64, 64, 32, 4, 3)  22.150 ms  0.945x  5.82 TFLOP/s  err 1.2e-07
+  today           (128, 64, 32, 4, 3)  23.430 ms  1.000x  5.50 TFLOP/s  err 0.0e+00
+  padded 128x128 tile: 0.862x
+
+21600 atoms (48 SMs): today 30.402 ms (5.59 TFLOP/s)
+  unpadded        (64, 128, 32, 8, 3)  24.420 ms  0.803x  6.96 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 2)  24.662 ms  0.811x  6.89 TFLOP/s  err 1.3e-07
+  unpadded        (64, 128, 32, 4, 3)  25.852 ms  0.850x  6.57 TFLOP/s  err 1.3e-07
+  padded-128x128  (128, 128, 32, 8, 3)  25.912 ms  0.852x  6.56 TFLOP/s  err 0.0e+00
+  unpadded        (64, 128, 32, 8, 2)  26.512 ms  0.872x  6.41 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 4, 3)  28.581 ms  0.940x  5.94 TFLOP/s  err 1.3e-07
+  unpadded        (64, 64, 32, 4, 2)  29.921 ms  0.984x  5.68 TFLOP/s  err 1.3e-07
+  today           (128, 64, 32, 4, 3)  30.402 ms  1.000x  5.59 TFLOP/s  err 0.0e+00
+  padded 128x128 tile: 0.852x
