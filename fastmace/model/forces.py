@@ -365,7 +365,9 @@ class MACEForceField:
         self.superset = tuple(z_table[column] for column in self.species_columns)
         self.check_species(atoms.numbers)
         batch = host_batch(calc, atoms)
-        node_attrs = batch["node_attrs"].to(self._device)
+        # One device copy of the one-hot species, which ``data`` keeps too (its ``.to`` below then returns this
+        # tensor): the species check and the rewrites read only its columns and sums, exact in any float dtype.
+        node_attrs = batch["node_attrs"] = batch["node_attrs"].to(self._device, self._dtype)
         if not bool((node_attrs[:, list(self.species_columns)].sum(dim=1) == 1).all()):
             raise SpeciesNotInSuperset([Reason("a one-hot species row of the structure does not sum to 1 over the "
                                                "superset's columns", rule=2, code="species-not-in-superset")])
