@@ -1,0 +1,91 @@
+{
+ "structure": "NbCl5",
+ "atoms": 21600,
+ "repeat": "5x5x12",
+ "rewrites": {
+  "recompute_conv_weights": "on",
+  "recompute_node_segments": "on",
+  "recompute_node_region": "on"
+ },
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "graphs": [
+  "('B', 568320)",
+  "ACP",
+  "('B', 596736)"
+ ],
+ "edges": 585184,
+ "padded": [
+  568320,
+  596736
+ ],
+ "captures": [
+  {
+   "key": "ACP",
+   "warmup_in_pool": false,
+   "max_reserved_after_warmup_MiB": 2868.0,
+   "max_reserved_after_capture_MiB": 2868.0
+  },
+  {
+   "key": "('B', 568320)",
+   "warmup_in_pool": false,
+   "max_reserved_after_warmup_MiB": 2890.0,
+   "max_reserved_after_capture_MiB": 2890.0
+  },
+  {
+   "key": "('B', 596736)",
+   "warmup_in_pool": true,
+   "max_reserved_after_warmup_MiB": 2908.0,
+   "max_reserved_after_capture_MiB": 2908.0
+  }
+ ],
+ "invalidations": [],
+ "recaptures": [
+  "{'step': 0, 'key': 'ACP', 'reason': 'first capture', 'counted': False, 's': 0.10994003497762606}",
+  "{'step': 0, 'key': \"('B', 568320)\", 'reason': 'first capture', 'counted': False, 's': 0.9829015849973075}",
+  "{'step': 2, 'key': \"('B', 596736)\", 'reason': 'new variant of B', 'counted': True, 's': 0.9329085950157605}"
+ ],
+ "points": [
+  {
+   "label": "start",
+   "outside_GiB": 0.17291259765625,
+   "reserved_GiB": 0.0,
+   "free_GiB": 19.3712158203125
+  },
+  {
+   "label": "built",
+   "outside_GiB": 0.29595947265625,
+   "reserved_GiB": 2.81640625,
+   "free_GiB": 16.4317626953125
+  },
+  {
+   "label": "40 steps",
+   "outside_GiB": 0.29986572265625,
+   "reserved_GiB": 2.8984375,
+   "free_GiB": 16.3458251953125
+  },
+  {
+   "label": "dropped ('B', 568320)",
+   "outside_GiB": 0.29986572265625,
+   "reserved_GiB": 2.8984375,
+   "free_GiB": 16.3458251953125
+  },
+  {
+   "label": "dropped ('B', 596736)",
+   "outside_GiB": 0.29986572265625,
+   "reserved_GiB": 2.8984375,
+   "free_GiB": 16.3458251953125
+  },
+  {
+   "label": "dropped ACP",
+   "outside_GiB": 0.29986572265625,
+   "reserved_GiB": 2.8984375,
+   "free_GiB": 16.3458251953125
+  },
+  {
+   "label": "all dropped, cache emptied",
+   "outside_GiB": 0.29986572265625,
+   "reserved_GiB": 0.33203125,
+   "free_GiB": 18.9122314453125
+  }
+ ]
+}
