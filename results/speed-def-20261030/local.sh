@@ -62,6 +62,9 @@ for job in "$@"; do
     gate-epi) PYTHONPATH=$FM run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate-epi" --engine fastmace \
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --reference-command "$PYT" --production-command "$PY" --rewrites gate_epilogue=on ;;
+    ledger-*) IFS=- read -r _ structure repeat mode <<< "$job"  # the rebuild-a falsifier, as leeloo.sh
+      rw=(); [ "$mode" = nodeseg ] && rw=(--rewrites recompute_conv_weights=on recompute_node_segments=on)
+      PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat"           --output "$ROOT/ledger" --tag="-$mode" "${rw[@]}" ;;
     ab-*) IFS=- read -r _ item structure size order <<< "$job"
       pattern=$([ "$order" = ab ] && echo abab || echo abba)
       spec=$structure; extra=()
