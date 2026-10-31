@@ -400,3 +400,33 @@ def test_field_built_with_its_one_hot_on_the_host_gives_bitwise_the_released_fie
             field.evaluate(atoms)
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+# ---------------------------------------------------------------- the host state aliased
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
+def test_aliased_host_state_is_bitwise_the_host_state(names, mode):
+    """``TileConfig.alias_state``: dE/dsc overwrites sc's rows (one tile reads a receiver's sc and writes its
+    dE/dsc), dE/dx takes x's rows once an atom's last tile is done (a window holds the open atoms' sums, added in
+    the same order): bitwise the unaliased host state's call, with two of the four state tensors."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*names))
+    results, sizes = [], []
+    for alias in (False, True):
+        tiled = TiledForceField(field, TileConfig(5, mode=mode, state="host", alias_state=alias))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        for current in (strained(atoms), atoms):
+            results.append(tiled.evaluate(current, stress=True))
+        sizes.append(sorted(tiled._g["state"].tensors))
+    assert sizes == [["gsc", "gx", "sc", "x"], ["sc", "x"]]
+    for plain, aliased in zip(results[:2], results[2:]):
+        assert plain[0] == aliased[0]
+        assert np.array_equal(plain[1], aliased[1]) and np.array_equal(plain[2], aliased[2])
+
+
+def test_aliased_state_needs_the_host_state():
+    with pytest.raises(ValueError, match="alias_state"):
+        TileConfig(5, alias_state=True)

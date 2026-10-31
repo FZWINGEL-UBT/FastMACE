@@ -58,6 +58,10 @@ class TileConfig:
     ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pageable host memory; each
     tile copies its rows to the device and its results back, so the device holds no per-atom state of the
     sweeps; not with ``mode="graphs"``, whose captured bodies read the state themselves).
+    ``alias_state`` (with ``state="host"``): dE/dsc takes sc's rows (a receiver's sc is read and its dE/dsc
+    written by the same tile) and dE/dx takes x's rows atom by atom (an atom's last tile in sweep 2 is the last to
+    read its x and the last to add to its dE/dx; until then the sum lives in a window of the open atoms, added in
+    the same order): bitwise the same call with two of the four state tensors.
     ``species``: the tiles' one-hot species rows from the field's ``node_attrs`` (``"one_hot"``) or built from
     its species index (``"index"``, bitwise the same rows): the field's device one-hot is then released to the
     host (``MACEForceField.release_node_attrs``; its own whole-system call refuses afterwards).
@@ -73,6 +77,7 @@ class TileConfig:
     neighbours: str = "global"
     budget_receivers: tuple[int, ...] = ()
     state: str = "device"
+    alias_state: bool = False
     species: str = "one_hot"
 
     def __post_init__(self):
@@ -88,6 +93,8 @@ class TileConfig:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
         if self.species not in ("one_hot", "index"):
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
+        if self.alias_state and self.state != "host":
+            raise ValueError("TileConfig.alias_state needs state='host'")
         if self.state not in ("device", "host"):
             raise ValueError(f"TileConfig.state must be 'device' or 'host', got {self.state!r}")
         if self.state == "host" and self.mode == "graphs":
@@ -104,9 +111,11 @@ class _State:
     host memory (``TileConfig.state``). Tiles read rows to the device and put or add rows; on the device these
     are the plain indexing and ``index_add_``, in host memory the same on the host after one copy."""
 
-    def __init__(self, device, dtype, host):
-        self.device, self.dtype, self.host = device, dtype, host
+    def __init__(self, device, dtype, host, alias=False):
+        self.device, self.dtype, self.host, self.alias = device, dtype, host, alias
         self.tensors = {}
+        # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
+        self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
 
     def allocate(self, n, widths):
         import torch
@@ -118,34 +127,105 @@ class _State:
         # 42 GiB of state at 9.26M NbCl5 atoms).
         where = "cpu" if self.host else self.device
         for name, width in widths.items():
-            self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where)
+            if name not in self._storage:
+                self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where)
+        if self.alias:
+            self._width = widths["gx"]
+            self._index(n)
+
+    def _index(self, n):
+        """alias: each atom's first and last tile and its row in the window while open (sweep 1 records the
+        tiles before its first outputs allocate the state)."""
+        import torch
+
+        if getattr(self, "_first", None) is None:
+            self._first = torch.full((n,), -1, dtype=torch.int32)
+            self._last = torch.full((n,), -1, dtype=torch.int32)
+            self._slot_of = torch.full((n,), -1, dtype=torch.int64)
 
     def zero(self):
         for tensor in self.tensors.values():
             tensor.zero_()
+        if self.alias and getattr(self, "_first", None) is not None:
+            self._first.fill_(-1)
+            self._last.fill_(-1)
+            self._slot_of.fill_(-1)
+            self._window = None
 
     def bytes(self):
-        return int(sum(t.numel() * t.element_size() for t in self.tensors.values()))
+        tensors = list(self.tensors.values())
+        if self.alias and getattr(self, "_first", None) is not None:
+            tensors += [self._first, self._last, self._slot_of]
+            tensors += [self._window] if getattr(self, "_window", None) is not None else []
+        return int(sum(t.numel() * t.element_size() for t in tensors))
 
     def rows(self, name, index):
         """``state[name][index]`` on the device."""
+        tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
-            return self.tensors[name][index]
-        return self.tensors[name].index_select(0, index.cpu()).to(self.device)
+            return tensor[index]
+        return tensor.index_select(0, index.cpu()).to(self.device)
 
     def put(self, name, index, values):
         """``state[name][index] = values``."""
+        tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
-            self.tensors[name][index] = values
+            tensor[index] = values
         else:
-            self.tensors[name][index.cpu()] = values.detach().cpu()
+            tensor[index.cpu()] = values.detach().cpu()
 
     def add(self, name, index, values):
-        """``state[name].index_add_(0, index, values)``."""
+        """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
+        if self.alias and name == "gx":
+            index, values = index.cpu(), values.detach().cpu()
+            slots = self._slot_of[index]
+            opening = index[slots < 0]
+            if opening.numel():
+                top = self._top - opening.numel()
+                new = self._free[top:self._top]
+                self._top = top
+                self._slot_of[opening] = new
+                self._window[new] = 0
+            self._window.index_add_(0, self._slot_of[index], values)
+            return
+        tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
-            self.tensors[name].index_add_(0, index, values)
+            tensor.index_add_(0, index, values)
         else:
-            self.tensors[name].index_add_(0, index.cpu(), values.detach().cpu())
+            tensor.index_add_(0, index.cpu(), values.detach().cpu())
+
+    def touch(self, index, tile, n):
+        """Sweep 1: tile ``tile`` holds the atoms ``index`` (receivers and halo) of ``n``."""
+        self._index(n)
+        index = index.cpu()
+        fresh = index[self._first[index] < 0]
+        self._first[fresh] = tile
+        self._last[index] = tile
+
+    def plan(self, tiles):
+        """After sweep 1: the atoms each tile closes, and a window of the most atoms open at once."""
+        import torch
+
+        last = self._last.long()
+        order = torch.sort(last, stable=True).indices
+        self._closing = torch.split(order, torch.bincount(last, minlength=tiles).tolist())
+        opened = torch.bincount(self._first.long(), minlength=tiles)
+        closed = torch.bincount(last, minlength=tiles)
+        # During tile t: the atoms open after it plus those it closes.
+        size = int((torch.cumsum(opened - closed, 0) + closed).max().item())
+        self._window = torch.zeros((size, self._width), dtype=self.dtype)
+        self._free = torch.arange(size, dtype=torch.int64)
+        self._top = size
+
+    def close(self, tile):
+        """After tile ``tile`` of sweep 2: its closing atoms' dE/dx is final; it takes their rows of x."""
+        atoms = self._closing[tile]
+        if atoms.numel():
+            slots = self._slot_of[atoms]
+            self.tensors["x"][atoms] = self._window[slots]
+            self._free[self._top:self._top + slots.numel()] = slots
+            self._top += slots.numel()
+            self._slot_of[atoms] = -1
 
 
 class _Ghosts:
@@ -552,9 +632,10 @@ class TiledForceField:
                 out[name] = torch.empty_like(value)
             out[name].copy_(value)
 
-    def _scatter(self, sweep, slot, g):
+    def _scatter(self, sweep, slot, g, piece):
         """Add the slot's outputs into the global buffers (outside the graphs: warm-ups and captures have no side
-        effects). Padding rows read atom 0 and add exact zeros to it."""
+        effects). Padding rows read atom 0 and add exact zeros to it; with the state aliased, only the tile's real
+        rows are written (dE/dsc overwrites sc, and dE/dx sums in the window of the tile's own atoms)."""
         out = slot["out"][sweep]
         receivers = slot["sizes"][0]
         recv = slot["nodes"][:receivers]
@@ -565,7 +646,16 @@ class TiledForceField:
             state.add("x", recv, out["x"])
             state.add("sc", recv, out["sc"])
             return
-        if sweep == 2:
+        if sweep == 2 and state.alias:
+            import torch
+
+            nodes, r, h = piece[0], piece[4], piece[5]
+            rows = torch.cat([torch.arange(r, device=self.device),
+                              torch.arange(receivers, receivers + h, device=self.device)])
+            g["node_es"].index_add_(0, recv, out["es"])
+            state.add("gx", nodes, out["g_x"][rows])
+            state.put("gsc", nodes[:r], out["g_sc"][:r])
+        elif sweep == 2:
             g["node_es"].index_add_(0, recv, out["es"])
             state.add("gx", slot["nodes"], out["g_x"])
             state.add("gsc", recv, out["g_sc"])
@@ -662,6 +752,7 @@ class TiledForceField:
                         slot["graphs"].clear()
                     self._graph_key = key
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
+            aliased = self.config.alias_state
             for sweep in (1, 2, 3):
                 for index, receivers in enumerate(tiles):
                     slot = self._slots[keys[index]] if padded else None
@@ -669,6 +760,8 @@ class TiledForceField:
                     self._note(stats, piece)
                     if sweep == 1:
                         stats["edges"] += piece[1].shape[1]
+                        if aliased:
+                            g["state"].touch(piece[0], index, n)
                     if padded:
                         if bound is not slot:  # the streaming kernels read this slot's edge count and tables
                             for module in field._streaming:
@@ -677,10 +770,14 @@ class TiledForceField:
                             bound = slot
                         self._fill(slot, piece)
                         self._run_slot(sweep, slot, g)
-                        self._scatter(sweep, slot, g)
+                        self._scatter(sweep, slot, g, piece)
                     else:
                         self._eager_tile(sweep, piece, g)
+                    if sweep == 2 and aliased:
+                        g["state"].close(index)
                     del piece
+                if sweep == 1 and aliased:
+                    g["state"].plan(len(tiles))
             stats["global_bytes"] = state.bytes()
             stats["host_bytes"] = state.bytes() if state.host else 0
             with torch.no_grad():
@@ -751,7 +848,8 @@ class TiledForceField:
                      forces=torch.zeros((n, 3), dtype=self.dtype, device=self.device),
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
-                     state=_State(self.device, self.dtype, self.config.state == "host"))
+                     state=_State(self.device, self.dtype, self.config.state == "host",
+                                  alias=self.config.alias_state))
             self._g = g
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))

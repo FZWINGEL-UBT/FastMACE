@@ -48,6 +48,8 @@ def parse_args(argv=None):
     p.add_argument("--calls", type=int, default=2, help="tiled force calls (the first one warms up)")
     p.add_argument("--host-state", action="store_true",
                    help="TileConfig.state='host': x, sc and their adjoints in pinned host memory")
+    p.add_argument("--alias-state", action="store_true",
+                   help="TileConfig.alias_state (with --host-state): dE/dsc in sc's rows, dE/dx in x's rows")
     p.add_argument("--species-index", action="store_true",
                    help="TileConfig.species='index': the tiles' one-hot rows from the species index; the field's "
                         "device one-hot is released")
@@ -173,6 +175,7 @@ def main(argv=None):
                                                   neighbours="tiles" if args.tile_list else "global",
                                                   budget_receivers=tuple(args.budget_receivers),
                                                   state="host" if args.host_state else "device",
+                                                  alias_state=args.alias_state,
                                                   species="index" if args.species_index else "one_hot"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
