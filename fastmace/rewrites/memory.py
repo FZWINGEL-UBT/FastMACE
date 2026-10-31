@@ -34,10 +34,12 @@ _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
 # (compiled default plan, recompute_conv_weights on; docs/validation/capacity-T08-chunks.md), 0.202 and 0.199 of
 # MH-1's stock 317,440 B per node in float32.
 _NODE_SEGMENTS_SHARE = 0.20
-# recompute_node_region (ninth list item 2), beyond recompute_node_segments: the chunked combined region's peak was
-# 0.709 GiB (35.2 kB per atom) below the separate segments' at NbCl5 21,600 atoms, 4 chunks (compiled default plan,
-# recompute_conv_weights on; docs/validation/chunked-region.md), 0.111 of MH-1's stock 317,440 B per node.
-_NODE_REGION_SHARE = 0.11
+# recompute_node_region (ninth list item 2), beyond recompute_node_segments: with the message divided inside the
+# region's chunks (M3 target 1), the chunked combined region's peak was 1.152 GiB (57.3 kB per atom) below the
+# separate segments' at NbCl5 21,600 atoms, 4 chunks (compiled default plan, recompute_conv_weights on, gate_epilogue
+# off; with gate_epilogue on, the region's peak is the same to 0.5 kB per atom; docs/validation/region-norm.md),
+# 0.180 of MH-1's stock 317,440 B per node.
+_NODE_REGION_SHARE = 0.18
 
 
 def _first_hidden(block) -> int:
