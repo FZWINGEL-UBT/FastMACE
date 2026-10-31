@@ -48,7 +48,8 @@ class TileConfig:
     ``headroom``: a padded slot's halo count above the largest of its tiles', as a fraction. ``bucket``: the padded
     modes keep one slot per edge bucket, ``bucket`` times the largest tile's edges (rounded up to 256) wide, so a
     small tile runs in a small slot; 1 or more gives one slot for every tile.
-    ``budget_receivers``: larger receiver caps the call may take after its first call (at ``receivers``), from
+    ``budget_receivers``: larger receiver caps the call may take after its first call (at ``receivers``; default
+    (8192, 16384) with ``mode="compiled"``, none otherwise), from
     the memory model: the first call measures its workspace per receiver (the peak above what stays allocated
     after it: the tiled state, the field and the outputs), and the call then takes the largest candidate whose
     predicted workspace, with 10 % headroom, fits the memory left on the device. Larger tiles run faster (fewer
@@ -75,7 +76,10 @@ class TileConfig:
     # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
-    budget_receivers: tuple[int, ...] = ()
+    # neighbours "tiles": each tile's edges found once per call and kept on the host (sender, receiver counts and
+    # unit shifts, about 10 bytes per edge), the later sweeps rebuilding them exactly from it.
+    list_cache: bool = True
+    budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
     species: str = "one_hot"
@@ -100,6 +104,8 @@ class TileConfig:
         if self.state == "host" and self.mode == "graphs":
             raise ValueError("TileConfig.state='host' cannot run in mode 'graphs': the captured bodies read the "
                              "state from device memory")
+        if self.budget_receivers is None:  # compiled tiles take the larger caps when they fit (tiled-speed.md)
+            object.__setattr__(self, "budget_receivers", (8192, 16384) if self.mode == "compiled" else ())
         if any(int(r) < 1 for r in self.budget_receivers):
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
@@ -402,9 +408,19 @@ class TiledForceField:
 
             bins = TileNeighbours.like(self.field.neighbours)
             bins.bin(positions)
+            cache = self._list_cache = {} if self.config.list_cache and n < 2**31 else None
 
             def tiles(receivers):
-                sender, receiver, _, shifts = bins.edges(receivers)
+                """The tile's (global edge index, shifts): searched once per call, then from the host cache."""
+                key = receivers.data_ptr()  # the call's tile tensors live through all its sweeps
+                if cache is not None and key in cache:
+                    sender, counts, unit = (t.to(self.device) for t in cache[key])
+                    receiver = receivers.repeat_interleave(counts, output_size=sender.shape[0])
+                    return torch.stack([sender.long(), receiver]), bins.shifts(unit.to(bins.float_dtype))
+                sender, receiver, unit, shifts = bins.edges(receivers)
+                if cache is not None and (unit.numel() == 0 or float(unit.abs().max()) < 2**15):
+                    counts = torch.bincount(torch.searchsorted(receivers, receiver), minlength=receivers.shape[0])
+                    cache[key] = (sender.to(torch.int32).cpu(), counts.cpu(), unit.to(torch.int16).cpu())
                 return torch.stack([sender, receiver]), shifts
 
             # No degrees before the tiles' builds: the tiles are planned by receivers only.
@@ -779,6 +795,10 @@ class TiledForceField:
                 if sweep == 1 and aliased:
                     g["state"].plan(len(tiles))
             stats["global_bytes"] = state.bytes()
+            list_cache = getattr(self, "_list_cache", None)
+            stats["list_cache_bytes"] = int(sum(t.numel() * t.element_size() for entry in (list_cache or {}).values()
+                                                for t in entry))
+            self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
             with torch.no_grad():
                 node_inter = self.model.scale_shift(node_es, self.heads[:n])
