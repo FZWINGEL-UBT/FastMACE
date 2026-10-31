@@ -172,6 +172,26 @@ BATCH_EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
 SPECIES_DEPENDENT = "fixed_species_superset"
 
 
+def host_batch(calc, atoms):
+    """MACE's input batch of ``atoms`` as a dict, left on the host.
+
+    ``MACECalculator._atoms_to_batch`` (mace-torch 0.3.16) without its last step, which moves the whole batch,
+    MACE's own neighbour list included, to the calculator's device (about 1.6 kB per atom in float64). The force
+    field moves what it keeps itself. No padding graph: the force field takes uncompiled calculators only, and
+    MACE pads only compiled ones.
+    """
+    from mace import data as mace_data
+    from mace.tools import torch_geometric, torch_tools
+
+    calc.arrays_keys.update({calc.charges_key: "charges"})
+    keyspec = mace_data.KeySpecification(info_keys=calc.info_keys, arrays_keys=calc.arrays_keys)
+    with torch_tools.default_dtype(calc.default_dtype):
+        config = mace_data.config_from_atoms(atoms, key_specification=keyspec, head_name=calc.head)
+        graph = mace_data.AtomicData.from_config(config, z_table=calc.z_table, cutoff=calc.r_max,
+                                                 heads=calc.available_heads)
+    return torch_geometric.Batch.from_data_list([graph]).to_dict()
+
+
 def _numbers(species):
     """Symbols or atomic numbers as distinct atomic numbers (a set, sorted)."""
     from ase.data import atomic_numbers
@@ -344,7 +364,7 @@ class MACEForceField:
         self.species_columns = tuple(sorted(z_table.index(z) for z in wanted if z in z_table))
         self.superset = tuple(z_table[column] for column in self.species_columns)
         self.check_species(atoms.numbers)
-        batch = calc._atoms_to_batch(atoms).to_dict()
+        batch = host_batch(calc, atoms)
         node_attrs = batch["node_attrs"].to(self._device)
         if not bool((node_attrs[:, list(self.species_columns)].sum(dim=1) == 1).all()):
             raise SpeciesNotInSuperset([Reason("a one-hot species row of the structure does not sum to 1 over the "
@@ -446,7 +466,7 @@ class MACEForceField:
                              "(NeighbourConfig.sort_receivers='on')")
 
         # The batch's edges (MACE's own neighbour list) are replaced by the skin list's (use_edges, below) before
-        # anything reads them: empty on the device instead of a copy (about 1 kB per atom at the build's peak).
+        # anything reads them: empty on the device instead of a copy (about 1.6 kB per atom at the build's peak).
         for key in BATCH_EDGE_KEYS:
             if key in batch:
                 value = batch[key]
