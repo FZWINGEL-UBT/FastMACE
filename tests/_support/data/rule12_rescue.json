@@ -1,0 +1,1481 @@
+[
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 121824,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 3361328,
+  "nodes": 121824,
+  "capacity": 5102336,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 14556332032,
+  "measured_edges": 3201264,
+  "recorded_prediction": 34156683069,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-121824s5-region.json",
+  "uniform_edges": 4024128,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 121824,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 3361328,
+  "nodes": 121824,
+  "capacity": 5102336,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 14011072512,
+  "measured_edges": 3201264,
+  "recorded_prediction": 34156683069,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-121824s6-region-ge.json",
+  "uniform_edges": 4024128,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s0-default",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 9592373248,
+  "measured_edges": 567600,
+  "recorded_prediction": 12330171262,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s0-default.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s1-conv",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 6551502848,
+  "measured_edges": 567600,
+  "recorded_prediction": 9042372478,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s1-conv.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s2-table",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 6299844608,
+  "measured_edges": 567600,
+  "recorded_prediction": 8875413946,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s2-table.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s3-segments",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 4894752768,
+  "measured_edges": 567600,
+  "recorded_prediction": 8104034746,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s3-segments.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s4-geoff",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 3972005888,
+  "measured_edges": 567600,
+  "recorded_prediction": 7400540026,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s4-geoff.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 2692743168,
+  "measured_edges": 567600,
+  "recorded_prediction": 6289738426,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s5-region.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 21600,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 595980,
+  "nodes": 21600,
+  "capacity": 904704,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 2797600768,
+  "measured_edges": 567600,
+  "recorded_prediction": 6289738426,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-21600s6-region-ge.json",
+  "uniform_edges": 713498,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s0-default",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 18941476864,
+  "measured_edges": 1135200,
+  "recorded_prediction": 24376415948,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s0-default.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s1-conv",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 12840861696,
+  "measured_edges": 1135200,
+  "recorded_prediction": 17800818380,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s1-conv.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s2-table",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 12224299008,
+  "measured_edges": 1135200,
+  "recorded_prediction": 17466901316,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s2-table.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s3-segments",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 9395240960,
+  "measured_edges": 1135200,
+  "recorded_prediction": 15924142916,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s3-segments.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s4-geoff",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 8839495680,
+  "measured_edges": 1135200,
+  "recorded_prediction": 14517153476,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s4-geoff.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 5356126208,
+  "measured_edges": 1135200,
+  "recorded_prediction": 12295550276,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s5-region.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 43200,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 1191960,
+  "nodes": 43200,
+  "capacity": 1809408,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 5240782848,
+  "measured_edges": 1135200,
+  "recorded_prediction": 12295550276,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-43200s6-region-ge.json",
+  "uniform_edges": 1426996,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 85536,
+  "dtype": "float32",
+  "stage": "s3-segments",
+  "edges": 2360081,
+  "nodes": 85536,
+  "capacity": 3582464,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 18261999616,
+  "measured_edges": 2247696,
+  "recorded_prediction": 31251534732,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-85536s3-segments.json",
+  "uniform_edges": 2825451,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 85536,
+  "dtype": "float32",
+  "stage": "s4-geoff",
+  "edges": 2360081,
+  "nodes": 85536,
+  "capacity": 3582464,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 14633926656,
+  "measured_edges": 2247696,
+  "recorded_prediction": 28465695640,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-85536s4-geoff.json",
+  "uniform_edges": 2825451,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 85536,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 2360081,
+  "nodes": 85536,
+  "capacity": 3582464,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 10271850496,
+  "measured_edges": 2247696,
+  "recorded_prediction": 24066921304,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-85536s5-region.json",
+  "uniform_edges": 2825451,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NbCl5",
+  "natoms": 85536,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 2360081,
+  "nodes": 85536,
+  "capacity": 3582464,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bytes": 9915334656,
+  "measured_edges": 2247696,
+  "recorded_prediction": 24066921304,
+  "source": "est-matrix-nbcl5/points/point-NbCl5-float32-85536s6-region-ge.json",
+  "uniform_edges": 2825451,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 105984,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 3561063,
+  "nodes": 105984,
+  "capacity": 5852672,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 12895387648,
+  "measured_edges": 3391488,
+  "recorded_prediction": 33159050368,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-105984s5-region.json",
+  "uniform_edges": 4615974,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 105984,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 3561063,
+  "nodes": 105984,
+  "capacity": 5852672,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 12895387648,
+  "measured_edges": 3391488,
+  "recorded_prediction": 33159050368,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-105984s6-region-ge.json",
+  "uniform_edges": 4615974,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s0-default",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 10454302720,
+  "measured_edges": 702464,
+  "recorded_prediction": 14350412389,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s0-default.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s1-conv",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 6725566464,
+  "measured_edges": 702464,
+  "recorded_prediction": 9944763493,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s1-conv.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s2-table",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 6532628480,
+  "measured_edges": 702464,
+  "recorded_prediction": 9721039135,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s2-table.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s3-segments",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 4607442944,
+  "measured_edges": 702464,
+  "recorded_prediction": 8937089311,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s3-segments.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s4-geoff",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 4123000832,
+  "measured_edges": 702464,
+  "recorded_prediction": 8222130232,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s4-geoff.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 2988441600,
+  "measured_edges": 702464,
+  "recorded_prediction": 7093226680,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s5-region.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 21952,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 737588,
+  "nodes": 21952,
+  "capacity": 1212416,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 2988441600,
+  "measured_edges": 702464,
+  "recorded_prediction": 7093226680,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-21952s6-region-ge.json",
+  "uniform_edges": 956087,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 46656,
+  "dtype": "float32",
+  "stage": "s1-conv",
+  "edges": 1567642,
+  "nodes": 46656,
+  "capacity": 2576384,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 13656653824,
+  "measured_edges": 1492992,
+  "recorded_prediction": 20816675671,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-46656s1-conv.json",
+  "uniform_edges": 2032032,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 46656,
+  "dtype": "float32",
+  "stage": "s2-table",
+  "edges": 1567642,
+  "nodes": 46656,
+  "capacity": 2576384,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 13425967104,
+  "measured_edges": 1492992,
+  "recorded_prediction": 20341180183,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-46656s2-table.json",
+  "uniform_edges": 2032032,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 46656,
+  "dtype": "float32",
+  "stage": "s3-segments",
+  "edges": 1567642,
+  "nodes": 46656,
+  "capacity": 2576384,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "gate_epilogue",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 9399435264,
+  "measured_edges": 1492992,
+  "recorded_prediction": 18675001111,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-46656s3-segments.json",
+  "uniform_edges": 2032032,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 46656,
+  "dtype": "float32",
+  "stage": "s4-geoff",
+  "edges": 1567642,
+  "nodes": 46656,
+  "capacity": 2576384,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 8329887744,
+  "measured_edges": 1492992,
+  "recorded_prediction": 17155452516,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-46656s4-geoff.json",
+  "uniform_edges": 2032032,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 46656,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 1567642,
+  "nodes": 46656,
+  "capacity": 2576384,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 5897191424,
+  "measured_edges": 1492992,
+  "recorded_prediction": 14756121060,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-46656s5-region.json",
+  "uniform_edges": 2032032,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 46656,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 1567642,
+  "nodes": 46656,
+  "capacity": 2576384,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 5876219904,
+  "measured_edges": 1492992,
+  "recorded_prediction": 14756121060,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-46656s6-region-ge.json",
+  "uniform_edges": 2032032,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 85184,
+  "dtype": "float32",
+  "stage": "s4-geoff",
+  "edges": 2862183,
+  "nodes": 85184,
+  "capacity": 4704000,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 14994636800,
+  "measured_edges": 2725888,
+  "recorded_prediction": 31087775343,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-85184s4-geoff.json",
+  "uniform_edges": 3710061,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 85184,
+  "dtype": "float32",
+  "stage": "s5-region",
+  "edges": 2862183,
+  "nodes": 85184,
+  "capacity": 4704000,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 10443816960,
+  "measured_edges": 2725888,
+  "recorded_prediction": 26707102959,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-85184s5-region.json",
+  "uniform_edges": 3710061,
+  "r_max": 6.0
+ },
+ {
+  "label": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 85184,
+  "dtype": "float32",
+  "stage": "s6-region-ge",
+  "edges": 2862183,
+  "nodes": 85184,
+  "capacity": 4704000,
+  "fused_conv": true,
+  "rewrites": [
+   "factor_species",
+   "fold_cutoff",
+   "joint_radial_input",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "reassociate_first",
+   "radial_tables",
+   "recompute_conv_weights",
+   "recompute_first_table",
+   "recompute_node_segments",
+   "recompute_node_region"
+  ],
+  "selfchecks": [
+   "segment_gemm",
+   "gate_epilogue"
+  ],
+  "resident": [
+   "block_linear",
+   "merged_residual"
+  ],
+  "sms": 48,
+  "gpu": "NVIDIA RTX A4000",
+  "peak_bytes": 10443816960,
+  "measured_edges": 2725888,
+  "recorded_prediction": 26707102959,
+  "source": "est-matrix-nacl/points/point-NaCl-float32-85184s6-region-ge.json",
+  "uniform_edges": 3710061,
+  "r_max": 6.0
+ }
+]

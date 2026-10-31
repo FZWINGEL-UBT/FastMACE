@@ -59,8 +59,7 @@ def test_the_record_is_exact_off_and_rescued_between_the_other_two():
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
     model, _ = tiny("mh1")
     dims = capabilities.model_dims(model)
-    edge, node = record.memory(dims, 4)
-    assert (edge, node) == (-(dims.interactions[0].radial[-2] + 1) * 4, 0)
+    assert record.memory(dims, 4) == (0, 0, terms._FIRST_TABLE_KEEP) and 0 < terms._FIRST_TABLE_KEEP < 1
     assert record.memory is terms.recompute_first_table
 
 

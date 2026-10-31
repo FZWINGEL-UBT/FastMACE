@@ -93,8 +93,8 @@ def test_the_record_is_rounding_deterministic_off_and_rescued_after_recompute_co
                                     "gate_epilogue", "recompute_node_region")
     assert "fastmace.rewrites.segments" in reg.RECORD_SOURCES
     model, _ = tiny("mh1")
-    edge, node = record.memory(capabilities.model_dims(model), 4)
-    assert edge == 0 and node < 0
+    edge, node, keep = record.memory(capabilities.model_dims(model), 4)
+    assert edge == node == 0 and 0 < keep < 1
     assert record.memory is terms.recompute_node_segments
 
 
@@ -181,8 +181,8 @@ def test_region_record_is_the_last_rescue_rung_and_needs_the_segments():
     assert (record.exactness, record.default, record.deterministic) == ("rounding", "off", True)
     assert record.requires == ("recompute_node_segments",)
     model, _ = tiny("mh1")
-    edge, node = record.memory(capabilities.model_dims(model), 4)
-    assert edge == 0 and node < 0 and record.memory is terms.recompute_node_region
+    edge, node, keep = record.memory(capabilities.model_dims(model), 4)
+    assert edge == node == 0 and 0 < keep < 1 and record.memory is terms.recompute_node_region
 
 
 def test_four_atom_chunks_for_every_cell():

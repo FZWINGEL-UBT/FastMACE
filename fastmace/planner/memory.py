@@ -80,11 +80,12 @@ def rescue_value(name: str) -> str:
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
-# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]).
-# Below 1 because the run term is stock-structured: it counts what stock MACE keeps per edge, while the fused
-# paths (OEq's convolution, the folded MH-1 backward) keep less, and the uniform-density edge estimate is
-# 1.2-1.3x the edges a crystal uses. Per-path structural terms are a known limitation (plans/phase-5.md).
-SAFETY = 0.90
+# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]),
+# with the edges counted in the structure (``counted_edges``): the lowest that keeps every case at or above its
+# measured peak (docs/validation/estimate-refit.md). Below 1 because the run term is stock-structured: it counts
+# what stock MACE keeps per edge, while the fused paths (OEq's convolution, the folded MH-1 backward) keep less.
+# Per-path structural terms are a known limitation (plans/phase-5.md).
+SAFETY = 0.97
 # Library workspaces live beside the model (cuBLAS's 32 MiB per stream and handle): five seen at the GPU peaks
 # of 5-T03 (the capture and side streams, the eager router, the self-checks, PolarMACE's long range). A path
 # that adds one adds it here, so the count stays visible.
@@ -104,10 +105,13 @@ DTYPE_BYTES = {"float32": 4, "float64": 8}
 @dataclass(frozen=True)
 class MemoryTerm:
     """A rewrite's memory beyond stock MACE (``Rewrite.memory``), in bytes per edge and per node; negative
-    for a stock tensor it does not materialise."""
+    for a stock tensor it does not materialise. ``keep``: the fraction of the remaining activations (the estimate's
+    activations and the additive terms) the rewrite keeps, for the memory-rescue records, whose savings were
+    measured as fractions of the peak (docs/validation/estimate-refit.md); 1 for the others."""
 
     edge_bytes: float = 0.0
     node_bytes: float = 0.0
+    keep: float = 1.0
 
     def bytes(self, edges: int, nodes: int) -> float:
         return self.edge_bytes * edges + self.node_bytes * nodes
@@ -177,6 +181,17 @@ def model_edges(natoms: int, volume_A3: float, r_max_A: float, bucket_fraction: 
     return int(math.ceil(2.0 * estimated_pairs(natoms, volume_A3, r_max_A) * (1.0 + bucket_fraction)))
 
 
+def counted_edges(atoms, r_max_A: float, bucket_fraction: float) -> int:
+    """The edges the model reads: both directions of every pair within ``r_max`` in ``atoms`` (counted, with the
+    cell's periodicity), plus one edge bucket of padding. The uniform-density count (``model_edges``) is 1.2-1.4x
+    a crystal's (NbCl5 33.0 against 26.3 per atom at 6 Å, NaCl 43.6 against 32.0; docs/validation/estimate-refit.md).
+    About 7 s on one CPU core at 137,000 atoms."""
+    from ase.neighborlist import neighbor_list
+
+    pairs = len(neighbor_list("i", atoms, float(r_max_A)))
+    return int(math.ceil(pairs * (1.0 + bucket_fraction)))
+
+
 def list_capacity(natoms: int, volume_A3: float, radius_A: float, headroom: float, multiple: int = 1) -> int:
     """The MACE pair list's capacity: both directions within cutoff + skin, at the pair-buffer headroom."""
     from fastmace.neighbors.d3_list import estimated_pairs
@@ -238,7 +253,18 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     transient = max(((block.weight_numel if fused_conv else block.messages) for block in dims.interactions),
                     default=0) * edges
     activations = (sum(per_layer) + transient + shared * edges) * width
-    rewrites = tuple((name, int(round(term.bytes(edges, nodes)))) for name, term in rewrite_terms)
+    additive = sum(term.bytes(edges, nodes) for _, term in rewrite_terms)
+    # The memory-rescue records' fractions apply to what remains (SAFETY times the activations and the additive
+    # terms), so the estimate's overstatement shrinks with the peak instead of staying as an absolute excess.
+    remaining = SAFETY * (activations + additive)
+    rewrites, kept = [], remaining
+    for name, term in rewrite_terms:
+        if term.keep != 1.0:
+            rewrites.append((name, int(round(kept * (term.keep - 1.0)))))
+            kept *= term.keep
+        else:
+            rewrites.append((name, int(round(term.bytes(edges, nodes)))))
+    rewrites = tuple(rewrites)
     list_width = DTYPE_BYTES[list_dtype or dtype]
     pair_list = capacity * (_INDEX_BYTES_PER_SLOT + _SHIFT_FLOATS_PER_SLOT * list_width + _SHIFT64_BYTES_PER_SLOT)
     weights = dims.parameters * width
@@ -248,7 +274,7 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
         held.append(("rewrites' buffers", int(resident)))
     terms = [*held,
              ("activations", int(math.ceil(SAFETY * activations))),
-             ("rewrites", int(math.ceil(SAFETY * sum(value for _, value in rewrites)))),
+             ("rewrites", int(math.ceil(SAFETY * additive + kept - remaining))),
              ("neighbour list", int(pair_list))]
     if d3 is not None:
         terms.append(("d3 list", int(d3.list_bytes + d3.build_bytes)))
@@ -361,6 +387,6 @@ def annotate_out_of_memory(error, plan) -> Any:
 __all__ = ["CONTEXT_TERMS", "DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
            "MemoryEstimate", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD", "RESCUE_OFF",
            "RESCUE_OVERSTATEMENT", "SAFETY", "WORKSPACE_BYTES",
-           "annotate_out_of_memory", "drop_order", "rescue_value", "short_by_far",
+           "annotate_out_of_memory", "counted_edges", "drop_order", "rescue_value", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
            "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]

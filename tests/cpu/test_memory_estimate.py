@@ -13,6 +13,7 @@
 
 import copy
 import dataclasses
+import math
 import types
 
 import pytest
@@ -154,6 +155,38 @@ def test_edges_and_capacity_follow_density_and_cutoff():
     assert memory.model_edges(len(atoms), volume, 5.0, 0.0) < edges < memory.model_edges(len(atoms), volume, 6.0, 0.05)
     capacity = memory.list_capacity(len(atoms), volume, 5.3, 1.15, 256)
     assert capacity % 256 == 0 and capacity > edges
+
+
+def test_rule_12_counts_the_edges_in_the_structure():
+    """docs/validation/estimate-refit.md: the uniform-density count is 1.2-1.4x a crystal's; rule 12 counts the pairs
+    within r_max (both directions, periodic) and adds the edge bucket."""
+    from ase.neighborlist import neighbor_list
+
+    atoms = nacl(repeat=3)
+    pairs = len(neighbor_list("i", atoms, 5.0))
+    assert memory.counted_edges(atoms, 5.0, 0.05) == math.ceil(pairs * 1.05)
+    assert memory.counted_edges(atoms, 5.0, 0.0) == pairs
+    expected = memory.counted_edges(nacl(repeat=3), mh1_traits().r_max, 0.05)
+    assert f"at {expected} edges" in str(plan().decision("memory")[2])
+
+
+def test_rescue_terms_keep_a_fraction_of_the_remaining_activations():
+    """docs/validation/estimate-refit.md: a memory-rescue record's term is the fraction of the remaining activations
+    (SAFETY times the activations and the additive terms) it keeps, so the estimate's overstatement shrinks with the
+    peak; its reported bytes are what it removes from the running remainder."""
+    dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
+    base = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False,
+                           rewrite_terms=(("a", memory.MemoryTerm(edge_bytes=-8.0)),))
+    half = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False,
+                           rewrite_terms=(("a", memory.MemoryTerm(edge_bytes=-8.0)),
+                                          ("k", memory.MemoryTerm(keep=0.5)), ("q", memory.MemoryTerm(keep=0.5))))
+    remaining = base.term("activations") + base.term("rewrites")
+    kept = half.term("activations") + half.term("rewrites")
+    assert kept == pytest.approx(remaining / 4, rel=1e-6)
+    saved = dict(half.rewrite_terms)
+    assert saved["k"] == pytest.approx(-remaining / 2, rel=1e-6) and saved["q"] == pytest.approx(-remaining / 4,
+                                                                                                    rel=1e-6)
+    assert half.total < base.total
 
 
 # --------------------------------------------------------------------------- the rewrites' terms
@@ -550,13 +583,13 @@ def test_gate_epilogue_s_term_depends_on_the_node_segments():
     registry = _rewrite_registry()
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert registry["gate_epilogue"].memory is terms.gate_epilogue
-    edge, node = terms.gate_epilogue(dims, 4)
-    assert edge == 0 and node > 0
+    edge, node, keep = terms.gate_epilogue(dims, 4)
+    assert edge == node == 0 and keep > 1
     alone = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue"], "float32"))
-    assert alone["gate_epilogue"].node_bytes == node
+    assert alone["gate_epilogue"].keep == keep
     segments = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue", "recompute_node_segments"],
                                                 "float32"))
-    assert segments["gate_epilogue"].node_bytes == terms.gate_epilogue_in_segments(dims, 4)[1] > node
+    assert segments["gate_epilogue"].keep == terms.gate_epilogue_in_segments(dims, 4)[2] > keep
     region = dict(memory.rewrite_memory_terms(
         registry, dims, ["gate_epilogue", "recompute_node_segments", "recompute_node_region"], "float32"))
     assert "gate_epilogue" not in region and "recompute_node_region" in region

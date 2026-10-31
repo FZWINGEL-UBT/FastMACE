@@ -1,0 +1,111 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-10-31T16:15:06.187438+00:00",
+  "host": "trillian",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "242e0ef3",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA RTX A4000",
+  "model": "mh1-r2scan",
+  "structure": "NaCl",
+  "precision": "float32",
+  "repeat": "22x22x22",
+  "natoms": 85184,
+  "volume_A3": 1858089.8667756522,
+  "steps": 30,
+  "warmup": 10,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "oom",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 16557801472,
+      "outside_allocator": 185532416
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 16557801472,
+    "cuda_total_bytes": 16743333888,
+    "windows": null
+  },
+  "rewrites": {
+    "wprime_backward": "on",
+    "recompute_conv_weights": "on",
+    "recompute_first_table": "off",
+    "recompute_node_segments": "off",
+    "recompute_node_region": "off",
+    "gate_epilogue": "on"
+  },
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "torch.OutOfMemoryError",
+    "message": "CUDA out of memory. Tried to allocate 624.00 MiB. GPU 0 has a total capacity of 15.59 GiB of which 44.75 MiB is free. Including non-PyTorch memory, this process has 15.53 GiB memory in use. Of the allocated memory 15.16 GiB is allocated by PyTorch, and 117.77 MiB is reserved by PyTorch but unallocated.",
+    "tried_to_allocate": "624.00 MiB",
+    "stage": null,
+    "frames": [
+      "fastmace/planner/fixed.py:1493 build: return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,",
+      "fastmace/engine/graph.py:235 __init__: self._initial_forces()",
+      "fastmace/engine/graph.py:1123 _initial_forces: self._force_stage()",
+      "fastmace/engine/graph.py:1127 _force_stage: out = self.force_field(self.state.positions)",
+      "fastmace/model/forces.py:804 __call__: out = self._outputs(positions)",
+      "fastmace/model/forces.py:827 _outputs: return self._split_outputs(self._compute_stress)",
+      "fastmace/model/forces.py:847 _split_outputs: out = self._model_call(data, training=self.training, compute_force=False, compute_stress=False,",
+      "fastmace/model/compile.py:329 lean_forward: def lean_forward(*args, **kwargs):",
+      "/mnt/homes/zwingel/fastmace-capacity/est-matrix-nacl/cache/inductor/g7/cg7wvarsln5sa72erqn3bbmfxou665ouv2ipkliu4vgbsazntgm5.py:4169 call: buf108 = empty_strided_cuda((5*s4, 384), (384, 1), torch.float32)"
+    ],
+    "memory": {
+      "max_allocated": 16280436224,
+      "max_reserved": 16403922944,
+      "allocated": 16280436224,
+      "reserved": 16403922944,
+      "inactive_split_bytes": 0,
+      "active_bytes": 16280436224,
+      "reserved_bytes": 16403922944,
+      "alloc_retries": 3,
+      "segments": 0,
+      "cuda_free": 46923776,
+      "outside_allocator": 292487168
+    },
+    "causes": []
+  },
+  "times": {
+    "load_s": 3.3215588279999793
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

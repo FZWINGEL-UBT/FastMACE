@@ -922,7 +922,7 @@ class MinimalPlanner:
         neighbours, dtype = parts["neighbours"], parts["precision"].dtype
         natoms, volume = len(atoms), float(atoms.get_volume())
         skin = float(neighbours.skin) if neighbours.skin != "auto" else 0.0
-        edges = memory.model_edges(natoms, volume, traits.r_max, neighbours.edge_bucket_fraction)
+        edges = memory.counted_edges(atoms, traits.r_max, neighbours.edge_bucket_fraction)
         capacity = memory.list_capacity(natoms, volume, traits.r_max + skin, neighbours.capacity_headroom,
                                         neighbours.edge_multiple)
         cuda = str(self.engine.device).startswith("cuda")

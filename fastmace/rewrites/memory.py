@@ -30,23 +30,21 @@ _STREAMING_INDEX_BYTES = 2 * 4
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
 _RADIAL_TABLES_SHARE = 576 / 8265
 _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
-# recompute_node_segments: the force call's peak fell by 64.2 kB per atom at NbCl5 21,600 atoms and 63.3 kB at 9,216
-# (compiled default plan, recompute_conv_weights on; docs/validation/capacity-T08-chunks.md), 0.202 and 0.199 of
-# MH-1's stock 317,440 B per node in float32.
-_NODE_SEGMENTS_SHARE = 0.20
-# recompute_node_region (ninth list item 2), beyond recompute_node_segments: with the message divided inside the
-# region's chunks (M3 target 1), the chunked combined region's peak was 1.152 GiB (57.3 kB per atom) below the
-# separate segments' at NbCl5 21,600 atoms, 4 chunks (compiled default plan, recompute_conv_weights on, gate_epilogue
-# off; with gate_epilogue on, the region's peak is the same to 0.5 kB per atom; docs/validation/region-norm.md),
-# 0.180 of MH-1's stock 317,440 B per node.
-_NODE_REGION_SHARE = 0.18
-# gate_epilogue (decision 66, speed-def E2): the force call's peak above gate_epilogue off at NbCl5 21,600 atoms
-# (compiled default plan, recompute_conv_weights on; docs/validation/region-norm.md): 0.247 GiB (12.3 kB per atom,
-# 0.039 of MH-1's stock 317,440 B per node) without the node segments, 0.731 GiB (36.3 kB, 0.114) with the separate
-# segments, on the RTX 4000 Ada and the RTX A4000 alike, and 0.5 kB inside recompute_node_region's chunks
-# (planner.memory.CONTEXT_TERMS picks the term).
-_GATE_EPILOGUE_SHARE = 0.039
-_GATE_EPILOGUE_SEGMENTS_SHARE = 0.114
+# The memory-rescue records and gate_epilogue as fractions of the remaining activations they keep
+# (``planner.memory.MemoryTerm.keep``), fitted by least squares on the compiled default plan's peaks, every stage
+# of the rescue ladder at NbCl5 21,600-121,824 and NaCl 21,952-105,984 atoms (RTX 4000 Ada and RTX A4000), so that
+# each stage's estimate sits at the default plan's ratio to its peak (docs/validation/estimate-refit.md). The
+# savings were measured as fractions of the peak (the whole ladder keeps 0.281-0.286 of the default plan's peak on
+# both crystals); counted as absolute bytes, the default plan's overstatement stayed and grew to 2.5x the peak.
+_CONV_WEIGHTS_KEEP = 0.62
+_FIRST_TABLE_KEEP = 0.966
+_NODE_SEGMENTS_KEEP = 0.648
+_NODE_REGION_KEEP = 0.663
+# gate_epilogue keeps more: 12.3 kB per atom (about 4 %) without the node segments, about 1.18 of the remaining with
+# the separate segments (36 kB per atom; the fit gave 1.182, 1.17 keeps NaCl 46,656 atoms, the fit's largest ratio,
+# under 1.4), nothing inside recompute_node_region's chunks (planner.memory.CONTEXT_TERMS).
+_GATE_EPILOGUE_KEEP = 1.04
+_GATE_EPILOGUE_SEGMENTS_KEEP = 1.17
 
 
 def _first_hidden(block) -> int:
@@ -131,51 +129,41 @@ def chunked_conv_backward(dims, width):
 def recompute_conv_weights(dims, width):
     """wprime_backward without the stored per-edge weights: the streaming interactions' ``[E, W]`` weights are not
     kept (MH-1: the second interaction's, 1,280 floats per edge; the first takes the reassociated path). With the
-    fused forward the weights never exist in memory (CAP-T07b: built on chip in both passes), and the force call's
-    peak drops by the full term: 5,126 B per edge measured against 5,120 declared (NbCl5, 32,400 atoms); the
-    chunked cuBLAS recompute reached two thirds of it."""
-    return -sum(block.weight_numel for block in dims.interactions[1:]) * width, 0
+    fused forward the weights never exist in memory (CAP-T07b: built on chip in both passes). It keeps
+    ``_CONV_WEIGHTS_KEEP`` of the remaining activations."""
+    return 0, 0, _CONV_WEIGHTS_KEEP
 
 
 def recompute_first_table(dims, width):
     """The first interaction's table output ``[h c, c]`` is not kept for the backward (the region keeps the lengths,
-    which the table keeps anyway). It was the only edge block of the reassociated first interaction alive at the force
-    call's peak with recompute_node_segments on (speed-def falsifier: 260 B per edge at NbCl5 and NaCl)."""
-    return -(dims.interactions[0].radial[-2] + 1) * width, 0
-
-
-def _stock_node_floats(dims) -> int:
-    """The floats per node stock MACE keeps for the force backward over all interactions
-    (``planner.memory.interaction_floats``'s node term)."""
-    return sum(block.node_in + block.messages + block.target + block.correlation * block.target
-               + max(block.hidden, block.node_in) for block in dims.interactions)
+    which the table keeps anyway; 260 B per edge at NbCl5 and NaCl). It keeps ``_FIRST_TABLE_KEEP`` of the remaining
+    activations."""
+    return 0, 0, _FIRST_TABLE_KEEP
 
 
 def recompute_node_segments(dims, width):
-    """The node-local segments recomputed in the backward keep only their inputs: ``_NODE_SEGMENTS_SHARE`` of the
-    stock per-node floats less at the force call's peak (fitted on the compiled default plan's peaks, CAP-T08)."""
-    return 0, -round(_NODE_SEGMENTS_SHARE * _stock_node_floats(dims)) * width
+    """The node-local segments recomputed in the backward keep only their inputs: ``_NODE_SEGMENTS_KEEP`` of the
+    remaining activations (CAP-T08)."""
+    return 0, 0, _NODE_SEGMENTS_KEEP
 
 
 def recompute_node_region(dims, width):
-    """The combined node region in atom chunks keeps less than the separate segments, and its chunked recomputation
-    sets a lower peak: ``_NODE_REGION_SHARE`` of the stock per-node floats less again (fitted on the compiled
-    default plan's peak, ninth list item 2)."""
-    return 0, -round(_NODE_REGION_SHARE * _stock_node_floats(dims)) * width
+    """The combined node region in atom chunks, with the message divided inside its chunks, keeps
+    ``_NODE_REGION_KEEP`` of the separate segments' remaining activations (ninth list item 2, M3 target 1)."""
+    return 0, 0, _NODE_REGION_KEEP
 
 
 def gate_epilogue(dims, width):
     """The gate's backward in ``linear_2``'s epilogue keeps more for the backward than the separate gate:
-    ``_GATE_EPILOGUE_SHARE`` of the stock per-node floats more (fitted on the compiled default plan's peak,
-    docs/validation/region-norm.md)."""
-    return 0, round(_GATE_EPILOGUE_SHARE * _stock_node_floats(dims)) * width
+    ``_GATE_EPILOGUE_KEEP`` of the remaining activations (docs/validation/region-norm.md)."""
+    return 0, 0, _GATE_EPILOGUE_KEEP
 
 
 def gate_epilogue_in_segments(dims, width):
     """``gate_epilogue`` with the separate node segments (``recompute_node_segments``), whose recomputation keeps
-    the epilogue's extra buffers live at the peak: ``_GATE_EPILOGUE_SEGMENTS_SHARE`` of the stock per-node floats
-    more (planner.memory.CONTEXT_TERMS)."""
-    return 0, round(_GATE_EPILOGUE_SEGMENTS_SHARE * _stock_node_floats(dims)) * width
+    the epilogue's extra buffers live at the peak: ``_GATE_EPILOGUE_SEGMENTS_KEEP`` of the remaining activations
+    (planner.memory.CONTEXT_TERMS)."""
+    return 0, 0, _GATE_EPILOGUE_SEGMENTS_KEEP
 
 
 def radial_tables(dims, width):

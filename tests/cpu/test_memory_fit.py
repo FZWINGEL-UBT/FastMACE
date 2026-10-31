@@ -35,6 +35,7 @@ FIT = json.loads(DATA.read_text())
 LOW, HIGH = 1.0, 1.5
 CAPACITY = json.loads((DATA.parent / "rule12_capacity.json").read_text())
 CAPACITY_HIGH = 1.4
+RESCUE = json.loads((DATA.parent / "rule12_rescue.json").read_text())
 
 
 def predicted(case):
@@ -84,6 +85,25 @@ def test_large_mh1_cells_stay_within_the_capacity_fit(case):
     found = predicted(case)
     ratio = found.total / case["peak_bytes"]
     assert LOW <= ratio <= CAPACITY_HIGH, (ratio, found.text(), case["peak_bytes"])
+
+
+@pytest.mark.rule(12)
+@pytest.mark.parametrize("case", RESCUE, ids=[f"{c['structure']}-{c['natoms']}-{c['stage']}" for c in RESCUE])
+def test_every_stage_of_the_memory_rescue_stays_within_the_capacity_fit(case):
+    """docs/validation/estimate-refit.md: with the memory-rescue records on, the estimate stays between the measured
+    peak and CAPACITY_HIGH times it at every stage of the ladder, as the default plan's (counted as absolute bytes,
+    the default plan's overstatement grew to 2.5x the peak with every record on)."""
+    found = predicted(case)
+    ratio = found.total / case["peak_bytes"]
+    assert LOW <= ratio <= CAPACITY_HIGH, (ratio, found.text(), case["peak_bytes"])
+
+
+def test_the_rescue_fit_covers_the_whole_ladder():
+    stages = {case["stage"] for case in RESCUE}
+    assert stages == {"s0-default", "s1-conv", "s2-table", "s3-segments", "s4-geoff", "s5-region", "s6-region-ge"}
+    for structure in ("NaCl", "NbCl5"):
+        sizes = {case["natoms"] for case in RESCUE if case["structure"] == structure and case["stage"] == "s5-region"}
+        assert len(sizes) >= 3 and max(sizes) >= 85_000, structure
 
 
 def test_the_capacity_fit_covers_both_platforms_and_precisions():
