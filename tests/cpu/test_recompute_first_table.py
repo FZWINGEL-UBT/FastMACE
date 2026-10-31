@@ -100,6 +100,21 @@ def test_the_selfcheck_finds_a_wrong_region(monkeypatch):
         message, density = original(self, *args)
         return message * 1.01, density
 
-    monkeypatch.setattr(mm, "first_table_region", wrong)
+    monkeypatch.setattr(mm, "first_table_region", wrong)  # the checkpointed side only
     with pytest.raises(reg.SelfCheckError):
         _rewritten("on")
+
+
+class _Refuses(torch.nn.Module):
+    def forward(self, *args):
+        raise AssertionError("the self-check ran a module outside the region")
+
+
+def test_the_selfcheck_runs_only_the_region():
+    """species_tables turns linear_up into a lookup by the one-hot argmax of its input, so random node features
+    index out of range on the GPU (the first GPU build): the self-check runs the table and the reassociation only."""
+    original, model, batch, _, _ = _rewritten("on")
+    model.interactions[0].linear_up = _Refuses()
+    model.interactions[0].skip_tp = _Refuses()
+    result = reg.CheckResult.coerce(radial.RECORDS["recompute_first_table"].selfcheck(original, model, context(batch)))
+    assert result.passed and result.max_relative_error == 0, result.detail

@@ -241,6 +241,14 @@ def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edg
     return message, edge_density
 
 
+def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+    """``first_table_region`` under non-reentrant checkpoint (``recompute_first_table``)."""
+    from torch.utils.checkpoint import checkpoint
+
+    return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                      use_reentrant=False, preserve_rng_state=False)
+
+
 def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
                           cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False):
     """RealAgnosticResidualNonLinearInteractionBlock.forward (mace-torch 0.3.16), except that
@@ -274,10 +282,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         wprime_lengths = edge_feats  # the message and the edge density from one op
     elif table is not None and edge_feats.shape[-1] == 1 and reassociation is not None and getattr(
             self, "recompute_first_table", False):  # recompute_first_table: the table's output is not kept
-        from torch.utils.checkpoint import checkpoint
-
-        message, edge_density = checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs,
-                                           edge_index, use_reentrant=False, preserve_rng_state=False)
+        message, edge_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index)
     elif table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
         if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
@@ -491,6 +496,6 @@ def probe_first_tensor_product(interaction):
 
 __all__ = [
     "FactoredRadialMLP", "FirstInteractionReassociation", "ProjectedEmbedding", "attach_streaming_kernels",
-    "cutoff_folded_forward", "first_table_region", "identity_attrs", "identity_species_feats",
+    "cutoff_folded_forward", "first_table_region", "identity_attrs", "recomputed_first_table", "identity_species_feats",
     "probe_first_tensor_product", "streaming_message",
 ]

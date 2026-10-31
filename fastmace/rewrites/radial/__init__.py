@@ -862,44 +862,62 @@ def attach_first_table(model):
 
 
 def _first_table_selfcheck(original, rewritten, context):
-    """Per interaction with the record, its message, skip term, edge density and the gradients to the lengths and the
-    spherical harmonics, with the region checkpointed and without, on mh1's random graph with edge lengths in the
-    tables' domain (a twelfth at or beyond the cutoff)."""
+    """Per interaction with the record, its checkpointed region (``modules.recomputed_first_table``) against the table
+    and the reassociation called directly: the message, the edge density and the gradients to the lengths and the
+    spherical harmonics, on a random receiver-sorted graph of the superset's species with a random species table
+    bound (the interaction's other modules are not run: species_tables reads its input as one-hot rows). A twelfth
+    of the edges lie at or beyond the cutoff."""
     import torch
 
-    from fastmace.rewrites import mh1
+    from fastmace.rewrites.mh1 import modules as mm
 
-    generator = torch.Generator().manual_seed(context.seed + 53)
     cases, dtype = CaseErrors(), None
     for index, interaction in _factored(rewritten):
         if not getattr(interaction, "recompute_first_table", False):
             continue
-        table = interaction.radial_table
+        generator = torch.Generator().manual_seed(context.seed + 53 + index)
+        table, reassociation = interaction.radial_table, interaction.first_reassociation
         device, dtype = table.coef.device, table.coef.dtype
-        inputs, species = mh1._graph(rewritten, interaction, context, generator)
-        edges = inputs["edge_attrs"].shape[0]
-        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand((edges, 1), generator=generator, dtype=torch.float64)
-        r[::12] = table.r_max + 0.5 * torch.rand((r[::12].shape[0], 1), generator=generator, dtype=torch.float64)
-        inputs = {**inputs, "edge_feats": r, "cutoff": None}
-        inputs = {name: (value.to(device=device, dtype=dtype) if value.is_floating_point() else value.to(device))
-                  if value is not None else None for name, value in inputs.items()}
-        reassociation = interaction.first_reassociation
+        nodes, edges = 37, 720
+
+        def rand(*shape):
+            return torch.rand(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+
+        def randn(*shape):
+            return torch.randn(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+
+        columns = reassociation.columns.cpu()
+        species = columns[torch.randint(0, len(columns), (nodes,), generator=generator)]
+        attrs = torch.nn.functional.one_hot(species, interaction.node_attrs_irreps.dim).to(device=device, dtype=dtype)
+        receivers = torch.sort(torch.randint(0, nodes, (edges,), generator=generator)).values
+        senders = torch.randint(0, nodes, (edges,), generator=generator)
+        edge_index = torch.stack([senders, receivers]).to(device)
+        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * rand(edges, 1)
+        r[::12] = table.r_max + 0.5 * rand(r[::12].shape[0], 1)
+        sh = randn(edges, interaction.edge_attrs_irreps.dim)
+        weight = interaction.conv_tp_weights.folded_weight().detach()
         own = reassociation.species_feats
-        reassociation.bind(mh1._bound_table(interaction, species, device, dtype))
+        reassociation.bind(randn(len(columns), reassociation.channels))
         try:
-            with torch.no_grad():
-                shapes = [out.shape for out in interaction(**inputs) if out is not None]
-            grads = [torch.randn(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
-                     for shape in shapes]
             values = []
-            for recompute in (False, True):
-                interaction.recompute_first_table = recompute
-                values.append(mh1._evaluate(interaction, inputs, grads, ["edge_attrs", "edge_feats"]))
+            grads = None
+            for checkpointed in (False, True):
+                with torch.enable_grad():
+                    leaves = [t.clone().requires_grad_() for t in (r, sh)]
+                    if checkpointed:
+                        message, density = mm.recomputed_first_table(interaction, leaves[0], None, attrs, leaves[1],
+                                                                     edge_index)
+                    else:
+                        folded, density = table(leaves[0], attrs, edge_index)
+                        message = reassociation(None, attrs, leaves[1], folded, edge_index, weight)
+                    if grads is None:
+                        grads = [randn(*message.shape), randn(*density.shape)]
+                    values.append([message.detach(), density.detach(),
+                                   *torch.autograd.grad([message, density], leaves, grads)])
         finally:
-            interaction.recompute_first_table = True
             reassociation.bind(own)
-        for a, b in zip(*values):
-            cases.add(f"interactions.{index}", a, b)
+        for name, a, b in zip(("message", "density", "dr", "dsh"), *values):
+            cases.add(f"interactions.{index}.{name}", a, b)
     return cases.result(dtype)
 
 

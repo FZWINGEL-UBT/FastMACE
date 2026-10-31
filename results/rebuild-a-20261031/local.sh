@@ -6,7 +6,7 @@
 #   gputest: tests/gpu/test_kernels_triton_cuda.py (the radial table and edge_outer_sum kernels);
 #   gate: tools/force_stress_gate.py with recompute_first_table on (NaCl NbCl5 NaNbO3);
 #   ledger-<structure>-<repeat>-<mode>: tools/bench/memory_ledger.py, mode nodeseg (recompute_conv_weights and
-#     recompute_node_segments on, the speed-def falsifier's plan) or table (the same and recompute_first_table on);
+#     recompute_node_segments on, recompute_first_table off: the speed-def falsifier's plan) or table (the same and recompute_first_table on);
 #   ab-<structure>-<size>-<order>: tools/ab_rewrites.py, a = the default plan, b = recompute_first_table on; size small
 #     (NaCl and NbCl5 3x3x3, NaNbO3 4x4x3: 216, 1,944, 1,920 atoms; 12 blocks of 300 steps) or big (NbCl5 4x4x8,
 #     NaNbO3 6x6x6: 9,216, 8,640 atoms; 8 blocks of 100 steps after 100 warm-up steps), order ab (abab) or ba (abba);
@@ -59,7 +59,7 @@ for job in "$@"; do
         --reference-command "$PYT" --production-command "$PY" --rewrites recompute_first_table=on ;;
     ledger-*) IFS=- read -r _ structure repeat mode <<< "$job"
       rw=(--rewrites recompute_conv_weights=on recompute_node_segments=on)
-      [ "$mode" = table ] && rw+=(recompute_first_table=on)
+      [ "$mode" = table ] && rw+=(recompute_first_table=on) || rw+=(recompute_first_table=off)  # else rule 12 turns it on at the limits
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat" \
         --output "$ROOT/ledger" --tag="-$mode" "${rw[@]}" ;;
     ab-*) IFS=- read -r _ structure size order <<< "$job"

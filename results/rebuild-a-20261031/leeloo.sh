@@ -50,7 +50,7 @@ for job in "$@"; do
         --reference-command "$PYT" --production-command "$PY" --rewrites recompute_first_table=on ;;
     ledger-*) IFS=- read -r _ structure repeat mode <<< "$job"
       rw=(--rewrites recompute_conv_weights=on recompute_node_segments=on)
-      [ "$mode" = table ] && rw+=(recompute_first_table=on)
+      [ "$mode" = table ] && rw+=(recompute_first_table=on) || rw+=(recompute_first_table=off)  # else rule 12 turns it on at the limits
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat" \
         --output "$ROOT/ledger" --tag="-$mode" "${rw[@]}" ;;
     ab-*) IFS=- read -r _ structure size order <<< "$job"
