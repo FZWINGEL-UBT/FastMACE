@@ -121,6 +121,23 @@ def test_the_rescue_turns_gate_epilogue_off_after_the_node_segments(monkeypatch,
                                planner=None, stage="capture", usable=lambda device: False)
 
 
+def test_the_region_s_rebuild_turns_gate_epilogue_back_on(monkeypatch, stubbed):
+    """docs/validation/region-norm.md: inside recompute_node_region's chunks gate_epilogue keeps 0.5 kB per atom, so
+    the rebuild that turns the region on gives it back, when an earlier rebuild of the rescue had turned it off."""
+    requires = {"recompute_node_region": ("recompute_node_segments",)}
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires.get(name, ())))
+    on = {"segment_gemm": "on", "gated_rows": "on", "recompute_conv_weights": "on", "recompute_first_table": "on",
+          "recompute_node_segments": "on", "recompute_node_region": "off", "gate_epilogue": "off"}
+    ff = types.SimpleNamespace(rewrites="auto")
+    plan = stub_plan(**on)
+    plan.reason = "fallback: rewrites: out of memory at build; gate_epilogue auto -> off (the memory rescue)"
+    fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_node_region": "on", "gate_epilogue": "on"}
+    plan = stub_plan(**on)  # off for another reason (not a decision-66 GPU): stays off
+    fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_node_region": "on"}
+
+
 class AcceleratorError(RuntimeError):
     """As ``torch.AcceleratorError``: the driver's error, not the caching allocator's."""
 

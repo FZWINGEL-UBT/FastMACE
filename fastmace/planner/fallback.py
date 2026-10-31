@@ -408,7 +408,7 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
     ``recompute_node_segments`` only after ``recompute_conv_weights`` is on. If the context is not usable (a sticky
     CUDA error), ``error`` is raised again with a note naming the fix: the records set in a fresh process.
     """
-    from fastmace.planner.memory import MEMORY_RESCUE, annotate_out_of_memory, rescue_value
+    from fastmace.planner.memory import CONTEXT_TERMS, MEMORY_RESCUE, annotate_out_of_memory, rescue_value
 
     if not _out_of_memory(error):
         return None
@@ -438,10 +438,31 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
         if note not in message:
             error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
         raise error
-    why = (f"out of memory at {stage}; " + ", ".join(f"{name} auto -> {rescue_value(name)}" for name in names)
+    values = {name: rescue_value(name) for name in names}
+    # A rung the rescue turned off whose term the new record absorbs (memory.CONTEXT_TERMS without a term) goes back on.
+    for owner, other, term in CONTEXT_TERMS:
+        if not term and other in names and _rescued_off(plan, owner) and (
+                requested == "auto" or getattr(requested, owner, "auto") == "auto"):
+            values[owner] = "on"
+    why = (f"out of memory at {stage}; " + ", ".join(f"{name} auto -> {value}" for name, value in values.items())
            + " (the memory rescue, rule 12; CAP-T07)")
-    return candidate(plan, {"rewrites": {name: rescue_value(name) for name in names}, "reason": why}, force_field,
-                     atoms, planner=planner)
+    return candidate(plan, {"rewrites": values, "reason": why}, force_field, atoms, planner=planner)
+
+
+def _rescued_off(plan: Any, name: str) -> bool:
+    """Whether the memory rescue turned ``name`` off in ``plan`` or a revision before it: rule 12's rescue decision,
+    or a rebuild's reason ("<name> auto -> off")."""
+    if not _off(getattr(plan.rewrites, name, "on")):
+        return False
+    try:
+        _, choice, reason = plan.decision(f"RewriteConfig.{name}")
+        if choice == "off" and getattr(reason, "code", None) == "rule-12-memory-rescue":
+            return True
+    except (KeyError, AttributeError, TypeError, ValueError):
+        pass
+    chain = getattr(plan, "chain", None)
+    plans = (*(chain() if callable(chain) else ()), plan)
+    return any(f"{name} auto -> off" in str(getattr(item, "reason", "") or "") for item in plans)
 
 
 def _rescuable(plan: Any, name: str) -> bool:

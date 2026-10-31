@@ -100,8 +100,11 @@ At the limit (trillian, NbCl5 114,048 atoms, every region record on, 200 steps),
   recompute_node_region)`. It is the one rung the rescue turns off (`planner.memory.RESCUE_OFF`).
 - **Its term** is 0.039 of the stock per-node floats (12.3 kB per atom), 0.114 with the separate segments
   (36.3 kB), and none with the chunked region. `planner.memory.CONTEXT_TERMS` picks it from the enabled records.
-- **Not done:** once `recompute_node_region` is on, gate_epilogue costs memory no longer and could be turned back on
-  for its speed. The rescue only adds rungs, so it stays off.
+- **Back on with the region.** Once `recompute_node_region` is on, gate_epilogue keeps almost nothing more, so it
+  gets its speed back:
+  - rule 12 turns it on again when the estimate with it still fits;
+  - the out-of-memory rebuild that turns the region on turns it on again, if an earlier rebuild had turned it off.
+  The order follows the measured context terms, and the conductor accepted it (31 October 2026).
 
 ## Correctness
 

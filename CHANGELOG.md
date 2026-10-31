@@ -12,8 +12,8 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   on for speed on the RTX 5060 Ti and RTX 4000 Ada, and it keeps more at the force call's peak, 12 kB per atom
   without the node segments, 36 kB with the separate segments and 0.5 kB inside `recompute_node_region`'s chunks.
   Rule 12 now counts that term (`planner.memory.CONTEXT_TERMS` picks it). Rule 12 for a cell that cannot fit and the
-  out-of-memory rebuild turn it off after `recompute_node_segments` and before `recompute_node_region`
-  (docs/validation/region-norm.md).
+  out-of-memory rebuild turn it off after `recompute_node_segments` and before `recompute_node_region`, and on
+  again once `recompute_node_region` is on, where the estimate still fits (docs/validation/region-norm.md).
 - `RewriteConfig.recompute_first_table` (capacity idea rebuild-`a`, exact, deterministic): the first interaction's
   radial table and reassociated message run under one non-reentrant checkpoint, so the force call keeps the edge
   lengths instead of the table's output (260 bytes per edge for MH-1 float32), and the backward evaluates the table

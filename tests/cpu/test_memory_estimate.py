@@ -583,6 +583,32 @@ def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments():
 
 
 @pytest.mark.rule(12)
+def test_rule_12_gives_gate_epilogue_back_with_the_chunked_region():
+    """docs/validation/region-norm.md: when the rescue ends with recompute_node_region on, gate_epilogue keeps 0.5 kB
+    per atom inside its chunks, so rule 12 turns it on again where the estimate still fits with it."""
+    atoms = nacl(repeat=8)  # large enough that the default plan is short by far of what the region needs
+    full = plan(atoms=atoms)
+    if full.rewrites.gate_epilogue != "on" or full.rewrites.wprime_backward != "on":
+        pytest.skip("gate_epilogue or wprime_backward is off in this plan (decision 66's GPUs)")
+    every = RewriteConfig(recompute_conv_weights="on", recompute_first_table="on", recompute_node_segments="on",
+                          recompute_node_region="on", gate_epilogue="on")
+    region = plan(rewrites=every, atoms=atoms)
+    without = plan(rewrites=dataclasses.replace(every, recompute_node_region="off", gate_epilogue="off"), atoms=atoms)
+    assert region.predicted_memory_bytes < without.predicted_memory_bytes
+    free = region.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with the region and gate_epilogue on
+    assert full.predicted_memory_bytes / memory.RESCUE_OVERSTATEMENT > memory.MARGIN * free  # short by far
+    auto = plan(memory_bytes=free, atoms=atoms)
+    assert auto.rewrites.recompute_node_region == "on", auto.decision("memory")
+    assert auto.rewrites.gate_epilogue == "on"
+    _, choice, reason = auto.decision("RewriteConfig.gate_epilogue")
+    assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    assert "recompute_node_region" in str(reason)
+    assert auto.predicted_memory_bytes <= memory.MARGIN * free
+    assert auto.decision("memory")[1] == "fits"
+
+
+@pytest.mark.rule(12)
 def test_rule_12_turns_on_recompute_first_table_only_after_recompute_conv_weights():
     """Rebuild-a: recompute_first_table ("auto") stays off while the plan fits, and while it fits with
     recompute_conv_weights on; otherwise rule 12 turns it on after recompute_conv_weights and before
