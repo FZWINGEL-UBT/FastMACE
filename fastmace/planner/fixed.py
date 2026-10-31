@@ -101,6 +101,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.recompute_conv_weights": "on_by_rule_12_when_the_plan_does_not_fit_without_it",
     "RewriteConfig.recompute_first_table": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.recompute_node_segments": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
+    "RewriteConfig.recompute_node_region": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -134,7 +135,7 @@ STAGE2_SUPPORT = (
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
     ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"), ("wprime_backward", "fold_cutoff"),
-    ("recompute_node_segments", "fold_cutoff"),
+    ("recompute_node_segments", "fold_cutoff"), ("recompute_node_region", "fold_cutoff"),
     ("species_tables", "species_tables"),
     ("fold_product_linear", "species_tables"),
     ("species_residual", "species_tables"),
@@ -150,7 +151,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "fused_folded_forward", "radial_tables", "w_tables", "wprime_backward", "recompute_conv_weights",
                   "recompute_first_table",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_epilogue",
-                  "recompute_node_segments", "grouped_launch", "species_skip",
+                  "recompute_node_segments", "recompute_node_region", "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
                   "species_residual",
                   "combo_kernels", "save_transcendentals", "tf32x3_gemms",
@@ -1089,6 +1090,14 @@ class FixedPlanner:
             v["_why"]["recompute_node_segments"] = (
                 "off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that "
                 "cannot fit, or a rebuild after an out-of-memory error at build or capture (CAP-T08)")
+        # Ninth list item 2: the last memory-rescue record, only when the plan would not fit with
+        # recompute_node_segments on (memory.MEMORY_RESCUE's order).
+        needs("recompute_node_region", r.recompute_node_region == "on", v["recompute_node_segments"],
+              "recompute_node_segments")
+        if r.recompute_node_region == "auto":
+            v["_why"]["recompute_node_region"] = (
+                "off: on only when memory would not be enough with recompute_node_segments on: rule 12 for a cell "
+                "that cannot fit, or a rebuild after an out-of-memory error at build or capture (ninth list item 2)")
         # Owner decision 57, 24 October 2026 (OPT4-T04): on by default for the generic MACE family only; stage 2
         # drops it for the other families, the FastMACE rules in float64 and reproducible plans.
         needs("grouped_launch", r.grouped_launch != "off", v["block_linear"], "block_linear")

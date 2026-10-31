@@ -34,6 +34,10 @@ _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
 # (compiled default plan, recompute_conv_weights on; docs/validation/capacity-T08-chunks.md), 0.202 and 0.199 of
 # MH-1's stock 317,440 B per node in float32.
 _NODE_SEGMENTS_SHARE = 0.20
+# recompute_node_region (ninth list item 2), beyond recompute_node_segments: the chunked combined region's peak was
+# 0.709 GiB (35.2 kB per atom) below the separate segments' at NbCl5 21,600 atoms, 4 chunks (compiled default plan,
+# recompute_conv_weights on; docs/validation/chunked-region.md), 0.111 of MH-1's stock 317,440 B per node.
+_NODE_REGION_SHARE = 0.11
 
 
 def _first_hidden(block) -> int:
@@ -142,6 +146,13 @@ def recompute_node_segments(dims, width):
     """The node-local segments recomputed in the backward keep only their inputs: ``_NODE_SEGMENTS_SHARE`` of the
     stock per-node floats less at the force call's peak (fitted on the compiled default plan's peaks, CAP-T08)."""
     return 0, -round(_NODE_SEGMENTS_SHARE * _stock_node_floats(dims)) * width
+
+
+def recompute_node_region(dims, width):
+    """The combined node region in atom chunks keeps less than the separate segments, and its chunked recomputation
+    sets a lower peak: ``_NODE_REGION_SHARE`` of the stock per-node floats less again (fitted on the compiled
+    default plan's peak, ninth list item 2)."""
+    return 0, -round(_NODE_REGION_SHARE * _stock_node_floats(dims)) * width
 
 
 def radial_tables(dims, width):

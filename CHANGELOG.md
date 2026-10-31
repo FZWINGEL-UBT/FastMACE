@@ -8,6 +8,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `RewriteConfig.recompute_node_region` (ninth list item 2, rounding, deterministic): `recompute_node_segments`'
+  chain and product block of each interaction as one checkpoint region in 4 atom chunks, so the backward rebuilds one
+  chunk at a time: the force call's peak is 0.77 times the separate segments' (35 kB per atom less) at 1.22-1.24
+  times their force call. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 82,944 to 101,088 atoms, NaCl 70,400 to
+  97,336. Off; the last memory-rescue record (rule 12 or the out-of-memory rebuild, only when the plan does not fit
+  with `recompute_node_segments` on). The combined region no longer breaks the compiled graph
+  (docs/validation/chunked-region.md).
 - `RewriteConfig.recompute_conv_weights` (plans/capacity.md CAP-T07 and CAP-T07b, rounding): the per-edge
   tensor-product weights are not kept for the backward (1,280 floats per edge for MH-1, about a third of a large
   cell's force-call memory). With `fused_folded_forward` the forward builds them on chip without storing them and the
@@ -123,6 +130,9 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   name, `planner.fixed.DECISION_66_GATE_EPILOGUE_GPUS`), where `segment_gemm` is on and `tf32x3_gemms` is off: MD
   steps 1.2-4.7 % faster on NbCl5 and NaNbO3, NaCl neutral (docs/validation/speed-def.md). Off elsewhere; the A100
   was not measured. An explicit value is kept.
+- `tools/bench/capacity_scan.py check_point`: no drift tolerance. The list at step 0 must have exactly the small
+  copy's edges per atom, and after the MD steps the live count must equal a fresh ASE rebuild at the current
+  positions (NbCl5's count grows 5 % in 200 steps at 300 K, which the old 5 % tolerance flagged).
 - `gate_epilogue`'s kernel (`fastmace.kernels.triton.gated_products`) runs the K loop outside over a tile that stacks
   every component of the gated segment, so each weight tile is loaded once per K block (fifth list, item E). With
   `gate_epilogue` on, step time is 0.1-2.5 % lower than with the old kernel; `gate_epilogue` on is now 1.2-4.7 %

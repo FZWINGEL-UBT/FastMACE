@@ -778,3 +778,36 @@ def test_configure_allocator_sets_expandable_segments_only_when_unset_and_on_new
     assert fc.configure_allocator(environ=environ, torch_version="2.14.1+cu130") == "max_split_size_mb:128"
     assert fc.configure_allocator(environ={}, torch_version="2.5.1+cu124") is None  # untested with CUDA graphs
     assert fc.configure_allocator(enabled=False, environ={}, torch_version="2.14.1") is None
+
+
+def test_construction_never_moves_the_batchs_edges(monkeypatch):
+    """The batch's edge arrays (MACE's own neighbour list) are replaced by the skin list's before anything reads
+    them, so the construction keeps them off the device: here they are meta tensors, which cannot be copied. The
+    host batch is MACE's own, without its move to the device."""
+    from fastmace.model import forces
+
+    calc, atoms = calculator(), structure()
+    mace_batch = calc._atoms_to_batch(atoms).to_dict()
+    host = forces.host_batch(calc, atoms)
+    assert set(host) == set(mace_batch)
+    for key, value in mace_batch.items():
+        if torch.is_tensor(value):
+            assert host[key].device.type == "cpu" and torch.equal(host[key], value.cpu())
+
+    def meta_edges(calc, atoms):
+        out = host_batch(calc, atoms)
+        for key in ("edge_index", "shifts", "unit_shifts"):
+            out[key] = out[key].to("meta")
+        return out
+
+    host_batch = forces.host_batch
+
+    reference = MACEForceField(calculator(), atoms, neighbours=NEIGHBOURS, compute_stress=True,
+                               rewrites=only())
+    reference.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+    expected = reference.evaluate(atoms, stress=True)
+    monkeypatch.setattr(forces, "host_batch", meta_edges)
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, compute_stress=True, rewrites=only())
+    got = field.evaluate(atoms, stress=True)
+    assert got[0] == expected[0]
+    assert np.array_equal(got[1], expected[1]) and np.array_equal(got[2], expected[2])

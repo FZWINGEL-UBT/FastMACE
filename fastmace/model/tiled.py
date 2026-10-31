@@ -256,6 +256,7 @@ class TiledForceField:
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
         self.receivers = int(self.config.receivers)  # the receiver cap (budget_receivers may raise it once)
+        self._released = False  # the allocator's cache, released once before the first tile
         self._budgeted = not self.config.budget_receivers
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._graph_key = None
@@ -615,6 +616,11 @@ class TiledForceField:
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
             stats["slot_changes"] = self.slot_changes
+        if not self._released and self.device.type == "cuda":
+            # The force field's construction leaves its peak in PyTorch's cache; libraries that allocate outside
+            # it (cuEquivariance's cudaMallocAsync) would find the device full in the first tile.
+            torch.cuda.empty_cache()
+        self._released = True
         saved = self._bind()
         bound = None
         try:

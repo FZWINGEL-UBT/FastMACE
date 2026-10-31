@@ -166,8 +166,30 @@ class ForceField(Protocol):
 # their own sorted graph.
 STREAMING_RECORDS = ("streaming_conv", "generic_streaming")
 SEGMENTED_RECORDS = ("segmented_first_sum", "generic_segmented_first_sum")  # edges grouped by sender species
+# The batch's edge arrays, which the skin list's replace before the first call (never moved to the device).
+BATCH_EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
 # Workload constraint of the records whose rewritten model depends on the structure's species.
 SPECIES_DEPENDENT = "fixed_species_superset"
+
+
+def host_batch(calc, atoms):
+    """MACE's input batch of ``atoms`` as a dict, left on the host.
+
+    ``MACECalculator._atoms_to_batch`` (mace-torch 0.3.16) without its last step, which moves the whole batch,
+    MACE's own neighbour list included, to the calculator's device (about 1.6 kB per atom in float64). The force
+    field moves what it keeps itself. No padding graph: the force field takes uncompiled calculators only, and
+    MACE pads only compiled ones.
+    """
+    from mace import data as mace_data
+    from mace.tools import torch_geometric, torch_tools
+
+    calc.arrays_keys.update({calc.charges_key: "charges"})
+    keyspec = mace_data.KeySpecification(info_keys=calc.info_keys, arrays_keys=calc.arrays_keys)
+    with torch_tools.default_dtype(calc.default_dtype):
+        config = mace_data.config_from_atoms(atoms, key_specification=keyspec, head_name=calc.head)
+        graph = mace_data.AtomicData.from_config(config, z_table=calc.z_table, cutoff=calc.r_max,
+                                                 heads=calc.available_heads)
+    return torch_geometric.Batch.from_data_list([graph]).to_dict()
 
 
 def _numbers(species):
@@ -342,7 +364,7 @@ class MACEForceField:
         self.species_columns = tuple(sorted(z_table.index(z) for z in wanted if z in z_table))
         self.superset = tuple(z_table[column] for column in self.species_columns)
         self.check_species(atoms.numbers)
-        batch = calc._atoms_to_batch(atoms).to_dict()
+        batch = host_batch(calc, atoms)
         node_attrs = batch["node_attrs"].to(self._device)
         if not bool((node_attrs[:, list(self.species_columns)].sum(dim=1) == 1).all()):
             raise SpeciesNotInSuperset([Reason("a one-hot species row of the structure does not sum to 1 over the "
@@ -443,6 +465,14 @@ class MACEForceField:
             raise ValueError("the model has streaming convolutions, which need receiver-sorted edges "
                              "(NeighbourConfig.sort_receivers='on')")
 
+        # The batch's edges (MACE's own neighbour list) are replaced by the skin list's (use_edges, below) before
+        # anything reads them: empty on the device instead of a copy (about 1.6 kB per atom at the build's peak).
+        for key in BATCH_EDGE_KEYS:
+            if key in batch:
+                value = batch[key]
+                shape = (value.shape[0], 0) if key == "edge_index" else (0, *value.shape[1:])
+                dtype = self._dtype if value.is_floating_point() else value.dtype
+                batch[key] = torch.empty(shape, dtype=dtype, device=self._device)
         self.data = {key: (value.to(self._device, self._dtype) if value.is_floating_point() else value.to(self._device))
                      if torch.is_tensor(value) else value for key, value in batch.items()}
         # The calculator's own model (eager, no private copy) is never changed: its float64 forward

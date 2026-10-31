@@ -76,6 +76,7 @@ AUTO_RULES = {
     "RewriteConfig.recompute_conv_weights": "on_by_rule_12_when_the_plan_does_not_fit_without_it",
     "RewriteConfig.recompute_first_table": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.recompute_node_segments": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
+    "RewriteConfig.recompute_node_region": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",

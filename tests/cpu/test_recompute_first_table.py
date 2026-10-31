@@ -54,7 +54,7 @@ def test_the_record_is_exact_off_and_rescued_between_the_other_two():
     record = radial.RECORDS["recompute_first_table"]
     assert (record.exactness, record.default, record.deterministic) == ("exact", "off", True)
     assert record.requires == ("radial_tables", "reassociate_first")
-    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments")
+    assert memory.MEMORY_RESCUE[:3] == ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments")
     assert fixed.AUTO_RULES["RewriteConfig.recompute_first_table"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
     model, _ = tiny("mh1")
