@@ -1003,7 +1003,7 @@ class MinimalPlanner:
                     rescued.append((name, found.total - raised.total))
                     enabled, found = candidate, raised
         # A rung turned off whose term a later rung absorbs (memory.CONTEXT_TERMS without a term: gate_epilogue inside
-        # recompute_node_region's chunks) goes back to its default when the plan still fits, or keeps no more, with it.
+        # recompute_node_region's chunks) goes back to its default when the plan still fits with it.
         restored = []
         absorbed = {owner: other for owner, other, term in memory.CONTEXT_TERMS if not term}
         for name, _ in list(rescued):
@@ -1011,14 +1011,14 @@ class MinimalPlanner:
                 continue
             candidate = [other for other in registry.order() if other in enabled or other == name]
             back = estimate(candidate)
-            if memory.fits(back, free) or back.total <= found.total:
+            if memory.fits(back, free):
                 rescued = [entry for entry in rescued if entry[0] != name]
                 restored.append((name, absorbed[name]))
                 enabled, found = candidate, back
         for name, other in restored:
             field = registry.config_field(name)
             why = (f"on: rule 12's memory rescue turned it off, and {other} (turned on after it) keeps its extra "
-                   f"memory within its chunks, so it is on again and the estimate still fits or keeps no more "
+                   f"memory within its chunks, so it is on again and the estimate still fits "
                    f"(docs/validation/region-norm.md)")
             book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
             book.decide(f"RewriteConfig.{field}", "on", Reason(why, rule=12, code="rule-12-memory-rescue"))
