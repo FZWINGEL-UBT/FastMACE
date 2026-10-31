@@ -60,10 +60,14 @@ def region_forward(self, node_feats, sc, node_attrs):
         return checkpoint(body, x, y, sc, node_attrs, use_reentrant=False, preserve_rng_state=False)
     # The region does not mix atoms: each atom chunk is its own checkpoint, so the backward rebuilds one chunk's
     # intermediates at a time (the recomputation's working set divided by the chunk count).
-    parts = zip(*(torch.tensor_split(t, chunks, dim=0) if t is not None else [None] * chunks
-                  for t in (x, y, sc, node_attrs)))
-    return torch.cat([checkpoint(body, *part, use_reentrant=False, preserve_rng_state=False) for part in parts],
-                     dim=0)
+    # A plain loop: Dynamo cannot lift a comprehension's closure into checkpoint's higher-order op.
+    xs, ys = torch.tensor_split(x, chunks, dim=0), torch.tensor_split(y, chunks, dim=0)
+    attrs = torch.tensor_split(node_attrs, chunks, dim=0)
+    scs = torch.tensor_split(sc, chunks, dim=0) if sc is not None else (None,) * chunks
+    outs = []
+    for i in range(chunks):
+        outs.append(checkpoint(body, xs[i], ys[i], scs[i], attrs[i], use_reentrant=False, preserve_rng_state=False))
+    return torch.cat(outs, dim=0)
 
 
 def join_region(interaction, product, chunks=1):
