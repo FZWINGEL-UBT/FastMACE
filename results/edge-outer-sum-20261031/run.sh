@@ -19,9 +19,10 @@ for spec in NbCl5-1944:NbCl5 NbCl5-9216:NbCl5@4x4x8; do
   name=${spec%%:*} structure=${spec#*:}
   echo "$(date -u +%FT%TZ) start $name" >> "$ROOT/run.log"
   "$NCU" --profile-from-start off --target-processes all --cache-control none --clock-control none \
-    --kernel-name regex:"edge_outer_sum|^kernel$" --metrics "$METRICS" --csv --page raw --print-units base \
+    --kernel-name regex:"edge_outer_sum|^kernel$" --metrics "$METRICS" --export "$ROOT/$name" --force-overwrite \
     "$PY" "$TOOL" --pass ncu --output "$ROOT/$name" --checkpoint "$HOME/models/mace-mh-1.model" --model mh1-r2scan \
     --backend hybrid --temperature-K 1000 --timestep-fs 1 --equilibrate-steps 100 --structure "$structure" \
-    > "$ROOT/$name.csv" 2> "$ROOT/$name.log"
+    > "$ROOT/$name.log" 2>&1
   echo "$(date -u +%FT%TZ) end $name exit=$?" >> "$ROOT/run.log"
+  "$NCU" --import "$ROOT/$name.ncu-rep" --csv --page raw --print-units base > "$ROOT/$name.csv"
 done
