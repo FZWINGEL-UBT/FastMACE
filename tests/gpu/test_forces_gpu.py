@@ -470,3 +470,20 @@ def test_mh1_agrees_with_maceforces(case):
     else:  # float32: the hybrid's run-to-run scatter is about 3e-7 eV/A (1a-T05)
         assert max(report["force_error_eV_per_A"]) <= 1e-5 and max(report["energy_error_eV"]) <= 1e-3
         assert max(report["stress_error_eV_per_A3"]) <= 1e-6
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_construction_keeps_one_copy_of_the_one_hot_species_on_the_device(dtype, monkeypatch):
+    """The species check and the rewrites read the batch's one-hot ``node_attrs`` on the device, and ``data`` keeps
+    it: one device tensor for both (a second copy was half the build's peak, 356 B per atom each)."""
+    from fastmace.model import forces
+
+    batches = []
+    host_batch = forces.host_batch
+    monkeypatch.setattr(forces, "host_batch", lambda calc, atoms: batches.append(host_batch(calc, atoms))
+                        or batches[-1])
+    calc = tiny_cueq_calculator(dtype)
+    field = MACEForceField(calc, structure(), neighbours=SORTED, rewrites=only("factor_species"))
+    node_attrs = field.data["node_attrs"]
+    assert node_attrs.is_cuda and node_attrs.dtype == dtype
+    assert batches[0]["node_attrs"] is node_attrs
