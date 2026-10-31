@@ -3,8 +3,10 @@
 # default plan with every memory-rescue record forced on (recompute_conv_weights, recompute_node_segments,
 # recompute_node_region), 200 steps, the point's edge check. Holding the local GPU reservation:
 #   python3 tools/ci/local_gpu.py run --purpose "fm node_region limits" -- env FM=<source> bash points.sh ROOT CELL...
-# CELL: Structure:NXxNYxNZ, e.g. NbCl5:6x6x28.
+# CELL: Structure:NXxNYxNZ, e.g. NbCl5:6x6x28. REGION=off: the same with recompute_node_region off (tag "segments").
 set -u -o pipefail
+region=${REGION:-on}
+tag=$([ "$region" = off ] && echo segments || echo region)
 ROOT=$1; shift
 FM=${FM:?set FM to a source copy}
 CACHE=$HOME/fastmace-cache/chunked-region-local
@@ -33,8 +35,8 @@ for cell in "$@"; do
   idle || exit 3
   echo "$(date -u +%FT%TZ) start $cell" >> "$log"
   "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" --model mh1-r2scan --precision float32 \
-    --repeat "$repeat" --output "$ROOT/points" --tag region \
-    --rewrites recompute_conv_weights=on recompute_node_segments=on recompute_node_region=on \
-    > "$ROOT/point-$structure-$repeat.log" 2>&1 < /dev/null
-  echo "$(date -u +%FT%TZ) end $cell exit=$? $(tail -n 2 "$ROOT/point-$structure-$repeat.log" | tr '\n' ' ' | cut -c1-240)" >> "$log"
+    --repeat "$repeat" --output "$ROOT/points" --tag "$tag" \
+    --rewrites recompute_conv_weights=on recompute_node_segments=on recompute_node_region="$region" \
+    > "$ROOT/point-$structure-$repeat-$tag.log" 2>&1 < /dev/null
+  echo "$(date -u +%FT%TZ) end $cell $tag exit=$? $(tail -n 2 "$ROOT/point-$structure-$repeat-$tag.log" | tr '\n' ' ' | cut -c1-240)" >> "$log"
 done
