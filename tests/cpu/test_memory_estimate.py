@@ -517,7 +517,8 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     recompute_conv_weights on; otherwise rule 12 turns it on after recompute_conv_weights, with its own reason."""
     from fastmace.planner.fixed import AUTO_RULES
 
-    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_node_segments", "recompute_node_region")
+    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments",
+                                    "recompute_node_region")
     assert AUTO_RULES["RewriteConfig.recompute_node_segments"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
     full = plan()
@@ -535,6 +536,35 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with recompute_conv_weights on
     fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
     assert fits.rewrites.recompute_node_segments == "off"
+
+
+@pytest.mark.rule(12)
+def test_rule_12_turns_on_recompute_first_table_only_after_recompute_conv_weights():
+    """Rebuild-a: recompute_first_table ("auto") stays off while the plan fits, and while it fits with
+    recompute_conv_weights on; otherwise rule 12 turns it on after recompute_conv_weights and before
+    recompute_node_segments, with its own reason."""
+    from fastmace.planner.fixed import AUTO_RULES
+
+    assert AUTO_RULES["RewriteConfig.recompute_first_table"] == (
+        "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
+    full = plan()
+    assert full.rewrites.recompute_first_table == "off"
+    if not (full.rewrites.wprime_backward == full.rewrites.radial_tables == full.rewrites.reassociate_first == "on"):
+        pytest.skip("wprime_backward, radial_tables or reassociate_first is off in this plan")
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20)  # nothing fits: every rescue on
+    assert tight.rewrites.recompute_conv_weights == "on" and tight.rewrites.recompute_first_table == "on"
+    _, choice, reason = tight.decision("RewriteConfig.recompute_first_table")
+    assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    assert "recompute_conv_weights" in str(reason)
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(recompute_first_table="off"))
+    assert kept.rewrites.recompute_first_table == "off"
+    recompute = plan(rewrites=RewriteConfig(recompute_conv_weights="on"))
+    free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with recompute_conv_weights on
+    fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
+    assert fits.rewrites.recompute_first_table == "off"
 
 
 @pytest.mark.rule(12)

@@ -1,0 +1,82 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/home/fzwin/fastmace-rebuild-a/src-a3069ef3/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/fastmace-rebuild-a/src-a3069ef3/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/fastmace-rebuild-a/src-a3069ef3/fastmace/model/loading.py:766: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/home/fzwin/fastmace-rebuild-a/src-a3069ef3/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+W1031 10:42:21.646000 184607 torch/_inductor/utils.py:1806] [0/0] Not enough SMs to use max_autotune_gemm mode
+NaCl float32 67200 atoms, 2210016 edges at the cutoff, padded 2257920; device 15.93 GiB, steady max reserved 11.24 GiB
+   10.260 GiB  graph pool (captured stages: the force call's activations and transients)
+    1.509 GiB  outside the allocator: graph executables (dropped on release)
+    1.184 GiB  outside the allocator: context, libraries, kernels (and other processes)
+    0.307 GiB  neighbour list (buffers and screen)
+    0.300 GiB  default pool, cached (reserved, not live)
+    0.212 GiB  default pool, live, not a named buffer
+    0.061 GiB  model parameters and buffers
+    0.060 GiB  Langevin noise batch
+    0.039 GiB  MD state, integrator and engine buffers
+    0.001 GiB  force field buffers (model inputs, tables)
+graph pool after the re-capture: 10.260 GiB in 2 segments; its own allocations peaked at 8.808 GiB live (8.808 GiB counting frees when they complete, 0.000 GiB of it requested-not-completed); free blocks 10.260 GiB (largest 10.254 GiB)
+re-capture: peak live 8.88 GiB above 0.62 GiB; top sites:
+    2.051 GiB     32.8 kB/atom      1 blocks  fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:114 joined_products_op
+    2.051 GiB     32.8 kB/atom      4 blocks  fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads
+    1.282 GiB     20.5 kB/atom      1 blocks  fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/fused_forward.py:386 fused_folded_message
+    0.897 GiB     14.3 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4434 call
+    0.513 GiB      8.2 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4397 call
+    0.449 GiB      7.2 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4428 call
+    0.385 GiB      6.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4401 call
+    0.385 GiB      6.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4407 call
+    0.150 GiB      2.4 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3599 call
+    0.135 GiB      2.2 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3695 call
+    0.128 GiB      2.0 kB/atom      1 blocks  mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _
+    0.128 GiB      2.0 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4438 call
+    0.096 GiB      1.5 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4391 call
+    0.054 GiB      0.9 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3597 call
+    0.031 GiB      0.5 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3660 call
+    0.031 GiB      0.5 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4299 call
+    0.024 GiB      0.4 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4335 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3612 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3629 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3630 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3631 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3632 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3634 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3635 call
+    0.008 GiB      0.1 kB/atom      1 blocks  fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3883 call
+/home/fzwin/fastmace-rebuild-a/r2/ledger/ledger-NaCl-float32-67200-table.json

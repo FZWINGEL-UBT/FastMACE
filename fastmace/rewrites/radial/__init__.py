@@ -843,6 +843,88 @@ def _apply_recompute(model, context):
     return attach_recompute(model)
 
 
+# --------------------------------------------------------------------------- recompute_first_table (rebuild-a)
+
+
+def attach_first_table(model):
+    """``recompute_first_table`` in every interaction with a radial table and the reassociated first interaction's
+    message (``modules.first_table_region``): the table's output is not kept for the backward. Returns their names."""
+    names = []
+    for index, interaction in _factored(model):
+        if getattr(interaction, "radial_table", None) is None or getattr(interaction, "first_reassociation",
+                                                                          None) is None:
+            continue
+        interaction.recompute_first_table = True
+        names.append(f"interactions.{index}")
+    if not names:
+        raise RewriteError("recompute_first_table: no reassociated interaction with a radial table")
+    return names
+
+
+def _first_table_selfcheck(original, rewritten, context):
+    """Per interaction with the record, its checkpointed region (``modules.recomputed_first_table``) against the table
+    and the reassociation called directly: the message, the edge density and the gradients to the lengths and the
+    spherical harmonics, on a random receiver-sorted graph of the superset's species with a random species table
+    bound (the interaction's other modules are not run: species_tables reads its input as one-hot rows). A twelfth
+    of the edges lie at or beyond the cutoff."""
+    import torch
+
+    from fastmace.rewrites.mh1 import modules as mm
+
+    cases, dtype = CaseErrors(), None
+    for index, interaction in _factored(rewritten):
+        if not getattr(interaction, "recompute_first_table", False):
+            continue
+        generator = torch.Generator().manual_seed(context.seed + 53 + index)
+        table, reassociation = interaction.radial_table, interaction.first_reassociation
+        device, dtype = table.coef.device, table.coef.dtype
+        nodes, edges = 37, 720
+
+        def rand(*shape):
+            return torch.rand(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+
+        def randn(*shape):
+            return torch.randn(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+
+        columns = reassociation.columns.cpu()
+        species = columns[torch.randint(0, len(columns), (nodes,), generator=generator)]
+        attrs = torch.nn.functional.one_hot(species, interaction.node_attrs_irreps.dim).to(device=device, dtype=dtype)
+        receivers = torch.sort(torch.randint(0, nodes, (edges,), generator=generator)).values
+        senders = torch.randint(0, nodes, (edges,), generator=generator)
+        edge_index = torch.stack([senders, receivers]).to(device)
+        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * rand(edges, 1)
+        r[::12] = table.r_max + 0.5 * rand(r[::12].shape[0], 1)
+        sh = randn(edges, interaction.edge_attrs_irreps.dim)
+        weight = interaction.conv_tp_weights.folded_weight().detach()
+        own = reassociation.species_feats
+        reassociation.bind(randn(len(columns), reassociation.channels))
+        try:
+            values = []
+            grads = None
+            for checkpointed in (False, True):
+                with torch.enable_grad():
+                    leaves = [t.clone().requires_grad_() for t in (r, sh)]
+                    if checkpointed:
+                        message, density = mm.recomputed_first_table(interaction, leaves[0], None, attrs, leaves[1],
+                                                                     edge_index)
+                    else:
+                        folded, density = table(leaves[0], attrs, edge_index)
+                        message = reassociation(None, attrs, leaves[1], folded, edge_index, weight)
+                    if grads is None:
+                        grads = [randn(*message.shape), randn(*density.shape)]
+                    values.append([message.detach(), density.detach(),
+                                   *torch.autograd.grad([message, density], leaves, grads)])
+        finally:
+            reassociation.bind(own)
+        for name, a, b in zip(("message", "density", "dr", "dsh"), *values):
+            cases.add(f"interactions.{index}.{name}", a, b)
+    return cases.result(dtype)
+
+
+def _apply_first_table(model, context):
+    return attach_first_table(model)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
@@ -869,7 +951,16 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_recompute, selfcheck=_recompute_selfcheck,
         memory=memory_terms.recompute_conv_weights),
+    # Capacity ideas, rebuild-a (speed-def falsifier: about 0.45 % of the force call at NbCl5 9,216 atoms): exact
+    # (the same table kernel evaluated again on the same lengths); off unless memory requires it, after
+    # recompute_conv_weights (planner.memory.MEMORY_RESCUE, fallback.memory_rescue).
+    "recompute_first_table": Rewrite(
+        name="recompute_first_table", applies_to=_support, requires=("radial_tables", "reassociate_first"),
+        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="exact", default="off",
+        deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_first_table,
+        selfcheck=_first_table_selfcheck, memory=memory_terms.recompute_first_table),
 }
 
 __all__ = ["DEGREE", "PIECE_BUCKET", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
-           "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]
+           "attach_first_table", "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit",
+           "tabulate_radials"]

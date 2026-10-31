@@ -8,6 +8,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `RewriteConfig.recompute_first_table` (capacity idea rebuild-`a`, exact, deterministic): the first interaction's
+  radial table and reassociated message run under one non-reentrant checkpoint, so the force call keeps the edge
+  lengths instead of the table's output (260 bytes per edge for MH-1 float32), and the backward evaluates the table
+  again. MH-1 float32 on a 20 GB RTX 4000 Ada: NbCl5 114,048 to 119,232 atoms, NaCl 108,800 to 115,200, at 1.02-1.04
+  times the step time. Off; rule 12 turns it on only when the plan does not fit with `recompute_conv_weights` on,
+  before `recompute_node_segments` (`planner.memory.MEMORY_RESCUE`), and the out-of-memory rebuild follows the same
+  order (`docs/validation/rebuild-a.md`).
 - `RewriteConfig.recompute_node_region` (ninth list item 2, rounding, deterministic): `recompute_node_segments`'
   chain and product block of each interaction as one checkpoint region in 4 atom chunks, so the backward rebuilds one
   chunk at a time: the force call's peak is 0.77 times the separate segments' (35 kB per atom less) at 1.22-1.24
