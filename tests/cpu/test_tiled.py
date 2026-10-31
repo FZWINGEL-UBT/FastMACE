@@ -341,3 +341,43 @@ def test_host_state_refuses_graphs_and_unknown_values():
         TileConfig(5, state="disk")
     with pytest.raises(ValueError, match="host"):  # a captured graph cannot read host memory
         TileConfig(5, mode="graphs", state="host")
+
+
+# ---------------------------------------------------------------- the species index instead of the one-hot
+
+
+def test_tile_rows_from_the_species_index_are_the_one_hot_rows():
+    """``TileConfig.species="index"``: a tile's one-hot rows are built from the field's species index, bitwise
+    the stored rows (padding rows read atom 0)."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    stored = field.data["node_attrs"].clone()
+    tiled = TiledForceField(field, TileConfig(5, species="index"))
+    nodes = torch.tensor([0, 3, 3, 7, len(atoms) - 1, 0, 1])
+    rows = tiled._attrs(nodes)
+    assert rows.dtype == stored.dtype and torch.equal(rows, stored[nodes])
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_tiled_call_from_the_species_index_equals_the_one_hot_call_bitwise(mode):
+    """The tiled call with the species index gives bitwise the call that reads the stored one-hot rows; the
+    field's device one-hot is released, and the field's own whole-system call then refuses."""
+    calc, atoms = calculator(), structure()
+    results = []
+    for species in ("one_hot", "index"):
+        field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                               rewrites=only(*MH1_PACKAGE))
+        tiled = TiledForceField(field, TileConfig(5, mode=mode, species=species))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results.append(tiled.evaluate(strained(atoms), stress=True))
+        if species == "index":
+            assert field.node_attrs_released and tiled.last["species"] == "index"
+            with pytest.raises(RuntimeError, match="node_attrs"):
+                field.evaluate(atoms)
+    assert results[0][0] == results[1][0]
+    assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+def test_species_index_refuses_unknown_values():
+    with pytest.raises(ValueError, match="species"):
+        TileConfig(5, species="bits")

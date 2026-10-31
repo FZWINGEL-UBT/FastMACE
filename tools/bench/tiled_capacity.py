@@ -48,6 +48,9 @@ def parse_args(argv=None):
     p.add_argument("--calls", type=int, default=2, help="tiled force calls (the first one warms up)")
     p.add_argument("--host-state", action="store_true",
                    help="TileConfig.state='host': x, sc and their adjoints in pinned host memory")
+    p.add_argument("--species-index", action="store_true",
+                   help="TileConfig.species='index': the tiles' one-hot rows from the species index; the field's "
+                        "device one-hot is released")
     p.add_argument("--budget-receivers", type=int, nargs="*", default=[],
                    help="TileConfig.budget_receivers: larger caps the call may take after its first call")
     p.add_argument("--tag", default="")
@@ -55,7 +58,10 @@ def parse_args(argv=None):
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
                         "left empty, so it costs no memory")
     p.add_argument("--output", required=True, type=Path)
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    if args.species_index and args.compare == "eager":
+        p.error("--species-index releases the field's one-hot, which --compare eager's whole-system call needs")
+    return args
 
 
 def supercell(structure, repeat, rattle, strain):
@@ -153,7 +159,8 @@ def main(argv=None):
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges,
                                                   neighbours="tiles" if args.tile_list else "global",
                                                   budget_receivers=tuple(args.budget_receivers),
-                                                  state="host" if args.host_state else "device"))
+                                                  state="host" if args.host_state else "device",
+                                                  species="index" if args.species_index else "one_hot"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
 

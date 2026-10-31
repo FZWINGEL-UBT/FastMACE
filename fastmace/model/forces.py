@@ -579,6 +579,7 @@ class MACEForceField:
         # The atoms' node_attrs columns, as every species refresh leaves them (a fresh construction equals a
         # refreshed one in every tensor, 3-T03's registry check).
         self._species_index = torch.index_select(self._column_of, 0, self.atomic_numbers)
+        self.node_attrs_released = False
         self._ones = torch.ones((n, 1), dtype=self.data["node_attrs"].dtype, device=device)
         self._sender_groups = torch.index_select(self._group_of, 0, self.atomic_numbers)
         # Total charge = its value at construction + the change of the summed per-atom charges, so
@@ -804,10 +805,21 @@ class MACEForceField:
         stress = out["stress"].reshape(3, 3) if self._compute_stress else None
         return ForceOutput(out["energy"], out["forces"], stress)
 
+    def release_node_attrs(self):
+        """Move the one-hot ``data["node_attrs"]`` [N, n_elements] to the host (356 bytes per atom on the device
+        for an 89-element float32 model), for a caller that builds the rows it needs from ``_species_index``
+        (the tiled path's ``TileConfig.species="index"``). The whole-system call reads the one-hot on the
+        device, so it refuses afterwards."""
+        self.data["node_attrs"] = self.data["node_attrs"].cpu()
+        self.node_attrs_released = True
+
     def _outputs(self, positions):
         """The model's output dict at float64 ``positions`` on the current edges."""
         import torch
 
+        if self.node_attrs_released:
+            raise RuntimeError("this force field's one-hot node_attrs were released to the host "
+                               "(release_node_attrs, TileConfig.species='index'): its own call needs them")
         self._bind_streaming_count()
         with torch.no_grad():
             self.positions.copy_(positions)
