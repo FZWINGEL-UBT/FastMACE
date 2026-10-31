@@ -119,6 +119,14 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- `gate_epilogue`'s kernel (`fastmace.kernels.triton.gated_products`) runs the K loop outside over a tile that stacks
+  every component of the gated segment, so each weight tile is loaded once per K block (fifth list, item E). With
+  `gate_epilogue` on, step time is 0.1-2.5 % lower than with the old kernel; `gate_epilogue` on is now 1.2-4.7 %
+  faster than off on NbCl5 and NaNbO3 on the RTX 5060 Ti and the RTX 4000 Ada (neutral on NaCl). It stays opt-in
+  until the default is decided: docs/validation/speed-def.md.
+- Measured, not adopted: `edge_outer_sum`'s backward storing `grad_y` once per edge block (item F, exact, neutral on
+  both GPUs) and the first interaction's reassociation through `segment_gemm`'s joined products (item D, 0.25 %
+  slower on the RTX 4000 Ada at NaNbO3 8,640 atoms); docs/validation/speed-def.md. No code change.
 - `segment_gemm` uses 128-row tiles with 8 warps on the RTX 4000 Ada (decision 66,
   `tile_rule.LARGE_TILE_GPUS`; bitwise equal): MH-1 float32 step 0.986-0.995 times on NbCl5 and NaNbO3. The
   28 October screen that called them neutral had measured the default against itself; the RTX 5060 Ti and the
