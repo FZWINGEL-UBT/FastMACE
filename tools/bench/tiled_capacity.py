@@ -163,7 +163,9 @@ def main(argv=None):
         # The species tables at the tiles' row count (the tiled call binds its own per tile): the construction
         # never evaluates N rows. An eager comparison keeps N, since it calls this field on the whole system.
         call_rows = None if args.compare == "eager" else args.receivers
-        field = planner.build_evaluation(eager, user, atoms, call_rows=call_rows)
+        # --species-index: the one-hot on the host from the construction on (it never reaches the device).
+        field = planner.build_evaluation(eager, user, atoms, call_rows=call_rows,
+                                         release_node_attrs=args.species_index)
         record["call_rows"] = field.call_rows
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
