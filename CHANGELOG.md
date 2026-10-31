@@ -119,6 +119,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- `gate_epilogue` is on by default for MH-1 on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, by exact device
+  name, `planner.fixed.DECISION_66_GATE_EPILOGUE_GPUS`), where `segment_gemm` is on and `tf32x3_gemms` is off: MD
+  steps 1.2-4.7 % faster on NbCl5 and NaNbO3, NaCl neutral (docs/validation/speed-def.md). Off elsewhere; the A100
+  was not measured. An explicit value is kept.
 - `gate_epilogue`'s kernel (`fastmace.kernels.triton.gated_products`) runs the K loop outside over a tile that stacks
   every component of the gated segment, so each weight tile is loaded once per K block (fifth list, item E). With
   `gate_epilogue` on, step time is 0.1-2.5 % lower than with the old kernel; `gate_epilogue` on is now 1.2-4.7 %

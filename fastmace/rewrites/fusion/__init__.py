@@ -367,7 +367,7 @@ RECORDS = {
         selfcheck=_segment_selfcheck, selfcheck_memory=memory_terms.segment_gemm_selfcheck),
     "gate_epilogue": Rewrite(
         name="gate_epilogue", applies_to=_segment_support, requires=("segment_gemm",), conflicts=("tf32x3_gemms",),
-        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto", deterministic=True,
         workload_constraints=(), apply=_apply_epilogue, selfcheck=_epilogue_selfcheck,
         selfcheck_memory=memory_terms.segment_gemm_selfcheck),
     "grouped_launch": Rewrite(

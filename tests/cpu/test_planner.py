@@ -232,6 +232,9 @@ FASTMACE_ONLY_DEFAULTS = {
     # Decision 66, 29 October 2026 (OPT9-T05): MH-1 on DECISION_66_WPRIME_GPUS (this file's GPU is one), float32, not
     # reproducible.
     "wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
+    # Decision 66, 31 October 2026 (speed-def E2): MH-1 on DECISION_66_GATE_EPILOGUE_GPUS (this file's GPU is one),
+    # with segment_gemm (float32, not reproducible).
+    "gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
@@ -246,7 +249,7 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
-           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS}
+           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS, "gate_epilogue": MH1_LABELS}
 
 
 def fastmace_only_expected(name, label, backend):
@@ -1040,6 +1043,34 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
         traits("mh1-r2scan"), nacl(), IntegratorConfig(), L4, model_label="mh1-r2scan")
     assert plan.rewrites.wprime_backward == "on"
     assert plan_for("mh1-r2scan", rewrites=RewriteConfig(wprime_backward="off")).rewrites.wprime_backward == "off"
+
+
+def test_decision_66_gate_epilogue_on_the_measured_gpus():
+    """Decision 66 (owner, 31 October 2026; speed-def E2): gate_epilogue is on for MH-1 with segment_gemm on the GPU
+    models whose MD step A/Bs measured it faster in both build orders (NbCl5 and NaNbO3 1.2-4.7 %, NaCl neutral), by
+    exact name; off elsewhere (the A100 was not measured), in float64 and in reproducible plans; explicit requests
+    override."""
+    assert fixed.DECISION_66_GATE_EPILOGUE_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+    for hardware in (GPU, ADA):
+        plan = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), hardware,
+                                                   model_label="mh1-r2scan")
+        item, choice, reason = decision(plan, "RewriteConfig.gate_epilogue")
+        assert choice == "on" and f"MH-1 on a measured GPU, decision 66 ({hardware.name})" in reason, hardware.name
+    for hardware in (A100, L4, RTX_5090):  # same capability or family, never measured
+        plan = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), hardware,
+                                                   model_label="mh1-r2scan")
+        assert plan.rewrites.gate_epilogue == "off", hardware.name
+        assert dict(plan.auto_options_off)["gate_epilogue"] == f"not a measured GPU, decision 66 ({hardware.name})"
+    other = plan_for("mp0-medium")
+    assert other.rewrites.gate_epilogue == "off"
+    float64 = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
+    assert float64.rewrites.gate_epilogue == "off"
+    tf32x3 = plan_for("mh1-r2scan", rewrites=RewriteConfig(tf32x3_gemms="on", grouped_launch="off"))
+    assert tf32x3.rewrites.gate_epilogue == "off" and tf32x3.rewrites.tf32x3_gemms == "on"
+    plan = planner(engine=EngineConfig(), rewrites=RewriteConfig(gate_epilogue="on")).plan(
+        traits("mh1-r2scan"), nacl(), IntegratorConfig(), L4, model_label="mh1-r2scan")
+    assert plan.rewrites.gate_epilogue == "on"
+    assert plan_for("mh1-r2scan", rewrites=RewriteConfig(gate_epilogue="off")).rewrites.gate_epilogue == "off"
 
 
 def test_decision_65_w_tables_stay_off_above_three_species(monkeypatch):

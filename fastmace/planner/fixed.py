@@ -110,7 +110,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
-    "RewriteConfig.gate_epilogue": "never_automatic",
+    "RewriteConfig.gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
     "RewriteConfig.grouped_launch":
         "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     "RewriteConfig.combo_kernels": "never_automatic",
@@ -379,6 +379,11 @@ DECISION_66_GROUPED_LAUNCH_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
 # NaCl 0.946 / 0.935. RTX 4000 Ada: NaNbO3 0.938 / 0.939, NbCl5 0.964 / 0.964, NaCl 0.934 / 0.934
 # (docs/validation/opt9-T03.md). The A100-SXM4-40GB was not measured.
 DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+# gate_epilogue with the K-outer gated_products kernel (speed-def E2, owner 31 October 2026): MD step b/a, both build
+# orders. RTX 5060 Ti: NbCl5 1,944 0.983 / 0.982, 9,216 0.958 / 0.957; NaNbO3 1,920 0.982 / 0.988, 8,640 0.972 /
+# 0.968; NaCl 1.000 / 1.005. RTX 4000 Ada: NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969;
+# NaCl 0.998 / 1.003 (docs/validation/speed-def.md). The A100 was not measured.
+DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -1072,10 +1077,9 @@ class FixedPlanner:
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
-        # opt-10 OPT10-T01: opt-in until its whole-step A/Bs (decision 66: per-GPU defaults by exact device name).
-        needs("gate_epilogue", r.gate_epilogue == "on", v["segment_gemm"], "segment_gemm")
-        if r.gate_epilogue == "auto":
-            v["_why"]["gate_epilogue"] = "off: only an explicit 'on' enables it (OPT10-T01, opt-in)"
+        # opt-10 OPT10-T01; decision 66 (owner, 31 October 2026, speed-def E2): "auto" on for MH-1 on
+        # DECISION_66_GATE_EPILOGUE_GPUS (stage 2), where segment_gemm is on, float32, without tf32x3_gemms.
+        needs("gate_epilogue", r.gate_epilogue != "off", v["segment_gemm"], "segment_gemm")
         # plans/capacity.md CAP-T08: "auto" stays off here; rule 12 turns it on only when the plan would not fit the
         # free memory with recompute_conv_weights on (memory.MEMORY_RESCUE's order, planner.minimal._rule_12).
         needs("recompute_node_segments", r.recompute_node_segments == "on", v["gated_rows"], "gated_rows")
@@ -1177,6 +1181,17 @@ class FixedPlanner:
                 v["wprime_backward"] = False
                 v["_auto_off"]["wprime_backward"] = reason
                 v["_why"]["wprime_backward"] += f"; stage 2: off, {reason}"
+        if v["gate_epilogue"] and "gate_epilogue" not in explicit:
+            # Decision 66: measured faster for MH-1 on these GPU models only (speed-def E2), matched by exact name.
+            name = getattr(hardware, "name", None)
+            if _mh1(model_label) and name in DECISION_66_GATE_EPILOGUE_GPUS:
+                v["_why"]["gate_epilogue"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            else:
+                reason = (f"not MH-1, decision 66 (label {model_label})" if not _mh1(model_label)
+                          else f"not a measured GPU, decision 66 ({name})")
+                v["gate_epilogue"] = False
+                v["_auto_off"]["gate_epilogue"] = reason
+                v["_why"]["gate_epilogue"] += f"; stage 2: off, {reason}"
 
     def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None,
                         decision_65="no hardware given, decision 65", species=None):
@@ -1232,6 +1247,12 @@ class FixedPlanner:
             v["segment_gemm"] = False
             v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
                                           else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
+        if v["gate_epilogue"] and "gate_epilogue" not in explicit and (
+                dtype != "float32" or not v["segment_gemm"] or v["tf32x3_gemms"]):
+            # Decision 66's default only where the fused kernel runs (OPT10-T01's requirements below).
+            v["gate_epilogue"] = False
+            v["_why"]["gate_epilogue"] += ("; off: tf32x3_gemms reroutes linear_2's input gradients"
+                                           if v["tf32x3_gemms"] else "; off: requires segment_gemm (float32)")
         if v["gate_epilogue"]:
             # OPT10-T01: the fused kernel is float32 IEEE; it runs only where segment_gemm's joined products do.
             if dtype != "float32":
