@@ -274,3 +274,40 @@ def test_tiled_call_does_not_depend_on_the_fields_call_rows(mode):
         assert np.array_equal(after[1], before[1]) and np.array_equal(after[2], before[2])
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+# ---------------------------------------------------------------- tile size from the workspace budget
+
+
+@pytest.mark.parametrize("available, chosen", [(10**9, 16), (900, 8), (879, 4)])  # 8 x 100 x 1.1 = 880
+def test_budget_receivers_take_the_largest_tile_whose_workspace_fits(available, chosen):
+    """``budget_receivers``: after the first call (at ``receivers``), the call measures its workspace per
+    receiver and takes the largest candidate whose predicted workspace, with 10 % headroom, fits the memory left
+    after the tiled state; the slots are then planned again. The forces are the fixed-size call's."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(4, mode="padded", budget_receivers=(8, 16)))
+    tiled._memory = lambda: (100 * tiled.receivers, available)  # 100 bytes per receiver
+    first = tiled.evaluate(atoms, stress=True)
+    assert tiled.receivers == chosen and tiled.last["receivers"] == 4
+    again = tiled.evaluate(atoms, stress=True)
+    assert tiled.last["receivers"] == chosen and tiled.last["max_receivers"] <= chosen
+    assert max(r for r, _, _ in tiled.last["slots"].values()) <= chosen + 1
+    fixed = TiledForceField(field, TileConfig(chosen, mode="padded")).evaluate(atoms, stress=True)
+    for got in (first, again):
+        assert got[0] == pytest.approx(fixed[0], rel=1e-13, abs=0)
+        assert relative(got[1], fixed[1]) <= 1e-11 and relative(got[2], fixed[2]) <= 1e-11
+    tiled._memory = lambda: (0, 10**12)
+    tiled.evaluate(atoms)
+    assert tiled.receivers == chosen  # chosen once, after the first call
+
+
+def test_budget_receivers_stay_without_a_memory_measurement():
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(4, budget_receivers=(8, 16)))
+    tiled.evaluate(atoms)  # CPU: no device memory to measure
+    assert tiled.receivers == 4
+    with pytest.raises(ValueError, match="budget_receivers"):
+        TileConfig(4, budget_receivers=(0,))

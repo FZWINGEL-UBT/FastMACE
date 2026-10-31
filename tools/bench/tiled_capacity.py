@@ -46,6 +46,8 @@ def parse_args(argv=None):
     p.add_argument("--rattle", type=float, default=0.0)
     p.add_argument("--strain", type=float, default=0.0)
     p.add_argument("--calls", type=int, default=2, help="tiled force calls (the first one warms up)")
+    p.add_argument("--budget-receivers", type=int, nargs="*", default=[],
+                   help="TileConfig.budget_receivers: larger caps the call may take after its first call")
     p.add_argument("--tag", default="")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
@@ -147,7 +149,8 @@ def main(argv=None):
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges,
-                                                  neighbours="tiles" if args.tile_list else "global"))
+                                                  neighbours="tiles" if args.tile_list else "global",
+                                                  budget_receivers=tuple(args.budget_receivers)))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
 

@@ -48,6 +48,13 @@ class TileConfig:
     ``headroom``: a padded slot's halo count above the largest of its tiles', as a fraction. ``bucket``: the padded
     modes keep one slot per edge bucket, ``bucket`` times the largest tile's edges (rounded up to 256) wide, so a
     small tile runs in a small slot; 1 or more gives one slot for every tile.
+    ``budget_receivers``: larger receiver caps the call may take after its first call (at ``receivers``), from
+    the memory model: the first call measures its workspace per receiver (the peak above what stays allocated
+    after it: the tiled state, the field and the outputs), and the call then takes the largest candidate whose
+    predicted workspace, with 10 % headroom, fits the memory left on the device. Larger tiles run faster (fewer
+    launches, a smaller halo fraction; docs/validation/tiled-screen.md), and at the capacity limit the
+    workspace does not fit, so the cap stays at ``receivers``. Chosen once; needs a CUDA device (elsewhere the
+    cap stays).
     """
 
     receivers: int = 8192
@@ -58,6 +65,7 @@ class TileConfig:
     # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
+    budget_receivers: tuple[int, ...] = ()
 
     def __post_init__(self):
         if self.mode not in ("eager", "padded", "graphs", "compiled"):
@@ -70,6 +78,8 @@ class TileConfig:
             raise ValueError(f"TileConfig.bucket must be in (0, 10], got {self.bucket!r}")
         if int(self.receivers) < 1:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
+        if any(int(r) < 1 for r in self.budget_receivers):
+            raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
             raise ValueError(f"TileConfig.edges must be positive or None, got {self.edges!r}")
 
@@ -189,6 +199,8 @@ class TiledForceField:
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
+        self.receivers = int(self.config.receivers)  # the receiver cap (budget_receivers may raise it once)
+        self._budgeted = not self.config.budget_receivers
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._graph_key = None
         self._pool = None
@@ -533,11 +545,15 @@ class TiledForceField:
         source, row_ptr, degree = self._source(positions, n)
         caps = self.config
         edge_cap = caps.edges if caps.edges is not None else (
-            2**62 if degree is None else max(1, int(math.ceil(2 * caps.receivers * degree))))
+            2**62 if degree is None else max(1, int(math.ceil(2 * self.receivers * degree))))
         cell = data["cell"].reshape(3, 3) if "cell" in data else torch.as_tensor(field.neighbours.cell)
-        tiles, grid = plan_tiles(pos, cell, row_ptr, caps.receivers, edge_cap)
+        tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
         local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
+        measure = not self._budgeted and self.device.type == "cuda"
+        if measure:  # the workspace of this call: its peak above what stays allocated after it
+            torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
+                     receivers=self.receivers,
                      edges=0, mode=caps.mode, neighbours=caps.neighbours)
         keys = self._slot_keys(tiles, source, local_of, n) if padded else None
         if padded:
@@ -589,11 +605,44 @@ class TiledForceField:
                     volume = torch.linalg.det(cell.to(torch.float64)).abs()
                     out_stress = (strain_grad / volume).to(self.dtype)  # MACE: dE/d(strain) / V
             self.last = stats
-            return ForceOutput(energy, forces.clone(), out_stress)
+            out = ForceOutput(energy, forces.clone(), out_stress)
+            if not self._budgeted:
+                self._budgeted = True
+                self._choose_receivers(self._memory())  # None without a CUDA device: the cap stays
+            return out
         finally:
             for module, count in saved:
                 if count is not None:
                     module.register_buffer("streaming_count", count, persistent=False)
+
+    def _memory(self):
+        """``(workspace, available)`` bytes after a measured call, or None without a CUDA device: the call's peak
+        above what stays allocated, and the device's free memory plus the allocator's cached, unallocated
+        blocks."""
+        import torch
+
+        if self.device.type != "cuda":
+            return None
+        allocated = torch.cuda.memory_allocated(self.device)
+        free, _ = torch.cuda.mem_get_info(self.device)
+        return (torch.cuda.max_memory_allocated(self.device) - allocated,
+                free + torch.cuda.memory_reserved(self.device) - allocated)
+
+    def _choose_receivers(self, memory):
+        """``budget_receivers``: the largest cap whose predicted workspace (the measured workspace per receiver,
+        times the cap, plus 10 %) fits ``available``; the padded slots are planned again for it."""
+        if memory is None:
+            return
+        workspace, available = memory
+        per_receiver = workspace / self.receivers
+        fits = [r for r in (self.receivers, *map(int, self.config.budget_receivers))
+                if 1.1 * per_receiver * r <= available]
+        chosen = max(fits, default=self.receivers)
+        if chosen != self.receivers:
+            self.receivers = chosen
+            self._slots.clear()  # their sizes and edge buckets were for the old cap
+            self._edge_step = None
+            self._graph_key = None
 
     def _globals(self, n, stress, pos, heads):
         """The call's global buffers, kept between calls at fixed addresses (the graphs read them) and zeroed.
@@ -656,7 +705,7 @@ class TiledForceField:
             members = [size for size, k in zip(sizes, keys) if k == key]
             # Receivers with headroom too (tiles are planned again every call, so their sizes move a little), but
             # never past the cap, which no tile exceeds: full tiles keep their slot.
-            rows = min(int(self.config.receivers), n,  # nor the atom count
+            rows = min(self.receivers, n,  # nor the atom count
                        math.ceil(max(r for r, _, _ in members) * head))
             need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
                     key * step)
@@ -666,7 +715,7 @@ class TiledForceField:
                     grown = need
                 else:  # an exceeded size grows by at least a quarter (receivers at most the cap), so a slot changes
                     # a few times, not once per tile a little larger than the last
-                    rows_cap = min(int(self.config.receivers), n) + 1
+                    rows_cap = min(self.receivers, n) + 1
                     grown = tuple(b if a <= b else max(a, math.ceil(1.25 * b)) for a, b in zip(need, slot["sizes"]))
                     grown = (min(grown[0], max(rows_cap, need[0])), grown[1], grown[2])
                 self._slots[key] = self._new_slot(grown)
