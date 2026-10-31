@@ -204,3 +204,73 @@ def test_tile_neighbours_refuse_small_cells():
     with pytest.raises(ValueError, match="neighbours"):
         TileConfig(neighbours="cells")
 
+
+
+# ---------------------------------------------------------------- species tables at the call's row count
+
+
+def test_force_field_builds_its_species_tables_at_call_rows(monkeypatch):
+    """``call_rows``: the reassociation's identity basis has the model call's row count, not the atom count, so
+    a tiled field's construction never evaluates N rows; ``species_tables(rows)`` gives the tables at any count."""
+    from fastmace.rewrites.mh1 import modules as m
+
+    calc, atoms = calculator(), structure()
+    whole = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    rows = []
+    identity_attrs = m.identity_attrs
+    monkeypatch.setattr(m, "identity_attrs", lambda columns, width, n, *a: rows.append(n) or identity_attrs(
+        columns, width, n, *a))
+    small = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE),
+                           call_rows=7)
+    assert rows and set(rows) == {7}
+    assert small.call_rows == 7 and whole.call_rows == len(atoms)
+    (_, _, table, _), = small._tables
+    assert torch.equal(table, whole.species_tables(7)[0])
+    assert torch.equal(whole._tables[0][2], small.species_tables(len(atoms))[0])
+    with pytest.raises(ValueError, match="call_rows"):
+        MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE), call_rows=0)
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_tiled_tiles_read_species_tables_at_their_own_rows(mode):
+    """Each tile's interaction 0 reads the table evaluated at the tile's node rows (the padded slot's, or the
+    eager tile's own), so the table is bitwise the features that tile's embedding gives its atoms."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE), call_rows=3)
+    tiled = TiledForceField(field, TileConfig(5, mode=mode))
+    reassociation = tiled.model.interactions[0].first_reassociation
+    seen = []
+    first_forward = tiled._first_forward
+
+    def recording(leaf, eps, attrs, local, r):
+        seen.append((attrs.shape[0], reassociation.species_feats.detach().clone()))
+        return first_forward(leaf, eps, attrs, local, r)
+
+    tiled._first_forward = recording
+    tiled.evaluate(atoms, stress=True)
+    rows_seen = {rows for rows, _ in seen}
+    if mode == "eager":
+        assert len(rows_seen) > 1  # tiles of several sizes
+    else:
+        assert rows_seen == {r + h for r, h, _ in tiled.last["slots"].values()}
+    for rows, table in seen:
+        assert torch.equal(table, field.species_tables(rows)[0])
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_tiled_call_does_not_depend_on_the_fields_call_rows(mode):
+    """The tiled call binds its own tables: bitwise the same whatever row count the field was built with, and
+    the field's own call afterwards is bitwise what it was before."""
+    calc, atoms = calculator(), structure()
+    results = []
+    for call_rows in (None, 3):
+        field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                               rewrites=only(*MH1_PACKAGE), call_rows=call_rows)
+        before = field.evaluate(atoms, stress=True)
+        results.append(TiledForceField(field, TileConfig(5, mode=mode)).evaluate(atoms, stress=True))
+        after = field.evaluate(atoms, stress=True)
+        assert after[0] == before[0]
+        assert np.array_equal(after[1], before[1]) and np.array_equal(after[2], before[2])
+    assert results[0][0] == results[1][0]
+    assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])

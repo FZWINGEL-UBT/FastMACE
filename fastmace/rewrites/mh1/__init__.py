@@ -370,7 +370,7 @@ def species_table(model, interaction, columns, rows, joint_features=None):
     return m.identity_species_feats(model, interaction, attrs, len(columns), joint)
 
 
-def reassociate_first_interaction(model, node_attrs, species_columns=None, joint_features=None):
+def reassociate_first_interaction(model, node_attrs, species_columns=None, joint_features=None, call_rows=None):
     """Attach the reassociated first interaction to a folded model; returns the species columns.
 
     Requires species-only first-interaction inputs (first_inputs_species_only):
@@ -380,7 +380,8 @@ def reassociate_first_interaction(model, node_attrs, species_columns=None, joint
     species present). Every superset species gets its row of the sender-feature table from the
     identity basis (SPEC §8.5), so atoms may later change to any superset species.
     ``joint_features``: the structure's per-graph joint-embedding inputs (OMOL-0's total charge
-    and spin), as in the batch.
+    and spin), as in the batch. ``call_rows``: the row count of the model's calls, at which the table is
+    evaluated (default the structure's atom count; ``MACEForceField``'s ``call_rows``).
     """
     m = _modules()
     interactions = getattr(model, "interactions", ())
@@ -393,7 +394,8 @@ def reassociate_first_interaction(model, node_attrs, species_columns=None, joint
         raise RewriteError("reassociate_first needs the structure's one-hot species (Context.inputs['node_attrs'])")
     channels, ls, gammas, ir_mul = m.probe_first_tensor_product(interaction)
     columns = superset_columns(node_attrs, species_columns)
-    table = species_table(model, interaction, columns, len(node_attrs), joint_features)
+    rows = len(node_attrs) if call_rows is None else int(call_rows)
+    table = species_table(model, interaction, columns, rows, joint_features)
     interaction.first_reassociation = m.FirstInteractionReassociation(
         columns.to(next(interaction.parameters()).device), channels, ls, gammas, ir_mul, species_feats=table)
     return tuple(int(c) for c in columns)
@@ -630,7 +632,7 @@ def _apply(function):
 def _apply_reassociate(model, context):
     inputs = context.inputs or {}
     return reassociate_first_interaction(model, inputs.get("node_attrs"), inputs.get("species_columns"),
-                                         inputs.get("joint_features"))
+                                         inputs.get("joint_features"), inputs.get("call_rows"))
 
 
 def _record(name, applies_to, apply, requires=(), exactness="rounding", default="auto", constraints=(),

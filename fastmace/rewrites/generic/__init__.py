@@ -134,8 +134,8 @@ def apply_reassociate(model, context):
     _prepare(interaction, kind)
     interaction.radial_hidden, interaction.radial_last = gm.fc_split(interaction.conv_tp_weights)
     channels, ls, gammas, ir_mul = probe_first_tensor_product(interaction)
-    table = species_table(model, interaction, columns, len(context.inputs[NODE_ATTRS]),
-                          context.inputs.get("joint_features"))
+    rows = context.inputs.get("call_rows") or len(context.inputs[NODE_ATTRS])  # MACEForceField's call_rows
+    table = species_table(model, interaction, columns, rows, context.inputs.get("joint_features"))
     interaction.first_reassociation = FirstInteractionReassociation(
         columns.to(_device(interaction)), channels, ls, gammas, ir_mul, species_feats=table)
     return ["interactions.0"]

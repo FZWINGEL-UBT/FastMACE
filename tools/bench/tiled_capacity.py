@@ -139,7 +139,11 @@ def main(argv=None):
         record["phases"]["plan"] = mem()
         eager = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                        dynamic_edges=False))
-        field = planner.build_evaluation(eager, user, atoms)
+        # The species tables at the tiles' row count (the tiled call binds its own per tile): the construction
+        # never evaluates N rows. An eager comparison keeps N, since it calls this field on the whole system.
+        call_rows = None if args.compare == "eager" else args.receivers
+        field = planner.build_evaluation(eager, user, atoms, call_rows=call_rows)
+        record["call_rows"] = field.call_rows
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges,
