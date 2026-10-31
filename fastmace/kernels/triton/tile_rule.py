@@ -28,10 +28,10 @@ from dataclasses import dataclass
 BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 64, 32, 4, 3
 # Triton only where M covers at least this many waves of BLOCK_M-row tiles over the SMs (one column of tiles).
 MIN_TRITON_WAVES = 2
-# The Triton products' tile rows and warps (the waves rule above keeps BLOCK_M). None: by GPU, 128 rows with 8 warps
-# on LARGE_TILE_GPUS, else BLOCK_M and NUM_WARPS; an int is an A/B side's override on every GPU.
-TRITON_BLOCK_M = None
-TRITON_NUM_WARPS = None
+# The Triton products' tile rows and warps (the waves rule above keeps BLOCK_M). 0: by GPU, 128 rows with 8 warps
+# on LARGE_TILE_GPUS, else BLOCK_M and NUM_WARPS; a positive value is an A/B side's override on every GPU.
+TRITON_BLOCK_M = 0
+TRITON_NUM_WARPS = 0
 # Decision 66 (owner, 29 October 2026): 128-row tiles with 8 warps (bitwise equal) only where same-process whole-step
 # A/Bs gained in both build orders (docs/validation/ab-constants-audit-20261030.md, "tiles128"). RTX 4000 Ada: NbCl5
 # 9,216 atoms 0.987 / 0.986 (column order), 1,944 atoms 0.989 / 0.989, NaNbO3 0.995 / 0.994. The RTX 5060 Ti lost
@@ -84,8 +84,8 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None, gpu: str | None
         return GemmChoice("cublas", reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs "
                                            f"(< {MIN_TRITON_WAVES})")
     large = gpu in LARGE_TILE_GPUS
-    block_m = TRITON_BLOCK_M if TRITON_BLOCK_M is not None else (128 if large else BLOCK_M)
-    num_warps = TRITON_NUM_WARPS if TRITON_NUM_WARPS is not None else (8 if large else NUM_WARPS)
+    block_m = TRITON_BLOCK_M if TRITON_BLOCK_M > 0 else (128 if large else BLOCK_M)
+    num_warps = TRITON_NUM_WARPS if TRITON_NUM_WARPS > 0 else (8 if large else NUM_WARPS)
     return GemmChoice("triton", block_m=block_m, num_warps=num_warps,
                       reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs")
 
