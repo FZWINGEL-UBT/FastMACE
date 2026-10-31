@@ -54,13 +54,12 @@ def region_forward(self, node_feats, sc, node_attrs):
     from torch.utils.checkpoint import checkpoint
 
     x, y = node_feats.split(self.region_widths, dim=1)
-    body = types.MethodType(region, self)
-    chunks = int(getattr(self, "region_chunks", 1))
+    body = self.region_body  # bound in join_region: a MethodType made while tracing breaks the graph
+    chunks = self.region_chunks
     if chunks <= 1:
         return checkpoint(body, x, y, sc, node_attrs, use_reentrant=False, preserve_rng_state=False)
     # The region does not mix atoms: each atom chunk is its own checkpoint, so the backward rebuilds one chunk's
     # intermediates at a time (the recomputation's working set divided by the chunk count).
-    # A plain loop: Dynamo cannot lift a comprehension's closure into checkpoint's higher-order op.
     xs, ys = torch.tensor_split(x, chunks, dim=0), torch.tensor_split(y, chunks, dim=0)
     attrs = torch.tensor_split(node_attrs, chunks, dim=0)
     scs = torch.tensor_split(sc, chunks, dim=0) if sc is not None else (None,) * chunks
@@ -81,6 +80,7 @@ def join_region(interaction, product, chunks=1):
                                                first.segments_in[first.first_count:]))
     product.region_chain, product.region_reshape = chain.forward, reshape.forward
     product.region_chunks = max(1, int(chunks))
+    product.region_body = types.MethodType(region, product)
     product.recomputed_inner = product.forward
     chain.forward = types.MethodType(joined_inputs, chain)
     reshape.forward = types.MethodType(passed_through, reshape)

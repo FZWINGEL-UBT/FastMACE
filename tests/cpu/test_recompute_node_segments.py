@@ -149,7 +149,7 @@ def test_the_record_recomputes_every_segment_and_passes_its_selfcheck(monkeypatc
         assert all(module.forward.__func__ is sm.recomputed_forward for _, module in segments.segments(model))
     twin = copy.deepcopy(model)  # the stored forwards rebind to the copy
     for module in (twin.products[1], twin.interactions[1].gated_rows):
-        for name in ("recomputed_inner", "region_chain", "region_reshape"):
+        for name in ("recomputed_inner", "region_chain", "region_reshape", "region_body"):
             bound = getattr(module, name, None)
             assert bound is None or bound.__self__ in set(twin.modules())
     product = model.products[1]
