@@ -183,6 +183,9 @@ class TiledForceField:
         r_max = float(getattr(model, "r_max", 10.0))
         self._far = torch.tensor([2.0 * r_max + 1.0, 0.0, 0.0], dtype=self.dtype, device=self.device)
         self._holders = (_holder_class()(), _holder_class()())
+        # The reassociated first interactions read species tables evaluated at the tile's own row count (the
+        # field's ``species_tables``): bitwise the features the tile's embedding gives its atoms.
+        self._reassociations = [entry[1] for entry in field._tables]
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
@@ -391,7 +394,8 @@ class TiledForceField:
         receivers, halo, edges = sizes
         i64 = torch.int64
         new = functools.partial(torch.zeros, device=self.device)
-        return dict(sizes=sizes, nodes=new(receivers + halo, dtype=i64),
+        tables = self.field.species_tables(receivers + halo) if self._reassociations else []
+        return dict(sizes=sizes, nodes=new(receivers + halo, dtype=i64), tables=tables,
                     node_mask=new(receivers + halo, dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype),
                     ei=new((2, edges), dtype=i64), shifts=new((edges, 3), dtype=self.dtype),
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
@@ -559,9 +563,10 @@ class TiledForceField:
                     if sweep == 1:
                         stats["edges"] += piece[1].shape[1]
                     if padded:
-                        if bound is not slot:  # the streaming kernels read this slot's edge count
+                        if bound is not slot:  # the streaming kernels read this slot's edge count and tables
                             for module in field._streaming:
                                 module.register_buffer("streaming_count", slot["count"], persistent=False)
+                            self._bind_tables(slot["tables"])
                             bound = slot
                         self._fill(slot, piece)
                         self._run_slot(sweep, slot, g)
@@ -668,9 +673,15 @@ class TiledForceField:
                 self.slot_changes += 1
         return keys
 
+    def _bind_tables(self, tables):
+        for reassociation, table in zip(self._reassociations, tables):
+            reassociation.bind(table)
+
     def _eager_tile(self, sweep, piece, g):
         """One sweep on one unpadded tile (``mode="eager"``)."""
         nodes, ei, shifts, local, r, _ = piece
+        if sweep != 2 and self._reassociations:  # interaction 0 runs on the tile's R + H rows
+            self._bind_tables(self.field.species_tables(nodes.shape[0]))
         state = g["state"]
         vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
         tile = (nodes, local, r, vectors, None, None)

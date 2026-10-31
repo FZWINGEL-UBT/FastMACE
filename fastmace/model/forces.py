@@ -230,6 +230,11 @@ class MACEForceField:
       reproduces 1a's energy, for A/B against the research engine only. ``atomic_energies``: the
       exact float64 E0 table; default the ``LoadedModel``'s (captured from the checkpoint before
       MACE converted the model), else the model's own table upcast.
+    - ``call_rows``: the row count of the model's calls, at which the reassociated first interaction's
+      species tables are evaluated from the identity basis (``species_tables``); default the atom count, so
+      that the tables are bitwise the features of the whole-system call (3-T02). A caller that runs the
+      model on fewer rows (the tiled path: one tile at a time) sets its own and binds its own tables; the
+      construction then never evaluates the atom count's rows.
 
     The streaming edge counter is this instance's neighbour-list count. Every call points the
     model's streaming interactions at it, so two force fields from one compiled model each read
@@ -239,7 +244,7 @@ class MACEForceField:
 
     def __init__(self, model, atoms, *, rewrites=None, engine=None, neighbours=None, polar=None,
                  compute_stress=False, compile_cache=None, registry=None, charge=None, spin_multiplicity=None,
-                 check=True, float64_energy=True, atomic_energies=None, species=None):
+                 check=True, float64_energy=True, atomic_energies=None, species=None, call_rows=None):
         import torch
 
         from fastmace import _patches
@@ -323,6 +328,9 @@ class MACEForceField:
         if spin_multiplicity is not None:
             atoms.info[info_keys.get("total_spin", "spin")] = spin_multiplicity
         self.numbers = atoms.numbers.copy()
+        if call_rows is not None and (int(call_rows) != call_rows or call_rows < 1):
+            raise ValueError(f"call_rows must be a positive integer, got {call_rows!r}")
+        self.call_rows = len(atoms) if call_rows is None else int(call_rows)
         # The species superset (SPEC §8.5): every species-indexed buffer and rewrite is built for it
         # from the identity basis, never from the species present, so an atom can become any of them.
         z_table = [int(z) for z in calc.z_table.zs]
@@ -357,7 +365,7 @@ class MACEForceField:
         joint_features = {name: batch[name].to(self._device, self._dtype) for name in specs if name in batch} or None
         context = reg.Context(config=rewrites if isinstance(rewrites, RewriteConfig) else RewriteConfig(),
                               inputs={"node_attrs": node_attrs, "species_columns": self.species_columns,
-                                      "joint_features": joint_features})
+                                      "joint_features": joint_features, "call_rows": self.call_rows})
         model_records = [name for name in enabled if name not in engine_rewrites.RECORDS]
         # The strain path, bound per model (2-T08b, docs/design/strain-per-model.md): the one-graph
         # function with the record on, else MACE's own, so that neither another instance nor the
@@ -559,25 +567,50 @@ class MACEForceField:
             self._spin_base = self.data["total_spin"].detach().clone()
         self._tables = []  # (FirstInteractionReassociation, its [S, C] table, its refresh)
 
-    def _setup_tables(self):
-        """Each reassociated interaction's sender-feature table, from the identity basis of the superset."""
+    def _reassociated(self):
+        """``(model, [(index, interaction)])`` of the interactions with a reassociated first interaction."""
+        model = getattr(self.model, "_orig_mod", self.model)
+        return model, [(index, interaction) for index, interaction in enumerate(getattr(model, "interactions", ()))
+                       if getattr(interaction, "first_reassociation", None) is not None]
+
+    def _identity_basis(self, model, rows):
+        """``(attrs, joint)``: the superset's identity basis in a batch of ``rows`` rows (``identity_attrs``),
+        and the joint-embedding inputs of those rows (None without a joint embedding)."""
         import torch
 
         from fastmace.rewrites.mh1 import modules as m
 
-        model = getattr(self.model, "_orig_mod", self.model)
-        reassociated = [(index, interaction) for index, interaction in enumerate(getattr(model, "interactions", ()))
-                        if getattr(interaction, "first_reassociation", None) is not None]
-        if not reassociated:
-            return
         parameter = next(model.parameters())
-        n = len(self.numbers)
-        attrs = m.identity_attrs(self.species_columns, self.data["node_attrs"].shape[1], n, parameter.dtype,
+        attrs = m.identity_attrs(self.species_columns, self.data["node_attrs"].shape[1], rows, parameter.dtype,
                                  parameter.device)
         joint = None
         if hasattr(model, "joint_embedding"):
             batch = torch.zeros(attrs.shape[0], dtype=torch.int64, device=parameter.device)
             joint = (batch, {name: self.data[name] for name in model.embedding_specs})
+        return attrs, joint
+
+    def species_tables(self, rows):
+        """The reassociated interactions' [S, C] sender-feature tables evaluated in a batch of ``rows`` rows,
+        in ``_tables``' order: bitwise the features a model call on ``rows`` rows gives the superset's species."""
+        from fastmace.rewrites.mh1 import modules as m
+
+        model, reassociated = self._reassociated()
+        if not reassociated:
+            return []
+        attrs, joint = self._identity_basis(model, rows)
+        count = len(self.species_columns)
+        return [m.identity_species_feats(model, interaction, attrs, count, joint).detach().clone()
+                for _, interaction in reassociated]
+
+    def _setup_tables(self):
+        """Each reassociated interaction's sender-feature table, from the identity basis of the superset in a
+        batch of ``call_rows`` rows."""
+        from fastmace.rewrites.mh1 import modules as m
+
+        model, reassociated = self._reassociated()
+        if not reassociated:
+            return
+        attrs, joint = self._identity_basis(model, self.call_rows)
         count = len(self.species_columns)
         for index, interaction in reassociated:
             table = m.identity_species_feats(model, interaction, attrs, count, joint).detach().clone()

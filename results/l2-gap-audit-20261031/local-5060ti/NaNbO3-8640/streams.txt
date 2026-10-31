@@ -1,0 +1,9 @@
+== /home/fzwin/fastmace-runs/l2-gap-audit-20261031/local/NaNbO3-8640: per step span 110.151 ms, any stream busy 109.817 ms
+   stream 142: busy 108.680 ms; gemm 21.919, oeq_projected_backward_wprime 21.371, fused_folded_forward 15.891, Kernel2 13.256, kernel 4.769, forward 2.394
+   stream 17: busy 1.434 ms; kernel 0.664, vectorized_elementwise_kernel 0.306, index_elementwise_kernel 0.223, DeviceRadixSortOnesweepKernel 0.127, unrolled_elementwise_kernel 0.041, reduce_kernel 0.037
+   stream 141: busy 0.326 ms; inside_kernel 0.149, scatter_kernel 0.141, reduce_kernel 0.012, drift_kernel 0.010, DeviceScanKernel 0.009, noise_kernel 0.003
+   overlap of the two busiest streams 0.623 ms
+   idle holes >= 10 us: 261.2 us per step
+       138.3 us/step  0.53/step  vectorized_elementwise_kernel -> noise_kernel
+       119.0 us/step  1.00/step  scatter_kernel -> unrolled_elementwise_kernel
+         3.9 us/step  0.20/step  triton_poi_fused_add_div_mul_50 -> vectorized_elementwise_kernel

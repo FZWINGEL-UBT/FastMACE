@@ -97,7 +97,8 @@ def _backends(rows_per_product, weights, device, dtype, precision):
                                                        f"N={int(w.shape[1])} kept on SIMT IEEE")
             for w in weights
         ]
-    return [tile_rule.segment_gemm_choice(rows, int(w.shape[1]), int(w.shape[0]), sms)
+    gpu = tile_rule.device_name(device)
+    return [tile_rule.segment_gemm_choice(rows, int(w.shape[1]), int(w.shape[0]), sms, gpu)
             for rows, w in zip(rows_per_product, weights)]
 
 

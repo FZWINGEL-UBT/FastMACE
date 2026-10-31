@@ -140,6 +140,19 @@ Modal's image has no Nsight tools, and the Colab account had no compute units on
 | **dr fused into the interaction-0 edge_outer_sum backward** | Ceiling about 0.5-1 % of the step; item F (a store change in the same kernel) just measured neutral on both GPUs | Measure first: edge_outer_sum backward plus the interaction-0 table backward from the M2 trace; STOP below 100 µs/step |
 | **Certified float64 tables for D3(BJ)** | Plausible (smooth 1-D and 2-D functions, the radial-table certificate machinery exists), but only for --dispersion d3bj runs, which are not the capacity or default path, and D3's reference status needs a ≤ 1e-10 certificate | Deferred: profile a D3-on step first when D3 production runs start |
 
+Results (31 October 2026, merged 4dd46874 and 3ec374a2):
+- Item 1, group-ordered wprime_backward: STOP. The G′ tables fit in L2 on both GPUs; NbCl5 1.29x (Ada) and 1.43x
+  (sm_120), NaNbO3 0.80x and 1.02x (`docs/validation/wprime-group-order.md`).
+- Item 3, tiled R x bucket: no GO. R=16,384 is about 0.90x but needs about 4.2 GiB of workspace; within 2 GiB the
+  best is 0.97x; bucket 0.05 buys nothing (`docs/validation/tiled-screen.md`). Follow-up taken up: R from the memory
+  budget (largest of 4096/8192/16384 that fits after the tiled state), so the limit is unchanged.
+- Item 4: edge_outer_sum backward plus the interaction-0 table backward are 0.5-0.57 % of the step at 9k atoms. Not
+  built.
+- Eighth list M1 (sm_120): no kernel rereads beyond L2; nothing with a ceiling above about 1 %. M2: host gap
+  0.24-0.8 % and in-graph gaps 0.06-0.8 % of the step, so the GPU-resident loop and the megakernel are dead
+  (`docs/validation/l2-gap-audit.md`).
+- tiles128 rerun: default on the RTX 4000 Ada only (0.986-0.999); RTX 5060 Ti 1.007-1.020 and A100-40GB 1.021 slower.
+
 Note on the proposal's premises: gate epilogues are not dead after wprime_backward. With the K-outer kernel, gate_epilogue=on measured
 1.2-4.3 % faster on sm_120 (speed-def E2, Ada pending).
 

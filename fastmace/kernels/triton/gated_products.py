@@ -9,9 +9,10 @@ reads ``drows``, the gated rows and the gates again for ``dgated = drows * gate`
 ``gated_joined_products(scalars, gated, gates, ...)`` has the same forward (the elementwise products, then
 ``joined_products_op``). Its backward runs, for every gated segment whose product the shape rule
 (``tile_rule.segment_gemm_choice``) gives to Triton, one atom-tiled kernel: per (atom block, column block) it runs
-the K-loop of each component m, multiplies by the gate tile (loaded once), stores ``dgated`` and sums ``dgate`` over
-m in registers. ``drows`` is never written, there are no atomics, and the m-sum needs no partial tensor. Segments
-the rule leaves to cuBLAS, the scalars' product, the CPU and other dtypes keep the stock operations.
+one K-loop over a tile that stacks every component m of the block's atoms (each weight tile loaded once per K
+block), multiplies by the gates, stores ``dgated`` and sums ``dgate`` over m in registers. ``drows`` is never
+written, there are no atomics, and the m-sum needs no partial tensor. Segments the rule leaves to cuBLAS, the
+scalars' product, the CPU and other dtypes keep the stock operations.
 
 Not bitwise the stock backward: the K-sums run in ``tl.dot`` with another tile shape, and the m-sum is in another
 order (7-8e-7 relative on the RTX 4000 Ada, docs/validation/opt10-T01.md). Deterministic. The weights get no
@@ -27,9 +28,10 @@ import torch
 
 from fastmace.kernels.triton import segment_gemm as sg
 
-# The fused kernel's tile: atoms x columns x K, warps, stages; the fastest of four on OPT10-T01's quick pass on the
-# RTX 4000 Ada for NbCl5, NaNbO3 and NaCl alike (one fixed configuration, SPEC §9.1).
-BLOCK_A, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 32, 64, 32, 4, 3
+# The fused kernel's tile: ROWS stacked gradient rows (BLOCK_A atoms times the D components padded to a power of two)
+# x columns x K, warps, stages. One fixed configuration for every crystal and GPU (SPEC §9.1); OPT10-T01's tile had
+# 32 atoms x 64 columns x 32, which ROWS = 128 keeps for D = 3 (32 atoms x 4 rows).
+ROWS, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 128, 64, 32, 4, 3
 
 
 @cache
@@ -39,45 +41,53 @@ def _kernel():
 
     @triton.jit
     def gated_input_grads(g_ptr, wt_ptr, gated_ptr, gate_ptr, dgated_ptr, dgate_ptr, atoms_n, N, K, g_n, g_m,
-                          gate_n, dgate_n, D: tl.constexpr, BLOCK_A: tl.constexpr, BLOCK_N: tl.constexpr,
-                          BLOCK_K: tl.constexpr, PRECISION: tl.constexpr):
+                          gate_n, dgate_n, D: tl.constexpr, DP: tl.constexpr, BLOCK_A: tl.constexpr,
+                          BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr, PRECISION: tl.constexpr):
         # Row (atom, m) of the gradient starts at atom * g_n + m * g_m; gated and dgated rows are atom * D + m.
+        # The tile stacks the D components of BLOCK_A atoms (row r is component r // BLOCK_A of atom r % BLOCK_A,
+        # m-major; components D..DP-1 are masked), so one tl.dot per K block covers every m and each weight tile
+        # is loaded once per K block (K outer, m inner).
         pa, pn = tl.program_id(0), tl.program_id(1)
-        atom = (pa * BLOCK_A + tl.arange(0, BLOCK_A)).to(tl.int64)
+        r = tl.arange(0, DP * BLOCK_A)
+        m = r // BLOCK_A
+        atom = (pa * BLOCK_A + r % BLOCK_A).to(tl.int64)
         j = (pn * BLOCK_N + tl.arange(0, BLOCK_N)).to(tl.int64)
-        amask, jmask = atom < atoms_n, j < N
-        tile = amask[:, None] & jmask[None, :]
-        gate = tl.load(gate_ptr + atom[:, None] * gate_n + j[None, :], mask=tile, other=0.0)
-        dgate = tl.zeros((BLOCK_A, BLOCK_N), dtype=tl.float32)
+        rmask, jmask = (atom < atoms_n) & (m < D), j < N
+        tile = rmask[:, None] & jmask[None, :]
+        g_row = atom * g_n + m * g_m
         kk = tl.arange(0, BLOCK_K)
-        for m in tl.static_range(D):
-            acc = tl.zeros((BLOCK_A, BLOCK_N), dtype=tl.float32)
-            for start in range(0, K, BLOCK_K):
-                k = start + kk
-                a = tl.load(g_ptr + (atom * g_n + m * g_m)[:, None] + k[None, :],
-                            mask=amask[:, None] & (k < K)[None, :], other=0.0)
-                b = tl.load(wt_ptr + k[:, None] * N + j[None, :], mask=(k < K)[:, None] & jmask[None, :], other=0.0)
-                acc += tl.dot(a, b, input_precision=PRECISION)
-            row = atom * D + m
-            gated = tl.load(gated_ptr + row[:, None] * N + j[None, :], mask=tile, other=0.0)
-            tl.store(dgated_ptr + row[:, None] * N + j[None, :], acc * gate, mask=tile)
-            dgate += acc * gated
-        tl.store(dgate_ptr + atom[:, None] * dgate_n + j[None, :], dgate, mask=tile)
+        acc = tl.zeros((DP * BLOCK_A, BLOCK_N), dtype=tl.float32)
+        for start in range(0, K, BLOCK_K):
+            k = start + kk
+            a = tl.load(g_ptr + g_row[:, None] + k[None, :], mask=rmask[:, None] & (k < K)[None, :], other=0.0)
+            b = tl.load(wt_ptr + k[:, None] * N + j[None, :], mask=(k < K)[:, None] & jmask[None, :], other=0.0)
+            acc += tl.dot(a, b, input_precision=PRECISION)
+        row = atom * D + m
+        gate = tl.load(gate_ptr + atom[:, None] * gate_n + j[None, :], mask=tile, other=0.0)
+        gated = tl.load(gated_ptr + row[:, None] * N + j[None, :], mask=tile, other=0.0)
+        tl.store(dgated_ptr + row[:, None] * N + j[None, :], acc * gate, mask=tile)
+        dgate = tl.sum(tl.reshape(acc * gated, (DP, BLOCK_A, BLOCK_N)), axis=0)
+        first = (pa * BLOCK_A + tl.arange(0, BLOCK_A)).to(tl.int64)
+        tl.store(dgate_ptr + first[:, None] * dgate_n + j[None, :], dgate,
+                 mask=(first < atoms_n)[:, None] & jmask[None, :])
 
     return gated_input_grads
 
 
 def _fused(grad, offset, mul_out, wt, gated, gates, gate_offset, dgated, dgates, dim, precision):
-    """dgated and dgates[:, gate_offset:gate_offset + mul_in] of one gated segment in one launch."""
+    """dgated and dgates[:, gate_offset:gate_offset + mul_in] of one gated segment in one launch; returns Triton's
+    compiled kernel (its register and spill counts)."""
     import triton
 
     atoms, width = grad.shape
     mul_in = int(wt.shape[1])
-    grid = (triton.cdiv(atoms, BLOCK_A), triton.cdiv(mul_in, BLOCK_N))
-    _kernel()[grid](grad.reshape(-1)[offset:], wt, gated, gates.reshape(-1)[gate_offset:],
-                    dgated, dgates.reshape(-1)[gate_offset:], atoms, mul_in, mul_out, width, mul_out,
-                    gates.stride(0), dgates.stride(0), D=dim, BLOCK_A=BLOCK_A, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
-                    PRECISION=precision, num_warps=NUM_WARPS, num_stages=NUM_STAGES)
+    padded = triton.next_power_of_2(dim)
+    block_a = max(1, ROWS // padded)
+    grid = (triton.cdiv(atoms, block_a), triton.cdiv(mul_in, BLOCK_N))
+    return _kernel()[grid](grad.reshape(-1)[offset:], wt, gated, gates.reshape(-1)[gate_offset:],
+                           dgated, dgates.reshape(-1)[gate_offset:], atoms, mul_in, mul_out, width, mul_out,
+                           gates.stride(0), dgates.stride(0), D=dim, DP=padded, BLOCK_A=block_a, BLOCK_N=BLOCK_N,
+                           BLOCK_K=BLOCK_K, PRECISION=precision, num_warps=NUM_WARPS, num_stages=NUM_STAGES)
 
 
 def _gated_rows(scalars, gated, gates, gate_offsets):
@@ -171,4 +181,4 @@ def gated_joined_products(scalars, gated, gates, gate_offsets, weights, weights_
                                       str(precision), len(gated), scalars, gates, *gated, *weights, *weights_t)
 
 
-__all__ = ["BLOCK_A", "BLOCK_K", "BLOCK_N", "gated_joined_products", "gated_products_input_grads"]
+__all__ = ["BLOCK_K", "BLOCK_N", "ROWS", "gated_joined_products", "gated_products_input_grads"]

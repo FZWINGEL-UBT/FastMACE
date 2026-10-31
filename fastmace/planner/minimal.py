@@ -1247,9 +1247,11 @@ class MinimalPlanner:
             field = None
         return True, f"a trial evaluation on {plan.engine.device} ran"
 
-    def build_evaluation(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True):
+    def build_evaluation(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True,
+                         call_rows=None):
         """The ``MACEForceField`` of an evaluation ``plan`` (``evaluate`` path, with stress, no graphs); with D3, a
-        ``DispersedForceField`` around it (3b-T04)."""
+        ``DispersedForceField`` around it (3b-T04). ``call_rows``: ``MACEForceField``'s (a caller that runs the
+        model on fewer rows than the atom count, such as the tiled path)."""
         from fastmace.model.forces import MACEForceField
         from fastmace.rewrites import registry as reg
 
@@ -1264,7 +1266,7 @@ class MinimalPlanner:
         field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
                                polar=plan.polar or PolarConfig(), compute_stress=True, compile_cache=compile_cache,
                                registry=registry, check=check, float64_energy=plan.precision.float64_energy,
-                               species=plan.superset or None)
+                               species=plan.superset or None, call_rows=call_rows)
         return fixed._with_d3(field, plan, atoms)
 
 

@@ -1,0 +1,142 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+19.8,2191920832,1600,1369950.5,1337228.5,333071,2583412,742785.5,gemm
+19.4,2137077097,100,21370771.0,21395841.0,20753662,21597070,120522.2,oeq_projected_backward_wprime
+14.4,1589109317,100,15891093.2,15958031.5,15327029,16118066,158824.0,fused_folded_forward
+4.9,543302713,220,2469557.8,3318325.5,1240024,3498046,1082823.7,kernel
+4.7,517759799,600,862933.0,913513.0,576282,1199702,201094.8,void cutlass::Kernel2<cutlass_80_simt_sgemm_128x128_8x4_nn_align1>(T1::Params)
+3.9,426210106,500,852420.2,1054015.5,414643,1159700,279014.3,void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(T1::Params)
+3.4,373140524,1600,233212.8,99300.0,5568,1020654,254320.7,void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(T1::Params)
+2.2,239373422,200,1196867.1,1193717.5,1156500,1250424,31898.2,forward
+1.6,179308867,100,1793088.7,1792657.0,1757072,1872405,17342.3,segmented_polynomial_bwd_algo4_2
+1.5,162545521,100,1625455.2,1621817.0,1575399,1696140,26589.5,segmented_polynomial_bwd_algo6_4
+1.3,144945262,200,724726.3,723073.0,666302,783459,17614.9,triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_27
+1.3,141643970,100,1416439.7,1412911.5,1378046,1497475,21103.1,triton_red_fused__unsafe_view_add_clone_div_mul_neg_slice_slice_backward_streaming_conv_wprime_backward_sum_10
+1.3,140703066,200,703515.3,705695.5,640413,773282,24044.2,triton_poi_fused_mul_sigmoid_slice_unsqueeze_view_9
+1.2,135731830,200,678659.2,679198.5,635741,869672,18383.6,triton_poi_fused_mul_sum_view_4
+1.1,122922563,300,409741.9,526439.5,147559,582714,175803.0,"void magma_sgemmEx_kernel<float, float, float, (bool)0, (bool)0, (int)6, (int)3, (int)5, (int)3, (int)3>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, int, int, const T1 *, const T1 *, T1, T1, int, cublasLtEpilogue_t, int, const void *, long)"
+1.0,112179568,200,560897.8,559369.0,515224,606459,17755.4,triton_poi_fused_add_mul_sigmoid_sigmoid_backward_silu_backward_slice_slice_backward_6
+0.9,104824175,200,524120.9,522568.0,482902,574394,15940.6,triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_25
+0.9,102425371,200,512126.9,511687.0,459220,670494,22942.0,triton_poi_fused_mul_sigmoid_slice_unsqueeze_view_8
+0.9,99288471,200,496442.4,495351.0,461269,538904,13781.3,triton_poi_fused_add_mul_slice_backward_squeeze_sum_view_5
+0.8,93342949,200,466714.7,464756.5,430131,529624,22247.1,triton_poi_fused_mul_sum_view_3
+0.8,92811141,200,464055.7,457252.5,67971,878087,395114.9,backward
+0.8,91977801,100,919778.0,919306.0,846726,1110770,31539.2,triton_poi_fused_add_div_mul_50
+0.8,91377779,100,913777.8,912745.5,873191,958570,17520.5,segmented_polynomial_algo1_4
+0.8,89008586,500,178017.2,162919.0,14401,383986,134318.6,"void magma_sgemmEx_kernel<float, float, float, (bool)1, (bool)0, (int)6, (int)4, (int)6, (int)3, (int)4>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, int, int, const T1 *, const T1 *, T1, T1, int, cublasLtEpilogue_t, int, const void *, long)"
+0.7,74789608,100,747896.1,746785.5,713952,824357,15265.2,segmented_polynomial_algo1_1
+0.6,64809485,200,324047.4,321102.0,298382,379537,14520.5,triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_23
+0.5,57570876,100,575708.8,574250.0,529975,608476,14237.7,triton_poi_fused_add_edge_outer_sum_backward_mm_slice_backward_transpose_view_20
+0.5,53672369,100,536723.7,534536.0,500919,568025,11104.4,triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_16
+0.4,45402871,100,454028.7,450948.0,419763,496310,16237.3,triton_poi_fused_add_constant_pad_nd_slice_backward_view_13
+0.4,44780188,100,447801.9,446052.0,438643,474486,5641.6,triton_poi_fused__unsafe_view_add_cat_clone_div_mul_slice_39
+0.4,39525614,100,395256.1,392962.0,361648,430835,14939.8,triton_poi_fused_add_constant_pad_nd_index_28
+0.4,39261866,100,392618.7,392370.0,350800,427891,14210.0,triton_poi_fused__to_copy_add_clamp_min_div_expand_index_linalg_vector_norm_lt_mul_pow_rsub_select_stack_sub_unsqueeze_5
+0.3,37180621,300,123935.4,51122.0,416,377361,141130.7,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<float>, std::array<char *, (unsigned long)1>, (bool)0>(int, T2, T3)"
+0.3,35933192,100,359331.9,353839.5,349808,404082,11048.5,triton_poi_fused__unsafe_view_add_cat_clone_div_mul_slice_40
+0.3,34146432,100,341464.3,338607.5,311662,392722,16525.7,triton_poi_fused_mul_sigmoid_slice_unsqueeze_view_15
+0.3,33315969,100,333159.7,333598.5,321583,347952,5421.0,triton_poi_fused__to_copy_add_clamp_min_div_eq_exp_expand_gather_mul_neg_pow_rsub_scalar_tensor_select_sub_unsqueeze_view_where_24
+0.3,32633335,100,326333.3,320606.0,290765,380177,16523.9,triton_poi_fused_mul_sigmoid_slice_unsqueeze_view_7
+0.3,30986064,100,309860.6,308142.0,281933,345551,12545.6,triton_poi_fused__unsafe_view_add_cat_clone_div_mul_slice_38
+0.3,30303155,100,303031.5,303021.0,276588,343536,13903.1,triton_poi_fused__unsafe_view_add_clone_constant_pad_nd_index_mm_slice_29
+0.2,26683435,100,266834.3,265339.5,243819,310030,10942.8,triton_poi_fused_clone_slice_transpose_view_18
+0.2,23271384,100,232713.8,232602.5,210858,272940,10501.3,triton_poi_fused_mul_12
+0.2,22250381,660,33712.7,32705.5,9217,92676,14423.1,"void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_kernel_impl<at::native::OpaqueType<(int)8>>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)"
+0.2,18541828,100,185418.3,185160.5,162599,213706,8347.9,triton_poi_fused_clone_slice_transpose_view_16
+0.2,17252616,100,172526.2,171591.5,153959,202313,9303.5,triton_poi_fused__unsafe_view_add_clone_div_mm_mul_slice_26
+0.2,16774096,200,83870.5,83284.0,70435,122149,11199.2,"void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)]>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+0.1,16267507,100,162675.1,162887.5,135558,216810,13048.6,triton_poi_fused_stack_11
+0.1,15899690,100,158996.9,158087.0,150343,178952,5703.7,triton_poi_fused_add_clamp_min_div_expand_mul_select_select_backward_25
+0.1,15421786,760,20291.8,10465.0,928,85444,21692.1,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::CUDAFunctor_add<double>, std::array<char *, (unsigned long)3>, (bool)0>(int, T2, T3)"
+0.1,15070500,200,75352.5,71907.0,65539,112997,9876.8,triton_poi_fused_joined_products_mul_sigmoid_silu_slice_unsqueeze_view_21
+0.1,15054412,100,150544.1,150134.0,145287,161831,2654.5,triton_poi_fused_add_clamp_min_div_eq_expand_gt_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_sum_where_26
+0.1,14926275,100,149262.8,149223.0,148102,150727,351.0,inside_kernel
+0.1,14907590,100,149075.9,145366.5,133350,195497,11226.1,triton_poi_fused_cat_view_19
+0.1,14879136,100,148791.4,148038.5,137190,175944,6888.8,triton_poi_fused_clone_slice_view_19
+0.1,14144030,100,141440.3,141318.5,129126,169896,7118.6,scatter_kernel
+0.1,14129271,100,141292.7,135830.0,126534,215177,14151.2,triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_11
+0.1,12786582,100,127865.8,125205.0,111941,176488,11950.9,triton_poi_fused__unsafe_view_add_clone_div_mm_mul_slice_24
+0.1,12700442,160,79377.8,76547.0,54947,128037,15707.3,"void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail::cub::detail::radix::policy_hub<long, at::cuda::cub::detail::OpaqueType<(int)8>, unsigned long long>::Policy1000, (at_cuda_detail::cub::SortOrder)0, long, at::cuda::cub::detail::OpaqueType<(int)8>, unsigned long long, int, int, at_cuda_detail::cub::detail::identity_decomposer_t>(T7 *, T7 *, T5 *, const T5 *, T3 *, const T3 *, T4 *, const T4 *, T6, int, int, T8)"
+0.1,9966463,100,99664.6,98804.5,90756,119302,4350.2,triton_poi_fused_clone_slice_view_18
+0.1,9520202,100,95202.0,92308.0,85731,129061,7946.3,triton_poi_fused__unsafe_view_add_clone_mm_slice_slice_backward_12
+0.1,8772399,100,87724.0,87316.0,80836,106372,4153.8,triton_poi_fused_clone_slice_transpose_view_14
+0.1,8482523,100,84825.2,84500.0,69091,104869,5856.2,triton_poi_fused_add_index_select_sub_4
+0.1,8199022,200,40995.1,40178.0,14849,73635,26018.4,void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(T1::Params)
+0.1,8183668,100,81836.7,81683.0,77636,86627,1849.4,triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_8
+0.1,7892190,100,78921.9,76355.5,66819,102148,8450.5,triton_poi_fused__unsafe_view_add_clone_div_mm_mul_slice_22
+0.1,7765120,100,77651.2,69859.0,61251,137126,17252.1,triton_poi_fused_cat_view_17
+0.1,7564945,100,75649.4,72867.0,46530,103429,10414.3,triton_poi_fused_add_cat_div_mul_slice_20
+0.1,6615846,100,66158.5,62307.0,55234,93796,9243.1,triton_poi_fused__to_copy_add_arange_full_like_index_lt_mul_select_where_33
+0.1,6519077,100,65190.8,64755.0,57411,80067,3775.8,triton_poi_fused_clone_slice_view_17
+0.1,5602485,100,56024.8,55362.5,51810,68483,2846.1,triton_poi_fused_add_index_sub_22
+0.0,5342642,100,53426.4,42866.0,40258,143718,22854.0,triton_poi_fused_add_cat_index_view_31
+0.0,4747357,100,47473.6,47762.5,38690,62499,3703.3,triton_poi_fused__to_copy_add_exp_expand_gather_mul_radial_table_backward_select_slice_unsqueeze_23
+0.0,4712943,100,47129.4,46482.0,41378,59618,2958.4,triton_poi_fused_add_cat_div_mul_slice_37
+0.0,4134977,100,41349.8,41154.0,38978,45730,1302.3,triton_poi_fused_scatter_add_select_unsqueeze_zeros_36
+0.0,3488765,360,9691.0,6720.5,896,55394,8302.9,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::CUDAFunctor_add<long>, std::array<char *, (unsigned long)3>, (bool)0>(int, T2, T3)"
+0.0,3178028,240,13241.8,11216.0,3297,33282,7895.2,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::BUnaryFunctor<long, long, long, at::native::binary_internal::div_floor_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long, long) (instance 1)]>, std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,2990758,260,11502.9,6208.0,6080,42849,10014.2,"void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<double, at::native::func_wrapper_t<double, at::native::sum_functor<double, double, double>::operator ()(at::TensorIterator &)::[lambda(double, double) (instance 1)]>, unsigned int, double, (int)4, (int)4>>(T3)"
+0.0,2260831,200,11304.2,3008.0,1248,39905,12584.0,"void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)"
+0.0,2216128,100,22161.3,21377.0,15552,47074,4068.0,triton_poi_fused_cat_view_15
+0.0,2100124,100,21001.2,20561.0,17633,30209,2200.9,triton_poi_fused_add_cat_index_view_2
+0.0,2042427,100,20424.3,20225.0,18913,24481,905.3,triton_poi_fused_clone_slice_transpose_view_13
+0.0,1985112,300,6617.0,5056.5,2208,24002,4842.6,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::AUnaryFunctor<long, long, long, at::native::binary_internal::MulFunctor<long>>, std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,1824693,100,18246.9,18272.5,17441,18977,273.0,triton_poi_fused__to_copy_add_expand_index_mul_scatter_add_stack_sum_zeros_49
+0.0,1759693,60,29328.2,26401.5,17665,61154,9781.0,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::BinaryFunctor<double, double, double, at::native::binary_internal::MulFunctor<double>>, std::array<char *, (unsigned long)3>, (bool)0>(int, T2, T3)"
+0.0,1637390,100,16373.9,11713.0,10880,60514,11341.5,triton_poi_fused__to_copy_arange_cat_full_like_fused_folded_forward_lt_searchsorted_select_slice_unsqueeze_where_35
+0.0,1589643,120,13247.0,8544.0,1088,40226,12225.6,"void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<double, double, double, at::native::binary_internal::MulFunctor<double>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+0.0,1573956,120,13116.3,12576.5,2592,27649,5948.9,"void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 3)]::operator ()() const::[lambda(int) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)"
+0.0,1416096,100,14161.0,14145.0,13248,15233,364.7,triton_per_fused_argmax_0
+0.0,1339646,60,22327.4,19648.5,10784,55554,10926.8,"void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<bool, at::native::func_wrapper_t<bool, at::native::and_kernel_cuda(at::TensorIterator &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 12)]::operator ()() const::[lambda(bool, bool) (instance 1)]>, unsigned int, bool, (int)4, (int)4>>(T3)"
+0.0,1318075,100,13180.8,12128.5,10528,19649,2586.0,triton_poi_fused__to_copy__unsafe_view_arange_clone_eq_expand_mul_silu_backward_unsqueeze_2
+0.0,1290816,100,12908.2,11265.0,10081,39394,5244.0,triton_poi_fused_argmax_index_slice_32
+0.0,1254036,120,10450.3,6224.0,2848,24961,6996.2,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::BUnaryFunctor<long, long, long, at::native::remainder_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long, long) (instance 1)]>, std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,1160721,60,19345.3,17568.5,15296,39842,5310.0,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<double, double, bool, at::native::<unnamed>::CompareEqFunctor<double>>, std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,1140949,100,11409.5,11361.0,11072,12161,209.2,triton_red_fused_add_argmax_index_slice_48
+0.0,1022994,100,10229.9,10177.0,9984,10913,158.3,drift_kernel
+0.0,1000302,100,10003.0,9697.0,9281,13024,797.7,triton_poi_fused__to_copy__unsafe_view_add_arange_clone_eq_expand_index_mul_silu_unsqueeze_47
+0.0,930565,100,9305.6,9312.0,9088,9601,97.0,"void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_cuda_detail::cub::detail::scan::policy_hub<long, long, long, unsigned int, std::plus<long>>::Policy1000, const long *, long *, at_cuda_detail::cub::ScanTileState<long, (bool)1>, std::plus<long>, at_cuda_detail::cub::NullType, unsigned int, long, (bool)0, at_cuda_detail::cub::NullType>(T2, T3, T4, int, T5, T6, T7)"
+0.0,801542,60,13359.0,12624.5,10721,24353,2935.6,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::BinaryFunctor<long, long, bool, at::native::<unnamed>::CompareEqFunctor<long>>, std::array<char *, (unsigned long)3>, (bool)0>(int, T2, T3)"
+0.0,760063,120,6333.9,3856.5,928,31554,6797.2,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::BinaryFunctor<bool, bool, bool, at::native::BitwiseAndFunctor<bool>>, std::array<char *, (unsigned long)3>, (bool)0>(int, T2, T3)"
+0.0,629983,60,10499.7,10080.0,2496,30146,4688.0,"void at::native::vectorized_elementwise_kernel<(int)4, void at::native::compare_scalar_kernel<double>(at::TensorIteratorBase &, at::native::<unnamed>::OpType, T1)::[lambda(double) (instance 1)], std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,613056,60,10217.6,7025.0,4352,33314,7763.1,"void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<long, at::native::func_wrapper_t<long, at::native::sum_functor<long, long, long>::operator ()(at::TensorIterator &)::[lambda(long, long) (instance 1)]>, unsigned int, long, (int)4, (int)4>>(T3)"
+0.0,588920,60,9815.3,6240.5,3744,23233,5895.1,"void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::<unnamed>::where_kernel_impl(at::TensorIterator &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(bool, unsigned long, unsigned long) (instance 1)]>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+0.0,535739,100,5357.4,5312.0,5056,7457,293.5,triton_poi_fused_index_1
+0.0,503829,60,8397.1,5600.0,3840,29922,5809.6,"void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)"
+0.0,453013,20,22650.7,21873.0,20609,31329,2783.9,"void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortHistogramKernel<at_cuda_detail::cub::detail::radix::policy_hub<long, at::cuda::cub::detail::OpaqueType<(int)8>, unsigned long long>::Policy1000, (at_cuda_detail::cub::SortOrder)0, long, unsigned long long, at_cuda_detail::cub::detail::identity_decomposer_t>(T4 *, const T3 *, T4, int, int, T5)"
+0.0,428788,100,4287.9,3840.0,3680,11680,1291.7,triton_red_fused_add_argmax_constant_pad_nd_index_slice_30
+0.0,419057,20,20952.8,22609.0,11616,24673,4144.3,"at::native::<unnamed>::fill_reverse_indices_kernel(long *, int, at::cuda::detail::IntDivider<unsigned int>)"
+0.0,385072,300,1283.6,1152.0,960,6304,663.3,triton_poi_fused_mm_14
+0.0,330571,100,3305.7,3072.0,2784,16993,1440.4,"void sgemm_largek_lds64<(bool)0, (bool)1, (int)5, (int)5, (int)4, (int)4, (int)4, (int)32>(float *, const float *, const float *, int, int, int, int, int, int, const float *, const float *, float, float, int, int, int *, int *)"
+0.0,312557,100,3125.6,3104.0,2848,3616,164.5,void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nt_align1>(T1::Params)
+0.0,260684,60,4344.7,2544.0,896,21249,4675.4,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::bitwise_not_kernel_cuda(at::TensorIteratorBase &)::[lambda(bool) (instance 1)], std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,255855,100,2558.6,2528.0,2336,3040,141.4,triton_poi_fused_cat_clone_mul_slice_t_unsqueeze_9
+0.0,251434,100,2514.3,2496.0,2400,2784,73.3,noise_kernel
+0.0,250347,100,2503.5,2336.0,2048,12513,1050.5,triton_poi_fused__to_copy_cat_fused_folded_forward_slice_unsqueeze_34
+0.0,242442,20,12122.1,14160.5,2689,17313,4914.3,"void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::FillFunctor<int>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+0.0,235499,100,2355.0,2336.0,2272,2656,68.7,"void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<double, double, double, at::native::binary_internal::DivFunctor<double>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+0.0,234792,200,1174.0,1120.0,832,1824,303.2,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::AUnaryFunctor<double, double, double, at::native::binary_internal::MulFunctor<double>>, std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,233933,20,11696.6,13777.0,5120,16129,4262.9,"void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)]>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+0.0,223141,100,2231.4,2176.0,1824,3904,280.9,triton_poi_fused__to_copy_add_expand_gather_index_put_mul_new_zeros_select_unsqueeze_1
+0.0,200452,300,668.2,640.0,448,3168,253.9,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::FillFunctor<double>, std::array<char *, (unsigned long)1>, (bool)0>(int, T2, T3)"
+0.0,193703,100,1937.0,1968.0,1568,2368,184.4,triton_poi_fused_argmax_index_slice_3
+0.0,175944,100,1759.4,1760.0,1728,1984,43.3,"void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 6)]::operator ()() const::[lambda(double) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)"
+0.0,141988,300,473.3,416.0,288,1856,183.7,triton_poi_fused_add_exp_mul_scatter_add_select_unsqueeze_zeros_7
+0.0,137160,100,1371.6,1312.0,928,2240,288.5,triton_poi_fused_index_44
+0.0,134338,200,671.7,640.0,448,2817,307.2,triton_poi_fused__to_copy_add_expand_gather_index_put_mul_new_zeros_select_unsqueeze_0
+0.0,126405,20,6320.3,992.0,960,38945,12971.1,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::floor_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 1)]::operator ()() const::[lambda(double) (instance 1)], std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,111718,80,1396.5,1136.0,608,6497,914.2,"void at::native::vectorized_elementwise_kernel<(int)2, at::native::FillFunctor<long>, std::array<char *, (unsigned long)1>, (bool)0>(int, T2, T3)"
+0.0,111713,120,930.9,640.0,352,14145,1618.6,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<int>, std::array<char *, (unsigned long)1>, (bool)0>(int, T2, T3)"
+0.0,110086,100,1100.9,1056.0,992,2241,179.5,"void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, float, float, float, (bool)0, float, float, float, (bool)1, (bool)0, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)"
+0.0,99972,100,999.7,928.0,736,2561,283.9,triton_poi_fused_add_index_squeeze_stack_46
+0.0,90086,200,450.4,448.0,384,672,45.9,triton_poi_fused_index_put_neg_new_zeros_21
+0.0,87556,200,437.8,416.0,288,1056,115.0,triton_poi_fused_add_expand_zeros_42
+0.0,85574,20,4278.7,3984.5,3297,6016,749.2,"void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortExclusiveSumKernel<at_cuda_detail::cub::detail::radix::policy_hub<long, at::cuda::cub::detail::OpaqueType<(int)8>, unsigned long long>::Policy1000, unsigned long long>(T2 *)"
+0.0,63043,100,630.4,640.0,608,768,27.5,"void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float>>, std::array<char *, (unsigned long)2>, (bool)0>(int, T2, T3)"
+0.0,58658,100,586.6,576.0,544,640,16.4,triton_poi_fused_add_27
+0.0,55522,100,555.2,544.0,352,1184,161.6,triton_poi_fused_arange_45
+0.0,52353,100,523.5,544.0,320,896,104.2,triton_poi_fused_expand_scatter_add_zeros_41
+0.0,50979,100,509.8,512.0,480,640,39.0,"void scal_kernel<float, float, (int)1, (bool)1, (int)6, (int)5, (int)5, (int)3>(cublasTransposeParams<T2>, const T1 *, T1 *, const T2 *)"
+0.0,46370,100,463.7,448.0,320,1440,140.9,triton_poi_fused_zeros_43
+0.0,43747,100,437.5,416.0,384,704,51.5,"void at_cuda_detail::cub::detail::scan::DeviceScanInitKernel<at_cuda_detail::cub::ScanTileState<long, (bool)1>>(T1, int)"
+0.0,37889,100,378.9,384.0,352,608,40.1,triton_poi_fused__to_copy_argmax_ones_6
+0.0,34752,100,347.5,352.0,320,480,33.1,triton_poi_fused_cat_mul_10

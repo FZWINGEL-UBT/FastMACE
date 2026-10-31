@@ -84,3 +84,22 @@ def test_compiled_matches_eager():
     compiled = torch.autograd.grad(torch.compile(energy, dynamic=False)(*leaves), leaves)
     for a, b in zip(compiled, eager):
         torch.testing.assert_close(a, b, rtol=1e-5, atol=1e-6)
+
+
+@pytest.mark.parametrize("dim", [3, 5, 7])
+def test_stacked_tile_has_no_register_spills(dim):
+    """The K-outer kernel keeps every component's accumulator of the stacked tile in registers (fifth list, E)."""
+    from fastmace.kernels.triton import gated_products as gp
+
+    atoms, mul = 300, MUL
+    g = torch.Generator(device="cuda").manual_seed(4)
+    grad = torch.randn((atoms, dim * mul), generator=g, device="cuda")
+    wt = torch.randn((mul, mul), generator=g, device="cuda")
+    gated = torch.randn((atoms * dim, mul), generator=g, device="cuda")
+    gates = torch.rand((atoms, mul), generator=g, device="cuda")
+    dgated, dgates = torch.empty_like(gated), torch.empty_like(gates)
+    compiled = gp._fused(grad, 0, mul, wt, gated, gates, 0, dgated, dgates, dim, "ieee")
+    assert compiled.n_spills == 0, f"D={dim}: {compiled.n_regs} registers, {compiled.n_spills} spills"
+    drows = (grad.view(atoms * dim, mul) @ wt).view(atoms, dim, mul)
+    torch.testing.assert_close(dgated, (drows * gates[:, None, :]).reshape(atoms * dim, mul), rtol=1e-5, atol=1e-5)
+    torch.testing.assert_close(dgates, (drows * gated.view(atoms, dim, mul)).sum(1), rtol=1e-5, atol=1e-5)
