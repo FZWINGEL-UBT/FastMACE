@@ -1,0 +1,40 @@
+{
+ "swaps": [
+  [
+   "fastmace.kernels.triton.edge_outer_sum",
+   "_triton_backward",
+   "edge_outer_sum_backward"
+  ]
+ ],
+ "trace": [
+  {
+   "side": "a",
+   "phase": "build",
+   "code": "reference",
+   "attribute": "_triton_backward",
+   "calls": 7
+  },
+  {
+   "side": "a",
+   "phase": "step",
+   "code": "reference",
+   "attribute": "_triton_backward",
+   "calls": 4
+  },
+  {
+   "side": "b",
+   "phase": "build",
+   "code": "library",
+   "attribute": "_triton_backward",
+   "calls": 7
+  },
+  {
+   "side": "b",
+   "phase": "step",
+   "code": "library",
+   "attribute": "_triton_backward",
+   "calls": 4
+  }
+ ],
+ "wrong": []
+}

@@ -1,0 +1,40 @@
+{
+ "swaps": [
+  [
+   "fastmace.kernels.triton.gated_products",
+   "_fused",
+   "gated_fused"
+  ]
+ ],
+ "trace": [
+  {
+   "side": "a",
+   "phase": "build",
+   "code": "reference",
+   "attribute": "_fused",
+   "calls": 36
+  },
+  {
+   "side": "a",
+   "phase": "step",
+   "code": "reference",
+   "attribute": "_fused",
+   "calls": 24
+  },
+  {
+   "side": "b",
+   "phase": "build",
+   "code": "library",
+   "attribute": "_fused",
+   "calls": 36
+  },
+  {
+   "side": "b",
+   "phase": "step",
+   "code": "library",
+   "attribute": "_fused",
+   "calls": 24
+  }
+ ],
+ "wrong": []
+}
