@@ -35,6 +35,7 @@ GATE_PASSED = {"status": "passed", "copies": "2 rattled", "energy_meV_per_atom":
 def _rewrites(off=("streaming_conv", "single_graph_strain", "grouped_launch", "folded_backward_tiles",
                    "direct_node_feats", "folded_constants", "radial_tables", "combo_kernels", "save_transcendentals",
                    "tf32x3_gemms", "gate_epilogue", "recompute_conv_weights", "recompute_node_segments",
+                   "recompute_node_region",
                    "fused_folded_forward", "w_tables",
                    "fx_e3nn_linear", "polar_graph_sums")):
     return tuple((f"RewriteConfig.{name}", "off" if name in off else "on", "auto") for name in REWRITE_FIELDS)

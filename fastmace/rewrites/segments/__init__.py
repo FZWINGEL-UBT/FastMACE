@@ -104,6 +104,39 @@ def recompute_segments(model):
     return names
 
 
+def region_chunks(atoms):
+    """The atom chunks of ``recompute_node_region``'s combined region for a cell of ``atoms`` atoms (the rule is set
+    from the chunk-count screens; ``REGION_CHUNKS`` above 1 overrides it for A/B sides)."""
+    if REGION_CHUNKS > 1:
+        return REGION_CHUNKS
+    return _rule_chunks(int(atoms))
+
+
+def _rule_chunks(atoms):
+    return 4
+
+
+def recompute_region(model, atoms):
+    """``recompute_node_region``: each interaction's separately recomputed ``gated_rows`` chain and product block
+    (``recompute_node_segments``) become one checkpoint region from the chain through the product block, run in
+    ``region_chunks(atoms)`` atom chunks; returns their names."""
+    m = _modules()
+    chunks = region_chunks(atoms)
+    names = []
+    for index, interaction in enumerate(getattr(model, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is None:
+            continue
+        product = model.products[index]
+        m.unrecompute(chain)
+        m.unrecompute(product)
+        m.join_region(interaction, product, chunks)
+        names.append(f"interactions.{index}.gated_rows..products.{index} ({chunks} atom chunks)")
+    if not names:
+        raise ValueError("recompute_node_region: no interaction with a gated_rows chain")
+    return names
+
+
 def _probe(generator, rows, width, like):
     import torch
 
@@ -199,11 +232,45 @@ def _apply(model, context):
     return recompute_segments(model)
 
 
+def _atoms(context):
+    attrs = context.inputs.get("node_attrs") if context.inputs else None
+    return int(attrs.shape[0]) if attrs is not None else 1
+
+
+def _apply_region(model, context):
+    return recompute_region(model, _atoms(context))
+
+
+def _support_region(model):
+    support = _support(model)
+    if not support.supported:
+        return support
+    if not any(getattr(interaction, "gated_rows", None) is not None for interaction in model.interactions):
+        return Support(False, "no gated_rows chain to join with its product block")
+    return support
+
+
+def _selfcheck_region(original, rewritten, context):
+    """Each combined region against its stored chain, reshape and product block on probe rows (``_region_cases``)."""
+    import torch
+
+    generator = torch.Generator().manual_seed(context.seed + 43)
+    cases = CaseErrors()
+    dtype = _region_cases(rewritten, generator, cases)
+    return cases.result(dtype)
+
+
 RECORDS = {
     "recompute_node_segments": Rewrite(
         name="recompute_node_segments", applies_to=_support, requires=("gated_rows",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
         workload_constraints=(), apply=_apply, selfcheck=_selfcheck, memory=memory_terms.recompute_node_segments),
+    "recompute_node_region": Rewrite(
+        name="recompute_node_region", applies_to=_support_region, requires=("recompute_node_segments",),
+        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off",
+        deterministic=True, workload_constraints=(), apply=_apply_region, selfcheck=_selfcheck_region,
+        memory=memory_terms.recompute_node_region),
 }
 
-__all__ = ["RECORDS", "REGION_CHUNKS", "SEGMENT_REGION", "recompute_segments", "segments"]
+__all__ = ["RECORDS", "REGION_CHUNKS", "SEGMENT_REGION", "recompute_region", "recompute_segments", "region_chunks",
+           "segments"]

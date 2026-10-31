@@ -89,7 +89,7 @@ def test_the_record_is_rounding_deterministic_off_and_rescued_after_recompute_co
     record = segments.RECORDS["recompute_node_segments"]
     assert (record.exactness, record.default, record.deterministic) == ("rounding", "off", True)
     assert record.requires == ("gated_rows",)
-    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_node_segments")
+    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_node_segments", "recompute_node_region")
     assert "fastmace.rewrites.segments" in reg.RECORD_SOURCES
     model, _ = tiny("mh1")
     edge, node = record.memory(capabilities.model_dims(model), 4)
@@ -107,12 +107,12 @@ def _registry():
     return out
 
 
-def _rewritten(recompute):
+def _rewritten(recompute, region="off"):
     model, batch = tiny("mh1", backend="cueq")
     regs = _registry()
     on = {*PACKAGE, *LINEAR, "gated_rows"}
     requests = ({name: "on" if name in on else "off" for name in regs.names()}
-                | {"recompute_node_segments": recompute})
+                | {"recompute_node_segments": recompute, "recompute_node_region": region})
     out = copy.deepcopy(model)
     resolution = regs.resolve(out, requests, strict=False)
     applied = regs.apply(out, resolution, context(batch), original=model)
@@ -167,4 +167,49 @@ def test_energy_and_forces_are_bitwise_unchanged_in_eager(monkeypatch, region):
     energy_and_forces(without, batch)  # throwaway evaluation (docs/development.md)
     energy, forces = energy_and_forces(without, batch)
     new_energy, new_forces = energy_and_forces(recomputed, batch)
+    assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)
+
+
+# --------------------------------------------------------------------------- recompute_node_region (ninth list item 2)
+
+def test_region_record_is_the_last_rescue_rung_and_needs_the_segments():
+    from fastmace.model import capabilities
+    from fastmace.rewrites import memory as terms
+
+    record = segments.RECORDS["recompute_node_region"]
+    assert (record.exactness, record.default, record.deterministic) == ("rounding", "off", True)
+    assert record.requires == ("recompute_node_segments",)
+    model, _ = tiny("mh1")
+    edge, node = record.memory(capabilities.model_dims(model), 4)
+    assert edge == 0 and node < 0 and record.memory is terms.recompute_node_region
+
+
+def test_the_chunk_count_overrides_the_rule_only_above_one(monkeypatch):
+    monkeypatch.setattr(segments, "REGION_CHUNKS", 1)
+    assert segments.region_chunks(21600) == segments._rule_chunks(21600)
+    monkeypatch.setattr(segments, "REGION_CHUNKS", 3)
+    assert segments.region_chunks(21600) == 3
+
+
+@CUEQ
+def test_the_region_record_joins_the_segments_in_chunks_and_passes_its_selfcheck(monkeypatch):
+    monkeypatch.setattr(segments, "REGION_CHUNKS", 3)
+    original, model, _, resolution, applied = _rewritten("on", "on")
+    assert resolution.decision("recompute_node_region").enabled
+    entry = next(entry for entry in applied if entry.name == "recompute_node_region")
+    assert entry.result.passed and entry.result.max_relative_error == 0
+    for interaction, product in zip(model.interactions, model.products):
+        assert product.forward.__func__ is sm.region_forward and product.region_chunks == 3
+        assert interaction.gated_rows.forward.__func__ is sm.joined_inputs
+        assert "recomputed_inner" not in interaction.gated_rows.__dict__  # the separate wrapper is undone
+
+
+@CUEQ
+def test_the_region_record_keeps_energy_and_forces_bitwise_in_eager(monkeypatch):
+    monkeypatch.setattr(segments, "REGION_CHUNKS", 3)
+    _, without, batch, _, _ = _rewritten("off")
+    _, joined, _, _, _ = _rewritten("on", "on")
+    energy_and_forces(without, batch)  # throwaway evaluation (docs/development.md)
+    energy, forces = energy_and_forces(without, batch)
+    new_energy, new_forces = energy_and_forces(joined, batch)
     assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)

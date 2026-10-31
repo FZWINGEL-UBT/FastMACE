@@ -53,8 +53,10 @@ MARGIN = 0.9
 #
 # The order is the planning order (CAP-T08): recompute_node_segments (about 1.10x the force call) only after
 # recompute_conv_weights (1.01-1.04x), so rule 12 turns it on only when the plan still does not fit with
-# recompute_conv_weights on, and the memory rescue turns on one record per rebuild in this order.
-MEMORY_RESCUE = ("recompute_conv_weights", "recompute_node_segments")
+# recompute_conv_weights on, and the memory rescue turns on one record per rebuild in this order. Last,
+# recompute_node_region (about 1.23x the separate segments' force call): only when the plan does not fit with
+# recompute_node_segments on (ninth list item 2).
+MEMORY_RESCUE = ("recompute_conv_weights", "recompute_node_segments", "recompute_node_region")
 # The estimate's largest overstatement of the measured peak in decision 67's fit (the capacity cells: 1.05 to 1.34
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34

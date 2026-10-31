@@ -22,6 +22,18 @@ def recompute(module):
     return module
 
 
+def unrecompute(module):
+    """Undo ``recompute``: the module's forward before it, if it has one."""
+    inner = module.__dict__.pop("recomputed_inner", None)
+    if inner is None:
+        return module
+    if getattr(inner, "__func__", None) is type(module).forward:
+        module.__dict__.pop("forward", None)  # the class's own forward again
+    else:
+        module.forward = inner
+    return module
+
+
 def stored(module):
     """``module``'s forward before ``recompute`` or ``join_region`` (the self-check's reference)."""
     return getattr(module, "recomputed_inner", module.forward)
@@ -89,4 +101,4 @@ def join_region(interaction, product, chunks=1):
 
 
 __all__ = ["join_region", "joined_inputs", "passed_through", "recompute", "recomputed_forward", "region",
-           "region_forward", "stored"]
+           "region_forward", "stored", "unrecompute"]
