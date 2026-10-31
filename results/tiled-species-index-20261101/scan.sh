@@ -21,7 +21,7 @@ for spec in ${NBCL5:+$(for r in $NBCL5; do echo NbCl5:$r; done)} ${NACL:+$(for r
   s=${spec%%:*}; rep=${spec#*:}
   atoms=$(echo $rep | awk -F x -v s=$s '{print $1 * $2 * $3 * (s == "NaCl" ? 8 : 72)}')
   avail=$(free -b | awk 'NR==2 {print $7}')
-  need=$(awk -v n=$atoms 'BEGIN {printf "%d", n * 6700}')
+  need=$(awk -v n=$atoms 'BEGIN {printf "%.0f", n * 6700}')  # %d overflows at 2^31 in mawk
   echo "host memory available $((avail / 1000000000)) GB, $s $rep needs about $((need / 1000000000)) GB"
   if [ $need -gt $((avail - 20000000000)) ]; then echo "capacity $s $rep skipped: host memory"; break; fi
   bash $R $P-cap-$s-$rep $T --structure $s --repeat $rep --receivers 4096 --calls 1 --tile-list --host-state \
