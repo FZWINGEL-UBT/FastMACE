@@ -57,7 +57,8 @@ def parse_args(argv=None):
                    help="TileConfig.species='index': the tiles' one-hot rows from the species index; the field's "
                         "device one-hot is released")
     p.add_argument("--budget-receivers", type=int, nargs="*", default=[],
-                   help="TileConfig.budget_receivers: larger caps the call may take after its first call")
+                   help="TileConfig.budget_receivers: larger caps the call may take after its first call (none "
+                        "given: TileConfig's default)")
     p.add_argument("--tag", default="")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
@@ -178,7 +179,7 @@ def main(argv=None):
         record["mode"] = args.mode
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges, mode=args.mode,
                                                   neighbours="tiles" if args.tile_list else "global",
-                                                  budget_receivers=tuple(args.budget_receivers) or None,  # none given: the default
+                                                  budget_receivers=tuple(args.budget_receivers) or None,
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
                                                   species="index" if args.species_index else "one_hot"))

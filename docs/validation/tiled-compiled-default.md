@@ -58,19 +58,41 @@ both modes.
   - The memory allocated before it is larger by the call's per-atom output buffers (forces, node energies and
     indices, about 32 bytes per atom), and the previous call's returned forces are still held by the caller.
   - The 70.96M of tiled-alias.md was a single call. **The limit for repeated calls, as in MD, is between 64.96M
-    and 67.9M NbCl5 atoms on 20 GB, the same for both modes.**
+    and 67.9M NbCl5 atoms on 20 GB, the same for both modes.** In short: single-call limit 70.96M, MD
+    (repeated-call) limit 65-68M.
 
-## The proposal for the default
+## The default (approved by the conductor; implemented)
 
-`TileConfig.mode` defaults to `"compiled"` when the force field is compiled (`compile_mode` not `"none"`), with
-one memory term: the compiled residency, 0.07 GiB at 9.26M, plus a 1 GiB margin for the compiled workspaces'
-first allocation.
+`TileConfig.mode` defaults to `"auto"`. The planner has no tiled estimate yet, so "auto" takes the call's own
+measurement, as the budget does.
 
-- In the measured cases the term is far below what decides the limit, the repeated call's per-atom terms.
-- A planner that fits eager tiles therefore fits compiled tiles, given that margin.
-- No size threshold.
-- The default switches only with the conductor's decision, so it is a proposal here. The measurements are in this
-  report; the code change is a one-line default in `TileConfig` once accepted.
+- **An eager force field's tiles** stay eager.
+- **A compiled force field's first call** runs eager tiles and measures its peak.
+  - The later calls compile when the memory left at that peak holds the compiled residency and a margin:
+    `COMPILED_RESIDENCY` (0.07 GiB, measured above) plus `COMPILED_MARGIN` (1 GiB, for the compiled workspaces'
+    first allocation).
+  - Otherwise they stay eager.
+  - Chosen once.
+- **The budget** (`budget_receivers` (8192, 16384)) is taken only once the tiles compile.
+- **Every call's report** (`TiledForceField.last`) records `mode` and `mode_reason`.
+- In the measured cases the memory term is far below what decides the limit, the repeated call's per-atom terms.
+  So a call that fits eager tiles fits compiled tiles. No size threshold.
+
+**Tests** (`test_tiled.py` and `test_layering.py`, 92 passed, leto):
+
+- an eager field stays eager, with its reason;
+- the choice at a headroom above and below the residency and margin, and that it is made once;
+- the budget's default per mode.
+
+**On the GPU** (leto, 7bbabbef, NbCl5 51,840 atoms, `tiled_capacity.py --mode auto --calls 4`):
+
+| Call | Time | Mode | R | Reason |
+| ---: | ---: | --- | ---: | --- |
+| 1 | 5.66 s | eager | 4,096 | compiled force field: the first call measures its memory |
+| 2 | 53.48 s | compiled (compiling) | 16,384 | 17.87 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB) |
+| 3, 4 | 0.89, 0.88 s | compiled | 16,384 | (the same) |
+
+`tiled_capacity.py --budget-receivers` without values now leaves TileConfig's default.
 
 **Compile time per new slot shape:**
 
