@@ -96,15 +96,17 @@ def test_fake_kernel_gives_the_shapes_of_the_gradients():
     assert [tuple(t.shape) for t in out] == [(3, MUL), (9, MUL), (15, MUL), (3, 2 * MUL)]
 
 
-def test_record_is_opt_in_rounding_deterministic_after_segment_gemm():
+def test_record_is_rounding_deterministic_after_segment_gemm():
     record = fusion.RECORDS["gate_epilogue"]
+    # off at the registry: the planner turns it on (decision 66), as grouped_launch, so a registry "auto" resolve
+    # never lets it take tf32x3_gemms' place
     assert record.default == "off" and record.exactness == "rounding" and record.deterministic
     assert record.requires == ("segment_gemm",) and record.conflicts == ("tf32x3_gemms",)
     regs = reg.default_registry()
     assert regs.config_field("gate_epilogue") == "gate_epilogue"
     order = regs.order()
     assert order.index("gate_epilogue") > order.index("segment_gemm")
-    assert fixed.AUTO_RULES["RewriteConfig.gate_epilogue"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.gate_epilogue"] == "on_with_segment_gemm_for_mh1_on_decision_66_gpus"
     assert "gate_epilogue" in fixed.REWRITE_FIELDS
     assert RewriteConfig().gate_epilogue == "auto"
 
@@ -185,12 +187,14 @@ def _plan(rewrites, dtype=None):
     configs = dict(rewrites=rewrites, engine=dataclasses.replace(EngineConfig(), backend="auto"))
     if dtype:
         configs["precision"] = PrecisionConfig(dtype=dtype)
-    return planner(**configs).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), GPU)
+    return planner(**configs).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), GPU, model_label="mh1-r2scan")
 
 
-def test_planner_keeps_it_off_unless_asked_and_enables_an_explicit_on():
-    assert _plan(RewriteConfig()).rewrites.gate_epilogue == "off"
+def test_planner_turns_it_on_for_mh1_on_the_measured_gpu_and_keeps_explicit_values():
+    assert _plan(RewriteConfig()).rewrites.gate_epilogue == "on"  # the RTX 5060 Ti, decision 66
+    assert _plan(RewriteConfig(gate_epilogue="off")).rewrites.gate_epilogue == "off"
     assert _plan(RewriteConfig(gate_epilogue="on")).rewrites.gate_epilogue == "on"
+    assert _plan(RewriteConfig(), dtype="float64").rewrites.gate_epilogue == "off"  # auto: never refused
 
 
 def test_planner_refuses_it_in_float64_without_segment_gemm_and_with_tf32x3():
