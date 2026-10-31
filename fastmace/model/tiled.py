@@ -55,7 +55,7 @@ class TileConfig:
     launches, a smaller halo fraction; docs/validation/tiled-screen.md), and at the capacity limit the
     workspace does not fit, so the cap stays at ``receivers``. Chosen once; needs a CUDA device (elsewhere the
     cap stays).
-    ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pinned host memory on CUDA; each
+    ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pageable host memory; each
     tile copies its rows to the device and its results back, so the device holds no per-atom state of the
     sweeps; not with ``mode="graphs"``, whose captured bodies read the state themselves).
     ``species``: the tiles' one-hot species rows from the field's ``node_attrs`` (``"one_hot"``) or built from
@@ -113,10 +113,12 @@ class _State:
 
         if self.tensors:
             return
-        pin = self.host and self.device.type == "cuda"
+        # Host memory unpinned: the tiles copy through gathered (pageable) rows, never from these tensors, and
+        # PyTorch's pinned allocator rounds every block up to a power of two, all of it resident (72 GiB for
+        # 42 GiB of state at 9.26M NbCl5 atoms).
         where = "cpu" if self.host else self.device
         for name, width in widths.items():
-            self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where, pin_memory=pin)
+            self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where)
 
     def zero(self):
         for tensor in self.tensors.values():

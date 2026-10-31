@@ -108,6 +108,17 @@ def no_global_list(active):
         SkinNeighbourList.build, SkinNeighbourList.compact = build, compact
 
 
+def host_memory():
+    """The process's host memory now and at its peak so far (``VmRSS``, ``VmHWM``; pinned pages included), in
+    bytes; empty where /proc is missing."""
+    try:
+        lines = Path("/proc/self/status").read_text().splitlines()
+    except OSError:
+        return {}
+    values = {line.split(":")[0]: int(line.split()[1]) * 1024 for line in lines if line.startswith(("VmRSS", "VmHWM"))}
+    return dict(host_rss=values.get("VmRSS"), host_peak=values.get("VmHWM"))
+
+
 def main(argv=None):
     args = parse_args(argv)
     from fastmace.model.compile import configure_allocator
@@ -135,7 +146,7 @@ def main(argv=None):
     def mem(before=0):
         torch.cuda.synchronize()
         return dict(allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()),
-                    peak_above_before=int(torch.cuda.max_memory_allocated() - before))
+                    peak_above_before=int(torch.cuda.max_memory_allocated() - before), **host_memory())
 
     lists = contextlib.ExitStack()
     lists.enter_context(no_global_list(args.tile_list))
