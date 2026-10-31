@@ -502,18 +502,17 @@ def test_rule_12_turns_on_a_memory_rescue_only_when_the_plan_does_not_fit():
 
     assert "recompute_conv_weights" in memory.MEMORY_RESCUE
     assert AUTO_RULES["RewriteConfig.recompute_conv_weights"] == "on_by_rule_12_when_the_plan_does_not_fit_without_it"
-    full = plan()
+    full = plan(label=MH1)
     assert full.rewrites.recompute_conv_weights == "off"
-    if full.rewrites.wprime_backward != "on":
-        pytest.skip("wprime_backward is off in this plan (decision 66's GPUs)")
+    assert full.rewrites.wprime_backward == "on"
     with pytest.warns(ResourceWarning, match="rule 12"):
-        tight = plan(memory_bytes=2**20)
+        tight = plan(label=MH1, memory_bytes=2**20)
     assert tight.rewrites.recompute_conv_weights == "on"
     _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
     assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
     check(reason)
     with pytest.warns(ResourceWarning, match="rule 12"):
-        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(recompute_conv_weights="off"))
+        kept = plan(label=MH1, memory_bytes=2**20, rewrites=RewriteConfig(recompute_conv_weights="off"))
     assert kept.rewrites.recompute_conv_weights == "off"
 
 
@@ -527,20 +526,19 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
                                     "gate_epilogue", "recompute_node_region")
     assert AUTO_RULES["RewriteConfig.recompute_node_segments"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
-    full = plan()
+    full = plan(label=MH1)
     assert full.rewrites.recompute_node_segments == "off"
-    if full.rewrites.wprime_backward != "on" or full.rewrites.gated_rows != "on":
-        pytest.skip("wprime_backward or gated_rows is off in this plan")
+    assert full.rewrites.wprime_backward == full.rewrites.gated_rows == "on"
     with pytest.warns(ResourceWarning, match="rule 12"):
-        tight = plan(memory_bytes=2**20)  # nothing fits: both on
+        tight = plan(label=MH1, memory_bytes=2**20)  # nothing fits: both on
     assert tight.rewrites.recompute_conv_weights == "on" and tight.rewrites.recompute_node_segments == "on"
     _, choice, reason = tight.decision("RewriteConfig.recompute_node_segments")
     assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
     check(reason)
     assert "recompute_conv_weights" in str(reason)
-    recompute = plan(rewrites=RewriteConfig(recompute_conv_weights="on"))
+    recompute = plan(label=MH1, rewrites=RewriteConfig(recompute_conv_weights="on"))
     free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with recompute_conv_weights on
-    fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
+    fits = plan(label=MH1, memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
     assert fits.rewrites.recompute_node_segments == "off"
 
 
@@ -627,23 +625,24 @@ def test_rule_12_turns_on_recompute_first_table_only_after_recompute_conv_weight
 
     assert AUTO_RULES["RewriteConfig.recompute_first_table"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
-    full = plan()
+    full = plan(label=MH1)
     assert full.rewrites.recompute_first_table == "off"
-    if not (full.rewrites.wprime_backward == full.rewrites.radial_tables == full.rewrites.reassociate_first == "on"):
-        pytest.skip("wprime_backward, radial_tables or reassociate_first is off in this plan")
+    assert full.rewrites.wprime_backward == full.rewrites.radial_tables == full.rewrites.reassociate_first == "on"
     with pytest.warns(ResourceWarning, match="rule 12"):
-        tight = plan(memory_bytes=2**20)  # nothing fits: every rescue on
+        # nothing fits: every rescue on; reassociate_first set on, so that decision 51 does not drop the table's
+        # requirement first
+        tight = plan(label=MH1, memory_bytes=2**20, rewrites=RewriteConfig(reassociate_first="on"))
     assert tight.rewrites.recompute_conv_weights == "on" and tight.rewrites.recompute_first_table == "on"
     _, choice, reason = tight.decision("RewriteConfig.recompute_first_table")
     assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
     check(reason)
     assert "recompute_conv_weights" in str(reason)
     with pytest.warns(ResourceWarning, match="rule 12"):
-        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(recompute_first_table="off"))
+        kept = plan(label=MH1, memory_bytes=2**20, rewrites=RewriteConfig(recompute_first_table="off"))
     assert kept.rewrites.recompute_first_table == "off"
-    recompute = plan(rewrites=RewriteConfig(recompute_conv_weights="on"))
+    recompute = plan(label=MH1, rewrites=RewriteConfig(recompute_conv_weights="on"))
     free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with recompute_conv_weights on
-    fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
+    fits = plan(label=MH1, memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
     assert fits.rewrites.recompute_first_table == "off"
 
 
@@ -652,14 +651,13 @@ def test_rule_12_leaves_the_rescue_to_the_run_when_the_cell_may_fit():
     """CAP-T07 (owner: only when memory would not be enough): the estimate overstates the peak by up to
     RESCUE_OVERSTATEMENT, so a plan that does not fit 90 % of the free memory, but whose estimate divided by it
     does, keeps recompute_conv_weights off; the run rebuilds with it after a real out-of-memory error."""
-    full = plan()
-    if full.rewrites.wprime_backward != "on":
-        pytest.skip("wprime_backward is off in this plan (decision 66's GPUs)")
+    full = plan(label=MH1)
+    assert full.rewrites.wprime_backward == "on"
     pinned = RewriteConfig(**{f.name: "on" for f in dataclasses.fields(RewriteConfig)
                               if getattr(full.rewrites, f.name) == "on"})  # explicit: decision 51 drops none
-    free = plan(rewrites=pinned).predicted_memory_bytes  # above the estimate / 1.34, below the estimate / 0.9
+    free = plan(label=MH1, rewrites=pinned).predicted_memory_bytes  # above the estimate / 1.34, below / 0.9
     with pytest.warns(ResourceWarning, match="rule 12"):
-        tight = plan(memory_bytes=free, rewrites=pinned)
+        tight = plan(label=MH1, memory_bytes=free, rewrites=pinned)
     assert tight.decision("memory")[1] == "warn"
     assert tight.rewrites.recompute_conv_weights == "off"
     _, choice, reason = tight.decision("RewriteConfig.recompute_conv_weights")
