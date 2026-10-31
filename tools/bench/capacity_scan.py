@@ -87,10 +87,13 @@ def parse_args(argv=None):
 # --------------------------------------------------------------------------- supercells
 
 
-# A capacity point counts only if its list has the structure's edges per atom to within this share, and its
-# forces are not all zero (31 October 2026: the GPU pair screen silently did not launch at 1.73M and 2.0M atoms,
-# and those points "ran" with no edges).
-EDGES_PER_ATOM_TOLERANCE = 0.05
+# A capacity point counts only if (31 October 2026; the GPU pair screen had silently not launched at 1.73M and 2.0M
+# atoms, and those points "ran" with no edges):
+# (a) its list at step 0 has exactly the small copy's edges per atom (the supercell repeats the unit cell);
+# (b) after the MD steps, the live list's at-cutoff count equals a fresh rebuild from the current positions (ASE's
+#     neighbour list on the CPU, independent of FastMACE's), exactly, so a list bug is caught without a drift
+#     tolerance (thermal motion changes NbCl5's count by 5 % in 200 steps at 300 K);
+# and its forces are not all zero.
 
 
 def reference_edges_per_atom(structure, cutoff):
@@ -107,15 +110,31 @@ def reference_edges_per_atom(structure, cutoff):
     return len(neighbor_list("i", small, cutoff)) / len(small)
 
 
-def check_point(structure, cutoff, natoms, edges, max_abs_force, reference=None):
-    """``(valid, detail)`` of a capacity point: its edges per atom against ``reference_edges_per_atom`` (within
-    ``EDGES_PER_ATOM_TOLERANCE``; thermal or rattled cells differ by a few per cent) and a nonzero largest force."""
+def fresh_edges(atoms, positions, cutoff):
+    """Directed edges within ``cutoff`` of ``atoms`` at ``positions`` (an ``[N, 3]`` array), from ASE's neighbour list
+    on the CPU: an independent rebuild for ``check_point``'s part (b)."""
+    from ase.neighborlist import neighbor_list
+
+    current = atoms.copy()
+    current.positions = positions
+    return len(neighbor_list("i", current, cutoff))
+
+
+def check_point(structure, cutoff, natoms, initial_edges, max_abs_force, live_edges=None, fresh=None,
+                reference=None):
+    """``(valid, detail)`` of a capacity point (see the comment above): (a) ``initial_edges``, the list's at-cutoff
+    count at step 0, equals ``reference_edges_per_atom`` times ``natoms``; (b) when the point ran MD steps,
+    ``live_edges`` (the live list's count now) equals ``fresh`` (``fresh_edges`` at the current positions); and the
+    largest force is nonzero."""
     reference = reference_edges_per_atom(structure, cutoff) if reference is None else reference
-    per_atom = edges / natoms if natoms else 0.0
-    deviation = abs(per_atom - reference) / reference if reference else float("inf")
-    valid = deviation <= EDGES_PER_ATOM_TOLERANCE and max_abs_force is not None and max_abs_force > 0
-    return valid, dict(edges_per_atom=per_atom, reference_edges_per_atom=reference, deviation=deviation,
-                       max_abs_force=max_abs_force, tolerance=EDGES_PER_ATOM_TOLERANCE)
+    expected = round(reference * natoms)
+    initial_ok = initial_edges is not None and int(initial_edges) == expected
+    live_ok = live_edges is None or (fresh is not None and int(live_edges) == int(fresh))
+    forces_ok = max_abs_force is not None and max_abs_force > 0
+    detail = dict(initial_edges=initial_edges, expected_initial_edges=expected, reference_edges_per_atom=reference,
+                  initial_ok=initial_ok, live_edges=live_edges, fresh_edges=fresh, live_ok=live_ok,
+                  max_abs_force=max_abs_force, forces_ok=forces_ok)
+    return initial_ok and live_ok and forces_ok, detail
 
 
 def base_cell(structure):
@@ -417,8 +436,11 @@ def run_point(args):
             record["edges"] = edges()
             ff = sim._engine.force_field
             state_forces = getattr(getattr(sim._engine, "state", None), "forces", None)
-            valid, detail = check_point(args.structure, float(ff.neighbours.cutoff), len(atoms), int(ff.edge_count),
-                                        None if state_forces is None else float(state_forces.abs().max()))
+            cutoff = float(ff.neighbours.cutoff)
+            fresh = fresh_edges(atoms, sim._engine.state.positions.detach().double().cpu().numpy(), cutoff)
+            valid, detail = check_point(args.structure, cutoff, len(atoms), getattr(sim._engine, "initial_edges", None),
+                                        None if state_forces is None else float(state_forces.abs().max()),
+                                        live_edges=int(ff.edge_count), fresh=fresh)
             record["check"] = detail
             record["status"] = "ok" if valid else "invalid"
             try:

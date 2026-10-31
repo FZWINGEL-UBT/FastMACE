@@ -155,6 +155,11 @@ class RewriteConfig:
     # fastmace.rewrites.segments); rounding; needs gated_rows; auto = off, turned on by rule 12 only when the plan
     # would not fit with recompute_conv_weights on.
     recompute_node_segments: Toggle = "auto"
+    # recompute_node_segments' segments joined into one checkpoint region per interaction (gated_rows through the
+    # product block), run in atom chunks (ninth list item 2, fastmace.rewrites.segments); rounding; needs
+    # recompute_node_segments; about 1.23 times the separate segments' force call; auto = off, turned on by rule 12
+    # only when the plan would not fit with recompute_node_segments on (the last memory-rescue record).
+    recompute_node_region: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.

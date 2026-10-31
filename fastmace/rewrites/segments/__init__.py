@@ -48,6 +48,11 @@ _PROBE_ROWS = 7
 # chain through its product block (modules.join_region). Combined kept 35 kB per atom fewer, but its recomputation set
 # the same compiled peak, at 1.24 times separate's step time, and fitted fewer atoms (capacity-T08-chunks.md).
 SEGMENT_REGION = "separate"
+# recompute_node_region's atom chunks, each its own checkpoint (ninth list item 2): one count for every cell. At NbCl5
+# 9,216, 21,600 and 43,200 atoms, 4 chunks set the lowest peak, 0.773-0.774 of the separate segments' (35.2 kB per
+# atom less at every size), at 1.22-1.24 times their force call; 2 kept more, and 8 or 16 more again, at every size
+# (docs/validation/chunked-region.md). An int for A/B sides; the "combined" screen above uses it too.
+REGION_CHUNKS = 4
 
 
 def _modules():
@@ -89,7 +94,7 @@ def recompute_segments(model):
     if SEGMENT_REGION == "combined":
         for index, interaction in enumerate(getattr(model, "interactions", ())):
             if getattr(interaction, "gated_rows", None) is not None:
-                m.join_region(interaction, model.products[index])
+                m.join_region(interaction, model.products[index], REGION_CHUNKS)
                 joined.add(index)
                 names.append(f"interactions.{index}.gated_rows..products.{index} (one region)")
     for name, module in segments(model):
@@ -99,6 +104,27 @@ def recompute_segments(model):
         names.append(name)
     if not names:
         raise ValueError("recompute_node_segments: no node-local segment")
+    return names
+
+
+def recompute_region(model):
+    """``recompute_node_region``: each interaction's separately recomputed ``gated_rows`` chain and product block
+    (``recompute_node_segments``) become one checkpoint region from the chain through the product block, run in
+    ``REGION_CHUNKS`` atom chunks; returns their names."""
+    m = _modules()
+    chunks = REGION_CHUNKS
+    names = []
+    for index, interaction in enumerate(getattr(model, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is None:
+            continue
+        product = model.products[index]
+        m.unrecompute(chain)
+        m.unrecompute(product)
+        m.join_region(interaction, product, chunks)
+        names.append(f"interactions.{index}.gated_rows..products.{index} ({chunks} atom chunks)")
+    if not names:
+        raise ValueError("recompute_node_region: no interaction with a gated_rows chain")
     return names
 
 
@@ -197,11 +223,30 @@ def _apply(model, context):
     return recompute_segments(model)
 
 
+def _apply_region(model, context):
+    return recompute_region(model)
+
+
+def _selfcheck_region(original, rewritten, context):
+    """Each combined region against its stored chain, reshape and product block on probe rows (``_region_cases``)."""
+    import torch
+
+    generator = torch.Generator().manual_seed(context.seed + 43)
+    cases = CaseErrors()
+    dtype = _region_cases(rewritten, generator, cases)
+    return cases.result(dtype)
+
+
 RECORDS = {
     "recompute_node_segments": Rewrite(
         name="recompute_node_segments", applies_to=_support, requires=("gated_rows",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
         workload_constraints=(), apply=_apply, selfcheck=_selfcheck, memory=memory_terms.recompute_node_segments),
+    "recompute_node_region": Rewrite(
+        name="recompute_node_region", applies_to=_support, requires=("recompute_node_segments",),
+        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off",
+        deterministic=True, workload_constraints=(), apply=_apply_region, selfcheck=_selfcheck_region,
+        memory=memory_terms.recompute_node_region),
 }
 
-__all__ = ["RECORDS", "SEGMENT_REGION", "recompute_segments", "segments"]
+__all__ = ["RECORDS", "REGION_CHUNKS", "SEGMENT_REGION", "recompute_region", "recompute_segments", "segments"]
