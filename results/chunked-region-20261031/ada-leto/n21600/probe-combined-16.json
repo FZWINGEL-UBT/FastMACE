@@ -1,0 +1,26 @@
+{
+ "host": "leto",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "bcc71592",
+ "structure": "NbCl5@5x5x12",
+ "atoms": 21600,
+ "region": "combined",
+ "chunks": 16,
+ "peak_above_start_GiB": 2.891303539276123,
+ "allocated_before_GiB": 0.30947160720825195,
+ "reserved_GiB": 7.03125,
+ "call_ms": 307.36383056640625,
+ "call_ms_all": [
+  307.4232177734375,
+  307.6464538574219,
+  307.29522705078125,
+  307.2234802246094,
+  307.36383056640625
+ ],
+ "plan_rewrites": [
+  "RewriteConfig.recompute_conv_weights = on  (requested 'on': on: requested)",
+  "RewriteConfig.recompute_node_segments = on  (requested 'on': stage 1: on (with gated_rows); stage 2: supported (ok))",
+  "requested: RewriteConfig.recompute_conv_weights=on, RewriteConfig.recompute_node_segments=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+ ]
+}
