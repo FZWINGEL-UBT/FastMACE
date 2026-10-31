@@ -35,7 +35,7 @@ for cell in "$@"; do
   idle || exit 3
   echo "$(date -u +%FT%TZ) start $cell" >> "$log"
   "$PY" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --repeat "$repeat" --output "$ROOT" \
-    --tag "-$records" --rewrites recompute_conv_weights=on recompute_node_segments=on recompute_node_region=$region \
+    --tag="-$records" --rewrites recompute_conv_weights=on recompute_node_segments=on recompute_node_region=$region \
     > "$ROOT/ledger-$structure-$repeat-$records.log" 2>&1 < /dev/null
   echo "$(date -u +%FT%TZ) end $cell exit=$?" >> "$log"
 done
