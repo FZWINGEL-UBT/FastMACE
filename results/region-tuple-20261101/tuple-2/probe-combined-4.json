@@ -1,0 +1,28 @@
+{
+ "host": "leeloo",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "07175c8c",
+ "structure": "NbCl5@5x5x24",
+ "atoms": 43200,
+ "region": "combined",
+ "chunks": 4,
+ "peak_above_start_GiB": 3.968759536743164,
+ "allocated_before_GiB": 0.3991546630859375,
+ "reserved_GiB": 9.314453125,
+ "call_ms": 554.1856079101562,
+ "call_ms_all": [
+  552.55859375,
+  555.750244140625,
+  554.1549072265625,
+  555.5145874023438,
+  554.1856079101562
+ ],
+ "plan_rewrites": [
+  "RewriteConfig.recompute_conv_weights = on  (requested 'on': on: requested)",
+  "RewriteConfig.recompute_first_table = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights): off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (rebuild-a))",
+  "RewriteConfig.recompute_node_segments = on  (requested 'on': stage 1: on (with gated_rows); stage 2: supported (ok))",
+  "RewriteConfig.recompute_node_region = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments): off: on only when memory would not be enough with recompute_node_segments on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (ninth list item 2))",
+  "requested: RewriteConfig.recompute_conv_weights=on, RewriteConfig.recompute_node_segments=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+ ]
+}
