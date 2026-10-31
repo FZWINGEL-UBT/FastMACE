@@ -77,7 +77,8 @@ force.
 | 9,261,000 | 4.14 GiB | 7.21 GiB | 6.54 GiB | 271 s | valid |
 | 12,812,904 | 5.68 GiB | 9.93 GiB | 8.48 GiB | 351 s | valid |
 | 14,886,936 | 6.57 GiB | 11.51 GiB | 9.61 GiB | 441 s | valid |
-| 17,173,512 | | 13.26 GiB | | | running |
+| 17,173,512 | 7.56 GiB | 13.26 GiB | 10.85 GiB | 495 s | valid |
+| 19,683,000 | | 15.17 GiB | | | running |
 
 **The NbCl5 limit on 20 GB rises from 7.76M to 22.43M atoms.**
 
@@ -95,5 +96,29 @@ The build's peak, at about 0.77 kB per atom. Reading the code, without a memory 
 - The tiled path reads only each tile's rows of it.
 
 The conductor asked for a memory snapshot at about 20M atoms to confirm this before anything changes.
+
+### The snapshot (leto, NbCl5 19,683,000 atoms, 8a2e7b3d)
+
+**Tool:** `results/tiled-build-20261101/snapshot.py`.
+
+- It builds as `tiled_capacity.py --tile-list` does, with PyTorch's memory history on.
+- It replays the allocation trace to the build's peak and lists what is alive there, with its innermost
+  FastMACE or MACE frames.
+
+The build's peak is 15.18 GiB above the start (15.17 GiB traced). 8.21 GiB stays allocated after the build.
+
+| Alive at the peak | GiB | Bytes per atom |
+| --- | ---: | ---: |
+| the one-hot `node_attrs`, local copy (`forces.py:368`, `batch["node_attrs"].to(device)`) | 6.53 | 356 |
+| the one-hot `node_attrs`, `data`'s copy (`forces.py:476`, `.to(device, dtype)` from the host batch) | 6.53 | 356 |
+| positions, float64 and float32 (`forces.py:523`, `:521`, `:476`) | 0.88 | 48 |
+| E0 (`energy.py:131`), the species arrays (`_setup_species`) and the batch's integer arrays | 1.10 | 60 |
+| everything else (the model's tables, a self-check, small allocations) | 0.16 | |
+
+The two copies of the one-hot matrix are 86 % of the peak. That confirms the code reading. Next steps, the
+conductor's order:
+
+- (a) one copy on the device;
+- (b) the tiled path keeps only the species index and builds each tile's one-hot rows itself.
 
 Records: `results/tiled-build-20261101/runs/` (8a2e7b3d) and `first-c88d28d6/`.
