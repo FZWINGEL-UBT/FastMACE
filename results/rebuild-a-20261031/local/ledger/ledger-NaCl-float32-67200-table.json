@@ -1,0 +1,4775 @@
+{
+ "tool": "memory_ledger",
+ "structure": "NaCl",
+ "precision": "float32",
+ "natoms": 67200,
+ "repeat": "20x20x21",
+ "fastmace_commit": "a3069ef32bd8c30d144e15b3846436593351a29e",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "host": "Fabi-PC",
+ "seconds": 83.3203568970057,
+ "alloc_conf": "expandable_segments:True",
+ "second_pool": [],
+ "workspace_prototype": false,
+ "drop_node_feats": false,
+ "output_wrapper": false,
+ "inductor_option": [],
+ "edges": {
+  "edges_at_cutoff": 2207214,
+  "padded_sizes": [
+   2150400,
+   2257920
+  ],
+  "capacity": 4327680,
+  "graphs": [
+   "ACP",
+   "('B', 2257920)"
+  ],
+  "captures": [
+   {
+    "key": "ACP",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 11170.0,
+    "max_reserved_after_capture_MiB": 11170.0
+   },
+   {
+    "key": "('B', 2150400)",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 11270.0,
+    "max_reserved_after_capture_MiB": 11270.0
+   },
+   {
+    "key": "('B', 2257920)",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 11414.0,
+    "max_reserved_after_capture_MiB": 11414.0
+   },
+   {
+    "key": "ACP",
+    "warmup_in_pool": false,
+    "max_reserved_after_warmup_MiB": 11414.0,
+    "max_reserved_after_capture_MiB": 11414.0
+   }
+  ],
+  "force_graph_releases": 1
+ },
+ "points": [
+  {
+   "label": "start (context created)",
+   "allocated": 0,
+   "reserved": 0,
+   "max_allocated": 0,
+   "max_reserved": 0,
+   "cuda_free": 15894315008,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1208549376,
+   "windows": {
+    "used_MiB": 1403,
+    "total_MiB": 16311
+   }
+  },
+  {
+   "label": "force field loaded",
+   "allocated": 0,
+   "reserved": 0,
+   "max_allocated": 0,
+   "max_reserved": 0,
+   "cuda_free": 15894315008,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1208549376
+  },
+  {
+   "label": "simulation built (first captures)",
+   "allocated": 730889216,
+   "reserved": 11771314176,
+   "max_allocated": 10182510080,
+   "max_reserved": 11817451520,
+   "cuda_free": 2453803008,
+   "cuda_total": 17102864384,
+   "outside_allocator": 2877747200
+  },
+  {
+   "label": "after 20 warm-up steps",
+   "allocated": 730889216,
+   "reserved": 12067012608,
+   "max_allocated": 10193369600,
+   "max_reserved": 12067012608,
+   "cuda_free": 2116341760,
+   "cuda_total": 17102864384,
+   "outside_allocator": 2919510016
+  },
+  {
+   "label": "after 20 steady steps",
+   "allocated": 730889216,
+   "reserved": 12069109760,
+   "max_allocated": 898671616,
+   "max_reserved": 12069109760,
+   "cuda_free": 2141655040,
+   "cuda_total": 17102864384,
+   "outside_allocator": 2892099584
+  },
+  {
+   "label": "2 graphs released, cache emptied",
+   "allocated": 663780352,
+   "reserved": 754974720,
+   "max_allocated": 898671616,
+   "max_reserved": 12069109760,
+   "cuda_free": 15076425728,
+   "cuda_total": 17102864384,
+   "outside_allocator": 1271463936
+  },
+  {
+   "label": "one step, stages captured again",
+   "allocated": 730889216,
+   "reserved": 11876171776,
+   "max_allocated": 10193369600,
+   "max_reserved": 11880366080,
+   "cuda_free": 2335379456,
+   "cuda_total": 17102864384,
+   "outside_allocator": 2891313152
+  }
+ ],
+ "allocator": {
+  "totals": {
+   "graph_pool_reserved": 11016339456,
+   "graph_pool_active": 0,
+   "default_reserved": 1052770304,
+   "default_active": 730889216,
+   "second_pool_reserved": 0,
+   "second_pool_active": 0
+  },
+  "rows": {
+   "default pool, live, not a named buffer": 227397632,
+   "model parameters and buffers": 65876992,
+   "MD state, integrator and engine buffers": 41671168,
+   "neighbour list (buffers and screen)": 330087424,
+   "force field buffers (model inputs, tables)": 1344000,
+   "Langevin noise batch": 64512000
+  },
+  "owners": {
+   "force_field.neighbours.edge_index": 69242880,
+   "force_field.neighbours.screen_buffer": 68812800,
+   "state.rng.batch": 64512000,
+   "force_field.neighbours.candidate_unit_shifts": 51932160,
+   "force_field.neighbours.unit_shifts": 51932160,
+   "force_field.neighbours.shifts": 51932160,
+   "force_field.neighbours.candidate_index": 34621440,
+   "derived.force_field.node_attrs": 23923200,
+   "model._orig_mod.interactions.1.wprime_backward.gprime": 9830400,
+   "model._orig_mod.interactions.1.residual_linear.weight_0": 3145728,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_0": 3145728,
+   "model._orig_mod.interactions.1.linear_1.weight_0": 2097152,
+   "model._orig_mod.interactions.1.linear_1.weight_t_0": 2097152,
+   "model._orig_mod.interactions.0.residual_linear.weight_0": 2097152,
+   "model._orig_mod.interactions.0.residual_linear.weight_t_0": 2097152,
+   "state.velocities": 1612800,
+   "state.forces": 1612800,
+   "integrator.x_old": 1612800,
+   "integrator.xi": 1612800,
+   "integrator.eta": 1612800,
+   "integrator.rnd_pos": 1612800,
+   "integrator.rnd_vel": 1612800,
+   "engine.mid.0": 1612800,
+   "state.positions": 1612800,
+   "force_field.neighbours.reference_positions": 1612800,
+   "model._orig_mod.interactions.0.linear_res.weight_t_0": 1048576,
+   "model._orig_mod.interactions.0.linear_1.weight_0": 1048576,
+   "model._orig_mod.interactions.0.linear_res.weight_0": 1048576,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_1": 1048576,
+   "model._orig_mod.interactions.1.residual_linear.weight_1": 1048576,
+   "model._orig_mod.interactions.0.linear_1.weight_t_0": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_0": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_1": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_2": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_3": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_0": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_1": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_2": 1048576,
+   "model._orig_mod.interactions.0.linear_2.weight_t_3": 1048576,
+   "model._orig_mod.interactions.1.linear_res.weight_0": 1048576,
+   "model._orig_mod.interactions.1.linear_res.weight_t_0": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_0": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_1": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_2": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_3": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_0": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_1": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_2": 1048576,
+   "model._orig_mod.interactions.1.linear_2.weight_t_3": 1048576,
+   "force_field.positions": 806400,
+   "model._orig_mod.interactions.1.residual_linear.weight_2": 786432,
+   "model._orig_mod.interactions.1.residual_linear.weight_t_2": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_1": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_2": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_t_1": 786432,
+   "model._orig_mod.interactions.1.linear_1.weight_t_2": 786432,
+   "model._orig_mod.interactions.0.skip_tp.table": 760832,
+   "model._orig_mod.interactions.1.radial_table.coef": 557568,
+   "state.masses": 537600,
+   "force_field.node_e0": 537600
+  },
+  "unattributed_sites": {
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/_native/registry.py:958 eager_router": 67108864,
+   "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3660 call": 33554432,
+   "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4299 call": 33554432,
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1374 convert": 25835008,
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/parameter.py:79 __deepcopy__": 25769472,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/rewrites/mh1/modules.py:212 identity_attrs": 23923200,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/rewrites/linear/modules.py:87 <listcomp>": 6297600,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/rewrites/linear/modules.py:116 __init__": 6297600,
+   "mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/torch_geometric/data.py:302 <lambda>": 1892864,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/rewrites/mh1/modules.py:45 __init__": 1048576,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/rewrites/species/modules.py:36 __init__": 729088,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:549 _setup_species": 537600,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:546 _setup_species": 537600,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:550 _setup_species": 268800,
+   "mace_cueq_oeq/lib/python3.10/site-packages/torch/storage.py:264 clone": 24576,
+   "mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/_torch/TensorProductConv.py:90 _init_class": 3072,
+   "mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/_torch/TensorProductConv.py:189 allocate_workspace": 3072,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:544 _setup_species": 2048,
+   "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86 __init__": 1024,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/neighbors/skin.py:37 times_3x3": 1024,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/neighbors/skin.py:331 _constants": 1024,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:474 __init__": 1024,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/rewrites/mh1/modules.py:47 __init__": 1024,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/neighbors/skin.py:339 _constants": 512,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/neighbors/skin.py:333 _constants": 512,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/neighbors/skin.py:332 _constants": 512,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:567 _setup_species": 512,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:559 _setup_species": 512,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/model/forces.py:558 _setup_species": 512,
+   "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:239 __init__": 512
+  }
+ },
+ "ledger": [
+  {
+   "row": "graph pool (captured stages: the force call's activations and transients)",
+   "bytes": 11016339456
+  },
+  {
+   "row": "outside the allocator: graph executables (dropped on release)",
+   "bytes": 1620635648
+  },
+  {
+   "row": "outside the allocator: context, libraries, kernels (and other processes)",
+   "bytes": 1271463936
+  },
+  {
+   "row": "neighbour list (buffers and screen)",
+   "bytes": 330087424
+  },
+  {
+   "row": "default pool, cached (reserved, not live)",
+   "bytes": 321881088
+  },
+  {
+   "row": "default pool, live, not a named buffer",
+   "bytes": 227397632
+  },
+  {
+   "row": "model parameters and buffers",
+   "bytes": 65876992
+  },
+  {
+   "row": "Langevin noise batch",
+   "bytes": 64512000
+  },
+  {
+   "row": "MD state, integrator and engine buffers",
+   "bytes": 41671168
+  },
+  {
+   "row": "force field buffers (model inputs, tables)",
+   "bytes": 1344000
+  }
+ ],
+ "recapture": {
+  "allocated_before": 663780352,
+  "peak_live_over_before": 9529579437,
+  "sites": [
+   {
+    "site": "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:114 joined_products_op",
+    "bytes": 2202009600,
+    "blocks": 1,
+    "per_edge": 975.2380952380952,
+    "per_atom": 32768.0
+   },
+   {
+    "site": "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads",
+    "bytes": 2202009600,
+    "blocks": 4,
+    "per_edge": 975.2380952380952,
+    "per_atom": 32768.0
+   },
+   {
+    "site": "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/fused_forward.py:386 fused_folded_message",
+    "bytes": 1376256000,
+    "blocks": 1,
+    "per_edge": 609.5238095238095,
+    "per_atom": 20480.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4434 call",
+    "bytes": 963379200,
+    "blocks": 1,
+    "per_edge": 426.6666666666667,
+    "per_atom": 14336.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4397 call",
+    "bytes": 550502400,
+    "blocks": 1,
+    "per_edge": 243.8095238095238,
+    "per_atom": 8192.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4428 call",
+    "bytes": 481689600,
+    "blocks": 1,
+    "per_edge": 213.33333333333334,
+    "per_atom": 7168.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4401 call",
+    "bytes": 412876800,
+    "blocks": 1,
+    "per_edge": 182.85714285714286,
+    "per_atom": 6144.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4407 call",
+    "bytes": 412876800,
+    "blocks": 1,
+    "per_edge": 182.85714285714286,
+    "per_atom": 6144.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3599 call",
+    "bytes": 161548800,
+    "blocks": 1,
+    "per_edge": 71.54761904761905,
+    "per_atom": 2404.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3695 call",
+    "bytes": 144506880,
+    "blocks": 1,
+    "per_edge": 64.0,
+    "per_atom": 2150.4
+   },
+   {
+    "site": "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _",
+    "bytes": 137625600,
+    "blocks": 1,
+    "per_edge": 60.95238095238095,
+    "per_atom": 2048.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4438 call",
+    "bytes": 137625600,
+    "blocks": 1,
+    "per_edge": 60.95238095238095,
+    "per_atom": 2048.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4391 call",
+    "bytes": 103219200,
+    "blocks": 1,
+    "per_edge": 45.714285714285715,
+    "per_atom": 1536.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3597 call",
+    "bytes": 58329600,
+    "blocks": 1,
+    "per_edge": 25.833333333333332,
+    "per_atom": 868.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3660 call",
+    "bytes": 33554432,
+    "blocks": 1,
+    "per_edge": 14.86077097505669,
+    "per_atom": 499.32190476190476
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4299 call",
+    "bytes": 33554432,
+    "blocks": 1,
+    "per_edge": 14.86077097505669,
+    "per_atom": 499.32190476190476
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4335 call",
+    "bytes": 25804800,
+    "blocks": 1,
+    "per_edge": 11.428571428571429,
+    "per_atom": 384.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3612 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3629 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3630 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3631 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3632 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3634 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3635 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3883 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3884 call",
+    "bytes": 9031680,
+    "blocks": 1,
+    "per_edge": 4.0,
+    "per_atom": 134.4
+   },
+   {
+    "site": "fastmace-rebuild-a/src-a3069ef3/fastmace/engine/registry.py:227 copy",
+    "bytes": 4570929,
+    "blocks": 23,
+    "per_edge": 2.024398118622449,
+    "per_atom": 68.01977678571428
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3636 call",
+    "bytes": 2257920,
+    "blocks": 1,
+    "per_edge": 1.0,
+    "per_atom": 33.6
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4314 call",
+    "bytes": 1612800,
+    "blocks": 1,
+    "per_edge": 0.7142857142857143,
+    "per_atom": 24.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4092 call",
+    "bytes": 537600,
+    "blocks": 1,
+    "per_edge": 0.23809523809523808,
+    "per_atom": 8.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4093 call",
+    "bytes": 537600,
+    "blocks": 1,
+    "per_edge": 0.23809523809523808,
+    "per_atom": 8.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3913 call",
+    "bytes": 332800,
+    "blocks": 1,
+    "per_edge": 0.1473922902494331,
+    "per_atom": 4.9523809523809526
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3661 call",
+    "bytes": 268800,
+    "blocks": 1,
+    "per_edge": 0.11904761904761904,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3665 call",
+    "bytes": 268800,
+    "blocks": 1,
+    "per_edge": 0.11904761904761904,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3669 call",
+    "bytes": 268800,
+    "blocks": 1,
+    "per_edge": 0.11904761904761904,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3904 call",
+    "bytes": 268800,
+    "blocks": 1,
+    "per_edge": 0.11904761904761904,
+    "per_atom": 4.0
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3687 call",
+    "bytes": 64,
+    "blocks": 1,
+    "per_edge": 2.834467120181406e-05,
+    "per_atom": 0.0009523809523809524
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4025 call",
+    "bytes": 36,
+    "blocks": 1,
+    "per_edge": 1.594387755102041e-05,
+    "per_atom": 0.0005357142857142857
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4017 call",
+    "bytes": 8,
+    "blocks": 1,
+    "per_edge": 3.5430839002267575e-06,
+    "per_atom": 0.00011904761904761905
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4021 call",
+    "bytes": 8,
+    "blocks": 1,
+    "per_edge": 3.5430839002267575e-06,
+    "per_atom": 0.00011904761904761905
+   },
+   {
+    "site": "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4013 call",
+    "bytes": 4,
+    "blocks": 1,
+    "per_edge": 1.7715419501133788e-06,
+    "per_atom": 5.9523809523809524e-05
+   },
+   {
+    "site": "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:25 compute_forces",
+    "bytes": 4,
+    "blocks": 1,
+    "per_edge": 1.7715419501133788e-06,
+    "per_atom": 5.9523809523809524e-05
+   }
+  ],
+  "pool": {
+   "reserved": 11016339456,
+   "segments": 2,
+   "largest_segments": [
+    11010048000,
+    6291456
+   ],
+   "live_peak": 9457899644,
+   "held_peak": 9457899644,
+   "held_at_peak": 0,
+   "free": 11016339456,
+   "largest_free": 11010048000,
+   "free_blocks": 2,
+   "events": 660,
+   "alloc_bytes_by_stream": {
+    "109453687603664": 40092716344
+   },
+   "segment_ranges": [
+    [
+     150055419904,
+     161065467904
+    ],
+    [
+     169315663872,
+     169321955328
+    ]
+   ],
+   "event_list": [
+    [
+     "segment_map",
+     150055419904,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     150057032704,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     150058645504,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     150060258304,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "segment_map",
+     169315663872,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664384,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665408,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "alloc",
+     169315664384,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665920,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "segment_map",
+     150076391424,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150061871104,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "segment_map",
+     150097362944,
+     41943040,
+     ""
+    ],
+    [
+     "alloc",
+     150096492544,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     78335,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_requested",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     150057032704,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     150058645504,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     150060258304,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "alloc",
+     169315663872,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664384,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665408,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "alloc",
+     169315664384,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665920,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "alloc",
+     150061871104,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "alloc",
+     150096492544,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     78335,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_requested",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     150057032704,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     150058645504,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     150060258304,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "alloc",
+     169315663872,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664384,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665408,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "alloc",
+     169315664384,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665920,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "alloc",
+     150061871104,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "alloc",
+     150096492544,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     78335,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_requested",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "segment_unmap",
+     150055419904,
+     83886080,
+     ""
+    ],
+    [
+     "segment_unmap",
+     169315663872,
+     2097152,
+     ""
+    ],
+    [
+     "segment_map",
+     150055419904,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:269 stage"
+    ],
+    [
+     "alloc",
+     150057032704,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:270 stage"
+    ],
+    [
+     "alloc",
+     150058645504,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:271 stage"
+    ],
+    [
+     "alloc",
+     150060258304,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:273 stage"
+    ],
+    [
+     "segment_map",
+     169315663872,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664384,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665408,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665408,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     816,
+     ""
+    ],
+    [
+     "alloc",
+     169315664384,
+     24,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     816,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "alloc",
+     169315665920,
+     8,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:279 stage"
+    ],
+    [
+     "free_requested",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169315665920,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     816,
+     ""
+    ],
+    [
+     "segment_map",
+     150076391424,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150061871104,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:292 stage"
+    ],
+    [
+     "segment_map",
+     150097362944,
+     41943040,
+     ""
+    ],
+    [
+     "alloc",
+     150096492544,
+     34621440,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "alloc",
+     169315664896,
+     78335,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/fused_integrator.py:297 stage"
+    ],
+    [
+     "free_requested",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664896,
+     78335,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150060258304,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_completed",
+     169315664384,
+     24,
+     ""
+    ],
+    [
+     "free_requested",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150061871104,
+     34621440,
+     ""
+    ],
+    [
+     "free_requested",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "free_completed",
+     150096492544,
+     34621440,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     27095040,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3588 call"
+    ],
+    [
+     "alloc",
+     169315663872,
+     537600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3595 call"
+    ],
+    [
+     "alloc",
+     169316201472,
+     537600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3596 call"
+    ],
+    [
+     "segment_map",
+     150139305984,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150082514944,
+     58329600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3597 call"
+    ],
+    [
+     "segment_map",
+     150160277504,
+     146800640,
+     ""
+    ],
+    [
+     "alloc",
+     150140844544,
+     161548800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3599 call"
+    ],
+    [
+     "segment_map",
+     150307078144,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150302393344,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3612 call"
+    ],
+    [
+     "segment_map",
+     150328049664,
+     146800640,
+     ""
+    ],
+    [
+     "alloc",
+     150311425024,
+     144506880,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3613 call"
+    ],
+    [
+     "alloc",
+     150455931904,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3629 call"
+    ],
+    [
+     "alloc",
+     150464963584,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3630 call"
+    ],
+    [
+     "segment_map",
+     150474850304,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150473995264,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3631 call"
+    ],
+    [
+     "alloc",
+     150483026944,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3632 call"
+    ],
+    [
+     "segment_map",
+     150495821824,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150492058624,
+     18063360,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3633 call"
+    ],
+    [
+     "segment_map",
+     150516793344,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150510121984,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3634 call"
+    ],
+    [
+     "alloc",
+     150519153664,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3635 call"
+    ],
+    [
+     "alloc",
+     150528185344,
+     2257920,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3636 call"
+    ],
+    [
+     "segment_map",
+     150537764864,
+     20971520,
+     ""
+    ],
+    [
+     "alloc",
+     150530443264,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3637 call"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     27095040,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     27095040,
+     ""
+    ],
+    [
+     "segment_map",
+     150558736384,
+     587202560,
+     ""
+    ],
+    [
+     "alloc",
+     150539474944,
+     587059200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:136 radial_table_forward"
+    ],
+    [
+     "alloc",
+     150055419904,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:137 radial_table_forward"
+    ],
+    [
+     "alloc",
+     169315663872,
+     59392,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3658 call"
+    ],
+    [
+     "alloc",
+     169315723264,
+     268800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3661 call"
+    ],
+    [
+     "alloc",
+     169316739072,
+     268800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3665 call"
+    ],
+    [
+     "alloc",
+     169317007872,
+     268800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3669 call"
+    ],
+    [
+     "free_requested",
+     150530443264,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150530443264,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     9031680,
+     ""
+    ],
+    [
+     "alloc",
+     169315992064,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3680 call"
+    ],
+    [
+     "alloc",
+     169316058624,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3681 call"
+    ],
+    [
+     "alloc",
+     169316125184,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3682 call"
+    ],
+    [
+     "alloc",
+     169317276672,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3683 call"
+    ],
+    [
+     "alloc",
+     169316191744,
+     64,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3687 call"
+    ],
+    [
+     "segment_map",
+     151145938944,
+     125829120,
+     ""
+    ],
+    [
+     "alloc",
+     151126534144,
+     144506880,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3695 call"
+    ],
+    [
+     "free_requested",
+     150311425024,
+     144506880,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     144506880,
+     ""
+    ],
+    [
+     "segment_map",
+     151271768064,
+     566231040,
+     ""
+    ],
+    [
+     "alloc",
+     151271041024,
+     559104000,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/edge_outer_sum.py:67 edge_outer_sum_forward"
+    ],
+    [
+     "free_requested",
+     150539474944,
+     587059200,
+     ""
+    ],
+    [
+     "free_completed",
+     150539474944,
+     587059200,
+     ""
+    ],
+    [
+     "alloc",
+     150311425024,
+     34944000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3722 call"
+    ],
+    [
+     "alloc",
+     150346369024,
+     34406400,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3727 call"
+    ],
+    [
+     "free_requested",
+     150311425024,
+     34944000,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     34944000,
+     ""
+    ],
+    [
+     "free_requested",
+     169315992064,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169315992064,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     150530443264,
+     104832000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3732 call"
+    ],
+    [
+     "alloc",
+     150635275264,
+     103219200,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3737 call"
+    ],
+    [
+     "free_requested",
+     150530443264,
+     104832000,
+     ""
+    ],
+    [
+     "free_completed",
+     150530443264,
+     104832000,
+     ""
+    ],
+    [
+     "free_requested",
+     169316058624,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169316058624,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     150738494464,
+     174720000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3742 call"
+    ],
+    [
+     "alloc",
+     150913214464,
+     172032000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3747 call"
+    ],
+    [
+     "free_requested",
+     150738494464,
+     174720000,
+     ""
+    ],
+    [
+     "free_completed",
+     150738494464,
+     174720000,
+     ""
+    ],
+    [
+     "free_requested",
+     169316125184,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169316125184,
+     66560,
+     ""
+    ],
+    [
+     "segment_map",
+     151837999104,
+     251658240,
+     ""
+    ],
+    [
+     "alloc",
+     151830145024,
+     244608000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3752 call"
+    ],
+    [
+     "free_requested",
+     151271041024,
+     559104000,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     559104000,
+     ""
+    ],
+    [
+     "alloc",
+     151271041024,
+     240844800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3758 call"
+    ],
+    [
+     "free_requested",
+     151830145024,
+     244608000,
+     ""
+    ],
+    [
+     "free_completed",
+     151830145024,
+     244608000,
+     ""
+    ],
+    [
+     "free_requested",
+     169317276672,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169317276672,
+     66560,
+     ""
+    ],
+    [
+     "alloc",
+     151511885824,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3764 call"
+    ],
+    [
+     "alloc",
+     150380775424,
+     68812800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3769 call"
+    ],
+    [
+     "segment_map",
+     152089657344,
+     524288000,
+     ""
+    ],
+    [
+     "alloc",
+     152062388224,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3775 call"
+    ],
+    [
+     "free_requested",
+     150380775424,
+     68812800,
+     ""
+    ],
+    [
+     "free_completed",
+     150380775424,
+     68812800,
+     ""
+    ],
+    [
+     "alloc",
+     150738494464,
+     137625600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3779 call"
+    ],
+    [
+     "segment_map",
+     152613945344,
+     419430400,
+     ""
+    ],
+    [
+     "alloc",
+     152612890624,
+     412876800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3790 call"
+    ],
+    [
+     "segment_map",
+     153033375744,
+     692060160,
+     ""
+    ],
+    [
+     "alloc",
+     153025767424,
+     688128000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3804 call"
+    ],
+    [
+     "free_requested",
+     150913214464,
+     172032000,
+     ""
+    ],
+    [
+     "free_completed",
+     150913214464,
+     172032000,
+     ""
+    ],
+    [
+     "free_requested",
+     151511885824,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     151511885824,
+     550502400,
+     ""
+    ],
+    [
+     "segment_map",
+     153725435904,
+     964689920,
+     ""
+    ],
+    [
+     "alloc",
+     153713895424,
+     963379200,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3820 call"
+    ],
+    [
+     "free_requested",
+     151271041024,
+     240844800,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     240844800,
+     ""
+    ],
+    [
+     "free_requested",
+     152062388224,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     152062388224,
+     550502400,
+     ""
+    ],
+    [
+     "segment_map",
+     154690125824,
+     2202009600,
+     ""
+    ],
+    [
+     "alloc",
+     154677274624,
+     2202009600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:114 joined_products_op"
+    ],
+    [
+     "alloc",
+     151271041024,
+     550502400,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     59392,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     59392,
+     ""
+    ],
+    [
+     "alloc",
+     151821543424,
+     574425600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3847 call"
+    ],
+    [
+     "free_requested",
+     150346369024,
+     34406400,
+     ""
+    ],
+    [
+     "free_completed",
+     150346369024,
+     34406400,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3883 call"
+    ],
+    [
+     "alloc",
+     150064451584,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3884 call"
+    ],
+    [
+     "segment_map",
+     156892135424,
+     587202560,
+     ""
+    ],
+    [
+     "alloc",
+     156879284224,
+     587059200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:136 radial_table_forward"
+    ],
+    [
+     "alloc",
+     150073483264,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:137 radial_table_forward"
+    ],
+    [
+     "alloc",
+     169315663872,
+     26624,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3901 call"
+    ],
+    [
+     "alloc",
+     169317276672,
+     268800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3904 call"
+    ],
+    [
+     "free_requested",
+     150073483264,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150073483264,
+     9031680,
+     ""
+    ],
+    [
+     "segment_map",
+     169317761024,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169317545472,
+     332800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3913 call"
+    ],
+    [
+     "alloc",
+     169317878272,
+     268804,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3919 call"
+    ],
+    [
+     "free_requested",
+     150492058624,
+     18063360,
+     ""
+    ],
+    [
+     "free_completed",
+     150492058624,
+     18063360,
+     ""
+    ],
+    [
+     "alloc",
+     150311425024,
+     137625600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/fused_forward.py:385 fused_folded_message"
+    ],
+    [
+     "segment_map",
+     157479337984,
+     1384120320,
+     ""
+    ],
+    [
+     "alloc",
+     157466343424,
+     1376256000,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/fused_forward.py:386 fused_folded_message"
+    ],
+    [
+     "alloc",
+     169316192256,
+     4,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/fused_forward.py:389 fused_folded_message"
+    ],
+    [
+     "alloc",
+     169316192768,
+     32,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/fused_forward.py:346 __call__"
+    ],
+    [
+     "free_requested",
+     169316192768,
+     32,
+     ""
+    ],
+    [
+     "free_completed",
+     169316192768,
+     32,
+     ""
+    ],
+    [
+     "free_requested",
+     169316192256,
+     4,
+     ""
+    ],
+    [
+     "free_completed",
+     169316192256,
+     4,
+     ""
+    ],
+    [
+     "free_requested",
+     150311425024,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     156879284224,
+     587059200,
+     ""
+    ],
+    [
+     "free_completed",
+     156879284224,
+     587059200,
+     ""
+    ],
+    [
+     "free_requested",
+     169317878272,
+     268804,
+     ""
+    ],
+    [
+     "free_completed",
+     169317878272,
+     268804,
+     ""
+    ],
+    [
+     "free_requested",
+     150635275264,
+     103219200,
+     ""
+    ],
+    [
+     "free_completed",
+     150635275264,
+     103219200,
+     ""
+    ],
+    [
+     "alloc",
+     156879284224,
+     412876800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3953 call"
+    ],
+    [
+     "free_requested",
+     152612890624,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     152612890624,
+     412876800,
+     ""
+    ],
+    [
+     "alloc",
+     152395969024,
+     516096000,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3962 call"
+    ],
+    [
+     "free_requested",
+     152395969024,
+     516096000,
+     ""
+    ],
+    [
+     "free_completed",
+     152395969024,
+     516096000,
+     ""
+    ],
+    [
+     "alloc",
+     152395969024,
+     481689600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:3977 call"
+    ],
+    [
+     "free_requested",
+     152395969024,
+     481689600,
+     ""
+    ],
+    [
+     "free_completed",
+     152395969024,
+     481689600,
+     ""
+    ],
+    [
+     "free_requested",
+     151271041024,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     550502400,
+     ""
+    ],
+    [
+     "segment_map",
+     158863458304,
+     2202009600,
+     ""
+    ],
+    [
+     "alloc",
+     158842599424,
+     2202009600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:114 joined_products_op"
+    ],
+    [
+     "free_requested",
+     150738494464,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150738494464,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     156879284224,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     156879284224,
+     412876800,
+     ""
+    ],
+    [
+     "free_requested",
+     153025767424,
+     688128000,
+     ""
+    ],
+    [
+     "free_completed",
+     153025767424,
+     688128000,
+     ""
+    ],
+    [
+     "free_requested",
+     153713895424,
+     963379200,
+     ""
+    ],
+    [
+     "free_completed",
+     153713895424,
+     963379200,
+     ""
+    ],
+    [
+     "alloc",
+     150311425024,
+     137625600,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     26624,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     26624,
+     ""
+    ],
+    [
+     "alloc",
+     169316192256,
+     4,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4013 call"
+    ],
+    [
+     "alloc",
+     169316192768,
+     8,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4017 call"
+    ],
+    [
+     "alloc",
+     169316193280,
+     8,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4021 call"
+    ],
+    [
+     "alloc",
+     169316193792,
+     36,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4025 call"
+    ],
+    [
+     "alloc",
+     169317878272,
+     537600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4032 call"
+    ],
+    [
+     "alloc",
+     169318415872,
+     537600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4037 call"
+    ],
+    [
+     "alloc",
+     169318953472,
+     806400,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4041 call"
+    ],
+    [
+     "alloc",
+     150449050624,
+     1612800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4047 call"
+    ],
+    [
+     "alloc",
+     151271041024,
+     25804800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4053 call"
+    ],
+    [
+     "free_requested",
+     150311425024,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     137625600,
+     ""
+    ],
+    [
+     "alloc",
+     150311425024,
+     25804800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4058 call"
+    ],
+    [
+     "alloc",
+     150450663424,
+     1612800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4069 call"
+    ],
+    [
+     "free_requested",
+     151271041024,
+     25804800,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     25804800,
+     ""
+    ],
+    [
+     "alloc",
+     150452276224,
+     1612800,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4075 call"
+    ],
+    [
+     "free_requested",
+     150452276224,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150452276224,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150450663424,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150450663424,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     151821543424,
+     574425600,
+     ""
+    ],
+    [
+     "free_completed",
+     151821543424,
+     574425600,
+     ""
+    ],
+    [
+     "segment_map",
+     169319858176,
+     2097152,
+     ""
+    ],
+    [
+     "alloc",
+     169319759872,
+     537600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4092 call"
+    ],
+    [
+     "alloc",
+     169320297472,
+     537600,
+     "fastmace-cache/rebuild-a-local/inductor/j3/cj3gm4fhwptk2sod5a6fmgcrg6vokkm3irawom76b5fautslbo4j.py:4093 call"
+    ],
+    [
+     "free_requested",
+     169318953472,
+     806400,
+     ""
+    ],
+    [
+     "free_completed",
+     169318953472,
+     806400,
+     ""
+    ],
+    [
+     "free_requested",
+     150449050624,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150449050624,
+     1612800,
+     ""
+    ],
+    [
+     "alloc",
+     169316194304,
+     4,
+     "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:25 compute_forces"
+    ],
+    [
+     "alloc",
+     169316194816,
+     8,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     169318953472,
+     537600,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     169320835072,
+     537600,
+     "unattributed"
+    ],
+    [
+     "alloc",
+     169315663872,
+     26624,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4297 call"
+    ],
+    [
+     "alloc",
+     156879284224,
+     137625600,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "alloc",
+     150073483264,
+     1612800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4309 call"
+    ],
+    [
+     "alloc",
+     150075096064,
+     1612800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4314 call"
+    ],
+    [
+     "free_requested",
+     169318415872,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169318415872,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     169316194816,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169316194816,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169318953472,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169318953472,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     169320835072,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169320835072,
+     537600,
+     ""
+    ],
+    [
+     "alloc",
+     150337229824,
+     25804800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4335 call"
+    ],
+    [
+     "free_requested",
+     150073483264,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150073483264,
+     1612800,
+     ""
+    ],
+    [
+     "alloc",
+     150363034624,
+     25804800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4341 call"
+    ],
+    [
+     "free_requested",
+     169316201472,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169316201472,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     150363034624,
+     25804800,
+     ""
+    ],
+    [
+     "free_completed",
+     150363034624,
+     25804800,
+     ""
+    ],
+    [
+     "free_requested",
+     169317878272,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169317878272,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     150311425024,
+     25804800,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     25804800,
+     ""
+    ],
+    [
+     "alloc",
+     151271041024,
+     2202009600,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     26624,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     26624,
+     ""
+    ],
+    [
+     "free_requested",
+     158842599424,
+     2202009600,
+     ""
+    ],
+    [
+     "free_completed",
+     158842599424,
+     2202009600,
+     ""
+    ],
+    [
+     "alloc",
+     157016909824,
+     137625600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "alloc",
+     150530443264,
+     412876800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "alloc",
+     153473050624,
+     688128000,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "alloc",
+     158842599424,
+     963379200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "free_requested",
+     151271041024,
+     2202009600,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     2202009600,
+     ""
+    ],
+    [
+     "alloc",
+     150943320064,
+     103219200,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4391 call"
+    ],
+    [
+     "alloc",
+     151271041024,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4397 call"
+    ],
+    [
+     "alloc",
+     154161178624,
+     412876800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4401 call"
+    ],
+    [
+     "alloc",
+     151821543424,
+     412876800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4407 call"
+    ],
+    [
+     "alloc",
+     152234420224,
+     516096000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4411 call"
+    ],
+    [
+     "alloc",
+     152750516224,
+     688128000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4417 call"
+    ],
+    [
+     "free_requested",
+     152234420224,
+     516096000,
+     ""
+    ],
+    [
+     "free_completed",
+     152234420224,
+     516096000,
+     ""
+    ],
+    [
+     "free_requested",
+     152750516224,
+     688128000,
+     ""
+    ],
+    [
+     "free_completed",
+     152750516224,
+     688128000,
+     ""
+    ],
+    [
+     "alloc",
+     152234420224,
+     481689600,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4428 call"
+    ],
+    [
+     "alloc",
+     159805978624,
+     963379200,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4434 call"
+    ],
+    [
+     "alloc",
+     157154535424,
+     137625600,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4438 call"
+    ],
+    [
+     "free_requested",
+     159805978624,
+     963379200,
+     ""
+    ],
+    [
+     "free_completed",
+     159805978624,
+     963379200,
+     ""
+    ],
+    [
+     "free_requested",
+     157154535424,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     157154535424,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     156879284224,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     156879284224,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     151821543424,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     151821543424,
+     412876800,
+     ""
+    ],
+    [
+     "alloc",
+     152716109824,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4452 call"
+    ],
+    [
+     "free_requested",
+     157016909824,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     157016909824,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     152716109824,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     152716109824,
+     550502400,
+     ""
+    ],
+    [
+     "free_requested",
+     150530443264,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     150530443264,
+     412876800,
+     ""
+    ],
+    [
+     "alloc",
+     156879284224,
+     516096000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4481 call"
+    ],
+    [
+     "free_requested",
+     153473050624,
+     688128000,
+     ""
+    ],
+    [
+     "free_completed",
+     153473050624,
+     688128000,
+     ""
+    ],
+    [
+     "free_requested",
+     151271041024,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     550502400,
+     ""
+    ],
+    [
+     "free_requested",
+     158842599424,
+     963379200,
+     ""
+    ],
+    [
+     "free_completed",
+     158842599424,
+     963379200,
+     ""
+    ],
+    [
+     "alloc",
+     152716109824,
+     1376256000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4498 call"
+    ],
+    [
+     "alloc",
+     169316194816,
+     268800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4499 call"
+    ],
+    [
+     "free_requested",
+     152234420224,
+     481689600,
+     ""
+    ],
+    [
+     "free_completed",
+     152234420224,
+     481689600,
+     ""
+    ],
+    [
+     "free_requested",
+     156879284224,
+     516096000,
+     ""
+    ],
+    [
+     "free_completed",
+     156879284224,
+     516096000,
+     ""
+    ],
+    [
+     "free_requested",
+     157466343424,
+     1376256000,
+     ""
+    ],
+    [
+     "free_completed",
+     157466343424,
+     1376256000,
+     ""
+    ],
+    [
+     "free_requested",
+     169317276672,
+     268800,
+     ""
+    ],
+    [
+     "free_completed",
+     169317276672,
+     268800,
+     ""
+    ],
+    [
+     "alloc",
+     151271041024,
+     587059200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:136 radial_table_forward"
+    ],
+    [
+     "alloc",
+     150492058624,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:137 radial_table_forward"
+    ],
+    [
+     "alloc",
+     150530443264,
+     137625600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/wrebuild_backward.py:280 __call__"
+    ],
+    [
+     "alloc",
+     150668068864,
+     137625600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/wrebuild_backward.py:282 __call__"
+    ],
+    [
+     "alloc",
+     151858100224,
+     144506880,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/wrebuild_backward.py:282 __call__"
+    ],
+    [
+     "alloc",
+     150501090304,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/wrebuild_backward.py:282 __call__"
+    ],
+    [
+     "alloc",
+     169315663872,
+     16,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/oeq_streaming/wrebuild_backward.py:285 __call__"
+    ],
+    [
+     "free_requested",
+     150530443264,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150530443264,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     169315663872,
+     16,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     16,
+     ""
+    ],
+    [
+     "free_requested",
+     151271041024,
+     587059200,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     587059200,
+     ""
+    ],
+    [
+     "free_requested",
+     150492058624,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150492058624,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     152716109824,
+     1376256000,
+     ""
+    ],
+    [
+     "free_completed",
+     152716109824,
+     1376256000,
+     ""
+    ],
+    [
+     "free_requested",
+     169317545472,
+     332800,
+     ""
+    ],
+    [
+     "free_completed",
+     169317545472,
+     332800,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150064451584,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150064451584,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150140844544,
+     161548800,
+     ""
+    ],
+    [
+     "free_completed",
+     150140844544,
+     161548800,
+     ""
+    ],
+    [
+     "alloc",
+     169315663872,
+     59392,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4530 call"
+    ],
+    [
+     "alloc",
+     150530443264,
+     137625600,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4536 call"
+    ],
+    [
+     "free_requested",
+     150075096064,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150075096064,
+     1612800,
+     ""
+    ],
+    [
+     "alloc",
+     150805694464,
+     137625600,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4542 call"
+    ],
+    [
+     "free_requested",
+     150337229824,
+     25804800,
+     ""
+    ],
+    [
+     "free_completed",
+     150337229824,
+     25804800,
+     ""
+    ],
+    [
+     "alloc",
+     150140844544,
+     161548800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4547 call"
+    ],
+    [
+     "alloc",
+     150311425024,
+     137625600,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4553 call"
+    ],
+    [
+     "free_requested",
+     150140844544,
+     161548800,
+     ""
+    ],
+    [
+     "free_completed",
+     150140844544,
+     161548800,
+     ""
+    ],
+    [
+     "alloc",
+     154574055424,
+     103219200,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4558 call"
+    ],
+    [
+     "free_requested",
+     150668068864,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150668068864,
+     137625600,
+     ""
+    ],
+    [
+     "alloc",
+     151271041024,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4569 call"
+    ],
+    [
+     "free_requested",
+     150530443264,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150530443264,
+     137625600,
+     ""
+    ],
+    [
+     "alloc",
+     156879284224,
+     2202009600,
+     "mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py:131 _"
+    ],
+    [
+     "free_requested",
+     169315663872,
+     59392,
+     ""
+    ],
+    [
+     "free_completed",
+     169315663872,
+     59392,
+     ""
+    ],
+    [
+     "free_requested",
+     169315723264,
+     268800,
+     ""
+    ],
+    [
+     "free_completed",
+     169315723264,
+     268800,
+     ""
+    ],
+    [
+     "free_requested",
+     154677274624,
+     2202009600,
+     ""
+    ],
+    [
+     "free_completed",
+     154677274624,
+     2202009600,
+     ""
+    ],
+    [
+     "alloc",
+     150140844544,
+     137625600,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "alloc",
+     152002607104,
+     412876800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "alloc",
+     152415483904,
+     688128000,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "alloc",
+     153103611904,
+     963379200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/segment_gemm.py:142 joined_products_input_grads"
+    ],
+    [
+     "free_requested",
+     156879284224,
+     2202009600,
+     ""
+    ],
+    [
+     "free_completed",
+     156879284224,
+     2202009600,
+     ""
+    ],
+    [
+     "alloc",
+     150492058624,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4607 call"
+    ],
+    [
+     "alloc",
+     150278470144,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4608 call"
+    ],
+    [
+     "alloc",
+     150055419904,
+     18063360,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4609 call"
+    ],
+    [
+     "alloc",
+     154677274624,
+     587059200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:136 radial_table_forward"
+    ],
+    [
+     "alloc",
+     150073483264,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:137 radial_table_forward"
+    ],
+    [
+     "free_requested",
+     150073483264,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150073483264,
+     9031680,
+     ""
+    ],
+    [
+     "alloc",
+     169316463616,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4625 call"
+    ],
+    [
+     "alloc",
+     169316530176,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4626 call"
+    ],
+    [
+     "alloc",
+     169316596736,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4627 call"
+    ],
+    [
+     "alloc",
+     169316663296,
+     66560,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4628 call"
+    ],
+    [
+     "alloc",
+     155264333824,
+     559104000,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/edge_outer_sum.py:67 edge_outer_sum_forward"
+    ],
+    [
+     "alloc",
+     151821543424,
+     34944000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4639 call"
+    ],
+    [
+     "alloc",
+     151046539264,
+     34406400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4644 call"
+    ],
+    [
+     "alloc",
+     150530443264,
+     104832000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4647 call"
+    ],
+    [
+     "alloc",
+     155823437824,
+     174720000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4655 call"
+    ],
+    [
+     "alloc",
+     155998157824,
+     172032000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4660 call"
+    ],
+    [
+     "alloc",
+     156170189824,
+     244608000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4663 call"
+    ],
+    [
+     "alloc",
+     156414797824,
+     240844800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4668 call"
+    ],
+    [
+     "free_requested",
+     151046539264,
+     34406400,
+     ""
+    ],
+    [
+     "free_completed",
+     151046539264,
+     34406400,
+     ""
+    ],
+    [
+     "alloc",
+     151046539264,
+     68812800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4678 call"
+    ],
+    [
+     "free_requested",
+     150082514944,
+     58329600,
+     ""
+    ],
+    [
+     "free_completed",
+     150082514944,
+     58329600,
+     ""
+    ],
+    [
+     "alloc",
+     156655642624,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4685 call"
+    ],
+    [
+     "free_requested",
+     150943320064,
+     103219200,
+     ""
+    ],
+    [
+     "free_completed",
+     150943320064,
+     103219200,
+     ""
+    ],
+    [
+     "alloc",
+     157206145024,
+     688128000,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4716 call"
+    ],
+    [
+     "free_requested",
+     157206145024,
+     688128000,
+     ""
+    ],
+    [
+     "free_completed",
+     157206145024,
+     688128000,
+     ""
+    ],
+    [
+     "alloc",
+     157206145024,
+     963379200,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4732 call"
+    ],
+    [
+     "free_requested",
+     157206145024,
+     963379200,
+     ""
+    ],
+    [
+     "free_completed",
+     157206145024,
+     963379200,
+     ""
+    ],
+    [
+     "alloc",
+     157206145024,
+     412876800,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4742 call"
+    ],
+    [
+     "free_requested",
+     152002607104,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     152002607104,
+     412876800,
+     ""
+    ],
+    [
+     "free_requested",
+     150311425024,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     150805694464,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150805694464,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     154161178624,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     154161178624,
+     412876800,
+     ""
+    ],
+    [
+     "alloc",
+     157619021824,
+     550502400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4751 call"
+    ],
+    [
+     "free_requested",
+     150140844544,
+     137625600,
+     ""
+    ],
+    [
+     "free_completed",
+     150140844544,
+     137625600,
+     ""
+    ],
+    [
+     "free_requested",
+     157206145024,
+     412876800,
+     ""
+    ],
+    [
+     "free_completed",
+     157206145024,
+     412876800,
+     ""
+    ],
+    [
+     "free_requested",
+     157619021824,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     157619021824,
+     550502400,
+     ""
+    ],
+    [
+     "free_requested",
+     152415483904,
+     688128000,
+     ""
+    ],
+    [
+     "free_completed",
+     152415483904,
+     688128000,
+     ""
+    ],
+    [
+     "free_requested",
+     153103611904,
+     963379200,
+     ""
+    ],
+    [
+     "free_completed",
+     153103611904,
+     963379200,
+     ""
+    ],
+    [
+     "free_requested",
+     151046539264,
+     68812800,
+     ""
+    ],
+    [
+     "free_completed",
+     151046539264,
+     68812800,
+     ""
+    ],
+    [
+     "free_requested",
+     151271041024,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     550502400,
+     ""
+    ],
+    [
+     "free_requested",
+     169317007872,
+     268800,
+     ""
+    ],
+    [
+     "free_completed",
+     169317007872,
+     268800,
+     ""
+    ],
+    [
+     "free_requested",
+     154574055424,
+     103219200,
+     ""
+    ],
+    [
+     "free_completed",
+     154574055424,
+     103219200,
+     ""
+    ],
+    [
+     "free_requested",
+     169316530176,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169316530176,
+     66560,
+     ""
+    ],
+    [
+     "free_requested",
+     155998157824,
+     172032000,
+     ""
+    ],
+    [
+     "free_completed",
+     155998157824,
+     172032000,
+     ""
+    ],
+    [
+     "free_requested",
+     169316596736,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169316596736,
+     66560,
+     ""
+    ],
+    [
+     "free_requested",
+     156414797824,
+     240844800,
+     ""
+    ],
+    [
+     "free_completed",
+     156414797824,
+     240844800,
+     ""
+    ],
+    [
+     "free_requested",
+     169316663296,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169316663296,
+     66560,
+     ""
+    ],
+    [
+     "free_requested",
+     156655642624,
+     550502400,
+     ""
+    ],
+    [
+     "free_completed",
+     156655642624,
+     550502400,
+     ""
+    ],
+    [
+     "free_requested",
+     169316463616,
+     66560,
+     ""
+    ],
+    [
+     "free_completed",
+     169316463616,
+     66560,
+     ""
+    ],
+    [
+     "free_requested",
+     156170189824,
+     244608000,
+     ""
+    ],
+    [
+     "free_completed",
+     156170189824,
+     244608000,
+     ""
+    ],
+    [
+     "free_requested",
+     155823437824,
+     174720000,
+     ""
+    ],
+    [
+     "free_completed",
+     155823437824,
+     174720000,
+     ""
+    ],
+    [
+     "free_requested",
+     150530443264,
+     104832000,
+     ""
+    ],
+    [
+     "free_completed",
+     150530443264,
+     104832000,
+     ""
+    ],
+    [
+     "free_requested",
+     151821543424,
+     34944000,
+     ""
+    ],
+    [
+     "free_completed",
+     151821543424,
+     34944000,
+     ""
+    ],
+    [
+     "alloc",
+     151271041024,
+     587059200,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/edge_outer_sum.py:122 edge_outer_sum_backward"
+    ],
+    [
+     "alloc",
+     150311425024,
+     144506880,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/edge_outer_sum.py:123 edge_outer_sum_backward"
+    ],
+    [
+     "free_requested",
+     155264333824,
+     559104000,
+     ""
+    ],
+    [
+     "free_completed",
+     155264333824,
+     559104000,
+     ""
+    ],
+    [
+     "free_requested",
+     154677274624,
+     587059200,
+     ""
+    ],
+    [
+     "free_completed",
+     154677274624,
+     587059200,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     18063360,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     18063360,
+     ""
+    ],
+    [
+     "free_requested",
+     151126534144,
+     144506880,
+     ""
+    ],
+    [
+     "free_completed",
+     151126534144,
+     144506880,
+     ""
+    ],
+    [
+     "alloc",
+     169317007872,
+     806400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4853 call"
+    ],
+    [
+     "alloc",
+     169317814272,
+     806400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4858 call"
+    ],
+    [
+     "alloc",
+     150055419904,
+     27095040,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4864 call"
+    ],
+    [
+     "alloc",
+     150287501824,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:165 radial_table_backward"
+    ],
+    [
+     "free_requested",
+     150483026944,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150483026944,
+     9031680,
+     ""
+    ],
+    [
+     "alloc",
+     150483026944,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4884 call"
+    ],
+    [
+     "alloc",
+     150082514944,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4885 call"
+    ],
+    [
+     "free_requested",
+     169316194816,
+     268800,
+     ""
+    ],
+    [
+     "free_completed",
+     169316194816,
+     268800,
+     ""
+    ],
+    [
+     "alloc",
+     150091546624,
+     9031680,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/kernels/triton/radial_table.py:165 radial_table_backward"
+    ],
+    [
+     "free_requested",
+     151271041024,
+     587059200,
+     ""
+    ],
+    [
+     "free_completed",
+     151271041024,
+     587059200,
+     ""
+    ],
+    [
+     "free_requested",
+     150278470144,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150278470144,
+     9031680,
+     ""
+    ],
+    [
+     "alloc",
+     150100578304,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4906 call"
+    ],
+    [
+     "alloc",
+     150109609984,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4907 call"
+    ],
+    [
+     "alloc",
+     150118641664,
+     9031680,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4909 call"
+    ],
+    [
+     "free_requested",
+     150473995264,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150473995264,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     169316739072,
+     268800,
+     ""
+    ],
+    [
+     "free_completed",
+     169316739072,
+     268800,
+     ""
+    ],
+    [
+     "free_requested",
+     150091546624,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150091546624,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150492058624,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150492058624,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150082514944,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150082514944,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150287501824,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150287501824,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150455931904,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150455931904,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150510121984,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150510121984,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150464963584,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150464963584,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150519153664,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150519153664,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150528185344,
+     2257920,
+     ""
+    ],
+    [
+     "free_completed",
+     150528185344,
+     2257920,
+     ""
+    ],
+    [
+     "alloc",
+     150455931904,
+     27095040,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4932 call"
+    ],
+    [
+     "free_requested",
+     150311425024,
+     144506880,
+     ""
+    ],
+    [
+     "free_completed",
+     150311425024,
+     144506880,
+     ""
+    ],
+    [
+     "free_requested",
+     150118641664,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150118641664,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150100578304,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150100578304,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150109609984,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150109609984,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150483026944,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150483026944,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     151858100224,
+     144506880,
+     ""
+    ],
+    [
+     "free_completed",
+     151858100224,
+     144506880,
+     ""
+    ],
+    [
+     "free_requested",
+     169316191744,
+     64,
+     ""
+    ],
+    [
+     "free_completed",
+     169316191744,
+     64,
+     ""
+    ],
+    [
+     "free_requested",
+     150501090304,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150501090304,
+     9031680,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     27095040,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     27095040,
+     ""
+    ],
+    [
+     "free_requested",
+     150455931904,
+     27095040,
+     ""
+    ],
+    [
+     "free_completed",
+     150455931904,
+     27095040,
+     ""
+    ],
+    [
+     "free_requested",
+     150302393344,
+     9031680,
+     ""
+    ],
+    [
+     "free_completed",
+     150302393344,
+     9031680,
+     ""
+    ],
+    [
+     "alloc",
+     169316194816,
+     806400,
+     "fastmace-cache/rebuild-a-local/inductor/e3/ce3rkatyb6qoiulzervdweeyhkcjccw3sy6vd2wxf7yfiqanwr2e.py:4954 call"
+    ],
+    [
+     "free_requested",
+     169317007872,
+     806400,
+     ""
+    ],
+    [
+     "free_completed",
+     169317007872,
+     806400,
+     ""
+    ],
+    [
+     "free_requested",
+     169317814272,
+     806400,
+     ""
+    ],
+    [
+     "free_completed",
+     169317814272,
+     806400,
+     ""
+    ],
+    [
+     "alloc",
+     169317001216,
+     806400,
+     "mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py:38 compute_forces"
+    ],
+    [
+     "free_requested",
+     169316194304,
+     4,
+     ""
+    ],
+    [
+     "free_completed",
+     169316194304,
+     4,
+     ""
+    ],
+    [
+     "free_requested",
+     169316194816,
+     806400,
+     ""
+    ],
+    [
+     "free_completed",
+     169316194816,
+     806400,
+     ""
+    ],
+    [
+     "free_requested",
+     169320297472,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169320297472,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     169316193280,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169316193280,
+     8,
+     ""
+    ],
+    [
+     "free_requested",
+     169319759872,
+     537600,
+     ""
+    ],
+    [
+     "free_completed",
+     169319759872,
+     537600,
+     ""
+    ],
+    [
+     "free_requested",
+     169316192256,
+     4,
+     ""
+    ],
+    [
+     "free_completed",
+     169316192256,
+     4,
+     ""
+    ],
+    [
+     "free_requested",
+     169316193792,
+     36,
+     ""
+    ],
+    [
+     "free_completed",
+     169316193792,
+     36,
+     ""
+    ],
+    [
+     "free_requested",
+     169317001216,
+     806400,
+     ""
+    ],
+    [
+     "free_completed",
+     169317001216,
+     806400,
+     ""
+    ],
+    [
+     "free_requested",
+     169316192768,
+     8,
+     ""
+    ],
+    [
+     "free_completed",
+     169316192768,
+     8,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "alloc",
+     150057032704,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "alloc",
+     150058645504,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150057032704,
+     1612800,
+     ""
+    ],
+    [
+     "alloc",
+     150055419904,
+     1612800,
+     "fastmace-rebuild-a/src-a3069ef3/fastmace/integrators/langevin.py:221 second_half"
+    ],
+    [
+     "free_requested",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150058645504,
+     1612800,
+     ""
+    ],
+    [
+     "free_requested",
+     150055419904,
+     1612800,
+     ""
+    ],
+    [
+     "free_completed",
+     150055419904,
+     1612800,
+     ""
+    ]
+   ]
+  }
+ },
+ "rewrites": {
+  "recompute_conv_weights": "on",
+  "recompute_node_segments": "on",
+  "recompute_first_table": "on"
+ },
+ "plan": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (MD only: phase 1a's skin and headroom; rule 11 would give skin 0.53 A, headroom 1.15 (fastest of 67200 atoms at 300 K, lightest mass 22.9898 u, 1 fs: 0.0165 A per step, 16 steps per rebuild) (it applies to MC and species-change workloads))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (no species changes: species-dependent rewrites are built for the superset (SPEC \u00a79.3 rule 8))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (67200 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (auto: OpenEquivariance builds and the process allows it (SPEC \u00a79.4))\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible): stage 1: on (with chunked_conv_backward); stage 2: supported (ok); stage 2: mh1-r2scan, decision 64)\n  RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.w_tables = off  (auto (on_for_mh1_float64_on_measured_gpus_decision_65): stage 1: on (with fold_cutoff); stage 2: supported (ok); off: float32 plan, decision 65)\n  RewriteConfig.wprime_backward = on  (auto (on_for_mh1_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok); stage 2: on, MH-1 on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))\n  RewriteConfig.recompute_conv_weights = on  (requested 'on': on: requested)\n  RewriteConfig.recompute_first_table = on  (requested 'on': on: requested)\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.gate_epilogue = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT10-T01, opt-in))\n  RewriteConfig.recompute_node_segments = on  (requested 'on': stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = on  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, MH-1 on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.species_residual = off  (auto (never_automatic): off: only an explicit 'on' enables it (fp32 profile, opt-in))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.save_transcendentals = off  (auto (on_for_mh1_float64_on_measured_gpus_decision_65): transcendental ops saved for the backward, not recomputed (ideas-20261027 D3); off: float32 plan, decision 65)\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  EngineConfig.fp64_emulation = off  (auto (on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible): float32 plan: no float64 matrix products)\n  EngineConfig.fp64_emulation_mantissa_bits = dynamic  (auto (dynamic_decision_65_d1_suspended_after_recapture_defect): no effect: fp64_emulation is off)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  EngineConfig.force_graphs = fit  (auto (fit_when_capturing_on_cuda_else_keep): CUDA graphs: one force graph when the next padded size would not fit the free memory (CAP-T01))\n  NeighbourConfig.skin = 0.3 A  (auto (rule_11_skin_from_workload): phase 1a's skin: rule 11 sizes only MC and species-change workloads; rule 11 would give 0.53 A)\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.15 and edge_bucket_fraction as given; rule 11 would give 1.15)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04))\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): the force precision: no MC moves, no MC energies)\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = warn  (rule 12: predicted 22.90 GiB (run; run 22.90, build 1.53) at 2926795 edges, 67200 atoms, float32 (activations 101359 MiB, neighbour list 368 MiB, workspace 160 MiB); needs 22.90 of 14.80 GiB free, above 90% of the free memory; kept as set: recompute_conv_weights, recompute_first_table, recompute_node_segments; the run may run out of memory (decision 51))\n  requested: RewriteConfig.recompute_conv_weights=on, RewriteConfig.recompute_first_table=on, RewriteConfig.recompute_node_segments=on, PrecisionConfig.dtype=float32"
+}

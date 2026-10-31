@@ -10,7 +10,9 @@
 #   ab-<structure>-<size>-<order>: tools/ab_rewrites.py, a = the default plan, b = recompute_first_table on; size small
 #     (NaCl and NbCl5 3x3x3, NaNbO3 4x4x3: 216, 1,944, 1,920 atoms; 12 blocks of 300 steps) or big (NbCl5 4x4x8,
 #     NaNbO3 6x6x6: 9,216, 8,640 atoms; 8 blocks of 100 steps after 100 warm-up steps), order ab (abab) or ba (abba);
-#   point-<structure>-<repeat>: tools/bench/capacity_scan.py point, default plan (rule 12 decides), 200 steps.
+#   point-<structure>-<repeat>: tools/bench/capacity_scan.py point, default plan (rule 12 decides), 200 steps;
+#   point-<structure>-<repeat>-<off|on>: the same with recompute_first_table forced off or on (rule 12 still decides
+#     the other two rescue records), 60 steps, point files tagged -off or -on.
 # Before each job: no WSL compute process and utilisation <= 10 % in both nvidia-smi views for 30 s.
 # Template: results/speed-def-20261030/local.sh.
 set -u -o pipefail
@@ -74,9 +76,13 @@ for job in "$@"; do
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/ab_rewrites.py" --b recompute_first_table=on --output "$ROOT/ab/$job" \
         --checkpoint "$CK" --model mh1-r2scan --structures "$spec" --order "$order" --pattern "$pattern" --prepare \
         "${extra[@]}" ;;
-    point-*) IFS=- read -r _ structure repeat <<< "$job"
+    point-*) IFS=- read -r _ structure repeat mode <<< "$job"
+      forced=()
+      if [ -n "$mode" ]; then
+        forced=(--rewrites "recompute_first_table=$mode" --tag="-$mode" --steps 60)
+      fi
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
-        --repeat "$repeat" --output "$ROOT/points" ;;
+        --repeat "$repeat" --output "$ROOT/points" "${forced[@]}" ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
 done

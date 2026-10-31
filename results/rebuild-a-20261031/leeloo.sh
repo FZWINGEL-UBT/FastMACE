@@ -65,9 +65,13 @@ for job in "$@"; do
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/ab_rewrites.py" --b recompute_first_table=on --output "$ROOT/ab/$job" \
         --checkpoint "$CK" --model mh1-r2scan --structures "$spec" --order "$order" --pattern "$pattern" --prepare \
         "${extra[@]}" ;;
-    point-*) IFS=- read -r _ structure repeat <<< "$job"
+    point-*) IFS=- read -r _ structure repeat mode <<< "$job"
+      forced=()
+      if [ -n "$mode" ]; then
+        forced=(--rewrites "recompute_first_table=$mode" --tag="-$mode" --steps 60)
+      fi
       PYTHONPATH=$FM run "$job" "$PY" "$FM/tools/bench/capacity_scan.py" point --structure "$structure" \
-        --repeat "$repeat" --output "$ROOT/points" ;;
+        --repeat "$repeat" --output "$ROOT/points" "${forced[@]}" ;;
     *) note "unknown job $job"; exit 2 ;;
   esac
 done
