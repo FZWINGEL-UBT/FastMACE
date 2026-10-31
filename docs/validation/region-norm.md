@@ -64,9 +64,47 @@ on and off:
 
 - **With the separate segments,** gate_epilogue keeps 36.3 kB per atom more at the force call's peak.
 - **In the chunked region,** its extra buffer is rebuilt per chunk, and the difference vanishes.
-- **Consequence.** The region's memory term holds with gate_epilogue on or off. The planner has no gate_epilogue
-  term yet. The conductor's decision is to add a gate_epilogue term, counted only while `recompute_node_region` is
-  off, and to make "gate_epilogue off" the first memory-rescue rung; that change follows separately.
+- **Consequence.** The region's memory term holds with gate_epilogue on or off.
+
+### gate_epilogue as a memory-rescue rung (fastmace/ge-rescue)
+
+Without the node segments (trillian, `recompute_node_segments` off, `recompute_conv_weights` on, NbCl5 21,600
+atoms), gate_epilogue keeps less:
+
+| Records | gate_epilogue on | off | Difference |
+|---|---:|---:|---:|
+| conv_weights | 4.786 GiB | 4.539 GiB | 12.3 kB per atom |
+| conv_weights, separate segments | 3.857 GiB | 3.126 GiB | 36.3 kB per atom |
+| conv_weights, segments, chunked region | 1.985 GiB | 1.974 GiB | 0.5 kB per atom |
+
+Without `recompute_conv_weights`, 21,600 atoms do not fit the A4000's 16 GB.
+
+At the limit (trillian, NbCl5 114,048 atoms, every region record on, 200 steps), the steady peak reserved is
+12.52 GiB with gate_epilogue on and 11.97 GiB with it off. That is 5 kB per atom of reserved memory.
+
+**The rung's place.** Each rung frees, per percent of step time:
+
+| Rung | Frees | Step time | Per percent |
+|---|---|---|---|
+| `recompute_conv_weights` | about 135 kB per atom (5,120 B per edge) | 1.01–1.04× | 35–135 kB |
+| `recompute_first_table` | about 7 kB per atom (260 B per edge) | 1.02–1.04× | 2–4 kB |
+| `recompute_node_segments` | 64 kB per atom | 1.095× | 7 kB |
+| gate_epilogue off, without the segments | 12 kB per atom | 1.00–1.05× | from 2.5 kB |
+| gate_epilogue off, with the segments | 36 kB per atom | 1.00–1.05× | from 7 kB |
+| `recompute_node_region` | 93 kB per atom (with gate_epilogue on) | about 1.2× | about 5 kB |
+
+- gate_epilogue's speed gain is speed-def E2's MD step: NbCl5 and NaNbO3 1.2–4.7 %, NaCl none.
+- So gate_epilogue off pays most once the separate segments are on. It goes after `recompute_node_segments` and
+  before `recompute_node_region`:
+  `MEMORY_RESCUE = (recompute_conv_weights, recompute_first_table, recompute_node_segments, gate_epilogue,
+  recompute_node_region)`. It is the one rung the rescue turns off (`planner.memory.RESCUE_OFF`).
+- **Its term** is 0.039 of the stock per-node floats (12.3 kB per atom), 0.114 with the separate segments
+  (36.3 kB), and none with the chunked region. `planner.memory.CONTEXT_TERMS` picks it from the enabled records.
+- **Back on with the region.** Once `recompute_node_region` is on, gate_epilogue keeps almost nothing more, so it
+  gets its speed back:
+  - rule 12 turns it on again when the estimate with it still fits;
+  - the out-of-memory rebuild that turns the region on turns it on again, if an earlier rebuild had turned it off.
+  The order follows the measured context terms, and the conductor accepted it (31 October 2026).
 
 ## Correctness
 
@@ -138,6 +176,5 @@ The ledger ([m3-ledger.md](m3-ledger.md)) listed 1.34 GiB of graph executables o
 - `falsifier-leto/`: main and branch region_probe records;
 - `leeloo/`: the gate summaries and the gate_epilogue on/off probe records;
 - `points-5060ti/`: the limit points' JSON and log;
-- `exec-probe-leeloo/`: the per-key graph-executable probe.
-
-The A4000 records are on the NAS at `/mnt/homes/zwingel/fastmace-capacity/ge-trillian2/`.
+- `exec-probe-leeloo/`: the per-key graph-executable probe;
+- `trillian/`: the A4000's gate_epilogue probes (with and without the segments) and its limit points.

@@ -1,0 +1,28 @@
+{
+ "host": "trillian",
+ "gpu": "NVIDIA RTX A4000",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "1f77378a",
+ "structure": "NbCl5@5x5x12",
+ "atoms": 21600,
+ "region": "separate",
+ "chunks": 1,
+ "peak_above_start_GiB": 4.538736820220947,
+ "allocated_before_GiB": 0.30947160720825195,
+ "reserved_GiB": 11.099609375,
+ "call_ms": 278.9642333984375,
+ "call_ms_all": [
+  278.5195617675781,
+  278.9642333984375,
+  278.8373718261719,
+  279.9503479003906,
+  280.6661071777344
+ ],
+ "plan_rewrites": [
+  "RewriteConfig.recompute_conv_weights = on  (requested 'on': on: requested)",
+  "RewriteConfig.recompute_first_table = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights): off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (rebuild-a))",
+  "RewriteConfig.recompute_node_segments = off  (requested 'off': stage 1: off)",
+  "RewriteConfig.recompute_node_region = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments): off: on only when memory would not be enough with recompute_node_segments on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (ninth list item 2))",
+  "requested: RewriteConfig.wprime_backward=on, RewriteConfig.recompute_conv_weights=on, RewriteConfig.recompute_node_segments=off, RewriteConfig.gate_epilogue=off, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+ ]
+}

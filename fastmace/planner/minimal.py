@@ -972,34 +972,67 @@ class MinimalPlanner:
             # without them and rebuilds with them after a real out-of-memory error, one record per rebuild
             # (fallback.memory_rescue); only a cell that cannot fit turns them on here, while each lowers the estimate.
             def eligible(name):
-                if name in enabled or name in explicit or name not in registry.names():
+                if name in explicit or name not in registry.names():
+                    return False
+                if memory.rescue_value(name) == "off":  # a rung turned off (memory.RESCUE_OFF), with its dependants
+                    return name in enabled and not explicit.intersection(registry.dependants(name))
+                if name in enabled:
                     return False
                 record = registry[name]
                 return _family_applies(record, traits) and all(other in enabled for other in record.requires)
 
+            def rescued_plan(name):
+                if memory.rescue_value(name) == "off":
+                    group = {name, *registry.dependants(name)}
+                    return [other for other in enabled if other not in group]
+                return [*enabled, name]
+
             if not memory.short_by_far(found, free):
-                deferred = [name for name in memory.MEMORY_RESCUE if eligible(name)]
+                deferred = [name for name in memory.MEMORY_RESCUE
+                            if eligible(name) and memory.rescue_value(name) == "on"]
             else:
                 for name in memory.MEMORY_RESCUE:
                     if memory.fits(found, free):
                         break
                     if not eligible(name):
                         continue
-                    candidate = [*enabled, name]
+                    candidate = rescued_plan(name)
                     raised = estimate(candidate)
                     if raised.total >= found.total:
                         continue
                     rescued.append((name, found.total - raised.total))
                     enabled, found = candidate, raised
-        for name, saved in rescued:
+        # A rung turned off whose term a later rung absorbs (memory.CONTEXT_TERMS without a term: gate_epilogue inside
+        # recompute_node_region's chunks) goes back to its default when the plan still fits with it.
+        restored = []
+        absorbed = {owner: other for owner, other, term in memory.CONTEXT_TERMS if not term}
+        for name, _ in list(rescued):
+            if memory.rescue_value(name) != "off" or absorbed.get(name) not in enabled:
+                continue
+            candidate = [other for other in registry.order() if other in enabled or other == name]
+            back = estimate(candidate)
+            if memory.fits(back, free):
+                rescued = [entry for entry in rescued if entry[0] != name]
+                restored.append((name, absorbed[name]))
+                enabled, found = candidate, back
+        for name, other in restored:
             field = registry.config_field(name)
-            parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: "on"})
-            why = (f"on by rule 12: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory without it"
-                   + ("" if name == memory.MEMORY_RESCUE[0] else
-                      f", with {', '.join(memory.MEMORY_RESCUE[:memory.MEMORY_RESCUE.index(name)])} on")
-                   + f"; turning {name} on saves about {saved / 2**20:.0f} MiB (CAP-T07, CAP-T08)")
+            why = (f"on: rule 12's memory rescue turned it off, and {other} (turned on after it) keeps its extra "
+                   f"memory within its chunks, so it is on again and the estimate still fits "
+                   f"(docs/validation/region-norm.md)")
             book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
             book.decide(f"RewriteConfig.{field}", "on", Reason(why, rule=12, code="rule-12-memory-rescue"))
+        for name, saved in rescued:
+            field, value = registry.config_field(name), memory.rescue_value(name)
+            parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: value})
+            before = [f"{other} {memory.rescue_value(other)}"
+                      for other in memory.MEMORY_RESCUE[:memory.MEMORY_RESCUE.index(name)]]
+            why = (f"{value} by rule 12: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory "
+                   + ("with it on" if value == "off" else "without it")
+                   + (f", with {', '.join(before)}" if before else "")
+                   + f"; turning {name} {value} saves about {saved / 2**20:.0f} MiB (CAP-T07, CAP-T08)")
+            book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
+            book.decide(f"RewriteConfig.{field}", value, Reason(why, rule=12, code="rule-12-memory-rescue"))
         for name in deferred:
             field = registry.config_field(name)
             why = (f"off: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory, but it overstates the "

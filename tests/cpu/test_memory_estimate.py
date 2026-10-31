@@ -13,6 +13,7 @@
 
 import copy
 import dataclasses
+import types
 
 import pytest
 import test_minimal_planner as tmp
@@ -404,12 +405,17 @@ def mh1_traits():
     return capabilities.model_traits(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
 
 
-def plan(memory_bytes=tmp.GPU.memory_bytes, rewrites="auto", atoms=None):
+MH1 = "mh1-r2scan"  # decision 66's defaults apply to MH-1 on this file's GPU
+
+
+def plan(memory_bytes=tmp.GPU.memory_bytes, rewrites="auto", atoms=None, label=None):
+    """``label``: a label-table label, so that decision 66's per-model defaults apply (a stand-in loaded model)."""
     planner = tmp.minimal()
     planner._free_memory_bytes = lambda hardware: hardware.memory_bytes  # as on CUDA before initialisation
     hardware = dataclasses.replace(tmp.GPU, memory_bytes=int(memory_bytes))
+    loaded = None if label is None else types.SimpleNamespace(label=label, head=None, sha256=None, backend=None)
     return planner.plan_traits(mh1_traits(), atoms if atoms is not None else nacl(repeat=3), IntegratorConfig(),
-                               WORKLOAD, hardware, precision="float32", rewrites=rewrites)
+                               WORKLOAD, hardware, precision="float32", rewrites=rewrites, loaded=loaded)
 
 
 def check(reason):
@@ -518,7 +524,7 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     from fastmace.planner.fixed import AUTO_RULES
 
     assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments",
-                                    "recompute_node_region")
+                                    "gate_epilogue", "recompute_node_region")
     assert AUTO_RULES["RewriteConfig.recompute_node_segments"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
     full = plan()
@@ -536,6 +542,80 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with recompute_conv_weights on
     fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
     assert fits.rewrites.recompute_node_segments == "off"
+
+
+def test_gate_epilogue_s_term_depends_on_the_node_segments():
+    """docs/validation/region-norm.md: gate_epilogue keeps 12.3 kB per atom more without the node segments, 36.3 with
+    the separate segments and 0.5 inside recompute_node_region's chunks (memory.CONTEXT_TERMS)."""
+    from fastmace.planner.minimal import _rewrite_registry
+
+    registry = _rewrite_registry()
+    dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
+    assert registry["gate_epilogue"].memory is terms.gate_epilogue
+    edge, node = terms.gate_epilogue(dims, 4)
+    assert edge == 0 and node > 0
+    alone = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue"], "float32"))
+    assert alone["gate_epilogue"].node_bytes == node
+    segments = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue", "recompute_node_segments"],
+                                                "float32"))
+    assert segments["gate_epilogue"].node_bytes == terms.gate_epilogue_in_segments(dims, 4)[1] > node
+    region = dict(memory.rewrite_memory_terms(
+        registry, dims, ["gate_epilogue", "recompute_node_segments", "recompute_node_region"], "float32"))
+    assert "gate_epilogue" not in region and "recompute_node_region" in region
+
+
+@pytest.mark.rule(12)
+def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments():
+    """docs/validation/region-norm.md: gate_epilogue (on by decision 66 on this file's GPU) stays on while the plan
+    fits, and while it fits with recompute_node_segments on; otherwise rule 12 turns it off, the memory rescue's
+    fourth rung, with its own reason. The caller's explicit "on" is kept."""
+    assert memory.RESCUE_OFF == ("gate_epilogue",) and memory.rescue_value("gate_epilogue") == "off"
+    full = plan(label=MH1)
+    assert full.rewrites.gate_epilogue == full.rewrites.wprime_backward == "on"
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20, label=MH1)  # nothing fits: every rung taken
+    assert tight.rewrites.recompute_node_segments == "on" and tight.rewrites.gate_epilogue == "off"
+    _, choice, reason = tight.decision("RewriteConfig.gate_epilogue")
+    assert choice == "off" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    assert "recompute_node_segments on" in str(reason)
+    nodes = RewriteConfig(recompute_conv_weights="on", recompute_node_segments="on")
+    free = plan(rewrites=nodes, label=MH1).predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with the segments on
+    assert plan(memory_bytes=free, rewrites=nodes, label=MH1).rewrites.gate_epilogue == "on"
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(gate_epilogue="on"), label=MH1)
+    assert kept.rewrites.gate_epilogue == "on"
+
+
+@pytest.mark.rule(12)
+def test_rule_12_gives_gate_epilogue_back_with_the_chunked_region(monkeypatch):
+    """docs/validation/region-norm.md: when the rescue ends with recompute_node_region on, gate_epilogue keeps 0.5 kB
+    per atom inside its chunks, so rule 12 turns it on again where the estimate still fits with it. The tiny model
+    saves too little for rule 12 to take the rungs itself (``short_by_far``), so the overstatement is set to 1, and
+    reassociate_first is set on, so that decision 51 drops nothing first."""
+    monkeypatch.setattr(memory, "RESCUE_OVERSTATEMENT", 1.0)
+    atoms = nacl(repeat=16)
+    base = RewriteConfig(reassociate_first="on")
+    full = plan(rewrites=base, atoms=atoms, label=MH1)
+    assert full.rewrites.gate_epilogue == full.rewrites.wprime_backward == "on"
+    every = dataclasses.replace(base, recompute_conv_weights="on", recompute_first_table="on",
+                                recompute_node_segments="on", recompute_node_region="on")
+    region = plan(rewrites=dataclasses.replace(every, gate_epilogue="on"), atoms=atoms, label=MH1)
+    segments = plan(rewrites=dataclasses.replace(every, recompute_node_region="off", gate_epilogue="off"), atoms=atoms,
+                    label=MH1)
+    assert region.predicted_memory_bytes < segments.predicted_memory_bytes
+    assert region.predicted_memory_bytes == plan(rewrites=dataclasses.replace(every, gate_epilogue="off"), atoms=atoms,
+                                                 label=MH1).predicted_memory_bytes  # absorbed: no term
+    free = region.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits only with the region on
+    auto = plan(memory_bytes=free, rewrites=base, atoms=atoms, label=MH1)
+    assert auto.rewrites.recompute_node_region == "on", auto.decision("memory")
+    assert auto.rewrites.gate_epilogue == "on"
+    _, choice, reason = auto.decision("RewriteConfig.gate_epilogue")
+    assert choice == "on" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    assert "recompute_node_region" in str(reason)
+    assert auto.predicted_memory_bytes <= memory.MARGIN * free
+    assert auto.decision("memory")[1] == "fits"
 
 
 @pytest.mark.rule(12)

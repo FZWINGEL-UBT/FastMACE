@@ -93,6 +93,51 @@ def test_the_rescue_turns_on_one_record_per_rebuild_in_its_order(monkeypatch, st
                                   usable=lambda device: True) is None
 
 
+def test_the_rescue_turns_gate_epilogue_off_after_the_node_segments(monkeypatch, stubbed):
+    """docs/validation/region-norm.md: gate_epilogue (decision 66's default) is the rung the rescue turns off, after
+    recompute_node_segments and before recompute_node_region; the caller's explicit "on" is kept."""
+    requires = {"recompute_conv_weights": ("wprime_backward",), "recompute_first_table": (),
+                "recompute_node_segments": ("gated_rows",), "gate_epilogue": ("segment_gemm",),
+                "recompute_node_region": ("recompute_node_segments",)}
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires[name]))
+    on = {"segment_gemm": "on", "gated_rows": "on", "recompute_conv_weights": "on", "recompute_first_table": "on",
+          "recompute_node_region": "off"}
+    ff = types.SimpleNamespace(rewrites="auto")
+    for nodes, expected in (("off", {"recompute_node_segments": "on"}), ("on", {"gate_epilogue": "off"})):
+        plan = stub_plan(recompute_node_segments=nodes, gate_epilogue="on", **on)
+        fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+        assert stubbed[-1]["rewrites"] == expected
+    assert stubbed[-1]["reason"] == ("out of memory at build; gate_epilogue auto -> off (the memory rescue, rule 12; "
+                                     "CAP-T07)")
+    plan = stub_plan(recompute_node_segments="on", gate_epilogue="off", **on)
+    fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_node_region": "on"}
+    explicit = types.SimpleNamespace(rewrites=RewriteConfig(gate_epilogue="on"))
+    plan = stub_plan(recompute_node_segments="on", gate_epilogue="on", **on)
+    fallback.memory_rescue(plan, oom(), explicit, None, planner=None, stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_node_region": "on"}
+    with pytest.raises(torch.cuda.OutOfMemoryError, match='gate_epilogue="off"'):
+        fallback.memory_rescue(stub_plan(recompute_node_segments="on", gate_epilogue="on", **on), oom(), ff, None,
+                               planner=None, stage="capture", usable=lambda device: False)
+
+
+def test_the_region_s_rebuild_turns_gate_epilogue_back_on(monkeypatch, stubbed):
+    """docs/validation/region-norm.md: inside recompute_node_region's chunks gate_epilogue keeps 0.5 kB per atom, so
+    the rebuild that turns the region on gives it back, when an earlier rebuild of the rescue had turned it off."""
+    requires = {"recompute_node_region": ("recompute_node_segments",)}
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires.get(name, ())))
+    on = {"segment_gemm": "on", "gated_rows": "on", "recompute_conv_weights": "on", "recompute_first_table": "on",
+          "recompute_node_segments": "on", "recompute_node_region": "off", "gate_epilogue": "off"}
+    ff = types.SimpleNamespace(rewrites="auto")
+    plan = stub_plan(**on)
+    plan.reason = "fallback: rewrites: out of memory at build; gate_epilogue auto -> off (the memory rescue)"
+    fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_node_region": "on", "gate_epilogue": "on"}
+    plan = stub_plan(**on)  # off for another reason (not a decision-66 GPU): stays off
+    fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_node_region": "on"}
+
+
 class AcceleratorError(RuntimeError):
     """As ``torch.AcceleratorError``: the driver's error, not the caching allocator's."""
 
