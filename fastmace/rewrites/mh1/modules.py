@@ -230,6 +230,17 @@ def identity_species_feats(model, interaction, attrs, count, joint=None):
         return interaction.linear_up(feats)[:count]
 
 
+def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+    """``(message, edge density)`` of a reassociated interaction with a radial table: the table, then the
+    reassociation. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward keeps the
+    lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again; the reassociation's
+    backward needs nothing else of the region, so the compiled backward rebuilds only the table."""
+    folded_input, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
+    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, folded_input, edge_index,
+                                       self.conv_tp_weights.folded_weight())
+    return message, edge_density
+
+
 def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
                           cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False):
     """RealAgnosticResidualNonLinearInteractionBlock.forward (mace-torch 0.3.16), except that
@@ -257,10 +268,16 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
     tp_weights = augmented = None
     table = getattr(self, "radial_table", None)  # radial_tables: edge_feats are then the edge lengths [E, 1]
-    w_lengths = wprime_lengths = None
+    w_lengths = wprime_lengths = message = None
     wprime = getattr(self, "wprime_backward", None)  # wprime_backward (OPT9-T03)
     if table is not None and edge_feats.shape[-1] == 1 and chunked and wprime is not None:
         wprime_lengths = edge_feats  # the message and the edge density from one op
+    elif table is not None and edge_feats.shape[-1] == 1 and reassociation is not None and getattr(
+            self, "recompute_first_table", False):  # recompute_first_table: the table's output is not kept
+        from torch.utils.checkpoint import checkpoint
+
+        message, edge_density = checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs,
+                                           edge_index, use_reentrant=False, preserve_rng_state=False)
     elif table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
         if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
@@ -298,7 +315,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         message, edge_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                   node_attrs=node_attrs, wprime_lengths=wprime_lengths)
     density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
-    if wprime_lengths is not None:
+    if wprime_lengths is not None or message is not None:
         pass
     elif reassociation is not None:
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
@@ -474,6 +491,6 @@ def probe_first_tensor_product(interaction):
 
 __all__ = [
     "FactoredRadialMLP", "FirstInteractionReassociation", "ProjectedEmbedding", "attach_streaming_kernels",
-    "cutoff_folded_forward", "identity_attrs", "identity_species_feats", "probe_first_tensor_product",
-    "streaming_message",
+    "cutoff_folded_forward", "first_table_region", "identity_attrs", "identity_species_feats",
+    "probe_first_tensor_product", "streaming_message",
 ]

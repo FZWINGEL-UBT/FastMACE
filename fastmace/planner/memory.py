@@ -51,10 +51,11 @@ MARGIN = 0.9
 # (planner.fallback.memory_rescue); rule 12 turns them on in the plan only for cells that cannot fit without them
 # (``short_by_far``).
 #
-# The order is the planning order (CAP-T08): recompute_node_segments (about 1.10x the force call) only after
-# recompute_conv_weights (1.01-1.04x), so rule 12 turns it on only when the plan still does not fit with
-# recompute_conv_weights on, and the memory rescue turns on one record per rebuild in this order.
-MEMORY_RESCUE = ("recompute_conv_weights", "recompute_node_segments")
+# The order is the planning order (CAP-T08): recompute_conv_weights first (1.01-1.04x the force call; it saves the
+# most), then recompute_first_table (about 1.005x; 260 B per edge in MH-1), then recompute_node_segments (about
+# 1.10x), so rule 12 turns each on only when the plan still does not fit with the ones before it on, and the memory
+# rescue turns on one record per rebuild in this order.
+MEMORY_RESCUE = ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments")
 # The estimate's largest overstatement of the measured peak in decision 67's fit (the capacity cells: 1.05 to 1.34
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34

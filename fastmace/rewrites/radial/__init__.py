@@ -843,6 +843,70 @@ def _apply_recompute(model, context):
     return attach_recompute(model)
 
 
+# --------------------------------------------------------------------------- recompute_first_table (rebuild-a)
+
+
+def attach_first_table(model):
+    """``recompute_first_table`` in every interaction with a radial table and the reassociated first interaction's
+    message (``modules.first_table_region``): the table's output is not kept for the backward. Returns their names."""
+    names = []
+    for index, interaction in _factored(model):
+        if getattr(interaction, "radial_table", None) is None or getattr(interaction, "first_reassociation",
+                                                                          None) is None:
+            continue
+        interaction.recompute_first_table = True
+        names.append(f"interactions.{index}")
+    if not names:
+        raise RewriteError("recompute_first_table: no reassociated interaction with a radial table")
+    return names
+
+
+def _first_table_selfcheck(original, rewritten, context):
+    """Per interaction with the record, its message, skip term, edge density and the gradients to the lengths and the
+    spherical harmonics, with the region checkpointed and without, on mh1's random graph with edge lengths in the
+    tables' domain (a twelfth at or beyond the cutoff)."""
+    import torch
+
+    from fastmace.rewrites import mh1
+
+    generator = torch.Generator().manual_seed(context.seed + 53)
+    cases, dtype = CaseErrors(), None
+    for index, interaction in _factored(rewritten):
+        if not getattr(interaction, "recompute_first_table", False):
+            continue
+        table = interaction.radial_table
+        device, dtype = table.coef.device, table.coef.dtype
+        inputs, species = mh1._graph(rewritten, interaction, context, generator)
+        edges = inputs["edge_attrs"].shape[0]
+        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand((edges, 1), generator=generator, dtype=torch.float64)
+        r[::12] = table.r_max + 0.5 * torch.rand((r[::12].shape[0], 1), generator=generator, dtype=torch.float64)
+        inputs = {**inputs, "edge_feats": r, "cutoff": None}
+        inputs = {name: (value.to(device=device, dtype=dtype) if value.is_floating_point() else value.to(device))
+                  if value is not None else None for name, value in inputs.items()}
+        reassociation = interaction.first_reassociation
+        own = reassociation.species_feats
+        reassociation.bind(mh1._bound_table(interaction, species, device, dtype))
+        try:
+            with torch.no_grad():
+                shapes = [out.shape for out in interaction(**inputs) if out is not None]
+            grads = [torch.randn(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+                     for shape in shapes]
+            values = []
+            for recompute in (False, True):
+                interaction.recompute_first_table = recompute
+                values.append(mh1._evaluate(interaction, inputs, grads, ["edge_attrs", "edge_feats"]))
+        finally:
+            interaction.recompute_first_table = True
+            reassociation.bind(own)
+        for a, b in zip(*values):
+            cases.add(f"interactions.{index}", a, b)
+    return cases.result(dtype)
+
+
+def _apply_first_table(model, context):
+    return attach_first_table(model)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
@@ -869,7 +933,16 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_recompute, selfcheck=_recompute_selfcheck,
         memory=memory_terms.recompute_conv_weights),
+    # Capacity ideas, rebuild-a (speed-def falsifier: about 0.45 % of the force call at NbCl5 9,216 atoms): exact
+    # (the same table kernel evaluated again on the same lengths); off unless memory requires it, after
+    # recompute_conv_weights (planner.memory.MEMORY_RESCUE, fallback.memory_rescue).
+    "recompute_first_table": Rewrite(
+        name="recompute_first_table", applies_to=_support, requires=("radial_tables", "reassociate_first"),
+        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="exact", default="off",
+        deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_first_table,
+        selfcheck=_first_table_selfcheck, memory=memory_terms.recompute_first_table),
 }
 
 __all__ = ["DEGREE", "PIECE_BUCKET", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
-           "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit", "tabulate_radials"]
+           "attach_first_table", "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit",
+           "tabulate_radials"]

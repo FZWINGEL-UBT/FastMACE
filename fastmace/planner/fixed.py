@@ -99,6 +99,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.recompute_conv_weights": "on_by_rule_12_when_the_plan_does_not_fit_without_it",
+    "RewriteConfig.recompute_first_table": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.recompute_node_segments": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
@@ -147,6 +148,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
                   "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
                   "fused_folded_forward", "radial_tables", "w_tables", "wprime_backward", "recompute_conv_weights",
+                  "recompute_first_table",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_epilogue",
                   "recompute_node_segments", "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -1342,6 +1344,18 @@ class FixedPlanner:
             "off: on only when memory would not be enough without it: rule 12 for a cell that cannot fit, or a "
             "rebuild after an out-of-memory error at build or capture (CAP-T07)"
             if self.rewrites.recompute_conv_weights == "auto" else "off: requested")
+        # Capacity ideas, rebuild-a: as recompute_node_segments, "auto" stays off here; rule 12 turns it on only when
+        # the plan would not fit with recompute_conv_weights on (memory.MEMORY_RESCUE's order, minimal._rule_12).
+        first_table = v["radial_tables"] and v["reassociate_first"]
+        if self.rewrites.recompute_first_table == "on" and not first_table:
+            book.refuse("RewriteConfig.recompute_first_table='on' requires radial_tables and reassociate_first, which "
+                        "are not both on", "rewrite-requirement-missing")
+        v["recompute_first_table"] = self.rewrites.recompute_first_table == "on" and first_table
+        v["_why"]["recompute_first_table"] = (
+            "on: requested" if v["recompute_first_table"] else
+            "off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that "
+            "cannot fit, or a rebuild after an out-of-memory error at build or capture (rebuild-a)"
+            if self.rewrites.recompute_first_table == "auto" else "off: requested")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))

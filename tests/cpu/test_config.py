@@ -74,6 +74,7 @@ AUTO_RULES = {
     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.recompute_conv_weights": "on_by_rule_12_when_the_plan_does_not_fit_without_it",
+    "RewriteConfig.recompute_first_table": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.recompute_node_segments": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",

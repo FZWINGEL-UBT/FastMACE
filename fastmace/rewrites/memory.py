@@ -124,6 +124,13 @@ def recompute_conv_weights(dims, width):
     return -sum(block.weight_numel for block in dims.interactions[1:]) * width, 0
 
 
+def recompute_first_table(dims, width):
+    """The first interaction's table output ``[h c, c]`` is not kept for the backward (the region keeps the lengths,
+    which the table keeps anyway). It was the only edge block of the reassociated first interaction alive at the force
+    call's peak with recompute_node_segments on (speed-def falsifier: 260 B per edge at NbCl5 and NaCl)."""
+    return -(dims.interactions[0].radial[-2] + 1) * width, 0
+
+
 def _stock_node_floats(dims) -> int:
     """The floats per node stock MACE keeps for the force backward over all interactions
     (``planner.memory.interaction_floats``'s node term)."""
@@ -174,4 +181,5 @@ _SEGMENT_SELFCHECK_TENSORS = 9
 __all__ = ["block_linear_resident", "chunked_conv_backward", "factor_species",
            "fold_cutoff", "fused_radial_hidden", "generic_reassociate", "joint_radial_input",
            "merged_residual_resident", "mh1_streaming_conv", "radial_tables", "reassociate_first",
-           "recompute_conv_weights", "recompute_node_segments", "segment_gemm_selfcheck", "streaming_conv"]
+           "recompute_conv_weights", "recompute_first_table", "recompute_node_segments", "segment_gemm_selfcheck",
+           "streaming_conv"]

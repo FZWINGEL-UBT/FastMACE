@@ -150,6 +150,11 @@ class RewriteConfig:
     # edge chunks (plans/capacity.md CAP-T07); exact (the same per-edge values, bitwise); needs wprime_backward;
     # auto = off, turned on by rule 12 only when the plan would not fit the free memory without it.
     recompute_conv_weights: Toggle = "auto"
+    # The first MH-1 interaction's radial table and reassociation under non-reentrant checkpointing: the force call
+    # keeps the edge lengths instead of the table's [E, h c + 1] output and evaluates the table again in the backward
+    # (capacity ideas, rebuild-a); exact; needs radial_tables and reassociate_first; auto = off, turned on by rule 12
+    # only when the plan would not fit with recompute_conv_weights on.
+    recompute_first_table: Toggle = "auto"
     # Each interaction's gated_rows chain and product block under non-reentrant checkpointing: the force call keeps
     # only their inputs and rebuilds their intermediates in the backward (plans/capacity.md CAP-T08,
     # fastmace.rewrites.segments); rounding; needs gated_rows; auto = off, turned on by rule 12 only when the plan

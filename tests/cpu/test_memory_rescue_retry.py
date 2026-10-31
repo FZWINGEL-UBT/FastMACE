@@ -70,16 +70,22 @@ def test_a_recoverable_out_of_memory_error_turns_the_rescue_on(stubbed):
 
 
 def test_the_rescue_turns_on_one_record_per_rebuild_in_its_order(monkeypatch, stubbed):
-    """CAP-T08: recompute_node_segments only after recompute_conv_weights is on, one record per rebuild."""
-    requires = {"recompute_conv_weights": ("wprime_backward",), "recompute_node_segments": ("gated_rows",)}
+    """CAP-T08, rebuild-a: recompute_conv_weights, then recompute_first_table, then recompute_node_segments, one
+    record per rebuild."""
+    requires = {"recompute_conv_weights": ("wprime_backward",),
+                "recompute_first_table": ("radial_tables", "reassociate_first"),
+                "recompute_node_segments": ("gated_rows",)}
     monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires[name]))
     ff = types.SimpleNamespace(rewrites="auto")
-    for recompute, expected in (("off", "recompute_conv_weights"), ("on", "recompute_node_segments")):
-        plan = stub_plan(recompute_conv_weights=recompute, recompute_node_segments="off", gated_rows="on")
+    on = {"gated_rows": "on", "radial_tables": "on", "reassociate_first": "on"}
+    for weights, table, expected in (("off", "off", "recompute_conv_weights"), ("on", "off", "recompute_first_table"),
+                                     ("on", "on", "recompute_node_segments")):
+        plan = stub_plan(recompute_conv_weights=weights, recompute_first_table=table, recompute_node_segments="off",
+                         **on)
         fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build", usable=lambda device: True)
         assert stubbed[-1]["rewrites"] == {expected: "on"}
     stubbed.clear()
-    plan = stub_plan(recompute_conv_weights="on", recompute_node_segments="on", gated_rows="on")
+    plan = stub_plan(recompute_conv_weights="on", recompute_first_table="on", recompute_node_segments="on", **on)
     assert fallback.memory_rescue(plan, oom(), ff, None, planner=None, stage="build",
                                   usable=lambda device: True) is None
 
