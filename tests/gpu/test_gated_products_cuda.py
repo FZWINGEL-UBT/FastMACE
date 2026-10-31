@@ -103,3 +103,42 @@ def test_stacked_tile_has_no_register_spills(dim):
     drows = (grad.view(atoms * dim, mul) @ wt).view(atoms, dim, mul)
     torch.testing.assert_close(dgated, (drows * gates[:, None, :]).reshape(atoms * dim, mul), rtol=1e-5, atol=1e-5)
     torch.testing.assert_close(dgates, (drows * gated.view(atoms, dim, mul)).sum(1), rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.parametrize("side", ["on", "off"])
+def test_unpadded_kernel_matches_the_chain_and_is_deterministic(monkeypatch, side):
+    """docs/validation/gated-unpadded.md: the unpadded kernel (whole atoms packed atom-major, the m-sum by a 0/1
+    selection tl.dot) against the chain to rounding, deterministic, with a partial atom tile."""
+    from fastmace.kernels.triton import gated_products as gp
+
+    monkeypatch.setattr(gp, "UNPADDED", side)
+    sms = tile_rule.device_sms("cuda")
+    atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(DIMS)) + 7
+    assert gp.unpadded(atoms, sms, tile_rule.device_name("cuda")) is (side == "on")
+    case = _case(atoms, seed=3)
+    want, got = _both(case)
+    assert torch.equal(got[0], want[0])
+    for a, b in zip(got[1:], want[1:]):
+        assert float((a - b).abs().max() / b.abs().max()) <= 1e-5
+    _, again = _both(case)
+    assert all(torch.equal(a, b) for a, b in zip(again, got))
+
+
+@pytest.mark.parametrize("dim", [3, 5, 7])
+def test_unpadded_kernel_on_one_segment(dim):
+    """The unpadded launch alone against drows: dgated and dgate. Its tile (64 rows x 128 columns, 4 warps) spills
+    registers on the RTX A4000 (sm_86; 30-314 spills); the measured speed-ups include that
+    (docs/validation/gated-unpadded.md), so spills are not asserted here."""
+    from fastmace.kernels.triton import gated_products as gp
+
+    atoms, mul = 301, MUL
+    g = torch.Generator(device="cuda").manual_seed(5)
+    grad = torch.randn((atoms, dim * mul), generator=g, device="cuda")
+    wt = torch.randn((mul, mul), generator=g, device="cuda")
+    gated = torch.randn((atoms * dim, mul), generator=g, device="cuda")
+    gates = torch.rand((atoms, mul), generator=g, device="cuda")
+    dgated, dgates = torch.empty_like(gated), torch.empty_like(gates)
+    gp._fused_unpadded(grad, 0, mul, wt, gated, gates, 0, dgated, dgates, dim, "ieee")
+    drows = (grad.view(atoms * dim, mul) @ wt).view(atoms, dim, mul)
+    torch.testing.assert_close(dgated, (drows * gates[:, None, :]).reshape(atoms * dim, mul), rtol=1e-5, atol=3e-5)
+    torch.testing.assert_close(dgates, (drows * gated.view(atoms, dim, mul)).sum(1), rtol=1e-5, atol=3e-5)
