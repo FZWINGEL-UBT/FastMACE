@@ -1,0 +1,268 @@
+{
+ "host": "leeloo",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "structure": "NbCl5@5x5x24",
+ "atoms": 43200,
+ "tag": "s2-table",
+ "rewrites": [
+  "wprime_backward=on",
+  "recompute_conv_weights=on",
+  "recompute_first_table=on",
+  "recompute_node_segments=off",
+  "recompute_node_region=off",
+  "gate_epilogue=on"
+ ],
+ "fastmace_commit": "5521f930",
+ "forward_ms": 178.4637451171875,
+ "backward_ms": 259.9035339355469,
+ "forward_all": [
+  178.4637451171875,
+  178.78323364257812,
+  178.6295623779297,
+  178.10426330566406,
+  177.839111328125
+ ],
+ "backward_all": [
+  259.4273376464844,
+  259.78369140625,
+  259.9035339355469,
+  260.1861267089844,
+  260.5066223144531
+ ],
+ "backward_kernel_ms": 260.562,
+ "kernels": [
+  [
+   "gated_input_grads",
+   85.028,
+   6
+  ],
+  [
+   "wrebuild_backward",
+   59.478,
+   1
+  ],
+  [
+   "ampere_sgemm_128x64_nn",
+   26.946,
+   12
+  ],
+  [
+   "segmented_polynomial_bwd_algo6_4",
+   12.646,
+   1
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_4",
+   9.491,
+   1
+  ],
+  [
+   "kernel",
+   9.327,
+   2
+  ],
+  [
+   "triton_red_fused__unsafe_view_add_clone_div_mul_neg_slice_slice_backward_sum_wrebuild_backward_4",
+   8.601,
+   1
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutlass_80_simt_sgemm_128x64_8x5_nn_align1::Params)",
+   7.55,
+   2
+  ],
+  [
+   "triton_poi_fused_add_mul_sigmoid_sigmoid_backward_silu_backward_slice_slice_backward_3",
+   6.718,
+   2
+  ],
+  [
+   "forward",
+   4.37,
+   2
+  ],
+  [
+   "backward",
+   3.905,
+   2
+  ],
+  [
+   "triton_red_fused_add_cat_div_mul_neg_slice_slice_backward_sum_view_14",
+   3.391,
+   1
+  ],
+  [
+   "gemm",
+   3.198,
+   2
+  ],
+  [
+   "ampere_sgemm_64x64_tn",
+   3.018,
+   4
+  ],
+  [
+   "triton_poi_fused_add_constant_pad_nd_slice_backward_view_7",
+   2.826,
+   1
+  ],
+  [
+   "triton_poi_fused_add_edge_outer_sum_backward_slice_backward_transpose_view_18",
+   2.279,
+   1
+  ],
+  [
+   "ampere_sgemm_128x128_nn",
+   1.783,
+   2
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+   1.528,
+   5
+  ],
+  [
+   "triton_poi_fused_clone_slice_transpose_view_13",
+   0.989,
+   1
+  ],
+  [
+   "triton_poi_fused_clone_slice_view_17",
+   0.977,
+   1
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_5",
+   0.899,
+   1
+  ],
+  [
+   "triton_poi_fused__to_copy_add_clamp_min_div_eq_exp_expand_gather_mul_neg_pow_rsub_scalar_tensor_select_sub_unsqueeze_view_where_22",
+   0.762,
+   1
+  ],
+  [
+   "triton_poi_fused_clone_slice_transpose_view_12",
+   0.711,
+   1
+  ],
+  [
+   "triton_poi_fused_clone_slice_view_16",
+   0.685,
+   1
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_mm_slice_slice_backward_6",
+   0.625,
+   1
+  ],
+  [
+   "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1}>(at::TensorIteratorBase&, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1} const&)::{lambda(int)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1}>(at::TensorIteratorBase&, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1} const&)::{lambda(int)#1})",
+   0.552,
+   1
+  ],
+  [
+   "triton_poi_fused_clone_slice_view_15",
+   0.43,
+   1
+  ],
+  [
+   "triton_poi_fused_clone_slice_transpose_view_11",
+   0.408,
+   1
+  ],
+  [
+   "triton_poi_fused_add_clamp_min_div_expand_mul_select_select_backward_23",
+   0.381,
+   1
+  ],
+  [
+   "triton_poi_fused_add_clamp_min_div_eq_expand_gt_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_sum_where_24",
+   0.261,
+   1
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x256_8x4_nn_align1>(cutlass_80_simt_sgemm_128x256_8x4_nn_align1::Params)",
+   0.225,
+   1
+  ],
+  [
+   "triton_poi_fused_add_index_sub_20",
+   0.152,
+   1
+  ],
+  [
+   "triton_poi_fused_clone_slice_transpose_view_10",
+   0.136,
+   1
+  ],
+  [
+   "triton_poi_fused__to_copy_add_argmax_gather_index_mul_radial_table_backward_slice_unsqueeze_8",
+   0.094,
+   1
+  ],
+  [
+   "triton_poi_fused__to_copy_add_exp_expand_gather_mul_radial_table_backward_select_unsqueeze_21",
+   0.073,
+   1
+  ],
+  [
+   "triton_poi_fused__to_copy__unsafe_view_arange_clone_eq_expand_mul_silu_backward_unsqueeze_2",
+   0.062,
+   1
+  ],
+  [
+   "ampere_sgemm_32x128_nn",
+   0.028,
+   1
+  ],
+  [
+   "triton_poi_fused__to_copy_add_expand_gather_index_put_mul_new_zeros_select_unsqueeze_1",
+   0.006,
+   1
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::FillFunctor<double>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<double>, std::array<char*, 1ul>)",
+   0.004,
+   3
+  ],
+  [
+   "triton_poi_fused__to_copy_add_expand_gather_index_put_mul_new_zeros_select_unsqueeze_0",
+   0.004,
+   2
+  ],
+  [
+   "triton_poi_fused_cat_clone_mul_slice_t_unsqueeze_9",
+   0.004,
+   1
+  ],
+  [
+   "triton_poi_fused_index_put_neg_new_zeros_19",
+   0.004,
+   2
+  ],
+  [
+   "triton_poi_fused_add_25",
+   0.003,
+   1
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<int>, std::array<char*, 1ul>)",
+   0.002,
+   1
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> >, std::array<char*, 2ul>, false>(int, at::native::AUnaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> >, std::array<char*, 2ul>)",
+   0.002,
+   1
+  ]
+ ],
+ "plan_rewrites": [
+  "RewriteConfig.recompute_conv_weights = on  (requested 'on': on: requested)",
+  "RewriteConfig.recompute_first_table = on  (requested 'on': on: requested)",
+  "RewriteConfig.gate_epilogue = on  (requested 'on': stage 1: on (with segment_gemm); stage 2: supported (ok))",
+  "RewriteConfig.recompute_node_segments = off  (requested 'off': stage 1: off)",
+  "RewriteConfig.recompute_node_region = off  (requested 'off': stage 1: off)",
+  "requested: RewriteConfig.wprime_backward=on, RewriteConfig.recompute_conv_weights=on, RewriteConfig.recompute_first_table=on, RewriteConfig.recompute_node_segments=off, RewriteConfig.recompute_node_region=off, RewriteConfig.gate_epilogue=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+ ]
+}
