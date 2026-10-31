@@ -42,8 +42,9 @@ def parse_args(argv=None):
     p.add_argument("--repeat", required=True, help="NXxNYxNZ")
     p.add_argument("--receivers", type=int, default=8192)
     p.add_argument("--edges", type=int, default=None)
-    p.add_argument("--mode", choices=("eager", "padded", "compiled"), default="eager",
-                   help="TileConfig.mode; 'compiled' builds the default compiled evaluation plan (its traceable model)")
+    p.add_argument("--mode", choices=("eager", "padded", "compiled", "auto"), default="eager",
+                   help="TileConfig.mode; 'compiled' and 'auto' build the default compiled evaluation plan (its "
+                        "traceable model)")
     p.add_argument("--compare", choices=("none", "eager", "compiled"), default="none")
     p.add_argument("--rattle", type=float, default=0.0)
     p.add_argument("--strain", type=float, default=0.0)
@@ -168,7 +169,8 @@ def main(argv=None):
         # never evaluates N rows. An eager comparison keeps N, since it calls this field on the whole system.
         call_rows = None if args.compare == "eager" else args.receivers
         # --species-index: the one-hot on the host from the construction on (it never reaches the device).
-        field = planner.build_evaluation(plan if args.mode == "compiled" else eager, user, atoms, call_rows=call_rows,
+        built = plan if args.mode in ("compiled", "auto") else eager
+        field = planner.build_evaluation(built, user, atoms, call_rows=call_rows,
                                          release_node_attrs=args.species_index)
         record["call_rows"] = field.call_rows
         record["rewrites"] = list(getattr(field, "applied", ()))
@@ -176,7 +178,7 @@ def main(argv=None):
         record["mode"] = args.mode
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges, mode=args.mode,
                                                   neighbours="tiles" if args.tile_list else "global",
-                                                  budget_receivers=tuple(args.budget_receivers),
+                                                  budget_receivers=tuple(args.budget_receivers) or None,  # none given: the default
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
                                                   species="index" if args.species_index else "one_hot"))
