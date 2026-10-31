@@ -56,7 +56,7 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-def run(field, call, atoms, steps, dt_fs, temperature):
+def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False):
     import numpy as np
     import torch
 
@@ -75,17 +75,19 @@ def run(field, call, atoms, steps, dt_fs, temperature):
     for step in range(steps + 1):
         kinetic = float(0.5 * (masses * v * v).sum())
         rows.append(dict(step=step, epot=float(out.energy.reshape(-1)[0]), ekin=kinetic,
-                         etot=float(out.energy.reshape(-1)[0]) + kinetic, edges=int(field.edge_count),
+                         etot=float(out.energy.reshape(-1)[0]) + kinetic,
+                         edges=int(getattr(call, "last", {}).get("edges", field.edge_count)),
                          rebuilds=rebuilds))
         if step == steps:
             break
         v = v + 0.5 * dt * f / masses
         x = x + dt * v
-        if bool(field.needs_rebuild(x)):
-            field.rebuild(x)
-            rebuilds += 1
-        field.compact(x)
-        field.use_edges(int(field.edge_count))
+        if not own_lists:  # per-tile lists: the tiles find their edges from the positions every call
+            if bool(field.needs_rebuild(x)):
+                field.rebuild(x)
+                rebuilds += 1
+            field.compact(x)
+            field.use_edges(int(field.edge_count))
         out = call(x)
         f = out.forces.detach().double()
         v = v + 0.5 * dt * f / masses
@@ -136,7 +138,8 @@ def main(argv=None):
     finals = {}
     for path in paths:
         call = tiled if path == "tiled" else field
-        result = run(field, call, atoms, args.steps, args.timestep_fs, args.temperature)
+        result = run(field, call, atoms, args.steps, args.timestep_fs, args.temperature,
+                     own_lists=args.tile_list and path == "tiled")
         finals[path] = result.pop("final_positions")
         etot = np.array([row["etot"] for row in result["rows"]])
         result["drift_meV_per_atom"] = float(1e3 * (etot[-1] - etot[0]) / len(atoms))
