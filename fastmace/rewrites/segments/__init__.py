@@ -48,6 +48,8 @@ _PROBE_ROWS = 7
 # chain through its product block (modules.join_region). Combined kept 35 kB per atom fewer, but its recomputation set
 # the same compiled peak, at 1.24 times separate's step time, and fitted fewer atoms (capacity-T08-chunks.md).
 SEGMENT_REGION = "separate"
+# The combined region's atom chunks (ninth list item 2, screen): each chunk its own checkpoint.
+REGION_CHUNKS = 1
 
 
 def _modules():
@@ -89,7 +91,7 @@ def recompute_segments(model):
     if SEGMENT_REGION == "combined":
         for index, interaction in enumerate(getattr(model, "interactions", ())):
             if getattr(interaction, "gated_rows", None) is not None:
-                m.join_region(interaction, model.products[index])
+                m.join_region(interaction, model.products[index], REGION_CHUNKS)
                 joined.add(index)
                 names.append(f"interactions.{index}.gated_rows..products.{index} (one region)")
     for name, module in segments(model):
@@ -204,4 +206,4 @@ RECORDS = {
         workload_constraints=(), apply=_apply, selfcheck=_selfcheck, memory=memory_terms.recompute_node_segments),
 }
 
-__all__ = ["RECORDS", "SEGMENT_REGION", "recompute_segments", "segments"]
+__all__ = ["RECORDS", "REGION_CHUNKS", "SEGMENT_REGION", "recompute_segments", "segments"]

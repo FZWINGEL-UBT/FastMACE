@@ -119,13 +119,21 @@ def _rewritten(recompute):
     return model, out, batch, resolution, applied
 
 
-REGIONS = pytest.mark.parametrize("region", ["combined", "separate"])
+REGIONS = pytest.mark.parametrize("region", ["combined", "combined-3", "separate"])  # -3: three atom chunks
 
+
+
+def _region(monkeypatch, region):
+    """Set ``SEGMENT_REGION`` and ``REGION_CHUNKS`` from a parameter such as "combined-3"; returns the region."""
+    name, _, chunks = region.partition("-")
+    monkeypatch.setattr(segments, "SEGMENT_REGION", name)
+    monkeypatch.setattr(segments, "REGION_CHUNKS", int(chunks or 1))
+    return name
 
 @CUEQ
 @REGIONS
 def test_the_record_recomputes_every_segment_and_passes_its_selfcheck(monkeypatch, region):
-    monkeypatch.setattr(segments, "SEGMENT_REGION", region)
+    region = _region(monkeypatch, region)
     original, model, _, resolution, applied = _rewritten("on")
     assert resolution.decision("recompute_node_segments").enabled
     entry = next(entry for entry in applied if entry.name == "recompute_node_segments")
@@ -136,6 +144,7 @@ def test_the_record_recomputes_every_segment_and_passes_its_selfcheck(monkeypatc
             assert interaction.gated_rows.forward.__func__ is sm.joined_inputs
             assert interaction.reshape.forward.__func__ is sm.passed_through
             assert product.forward.__func__ is sm.region_forward
+            assert product.region_chunks == segments.REGION_CHUNKS
     else:
         assert all(module.forward.__func__ is sm.recomputed_forward for _, module in segments.segments(model))
     twin = copy.deepcopy(model)  # the stored forwards rebind to the copy
@@ -152,7 +161,7 @@ def test_the_record_recomputes_every_segment_and_passes_its_selfcheck(monkeypatc
 @CUEQ
 @REGIONS
 def test_energy_and_forces_are_bitwise_unchanged_in_eager(monkeypatch, region):
-    monkeypatch.setattr(segments, "SEGMENT_REGION", region)
+    _region(monkeypatch, region)
     _, without, batch, _, _ = _rewritten("off")
     _, recomputed, _, _, _ = _rewritten("on")
     energy_and_forces(without, batch)  # throwaway evaluation (docs/development.md)

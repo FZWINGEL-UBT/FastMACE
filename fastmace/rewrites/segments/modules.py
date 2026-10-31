@@ -50,14 +50,23 @@ def region_forward(self, node_feats, sc, node_attrs):
     """The product block's forward with the region: ``node_feats`` is the deferred chain's joined inputs; the chain,
     the reshape and the product run under one non-reentrant checkpoint, so the backward keeps only the chain's
     inputs, the skip term and the species, and rebuilds the rest when it reaches the region."""
+    import torch
     from torch.utils.checkpoint import checkpoint
 
     x, y = node_feats.split(self.region_widths, dim=1)
-    return checkpoint(types.MethodType(region, self), x, y, sc, node_attrs, use_reentrant=False,
-                      preserve_rng_state=False)
+    body = types.MethodType(region, self)
+    chunks = int(getattr(self, "region_chunks", 1))
+    if chunks <= 1:
+        return checkpoint(body, x, y, sc, node_attrs, use_reentrant=False, preserve_rng_state=False)
+    # The region does not mix atoms: each atom chunk is its own checkpoint, so the backward rebuilds one chunk's
+    # intermediates at a time (the recomputation's working set divided by the chunk count).
+    parts = zip(*(torch.tensor_split(t, chunks, dim=0) if t is not None else [None] * chunks
+                  for t in (x, y, sc, node_attrs)))
+    return torch.cat([checkpoint(body, *part, use_reentrant=False, preserve_rng_state=False) for part in parts],
+                     dim=0)
 
 
-def join_region(interaction, product):
+def join_region(interaction, product, chunks=1):
     """One region from ``interaction.gated_rows`` through ``product``: the chain returns its joined inputs, the
     reshape passes them through, and the product block runs the chain, the reshape and itself under one checkpoint.
     The forwards before are kept as bound methods (a deep copy rebinds them to the copy)."""
@@ -67,6 +76,7 @@ def join_region(interaction, product):
                                   for part in (first.segments_in[:first.first_count],
                                                first.segments_in[first.first_count:]))
     product.region_chain, product.region_reshape = chain.forward, reshape.forward
+    product.region_chunks = max(1, int(chunks))
     product.recomputed_inner = product.forward
     chain.forward = types.MethodType(joined_inputs, chain)
     reshape.forward = types.MethodType(passed_through, reshape)
