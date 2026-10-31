@@ -222,7 +222,7 @@ def main(argv=None):
                 max_stress_diff=None if stress is None else float((stress - r_stress).abs().max()),
                 stress=None if r_stress is None else r_stress.cpu().tolist())
         # A list without pairs (or zero forces) is a failed build, not a capacity point (31 October 2026: the
-        # pair screen silently did not launch at 1.73M and 2.0M atoms).
+        # pair screen silently did not launch at 1.73M and 2.0M atoms). One force call, no MD: part (a) only.
         valid, detail = capacity_scan.check_point(args.structure, float(field.neighbours.cutoff), n,
                                                   int(record.get("edges_within_cutoff") or 0),
                                                   record["tiled"]["max_abs_force"])
