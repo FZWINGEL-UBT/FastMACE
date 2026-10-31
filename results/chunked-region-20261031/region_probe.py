@@ -31,6 +31,8 @@ def main():
     p.add_argument("--region", choices=("separate", "combined"), required=True)
     p.add_argument("--chunks", type=int, default=1)
     p.add_argument("--calls", type=int, default=5)
+    p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="further RewriteConfig fields (e.g. gate_epilogue=off)")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     ab_step_time.prepare_fastmace_hybrid()
@@ -49,7 +51,8 @@ def main():
     loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint),
                                    sha256=ab_step_time._sha256(args.checkpoint))
     name, base = ab_step_time.read_structure(args.structure, None)
-    rewrites = RewriteConfig(recompute_conv_weights="on", recompute_node_segments="on")
+    extra = dict(item.split("=", 1) for item in args.rewrites)
+    rewrites = RewriteConfig(recompute_conv_weights="on", recompute_node_segments="on", **extra)
     field = ForceField(loaded, base, precision="float32", rewrites=rewrites)
     integrator = IntegratorConfig(temperature_K=300.0)
     plan = planner.plan(field, base, integrator, Workload(max_temperature_K=300.0), hardware)
@@ -82,7 +85,7 @@ def main():
                   call_ms=statistics.median(times), call_ms_all=times,
                   plan_rewrites=[line.strip() for line in plan.describe(full=True).splitlines()
                                  if "recompute_" in line])
-    tag = f"{args.region}-{args.chunks}"
+    tag = f"{args.region}-{args.chunks}" + "".join(f"-{item}" for item in args.rewrites)
     print(f"{name} {len(base)} atoms {tag}: peak above start {record['peak_above_start_GiB']:.3f} GiB, "
           f"call {record['call_ms']:.1f} ms (before {record['allocated_before_GiB']:.2f} GiB)", flush=True)
     args.output.mkdir(parents=True, exist_ok=True)
