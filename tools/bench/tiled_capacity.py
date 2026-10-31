@@ -228,13 +228,22 @@ def main(argv=None):
                                                   record["tiled"]["max_abs_force"])
         record["valid"], record["check"] = valid, detail
         record["phase"] = "done" if record["valid"] else "invalid"
-    except torch.cuda.OutOfMemoryError as error:
-        record["error"] = f"OutOfMemoryError: {str(error).splitlines()[0]}"
-        record["oom_at"] = record["phase"]
+    except (torch.cuda.OutOfMemoryError, RuntimeError) as error:
+        # cuEquivariance allocates outside PyTorch's allocator: its out-of-memory is a RuntimeError
+        # (cudaErrorMemoryAllocation). Any other RuntimeError is recorded, then raised.
+        message = str(error)
+        oom = isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in message
+        record["error"] = f"{type(error).__name__}: {message.splitlines()[0] if message else ''}"[:600]
+        if oom:
+            record["oom_at"] = record["phase"]
         import traceback
 
         record["traceback"] = [f"{frame.filename}:{frame.lineno} {frame.name}: {frame.line}"
                                for frame in traceback.extract_tb(error.__traceback__)][-25:]
+        if not oom:
+            lists.close()
+            save()
+            raise
     lists.close()
     save()
     print(json.dumps({k: record.get(k) for k in ("atoms", "phase", "error", "calls", "tiled", "reference")},

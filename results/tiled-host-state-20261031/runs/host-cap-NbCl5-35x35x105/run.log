@@ -1,0 +1,166 @@
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/loading.py:766: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Traceback (most recent call last):
+  File "/mnt/homes/zwingel/fm-tiled/src-host/tools/bench/tiled_capacity.py", line 245, in <module>
+    main()
+  File "/mnt/homes/zwingel/fm-tiled/src-host/tools/bench/tiled_capacity.py", line 178, in main
+    out = tiled(positions)
+  File "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/tiled.py", line 647, in __call__
+    self._eager_tile(sweep, piece, g)
+  File "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/tiled.py", line 795, in _eager_tile
+    es, x, sc = self._first(tile, state)
+  File "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/tiled.py", line 372, in _first
+    es, x, sc = self._forward(3 if adjoint else 1)(leaf, eps, attrs, local, r)
+  File "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/tiled.py", line 418, in _first_forward
+    h1 = self._layer(0, node_feats, attrs, edge_attrs, edge_feats, cutoff, local, r)
+  File "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/tiled.py", line 344, in _layer
+    return model.products[index](node_feats=feats, sc=sc, node_attrs=node_attrs[:r])
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py", line 500, in forward
+    node_feats = self.symmetric_contractions(
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/operations/symmetric_contraction.py", line 241, in forward
+    output = self.f([weight, self.transpose_in(x)], input_indices={0: indices})
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372, in forward
+    return self.m(inputs, input_indices, output_shapes, output_indices)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 294, in forward
+    return uniform_1d(
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 55, in uniform_1d
+    return torch.ops.cuequivariance.uniform_1d(
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py", line 1350, in __call__
+    return self._op(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_library/autograd.py", line 147, in autograd_impl
+    result = redispatch_no_grad(keyset, args, keyword_only_args)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_library/autograd.py", line 43, in redispatch_no_grad
+    result = op.redispatch(keyset & _C._after_autograd_keyset, *args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_ops.py", line 926, in redispatch
+    return self._handle.redispatch_boxed(keyset, *args, **kwargs)  # type: ignore[return-value]
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 442, in backend_impl
+    result = self._backend_fns[device_type](*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_compile.py", line 54, in inner
+    return disable_fn(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548, in _fn
+    return fn(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 503, in wrapped_fn
+    return fn(*args, **kwargs)
+  File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/uniform_1d.py", line 179, in _
+    ext.uniform_1d.run(
+RuntimeError: CUDA error encountered at: file=/builds/clara-discovery/kernelcatcher/cuequivariance_ops/cuda/equivariance/uniform1d/../common/kernel.cuh line=859: call='cudaMallocAsync(&d_result, sizeof(unsigned long long), stream)', Reason=cudaErrorMemoryAllocation:out of memory
+Obtained 63 stack frames
+#1 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x3add9) [0x7d66b9fb1dd9]
+#2 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x6d2b8) [0x7d66b9fe42b8]
+#3 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x69360) [0x7d66b9fe0360]
+#4 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so(+0x69b80) [0x7d66b9fe0b80]
+#5 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops/lib/libcue_ops.so: kernelcatcher::equivariance::uniform_1d::run_uniform_1d_cuda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, kernelcatcher::utils::Datatype, int, int, int, int, std::vector<kernelcatcher::equivariance::uniform_1d::Dimension, std::allocator<kernelcatcher::equivariance::uniform_1d::Dimension> > const&, std::vector<int, std::allocator<int> > const&, std::vector<std::vector<kernelcatcher::utils::BatchDimension, std::allocator<kernelcatcher::utils::BatchDimension> >, std::allocator<std::vector<kernelcatcher::utils::BatchDimension, std::allocator<kernelcatcher::utils::BatchDimension> > > > const&, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > > const&, std::vector<int, std::allocator<int> > const&, std::vector<kernelcatcher::utils::Datatype, std::allocator<kernelcatcher::utils::Datatype> > const&, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > > const&, std::vector<int, std::allocator<int> > const&, std::vector<int, std::allocator<int> > const&, std::vector<int, std::allocator<int> > const&, std::vector<int, std::allocator<int> > const&, std::vector<double, std::allocator<double> > const&, std::vector<int, std::allocator<int> > const&, std::vector<void*, std::allocator<void*> > const&, std::vector<unsigned long, std::allocator<unsigned long> > const&, bool, bool, void*) +0x131c [0x7d66b9fc6c9c]
+#6 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/_ext/cuequivariance_ops_torch_ext.cpython-310-x86_64-linux-gnu.so(+0x2aea6) [0x7d66b9c53ea6]
+#7 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/_ext/cuequivariance_ops_torch_ext.cpython-310-x86_64-linux-gnu.so(+0x2c40c) [0x7d66b9c5540c]
+#8 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_ops_torch/_ext/cuequivariance_ops_torch_ext.cpython-310-x86_64-linux-gnu.so(+0x4ae13) [0x7d66b9c73e13]
+#9 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x56d3 [0x574f00520cd3]
+#10 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#11 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#12 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#13 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#14 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#15 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#16 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#17 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#18 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#19 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0x4d0acf) [0x7d67eac3eacf]
+#20 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xabffe0) [0x7d67eb22dfe0]
+#21 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xe848ce) [0x7d67eb5f28ce]
+#22 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xe73c1b) [0x7d67eb5e1c1b]
+#23 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xe61c8b) [0x7d67eb5cfc8b]
+#24 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0x409bf5) [0x7d67eab77bf5]
+#25 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x17ec7f) [0x574f00524c7f]
+#26 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x199097) [0x574f0053f097]
+#27 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#28 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x198d4e) [0x574f0053ed4e]
+#29 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#30 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#31 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x6c0 [0x574f0051bcc0]
+#32 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#33 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0x4d0acf) [0x7d67eac3eacf]
+#34 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xe841a5) [0x7d67eb5f21a5]
+#35 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xe8470a) [0x7d67eb5f270a]
+#36 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so(+0x6706ee8) [0x7d67dba5bee8]
+#37 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xb8d3e4) [0x7d67eb2fb3e4]
+#38 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xb8d9e8) [0x7d67eb2fb9e8]
+#39 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so: torch::jit::_get_operation_for_overload_or_packet(std::vector<std::shared_ptr<torch::jit::Operator>, std::allocator<std::shared_ptr<torch::jit::Operator> > > const&, c10::Symbol, pybind11::args const&, pybind11::kwargs const&, bool, std::optional<c10::DispatchKey>) +0x38 [0x7d67eb2fbbd8]
+#40 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0xa61203) [0x7d67eb1cf203]
+#41 in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/lib/libtorch_python.so(+0x409bf5) [0x7d67eab77bf5]
+#42 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x17ec7f) [0x574f00524c7f]
+#43 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x6924 [0x574f00521f24]
+#44 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyObject_FastCallDictTstate +0xc4 [0x574f00526d84]
+#45 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyObject_Call_Prepend +0xc1 [0x574f0053bdc1]
+#46 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x29dea4) [0x574f00643ea4]
+#47 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyObject_MakeTpCall +0x25b [0x574f00527bab]
+#48 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x609e [0x574f0052169e]
+#49 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyFunction_Vectorcall +0x7c [0x574f00531aec]
+#50 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x6c0 [0x574f0051bcc0]
+#51 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x198d4e) [0x574f0053ed4e]
+#52 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#53 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x198d4e) [0x574f0053ed4e]
+#54 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#55 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyObject_FastCallDictTstate +0xc4 [0x574f00526d84]
+#56 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyObject_Call_Prepend +0x5c [0x574f0053bd5c]
+#57 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x29dea4) [0x574f00643ea4]
+#58 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyObject_MakeTpCall +0x25b [0x574f00527bab]
+#59 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x609e [0x574f0052169e]
+#60 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x198c01) [0x574f0053ec01]
+#61 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: PyObject_Call +0x122 [0x574f0053f8a2]
+#62 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python: _PyEval_EvalFrameDefault +0x28e9 [0x574f0051dee9]
+#63 in /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python(+0x198c01) [0x574f0053ec01]
+
+exit 1
