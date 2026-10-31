@@ -6,15 +6,15 @@
 set -u
 R=/mnt/homes/zwingel/fm-tiled/run.sh
 T=tools/bench/tiled_capacity.py
-P=${PREFIX:-build}
-for rep in ${NBCL5:-35x35x105 37x37x111 39x39x117 41x41x123 43x43x129}; do
+P=${PREFIX:-build2}
+for rep in ${NBCL5:-41x41x123 43x43x129 45x45x135 47x47x141}; do
   free -g | awk 'NR==2 {print "host memory free " $7 " GB"}'
   bash $R $P-cap-NbCl5-$rep $T --structure NbCl5 --repeat $rep --receivers 4096 --calls 1 --tile-list --host-state \
     > /dev/null 2>&1
   echo "capacity NbCl5 $rep exit $?"
   grep -q '"phase": "done"' /mnt/homes/zwingel/fm-tiled/runs/$P-cap-NbCl5-$rep/tiled-*.json 2>/dev/null || break
 done
-for rep in ${NACL:-105x105x105 111x111x111 117x117x117 123x123x123 129x129x129}; do
+for rep in ${NACL:-105x105x105 117x117x117 123x123x123 129x129x129 135x135x135 141x141x141}; do
   free -g | awk 'NR==2 {print "host memory free " $7 " GB"}'
   bash $R $P-cap-NaCl-$rep $T --structure NaCl --repeat $rep --receivers 4096 --calls 1 --tile-list --host-state \
     > /dev/null 2>&1
