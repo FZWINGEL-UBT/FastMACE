@@ -121,12 +121,14 @@ def node_e0_float64(table, node_attrs, head=0):
     """Per-atom float64 E0 ``(n_atoms,)`` from a float64 table and the one-hot species ``(n_atoms, n_elements)``.
 
     ``table`` is ``AtomicEnergiesBlock.atomic_energies`` in float64: ``(n_elements,)`` or
-    ``(n_heads, n_elements)``. The one-hot product is exact in float64 (one nonzero term per row).
+    ``(n_heads, n_elements)``. The table entry of each atom's species, looked up by index: bitwise the one-hot
+    product ``node_attrs @ table.T`` (one nonzero term per row, times exactly 1), without its [N, n_elements]
+    float64 copy of the one-hot matrix (6 GiB at 9M atoms).
     """
     import torch
 
     table = torch.atleast_2d(torch.as_tensor(table, dtype=torch.float64)).to(node_attrs.device)
-    return (node_attrs.to(torch.float64) @ table.T)[:, int(head)].contiguous()
+    return table[int(head)][node_attrs.argmax(dim=1)].contiguous()
 
 
 def model_atomic_energies(model):

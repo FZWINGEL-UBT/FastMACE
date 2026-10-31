@@ -166,6 +166,8 @@ class ForceField(Protocol):
 # their own sorted graph.
 STREAMING_RECORDS = ("streaming_conv", "generic_streaming")
 SEGMENTED_RECORDS = ("segmented_first_sum", "generic_segmented_first_sum")  # edges grouped by sender species
+# The batch's edge arrays, which the skin list's replace before the first call (never moved to the device).
+BATCH_EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
 # Workload constraint of the records whose rewritten model depends on the structure's species.
 SPECIES_DEPENDENT = "fixed_species_superset"
 
@@ -443,6 +445,14 @@ class MACEForceField:
             raise ValueError("the model has streaming convolutions, which need receiver-sorted edges "
                              "(NeighbourConfig.sort_receivers='on')")
 
+        # The batch's edges (MACE's own neighbour list) are replaced by the skin list's (use_edges, below) before
+        # anything reads them: empty on the device instead of a copy (about 1 kB per atom at the build's peak).
+        for key in BATCH_EDGE_KEYS:
+            if key in batch:
+                value = batch[key]
+                shape = (value.shape[0], 0) if key == "edge_index" else (0, *value.shape[1:])
+                dtype = self._dtype if value.is_floating_point() else value.dtype
+                batch[key] = torch.empty(shape, dtype=dtype, device=self._device)
         self.data = {key: (value.to(self._device, self._dtype) if value.is_floating_point() else value.to(self._device))
                      if torch.is_tensor(value) else value for key, value in batch.items()}
         # The calculator's own model (eager, no private copy) is never changed: its float64 forward

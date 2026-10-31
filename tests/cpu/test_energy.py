@@ -161,6 +161,23 @@ def test_node_e0_lookup_is_exact():
     assert energy.node_e0_float64(table[0], one_hot).tolist()[0] == -2048.1234567891
 
 
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_node_e0_lookup_is_bitwise_the_one_hot_product(dtype):
+    """The species-index lookup gives bitwise the one-hot product it replaced (one nonzero term per row), for
+    every head, without the [N, n_elements] float64 copy of the one-hot matrix."""
+    generator = torch.Generator().manual_seed(4)
+    table = -1e4 * torch.rand((3, 89), dtype=torch.float64, generator=generator)
+    table[1, 5] = 0.0
+    species = torch.randint(0, 89, (500,), generator=generator)
+    one_hot = torch.nn.functional.one_hot(species, 89).to(dtype)
+    for head in range(3):
+        product = (one_hot.to(torch.float64) @ table.T)[:, head]
+        got = energy.node_e0_float64(table, one_hot, head)
+        assert got.dtype == torch.float64 and got.is_contiguous()
+        assert torch.equal(got, product)
+    assert torch.equal(energy.node_e0_float64(table[0], one_hot), (one_hot.double() @ table[0]))
+
+
 # --------------------------------------------------------------------------- float32 models
 
 
