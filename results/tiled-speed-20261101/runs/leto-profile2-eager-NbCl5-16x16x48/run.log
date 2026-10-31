@@ -1,0 +1,59 @@
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/homes/zwingel/fm-tiled/src-profile2/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-tiled/src-profile2/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-tiled/src-profile2/fastmace/model/loading.py:766: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/homes/zwingel/fm-tiled/src-profile2/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+USDT:2026-10-31 21:02:00 1987467:1987467 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-10-31 21:02:31 1987467:1987467 SyncActivityProfilerHandler.cpp:46] profiler_stop
+{"structure": "NbCl5", "atoms": 884736, "mode": "eager", "receivers": 4096, "device": "NVIDIA RTX 4000 Ada Generation", "host": "leto", "source_commit": "2990be9f", "warm": [28.877238045970444, 24.81670069298707], "plain_call": 24.280749858997297, "timed_call": 24.56765683501726, "stages": {"interaction 0 (sweeps 1, 3)": 9.985, "interaction 1 (sweep 2)": 9.596, "tile list (per-tile neighbour list)": 1.911, "call (rest)": 0.802, "host state: read rows": 0.555, "host state: add rows / window": 0.528, "eager tile (rest: scatter)": 0.474, "host state: put rows": 0.336, "tile graph (rest)": 0.237, "host state: close": 0.099, "host state: touch": 0.034, "host state: plan": 0.012}, "stage_counts": {"call (rest)": 1, "tile graph (rest)": 936, "tile list (per-tile neighbour list)": 936, "host state: touch": 312, "eager tile (rest: scatter)": 936, "interaction 0 (sweeps 1, 3)": 624, "host state: put rows": 936, "host state: plan": 1, "interaction 1 (sweep 2)": 312, "host state: read rows": 1248, "host state: add rows / window": 312, "host state: close": 312}, "profiled_call": 27.453251708007883, "device_seconds": 19.676989819999637, "device_busy_share": 0.7167453250814738, "kernel_groups": {"elementwise": 8.515, "other": 4.393, "gemm": 4.049, "copies": 1.023, "convolution": 0.762, "index/scatter": 0.562, "reduce": 0.281, "sort/unique": 0.092}, "tiles": 312}
+    2.602 s  void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, false>(int
+    2.039 s  ampere_sgemm_128x64_nn
+    1.640 s  gemm
+    1.639 s  gated_input_grads
+    1.503 s  void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::T
+    1.092 s  void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at
+    0.763 s  oeq_projected_backward_wprime
+    0.702 s  void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, f
+    0.630 s  void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, f
+    0.623 s  void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std::array<char*, 3ul>, false>(in
+    0.580 s  fused_folded_forward
+    0.511 s  backward
+    0.442 s  Memcpy HtoD (Pageable -> Device)
+    0.375 s  Memcpy DtoH (Device -> Pageable)
+    0.360 s  void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native:
+exit 0
