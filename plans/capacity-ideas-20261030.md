@@ -146,6 +146,10 @@ Results (31 October 2026, merged 4dd46874 and 3ec374a2):
 - Item 3, tiled R x bucket: no GO. R=16,384 is about 0.90x but needs about 4.2 GiB of workspace; within 2 GiB the
   best is 0.97x; bucket 0.05 buys nothing (`docs/validation/tiled-screen.md`). Follow-up taken up: R from the memory
   budget (largest of 4096/8192/16384 that fits after the tiled state), so the limit is unchanged.
+- Item 2, chunked combined node region: merged (53c00cf3) as recompute_node_region, the last MEMORY_RESCUE rung
+  (4 chunks at every size; 0.77x the separate layout's peak at 1.22-1.24x its call). Limits on 16 GB: NbCl5 82,944 →
+  101,088 atoms (+22 %), NaCl 70,400 → 97,336 (+38 %). capacity_scan's edge check is now exact (initial count and a
+  fresh rebuild after the MD steps).
 - Item 4: edge_outer_sum backward plus the interaction-0 table backward are 0.5-0.57 % of the step at 9k atoms. Not
   built.
 - Eighth list M1 (sm_120): no kernel rereads beyond L2; nothing with a ceiling above about 1 %. M2: host gap
