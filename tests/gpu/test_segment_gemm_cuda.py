@@ -68,6 +68,29 @@ def test_column_tiles_together_equal_the_row_order_bitwise(dim):
     assert torch.equal(outs[0], outs[1])
 
 
+@pytest.mark.parametrize("dim", [1, 7])
+def test_large_tiles_equal_the_default_tiles_bitwise(dim):
+    """128 rows with 8 warps (LARGE_TILE_GPUS) against 64 rows with 4 warps: each output element is the same K-ordered
+    sum, so the products are bitwise equal, in both tile orders."""
+    import dataclasses
+
+    sms = tile_rule.device_sms("cuda")
+    atoms, k, n = 4 * sms * tile_rule.BLOCK_M // dim + 5, 512, 200
+    g = torch.Generator(device="cuda").manual_seed(4)
+    a = torch.randn((atoms * dim, k), generator=g, device="cuda")
+    b = torch.randn((k, n), generator=g, device="cuda") / k ** 0.5
+    small = tile_rule.segment_gemm_choice(atoms * dim, n, k, sms, None)
+    large = tile_rule.segment_gemm_choice(atoms * dim, n, k, sms, tile_rule.LARGE_TILE_GPUS[0])
+    assert (small.block_m, small.num_warps, large.block_m, large.num_warps) == (64, 4, 128, 8)
+    outs = []
+    for choice in (small, large, dataclasses.replace(large, column_fastest=True)):
+        c = torch.full((atoms, dim * n), float("nan"), device="cuda")
+        sg._gemm(a, 0, dim * k, k, b, c, 0, dim * n, n, atoms * dim, dim, choice)
+        outs.append(c)
+    assert not outs[0].isnan().any()
+    assert torch.equal(outs[0], outs[1]) and torch.equal(outs[0], outs[2])
+
+
 def test_joined_products_order_columns_by_the_l2_rule(monkeypatch):
     sms = tile_rule.device_sms("cuda")
     atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(DIMS))
