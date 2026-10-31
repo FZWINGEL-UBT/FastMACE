@@ -1,0 +1,38 @@
+{
+ "structure": "NaCl",
+ "repeat": [
+  105,
+  105,
+  105
+ ],
+ "atoms": 9261000,
+ "receivers": 4096,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "mh1-r2scan",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "source_commit": "c0122a97",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0
+  }
+ },
+ "phase": "build",
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 6.14 GiB. GPU 0 has a total capacity of 19.54 GiB of which 4.64 GiB is free. Including non-PyTorch memory, this process has 14.89 GiB memory in use. Of the allocated memory 14.60 GiB is allocated by PyTorch, and 45.54 MiB is reserved by PyTorch but unallocated.",
+ "oom_at": "build",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-host/tools/bench/tiled_capacity.py:149 main: field = planner.build_evaluation(eager, user, atoms, call_rows=call_rows)",
+  "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/planner/minimal.py:1266 build_evaluation: field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,",
+  "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/forces.py:473 __init__: self.data[energy64.NODE_E0_KEY] = energy64.node_e0_float64(atomic_energies, node_attrs, head)",
+  "/mnt/homes/zwingel/fm-tiled/src-host/fastmace/model/energy.py:129 node_e0_float64: return (node_attrs.to(torch.float64) @ table.T)[:, int(head)].contiguous()"
+ ]
+}

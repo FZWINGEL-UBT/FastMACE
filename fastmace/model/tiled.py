@@ -55,6 +55,9 @@ class TileConfig:
     launches, a smaller halo fraction; docs/validation/tiled-screen.md), and at the capacity limit the
     workspace does not fit, so the cap stays at ``receivers``. Chosen once; needs a CUDA device (elsewhere the
     cap stays).
+    ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pinned host memory on CUDA; each
+    tile copies its rows to the device and its results back, so the device holds no per-atom state of the
+    sweeps; not with ``mode="graphs"``, whose captured bodies read the state themselves).
     """
 
     receivers: int = 8192
@@ -66,6 +69,7 @@ class TileConfig:
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
     budget_receivers: tuple[int, ...] = ()
+    state: str = "device"
 
     def __post_init__(self):
         if self.mode not in ("eager", "padded", "graphs", "compiled"):
@@ -78,10 +82,62 @@ class TileConfig:
             raise ValueError(f"TileConfig.bucket must be in (0, 10], got {self.bucket!r}")
         if int(self.receivers) < 1:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
+        if self.state not in ("device", "host"):
+            raise ValueError(f"TileConfig.state must be 'device' or 'host', got {self.state!r}")
+        if self.state == "host" and self.mode == "graphs":
+            raise ValueError("TileConfig.state='host' cannot run in mode 'graphs': the captured bodies read the "
+                             "state from device memory")
         if any(int(r) < 1 for r in self.budget_receivers):
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
             raise ValueError(f"TileConfig.edges must be positive or None, got {self.edges!r}")
+
+
+class _State:
+    """x, sc and their adjoints [N, width] (sweep 1 allocates them from its first outputs), on the device or in
+    host memory (``TileConfig.state``). Tiles read rows to the device and put or add rows; on the device these
+    are the plain indexing and ``index_add_``, in host memory the same on the host after one copy."""
+
+    def __init__(self, device, dtype, host):
+        self.device, self.dtype, self.host = device, dtype, host
+        self.tensors = {}
+
+    def allocate(self, n, widths):
+        import torch
+
+        if self.tensors:
+            return
+        pin = self.host and self.device.type == "cuda"
+        where = "cpu" if self.host else self.device
+        for name, width in widths.items():
+            self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where, pin_memory=pin)
+
+    def zero(self):
+        for tensor in self.tensors.values():
+            tensor.zero_()
+
+    def bytes(self):
+        return int(sum(t.numel() * t.element_size() for t in self.tensors.values()))
+
+    def rows(self, name, index):
+        """``state[name][index]`` on the device."""
+        if not self.host:
+            return self.tensors[name][index]
+        return self.tensors[name].index_select(0, index.cpu()).to(self.device)
+
+    def put(self, name, index, values):
+        """``state[name][index] = values``."""
+        if not self.host:
+            self.tensors[name][index] = values
+        else:
+            self.tensors[name][index.cpu()] = values.detach().cpu()
+
+    def add(self, name, index, values):
+        """``state[name].index_add_(0, index, values)``."""
+        if not self.host:
+            self.tensors[name].index_add_(0, index, values)
+        else:
+            self.tensors[name].index_add_(0, index.cpu(), values.detach().cpu())
 
 
 class _Ghosts:
@@ -318,8 +374,8 @@ class TiledForceField:
             if not adjoint:
                 return self._masked(es, recv_mask), self._masked(x, recv_mask), self._masked(sc, recv_mask)
             objective = (self._masked(model.scale_shift(es, heads), recv_mask).sum()
-                         + (self._masked(state["gx"][receivers], recv_mask) * x).sum()
-                         + (self._masked(state["gsc"][receivers], recv_mask) * sc).sum())
+                         + (self._masked(state.rows("gx", receivers), recv_mask) * x).sum()
+                         + (self._masked(state.rows("gsc", receivers), recv_mask) * sc).sum())
             wanted = [leaf] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
         return self._masked(es.detach(), recv_mask), grads[0], grads[1] if eps is not None else None
@@ -337,8 +393,8 @@ class TiledForceField:
             leaf = vectors.detach().requires_grad_(True)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
                    if strain is not None else None)
-            x = state["x"][nodes].detach().requires_grad_(True)
-            sc = state["sc"][nodes[:r]].detach().requires_grad_(True)
+            x = state.rows("x", nodes).detach().requires_grad_(True)
+            sc = state.rows("sc", nodes[:r]).detach().requires_grad_(True)
             modules = interaction._modules
             saved = modules["linear_up"], modules["skip_tp"]
             holder_x, holder_sc = self._holders
@@ -477,13 +533,13 @@ class TiledForceField:
         if sweep == 1:
             state = self._state(g, out["x"], out["sc"])
             g["node_es"].index_add_(0, recv, out["es"])
-            state["x"].index_add_(0, recv, out["x"])
-            state["sc"].index_add_(0, recv, out["sc"])
+            state.add("x", recv, out["x"])
+            state.add("sc", recv, out["sc"])
             return
         if sweep == 2:
             g["node_es"].index_add_(0, recv, out["es"])
-            state["gx"].index_add_(0, slot["nodes"], out["g_x"])
-            state["gsc"].index_add_(0, recv, out["g_sc"])
+            state.add("gx", slot["nodes"], out["g_x"])
+            state.add("gsc", recv, out["g_sc"])
         ei = slot["ei"]
         g["forces"].index_add_(0, ei[1], out["g_vec"], alpha=-1)
         g["forces"].index_add_(0, ei[0], out["g_vec"])
@@ -590,7 +646,8 @@ class TiledForceField:
                     else:
                         self._eager_tile(sweep, piece, g)
                     del piece
-            stats["global_bytes"] = int(sum(t.numel() * t.element_size() for t in state.values()))
+            stats["global_bytes"] = state.bytes()
+            stats["host_bytes"] = state.bytes() if state.host else 0
             with torch.no_grad():
                 node_inter = self.model.scale_shift(node_es, self.heads[:n])
                 from fastmace.model import energy as energy64
@@ -658,24 +715,21 @@ class TiledForceField:
                      arange=torch.arange(n + 1, device=self.device),
                      forces=torch.zeros((n, 3), dtype=self.dtype, device=self.device),
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
-                     strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device), state={})
+                     strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
+                     state=_State(self.device, self.dtype, self.config.state == "host"))
             self._g = g
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))
         g["stress"] = stress
-        for tensor in [g["forces"], g["node_es"], g["strain_grad"], *g["state"].values()]:
+        for tensor in [g["forces"], g["node_es"], g["strain_grad"]]:
             tensor.zero_()
+        g["state"].zero()
         return g
 
     def _state(self, g, x, sc):
         """Allocate ``x``, ``sc`` and their adjoints [N, width] on sweep 1's first outputs."""
-        import torch
-
         state = g["state"]
-        if "x" not in state:
-            n = g["n"]
-            for name, like in (("x", x), ("sc", sc), ("gx", x), ("gsc", sc)):
-                state[name] = torch.zeros((n, like.shape[1]), dtype=self.dtype, device=self.device)
+        state.allocate(g["n"], dict(x=x.shape[1], sc=sc.shape[1], gx=x.shape[1], gsc=sc.shape[1]))
         return state
 
     @staticmethod
@@ -741,14 +795,14 @@ class TiledForceField:
             es, x, sc = self._first(tile, state)
             state = self._state(g, x, sc)
             g["node_es"][receivers] += es
-            state["x"][receivers] = x
-            state["sc"][receivers] = sc
+            state.put("x", receivers, x)
+            state.put("sc", receivers, sc)
             return
         if sweep == 2:
             es, g_vec, g_x, g_sc, g_eps = self._second(tile, state, strain)
             g["node_es"][receivers] += es
-            state["gx"].index_add_(0, nodes, g_x)
-            state["gsc"][receivers] = g_sc
+            state.add("gx", nodes, g_x)
+            state.put("gsc", receivers, g_sc)
         else:
             _, g_vec, g_eps = self._first(tile, state, adjoint=True, strain=strain)
         g["forces"].index_add_(0, ei[1], g_vec, alpha=-1)

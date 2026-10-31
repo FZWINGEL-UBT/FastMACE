@@ -311,3 +311,33 @@ def test_budget_receivers_stay_without_a_memory_measurement():
     assert tiled.receivers == 4
     with pytest.raises(ValueError, match="budget_receivers"):
         TileConfig(4, budget_receivers=(0,))
+
+
+# ---------------------------------------------------------------- the tiled state on the host
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
+def test_host_state_equals_device_state_bitwise(names, mode):
+    """``TileConfig.state="host"``: x, sc and their adjoints live in host memory; each tile reads and writes its
+    rows there. The same gathers, assignments and index_add_ as on the device: bitwise the same call."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*names))
+    results = []
+    for state in ("device", "host"):
+        tiled = TiledForceField(field, TileConfig(5, mode=mode, state=state))
+        for current in (atoms, strained(atoms)):
+            results.append(tiled.evaluate(current, stress=True))
+        assert all(t.device.type == "cpu" for t in tiled._g["state"].tensors.values())
+        assert tiled.last["host_bytes"] == (tiled.last["global_bytes"] if state == "host" else 0)
+    for device, host in zip(results[:2], results[2:]):
+        assert device[0] == host[0]
+        assert np.array_equal(device[1], host[1]) and np.array_equal(device[2], host[2])
+
+
+def test_host_state_refuses_graphs_and_unknown_values():
+    with pytest.raises(ValueError, match="state"):
+        TileConfig(5, state="disk")
+    with pytest.raises(ValueError, match="host"):  # a captured graph cannot read host memory
+        TileConfig(5, mode="graphs", state="host")
