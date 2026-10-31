@@ -146,3 +146,61 @@ def test_refuses_compiled_and_unsupported_fields():
         TileConfig(bucket=0)
     with pytest.raises(ValueError, match="CUDA"):
         TiledForceField(MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER), TileConfig(mode="graphs"))
+
+
+def big_structure(seed=8):
+    """NaCl 3x3x3 (16.9 A): at the tiny model's 4 A cutoff, at least three cutoff-wide bins per axis."""
+    from _support.structures import nacl
+
+    atoms = nacl(repeat=3, rattle=0.1, seed=seed)
+    atoms.numbers[3] = 8
+    return atoms
+
+
+@pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
+def test_tile_neighbours_are_bitwise_the_global_list(names):
+    """Each tile's edges from the cell bins (fastmace.neighbors.tile_list) are the global skin list's edges for
+    those receivers after compact at the same positions: the same pairs, unit shifts and shifts, in the same order
+    (with MH-1's rewrites the list sorts by sender group too)."""
+    from fastmace.neighbors.tile_list import TileNeighbours
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*names))
+    moved = atoms.copy()
+    moved.positions += np.random.default_rng(4).uniform(-0.12, 0.12, atoms.positions.shape)
+    positions = field._prepare_one_off(moved)
+    count = int(field.neighbours.count)
+    expected = (field.neighbours.edge_index[:, :count], field.neighbours.unit_shifts[:count],
+                field.neighbours.shifts[:count])
+    bins = TileNeighbours.like(field.neighbours)
+    bins.bin(positions)
+    chunks = [bins.edges(chunk) for chunk in torch.arange(len(atoms)).split(37)]
+    sender, receiver, unit, shifts = (torch.cat(part) for part in zip(*chunks))
+    assert torch.equal(torch.stack([sender, receiver]), expected[0])
+    assert torch.equal(unit, expected[1]) and torch.equal(shifts, expected[2])
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_tiled_call_with_tile_neighbours_equals_the_whole_system_call(mode):
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles"))
+    for current in (atoms, strained(atoms)):
+        expected = field.evaluate(current, stress=True)
+        got = tiled.evaluate(current, stress=True)
+        assert got[0] == pytest.approx(expected[0], rel=1e-13, abs=0)
+        assert relative(got[1], expected[1]) <= 1e-11
+        assert relative(got[2], expected[2]) <= 1e-11
+        assert tiled.last["tiles"] > 1
+
+
+def test_tile_neighbours_refuse_small_cells():
+    from fastmace.neighbors.tile_list import TileNeighbours
+
+    with pytest.raises(ValueError, match="bins"):
+        TileNeighbours(4.0, torch.eye(3, dtype=torch.float64) * 11.0, torch.float64)
+    with pytest.raises(ValueError, match="neighbours"):
+        TileConfig(neighbours="cells")
+

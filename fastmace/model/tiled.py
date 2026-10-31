@@ -55,12 +55,17 @@ class TileConfig:
     mode: str = "eager"
     headroom: float = 0.1
     bucket: float = 0.15
+    # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
+    # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
+    neighbours: str = "global"
 
     def __post_init__(self):
         if self.mode not in ("eager", "padded", "graphs", "compiled"):
             raise ValueError(f"TileConfig.mode must be 'eager', 'padded', 'graphs' or 'compiled', got {self.mode!r}")
         if not 0 <= float(self.headroom) <= 10:
             raise ValueError(f"TileConfig.headroom must be in [0, 10], got {self.headroom!r}")
+        if self.neighbours not in ("global", "tiles"):
+            raise ValueError(f"TileConfig.neighbours must be 'global' or 'tiles', got {self.neighbours!r}")
         if not 0 < float(self.bucket) <= 10:
             raise ValueError(f"TileConfig.bucket must be in (0, 10], got {self.bucket!r}")
         if int(self.receivers) < 1:
@@ -193,31 +198,58 @@ class TiledForceField:
 
     # ------------------------------------------------------------------ one tile
 
-    def _tile_graph(self, receivers, row_ptr, edge_index, local_of, halo_start=None):
-        """Local graph of one tile: (nodes [R + H], edge ids [Ec], local edge_index [2, Ec], R, halo size).
+    def _tile_graph(self, receivers, source, local_of, halo_start=None):
+        """Local graph of one tile: ``(nodes [R + H], ei [2, Ec], shifts [Ec, 3], local edge_index [2, Ec], R, H)``.
 
-        The halo's local indices start at ``halo_start`` (default: after the receivers; a padded slot puts them
-        after its receiver slots)."""
+        ``source(receivers)`` gives the edges into the receivers, receiver-sorted: ``(ei, shifts)`` with ``ei`` the
+        global (sender, receiver) pairs. The halo's local indices start at ``halo_start`` (default: after the
+        receivers; a padded slot puts them after its receiver slots)."""
         import torch
 
         r = receivers.shape[0]
         start = r if halo_start is None else int(halo_start)
-        starts = row_ptr[receivers]
-        counts = row_ptr[receivers + 1] - starts
-        total = int(counts.sum())
-        offsets = torch.cumsum(counts, 0) - counts
-        edge_ids = (torch.repeat_interleave(starts - offsets, counts, output_size=total)
-                    + torch.arange(total, device=self.device))
-        senders = edge_index[0, edge_ids]
+        ei, shifts = source(receivers)
+        senders = ei[0]
         local_of[receivers] = torch.arange(r, device=self.device)
         outside = senders[local_of[senders] < 0]
         halo = torch.unique(outside)
         local_of[halo] = torch.arange(start, start + halo.shape[0], device=self.device)
-        local = torch.stack([local_of[senders], torch.repeat_interleave(
-            torch.arange(r, device=self.device), counts, output_size=total)])
+        local = torch.stack([local_of[senders], local_of[ei[1]]])
         local_of[receivers] = -1
         local_of[halo] = -1
-        return torch.cat([receivers, halo]), edge_ids, local, r, halo.shape[0]
+        return torch.cat([receivers, halo]), ei, shifts, local, r, halo.shape[0]
+
+    def _source(self, positions, n):
+        """``(source, row_ptr, edges per atom)`` of this call's edges: the force field's list, or (neighbours
+        "tiles") a cell binning of ``positions`` (float64) that builds each tile's edges."""
+        import torch
+
+        data = self.field.data
+        if self.config.neighbours == "tiles":
+            from fastmace.neighbors.tile_list import TileNeighbours
+
+            bins = TileNeighbours.like(self.field.neighbours)
+            bins.bin(positions)
+
+            def tiles(receivers):
+                sender, receiver, _, shifts = bins.edges(receivers)
+                return torch.stack([sender, receiver]), shifts
+
+            # No degrees before the tiles' builds: the tiles are planned by receivers only.
+            return tiles, torch.zeros(n + 1, dtype=torch.int64, device=self.device), None
+        edge_index, shifts = data["edge_index"], data["shifts"]
+        row_ptr = torch.searchsorted(edge_index[1], torch.arange(n + 1, device=self.device))
+
+        def global_list(receivers):
+            starts = row_ptr[receivers]
+            counts = row_ptr[receivers + 1] - starts
+            total = int(counts.sum())
+            offsets = torch.cumsum(counts, 0) - counts
+            edge_ids = (torch.repeat_interleave(starts - offsets, counts, output_size=total)
+                        + torch.arange(total, device=self.device))
+            return edge_index[:, edge_ids], shifts[edge_ids]
+
+        return global_list, row_ptr, edge_index.shape[1] / max(n, 1)
 
     def _edges(self, vectors, node_attrs, local, strain):
         """Spherical harmonics, radial features and cutoff of the tile's edges from their vectors."""
@@ -359,10 +391,11 @@ class TiledForceField:
         receivers, halo, edges = sizes
         i64 = torch.int64
         new = functools.partial(torch.zeros, device=self.device)
-        return dict(sizes=sizes, nodes=new(receivers + halo, dtype=i64), node_mask=new(receivers + halo,
-                    dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype), edge_ids=new(edges, dtype=i64),
-                    local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype), count=new((), dtype=i64),
-                    out={}, graphs={})
+        return dict(sizes=sizes, nodes=new(receivers + halo, dtype=i64),
+                    node_mask=new(receivers + halo, dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype),
+                    ei=new((2, edges), dtype=i64), shifts=new((edges, 3), dtype=self.dtype),
+                    local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
+                    count=new((), dtype=i64), out={}, graphs={})
 
     def _fill(self, slot, piece):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
@@ -370,9 +403,9 @@ class TiledForceField:
         Padding: receivers and halo rows read atom 0 and are masked; padding edges join the last receiver slot
         (always padding) to itself, after the tile's edges (so the receivers stay sorted), beyond the cutoff and
         beyond the tile's edge count (the streaming kernels' ``streaming_count``)."""
-        nodes, edge_ids, local, r, h = piece
+        nodes, ei, shifts, local, r, h = piece
         receivers, _, edges = slot["sizes"]
-        e = edge_ids.shape[0]
+        e = ei.shape[1]
         slot["nodes"].zero_()
         slot["nodes"][:r] = nodes[:r]
         slot["nodes"][receivers:receivers + h] = nodes[r:]
@@ -381,8 +414,10 @@ class TiledForceField:
         slot["node_mask"][receivers:receivers + h] = 1
         slot["recv_mask"].zero_()
         slot["recv_mask"][:r] = 1
-        slot["edge_ids"].zero_()
-        slot["edge_ids"][:e] = edge_ids
+        slot["ei"].zero_()
+        slot["ei"][:, :e] = ei
+        slot["shifts"].zero_()
+        slot["shifts"][:e] = shifts
         slot["local"].fill_(receivers - 1)
         slot["local"][:, :e] = local
         slot["edge_mask"].zero_()
@@ -394,9 +429,8 @@ class TiledForceField:
         import torch
 
         receivers = slot["sizes"][0]
-        nodes, eids = slot["nodes"], slot["edge_ids"]
-        ei = g["edge_index"][:, eids]
-        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + g["shifts"][eids]
+        nodes, ei = slot["nodes"], slot["ei"]
+        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + slot["shifts"]
         vectors = torch.where(slot["edge_mask"].unsqueeze(1) > 0, vectors, self._far)
         tile = (nodes, slot["local"], receivers, vectors, slot["recv_mask"], slot["node_mask"])
         strain = True if g["stress"] else None
@@ -434,7 +468,7 @@ class TiledForceField:
             g["node_es"].index_add_(0, recv, out["es"])
             state["gx"].index_add_(0, slot["nodes"], out["g_x"])
             state["gsc"].index_add_(0, recv, out["g_sc"])
-        ei = g["edge_index"][:, slot["edge_ids"]]
+        ei = slot["ei"]
         g["forces"].index_add_(0, ei[1], out["g_vec"], alpha=-1)
         g["forces"].index_add_(0, ei[0], out["g_vec"])
         if "g_eps" in out:
@@ -489,36 +523,29 @@ class TiledForceField:
         with torch.no_grad():
             field.positions.copy_(positions)
         pos = field.positions.detach()
-        edge_index = data["edge_index"]
         n = pos.shape[0]
         self.node_attrs = data["node_attrs"]
         heads = (data["head"][data["batch"]] if "head" in data else torch.zeros_like(data["batch"])).long()
-        receiver = edge_index[1]
-        row_ptr = torch.searchsorted(receiver, torch.arange(n + 1, device=self.device))
-        num_edges = receiver.shape[0]
+        source, row_ptr, degree = self._source(positions, n)
         caps = self.config
-        edge_cap = caps.edges if caps.edges is not None else max(
-            1, int(math.ceil(2 * caps.receivers * num_edges / max(n, 1))))
+        edge_cap = caps.edges if caps.edges is not None else (
+            2**62 if degree is None else max(1, int(math.ceil(2 * caps.receivers * degree))))
         cell = data["cell"].reshape(3, 3) if "cell" in data else torch.as_tensor(field.neighbours.cell)
         tiles, grid = plan_tiles(pos, cell, row_ptr, caps.receivers, edge_cap)
         local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
-                     mode=caps.mode)
-        keys = self._slot_keys(tiles, row_ptr, edge_index, local_of) if padded else None
+                     edges=0, mode=caps.mode, neighbours=caps.neighbours)
+        keys = self._slot_keys(tiles, source, local_of, n) if padded else None
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
             stats["slot_changes"] = self.slot_changes
         saved = self._bind()
         bound = None
         try:
-            # The neighbour list's full buffers (fixed addresses between capacity changes) for the padded path.
-            base_index = field.neighbours.edge_index if padded else edge_index
-            base_shifts = field.neighbours.shifts if padded else data["shifts"]
-            g = self._globals(n, stress, pos, base_index, base_shifts, heads)
+            g = self._globals(n, stress, pos, heads)
             self.heads, self.arange = g["heads"], g["arange"]
             if padded:
-                key = (id(g), base_index.data_ptr(), base_shifts.data_ptr(), pos.data_ptr(),
-                       self.node_attrs.data_ptr(), stress)
+                key = (id(g), pos.data_ptr(), self.node_attrs.data_ptr(), stress)
                 if key != self._graph_key:  # the graphs read these addresses
                     for slot in self._slots.values():
                         slot["graphs"].clear()
@@ -527,9 +554,10 @@ class TiledForceField:
             for sweep in (1, 2, 3):
                 for index, receivers in enumerate(tiles):
                     slot = self._slots[keys[index]] if padded else None
-                    piece = self._tile_graph(receivers, row_ptr, edge_index, local_of,
-                                             slot["sizes"][0] if padded else None)
+                    piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
                     self._note(stats, piece)
+                    if sweep == 1:
+                        stats["edges"] += piece[1].shape[1]
                     if padded:
                         if bound is not slot:  # the streaming kernels read this slot's edge count
                             for module in field._streaming:
@@ -562,17 +590,17 @@ class TiledForceField:
                 if count is not None:
                     module.register_buffer("streaming_count", count, persistent=False)
 
-    def _globals(self, n, stress, pos, edge_index, shifts, heads):
+    def _globals(self, n, stress, pos, heads):
         """The call's global buffers, kept between calls at fixed addresses (the graphs read them) and zeroed.
 
-        A new set (another atom count, or the neighbour list's buffers moved) drops the captured graphs. The
-        state (``x``, ``sc`` and their adjoints) is allocated from sweep 1's first outputs."""
+        A new set (another atom count) drops the captured graphs. The state (``x``, ``sc`` and their adjoints) is
+        allocated from sweep 1's first outputs."""
         import torch
 
         g = getattr(self, "_g", None)
-        if g is None or g["n"] != n or g["edge_index"] is not edge_index or g["shifts"] is not shifts:
+        if g is None or g["n"] != n:
             # n + 1 rows: a padded slot has at most n + 1 receiver rows (one padding row past the largest tile).
-            g = dict(n=n, pos=pos, edge_index=edge_index, shifts=shifts, heads=torch.cat([heads, heads[-1:]]),
+            g = dict(n=n, pos=pos, heads=torch.cat([heads, heads[-1:]]),
                      arange=torch.arange(n + 1, device=self.device),
                      forces=torch.zeros((n, 3), dtype=self.dtype, device=self.device),
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
@@ -598,12 +626,12 @@ class TiledForceField:
 
     @staticmethod
     def _note(stats, piece):
-        nodes, edge_ids, _, r, h = piece
+        nodes, ei, _, _, r, h = piece
         stats["max_receivers"] = max(stats["max_receivers"], r)
         stats["max_halo"] = max(stats["max_halo"], h)
-        stats["max_edges"] = max(stats["max_edges"], edge_ids.shape[0])
+        stats["max_edges"] = max(stats["max_edges"], ei.shape[1])
 
-    def _slot_keys(self, tiles, row_ptr, edge_index, local_of):
+    def _slot_keys(self, tiles, source, local_of, n):
         """Each tile's slot: the edge bucket ``ceil(edges / step)``, with ``step`` set on the first call from the
         largest tile (``TileConfig.bucket`` of its edges, at least 256, a multiple of 256). A slot holds one
         receiver row more than the largest of its tiles with ``TileConfig.headroom``, at most the receiver cap (the
@@ -611,8 +639,8 @@ class TiledForceField:
         grows (and its graphs and compiled shapes go) only when a tile does not fit it."""
         sizes = []
         for receivers in tiles:
-            _, edge_ids, _, r, h = self._tile_graph(receivers, row_ptr, edge_index, local_of)
-            sizes.append((r, h, int(edge_ids.shape[0])))
+            _, ei, _, _, r, h = self._tile_graph(receivers, source, local_of)
+            sizes.append((r, h, int(ei.shape[1])))
         if self._edge_step is None:
             largest = max(e for _, _, e in sizes)
             self._edge_step = max(256, 256 * math.ceil(float(self.config.bucket) * largest / 256))
@@ -623,7 +651,7 @@ class TiledForceField:
             members = [size for size, k in zip(sizes, keys) if k == key]
             # Receivers with headroom too (tiles are planned again every call, so their sizes move a little), but
             # never past the cap, which no tile exceeds: full tiles keep their slot.
-            rows = min(int(self.config.receivers), row_ptr.shape[0] - 1,  # nor the atom count
+            rows = min(int(self.config.receivers), n,  # nor the atom count
                        math.ceil(max(r for r, _, _ in members) * head))
             need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
                     key * step)
@@ -633,7 +661,7 @@ class TiledForceField:
                     grown = need
                 else:  # an exceeded size grows by at least a quarter (receivers at most the cap), so a slot changes
                     # a few times, not once per tile a little larger than the last
-                    rows_cap = min(int(self.config.receivers), row_ptr.shape[0] - 1) + 1
+                    rows_cap = min(int(self.config.receivers), n) + 1
                     grown = tuple(b if a <= b else max(a, math.ceil(1.25 * b)) for a, b in zip(need, slot["sizes"]))
                     grown = (min(grown[0], max(rows_cap, need[0])), grown[1], grown[2])
                 self._slots[key] = self._new_slot(grown)
@@ -642,10 +670,9 @@ class TiledForceField:
 
     def _eager_tile(self, sweep, piece, g):
         """One sweep on one unpadded tile (``mode="eager"``)."""
-        nodes, edge_ids, local, r, _ = piece
-        edge_index, state = g["edge_index"], g["state"]
-        ei = edge_index[:, edge_ids]
-        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + g["shifts"][edge_ids]
+        nodes, ei, shifts, local, r, _ = piece
+        state = g["state"]
+        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
         tile = (nodes, local, r, vectors, None, None)
         receivers = nodes[:r]
         strain = True if g["stress"] else None

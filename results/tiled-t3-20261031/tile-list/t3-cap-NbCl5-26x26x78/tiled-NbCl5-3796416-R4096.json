@@ -1,0 +1,59 @@
+{
+ "structure": "NbCl5",
+ "repeat": [
+  26,
+  26,
+  78
+ ],
+ "atoms": 3796416,
+ "receivers": 4096,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "mh1-r2scan",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "source_commit": "6e63ab85",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0
+  }
+ },
+ "phase": "build",
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.24 GiB. GPU 0 has a total capacity of 19.54 GiB of which 5.62 GiB is free. Including non-PyTorch memory, this process has 13.92 GiB memory in use. Of the allocated memory 13.70 GiB is allocated by PyTorch, and 12.74 MiB is reserved by PyTorch but unallocated.",
+ "oom_at": "build",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/planner/minimal.py:1264 build_evaluation: field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/model/forces.py:424 __init__: self.model = prepare(compiling.private_copy(source))",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/model/forces.py:381 prepare: self.applied = registry.apply(private, resolution, context, original=source, check=check)",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/rewrites/registry.py:686 apply: detail = self._records[name].apply(model, context)",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/rewrites/mh1/__init__.py:632 _apply_reassociate: return reassociate_first_interaction(model, inputs.get(\"node_attrs\"), inputs.get(\"species_columns\"),",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/rewrites/mh1/__init__.py:396 reassociate_first_interaction: table = species_table(model, interaction, columns, len(node_attrs), joint_features)",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/rewrites/mh1/__init__.py:370 species_table: return m.identity_species_feats(model, interaction, attrs, len(columns), joint)",
+  "/mnt/homes/zwingel/fm-tiled/src-t3/fastmace/rewrites/mh1/modules.py:227 identity_species_feats: feats = model.node_embedding(attrs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py:58 forward: return self.linear(node_attrs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/operations/linear.py:190 forward: output = self.f([weight, self.transpose_in(x)], input_indices=input_indices)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:372 forward: return self.m(inputs, input_indices, output_shapes, output_indices)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_naive.py:405 forward: out = graph(input_list)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_naive.py:272 forward: return self.graph(inputs[0], inputs[1])",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/fx/graph_module.py:1007 call_wrapped: return self._wrapped_call(self, *args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/fx/graph_module.py:512 __call__: raise e.with_traceback(None)  # noqa: B904"
+ ]
+}
