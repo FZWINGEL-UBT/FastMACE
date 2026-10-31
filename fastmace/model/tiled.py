@@ -131,14 +131,22 @@ class _State:
                 self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where)
         if self.alias:
             self._width = widths["gx"]
-            self._first = torch.full((n,), -1, dtype=torch.int32)  # each atom's first and last tile
+            self._index(n)
+
+    def _index(self, n):
+        """alias: each atom's first and last tile and its row in the window while open (sweep 1 records the
+        tiles before its first outputs allocate the state)."""
+        import torch
+
+        if getattr(self, "_first", None) is None:
+            self._first = torch.full((n,), -1, dtype=torch.int32)
             self._last = torch.full((n,), -1, dtype=torch.int32)
-            self._slot_of = torch.full((n,), -1, dtype=torch.int64)  # its row in the window while open
+            self._slot_of = torch.full((n,), -1, dtype=torch.int64)
 
     def zero(self):
         for tensor in self.tensors.values():
             tensor.zero_()
-        if self.alias and self.tensors:
+        if self.alias and getattr(self, "_first", None) is not None:
             self._first.fill_(-1)
             self._last.fill_(-1)
             self._slot_of.fill_(-1)
@@ -146,7 +154,7 @@ class _State:
 
     def bytes(self):
         tensors = list(self.tensors.values())
-        if self.alias and self.tensors:
+        if self.alias and getattr(self, "_first", None) is not None:
             tensors += [self._first, self._last, self._slot_of]
             tensors += [self._window] if getattr(self, "_window", None) is not None else []
         return int(sum(t.numel() * t.element_size() for t in tensors))
@@ -186,8 +194,9 @@ class _State:
         else:
             tensor.index_add_(0, index.cpu(), values.detach().cpu())
 
-    def touch(self, index, tile):
-        """Sweep 1: tile ``tile`` holds the atoms ``index`` (receivers and halo)."""
+    def touch(self, index, tile, n):
+        """Sweep 1: tile ``tile`` holds the atoms ``index`` (receivers and halo) of ``n``."""
+        self._index(n)
         index = index.cpu()
         fresh = index[self._first[index] < 0]
         self._first[fresh] = tile
@@ -752,7 +761,7 @@ class TiledForceField:
                     if sweep == 1:
                         stats["edges"] += piece[1].shape[1]
                         if aliased:
-                            g["state"].touch(piece[0], index)
+                            g["state"].touch(piece[0], index, n)
                     if padded:
                         if bound is not slot:  # the streaming kernels read this slot's edge count and tables
                             for module in field._streaming:
