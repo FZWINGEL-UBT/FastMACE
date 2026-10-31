@@ -1,0 +1,42 @@
+{
+ "structure": "NbCl5",
+ "repeat": [
+  41,
+  41,
+  123
+ ],
+ "atoms": 14886936,
+ "receivers": 4096,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "mh1-r2scan",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "source_commit": "c88d28d6",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0
+  }
+ },
+ "phase": "build",
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 4.37 GiB. GPU 0 has a total capacity of 19.54 GiB of which 3.59 GiB is free. Including non-PyTorch memory, this process has 15.94 GiB memory in use. Of the allocated memory 15.74 GiB is allocated by PyTorch, and 20.57 MiB is reserved by PyTorch but unallocated.",
+ "oom_at": "build",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-build/tools/bench/tiled_capacity.py:149 main: field = planner.build_evaluation(eager, user, atoms, call_rows=call_rows)",
+  "/mnt/homes/zwingel/fm-tiled/src-build/fastmace/planner/minimal.py:1266 build_evaluation: field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,",
+  "/mnt/homes/zwingel/fm-tiled/src-build/fastmace/model/forces.py:347 __init__: batch = calc._atoms_to_batch(atoms).to_dict()",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/calculators/mace.py:582 _atoms_to_batch: batch = torch_geometric.Batch.from_data_list(data_list).to(self.device)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/torch_geometric/data.py:302 to: return self.apply(lambda x: x.to(device, **kwargs), *keys)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/torch_geometric/data.py:288 apply: self[key] = self.__apply__(item, func)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/torch_geometric/data.py:274 __apply__: return func(item)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/tools/torch_geometric/data.py:302 <lambda>: return self.apply(lambda x: x.to(device, **kwargs), *keys)"
+ ]
+}
