@@ -140,6 +140,15 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- Rule 12's memory estimate:
+  - it counts the structure's edges (`planner.memory.counted_edges`) instead of assuming uniform density, which was
+    1.26–1.36 times too many for NbCl5 and NaCl;
+  - the memory-rescue records and `gate_epilogue` keep fractions of the remaining activations
+    (`planner.memory.MemoryTerm.keep`) instead of absolute bytes;
+  - `SAFETY` goes from 0.90 to 0.97.
+  The estimate now stays within 1.08–1.39 times the measured peak at every stage of the rescue ladder, where it was
+  2.3–2.6 times with every record on. Rule 12 plans only the rungs a cell needs: on 20 GB, NbCl5 at 121,824 atoms
+  fits with `gate_epilogue` back on, where all rungs were planned with it off (docs/validation/estimate-refit.md).
 - `gate_epilogue` is on by default for MH-1 on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, by exact device
   name, `planner.fixed.DECISION_66_GATE_EPILOGUE_GPUS`), where `segment_gemm` is on and `tf32x3_gemms` is off: MD
   steps 1.2-4.7 % faster on NbCl5 and NaNbO3, NaCl neutral (docs/validation/speed-def.md). Off elsewhere; the A100
