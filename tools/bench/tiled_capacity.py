@@ -46,6 +46,10 @@ def parse_args(argv=None):
     p.add_argument("--rattle", type=float, default=0.0)
     p.add_argument("--strain", type=float, default=0.0)
     p.add_argument("--calls", type=int, default=2, help="tiled force calls (the first one warms up)")
+    p.add_argument("--host-state", action="store_true",
+                   help="TileConfig.state='host': x, sc and their adjoints in pinned host memory")
+    p.add_argument("--budget-receivers", type=int, nargs="*", default=[],
+                   help="TileConfig.budget_receivers: larger caps the call may take after its first call")
     p.add_argument("--tag", default="")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
@@ -147,7 +151,9 @@ def main(argv=None):
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges,
-                                                  neighbours="tiles" if args.tile_list else "global"))
+                                                  neighbours="tiles" if args.tile_list else "global",
+                                                  budget_receivers=tuple(args.budget_receivers),
+                                                  state="host" if args.host_state else "device"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
 
@@ -222,13 +228,22 @@ def main(argv=None):
                                                   record["tiled"]["max_abs_force"])
         record["valid"], record["check"] = valid, detail
         record["phase"] = "done" if record["valid"] else "invalid"
-    except torch.cuda.OutOfMemoryError as error:
-        record["error"] = f"OutOfMemoryError: {str(error).splitlines()[0]}"
-        record["oom_at"] = record["phase"]
+    except (torch.cuda.OutOfMemoryError, RuntimeError) as error:
+        # cuEquivariance allocates outside PyTorch's allocator: its out-of-memory is a RuntimeError
+        # (cudaErrorMemoryAllocation). Any other RuntimeError is recorded, then raised.
+        message = str(error)
+        oom = isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in message
+        record["error"] = f"{type(error).__name__}: {message.splitlines()[0] if message else ''}"[:600]
+        if oom:
+            record["oom_at"] = record["phase"]
         import traceback
 
         record["traceback"] = [f"{frame.filename}:{frame.lineno} {frame.name}: {frame.line}"
                                for frame in traceback.extract_tb(error.__traceback__)][-25:]
+        if not oom:
+            lists.close()
+            save()
+            raise
     lists.close()
     save()
     print(json.dumps({k: record.get(k) for k in ("atoms", "phase", "error", "calls", "tiled", "reference")},

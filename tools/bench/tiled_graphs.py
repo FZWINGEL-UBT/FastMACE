@@ -19,7 +19,9 @@ process (ninth idea list, item 3). Per candidate: Dynamo's caches reset, the bas
 warmed up (two calls each: compilation, then a steady call whose peak above the memory allocated before it is the
 workspace), then ``--blocks`` alternating blocks of ``--calls`` calls each, the order flipped every block. Records
 the ratio of the candidate's median block time to the baseline's, the workspace, the slot count and changes, and
-the largest force difference against the baseline.
+the largest force difference against the baseline. A third field ``R:bucket:R1+R2`` gives the candidate
+``budget_receivers`` (its first call at R, then the largest of R1, R2 whose workspace fits; warmed up past the
+switch), and the record names the cap it chose.
 
 Writes ``<output>/graphs-<kind>-<name>-<atoms>-R<receivers>.json``.
 """
@@ -239,7 +241,9 @@ def screen(args, torch, atoms, field, record):
     from fastmace.model.tiled import TileConfig, TiledForceField
 
     positions = field._prepare_one_off(atoms)
-    grid = [(int(r), float(b)) for r, b in (pair.split(":") for pair in args.grid.split(","))]
+    grid = [(int(fields[0]), float(fields[1]),
+             tuple(int(r) for r in fields[2].split("+")) if len(fields) > 2 else ())
+            for fields in (pair.split(":") for pair in args.grid.split(","))]
 
     def call(tiled):
         torch.cuda.synchronize()
@@ -250,21 +254,24 @@ def screen(args, torch, atoms, field, record):
         torch.cuda.synchronize()
         return out, time.perf_counter() - started, int(torch.cuda.max_memory_allocated() - before)
 
-    def setup(receivers, bucket):
-        tiled = TiledForceField(field, TileConfig(receivers, mode="compiled", bucket=bucket))
+    def setup(receivers, bucket, budget):
+        tiled = TiledForceField(field, TileConfig(receivers, mode="compiled", bucket=bucket, budget_receivers=budget))
         _, first, _ = call(tiled)
+        if budget:  # the call at the chosen cap compiles its slots
+            call(tiled)
         out, steady, workspace = call(tiled)
-        return tiled, out, dict(receivers=receivers, bucket=bucket, first_call_seconds=first, steady_seconds=steady,
+        return tiled, out, dict(receivers=receivers, bucket=bucket, budget_receivers=list(budget),
+                                chosen_receivers=tiled.receivers, first_call_seconds=first, steady_seconds=steady,
                                 workspace=workspace)
 
     candidates = []
-    for receivers, bucket in grid[1:]:
+    for receivers, bucket, budget in grid[1:]:
         # Every TiledForceField compiles the same functions (``_first_forward``, ``_second_forward``), so their
         # specialisations share Dynamo's per-function cache: reset it, or a later pair would run eager past the cap.
         torch._dynamo.reset()
         torch.cuda.empty_cache()
         base, base_out, base_entry = setup(*grid[0])
-        tiled, out, entry = setup(receivers, bucket)
+        tiled, out, entry = setup(receivers, bucket, budget)
         times = {"baseline": [], "candidate": []}
         for block in range(args.blocks):
             order = [("baseline", base), ("candidate", tiled)]

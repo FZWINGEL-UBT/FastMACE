@@ -182,7 +182,7 @@ as one generic kernel; these rewrites run them as ordinary matrix products.
 | `merged_residual` | `auto`, `on`, `off` | On with `block_linear`. | Runs `linear_1` and the residual linear as one product per output segment. | rounding, deterministic. Needs `block_linear` and `density_first`; does nothing on models without `density_first`. |
 | `gated_rows` | `auto`, `on`, `off` | On with `merged_residual` (MH-1 class). | Runs the residual products, the gate and `linear_2` of MH-1-class interactions on per-segment rows, without the joins and copies between them. | exact, deterministic. Needs `block_linear` and `merged_residual`. |
 | `segment_gemm` | `auto`, `on`, `off` | On with `gated_rows` in float32 plans that are not reproducible. | Writes `linear_2`'s products straight into its joined output with a gathered-row Triton matrix product, where a shared shape rule picks it. | rounding, deterministic. Needs `gated_rows`. The kernel is float32. |
-| `gate_epilogue` | `auto`, `on`, `off` | Off. Only `"on"` enables it. | Runs the gate's backward inside `linear_2`'s input-gradient matrix product in MH-1-class chains: one atom-tiled Triton kernel per gated segment stores the gated rows' gradient and sums the gates' gradient in registers, where the shape rule picks Triton. | rounding, deterministic. Needs `segment_gemm` and float32. Conflicts with `tf32x3_gemms`. |
+| `gate_epilogue` | `auto`, `on`, `off` | On for MH-1 with `segment_gemm` on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, by exact device name); off elsewhere. | Runs the gate's backward inside `linear_2`'s input-gradient matrix product in MH-1-class chains: one atom-tiled Triton kernel per gated segment stores the gated rows' gradient and sums the gates' gradient in registers, where the shape rule picks Triton. | rounding, deterministic. Needs `segment_gemm` and float32. Conflicts with `tf32x3_gemms`. |
 | `grouped_launch` | `auto`, `on`, `off` | On with `block_linear` for the generic MACE family in float32 plans that are not reproducible. Off for other families. | Runs a block linear's small per-`l` products (too few row tiles to fill the GPU, by the shared shape rule) in one Triton launch. | rounding, deterministic. Needs `block_linear`. Conflicts with `tf32x3_gemms`. |
 | `inplace_block_linear` | `False`, `True` (bool) | `False`. | Runs the per-`l` products as in-place strided-batched products. | `True` is refused: it was slower and is not carried over. |
 
@@ -283,7 +283,6 @@ no gain, or a loss, in the measurements so far:
 | `combo_kernels` | NaCl about 1–2 % faster, NbCl5 2–3 % slower on an RTX 5060 Ti and an L4. |
 | `fused_radial_hidden` | No measured gain. |
 | `tf32x3_gemms` | An accuracy screen; slower than cuBLAS float32 on most production shapes measured. |
-| `gate_epilogue` | MH-1 with `wprime_backward` on (the default on both GPUs): no gain; NbCl5 0.3 % slower on an RTX 4000 Ada, NaNbO3 0.7-0.9 % slower on an RTX 5060 Ti. Small cells such as NaCl run the stock path. |
 
 Test them with a same-process A/B on your own GPU and structure before you
 rely on them.

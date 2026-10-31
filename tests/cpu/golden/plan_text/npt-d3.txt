@@ -4,9 +4,9 @@ Plan revision 0, tier graph (molecular dynamics on the graph tier)
       fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, chunked_conv_backward,
       radial_tables, block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm, single_graph_strain,
       species_tables, fold_readout_tail, fold_product_linear, polar_uvu
-  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, gate_epilogue, species_residual,
-      combo_kernels, tf32x3_gemms (only an explicit 'on' enables it); fused_folded_forward (not MH-1, decision 64);
-      w_tables, save_transcendentals (float32 plan, decision 65) (+9 more; describe(full=True) lists them)
+  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, species_residual, combo_kernels,
+      tf32x3_gemms (only an explicit 'on' enables it); fused_folded_forward (not MH-1, decision 64); w_tables,
+      save_transcendentals (float32 plan, decision 65); wprime_backward (+9 more; describe(full=True) lists them)
   sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64
   sizes: D3 skin 1 A; k-space headroom n/a
   kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes

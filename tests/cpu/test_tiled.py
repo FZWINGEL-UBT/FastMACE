@@ -274,3 +274,70 @@ def test_tiled_call_does_not_depend_on_the_fields_call_rows(mode):
         assert np.array_equal(after[1], before[1]) and np.array_equal(after[2], before[2])
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+# ---------------------------------------------------------------- tile size from the workspace budget
+
+
+@pytest.mark.parametrize("available, chosen", [(10**9, 16), (900, 8), (879, 4)])  # 8 x 100 x 1.1 = 880
+def test_budget_receivers_take_the_largest_tile_whose_workspace_fits(available, chosen):
+    """``budget_receivers``: after the first call (at ``receivers``), the call measures its workspace per
+    receiver and takes the largest candidate whose predicted workspace, with 10 % headroom, fits the memory left
+    after the tiled state; the slots are then planned again. The forces are the fixed-size call's."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(4, mode="padded", budget_receivers=(8, 16)))
+    tiled._memory = lambda: (100 * tiled.receivers, available)  # 100 bytes per receiver
+    first = tiled.evaluate(atoms, stress=True)
+    assert tiled.receivers == chosen and tiled.last["receivers"] == 4
+    again = tiled.evaluate(atoms, stress=True)
+    assert tiled.last["receivers"] == chosen and tiled.last["max_receivers"] <= chosen
+    assert max(r for r, _, _ in tiled.last["slots"].values()) <= chosen + 1
+    fixed = TiledForceField(field, TileConfig(chosen, mode="padded")).evaluate(atoms, stress=True)
+    for got in (first, again):
+        assert got[0] == pytest.approx(fixed[0], rel=1e-13, abs=0)
+        assert relative(got[1], fixed[1]) <= 1e-11 and relative(got[2], fixed[2]) <= 1e-11
+    tiled._memory = lambda: (0, 10**12)
+    tiled.evaluate(atoms)
+    assert tiled.receivers == chosen  # chosen once, after the first call
+
+
+def test_budget_receivers_stay_without_a_memory_measurement():
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(4, budget_receivers=(8, 16)))
+    tiled.evaluate(atoms)  # CPU: no device memory to measure
+    assert tiled.receivers == 4
+    with pytest.raises(ValueError, match="budget_receivers"):
+        TileConfig(4, budget_receivers=(0,))
+
+
+# ---------------------------------------------------------------- the tiled state on the host
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
+def test_host_state_equals_device_state_bitwise(names, mode):
+    """``TileConfig.state="host"``: x, sc and their adjoints live in host memory; each tile reads and writes its
+    rows there. The same gathers, assignments and index_add_ as on the device: bitwise the same call."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*names))
+    results = []
+    for state in ("device", "host"):
+        tiled = TiledForceField(field, TileConfig(5, mode=mode, state=state))
+        for current in (atoms, strained(atoms)):
+            results.append(tiled.evaluate(current, stress=True))
+        assert all(t.device.type == "cpu" for t in tiled._g["state"].tensors.values())
+        assert tiled.last["host_bytes"] == (tiled.last["global_bytes"] if state == "host" else 0)
+    for device, host in zip(results[:2], results[2:]):
+        assert device[0] == host[0]
+        assert np.array_equal(device[1], host[1]) and np.array_equal(device[2], host[2])
+
+
+def test_host_state_refuses_graphs_and_unknown_values():
+    with pytest.raises(ValueError, match="state"):
+        TileConfig(5, state="disk")
+    with pytest.raises(ValueError, match="host"):  # a captured graph cannot read host memory
+        TileConfig(5, mode="graphs", state="host")
