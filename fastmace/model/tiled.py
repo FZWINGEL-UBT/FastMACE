@@ -58,6 +58,9 @@ class TileConfig:
     ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pinned host memory on CUDA; each
     tile copies its rows to the device and its results back, so the device holds no per-atom state of the
     sweeps; not with ``mode="graphs"``, whose captured bodies read the state themselves).
+    ``species``: the tiles' one-hot species rows from the field's ``node_attrs`` (``"one_hot"``) or built from
+    its species index (``"index"``, bitwise the same rows): the field's device one-hot is then released to the
+    host (``MACEForceField.release_node_attrs``; its own whole-system call refuses afterwards).
     """
 
     receivers: int = 8192
@@ -70,6 +73,7 @@ class TileConfig:
     neighbours: str = "global"
     budget_receivers: tuple[int, ...] = ()
     state: str = "device"
+    species: str = "one_hot"
 
     def __post_init__(self):
         if self.mode not in ("eager", "padded", "graphs", "compiled"):
@@ -82,6 +86,8 @@ class TileConfig:
             raise ValueError(f"TileConfig.bucket must be in (0, 10], got {self.bucket!r}")
         if int(self.receivers) < 1:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
+        if self.species not in ("one_hot", "index"):
+            raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
         if self.state not in ("device", "host"):
             raise ValueError(f"TileConfig.state must be 'device' or 'host', got {self.state!r}")
         if self.state == "host" and self.mode == "graphs":
@@ -252,6 +258,18 @@ class TiledForceField:
         # The reassociated first interactions read species tables evaluated at the tile's own row count (the
         # field's ``species_tables``): bitwise the features the tile's embedding gives its atoms.
         self._reassociations = [entry[1] for entry in field._tables]
+        # TileConfig.species="index": each tile's one-hot rows from the field's species index (the one-hot's
+        # column of every atom), bitwise the stored rows; the field's device one-hot goes to the host.
+        self._species = None
+        if self.config.species == "index":
+            from fastmace.model import energy as energy64
+
+            if energy64.NODE_E0_KEY not in field.data:
+                raise ValueError("TileConfig.species='index' needs the force field's float64 per-atom E0 "
+                                 "(its one-hot node_attrs are not kept on the device)")
+            stored = field.data["node_attrs"]
+            self._species, self._width, self._attrs_dtype = field._species_index, stored.shape[1], stored.dtype
+            field.release_node_attrs()
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
@@ -351,6 +369,14 @@ class TiledForceField:
         sc = interaction.skip_tp(h1, attrs) if self._skip_takes_attrs else interaction.skip_tp(h1)
         return interaction.linear_up(h1), sc
 
+    def _attrs(self, nodes):
+        """The one-hot species rows of ``nodes``: the field's, or (``species="index"``) built from its index."""
+        import torch
+
+        if self._species is None:
+            return self.node_attrs[nodes]
+        return torch.nn.functional.one_hot(self._species[nodes], self._width).to(self._attrs_dtype)
+
     @staticmethod
     def _masked(value, mask):
         return value if mask is None else value * mask.unsqueeze(-1) if value.dim() > 1 else value * mask
@@ -364,7 +390,7 @@ class TiledForceField:
 
         model = self.model
         nodes, local, r, vectors, recv_mask, _ = tile
-        attrs = self.node_attrs[nodes]
+        attrs = self._attrs(nodes)
         receivers = nodes[:r]
         with torch.enable_grad() if adjoint else torch.no_grad():
             leaf = vectors.detach().requires_grad_(adjoint)
@@ -389,7 +415,7 @@ class TiledForceField:
         model = self.model
         interaction = model.interactions[1]
         nodes, local, r, vectors, recv_mask, node_mask = tile
-        attrs = self.node_attrs[nodes]
+        attrs = self._attrs(nodes)
         with torch.enable_grad():
             leaf = vectors.detach().requires_grad_(True)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
@@ -597,7 +623,7 @@ class TiledForceField:
             field.positions.copy_(positions)
         pos = field.positions.detach()
         n = pos.shape[0]
-        self.node_attrs = data["node_attrs"]
+        self.node_attrs = data["node_attrs"] if self._species is None else None
         heads = (data["head"][data["batch"]] if "head" in data else torch.zeros_like(data["batch"])).long()
         source, row_ptr, degree = self._source(positions, n)
         caps = self.config
@@ -611,7 +637,7 @@ class TiledForceField:
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      receivers=self.receivers,
-                     edges=0, mode=caps.mode, neighbours=caps.neighbours)
+                     edges=0, mode=caps.mode, neighbours=caps.neighbours, species=caps.species)
         keys = self._slot_keys(tiles, source, local_of, n) if padded else None
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
@@ -627,7 +653,8 @@ class TiledForceField:
             g = self._globals(n, stress, pos, heads)
             self.heads, self.arange = g["heads"], g["arange"]
             if padded:
-                key = (id(g), pos.data_ptr(), self.node_attrs.data_ptr(), stress)
+                species = self.node_attrs if self._species is None else self._species
+                key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
                 if key != self._graph_key:  # the graphs read these addresses
                     for slot in self._slots.values():
                         slot["graphs"].clear()
