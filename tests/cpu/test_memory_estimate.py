@@ -518,7 +518,7 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     from fastmace.planner.fixed import AUTO_RULES
 
     assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments",
-                                    "recompute_node_region")
+                                    "gate_epilogue", "recompute_node_region")
     assert AUTO_RULES["RewriteConfig.recompute_node_segments"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
     full = plan()
@@ -536,6 +536,50 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     free = recompute.predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with recompute_conv_weights on
     fits = plan(memory_bytes=free, rewrites=RewriteConfig(recompute_conv_weights="on"))
     assert fits.rewrites.recompute_node_segments == "off"
+
+
+def test_gate_epilogue_s_term_depends_on_the_node_segments():
+    """docs/validation/region-norm.md: gate_epilogue keeps 12.3 kB per atom more without the node segments, 36.3 with
+    the separate segments and 0.5 inside recompute_node_region's chunks (memory.CONTEXT_TERMS)."""
+    from fastmace.planner.minimal import _rewrite_registry
+
+    registry = _rewrite_registry()
+    dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
+    assert registry["gate_epilogue"].memory is terms.gate_epilogue
+    edge, node = terms.gate_epilogue(dims, 4)
+    assert edge == 0 and node > 0
+    alone = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue"], "float32"))
+    assert alone["gate_epilogue"].node_bytes == node
+    segments = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue", "recompute_node_segments"],
+                                                "float32"))
+    assert segments["gate_epilogue"].node_bytes == terms.gate_epilogue_in_segments(dims, 4)[1] > node
+    region = dict(memory.rewrite_memory_terms(
+        registry, dims, ["gate_epilogue", "recompute_node_segments", "recompute_node_region"], "float32"))
+    assert "gate_epilogue" not in region and "recompute_node_region" in region
+
+
+@pytest.mark.rule(12)
+def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments():
+    """docs/validation/region-norm.md: gate_epilogue (on by decision 66 on this file's GPU) stays on while the plan
+    fits, and while it fits with recompute_node_segments on; otherwise rule 12 turns it off, the memory rescue's
+    fourth rung, with its own reason. The caller's explicit "on" is kept."""
+    assert memory.RESCUE_OFF == ("gate_epilogue",) and memory.rescue_value("gate_epilogue") == "off"
+    full = plan()
+    if full.rewrites.gate_epilogue != "on" or full.rewrites.wprime_backward != "on":
+        pytest.skip("gate_epilogue or wprime_backward is off in this plan (decision 66's GPUs)")
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20)  # nothing fits: every rung taken
+    assert tight.rewrites.recompute_node_segments == "on" and tight.rewrites.gate_epilogue == "off"
+    _, choice, reason = tight.decision("RewriteConfig.gate_epilogue")
+    assert choice == "off" and (reason.rule, reason.code) == (12, "rule-12-memory-rescue")
+    check(reason)
+    assert "recompute_node_segments on" in str(reason)
+    nodes = RewriteConfig(recompute_conv_weights="on", recompute_node_segments="on")
+    free = plan(rewrites=nodes).predicted_memory_bytes / memory.MARGIN * 1.0001  # fits with the segments on
+    assert plan(memory_bytes=free, rewrites=nodes).rewrites.gate_epilogue == "on"
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        kept = plan(memory_bytes=2**20, rewrites=RewriteConfig(gate_epilogue="on"))
+    assert kept.rewrites.gate_epilogue == "on"
 
 
 @pytest.mark.rule(12)

@@ -401,14 +401,14 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
     (plans/capacity.md CAP-T07; the owner's rule: memory-saving records only when memory would not be enough).
 
     ``None`` unless ``error`` is an out-of-memory error and the plan has a record of ``memory.MEMORY_RESCUE`` off
-    that the caller left "auto" and whose requirements are on. Then, if the device is still usable, a revision of
-    ``plan`` with the first such record in ``MEMORY_RESCUE``'s order on (``candidate``: "fallback: rewrites
-    recompute_conv_weights on: out of memory at build; ..."), which the run record keeps in ``Plan.revisions``.
-    One record per rebuild (CAP-T08): ``recompute_node_segments`` only after ``recompute_conv_weights`` is on. If the
-    context is not usable (a sticky CUDA error), ``error`` is raised again with a note naming the fix: the records set
-    "on" in a fresh process.
+    that the caller left "auto" and whose requirements are on, or a record of ``memory.RESCUE_OFF`` on that the
+    caller left "auto". Then, if the device is still usable, a revision of ``plan`` with the first such record in
+    ``MEMORY_RESCUE``'s order set (``candidate``: "fallback: rewrites recompute_conv_weights on: out of memory at
+    build; ..."), which the run record keeps in ``Plan.revisions``. One record per rebuild (CAP-T08):
+    ``recompute_node_segments`` only after ``recompute_conv_weights`` is on. If the context is not usable (a sticky
+    CUDA error), ``error`` is raised again with a note naming the fix: the records set in a fresh process.
     """
-    from fastmace.planner.memory import MEMORY_RESCUE, annotate_out_of_memory
+    from fastmace.planner.memory import MEMORY_RESCUE, annotate_out_of_memory, rescue_value
 
     if not _out_of_memory(error):
         return None
@@ -417,16 +417,19 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
     for name in MEMORY_RESCUE:
         if requested != "auto" and getattr(requested, name, "auto") != "auto":
             continue  # the caller's explicit value is kept
-        record = _record(name)
-        if not _off(getattr(plan.rewrites, name, "on")) or record is None:
+        if not _rescuable(plan, name):
             continue
-        if all(not _off(getattr(plan.rewrites, other, "off")) for other in record.requires):
+        record = _record(name)
+        if record is None:
+            continue
+        if rescue_value(name) == "off" or all(not _off(getattr(plan.rewrites, other, "off"))
+                                              for other in record.requires):
             names.append(name)
             break  # one record per rebuild, in MEMORY_RESCUE's order
     if not names:
         return None
     if not usable(plan.engine.device):
-        fix = ", ".join(f'{name}="on"' for name in names)
+        fix = ", ".join(f'{name}="{rescue_value(name)}"' for name in names)
         note = (f"FastMACE (CAP-T07): out of memory at {stage}, and the CUDA context is not usable afterwards, so "
                 f"this process cannot rebuild with {', '.join(names)} on. Run again in a fresh process with "
                 f"fm.ForceField(..., rewrites=RewriteConfig({fix})).")
@@ -435,9 +438,21 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
         if note not in message:
             error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
         raise error
-    why = (f"out of memory at {stage}; {', '.join(names)} auto -> on (the memory rescue, rule 12; CAP-T07)")
-    return candidate(plan, {"rewrites": {name: "on" for name in names}, "reason": why}, force_field, atoms,
-                     planner=planner)
+    why = (f"out of memory at {stage}; " + ", ".join(f"{name} auto -> {rescue_value(name)}" for name in names)
+           + " (the memory rescue, rule 12; CAP-T07)")
+    return candidate(plan, {"rewrites": {name: rescue_value(name) for name in names}, "reason": why}, force_field,
+                     atoms, planner=planner)
+
+
+def _rescuable(plan: Any, name: str) -> bool:
+    """Whether the memory rescue can still set ``name``: a record it turns on is off in ``plan``, a record it turns
+    off (``memory.RESCUE_OFF``) is on. A field the plan lacks counts as already set."""
+    from fastmace.planner.memory import rescue_value
+
+    value = getattr(plan.rewrites, name, None)
+    if value is None:
+        return False
+    return not _off(value) if rescue_value(name) == "off" else _off(value)
 
 
 def raise_if_context_unusable(failure: Any, force_field: Any, *,
@@ -448,7 +463,7 @@ def raise_if_context_unusable(failure: Any, force_field: Any, *,
     46,656 atoms: ``CUBLAS_STATUS_EXECUTION_FAILED``) and leave the context sticky; the fallback search's re-plans
     then fail in ``cudaMemGetInfo``. When rule 12 had warned that the plan may not fit, the note names the memory
     rescue's records (set "on", when they are off) or a smaller cell as the fix."""
-    from fastmace.planner.memory import MEMORY_RESCUE
+    from fastmace.planner.memory import MEMORY_RESCUE, rescue_value
 
     plan = failure.plan
     if usable(plan.engine.device):
@@ -458,13 +473,14 @@ def raise_if_context_unusable(failure: Any, force_field: Any, *,
         tight = plan.decision("memory")[1] == "warn"
     except (KeyError, AttributeError, TypeError, ValueError):
         tight = False
-    off = [name for name in MEMORY_RESCUE if _off(getattr(plan.rewrites, name, "on"))]
+    off = [name for name in MEMORY_RESCUE if _rescuable(plan, name)]
     note = (f"FastMACE: the CUDA context is not usable after this {failure.stage} error, so the fallback cannot run "
             "in this process.")
     if tight:
         fix = "a smaller cell"
         if off:
-            fix = "fm.ForceField(..., rewrites=RewriteConfig(" + ", ".join(f'{name}="on"' for name in off) + "))"
+            fix = ("fm.ForceField(..., rewrites=RewriteConfig("
+                   + ", ".join(f'{name}="{rescue_value(name)}"' for name in off) + "))")
         note += (f" Rule 12 had warned that the plan may not fit the free GPU memory, so it is most likely out of "
                  f"memory: run again in a fresh process with {fix}.")
     message = str(error.args[0]) if error.args else ""

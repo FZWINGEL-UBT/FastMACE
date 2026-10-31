@@ -56,7 +56,26 @@ MARGIN = 0.9
 # 1.10x), so rule 12 turns each on only when the plan still does not fit with the ones before it on, and the memory
 # rescue turns on one record per rebuild in this order. Last, recompute_node_region (about 1.23x the separate
 # segments' force call): only when the plan does not fit with recompute_node_segments on (ninth list item 2).
-MEMORY_RESCUE = ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments", "recompute_node_region")
+#
+# gate_epilogue is a rung the other way round (docs/validation/region-norm.md): decision 66 turns it on for speed
+# (speed-def E2, 1.00-1.05x), and it keeps more for the backward, so the rescue turns it off. It keeps 12 kB per atom
+# more without the node segments and 36 kB with the separate segments, so it comes after recompute_node_segments:
+# there it frees about 9 kB per atom for each percent of step time, recompute_node_region about 5.
+MEMORY_RESCUE = ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments", "gate_epilogue",
+                 "recompute_node_region")
+# The rungs the rescue turns off rather than on.
+RESCUE_OFF = ("gate_epilogue",)
+# Records whose term depends on another enabled record, in priority order: (record, other record, the term's name in
+# ``fastmace.rewrites.memory``, "" for none). The first whose other record is enabled replaces the record's own term.
+# Inside recompute_node_region's chunks gate_epilogue's extra buffers are rebuilt per chunk (0.5 kB per atom); with
+# the separate segments they stay live at the peak (docs/validation/region-norm.md).
+CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
+                 ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"))
+
+
+def rescue_value(name: str) -> str:
+    """The value the memory rescue sets a ``MEMORY_RESCUE`` record to: "off" for ``RESCUE_OFF``, else "on"."""
+    return "off" if name in RESCUE_OFF else "on"
 # The estimate's largest overstatement of the measured peak in decision 67's fit (the capacity cells: 1.05 to 1.34
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
@@ -292,12 +311,18 @@ def drop_order(rewrite_terms: tuple[tuple[str, int], ...], edge_sized: set[str],
 
 def rewrite_memory_terms(records: Any, dims, enabled: list[str], dtype: str) -> tuple[tuple[str, MemoryTerm], ...]:
     """``(name, MemoryTerm)`` of every enabled record that declares one: ``Rewrite.memory(dims, width)`` gives
-    ``(bytes per edge, bytes per node)``."""
+    ``(bytes per edge, bytes per node)``, or the term ``CONTEXT_TERMS`` names for it."""
+    from fastmace.rewrites import memory as terms
+
     width = DTYPE_BYTES[dtype]
     out = []
     for name in enabled:
         record = records[name] if name in records else None
         declare = getattr(record, "memory", None)
+        for owner, other, term in CONTEXT_TERMS:
+            if owner == name and other in enabled:
+                declare = getattr(terms, term) if term else None
+                break
         if declare is not None:
             out.append((name, MemoryTerm(*declare(dims, width))))
     return tuple(out)
@@ -333,9 +358,9 @@ def annotate_out_of_memory(error, plan) -> Any:
     return error
 
 
-__all__ = ["DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
-           "MemoryEstimate", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD", "RESCUE_OVERSTATEMENT",
-           "SAFETY", "WORKSPACE_BYTES",
-           "annotate_out_of_memory", "drop_order", "short_by_far",
+__all__ = ["CONTEXT_TERMS", "DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
+           "MemoryEstimate", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD", "RESCUE_OFF",
+           "RESCUE_OVERSTATEMENT", "SAFETY", "WORKSPACE_BYTES",
+           "annotate_out_of_memory", "drop_order", "rescue_value", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
            "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]

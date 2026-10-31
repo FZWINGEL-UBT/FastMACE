@@ -40,6 +40,13 @@ _NODE_SEGMENTS_SHARE = 0.20
 # off; with gate_epilogue on, the region's peak is the same to 0.5 kB per atom; docs/validation/region-norm.md),
 # 0.180 of MH-1's stock 317,440 B per node.
 _NODE_REGION_SHARE = 0.18
+# gate_epilogue (decision 66, speed-def E2): the force call's peak above gate_epilogue off at NbCl5 21,600 atoms
+# (compiled default plan, recompute_conv_weights on; docs/validation/region-norm.md): 0.247 GiB (12.3 kB per atom,
+# 0.039 of MH-1's stock 317,440 B per node) without the node segments, 0.731 GiB (36.3 kB, 0.114) with the separate
+# segments, on the RTX 4000 Ada and the RTX A4000 alike, and 0.5 kB inside recompute_node_region's chunks
+# (planner.memory.CONTEXT_TERMS picks the term).
+_GATE_EPILOGUE_SHARE = 0.039
+_GATE_EPILOGUE_SEGMENTS_SHARE = 0.114
 
 
 def _first_hidden(block) -> int:
@@ -157,6 +164,20 @@ def recompute_node_region(dims, width):
     return 0, -round(_NODE_REGION_SHARE * _stock_node_floats(dims)) * width
 
 
+def gate_epilogue(dims, width):
+    """The gate's backward in ``linear_2``'s epilogue keeps more for the backward than the separate gate:
+    ``_GATE_EPILOGUE_SHARE`` of the stock per-node floats more (fitted on the compiled default plan's peak,
+    docs/validation/region-norm.md)."""
+    return 0, round(_GATE_EPILOGUE_SHARE * _stock_node_floats(dims)) * width
+
+
+def gate_epilogue_in_segments(dims, width):
+    """``gate_epilogue`` with the separate node segments (``recompute_node_segments``), whose recomputation keeps
+    the epilogue's extra buffers live at the peak: ``_GATE_EPILOGUE_SEGMENTS_SHARE`` of the stock per-node floats
+    more (planner.memory.CONTEXT_TERMS)."""
+    return 0, round(_GATE_EPILOGUE_SEGMENTS_SHARE * _stock_node_floats(dims)) * width
+
+
 def radial_tables(dims, width):
     """Tabulated radial networks keep no hidden activations per edge (measured)."""
     return -round(_RADIAL_TABLES_SHARE * _stock_edge_floats(dims)) * width, 0
@@ -192,7 +213,8 @@ _SEGMENT_SELFCHECK_TENSORS = 9
 
 
 __all__ = ["block_linear_resident", "chunked_conv_backward", "factor_species",
-           "fold_cutoff", "fused_radial_hidden", "generic_reassociate", "joint_radial_input",
+           "fold_cutoff", "fused_radial_hidden", "gate_epilogue", "gate_epilogue_in_segments", "generic_reassociate",
+           "joint_radial_input",
            "merged_residual_resident", "mh1_streaming_conv", "radial_tables", "reassociate_first",
            "recompute_conv_weights", "recompute_first_table", "recompute_node_segments", "segment_gemm_selfcheck",
            "streaming_conv"]
