@@ -99,6 +99,18 @@ eV/Å on both sides), and the edge check passed on both.
   10 of 11 passed. The failure is the existing padded kernel's `test_stacked_tile_has_no_register_spills[3]`, which
   misses its 1e-5 absolute tolerance by one element (1.3e-5) on the A4000. It is independent of this change.
 
+## The one-segment tests' tolerance (follow-up)
+
+`test_stacked_tile_has_no_register_spills[3]` (the padded kernel) missed `atol = 1e-5` by one element (1.3e-5) on the
+RTX A4000. It is not an accuracy difference. Against a float64 reference on the test's operands (300 atoms, 64
+channels, D = 3, 5, 7):
+- the padded kernel stays within 1.6–3.8e-7 of the largest value, and cuBLAS's own float32 product within 0.9–2.5e-7;
+- cuBLAS too reaches 2.4e-5 absolute.
+
+`dgate` sums D products of 64-long float32 sums. Where they cancel, as at the failing element (0.32 out of terms of
+order 10–100), an element-wise `atol` of 1e-5 fails for any summation order. Both one-segment tests now compare with
+float64, with the largest error at most 1e-6 of the largest value. 11 of 11 pass on the A4000 and the RTX 4000 Ada.
+
 ## Records
 
 `results/gated-unpadded-20261101/`:
