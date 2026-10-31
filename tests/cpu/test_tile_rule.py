@@ -26,6 +26,23 @@ def test_one_fixed_configuration_and_a_reason():
     assert tr.row_waves(6144, 48) == 2.0
 
 
+def test_large_tiles_only_on_the_measured_gpus(monkeypatch):
+    # Decision 66: 128 rows and 8 warps where whole-step A/Bs gained in both build orders (the RTX 4000 Ada).
+    assert tr.LARGE_TILE_GPUS == ("NVIDIA RTX 4000 Ada Generation",)
+    choice = tr.segment_gemm_choice(13608, 512, 512, 48, "NVIDIA RTX 4000 Ada Generation")
+    assert (choice.backend, choice.block_m, choice.num_warps) == ("triton", 128, 8)
+    for other in ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA A100-SXM4-80GB", "NVIDIA A100-SXM4-40GB", None):
+        choice = tr.segment_gemm_choice(13608, 512, 512, 48, other)
+        assert (choice.block_m, choice.num_warps) == (64, 4)
+    # The waves rule stays in 64-row tiles: the backend does not depend on the tile shape.
+    assert tr.segment_gemm_choice(5832, 512, 512, 48, "NVIDIA RTX 4000 Ada Generation").backend == "cublas"
+    # An A/B side's override wins on every GPU.
+    monkeypatch.setattr(tr, "TRITON_BLOCK_M", 64)
+    monkeypatch.setattr(tr, "TRITON_NUM_WARPS", 4)
+    choice = tr.segment_gemm_choice(13608, 512, 512, 48, "NVIDIA RTX 4000 Ada Generation")
+    assert (choice.block_m, choice.num_warps) == (64, 4)
+
+
 def test_column_tiles_run_together_only_when_a_exceeds_l2(monkeypatch):
     # MH-1 linear_2 at NbCl5 9,216 atoms on a 32 MiB L2: l = 0 (18.9 MB) fits, l = 1..3 do not.
     l2, gpu = 32 * 2**20, "NVIDIA GeForce RTX 5060 Ti"

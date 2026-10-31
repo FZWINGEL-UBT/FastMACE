@@ -1,0 +1,8 @@
+== /home/fzwin/fastmace-runs/l2-gap-audit-20261031/local/NbCl5-9216: per step span 84.540 ms, any stream busy 84.046 ms
+   stream 144: busy 83.338 ms; gemm 23.061, Kernel2 13.299, oeq_projected_backward_wprime 8.635, fused_folded_forward 6.878, kernel 2.333, magma_sgemmEx_kernel 1.971
+   stream 17: busy 0.816 ms; kernel 0.526, vectorized_elementwise_kernel 0.120, index_elementwise_kernel 0.083, DeviceRadixSortOnesweepKernel 0.043, reduce_kernel 0.016, elementwise_kernel 0.011
+   stream 141: busy 0.144 ms; inside_kernel 0.067, scatter_kernel 0.047, reduce_kernel 0.013, drift_kernel 0.010, DeviceScanKernel 0.005, noise_kernel 0.003
+   overlap of the two busiest streams 0.252 ms
+   idle holes >= 10 us: 422.8 us per step
+       326.0 us/step  0.88/step  vectorized_elementwise_kernel -> noise_kernel
+        96.8 us/step  1.00/step  scatter_kernel -> unrolled_elementwise_kernel

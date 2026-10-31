@@ -73,4 +73,58 @@ So each verdict rests on where the constant is read:
 2. **MARK_ATOMS_DYNAMIC=False,** a short step-time recheck: NaCl and NbCl5, both orders, one GPU.
 3. **aggrfusion:** no rerun.
 
-The results go into this report when they are back.
+## Rerun results (31 October 2026)
+
+### MARK_ATOMS_DYNAMIC: a real step-time cost on small cells
+
+The switch was removed from main after the setup fixes (c97e9dc8; F5 is unconditional since). The recheck ran from
+f246625b, the last commit with the switch, with only `tools/ab_rewrites.py` replaced by the fixed one (d16d41c6; the
+only file that differs). Setup:
+
+- local RTX 5060 Ti, `mace_cueq_oeq`, MH-1 hybrid float32 NVT 300 K;
+- `--prepare`, 12 blocks of 300 steps;
+- side a `fastmace.model.compile:MARK_ATOMS_DYNAMIC=False`, side b the adopted default (the atom dimension dynamic).
+
+| Cell | Order ab: a / b ms, b/a | Order ba: a / b ms, b/a |
+|---|---|---|
+| NaCl 3×3×3, 216 atoms | 2.413 / 2.446, **1.014** | 2.454 / 2.496, **1.017** |
+| NbCl5 3×3×3, 1,944 atoms | 18.050 / 18.041, 0.9995 | 18.230 / 18.311, 1.0045 |
+
+- **The verdict changes.** F5's per-atom dynamic marking makes the NaCl step 1.4–1.7 % slower in both build orders.
+  On NbCl5 the step is unchanged. The setup-fixes report's "step time unchanged" (b/a 0.995–1.005, NbCl5 only) had
+  measured the default against itself.
+- **What it bought** ([setup-fixes.md](setup-fixes.md), "F5's first-build cost"):
+  - −8.6 s whenever a process meets an atom count new to the compile cache (27.3 against 18.7 s, NbCl5 3×3×4 on
+    3×3×3's cache);
+  - +2.0 s on every fresh process's first build.
+- **Trade-off:** 1.5 % of a 2.4 ms step is 36 µs per step, so the 8.6 s saved on a new atom count are spent again
+  after about 240,000 NaCl steps (4 minutes of MD at 216 atoms). On cells of about 2,000 atoms and more there is no
+  step cost.
+- **Decision:** the conductor puts the trade-off to the owner, and the code is unchanged.
+- **Records:** results/ab-constants-audit-20261030/mark-atoms-dynamic/.
+
+### tiles128 (128 rows and 8 warps against 64 and 4)
+
+Same-process A/Bs with the fixed tool, MH-1 hybrid float32 NVT 300 K, side b `TRITON_BLOCK_M=128`,
+`TRITON_NUM_WARPS=8`. Each side ran in one tile order: the old row-first order, or the new column order.
+`results/segment-gemm-order-20261030/tiles128.sh`. Figures are b/a, build order ab / ba.
+
+| Cell | Tile order | RTX 4000 Ada (leto) | RTX 5060 Ti (local) | A100-SXM4-40GB (Modal) |
+|---|---|---|---|---|
+| NbCl5 4×4×8, 9,216 atoms | rows | 0.999 / 0.996 | 1.001 / 1.002 | 1.021 / 1.021 |
+| | columns | **0.987 / 0.986** | 0.996 / 0.994 | 1.021 / 1.021 |
+| NbCl5 3×3×3, 1,944 atoms | rows | **0.990 / 0.989** | 1.017 / 1.004 | 1.000 / 1.000 |
+| | columns | **0.989 / 0.989** | 1.020 / 1.007 | 1.000 / 1.000 |
+| NaNbO3 3×3×3, 1,080 atoms | rows | **0.994 / 0.994** | 1.004 / 0.992 | 0.999 / 0.999 |
+| | columns | **0.995 / 0.994** | 1.001 / 0.996 | 0.999 / 1.000 |
+
+- **The 28 October verdict was the bug.** The screen called the tiles neutral, but on the RTX 4000 Ada they gain
+  0.5–1.4 % on every cell in both build orders.
+- **Elsewhere they do not.** The RTX 5060 Ti loses at NbCl5 1,944 atoms in both build orders. The A100 loses 2.1 %
+  at 9,216 atoms.
+- **The default (decision 66):** 128/8 is on for `NVIDIA RTX 4000 Ada Generation` only (`tile_rule.LARGE_TILE_GPUS`,
+  8b074e61). Every other GPU keeps 64/4. The products are bitwise equal: the new GPU test
+  `test_large_tiles_equal_the_default_tiles_bitwise` passed on the Ada.
+- **The A100:** Modal served an A100-SXM4-40GB for this run. The tile-order A/Bs had run on the 80 GB card, which
+  is the one `wprime_backward` defaults to.
+- **Records:** results/ab-constants-audit-20261030/tiles128/.
