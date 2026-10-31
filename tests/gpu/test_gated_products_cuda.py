@@ -36,6 +36,20 @@ def _case(atoms, seed=0):
                 inputs=[0, 1, 2, 3], width=at)
 
 
+def _check_one_segment(grad, wt, gated, gates, dgated, dgates, atoms, dim, mul):
+    """One gated segment's dgated and dgate against a float64 reference, the largest error relative to the largest
+    value at most 1e-6. Not an element-wise rtol/atol: dgate sums D products of K-long float32 sums, and where they
+    cancel (a value of 0.3 out of terms of order 10-100) float32 rounding exceeds atol = 1e-5 for any summation
+    order. On the RTX A4000 cuBLAS's own float32 product misses that by up to 2.4e-5, while both it and the kernels
+    stay within 4e-7 of the largest value (docs/validation/gated-unpadded.md)."""
+    drows = (grad.double().view(atoms * dim, mul) @ wt.double()).view(atoms, dim, mul)
+    want = {"dgated": (drows * gates.double()[:, None, :]).reshape(atoms * dim, mul),
+            "dgate": (drows * gated.double().view(atoms, dim, mul)).sum(1)}
+    for name, got in (("dgated", dgated), ("dgate", dgates)):
+        error = float((got.double() - want[name]).abs().max() / want[name].abs().max())
+        assert error <= 1e-6, f"D={dim} {name}: {error:.2e} of the largest value"
+
+
 def _both(case):
     leaves = (case["scalars"], case["gates"], *case["gated"])
     atoms = case["scalars"].shape[0]
@@ -100,9 +114,7 @@ def test_stacked_tile_has_no_register_spills(dim):
     dgated, dgates = torch.empty_like(gated), torch.empty_like(gates)
     compiled = gp._fused(grad, 0, mul, wt, gated, gates, 0, dgated, dgates, dim, "ieee")
     assert compiled.n_spills == 0, f"D={dim}: {compiled.n_regs} registers, {compiled.n_spills} spills"
-    drows = (grad.view(atoms * dim, mul) @ wt).view(atoms, dim, mul)
-    torch.testing.assert_close(dgated, (drows * gates[:, None, :]).reshape(atoms * dim, mul), rtol=1e-5, atol=1e-5)
-    torch.testing.assert_close(dgates, (drows * gated.view(atoms, dim, mul)).sum(1), rtol=1e-5, atol=1e-5)
+    _check_one_segment(grad, wt, gated, gates, dgated, dgates, atoms, dim, mul)
 
 
 @pytest.mark.parametrize("side", ["on", "off"])
@@ -139,6 +151,4 @@ def test_unpadded_kernel_on_one_segment(dim):
     gates = torch.rand((atoms, mul), generator=g, device="cuda")
     dgated, dgates = torch.empty_like(gated), torch.empty_like(gates)
     gp._fused_unpadded(grad, 0, mul, wt, gated, gates, 0, dgated, dgates, dim, "ieee")
-    drows = (grad.view(atoms * dim, mul) @ wt).view(atoms, dim, mul)
-    torch.testing.assert_close(dgated, (drows * gates[:, None, :]).reshape(atoms * dim, mul), rtol=1e-5, atol=3e-5)
-    torch.testing.assert_close(dgates, (drows * gated.view(atoms, dim, mul)).sum(1), rtol=1e-5, atol=3e-5)
+    _check_one_segment(grad, wt, gated, gates, dgated, dgates, atoms, dim, mul)
