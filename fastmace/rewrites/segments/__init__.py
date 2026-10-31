@@ -241,15 +241,6 @@ def _apply_region(model, context):
     return recompute_region(model, _atoms(context))
 
 
-def _support_region(model):
-    support = _support(model)
-    if not support.supported:
-        return support
-    if not any(getattr(interaction, "gated_rows", None) is not None for interaction in model.interactions):
-        return Support(False, "no gated_rows chain to join with its product block")
-    return support
-
-
 def _selfcheck_region(original, rewritten, context):
     """Each combined region against its stored chain, reshape and product block on probe rows (``_region_cases``)."""
     import torch
@@ -266,7 +257,7 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
         workload_constraints=(), apply=_apply, selfcheck=_selfcheck, memory=memory_terms.recompute_node_segments),
     "recompute_node_region": Rewrite(
-        name="recompute_node_region", applies_to=_support_region, requires=("recompute_node_segments",),
+        name="recompute_node_region", applies_to=_support, requires=("recompute_node_segments",),
         conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off",
         deterministic=True, workload_constraints=(), apply=_apply_region, selfcheck=_selfcheck_region,
         memory=memory_terms.recompute_node_region),
