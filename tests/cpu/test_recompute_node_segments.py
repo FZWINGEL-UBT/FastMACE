@@ -184,11 +184,8 @@ def test_region_record_is_the_last_rescue_rung_and_needs_the_segments():
     assert edge == 0 and node < 0 and record.memory is terms.recompute_node_region
 
 
-def test_the_chunk_count_overrides_the_rule_only_above_one(monkeypatch):
-    monkeypatch.setattr(segments, "REGION_CHUNKS", 1)
-    assert segments.region_chunks(21600) == segments._rule_chunks(21600)
-    monkeypatch.setattr(segments, "REGION_CHUNKS", 3)
-    assert segments.region_chunks(21600) == 3
+def test_four_atom_chunks_for_every_cell():
+    assert segments.REGION_CHUNKS == 4  # the lowest peak at 9,216, 21,600 and 43,200 atoms (chunked-region.md)
 
 
 @CUEQ

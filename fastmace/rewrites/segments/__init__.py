@@ -48,8 +48,11 @@ _PROBE_ROWS = 7
 # chain through its product block (modules.join_region). Combined kept 35 kB per atom fewer, but its recomputation set
 # the same compiled peak, at 1.24 times separate's step time, and fitted fewer atoms (capacity-T08-chunks.md).
 SEGMENT_REGION = "separate"
-# The combined region's atom chunks (ninth list item 2, screen): each chunk its own checkpoint.
-REGION_CHUNKS = 1
+# recompute_node_region's atom chunks, each its own checkpoint (ninth list item 2): one count for every cell. At NbCl5
+# 9,216, 21,600 and 43,200 atoms, 4 chunks set the lowest peak, 0.773-0.774 of the separate segments' (35.2 kB per
+# atom less at every size), at 1.22-1.24 times their force call; 2 kept more, and 8 or 16 more again, at every size
+# (docs/validation/chunked-region.md). An int for A/B sides; the "combined" screen above uses it too.
+REGION_CHUNKS = 4
 
 
 def _modules():
@@ -104,24 +107,12 @@ def recompute_segments(model):
     return names
 
 
-def region_chunks(atoms):
-    """The atom chunks of ``recompute_node_region``'s combined region for a cell of ``atoms`` atoms (the rule is set
-    from the chunk-count screens; ``REGION_CHUNKS`` above 1 overrides it for A/B sides)."""
-    if REGION_CHUNKS > 1:
-        return REGION_CHUNKS
-    return _rule_chunks(int(atoms))
-
-
-def _rule_chunks(atoms):
-    return 4
-
-
-def recompute_region(model, atoms):
+def recompute_region(model):
     """``recompute_node_region``: each interaction's separately recomputed ``gated_rows`` chain and product block
     (``recompute_node_segments``) become one checkpoint region from the chain through the product block, run in
-    ``region_chunks(atoms)`` atom chunks; returns their names."""
+    ``REGION_CHUNKS`` atom chunks; returns their names."""
     m = _modules()
-    chunks = region_chunks(atoms)
+    chunks = REGION_CHUNKS
     names = []
     for index, interaction in enumerate(getattr(model, "interactions", ())):
         chain = getattr(interaction, "gated_rows", None)
@@ -232,13 +223,8 @@ def _apply(model, context):
     return recompute_segments(model)
 
 
-def _atoms(context):
-    attrs = context.inputs.get("node_attrs") if context.inputs else None
-    return int(attrs.shape[0]) if attrs is not None else 1
-
-
 def _apply_region(model, context):
-    return recompute_region(model, _atoms(context))
+    return recompute_region(model)
 
 
 def _selfcheck_region(original, rewritten, context):
@@ -263,5 +249,4 @@ RECORDS = {
         memory=memory_terms.recompute_node_region),
 }
 
-__all__ = ["RECORDS", "REGION_CHUNKS", "SEGMENT_REGION", "recompute_region", "recompute_segments", "region_chunks",
-           "segments"]
+__all__ = ["RECORDS", "REGION_CHUNKS", "SEGMENT_REGION", "recompute_region", "recompute_segments", "segments"]
