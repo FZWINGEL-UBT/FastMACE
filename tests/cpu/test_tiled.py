@@ -381,3 +381,22 @@ def test_tiled_call_from_the_species_index_equals_the_one_hot_call_bitwise(mode)
 def test_species_index_refuses_unknown_values():
     with pytest.raises(ValueError, match="species"):
         TileConfig(5, species="bits")
+
+
+def test_field_built_with_its_one_hot_on_the_host_gives_bitwise_the_released_field():
+    """``MACEForceField(release_node_attrs=True)`` never puts the one-hot on the device (the construction's
+    species check and rewrites read it on the host, E0 is looked up there): the tiled call with the species index
+    is bitwise the one of a field released after construction, and the field refuses its own call."""
+    calc, atoms = calculator(), structure()
+    results = []
+    for at_build in (False, True):
+        field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                               rewrites=only(*MH1_PACKAGE), release_node_attrs=at_build)
+        assert field.node_attrs_released == at_build
+        tiled = TiledForceField(field, TileConfig(5, mode="padded", species="index"))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results.append(tiled.evaluate(strained(atoms), stress=True))
+        with pytest.raises(RuntimeError, match="node_attrs"):
+            field.evaluate(atoms)
+    assert results[0][0] == results[1][0]
+    assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
