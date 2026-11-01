@@ -1,0 +1,95 @@
+{
+ "structure": "NbCl5",
+ "atoms": 9261000,
+ "receivers": 4096,
+ "arms": [
+  "compiled",
+  "compiled+nooverlap"
+ ],
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "host": "murphy",
+ "source_commit": "aa313e49",
+ "builds": {
+  "compiled": 79.83579518797342
+ },
+ "warm": {
+  "compiled": [
+   192.65435537300073,
+   162.3402954969788
+  ],
+  "compiled+nooverlap": [
+   169.9529494990129,
+   167.48352830501972
+  ]
+ },
+ "list_cache_bytes": {
+  "compiled": 2507673000,
+  "compiled+nooverlap": 2507673000
+ },
+ "receivers_chosen": {
+  "compiled": 4096,
+  "compiled+nooverlap": 4096
+ },
+ "slot_changes": {
+  "compiled": 3,
+  "compiled+nooverlap": 3
+ },
+ "blocks": {
+  "compiled": [
+   161.05657930101734,
+   161.28227140399395,
+   161.4756126140128,
+   160.0501534449868
+  ],
+  "compiled+nooverlap": [
+   166.56915993895382,
+   168.11821450002026,
+   168.4077097090194,
+   168.95917781698518
+  ]
+ },
+ "medians": {
+  "compiled": 161.16942535250564,
+  "compiled+nooverlap": 168.26296210451983
+ },
+ "ratios": {
+  "compiled": 1.0,
+  "compiled+nooverlap": 1.0440129183094087
+ },
+ "gate": {
+  "compiled+nooverlap": {
+   "energy_diff_meV_per_atom": 9.885836775186265e-09,
+   "max_force_diff": 1.4118850231170654e-06,
+   "max_stress_diff": 2.9103830456733704e-11
+  }
+ },
+ "max_force": 0.0895853340625763,
+ "dynamo_counters": {
+  "frames": {
+   "total": 10,
+   "ok": 10
+  },
+  "stats": {
+   "calls_captured": 2505,
+   "unique_graphs": 9
+  },
+  "aot_autograd": {
+   "total": 9,
+   "autograd_cache_hit": 3,
+   "ok": 9,
+   "autograd_cache_bypass": 6
+  },
+  "inductor": {
+   "triton_bundler_load_static_autotuner": 426,
+   "async_compile_cache_miss": 1277,
+   "async_compile_cache_hit": 847,
+   "pad_rewritten_as_cat": 18,
+   "extern_calls": 308,
+   "fxgraph_cache_hit": 15,
+   "pattern_matcher_count": 354,
+   "pattern_matcher_nodes": 399,
+   "removed_pointless_view_pair": 18,
+   "decompose_mm_pointwise": 12
+  }
+ }
+}
