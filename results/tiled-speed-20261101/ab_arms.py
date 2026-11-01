@@ -1,8 +1,10 @@
 """Tiled call arms at scale, in one process (the speed phase).
 
 Arms (``--arms``, two or more): ``eager`` or ``compiled``, with suffixes ``+budget`` (budget_receivers (8192,
-16384); without it, none, whatever the default), ``+nocache`` (list_cache off) and ``+nooverlap`` (overlap off).
-The compiled
+16384); without it, none, whatever the default), ``+nocache`` (list_cache off), ``+nooverlap`` (overlap off) and
+``+old`` (the tiled call of an older tree, ``--old-tree``: its ``fastmace/model/tiled.py`` and
+``fastmace/neighbors/tile_list.py`` loaded as modules of their own, everything else this tree's; only for trees that
+differ from this one in those two files). The compiled
 arms run on a force field of the default compiled evaluation plan (its traceable model), the eager arms on one of
 the eager plan; both with their one-hot on the host, the force field's global list left empty (the tiles build
 their own, as ``tiled_capacity.py --tile-list``). Every arm: TileConfig(tile lists, the state on the host, the
@@ -34,6 +36,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "bench"))
 import tiled_capacity  # noqa: E402
 
 
+def old_tiled(tree):
+    """An older tree's tiled module, its tile list module beside it (both under names of their own)."""
+    import importlib.util
+
+    if "tiled_old" in sys.modules:
+        return sys.modules["tiled_old"]
+    for name, path, substitutions in (
+            ("tile_list_old", tree / "fastmace" / "neighbors" / "tile_list.py",
+             (("from .skin import", "from fastmace.neighbors.skin import"),)),
+            ("tiled_old", tree / "fastmace" / "model" / "tiled.py",
+             (("from fastmace.neighbors.tile_list import", "from tile_list_old import"),))):
+        source = path.read_text(encoding="utf-8")
+        for a, b in substitutions:
+            assert a in source, (path, a)
+            source = source.replace(a, b)
+        spec = importlib.util.spec_from_loader(name, loader=None, origin=str(path))
+        module = importlib.util.module_from_spec(spec)
+        module.__file__ = str(path)
+        sys.modules[name] = module
+        exec(compile(source, str(path), "exec"), module.__dict__)
+    return sys.modules["tiled_old"]
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--structure", default="NbCl5")
@@ -42,6 +67,7 @@ def main():
     p.add_argument("--arms", default="eager,compiled")
     p.add_argument("--blocks", type=int, default=4)
     p.add_argument("--calls", type=int, default=1)
+    p.add_argument("--old-tree", type=Path)
     p.add_argument("--output", required=True, type=Path)
     args = p.parse_args()
     from fastmace.model.compile import configure_allocator
@@ -76,11 +102,14 @@ def main():
                                                         release_node_attrs=True)
                 record["builds"][mode] = time.perf_counter() - started
             budget = (8192, 16384) if "+budget" in arm else ()
-            tiled[arm] = TiledForceField(fields[mode], TileConfig(args.receivers, mode=mode, neighbours="tiles",
-                                                                  state="host", alias_state=True, species="index",
-                                                                  budget_receivers=budget,
-                                                                  list_cache="+nocache" not in arm,
-                                                                  overlap="+nooverlap" not in arm))
+            options = dict(mode=mode, neighbours="tiles", state="host", alias_state=True, species="index",
+                           budget_receivers=budget, list_cache="+nocache" not in arm)
+            if "+old" in arm:
+                old = old_tiled(args.old_tree)
+                tiled[arm] = old.TiledForceField(fields[mode], old.TileConfig(args.receivers, **options))
+            else:
+                tiled[arm] = TiledForceField(fields[mode], TileConfig(args.receivers, overlap="+nooverlap" not in arm,
+                                                                      **options))
         positions = fields[arms[0].split("+")[0]]._prepare_one_off(atoms)
         outputs = {}
 
