@@ -1,7 +1,8 @@
 """Tiled call arms at scale, in one process (the speed phase).
 
 Arms (``--arms``, two or more): ``eager`` or ``compiled``, with suffixes ``+budget`` (budget_receivers (8192,
-16384); without it, none, whatever the default), ``+nocache`` (list_cache off), ``+nooverlap`` (overlap off) and
+16384); without it, none, whatever the default), ``+nocache`` (list_cache off), ``+reuse`` (list_reuse on:
+repeated calls on the same positions reuse the lists after the first), ``+nooverlap`` (overlap off) and
 ``+old`` (the tiled call of an older tree, ``--old-tree``: its ``fastmace/model/tiled.py`` and
 ``fastmace/neighbors/tile_list.py`` loaded as modules of their own, everything else this tree's; only for trees that
 differ from this one in those two files). The compiled
@@ -103,7 +104,8 @@ def main():
                 record["builds"][mode] = time.perf_counter() - started
             budget = (8192, 16384) if "+budget" in arm else ()
             options = dict(mode=mode, neighbours="tiles", state="host", alias_state=True, species="index",
-                           budget_receivers=budget, list_cache="+nocache" not in arm)
+                           budget_receivers=budget, list_cache="+nocache" not in arm,
+                           **({"list_reuse": True} if "+reuse" in arm else {}))
             if "+old" in arm:
                 old = old_tiled(args.old_tree)
                 tiled[arm] = old.TiledForceField(fields[mode], old.TileConfig(args.receivers, **options))

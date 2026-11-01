@@ -112,10 +112,11 @@ class TileNeighbours:
         return times_3x3(unit.to(torch.float64), self.cell).to(self.float_dtype)
 
     @classmethod
-    def like(cls, neighbours, cell=None):
-        """A ``TileNeighbours`` with a ``SkinNeighbourList``'s cutoff, float dtype, sender groups and current cell."""
+    def like(cls, neighbours, cell=None, cutoff=None):
+        """A ``TileNeighbours`` with a ``SkinNeighbourList``'s cutoff (or ``cutoff``: a search radius, e.g. cutoff +
+        skin), float dtype, sender groups and current cell."""
         if cell is None:
             cell = neighbours.cell_t if neighbours.variable_cell else neighbours.build_cell
         groups = neighbours.sender_groups if neighbours.sort_receivers else None
-        return cls(neighbours.cutoff, cell, neighbours.float_dtype, groups,
+        return cls(neighbours.cutoff if cutoff is None else cutoff, cell, neighbours.float_dtype, groups,
                    neighbours.group_count if groups is not None else 1, device=neighbours.device)

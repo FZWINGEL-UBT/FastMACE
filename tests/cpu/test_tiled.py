@@ -510,6 +510,46 @@ def test_tile_lists_built_once_per_call_are_bitwise_the_rebuilt_ones(mode, monke
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
 
 
+@pytest.mark.parametrize("stress", [False, True], ids=["fixed", "stress"])
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, stress, monkeypatch):
+    """``TileConfig.list_reuse``: the tiles' edges are searched within cutoff + skin and kept across calls with the
+    plan; while no atom has moved more than skin / 2 a call filters them at the cutoff (pairs cross it), bitwise a
+    fresh search on the same tiles; a larger move searches again."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=stress,
+                           rewrites=only(*MH1_PACKAGE))
+    kept = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse=True))
+    fresh = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles"))
+    x0 = field._prepare_one_off(atoms).clone()
+    rng = np.random.default_rng(5)
+    direction = torch.tensor(rng.normal(size=(len(atoms), 3)), dtype=x0.dtype)
+    direction /= direction.norm(dim=1, keepdim=True)
+    skin = field.neighbours.skin
+    for tiled in (kept, fresh):
+        tiled(x0)  # TorchScript's first call in a process rounds differently
+    assert kept.last["list_reused"] is False and kept.list_rebuilds == 1
+    edges0 = kept.last["edges"]
+    x1 = x0 + 0.4 * skin * direction
+    got = kept(x1)
+    assert kept.last["list_reused"] is True and kept.last["edges"] != edges0
+    tiles = [t.to(x0.device) for t in kept._kept["tiles"]]
+    grid = kept._kept["grid"]
+    original = tiled_module.plan_tiles
+    monkeypatch.setattr(tiled_module, "plan_tiles", lambda *a, **k: (tiles, grid))
+    expected = fresh(x1)
+    monkeypatch.setattr(tiled_module, "plan_tiles", original)
+    assert fresh.last["edges"] == kept.last["edges"]
+    assert torch.equal(got.energy, expected.energy) and torch.equal(got.forces, expected.forces)
+    kept(x0 + 0.6 * skin * direction)
+    assert kept.last["list_reused"] is False and kept.list_rebuilds == 2
+    kept.receivers = 30  # a new receiver cap (the budget's switch) plans again
+    kept(x0 + 0.6 * skin * direction)
+    assert kept.last["list_reused"] is False and kept.list_rebuilds == 3
+
+
 def test_list_cache_unit_shifts_one_byte_codes_or_int16_and_back_exactly():
     """The list cache keeps unit shifts in {-1, 0, 1}^3 as one byte (an index into the 27 combinations), larger
     ones (a cell shorter than the cutoff) as int16, and gives back the float unit shifts exactly; receiver counts at

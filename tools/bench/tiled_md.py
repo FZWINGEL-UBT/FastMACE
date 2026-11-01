@@ -51,6 +51,8 @@ def parse_args(argv=None):
                    help="TileConfig.species='index', the force field built with its one-hot on the host")
     p.add_argument("--integrator", choices=("host", "device", "both"), default="host",
                    help="where the integrator's state lives; both: two runs from the same start, compared bitwise")
+    p.add_argument("--list-reuse", action="store_true",
+                   help="TileConfig.list_reuse: the tiles' lists kept across steps within half the skin")
     p.add_argument("--no-list-cache", action="store_true",
                    help="TileConfig.list_cache=False: about 270 bytes per atom less on the host, the tiles' lists "
                         "searched every sweep")
@@ -145,6 +147,7 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False, integrat
         last = getattr(call, "last", None)
         if last is not None and "slots" in last:  # the padded slots after this step's call, and how often they changed
             rows[-1]["slot_changes"] = last.get("slot_changes")
+            rows[-1]["list_reused"], rows[-1]["list_rebuilds"] = last.get("list_reused"), last.get("list_rebuilds")
             rows[-1]["slots"] = {str(key): list(sizes) for key, sizes in last["slots"].items()}
             rows[-1]["slot_needs"] = {str(key): list(sizes) for key, sizes in last.get("slot_needs", {}).items()}
             rows[-1]["receivers"] = last.get("receivers")
@@ -213,7 +216,8 @@ def main(argv=None):
     field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index, **rows)
     config = TileConfig(args.receivers, mode=args.mode, neighbours="tiles" if args.tile_list else "global",
                         state="host" if args.host_state else "device", alias_state=args.alias_state,
-                        species="index" if args.species_index else "one_hot", list_cache=not args.no_list_cache)
+                        species="index" if args.species_index else "one_hot", list_cache=not args.no_list_cache,
+                        list_reuse=args.list_reuse)
     if args.bucket is not None:
         config = dataclasses.replace(config, bucket=args.bucket)
     tiled = TiledForceField(field, config)
