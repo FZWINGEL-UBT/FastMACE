@@ -37,7 +37,7 @@ def parse_args(argv=None):
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--repeat", required=True)
     p.add_argument("--receivers", type=int, default=4096)
-    p.add_argument("--mode", choices=("eager", "padded", "graphs", "compiled"), default="eager",
+    p.add_argument("--mode", choices=("eager", "padded", "graphs", "compiled", "auto"), default="eager",
                    help="TileConfig.mode; 'compiled' builds the compiled evaluation plan (its whole-system call is "
                         "then the compiled model's)")
     p.add_argument("--bucket", type=float, default=None, help="TileConfig.bucket (default: TileConfig's)")
@@ -61,6 +61,32 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
+def _reset_host_peak():
+    """Reset the process's peak resident set (VmHWM) where Linux allows it, so each call's peak is its own."""
+    try:
+        with open("/proc/self/clear_refs", "w") as handle:
+            handle.write("5")
+    except OSError:
+        pass
+
+
+def _host_memory():
+    """The process's current and peak resident bytes (VmRSS, VmHWM; ``None`` off Linux), and the machine's total."""
+    values = {}
+    try:
+        with open("/proc/self/status") as handle:
+            for line in handle:
+                key, _, rest = line.partition(":")
+                if key in ("VmRSS", "VmHWM"):
+                    values[key] = int(rest.split()[0]) * 1024
+        with open("/proc/meminfo") as handle:
+            values["MemTotal"] = int(handle.readline().split()[1]) * 1024
+    except OSError:
+        pass
+    return dict(host_rss_bytes=values.get("VmRSS"), host_peak_bytes=values.get("VmHWM"),
+                host_total_bytes=values.get("MemTotal"))
+
+
 def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False, integrator="device"):
     """``integrator`` "host": the positions, velocities, forces and masses (float64) stay on the host, and each call
     gets a device copy of the positions (freed after the call), so at the largest sizes the device holds no more
@@ -81,9 +107,28 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False, integrat
     x = field._prepare_one_off(atoms).clone().to(device)
     dt = dt_fs * FS
 
+    memory = []  # per call: the device's peak and reserved bytes, the host's resident and peak bytes, mode, R
+
     def force(x):
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats(field.device)
+        _reset_host_peak()
+        call_started = time.perf_counter()
         out = call(x.to(field.device))
-        return out, out.forces.detach().to(device).double()
+        forces = out.forces.detach().to(device).double()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(field.device)
+        last = getattr(call, "last", {}) or {}
+        memory.append(dict(call_seconds=time.perf_counter() - call_started,
+                           gpu_peak_bytes=int(torch.cuda.max_memory_allocated(field.device))
+                           if torch.cuda.is_available() else None,
+                           gpu_reserved_bytes=int(torch.cuda.max_memory_reserved(field.device))
+                           if torch.cuda.is_available() else None,
+                           gpu_total_bytes=int(torch.cuda.get_device_properties(field.device).total_memory)
+                           if torch.cuda.is_available() else None,
+                           **_host_memory(), mode=last.get("mode"), mode_reason=last.get("mode_reason"),
+                           call_receivers=last.get("receivers"), list_cache_bytes=last.get("list_cache_bytes")))
+        return out, forces
 
     out, f = force(x)
     if shadow:  # the device integrator's state, from the same start
@@ -96,7 +141,7 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False, integrat
         rows.append(dict(step=step, epot=float(out.energy.reshape(-1)[0]), ekin=kinetic,
                          etot=float(out.energy.reshape(-1)[0]) + kinetic,
                          edges=int(getattr(call, "last", {}).get("edges", field.edge_count)),
-                         rebuilds=rebuilds, seconds=time.perf_counter() - started))
+                         rebuilds=rebuilds, seconds=time.perf_counter() - started, **memory[-1]))
         last = getattr(call, "last", None)
         if last is not None and "slots" in last:  # the padded slots after this step's call, and how often they changed
             rows[-1]["slot_changes"] = last.get("slot_changes")
@@ -156,7 +201,7 @@ def main(argv=None):
     user = fm.ForceField(fm.load(args.model), atoms, precision="float32")
     planner = minimal.default_planner(user)
     plan = planner.plan_evaluation(user, atoms)
-    if args.mode != "compiled":
+    if args.mode not in ("compiled", "auto"):  # "auto" (TileConfig's default) needs the compiled plan
         plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                       dynamic_edges=False))
     if args.tile_list and args.path != "tiled":
