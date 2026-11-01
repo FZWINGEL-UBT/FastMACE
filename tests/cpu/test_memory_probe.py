@@ -96,9 +96,11 @@ def test_a_probed_estimate_keeps_its_fixed_part_and_scales_the_rest():
     assert corrected.total == pytest.approx(GIB / 4 + 3 * GIB * 0.5 * memory.PROBE_HEADROOM, abs=1)
     assert memory.probe_corrected(corrected) and not memory.probe_corrected(estimate)
     assert corrected.term(memory.PROBE_TERM) == corrected.total - estimate.total
-    # "short by far": a corrected estimate overstates by the headroom only
-    free = corrected.total / memory.MARGIN / 1.1
-    assert memory.short_by_far(corrected, free) and not memory.short_by_far(estimate, free)
+    # "short by far": a corrected estimate overstates by the headroom only, an estimate by RESCUE_OVERSTATEMENT
+    free = corrected.total / memory.MARGIN / 1.2
+    same = memory.MemoryEstimate(terms=(("activations", corrected.total),), edges=1, nodes=1, capacity=0,
+                                 dtype="float32")
+    assert memory.short_by_far(corrected, free) and not memory.short_by_far(same, free)
 
 
 def planner_plan(planner, memory_bytes, rewrites, atoms):
@@ -195,7 +197,6 @@ def test_the_option_and_its_rule():
     _, choice, reason = plan.decision("EngineConfig.memory_probe")
     assert choice == "near-limit" and "auto (near_limit_for_md_on_cuda)" in str(reason)
     assert plan.engine.memory_probe == "near-limit"
-    assert tmp.plan_label("mh1-r2scan").decision("EngineConfig.memory_probe")[1] == "off"  # CPU
 
 
 # --------------------------------------------------------------------------- Simulation
@@ -231,6 +232,7 @@ def forced_probe(monkeypatch):
 
 def test_nothing_is_probed_on_the_cpu(loaded):
     sim = tc.simulation(loaded)
+    assert sim.plan.engine.memory_probe == "off" and sim.plan.decision("EngineConfig.memory_probe")[1] == "off"
     assert sim.plan.memory_ladder is None and sim.plan.memory_probe is None
     assert "memory_probe" not in sim.report.setup_s
     assert all(not text.startswith("memory:") for text in sim.report.text().splitlines())
@@ -245,8 +247,8 @@ def test_a_probe_is_recorded_and_a_resume_plans_with_its_scales(loaded, forced_p
     record = sim.plan.memory_probe
     assert record is not None and record.stages[0].scale == 0.75 and not record.changed_plan
     assert sim.report.setup_s["memory_probe"] == record.setup_s
-    assert any(text.startswith("memory: memory probe kept the default stage") for text in
-               sim.report.text().splitlines())
+    line = next(text for text in sim.report.text().splitlines() if text.startswith("memory:"))
+    assert line.split(":", 1)[1].strip().startswith("memory probe kept the default stage; default: replica 64 atoms")
     assert "memory probe: kept the default" in str(sim.plan)
     assert memory.PROBE_TERM in str(sim.plan.decision("memory")[2])
     sim.run(steps=2)

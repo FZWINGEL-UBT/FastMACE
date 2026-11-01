@@ -389,7 +389,7 @@ def fixed_bytes(estimate_: MemoryEstimate) -> int:
 
 def probe_corrected(estimate_: MemoryEstimate) -> bool:
     """Whether the memory probe corrected the estimate (it has the ``PROBE_TERM``)."""
-    return any(name == PROBE_TERM for name, _ in estimate_.terms)
+    return any(name == PROBE_TERM for name, _ in getattr(estimate_, "terms", ()))
 
 
 def probed(estimate_: MemoryEstimate, scale: float, headroom: float = PROBE_HEADROOM) -> MemoryEstimate:

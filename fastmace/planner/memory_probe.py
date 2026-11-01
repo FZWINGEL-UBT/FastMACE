@@ -142,11 +142,10 @@ def _in_first_cell(frac, repeats, tolerance):
     """The atoms whose positions lie in the first of the ``repeats`` sub-cells (one image of each)."""
     import numpy as np
 
-    scaled = frac * np.asarray(repeats)
-    # an atom at the sub-cell's far face (within the tolerance) belongs to the next sub-cell
-    near_face = np.abs(scaled - np.round(scaled)) <= tolerance * np.asarray(repeats)
-    scaled = np.where(near_face, np.round(scaled), scaled)
-    return np.all(scaled < 1.0, axis=1)
+    counts = np.asarray(repeats)
+    # an atom at a sub-cell's far face (within the tolerance) belongs to the next sub-cell, periodically
+    index = np.floor(frac * counts + tolerance * counts).astype(int) % counts
+    return np.all(index == 0, axis=1)
 
 
 def replica(atoms: Any, size: tuple[int, int] = REPLICA_ATOMS,
