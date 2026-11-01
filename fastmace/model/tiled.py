@@ -349,6 +349,7 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     The fractional coordinates are reduced in place and the block index is computed in chunks, so the plan's
     whole-system transients stay small (tiled-call-memory.md); the values are the unchunked ones.
     """
+    import numpy as np
     import torch
 
     from fastmace.neighbors.tile_list import CHUNK
@@ -381,21 +382,21 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
                          for piece in range(start, start + count, receivers))
             start += count
         return tiles, tuple(k)
+    # A piece ends before the first atom i that would take it to ``receivers`` atoms or past ``edges`` edges, and
+    # holds at least one atom: with the cumulative degrees c (c[i] the edges of the atoms before i), the edge cap
+    # cuts at j - 1 for the first j with c[j] > c[piece] + edges. One search per piece, not a loop per atom.
     degree = (row_ptr[1:] - row_ptr[:-1])[order].cpu()
+    cumulative = torch.cat([torch.zeros(1, dtype=torch.int64), torch.cumsum(degree, 0)]).numpy()
     tiles = []
     start = 0
     for count in counts:
         stop = start + count
         piece = start
-        edge_sum = 0
-        for i in range(start, stop):
-            d = int(degree[i])
-            if i > piece and (i - piece >= receivers or edge_sum + d > edges):
-                tiles.append(order[piece:i])
-                piece, edge_sum = i, 0
-            edge_sum += d
-        if stop > piece:
-            tiles.append(order[piece:stop])
+        while piece < stop:
+            over = int(np.searchsorted(cumulative, cumulative[piece] + edges, side="right"))
+            cut = min(piece + receivers, max(over - 1, piece + 1), stop)
+            tiles.append(order[piece:cut])
+            piece = cut
         start = stop
     return tiles, tuple(k)
 
