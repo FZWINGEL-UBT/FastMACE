@@ -865,6 +865,7 @@ class TiledForceField:
         keys = self._slot_keys(tiles, source, local_of, n) if padded else None
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
+            stats["slot_needs"] = {key: self.slot_needs[key] for key in sorted(self.slot_needs)}
             stats["slot_changes"] = self.slot_changes
         if not self._released and self.device.type == "cuda":
             # The force field's construction leaves its peak in PyTorch's cache; libraries that allocate outside
@@ -1048,8 +1049,10 @@ class TiledForceField:
         step = self._edge_step
         keys = [max(1, math.ceil(e / step)) for _, _, e in sizes]
         head = 1.0 + float(self.config.headroom)
+        self.slot_needs = {}  # each bucket's largest tile sizes this call, before headroom (the call's report)
         for key in set(keys):
             members = [size for size, k in zip(sizes, keys) if k == key]
+            self.slot_needs[key] = tuple(max(size[i] for size in members) for i in range(3))
             # Receivers with headroom too (tiles are planned again every call, so their sizes move a little), but
             # never past the cap, which no tile exceeds: full tiles keep their slot.
             rows = min(self.receivers, n,  # nor the atom count

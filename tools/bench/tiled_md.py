@@ -78,6 +78,13 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False):
                          etot=float(out.energy.reshape(-1)[0]) + kinetic,
                          edges=int(getattr(call, "last", {}).get("edges", field.edge_count)),
                          rebuilds=rebuilds, seconds=time.perf_counter() - started))
+        last = getattr(call, "last", None)
+        if last is not None and "slots" in last:  # the padded slots after this step's call, and how often they changed
+            rows[-1]["slot_changes"] = last.get("slot_changes")
+            rows[-1]["slots"] = {str(key): list(sizes) for key, sizes in last["slots"].items()}
+            rows[-1]["slot_needs"] = {str(key): list(sizes) for key, sizes in last.get("slot_needs", {}).items()}
+            rows[-1]["receivers"] = last.get("receivers")
+            rows[-1]["max_halo"], rows[-1]["max_edges"] = last.get("max_halo"), last.get("max_edges")
         if step == steps:
             break
         v = v + 0.5 * dt * f / masses
