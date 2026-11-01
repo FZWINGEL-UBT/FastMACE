@@ -407,6 +407,41 @@ def _split_block(cumulative, start, stop, receivers, edges):
     return pieces
 
 
+_UNIT_WEIGHTS = (9, 3, 1)  # a unit shift in {-1, 0, 1}^3 as one byte: sum((u + 1) * w), 0..26
+
+
+def _pack_units(unit):
+    """A tile's unit shifts [E, 3] (integer valued, float) for the list cache: one byte each when all lie in
+    {-1, 0, 1}^3 (every cell longer than the search radius), else int16; None when they exceed int16."""
+    import torch
+
+    if unit.numel() == 0 or float(unit.abs().max()) <= 1:
+        weights = torch.tensor(_UNIT_WEIGHTS, dtype=unit.dtype, device=unit.device)
+        return ((unit + 1) * weights).sum(1).to(torch.uint8)
+    if float(unit.abs().max()) < 2**15:
+        return unit.to(torch.int16)
+    return None
+
+
+def _unpack_units(packed, dtype, device):
+    """The float unit shifts [E, 3] of ``_pack_units``' result, exactly."""
+    import torch
+
+    if packed.dtype != torch.uint8:
+        return packed.to(dtype)
+    codes = torch.arange(27, device=device)
+    table = torch.stack([codes // 9, codes // 3 % 3, codes % 3], dim=1).to(dtype) - 1
+    return table[packed.long()]
+
+
+def _narrow_counts(counts):
+    """Per-receiver edge counts at the narrowest integer dtype that holds them (uint8, int16 or int32)."""
+    import torch
+
+    top = int(counts.max()) if counts.numel() else 0
+    return counts.to(torch.uint8 if top < 2**8 else torch.int16 if top < 2**15 else torch.int32)
+
+
 class TiledForceField:
     """The tiled three-sweep force call around an eager ``MACEForceField`` (``field``, ``compile_mode="none"``).
 
@@ -503,11 +538,11 @@ class TiledForceField:
         start = r if halo_start is None else int(halo_start)
         ei, shifts = source(receivers)
         senders = ei[0]
-        local_of[receivers] = torch.arange(r, device=self.device)
+        local_of[receivers] = torch.arange(r, dtype=local_of.dtype, device=self.device)
         outside = senders[local_of[senders] < 0]
         halo = torch.unique(outside)
-        local_of[halo] = torch.arange(start, start + halo.shape[0], device=self.device)
-        local = torch.stack([local_of[senders], local_of[ei[1]]])
+        local_of[halo] = torch.arange(start, start + halo.shape[0], dtype=local_of.dtype, device=self.device)
+        local = torch.stack([local_of[senders], local_of[ei[1]]]).long()  # local_of is int32
         local_of[receivers] = -1
         local_of[halo] = -1
         return torch.cat([receivers, halo]), ei, shifts, local, r, halo.shape[0]
@@ -526,16 +561,19 @@ class TiledForceField:
             cache = self._list_cache = {} if self.config.list_cache and n < 2**31 else None
 
             def tiles(receivers):
-                """The tile's (global edge index, shifts): searched once per call, then from the host cache."""
+                """The tile's (global edge index, shifts): searched once per call, then from the host cache (int32
+                senders, the receivers' edge counts at their narrowest dtype, the unit shifts packed)."""
                 key = receivers.data_ptr()  # the call's tile tensors live through all its sweeps
                 if cache is not None and key in cache:
-                    sender, counts, unit = (t.to(self.device) for t in cache[key])
-                    receiver = receivers.repeat_interleave(counts, output_size=sender.shape[0])
-                    return torch.stack([sender.long(), receiver]), bins.shifts(unit.to(bins.float_dtype))
+                    sender, counts, packed = (t.to(self.device) for t in cache[key])
+                    receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
+                    unit = _unpack_units(packed, bins.float_dtype, self.device)
+                    return torch.stack([sender.long(), receiver]), bins.shifts(unit)
                 sender, receiver, unit, shifts = bins.edges(receivers)
-                if cache is not None and (unit.numel() == 0 or float(unit.abs().max()) < 2**15):
+                packed = _pack_units(unit) if cache is not None else None
+                if packed is not None:
                     counts = torch.bincount(torch.searchsorted(receivers, receiver), minlength=receivers.shape[0])
-                    cache[key] = (sender.to(torch.int32).cpu(), counts.cpu(), unit.to(torch.int16).cpu())
+                    cache[key] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(), packed.cpu())
                 return torch.stack([sender, receiver]), shifts
 
             # No degrees before the tiles' builds: the tiles are planned by receivers only.
@@ -854,7 +892,7 @@ class TiledForceField:
             2**62 if degree is None else max(1, int(math.ceil(2 * self.receivers * degree))))
         cell = data["cell"].reshape(3, 3) if "cell" in data else torch.as_tensor(field.neighbours.cell)
         tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
-        local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
+        local_of = torch.full((n,), -1, dtype=torch.int32, device=self.device)  # int32: 4 bytes per atom
         measure = (not self._budgeted or self._auto) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
