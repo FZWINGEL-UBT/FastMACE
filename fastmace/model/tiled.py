@@ -1038,7 +1038,11 @@ class TiledForceField:
         largest tile (``TileConfig.bucket`` of its edges, at least 256, a multiple of 256). A slot holds one
         receiver row more than the largest of its tiles with ``TileConfig.headroom``, at most the receiver cap (the
         extra row is the padding receiver), their halo with the same headroom and its bucket's edge count. A slot
-        grows (and its graphs and compiled shapes go) only when a tile does not fit it."""
+        grows (and its graphs and compiled shapes go) only when a tile does not fit it: the fit test takes the tiles'
+        own sizes, the headroom is for sizing only (in MD the tiles' sizes move a little every step). An exceeded
+        size grows by at least a quarter of the largest slot's in that size: the large slot's sizes drift by a few per
+        cent in MD, while a small slot (the remainder pieces of blocks just above the cap) can triple
+        (tiled-slot-growth.md)."""
         sizes = []
         for receivers in tiles:
             _, ei, _, _, r, h = self._tile_graph(receivers, source, local_of)
@@ -1059,14 +1063,17 @@ class TiledForceField:
                        math.ceil(max(r for r, _, _ in members) * head))
             need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
                     key * step)
+            raw = (self.slot_needs[key][0] + 1,) + self.slot_needs[key][1:]  # one padding row
             slot = self._slots.get(key)
-            if slot is None or any(a > b for a, b in zip(need, slot["sizes"])):
+            if slot is None or any(a > b for a, b in zip(raw, slot["sizes"])):
                 if slot is None:
                     grown = need
-                else:  # an exceeded size grows by at least a quarter (receivers at most the cap), so a slot changes
-                    # a few times, not once per tile a little larger than the last
+                else:  # an exceeded size grows by at least a quarter of the largest slot's (receivers at most the
+                    # cap), so a slot changes a few times, not once per tile a little larger than the last
                     rows_cap = min(self.receivers, n) + 1
-                    grown = tuple(b if a <= b else max(a, math.ceil(1.25 * b)) for a, b in zip(need, slot["sizes"]))
+                    largest = [max(other["sizes"][i] for other in self._slots.values()) for i in range(3)]
+                    grown = tuple(b if a <= b else max(c, b + math.ceil(0.25 * top))
+                                  for a, b, c, top in zip(raw, slot["sizes"], need, largest))
                     grown = (min(grown[0], max(rows_cap, need[0])), grown[1], grown[2])
                 self._slots[key] = self._new_slot(grown)
                 self.slot_changes += 1
