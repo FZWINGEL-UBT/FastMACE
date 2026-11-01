@@ -59,7 +59,8 @@ def test_the_record_is_exact_off_and_rescued_between_the_other_two():
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")
     model, _ = tiny("mh1")
     dims = capabilities.model_dims(model)
-    assert record.memory(dims, 4) == (0, 0, terms._FIRST_TABLE_KEEP) and 0 < terms._FIRST_TABLE_KEEP < 1
+    # an edge-side rung: it keeps a fraction of the per-edge remainder only (docs/validation/estimate-band.md)
+    assert record.memory(dims, 4) == (0, 0, terms._FIRST_TABLE_KEEP, 1.0) and 0 < terms._FIRST_TABLE_KEEP < 1
     assert record.memory is terms.recompute_first_table
 
 

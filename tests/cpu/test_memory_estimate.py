@@ -170,23 +170,66 @@ def test_rule_12_counts_the_edges_in_the_structure():
     assert f"at {expected} edges" in str(plan().decision("memory")[2])
 
 
-def test_rescue_terms_keep_a_fraction_of_the_remaining_activations():
-    """docs/validation/estimate-refit.md: a memory-rescue record's term is the fraction of the remaining activations
-    (SAFETY times the activations and the additive terms) it keeps, so the estimate's overstatement shrinks with the
-    peak; its reported bytes are what it removes from the running remainder."""
+def _sides(dims, edges, nodes, terms=()):
+    """The run's per-edge and per-node remainders (activations and additive terms, after SAFETY), each from an
+    estimate with the other size set to zero."""
+    def remainder(e, n):
+        est = memory.estimate(dims, edges=e, nodes=n, dtype="float32", workspace=False, rewrite_terms=terms)
+        return est.term("activations") + est.term("rewrites")
+
+    return remainder(edges, 0), remainder(0, nodes)
+
+
+def test_rescue_terms_keep_a_fraction_of_their_own_side():
+    """docs/validation/estimate-band.md: a memory-rescue record keeps a fraction of the remaining per-edge
+    activations (``edge_keep``) or of the remaining per-node activations (``node_keep``; SAFETY times the
+    activations and the additive terms of that side), never of the other side's: the edge-side rungs recompute
+    per-edge tensors, the node-side rungs per-node ones, so a crystal with more edges per atom saves more from the
+    first and less from the second. The reported bytes are what each removes from the running remainder."""
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
-    base = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False,
-                           rewrite_terms=(("a", memory.MemoryTerm(edge_bytes=-8.0)),))
-    half = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False,
-                           rewrite_terms=(("a", memory.MemoryTerm(edge_bytes=-8.0)),
-                                          ("k", memory.MemoryTerm(keep=0.5)), ("q", memory.MemoryTerm(keep=0.5))))
-    remaining = base.term("activations") + base.term("rewrites")
-    kept = half.term("activations") + half.term("rewrites")
-    assert kept == pytest.approx(remaining / 4, rel=1e-6)
-    saved = dict(half.rewrite_terms)
-    assert saved["k"] == pytest.approx(-remaining / 2, rel=1e-6) and saved["q"] == pytest.approx(-remaining / 4,
-                                                                                                    rel=1e-6)
-    assert half.total < base.total
+    a = ("a", memory.MemoryTerm(edge_bytes=-8.0, node_bytes=-4.0))
+    edge, node = _sides(dims, 10_000, 500, (a,))
+    rungs = (a, ("e", memory.MemoryTerm(edge_keep=0.5)), ("n", memory.MemoryTerm(node_keep=0.25)),
+             ("q", memory.MemoryTerm(edge_keep=0.5)))
+    edge_kept, node_kept = _sides(dims, 10_000, 500, rungs)
+    assert edge_kept == pytest.approx(edge / 4, rel=1e-6) and node_kept == pytest.approx(node / 4, rel=1e-6)
+    both = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False, rewrite_terms=rungs)
+    saved = dict(both.rewrite_terms)
+    assert saved["e"] == pytest.approx(-edge / 2, rel=1e-6) and saved["q"] == pytest.approx(-edge / 4, rel=1e-6)
+    assert saved["n"] == pytest.approx(-node * 3 / 4, rel=1e-6)
+    base = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False, rewrite_terms=(a,))
+    assert both.run - base.run == pytest.approx(saved["e"] + saved["n"] + saved["q"], abs=4)
+
+
+def test_the_rescue_stage_sets_the_allocator_reserve():
+    """docs/validation/estimate-band.md: the caching allocator reserves more than the live peak, by a ratio that is
+    stable across sizes for one stage of the memory rescue but differs between stages (graph-pool packing). The
+    deepest rung taken names the stage (``rescue_stage``); its ``RESCUE_RESERVE`` factor multiplies the kept
+    remainder and shows as the "allocator reserve" term. The default plan (no rung) keeps SAFETY's fit unchanged."""
+    assert memory.rescue_stage([]) == ""
+    assert memory.rescue_stage(["recompute_conv_weights", "gate_epilogue"]) == "recompute_conv_weights"
+    assert memory.rescue_stage(["recompute_conv_weights", "recompute_first_table", "recompute_node_segments",
+                                "gate_epilogue"]) == "recompute_node_segments"
+    # gate_epilogue off after the node segments is its own rung
+    assert memory.rescue_stage(["recompute_conv_weights", "recompute_first_table",
+                                "recompute_node_segments"]) == "gate_epilogue"
+    assert memory.rescue_stage(["recompute_node_segments", "recompute_node_region", "gate_epilogue"]) == (
+        "recompute_node_region")
+    stages = dict(memory.RESCUE_RESERVE)
+    assert set(stages) == set(memory.MEMORY_RESCUE) and all(0.5 < f < 1.5 for f in stages.values())
+    dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
+
+    def run(names):
+        terms = tuple((n, memory.MemoryTerm(edge_keep=0.5)) for n in names)
+        return memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False, rewrite_terms=terms)
+
+    plain = run([])
+    assert plain.term("allocator reserve") == 0
+    conv = run(["recompute_conv_weights"])
+    kept = conv.term("activations") + conv.term("rewrites")
+    assert conv.term("allocator reserve") == pytest.approx((stages["recompute_conv_weights"] - 1) * kept, abs=2)
+    assert conv.run == pytest.approx(plain.run + dict(conv.rewrite_terms)["recompute_conv_weights"]
+                                     + conv.term("allocator reserve"), abs=4)
 
 
 # --------------------------------------------------------------------------- the rewrites' terms
@@ -583,23 +626,26 @@ def test_gate_epilogue_s_term_depends_on_the_node_segments():
     registry = _rewrite_registry()
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert registry["gate_epilogue"].memory is terms.gate_epilogue
-    edge, node, keep = terms.gate_epilogue(dims, 4)
-    assert edge == node == 0 and keep > 1
+    edge, node, edge_keep, keep = terms.gate_epilogue(dims, 4)
+    assert edge == node == 0 and edge_keep == 1 and keep > 1
     alone = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue"], "float32"))
-    assert alone["gate_epilogue"].keep == keep
+    assert alone["gate_epilogue"].node_keep == keep and alone["gate_epilogue"].edge_keep == 1
     segments = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue", "recompute_node_segments"],
                                                 "float32"))
-    assert segments["gate_epilogue"].keep == terms.gate_epilogue_in_segments(dims, 4)[2] > keep
+    assert segments["gate_epilogue"].node_keep == terms.gate_epilogue_in_segments(dims, 4)[3] > keep
     region = dict(memory.rewrite_memory_terms(
         registry, dims, ["gate_epilogue", "recompute_node_segments", "recompute_node_region"], "float32"))
     assert "gate_epilogue" not in region and "recompute_node_region" in region
 
 
 @pytest.mark.rule(12)
-def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments():
+def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments(monkeypatch):
     """docs/validation/region-norm.md: gate_epilogue (on by decision 66 on this file's GPU) stays on while the plan
     fits, and while it fits with recompute_node_segments on; otherwise rule 12 turns it off, the memory rescue's
-    fourth rung, with its own reason. The caller's explicit "on" is kept."""
+    fourth rung, with its own reason. The caller's explicit "on" is kept. The stages' allocator reserve is neutral
+    here: fitted on MH-1's widths (the rung lowers its estimate by 3.5-4.5 %, docs/validation/estimate-band.md), it
+    would outweigh the rung on the tiny model, whose kept remainder is mostly per edge."""
+    monkeypatch.setattr(memory, "RESCUE_RESERVE", tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE))
     assert memory.RESCUE_OFF == ("gate_epilogue",) and memory.rescue_value("gate_epilogue") == "off"
     full = plan(label=MH1)
     assert full.rewrites.gate_epilogue == full.rewrites.wprime_backward == "on"
@@ -623,8 +669,10 @@ def test_rule_12_gives_gate_epilogue_back_with_the_chunked_region(monkeypatch):
     """docs/validation/region-norm.md: when the rescue ends with recompute_node_region on, gate_epilogue keeps 0.5 kB
     per atom inside its chunks, so rule 12 turns it on again where the estimate still fits with it. The tiny model
     saves too little for rule 12 to take the rungs itself (``short_by_far``), so the overstatement is set to 1, and
-    reassociate_first is set on, so that decision 51 drops nothing first."""
+    reassociate_first is set on, so that decision 51 drops nothing first. The stages' allocator reserve is neutral,
+    as in the test above."""
     monkeypatch.setattr(memory, "RESCUE_OVERSTATEMENT", 1.0)
+    monkeypatch.setattr(memory, "RESCUE_RESERVE", tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE))
     atoms = nacl(repeat=16)
     base = RewriteConfig(reassociate_first="on")
     full = plan(rewrites=base, atoms=atoms, label=MH1)

@@ -1,0 +1,22 @@
+fractions: _CONV_WEIGHTS_KEEP 0.081, _FIRST_TABLE_KEEP 0.391, _NODE_SEGMENTS_KEEP 0.640, _GATE_EPILOGUE_SEGMENTS_KEEP 1.256, _NODE_REGION_KEEP 0.646, _GATE_EPILOGUE_KEEP 1.056 (region with gate_epilogue / without: 1.007)
+MH-1 streaming share, float32: 2291 of 8265 floats
+reserve default                   envelope 0.837 (NbCl5 21600) -> 0.840; held out needs 0.796 (19360)
+reserve gate_epilogue             envelope 0.995 (SrTiO3 24565) -> 0.995; held out needs 1.000 (19360)
+reserve recompute_conv_weights    envelope 0.852 (NbCl5 21600) -> 0.855; held out needs 0.848 (39200)
+reserve recompute_first_table     envelope 0.848 (NbCl5 21600) -> 0.850; held out needs 0.826 (19360)
+reserve recompute_node_region     envelope 0.899 (SrTiO3 78125) -> 0.900; held out needs 0.835 (39200)
+reserve recompute_node_segments   envelope 0.843 (NbCl5 21600) -> 0.845; held out needs 0.810 (19360)
+
+                               n  est/reserved    est/allocated  reserved/allocated  edges/atom
+fit  Ada Generation NaTaO3  16  1.010-1.247   1.220-1.459   1.080-1.264      84.0
+fit  Ada Generation NbCl5   20  1.019-1.228   1.207-1.425   1.123-1.361      27.6
+fit  Ada Generation SrTiO3  17  1.000-1.283   1.225-1.453   1.081-1.442      77.7
+fit  IDIA RTX A4000 NaCl    18  1.014-1.233   1.208-1.424   1.071-1.254      33.6
+fit  ce RTX 5060 Ti NbCl5   14  1.002-1.195   1.178-1.382   1.118-1.223      27.6
+held IDIA RTX A4000 NaNbO3  17  0.996-1.248   1.225-1.456   1.078-1.435      81.5
+
+by stage: s0-default 1.188-1.283; s1-conv 1.004-1.048; s2-table 1.003-1.039; s3-segments 1.002-1.133; s4-geoff 0.996-1.228; s5-region 1.001-1.105; s6-region-ge 1.030-1.104
+all rescue points: est/reserved 0.996-1.283; est/allocated 1.178-1.459
+fit (60): 1.006-1.210
+capacity (28): 1.029-1.235
+RESCUE_RESERVE = (('recompute_conv_weights', 0.855), ('recompute_first_table', 0.85), ('recompute_node_segments', 0.845), ('gate_epilogue', 0.995), ('recompute_node_region', 0.9))

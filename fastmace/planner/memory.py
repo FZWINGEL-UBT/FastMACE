@@ -73,6 +73,32 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
                  ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"))
 
 
+# The caching allocator's reserve above the live peak differs per stage of the memory rescue (the graph pool's packing
+# slack: reserved / allocated 1.07-1.44 over the matrix, stable within 1.5 % across sizes for one crystal and stage,
+# the same on Linux and WSL2), so each stage scales the kept activations by its own factor, named by the deepest rung
+# taken (``rescue_stage``): the upper envelope over the rescue matrix of what keeps every point at or above its
+# measured peak (docs/validation/estimate-band.md). Relative to the default plan, whose reserve SAFETY's fit covers.
+# Cells of at least 15,000 atoms (the rescue is never planned below; there the build's fixed transient sets the
+# peak). Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's
+# rung at 1 (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
+RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84),
+                  ("gate_epilogue", 1.0), ("recompute_node_region", 0.9))
+
+
+def rescue_stage(enabled) -> str:
+    """The deepest memory-rescue rung among ``enabled`` (record names; gate_epilogue's rung is taken when it is off
+    with the node segments on): ``RESCUE_RESERVE``'s key, or "" for the default plan."""
+    enabled = set(enabled)
+    if "recompute_node_region" in enabled:
+        return "recompute_node_region"
+    if "recompute_node_segments" in enabled:
+        return "recompute_node_segments" if "gate_epilogue" in enabled else "gate_epilogue"
+    for name in ("recompute_first_table", "recompute_conv_weights"):
+        if name in enabled:
+            return name
+    return ""
+
+
 def rescue_value(name: str) -> str:
     """The value the memory rescue sets a ``MEMORY_RESCUE`` record to: "off" for ``RESCUE_OFF``, else "on"."""
     return "off" if name in RESCUE_OFF else "on"
@@ -80,7 +106,7 @@ def rescue_value(name: str) -> str:
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
-# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]),
+# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.25]),
 # with the edges counted in the structure (``counted_edges``): the lowest that keeps every case at or above its
 # measured peak (docs/validation/estimate-refit.md). Below 1 because the run term is stock-structured: it counts
 # what stock MACE keeps per edge, while the fused paths (OEq's convolution, the folded MH-1 backward) keep less.
@@ -105,13 +131,15 @@ DTYPE_BYTES = {"float32": 4, "float64": 8}
 @dataclass(frozen=True)
 class MemoryTerm:
     """A rewrite's memory beyond stock MACE (``Rewrite.memory``), in bytes per edge and per node; negative
-    for a stock tensor it does not materialise. ``keep``: the fraction of the remaining activations (the estimate's
-    activations and the additive terms) the rewrite keeps, for the memory-rescue records, whose savings were
-    measured as fractions of the peak (docs/validation/estimate-refit.md); 1 for the others."""
+    for a stock tensor it does not materialise. ``edge_keep`` and ``node_keep``: the fractions of the remaining
+    per-edge and per-node activations (the estimate's activations and the additive terms of that side) the rewrite
+    keeps, for the memory-rescue records, whose savings were measured as fractions of the peak's per-edge or
+    per-node part (docs/validation/estimate-band.md); 1 for the others."""
 
     edge_bytes: float = 0.0
     node_bytes: float = 0.0
-    keep: float = 1.0
+    edge_keep: float = 1.0
+    node_keep: float = 1.0
 
     def bytes(self, edges: int, nodes: int) -> float:
         return self.edge_bytes * edges + self.node_bytes * nodes
@@ -247,24 +275,35 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     floats = interaction_floats(dims, fused_conv)
     first = dims.interactions[0] if dims.interactions else None
     shared = _GEOMETRY_FLOATS + (first.edge_attrs + first.edge_feats if first is not None else 0)
-    per_layer = [edge * edges + node * nodes for edge, node in floats]
     # The backward's transient, one interaction at a time, the widest: the messages' gradient, or with a fused
     # convolution the tensor product weights' gradient.
     transient = max(((block.weight_numel if fused_conv else block.messages) for block in dims.interactions),
                     default=0) * edges
-    activations = (sum(per_layer) + transient + shared * edges) * width
-    additive = sum(term.bytes(edges, nodes) for _, term in rewrite_terms)
-    # The memory-rescue records' fractions apply to what remains (SAFETY times the activations and the additive
-    # terms), so the estimate's overstatement shrinks with the peak instead of staying as an absolute excess.
-    remaining = SAFETY * (activations + additive)
-    rewrites, kept = [], remaining
+    edge_activations = (sum(edge for edge, _ in floats) * edges + transient + shared * edges) * width
+    node_activations = sum(node for _, node in floats) * nodes * width
+    activations = edge_activations + node_activations
+    additive_edge = sum(term.edge_bytes * edges for _, term in rewrite_terms)
+    additive_node = sum(term.node_bytes * nodes for _, term in rewrite_terms)
+    additive = additive_edge + additive_node
+    # The memory-rescue records' fractions apply to what remains of their own side (SAFETY times the per-edge or the
+    # per-node activations and additive terms), so the estimate's overstatement shrinks with the peak instead of
+    # staying as an absolute excess, and a record that frees per-edge tensors saves nothing per atom
+    # (docs/validation/estimate-band.md).
+    remaining_edge, remaining_node = SAFETY * (edge_activations + additive_edge), SAFETY * (node_activations
+                                                                                            + additive_node)
+    rewrites, kept_edge, kept_node = [], remaining_edge, remaining_node
     for name, term in rewrite_terms:
-        if term.keep != 1.0:
-            rewrites.append((name, int(round(kept * (term.keep - 1.0)))))
-            kept *= term.keep
+        if term.edge_keep != 1.0 or term.node_keep != 1.0:
+            saved = kept_edge * (term.edge_keep - 1.0) + kept_node * (term.node_keep - 1.0)
+            rewrites.append((name, int(round(saved))))
+            kept_edge *= term.edge_keep
+            kept_node *= term.node_keep
         else:
             rewrites.append((name, int(round(term.bytes(edges, nodes)))))
     rewrites = tuple(rewrites)
+    kept, remaining = kept_edge + kept_node, remaining_edge + remaining_node
+    # The stage's allocator reserve on what the rescue kept (RESCUE_RESERVE; 1 for the default plan).
+    reserve = dict(RESCUE_RESERVE).get(rescue_stage(name for name, _ in rewrite_terms), 1.0)
     list_width = DTYPE_BYTES[list_dtype or dtype]
     pair_list = capacity * (_INDEX_BYTES_PER_SLOT + _SHIFT_FLOATS_PER_SLOT * list_width + _SHIFT64_BYTES_PER_SLOT)
     weights = dims.parameters * width
@@ -275,6 +314,7 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     terms = [*held,
              ("activations", int(math.ceil(SAFETY * activations))),
              ("rewrites", int(math.ceil(SAFETY * additive + kept - remaining))),
+             ("allocator reserve", int(round((reserve - 1.0) * kept))),
              ("neighbour list", int(pair_list))]
     if d3 is not None:
         terms.append(("d3 list", int(d3.list_bytes + d3.build_bytes)))

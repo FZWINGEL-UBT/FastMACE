@@ -12,7 +12,7 @@ recorded GPU and SM count):
 - the names of the rewrites whose terms apply;
 
 and the measured peaks. The test rebuilds each estimate with today's code and terms, so a change to the
-formula, a rewrite's declared term, ``SAFETY`` or the workspaces that moves any case outside [1.0, 1.5] of
+formula, a rewrite's declared term, ``SAFETY`` or the workspaces that moves any case outside [1.0, HIGH] of
 its measured peak fails here.
 
 ``tests/_support/data/rule12_capacity.json`` holds the capacity scan's MH-1 cells (decision 67, plans/capacity.md
@@ -32,10 +32,17 @@ from fastmace.planner import memory, minimal
 
 DATA = Path(__file__).resolve().parents[1] / "_support" / "data" / "rule12_fit.json"
 FIT = json.loads(DATA.read_text())
-LOW, HIGH = 1.0, 1.5
+LOW, HIGH = 1.0, 1.25
 CAPACITY = json.loads((DATA.parent / "rule12_capacity.json").read_text())
-CAPACITY_HIGH = 1.4
+CAPACITY_HIGH = 1.25
 RESCUE = json.loads((DATA.parent / "rule12_rescue.json").read_text())
+# docs/validation/estimate-band.md: the highest ratio per stage of the rescue matrix (five crystals, three GPUs),
+# rounded up. The spread within a stage is the allocator's reserve, which differs between crystals by the graph
+# pool's packing.
+RESCUE_HIGH = {"s0-default": 1.30, "s1-conv": 1.06, "s2-table": 1.05, "s3-segments": 1.15, "s4-geoff": 1.25,
+               "s5-region": 1.12, "s6-region-ge": 1.12}
+# the rescue is never planned on smaller cells, whose peak is the build's fixed transient (the build term's)
+RESCUE_MIN_ATOMS = 15_000
 
 
 def predicted(case):
@@ -61,7 +68,7 @@ def test_the_fit_covers_both_backends_and_gpus():
 @pytest.mark.parametrize("case", FIT["cases"],
                          ids=[f"{c['label']}-{c['structure']}-{c['ensemble']}-{c['backend']}" for c in FIT["cases"]])
 def test_the_prediction_stays_within_the_fit(case):
-    """Never below the measured peak (rule 12 guards memory), at most 1.5x above it."""
+    """Never below the measured peak (rule 12 guards memory), at most HIGH above it."""
     found = predicted(case)
     ratio = found.total / case["peak_bytes"]
     assert LOW <= ratio <= HIGH, (ratio, found.text(), case["peak_bytes"])
@@ -88,22 +95,31 @@ def test_large_mh1_cells_stay_within_the_capacity_fit(case):
 
 
 @pytest.mark.rule(12)
-@pytest.mark.parametrize("case", RESCUE, ids=[f"{c['structure']}-{c['natoms']}-{c['stage']}" for c in RESCUE])
-def test_every_stage_of_the_memory_rescue_stays_within_the_capacity_fit(case):
-    """docs/validation/estimate-refit.md: with the memory-rescue records on, the estimate stays between the measured
-    peak and CAPACITY_HIGH times it at every stage of the ladder, as the default plan's (counted as absolute bytes,
-    the default plan's overstatement grew to 2.5x the peak with every record on)."""
+@pytest.mark.parametrize("case", RESCUE, ids=[f"{c['structure']}-{c['natoms']}-{c['stage']}-{c['gpu'].split()[-1]}"
+                                               for c in RESCUE])
+def test_every_stage_of_the_memory_rescue_stays_within_its_band(case):
+    """docs/validation/estimate-band.md: with the memory-rescue records on, the estimate stays between the measured
+    peak and the stage's RESCUE_HIGH times it, on every crystal: the records keep fractions of their own side (per edge
+    or per atom), and the stage's allocator reserve (memory.RESCUE_RESERVE) scales what they keep."""
     found = predicted(case)
     ratio = found.total / case["peak_bytes"]
-    assert LOW <= ratio <= CAPACITY_HIGH, (ratio, found.text(), case["peak_bytes"])
+    assert LOW <= ratio <= RESCUE_HIGH[case["stage"]], (ratio, found.text(), case["peak_bytes"])
 
 
 def test_the_rescue_fit_covers_the_whole_ladder():
     stages = {case["stage"] for case in RESCUE}
     assert stages == {"s0-default", "s1-conv", "s2-table", "s3-segments", "s4-geoff", "s5-region", "s6-region-ge"}
+    assert set(RESCUE_HIGH) == stages and min(case["natoms"] for case in RESCUE) >= RESCUE_MIN_ATOMS
     for structure in ("NaCl", "NbCl5"):
         sizes = {case["natoms"] for case in RESCUE if case["structure"] == structure and case["stage"] == "s5-region"}
         assert len(sizes) >= 3 and max(sizes) >= 85_000, structure
+    # five crystals from 27.6 to 84 edges per atom (NaNbO3 was held out of the fit), at least three sizes each, on
+    # Linux (RTX 4000 Ada, RTX A4000) and WSL2 (RTX 5060 Ti)
+    assert {case["structure"] for case in RESCUE} == {"NaCl", "NbCl5", "SrTiO3", "NaTaO3", "NaNbO3"}
+    for structure in {case["structure"] for case in RESCUE}:
+        assert len({case["natoms"] for case in RESCUE if case["structure"] == structure}) >= 3, structure
+    assert {case["gpu"] for case in RESCUE} == {"NVIDIA RTX 4000 Ada Generation", "NVIDIA RTX A4000",
+                                                 "NVIDIA GeForce RTX 5060 Ti"}
 
 
 def test_the_capacity_fit_covers_both_platforms_and_precisions():
