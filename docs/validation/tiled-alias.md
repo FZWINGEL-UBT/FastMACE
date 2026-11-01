@@ -74,7 +74,7 @@ exact capacity check: the initial edges equal ASE's count, and the largest force
 | NbCl5 | 70,957,944 | 7.28 GiB | **18.47 GiB** | 207.4 GiB (3.14 kB/atom) | 200.9 GiB | 1,937 s |
 | NaCl | 67,917,312 | 6.97 GiB | 17.67 GiB | 221.3 GiB (3.50 kB/atom) | 221.3 GiB | 1,768 s |
 
-**The largest valid structure on a 20 GB GPU with 250 GB of host memory rises from 40.0M to 70.96M atoms.**
+**The largest valid structure on a 20 GB GPU with 250 GB of host memory rises from 40.0M to 70.96M atoms (single call).** The limit for repeated calls, as in MD, is 65-68M ([tiled-compiled-default.md](tiled-compiled-default.md)): the second call holds about 2 GiB more.
 
 - The GPU's call limits next: 18.47 GiB of 19.5 GiB at 70.96M, about 73M at most. The owner's 70M target is
   reached.

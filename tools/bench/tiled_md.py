@@ -13,6 +13,7 @@ Writes ``<output>/md-<name>-<atoms>-R<receivers>.json``.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
 import os
@@ -41,6 +42,13 @@ def parse_args(argv=None):
                         "then the compiled model's)")
     p.add_argument("--bucket", type=float, default=None, help="TileConfig.bucket (default: TileConfig's)")
     p.add_argument("--path", choices=("tiled", "whole", "both"), default="both")
+    p.add_argument("--tile-list", action="store_true",
+                   help="per-tile lists (TileConfig.neighbours='tiles'); the force field's own list stays empty, so "
+                        "only --path tiled")
+    p.add_argument("--host-state", action="store_true", help="TileConfig.state='host'")
+    p.add_argument("--alias-state", action="store_true", help="TileConfig.alias_state (with --host-state)")
+    p.add_argument("--species-index", action="store_true",
+                   help="TileConfig.species='index', the force field built with its one-hot on the host")
     p.add_argument("--steps", type=int, default=200)
     p.add_argument("--timestep-fs", type=float, default=2.0)
     p.add_argument("--temperature", type=float, default=600.0)
@@ -48,7 +56,7 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-def run(field, call, atoms, steps, dt_fs, temperature):
+def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False):
     import numpy as np
     import torch
 
@@ -67,17 +75,19 @@ def run(field, call, atoms, steps, dt_fs, temperature):
     for step in range(steps + 1):
         kinetic = float(0.5 * (masses * v * v).sum())
         rows.append(dict(step=step, epot=float(out.energy.reshape(-1)[0]), ekin=kinetic,
-                         etot=float(out.energy.reshape(-1)[0]) + kinetic, edges=int(field.edge_count),
+                         etot=float(out.energy.reshape(-1)[0]) + kinetic,
+                         edges=int(getattr(call, "last", {}).get("edges", field.edge_count)),
                          rebuilds=rebuilds))
         if step == steps:
             break
         v = v + 0.5 * dt * f / masses
         x = x + dt * v
-        if bool(field.needs_rebuild(x)):
-            field.rebuild(x)
-            rebuilds += 1
-        field.compact(x)
-        field.use_edges(int(field.edge_count))
+        if not own_lists:  # per-tile lists: the tiles find their edges from the positions every call
+            if bool(field.needs_rebuild(x)):
+                field.rebuild(x)
+                rebuilds += 1
+            field.compact(x)
+            field.use_edges(int(field.edge_count))
         out = call(x)
         f = out.forces.detach().double()
         v = v + 0.5 * dt * f / masses
@@ -108,13 +118,19 @@ def main(argv=None):
     if args.mode != "compiled":
         plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                       dynamic_edges=False))
-    field = planner.build_evaluation(plan, user, atoms)
-    config = TileConfig(args.receivers, mode=args.mode)
+    if args.tile_list and args.path != "tiled":
+        raise SystemExit("--tile-list leaves the force field's own list empty: use --path tiled")
+    lists = contextlib.ExitStack()
+    lists.enter_context(tiled_capacity.no_global_list(args.tile_list))
+    field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index)
+    config = TileConfig(args.receivers, mode=args.mode, neighbours="tiles" if args.tile_list else "global",
+                        state="host" if args.host_state else "device", alias_state=args.alias_state,
+                        species="index" if args.species_index else "one_hot")
     if args.bucket is not None:
         config = dataclasses.replace(config, bucket=args.bucket)
     tiled = TiledForceField(field, config)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=len(atoms), receivers=args.receivers,
-                  mode=args.mode, bucket=config.bucket,
+                  mode=args.mode, bucket=config.bucket, tile_config=dataclasses.asdict(config),
                   steps=args.steps, timestep_fs=args.timestep_fs, temperature_K=args.temperature,
                   device=torch.cuda.get_device_name(), source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"),
                   skin=float(getattr(plan.neighbours, "skin", float("nan"))), runs={})
@@ -122,7 +138,8 @@ def main(argv=None):
     finals = {}
     for path in paths:
         call = tiled if path == "tiled" else field
-        result = run(field, call, atoms, args.steps, args.timestep_fs, args.temperature)
+        result = run(field, call, atoms, args.steps, args.timestep_fs, args.temperature,
+                     own_lists=args.tile_list and path == "tiled")
         finals[path] = result.pop("final_positions")
         etot = np.array([row["etot"] for row in result["rows"]])
         result["drift_meV_per_atom"] = float(1e3 * (etot[-1] - etot[0]) / len(atoms))

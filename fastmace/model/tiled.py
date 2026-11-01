@@ -35,6 +35,12 @@ from typing import Any
 
 from fastmace.model.forces import ForceOutput
 
+# Compiled tiles' device memory held between calls beyond eager tiles' (their padded slots and outputs; 0.065 GiB
+# measured at 9.26M NbCl5 atoms), and the margin the "auto" mode keeps for the compiled workspaces' first allocation
+# (tiled-compiled-default.md).
+COMPILED_RESIDENCY = int(0.07 * 2**30)
+COMPILED_MARGIN = 2**30
+
 
 @dataclasses.dataclass(frozen=True)
 class TileConfig:
@@ -70,7 +76,7 @@ class TileConfig:
 
     receivers: int = 8192
     edges: int | None = None
-    mode: str = "eager"
+    mode: str = "auto"
     headroom: float = 0.1
     bucket: float = 0.15
     # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
@@ -85,8 +91,9 @@ class TileConfig:
     species: str = "one_hot"
 
     def __post_init__(self):
-        if self.mode not in ("eager", "padded", "graphs", "compiled"):
-            raise ValueError(f"TileConfig.mode must be 'eager', 'padded', 'graphs' or 'compiled', got {self.mode!r}")
+        if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
+            raise ValueError("TileConfig.mode must be 'auto', 'eager', 'padded', 'graphs' or 'compiled', "
+                             f"got {self.mode!r}")
         if not 0 <= float(self.headroom) <= 10:
             raise ValueError(f"TileConfig.headroom must be in [0, 10], got {self.headroom!r}")
         if self.neighbours not in ("global", "tiles"):
@@ -105,7 +112,8 @@ class TileConfig:
             raise ValueError("TileConfig.state='host' cannot run in mode 'graphs': the captured bodies read the "
                              "state from device memory")
         if self.budget_receivers is None:  # compiled tiles take the larger caps when they fit (tiled-speed.md)
-            object.__setattr__(self, "budget_receivers", (8192, 16384) if self.mode == "compiled" else ())
+            compiled = self.mode in ("compiled", "auto")  # "auto": only once its tiles compile
+            object.__setattr__(self, "budget_receivers", (8192, 16384) if compiled else ())
         if any(int(r) < 1 for r in self.budget_receivers):
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
@@ -362,6 +370,15 @@ class TiledForceField:
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
         self.receivers = int(self.config.receivers)  # the receiver cap (budget_receivers may raise it once)
+        # mode "auto": a compiled force field's first call runs eager tiles and measures its peak; the later calls
+        # compile when the compiled residency and a margin fit (``_choose_mode``). An eager field stays eager.
+        self._auto = self.config.mode == "auto" and field.compile_mode != "none"
+        if self.config.mode != "auto":
+            self.mode, self.mode_reason = self.config.mode, "configured"
+        elif self._auto:
+            self.mode, self.mode_reason = "eager", "compiled force field: the first call measures its memory"
+        else:
+            self.mode, self.mode_reason = "eager", "the force field is not compiled"
         self._released = False  # the allocator's cache, released once before the first tile
         self._budgeted = not self.config.budget_receivers
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
@@ -562,7 +579,7 @@ class TiledForceField:
         """The sweep's forward: plain, or (mode "compiled") compiled on first use, once per sweep (sweeps 1 and 3
         apart: without and with autograd); each slot's shapes are one specialisation."""
         plain = {1: self._first_forward, 2: self._second_forward, 3: self._first_forward}[sweep]
-        if self.config.mode != "compiled":
+        if self.mode != "compiled":
             return plain
         compiled = self._compiled.get(sweep)
         if compiled is None:
@@ -685,7 +702,7 @@ class TiledForceField:
         """The sweep's body on the filled slot: eagerly, or by replaying its graph (captured on first use)."""
         import torch
 
-        if self.config.mode != "graphs":
+        if self.mode != "graphs":
             self._body(sweep, slot, g)
             return
         graph = slot["graphs"].get(sweep)
@@ -726,7 +743,7 @@ class TiledForceField:
         field = self.field
         data = field.data
         stress = field.compute_stress
-        padded = self.config.mode != "eager"
+        padded = self.mode != "eager"
         with torch.no_grad():
             field.positions.copy_(positions)
         pos = field.positions.detach()
@@ -740,12 +757,13 @@ class TiledForceField:
         cell = data["cell"].reshape(3, 3) if "cell" in data else torch.as_tensor(field.neighbours.cell)
         tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
         local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
-        measure = not self._budgeted and self.device.type == "cuda"
+        measure = (not self._budgeted or self._auto) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      receivers=self.receivers,
-                     edges=0, mode=caps.mode, neighbours=caps.neighbours, species=caps.species)
+                     edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
+                     species=caps.species)
         keys = self._slot_keys(tiles, source, local_of, n) if padded else None
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
@@ -815,9 +833,13 @@ class TiledForceField:
                     out_stress = (strain_grad / volume).to(self.dtype)  # MACE: dE/d(strain) / V
             self.last = stats
             out = ForceOutput(energy, forces.clone(), out_stress)
-            if not self._budgeted:
-                self._budgeted = True
-                self._choose_receivers(self._memory())  # None without a CUDA device: the cap stays
+            if self._auto or not self._budgeted:
+                memory = self._memory()  # None without a CUDA device: the mode and the cap stay
+                self._choose_mode(memory)
+                if not self._budgeted:
+                    self._budgeted = True
+                    if self.config.mode != "auto" or self.mode == "compiled":  # "auto": eager tiles take no budget
+                        self._choose_receivers(memory)
             return out
         finally:
             for module, count in saved:
@@ -836,6 +858,24 @@ class TiledForceField:
         free, _ = torch.cuda.mem_get_info(self.device)
         return (torch.cuda.max_memory_allocated(self.device) - allocated,
                 free + torch.cuda.memory_reserved(self.device) - allocated)
+
+    def _choose_mode(self, memory):
+        """Mode "auto" after a compiled force field's first (eager) call: compiled tiles when the memory left at
+        the call's peak (``available`` less the call's workspace) holds their residency and a margin, else eager.
+        Chosen once."""
+        if not self._auto:
+            return
+        self._auto = False
+        if memory is None:
+            self.mode_reason = "no device memory measurement: eager"
+            return
+        workspace, available = memory
+        headroom = available - workspace
+        need = COMPILED_RESIDENCY + COMPILED_MARGIN
+        verdict = ">=" if headroom >= need else "<"
+        self.mode = "compiled" if headroom >= need else "eager"
+        self.mode_reason = (f"{headroom / 2**30:.2f} GiB left at the first call's peak {verdict} the compiled "
+                            f"residency and margin ({need / 2**30:.2f} GiB)")
 
     def _choose_receivers(self, memory):
         """``budget_receivers``: the largest cap whose predicted workspace (the measured workspace per receiver,

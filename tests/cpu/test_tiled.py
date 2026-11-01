@@ -463,5 +463,38 @@ def test_tile_lists_built_once_per_call_are_bitwise_the_rebuilt_ones(mode, monke
 
 def test_compiled_tiles_default_to_the_workspace_budget():
     assert TileConfig(4096, mode="compiled").budget_receivers == (8192, 16384)
-    assert TileConfig(4096).budget_receivers == ()
+    assert TileConfig(4096).budget_receivers == (8192, 16384)  # "auto": taken only once its tiles compile
+    assert TileConfig(4096, mode="eager").budget_receivers == ()
     assert TileConfig(4096, mode="compiled", budget_receivers=()).budget_receivers == ()
+
+
+# ---------------------------------------------------------------- compiled tiles by default
+
+
+def test_auto_mode_keeps_eager_tiles_for_an_uncompiled_field():
+    """``TileConfig.mode="auto"`` (the default): an eager force field's tiles stay eager, with the reason in the
+    call's report."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    assert TileConfig(5).mode == "auto"
+    tiled = TiledForceField(field, TileConfig(5))
+    tiled.evaluate(atoms)
+    assert tiled.last["mode"] == "eager" and "not compiled" in tiled.last["mode_reason"]
+
+
+@pytest.mark.parametrize("headroom, chosen", [(2.0, "compiled"), (1.0, "eager")])
+def test_auto_mode_compiles_the_tiles_when_the_residency_fits(headroom, chosen):
+    """A compiled force field's first call runs eager and measures its peak; the later calls compile when the
+    memory left at that peak holds the compiled residency and a 1 GiB margin (tiled-compiled-default.md)."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(5))
+    tiled._auto = True  # as for a compiled force field
+    gib = 2**30
+    tiled._choose_mode((int(3 * gib), int((3 + headroom) * gib)))  # workspace, available after the call
+    assert tiled.mode == chosen
+    assert (tiled_module.COMPILED_RESIDENCY + tiled_module.COMPILED_MARGIN < headroom * gib) == (chosen == "compiled")
+    tiled._choose_mode(None)  # chosen once
+    assert tiled.mode == chosen
