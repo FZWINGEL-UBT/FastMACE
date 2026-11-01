@@ -258,6 +258,30 @@ class SubprocessRunner:
             raise RuntimeError(f"the calibration child planned the {result['backend']} backend, not {backend}")
         return float(result["seconds_per_step"])
 
+    def memory_probe(self, simulation: Any, options: Any, atoms: Any, rewrites: dict, *, steps: int) -> dict:
+        """One stage of the near-limit memory probe (``planner.memory_probe``): a fresh child builds ``simulation``'s
+        run on ``atoms`` (the replica) with the planner ``options`` and the force field's ``RewriteConfig`` fields
+        ``rewrites`` set (the stage's rescue records), runs ``steps`` MD steps and returns rule 12's estimate of the
+        replica (``estimate``) and the child's peak ``reserved`` and ``allocated`` device memory over build and steps,
+        bytes. It writes no output; the stage is removed after the probe, the hand-off directory by ``close()``."""
+        from ase.io import write
+
+        sim = simulation
+        if self.root is None:
+            self.root = handoff_root(None if sim.output is None else Path(sim.output.directory).resolve())
+            self.root.mkdir(parents=True, exist_ok=True)
+        stage = self._stage()
+        write(stage / START_NAME, atoms)
+        record = sim._simulation_record(stage)
+        record["output"] = None
+        record["planner_options"] = options.to_record()
+        given = record["force_field"]["rewrites"]  # "auto" plans as RewriteConfig()
+        record["force_field"]["rewrites"] = {**({} if given == "auto" else given), **rewrites}
+        request = {"action": "memory_probe", "simulation": record, "check": "skip", "steps": int(steps)}
+        result = self._launch(stage, request)["memory_probe"]
+        shutil.rmtree(stage, ignore_errors=True)
+        return {key: int(result[key]) for key in ("estimate", "reserved", "allocated")}
+
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
         """Queue a host write (``HOST_WRITE_KINDS``); the next child applies it after its resume."""
         from fastmace.simulation import HOST_WRITE_WARNING
@@ -975,6 +999,8 @@ def _child(directory, request, heartbeat, worker=None):
     action = request["action"]
     if action == "calibrate":
         return _calibrate(directory, request, heartbeat)
+    if action == "memory_probe":
+        return _memory_probe(directory, request, heartbeat)
     if action not in ("setup", "run"):
         raise ValueError(f"unknown hand-off action {action!r}")
     if worker.simulation is not None:  # the worker's next call: the engine it has (OPT-T07)
@@ -1105,6 +1131,26 @@ def _calibrate(directory, request, heartbeat):
     seconds = sim._synchronised_time() - started
     return {"status": "ok", "calibration": {"backend": sim.plan.engine.backend, "seconds_per_step": seconds / steps,
                                             "setup_s": {name: float(s) for name, s in sim._setup_s.items()}}}
+
+
+def _memory_probe(directory, request, heartbeat):
+    """A stage of the near-limit memory probe (``SubprocessRunner.memory_probe``): build on the replica, run the
+    steps, return rule 12's estimate and the process's peak reserved and allocated device memory."""
+    import torch
+
+    heartbeat.mark("setup")
+    sim = _construct(directory, request)
+    sim._child = True  # a tier switch is the parent's; this child hands nothing over
+    heartbeat.simulation = sim
+    heartbeat.mark("running")
+    sim.run(steps=int(request["steps"]))
+    cuda = torch.cuda.is_available() and torch.cuda.is_initialized()
+    if cuda:
+        torch.cuda.synchronize()
+    return {"status": "ok", "memory_probe": {
+        "estimate": int(sim.plan.predicted_memory_bytes or 0),
+        "reserved": int(torch.cuda.max_memory_reserved()) if cuda else 0,
+        "allocated": int(torch.cuda.max_memory_allocated()) if cuda else 0}}
 
 
 def _construct(directory, request):

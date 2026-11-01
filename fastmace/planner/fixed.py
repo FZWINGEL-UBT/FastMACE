@@ -84,6 +84,7 @@ AUTO_RULES = MappingProxyType({
     "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "EngineConfig.force_graphs": "fit_when_capturing_on_cuda_else_keep",
+    "EngineConfig.memory_probe": "near_limit_for_md_on_cuda",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
     "RewriteConfig.fold_cutoff": "on_with_factor_species_if_model_supports",
@@ -866,6 +867,12 @@ class FixedPlanner:
             engine.force_graphs, AUTO_RULES["EngineConfig.force_graphs"],
             "CUDA graphs: one force graph when the next padded size would not fit the free memory (CAP-T01)"
             if capturing else "no CUDA graphs"))
+        probing = capturing and optimizer is None
+        memory_probe = engine.memory_probe if engine.memory_probe != "auto" else "near-limit" if probing else "off"
+        book.decide("EngineConfig.memory_probe", memory_probe, _why(
+            engine.memory_probe, AUTO_RULES["EngineConfig.memory_probe"],
+            "MD with CUDA graphs: rule 12's ambiguous memory choices are measured on a replica"
+            if probing else "no MD on CUDA: nothing to probe"))
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
                                        evaluation=evaluation, mc=mc, optimizer=optimizer)
         return dict(
@@ -875,6 +882,7 @@ class FixedPlanner:
                                        async_output=_toggle(async_output), cueq_conv_fusion=_toggle(bool(fusion)),
                                        expandable_segments=expandable, fp64_emulation=fp64_emulation,
                                        fp64_emulation_mantissa_bits=mantissa_bits, force_graphs=force_graphs,
+                                       memory_probe=memory_probe,
                                        **phase_3["engine"]),
             precision=dataclasses.replace(self.precision, dtype=dtype, **phase_3["precision"]),
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),

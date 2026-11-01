@@ -485,6 +485,7 @@ SPEC_13_KEYS = (
     ("calibration record (5-T09)", "plan.calibration"),
     ("adaptation limits (5-T07)", "plan.adaptation"),
     ("runtime monitor segments (5-T06)", "counters.segments"),
+    ("near-limit memory probe record (estimate-probe)", "plan.memory_probe"),
 )
 # Integration is always float64 (SPEC §7.3); only the force precision is a choice.
 INTEGRATION_PRECISION = "float64"
@@ -692,6 +693,7 @@ def _plan(plan):
         "predicted_memory_bytes": plan.predicted_memory_bytes,
         "runner": plan.runner,
         "calibration": config(plan.calibration, "calibration"),  # CalibrationRecord (5-T09), null when none ran
+        "memory_probe": config(plan.memory_probe, "memory_probe"),  # MemoryProbeRecord, null when none ran
         "adaptation": config(plan.adaptation, "adaptation"),  # the active AdaptationConfig (5-T07), else null
     }
 

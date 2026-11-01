@@ -547,6 +547,11 @@ class Simulation:
         setup = {}
 
         planner = _planner(minimal.default_planner(ff), options)
+        scales = getattr(self, "_resume_probe_scales", ())
+        if scales:  # a resume plans with the run's measured memory-probe scales and never probes
+            from fastmace.planner import memory_probe
+
+            planner = memory_probe.with_scales(planner, scales)
         self._planner = planner  # a tier switch re-plans through it (5-T07)
         self._references = self._move_references = None  # the gate's references, for a switch's validation
         self._switch_due = None  # a SwitchRequest the trigger fired, until the switch is made (5-T07)
@@ -575,10 +580,25 @@ class Simulation:
                                   allow_reference=options.allow_reference,
                                   mode=options.mode if stored is None else stored.tier,
                                   optimizer=self._optimizer_config)
+        probed = None
+        if stored is None and not getattr(self, "_resuming", False) and self._optimizer_config is None:
+            probed = self._memory_probe(planner, workload)  # the near-limit memory probe (planner.memory_probe)
+            if probed is not None and probed.record is not None:
+                planner = self._planner = probed.planner
+                self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
+                                          allow_reference=options.allow_reference, mode=options.mode,
+                                          optimizer=self._optimizer_config)
         if stored is not None:
             from fastmace.planner.fallback import replay_off
 
             self._plan = replay_off(stored, self._plan)
+        if probed is not None:
+            from fastmace.planner import memory_probe
+
+            self._plan = memory_probe.apply(self._plan, probed)
+            if probed.record is not None:
+                setup["memory_probe"] = probed.record.setup_s
+        self._memory_probed = probed
         if calibrated is not None:
             from fastmace.planner import calibrate
 
@@ -1742,6 +1762,13 @@ class Simulation:
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
+        probed = getattr(self, "_memory_probed", None)
+        if probed is not None:  # the near-limit memory probe: measured, or why not
+            from fastmace.planner import memory_probe
+
+            report.memory_probe = memory_probe.report_line(self._plan.memory_probe, probed.note)
+            if probed.warning is not None:
+                report.add_warning(probed.warning)
         calibrated = getattr(self, "_calibrated", None)
         if calibrated is not None:  # calibrate=True (SPEC §9.1, 5-T09): measured, or why not
             from fastmace.planner import calibrate
@@ -1750,6 +1777,34 @@ class Simulation:
             if calibrated.warning is not None:
                 report.add_warning(calibrated.warning)
         return report
+
+    def _memory_probe(self, planner, workload):
+        """The near-limit memory probe (``planner.memory_probe``) on ``self._plan``, the rules' plan: its stages
+        measured on a replica in children; returns its ``Outcome``, or ``None`` when nothing is to be probed."""
+        from fastmace.planner import calibrate, memory_probe
+
+        plan = self._plan
+        setting = plan.engine.memory_probe if plan.engine is not None else "off"
+        stages = memory_probe.stages_to_probe(plan.memory_ladder, setting)
+        if not stages:
+            return None
+        if plan.runner != "in-process":
+            return memory_probe.Outcome(None, planner, note="not run: the plan runs in a child process (SPEC §8.7)")
+        replica = memory_probe.replica(self._atoms)
+        if replica is None:
+            return memory_probe.Outcome(None, planner, note="not run: the structure has no periodic repeat unit to "
+                                                            "make a replica of")
+
+        def plan_with(candidate):  # a copy that claims nothing in this process
+            return calibrate.probe(candidate).plan(
+                self.force_field, self._atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
+                allow_reference=self.options.allow_reference, mode=self.options.mode)
+
+        launcher = memory_probe.ChildProbe(self, replica)
+        try:
+            return memory_probe.probe(planner, plan.memory_ladder, stages, launcher, plan_with=plan_with)
+        finally:
+            launcher.close()
 
     def _calibrate(self, planner, workload):
         """The optional calibration (SPEC §9.1, decision 55; plan task 5-T09) before this process plans: the
@@ -1940,6 +1995,8 @@ class Simulation:
             "seed": self.seed,
             "allow_naive_cueq": self.allow_naive_cueq,
             "planner_options": self.options.to_record(),
+            # the near-limit memory probe's measured scales: a resume plans with them and never probes
+            "memory_probe_scales": [[stage, scale] for stage, scale in getattr(self._planner, "probe_scales", ())],
             "structure": {"numbers": [int(z) for z in atoms.numbers],
                           "masses": [float(m) for m in atoms.get_masses()],
                           "pbc": [bool(p) for p in atoms.pbc]},
@@ -2012,6 +2069,8 @@ class Simulation:
             output = Output(**output)
         sim = cls.__new__(cls)
         sim._resuming = True  # a plan that runs in a child takes this restart as its first hand-off (2-T07)
+        sim._resume_probe_scales = tuple((str(stage), float(scale))
+                                         for stage, scale in record.get("memory_probe_scales", ()))
         from fastmace.planner import adapt, fallback
 
         previous = fallback.stored_fallback_plan(restart.plan_record(stored))
@@ -2027,6 +2086,7 @@ class Simulation:
                      runner=options.runner, engine=options.engine, neighbours=options.neighbours,
                      adaptation=options.adaptation, calibration=options.calibration)  # a resume never calibrates
         del sim._resuming
+        del sim._resume_probe_scales
         sim.__dict__.pop("_resume_plan", None)
         sim._resume(stored, record, output, allow_plan_change, versions, source=directory)
         return sim
