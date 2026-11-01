@@ -105,13 +105,15 @@ DTYPE_BYTES = {"float32": 4, "float64": 8}
 @dataclass(frozen=True)
 class MemoryTerm:
     """A rewrite's memory beyond stock MACE (``Rewrite.memory``), in bytes per edge and per node; negative
-    for a stock tensor it does not materialise. ``keep``: the fraction of the remaining activations (the estimate's
-    activations and the additive terms) the rewrite keeps, for the memory-rescue records, whose savings were
-    measured as fractions of the peak (docs/validation/estimate-refit.md); 1 for the others."""
+    for a stock tensor it does not materialise. ``edge_keep`` and ``node_keep``: the fractions of the remaining
+    per-edge and per-node activations (the estimate's activations and the additive terms of that side) the rewrite
+    keeps, for the memory-rescue records, whose savings were measured as fractions of the peak's per-edge or
+    per-node part (docs/validation/estimate-band.md); 1 for the others."""
 
     edge_bytes: float = 0.0
     node_bytes: float = 0.0
-    keep: float = 1.0
+    edge_keep: float = 1.0
+    node_keep: float = 1.0
 
     def bytes(self, edges: int, nodes: int) -> float:
         return self.edge_bytes * edges + self.node_bytes * nodes
@@ -247,24 +249,33 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     floats = interaction_floats(dims, fused_conv)
     first = dims.interactions[0] if dims.interactions else None
     shared = _GEOMETRY_FLOATS + (first.edge_attrs + first.edge_feats if first is not None else 0)
-    per_layer = [edge * edges + node * nodes for edge, node in floats]
     # The backward's transient, one interaction at a time, the widest: the messages' gradient, or with a fused
     # convolution the tensor product weights' gradient.
     transient = max(((block.weight_numel if fused_conv else block.messages) for block in dims.interactions),
                     default=0) * edges
-    activations = (sum(per_layer) + transient + shared * edges) * width
-    additive = sum(term.bytes(edges, nodes) for _, term in rewrite_terms)
-    # The memory-rescue records' fractions apply to what remains (SAFETY times the activations and the additive
-    # terms), so the estimate's overstatement shrinks with the peak instead of staying as an absolute excess.
-    remaining = SAFETY * (activations + additive)
-    rewrites, kept = [], remaining
+    edge_activations = (sum(edge for edge, _ in floats) * edges + transient + shared * edges) * width
+    node_activations = sum(node for _, node in floats) * nodes * width
+    activations = edge_activations + node_activations
+    additive_edge = sum(term.edge_bytes * edges for _, term in rewrite_terms)
+    additive_node = sum(term.node_bytes * nodes for _, term in rewrite_terms)
+    additive = additive_edge + additive_node
+    # The memory-rescue records' fractions apply to what remains of their own side (SAFETY times the per-edge or the
+    # per-node activations and additive terms), so the estimate's overstatement shrinks with the peak instead of
+    # staying as an absolute excess, and a record that frees per-edge tensors saves nothing per atom
+    # (docs/validation/estimate-band.md).
+    remaining_edge, remaining_node = SAFETY * (edge_activations + additive_edge), SAFETY * (node_activations
+                                                                                            + additive_node)
+    rewrites, kept_edge, kept_node = [], remaining_edge, remaining_node
     for name, term in rewrite_terms:
-        if term.keep != 1.0:
-            rewrites.append((name, int(round(kept * (term.keep - 1.0)))))
-            kept *= term.keep
+        if term.edge_keep != 1.0 or term.node_keep != 1.0:
+            saved = kept_edge * (term.edge_keep - 1.0) + kept_node * (term.node_keep - 1.0)
+            rewrites.append((name, int(round(saved))))
+            kept_edge *= term.edge_keep
+            kept_node *= term.node_keep
         else:
             rewrites.append((name, int(round(term.bytes(edges, nodes)))))
     rewrites = tuple(rewrites)
+    kept, remaining = kept_edge + kept_node, remaining_edge + remaining_node
     list_width = DTYPE_BYTES[list_dtype or dtype]
     pair_list = capacity * (_INDEX_BYTES_PER_SLOT + _SHIFT_FLOATS_PER_SLOT * list_width + _SHIFT64_BYTES_PER_SLOT)
     weights = dims.parameters * width

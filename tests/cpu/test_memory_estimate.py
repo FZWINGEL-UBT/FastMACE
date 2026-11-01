@@ -170,23 +170,35 @@ def test_rule_12_counts_the_edges_in_the_structure():
     assert f"at {expected} edges" in str(plan().decision("memory")[2])
 
 
-def test_rescue_terms_keep_a_fraction_of_the_remaining_activations():
-    """docs/validation/estimate-refit.md: a memory-rescue record's term is the fraction of the remaining activations
-    (SAFETY times the activations and the additive terms) it keeps, so the estimate's overstatement shrinks with the
-    peak; its reported bytes are what it removes from the running remainder."""
+def _sides(dims, edges, nodes, terms=()):
+    """The run's per-edge and per-node remainders (activations and additive terms, after SAFETY), each from an
+    estimate with the other size set to zero."""
+    def remainder(e, n):
+        est = memory.estimate(dims, edges=e, nodes=n, dtype="float32", workspace=False, rewrite_terms=terms)
+        return est.term("activations") + est.term("rewrites")
+
+    return remainder(edges, 0), remainder(0, nodes)
+
+
+def test_rescue_terms_keep_a_fraction_of_their_own_side():
+    """docs/validation/estimate-band.md: a memory-rescue record keeps a fraction of the remaining per-edge
+    activations (``edge_keep``) or of the remaining per-node activations (``node_keep``; SAFETY times the
+    activations and the additive terms of that side), never of the other side's: the edge-side rungs recompute
+    per-edge tensors, the node-side rungs per-node ones, so a crystal with more edges per atom saves more from the
+    first and less from the second. The reported bytes are what each removes from the running remainder."""
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
-    base = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False,
-                           rewrite_terms=(("a", memory.MemoryTerm(edge_bytes=-8.0)),))
-    half = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False,
-                           rewrite_terms=(("a", memory.MemoryTerm(edge_bytes=-8.0)),
-                                          ("k", memory.MemoryTerm(keep=0.5)), ("q", memory.MemoryTerm(keep=0.5))))
-    remaining = base.term("activations") + base.term("rewrites")
-    kept = half.term("activations") + half.term("rewrites")
-    assert kept == pytest.approx(remaining / 4, rel=1e-6)
-    saved = dict(half.rewrite_terms)
-    assert saved["k"] == pytest.approx(-remaining / 2, rel=1e-6) and saved["q"] == pytest.approx(-remaining / 4,
-                                                                                                    rel=1e-6)
-    assert half.total < base.total
+    a = ("a", memory.MemoryTerm(edge_bytes=-8.0, node_bytes=-4.0))
+    edge, node = _sides(dims, 10_000, 500, (a,))
+    rungs = (a, ("e", memory.MemoryTerm(edge_keep=0.5)), ("n", memory.MemoryTerm(node_keep=0.25)),
+             ("q", memory.MemoryTerm(edge_keep=0.5)))
+    edge_kept, node_kept = _sides(dims, 10_000, 500, rungs)
+    assert edge_kept == pytest.approx(edge / 4, rel=1e-6) and node_kept == pytest.approx(node / 4, rel=1e-6)
+    both = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False, rewrite_terms=rungs)
+    saved = dict(both.rewrite_terms)
+    assert saved["e"] == pytest.approx(-edge / 2, rel=1e-6) and saved["q"] == pytest.approx(-edge / 4, rel=1e-6)
+    assert saved["n"] == pytest.approx(-node * 3 / 4, rel=1e-6)
+    base = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False, rewrite_terms=(a,))
+    assert both.run - base.run == pytest.approx(saved["e"] + saved["n"] + saved["q"], abs=4)
 
 
 # --------------------------------------------------------------------------- the rewrites' terms
@@ -583,13 +595,13 @@ def test_gate_epilogue_s_term_depends_on_the_node_segments():
     registry = _rewrite_registry()
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert registry["gate_epilogue"].memory is terms.gate_epilogue
-    edge, node, keep = terms.gate_epilogue(dims, 4)
-    assert edge == node == 0 and keep > 1
+    edge, node, edge_keep, keep = terms.gate_epilogue(dims, 4)
+    assert edge == node == 0 and edge_keep == 1 and keep > 1
     alone = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue"], "float32"))
-    assert alone["gate_epilogue"].keep == keep
+    assert alone["gate_epilogue"].node_keep == keep and alone["gate_epilogue"].edge_keep == 1
     segments = dict(memory.rewrite_memory_terms(registry, dims, ["gate_epilogue", "recompute_node_segments"],
                                                 "float32"))
-    assert segments["gate_epilogue"].keep == terms.gate_epilogue_in_segments(dims, 4)[2] > keep
+    assert segments["gate_epilogue"].node_keep == terms.gate_epilogue_in_segments(dims, 4)[3] > keep
     region = dict(memory.rewrite_memory_terms(
         registry, dims, ["gate_epilogue", "recompute_node_segments", "recompute_node_region"], "float32"))
     assert "gate_epilogue" not in region and "recompute_node_region" in region

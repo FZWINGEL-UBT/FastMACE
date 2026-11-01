@@ -30,21 +30,25 @@ _STREAMING_INDEX_BYTES = 2 * 4
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
 _RADIAL_TABLES_SHARE = 576 / 8265
 _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
-# The memory-rescue records and gate_epilogue as fractions of the remaining activations they keep
-# (``planner.memory.MemoryTerm.keep``), fitted by least squares on the compiled default plan's peaks, every stage
-# of the rescue ladder at NbCl5 21,600-121,824 and NaCl 21,952-105,984 atoms (RTX 4000 Ada and RTX A4000), so that
-# each stage's estimate sits at the default plan's ratio to its peak (docs/validation/estimate-refit.md). The
-# savings were measured as fractions of the peak (the whole ladder keeps 0.281-0.286 of the default plan's peak on
-# both crystals); counted as absolute bytes, the default plan's overstatement stayed and grew to 2.5x the peak.
-_CONV_WEIGHTS_KEEP = 0.62
-_FIRST_TABLE_KEEP = 0.966
+# The memory-rescue records and gate_epilogue as fractions of the remaining activations of their own side they keep
+# (``planner.memory.MemoryTerm.edge_keep`` and ``node_keep``): conv_weights and first_table recompute per-edge
+# tensors, the node segments, the node region and gate_epilogue per-node ones. Each is the ratio of the measured live
+# peak's per-edge or per-node slope (max allocated = fixed + per atom x N + per edge x E, least squares per stage of
+# the rescue ladder over NbCl5, NaCl, SrTiO3 and NaTaO3; within 1 % at every point) between consecutive stages
+# (docs/validation/estimate-band.md). As fractions of the whole remainder (estimate-refit) they mixed the two sides,
+# so a crystal with more edges per atom came out 1.2 times higher at the node-side stages.
+# conv_weights keeps 0.59 of 5.87 kB per edge (the second interaction's [E, 1280] weights); first_table 0.31 of 0.59
+# (260 B per edge, the table output; what remains is the radial basis and the indices).
+_CONV_WEIGHTS_KEEP = 0.101
+_FIRST_TABLE_KEEP = 0.532
+# Per atom: 210.7 kB with the separate gate, 136.6 with the node segments (0.648), 86.4 with the node region (0.633
+# of the segments').
 _NODE_SEGMENTS_KEEP = 0.648
-_NODE_REGION_KEEP = 0.663
-# gate_epilogue keeps more: 12.3 kB per atom (about 4 %) without the node segments, about 1.18 of the remaining with
-# the separate segments (36 kB per atom; the fit gave 1.182, 1.17 keeps NaCl 46,656 atoms, the fit's largest ratio,
-# under 1.4), nothing inside recompute_node_region's chunks (planner.memory.CONTEXT_TERMS).
-_GATE_EPILOGUE_KEEP = 1.04
-_GATE_EPILOGUE_SEGMENTS_KEEP = 1.17
+_NODE_REGION_KEEP = 0.633
+# gate_epilogue keeps more: 12.3 kB per atom without the node segments (1.058), 35.6 with the separate segments
+# (1.261 of the segments' 136.6), nothing inside recompute_node_region's chunks (planner.memory.CONTEXT_TERMS).
+_GATE_EPILOGUE_KEEP = 1.058
+_GATE_EPILOGUE_SEGMENTS_KEEP = 1.261
 
 
 def _first_hidden(block) -> int:
@@ -130,40 +134,41 @@ def recompute_conv_weights(dims, width):
     """wprime_backward without the stored per-edge weights: the streaming interactions' ``[E, W]`` weights are not
     kept (MH-1: the second interaction's, 1,280 floats per edge; the first takes the reassociated path). With the
     fused forward the weights never exist in memory (CAP-T07b: built on chip in both passes). It keeps
-    ``_CONV_WEIGHTS_KEEP`` of the remaining activations."""
-    return 0, 0, _CONV_WEIGHTS_KEEP
+    ``_CONV_WEIGHTS_KEEP`` of the remaining per-edge activations."""
+    return 0, 0, _CONV_WEIGHTS_KEEP, 1.0
 
 
 def recompute_first_table(dims, width):
     """The first interaction's table output ``[h c, c]`` is not kept for the backward (the region keeps the lengths,
     which the table keeps anyway; 260 B per edge at NbCl5 and NaCl). It keeps ``_FIRST_TABLE_KEEP`` of the remaining
-    activations."""
-    return 0, 0, _FIRST_TABLE_KEEP
+    per-edge activations."""
+    return 0, 0, _FIRST_TABLE_KEEP, 1.0
 
 
 def recompute_node_segments(dims, width):
     """The node-local segments recomputed in the backward keep only their inputs: ``_NODE_SEGMENTS_KEEP`` of the
-    remaining activations (CAP-T08)."""
-    return 0, 0, _NODE_SEGMENTS_KEEP
+    remaining per-node activations (CAP-T08)."""
+    return 0, 0, 1.0, _NODE_SEGMENTS_KEEP
 
 
 def recompute_node_region(dims, width):
     """The combined node region in atom chunks, with the message divided inside its chunks, keeps
-    ``_NODE_REGION_KEEP`` of the separate segments' remaining activations (ninth list item 2, M3 target 1)."""
-    return 0, 0, _NODE_REGION_KEEP
+    ``_NODE_REGION_KEEP`` of the separate segments' remaining per-node activations (ninth list item 2, M3
+    target 1)."""
+    return 0, 0, 1.0, _NODE_REGION_KEEP
 
 
 def gate_epilogue(dims, width):
     """The gate's backward in ``linear_2``'s epilogue keeps more for the backward than the separate gate:
-    ``_GATE_EPILOGUE_KEEP`` of the remaining activations (docs/validation/region-norm.md)."""
-    return 0, 0, _GATE_EPILOGUE_KEEP
+    ``_GATE_EPILOGUE_KEEP`` of the remaining per-node activations (docs/validation/region-norm.md)."""
+    return 0, 0, 1.0, _GATE_EPILOGUE_KEEP
 
 
 def gate_epilogue_in_segments(dims, width):
     """``gate_epilogue`` with the separate node segments (``recompute_node_segments``), whose recomputation keeps
-    the epilogue's extra buffers live at the peak: ``_GATE_EPILOGUE_SEGMENTS_KEEP`` of the remaining activations
-    (planner.memory.CONTEXT_TERMS)."""
-    return 0, 0, _GATE_EPILOGUE_SEGMENTS_KEEP
+    the epilogue's extra buffers live at the peak: ``_GATE_EPILOGUE_SEGMENTS_KEEP`` of the remaining per-node
+    activations (planner.memory.CONTEXT_TERMS)."""
+    return 0, 0, 1.0, _GATE_EPILOGUE_SEGMENTS_KEEP
 
 
 def radial_tables(dims, width):
