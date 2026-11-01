@@ -88,8 +88,10 @@ class TileConfig:
     # neighbours "tiles": the tiles' edges searched within cutoff + skin (the force field's list's skin) and kept on
     # the host across calls with the tile plan; a call with the same cell while no atom has moved more than skin / 2
     # since that search filters them at the cutoff (bitwise a fresh search on the same tiles) instead of binning,
-    # planning and searching again (MD).
-    list_reuse: bool = False
+    # planning and searching again (MD). Kept only while the host keeps ``list_reuse_floor`` bytes available
+    # (MemAvailable, Linux): below it the kept lists are dropped and reuse is off, the reason in the call's report.
+    list_reuse: bool = True
+    list_reuse_floor: int = 20 * 2**30
     budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
@@ -439,6 +441,18 @@ def _unpack_units(packed, dtype, device):
     return table[packed.long()]
 
 
+def _host_available():
+    """The host's available memory in bytes (``MemAvailable``), or None where /proc/meminfo is missing."""
+    try:
+        with open("/proc/meminfo") as handle:
+            for line in handle:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    return None
+
+
 def _narrow_counts(counts):
     """Per-receiver edge counts at the narrowest integer dtype that holds them (uint8, int16 or int32)."""
     import torch
@@ -522,6 +536,7 @@ class TiledForceField:
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
         self._reuse_ok = None
+        self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
         self._graph_key = None
         self._pool = None
@@ -566,8 +581,10 @@ class TiledForceField:
             from fastmace.neighbors.tile_list import TileNeighbours
 
             skin, cutoff = self._reuse_skin(), float(self.field.neighbours.cutoff)
-            bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + skin)
-            kept = self._keep_lists(positions, n, bins.cell, skin) if skin > 0 else None
+            self._reusing = False
+            kept = (self._keep_lists(positions, n, TileNeighbours.like(self.field.neighbours).cell, skin)
+                    if skin > 0 else None)
+            bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + (skin if kept is not None else 0.0))
             if not self._reusing:
                 bins.bin(positions)
             positions64 = positions.to(device=self.device, dtype=torch.float64)
@@ -583,7 +600,10 @@ class TiledForceField:
                     packed = _pack_units(unit)
                     if packed is None:  # beyond int16 shifts: not kept, searched again next call
                         kept["complete"] = False
-                    else:
+                    elif not self._host_allows(f"keeping tile {index}'s lists"):
+                        kept["complete"] = False
+                        kept["superset"].clear()
+                    elif kept["complete"]:
                         counts = torch.bincount(torch.searchsorted(receivers, receiver),
                                                 minlength=receivers.shape[0])
                         kept["superset"][index] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(),
@@ -643,10 +663,22 @@ class TiledForceField:
 
             try:
                 TileNeighbours.like(neighbours, cutoff=float(neighbours.cutoff) + skin)
-                self._reuse_ok = True
+                self._reuse_ok, self.list_reuse_state = True, "on"
             except ValueError:  # fewer than three bins per axis at cutoff + skin
                 self._reuse_ok = False
+                self.list_reuse_state = "off: fewer than three bins of cutoff + skin per cell axis"
         return skin if self._reuse_ok else 0.0
+
+    def _host_allows(self, what):
+        """Whether the host keeps ``list_reuse_floor`` bytes available (MemAvailable; always off Linux). If not,
+        reuse is off from now on, with the reason in ``list_reuse_state``."""
+        available = _host_available()
+        if available is None or available >= int(self.config.list_reuse_floor):
+            return True
+        self._reuse_ok, self._kept = False, None
+        self.list_reuse_state = (f"off: {available / 2**30:.1f} GiB available on the host when {what}, below the "
+                                 f"floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
+        return False
 
     def _keep_lists(self, positions, n, cell, skin):
         """The kept lists for this call: reused (``self._reusing``) while the atom count, cell and receiver cap
@@ -660,6 +692,9 @@ class TiledForceField:
                  and torch.equal(kept["cell"], cell.cpu())
                  and float(((here - kept["reference"]) ** 2).sum(dim=1).max()) <= (skin / 2) ** 2)
         if not reuse:
+            self._kept = None
+            if not self._host_allows("keeping the reference positions"):
+                return None
             kept = self._kept = dict(n=n, cell=cell.cpu(), receivers=self.receivers, reference=here, superset={},
                                      tiles=None, grid=None, complete=True)
             self.list_rebuilds += 1
@@ -978,6 +1013,7 @@ class TiledForceField:
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      list_reused=self._reusing, list_rebuilds=self.list_rebuilds,
+                     list_reuse=self.list_reuse_state,
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
