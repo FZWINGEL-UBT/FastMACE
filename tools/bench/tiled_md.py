@@ -49,6 +49,11 @@ def parse_args(argv=None):
     p.add_argument("--alias-state", action="store_true", help="TileConfig.alias_state (with --host-state)")
     p.add_argument("--species-index", action="store_true",
                    help="TileConfig.species='index', the force field built with its one-hot on the host")
+    p.add_argument("--integrator", choices=("host", "device", "both"), default="host",
+                   help="where the integrator's state lives; both: two runs from the same start, compared bitwise")
+    p.add_argument("--no-list-cache", action="store_true",
+                   help="TileConfig.list_cache=False: about 270 bytes per atom less on the host, the tiles' lists "
+                        "searched every sweep")
     p.add_argument("--steps", type=int, default=200)
     p.add_argument("--timestep-fs", type=float, default=2.0)
     p.add_argument("--temperature", type=float, default=600.0)
@@ -56,20 +61,34 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False):
+def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False, integrator="device"):
+    """``integrator`` "host": the positions, velocities, forces and masses (float64) stay on the host, and each call
+    gets a device copy of the positions (freed after the call), so at the largest sizes the device holds no more
+    than one force call needs. "device": all of them on the device. The same float64 operations in the same order:
+    the trajectories are bitwise equal (the kinetic energy's sum is reduced in another order). "both": the host
+    integrator, with a device integrator beside it fed the same forces, compared bitwise every step (the device's
+    forces vary in their last bits from run to run, so two separate runs could not be compared bitwise)."""
     import numpy as np
     import torch
 
-    device = field.device
+    shadow = integrator == "both"
+    device = field.device if integrator == "device" else torch.device("cpu")
     masses = torch.tensor(atoms.get_masses(), dtype=torch.float64, device=device)[:, None]
     rng = np.random.default_rng(0)
     v = rng.standard_normal((len(atoms), 3)) * np.sqrt(KB_EV * temperature / atoms.get_masses())[:, None]
     v -= (atoms.get_masses()[:, None] * v).sum(0) / atoms.get_masses().sum()
     v = torch.tensor(v, dtype=torch.float64, device=device)
-    x = field._prepare_one_off(atoms).clone()
+    x = field._prepare_one_off(atoms).clone().to(device)
     dt = dt_fs * FS
-    out = call(x)
-    f = out.forces.detach().double()
+
+    def force(x):
+        out = call(x.to(field.device))
+        return out, out.forces.detach().to(device).double()
+
+    out, f = force(x)
+    if shadow:  # the device integrator's state, from the same start
+        xs, vs, ms = x.to(field.device), v.to(field.device), masses.to(field.device)
+        compared, mismatches = 0, []
     rows, rebuilds = [], 0
     started = time.perf_counter()
     for step in range(steps + 1):
@@ -80,22 +99,37 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False):
                          rebuilds=rebuilds, seconds=time.perf_counter() - started))
         if step == steps:
             break
+        if shadow:
+            fs = out.forces.detach().double()
+            vs = vs + 0.5 * dt * fs / ms
+            xs = xs + dt * vs
         v = v + 0.5 * dt * f / masses
         x = x + dt * v
         if not own_lists:  # per-tile lists: the tiles find their edges from the positions every call
-            if bool(field.needs_rebuild(x)):
-                field.rebuild(x)
+            on_device = x.to(field.device)
+            if bool(field.needs_rebuild(on_device)):
+                field.rebuild(on_device)
                 rebuilds += 1
-            field.compact(x)
+            field.compact(on_device)
             field.use_edges(int(field.edge_count))
-        out = call(x)
-        f = out.forces.detach().double()
+            del on_device
+        out, f = force(x)
         v = v + 0.5 * dt * f / masses
+        if shadow:
+            fs = out.forces.detach().double()
+            vs = vs + 0.5 * dt * fs / ms
+            compared += 1
+            if not (torch.equal(xs.cpu(), x) and torch.equal(vs.cpu(), v)):
+                mismatches.append(step)
         if step in (0, 9, 49, 99, 199, 499):
             rows[-1]["positions_sample"] = x[:4].cpu().tolist()
     torch.cuda.synchronize()
     seconds = time.perf_counter() - started
-    return dict(rows=rows, seconds=seconds, rebuilds=rebuilds, final_positions=x, natoms=len(atoms))
+    result = dict(rows=rows, seconds=seconds, rebuilds=rebuilds, final_positions=x, natoms=len(atoms),
+                  integrator=integrator)
+    if shadow:
+        result["shadow"] = dict(steps_compared=compared, bitwise_equal=not mismatches, mismatched_steps=mismatches)
+    return result
 
 
 def main(argv=None):
@@ -127,7 +161,7 @@ def main(argv=None):
     field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index, **rows)
     config = TileConfig(args.receivers, mode=args.mode, neighbours="tiles" if args.tile_list else "global",
                         state="host" if args.host_state else "device", alias_state=args.alias_state,
-                        species="index" if args.species_index else "one_hot")
+                        species="index" if args.species_index else "one_hot", list_cache=not args.no_list_cache)
     if args.bucket is not None:
         config = dataclasses.replace(config, bucket=args.bucket)
     tiled = TiledForceField(field, config)
@@ -141,7 +175,7 @@ def main(argv=None):
     for path in paths:
         call = tiled if path == "tiled" else field
         result = run(field, call, atoms, args.steps, args.timestep_fs, args.temperature,
-                     own_lists=args.tile_list and path == "tiled")
+                     own_lists=args.tile_list and path == "tiled", integrator=args.integrator)
         finals[path] = result.pop("final_positions")
         etot = np.array([row["etot"] for row in result["rows"]])
         result["drift_meV_per_atom"] = float(1e3 * (etot[-1] - etot[0]) / len(atoms))
