@@ -116,6 +116,8 @@ def main():
 
     device, stages = [], []
     for event in prof.events():
+        if event.name.startswith(PREFIX) and event.device_type == DeviceType.CUDA:
+            continue  # the marks' device-side annotations span whole stages: not device work
         if event.device_type == DeviceType.CUDA:
             device.append((event.time_range.start, event.time_range.end))
         elif event.name.startswith(PREFIX):
@@ -159,6 +161,12 @@ def main():
                                                             key=lambda kv: -sum(s for _, s in kv[1].values()))},
                   tiles=tiled.last.get("tiles"))
     args.output.mkdir(parents=True, exist_ok=True)
+    import numpy as np  # the raw intervals, for analyses without the GPU
+
+    np.savez_compressed(args.output / f"intervals-{args.mode}-{args.structure}-{n}.npz",
+                        device=np.array(device, dtype=np.float64).reshape(-1, 2),
+                        stages=np.array([(s, e) for s, e, _ in stages], dtype=np.float64).reshape(-1, 2),
+                        stage_labels=np.array([label for _, _, label in stages]))
     (args.output / f"gaps-{args.mode}-{args.structure}-{n}.json").write_text(json.dumps(record, indent=1))
     print(json.dumps({k: v for k, v in record.items() if k != "gaps_by_stage"}))
     for label, table in record["gaps_by_stage"].items():
