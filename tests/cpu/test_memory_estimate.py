@@ -201,6 +201,37 @@ def test_rescue_terms_keep_a_fraction_of_their_own_side():
     assert both.run - base.run == pytest.approx(saved["e"] + saved["n"] + saved["q"], abs=4)
 
 
+def test_the_rescue_stage_sets_the_allocator_reserve():
+    """docs/validation/estimate-band.md: the caching allocator reserves more than the live peak, by a ratio that is
+    stable across sizes for one stage of the memory rescue but differs between stages (graph-pool packing). The
+    deepest rung taken names the stage (``rescue_stage``); its ``RESCUE_RESERVE`` factor multiplies the kept
+    remainder and shows as the "allocator reserve" term. The default plan (no rung) keeps SAFETY's fit unchanged."""
+    assert memory.rescue_stage([]) == ""
+    assert memory.rescue_stage(["recompute_conv_weights", "gate_epilogue"]) == "recompute_conv_weights"
+    assert memory.rescue_stage(["recompute_conv_weights", "recompute_first_table", "recompute_node_segments",
+                                "gate_epilogue"]) == "recompute_node_segments"
+    # gate_epilogue off after the node segments is its own rung
+    assert memory.rescue_stage(["recompute_conv_weights", "recompute_first_table",
+                                "recompute_node_segments"]) == "gate_epilogue"
+    assert memory.rescue_stage(["recompute_node_segments", "recompute_node_region", "gate_epilogue"]) == (
+        "recompute_node_region")
+    stages = dict(memory.RESCUE_RESERVE)
+    assert set(stages) == set(memory.MEMORY_RESCUE) and all(0.5 < f < 1.5 for f in stages.values())
+    dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
+
+    def run(names):
+        terms = tuple((n, memory.MemoryTerm(edge_keep=0.5)) for n in names)
+        return memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", workspace=False, rewrite_terms=terms)
+
+    plain = run([])
+    assert plain.term("allocator reserve") == 0
+    conv = run(["recompute_conv_weights"])
+    kept = conv.term("activations") + conv.term("rewrites")
+    assert conv.term("allocator reserve") == pytest.approx((stages["recompute_conv_weights"] - 1) * kept, abs=2)
+    assert conv.run == pytest.approx(plain.run + dict(conv.rewrite_terms)["recompute_conv_weights"]
+                                     + conv.term("allocator reserve"), abs=4)
+
+
 # --------------------------------------------------------------------------- the rewrites' terms
 
 

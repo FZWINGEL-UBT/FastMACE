@@ -73,6 +73,29 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
                  ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"))
 
 
+# The caching allocator's reserve above the live peak differs per stage of the memory rescue (the graph pool's packing
+# slack: reserved / allocated 1.07-1.44 over the matrix, stable within 1.5 % across sizes for one crystal and stage,
+# the same on Linux and WSL2), so each stage scales the kept activations by its own factor, named by the deepest rung
+# taken (``rescue_stage``): the upper envelope over the rescue matrix of what keeps every point at or above its
+# measured peak (docs/validation/estimate-band.md). Relative to the default plan, whose reserve SAFETY's fit covers.
+RESCUE_RESERVE = (("recompute_conv_weights", 1.0), ("recompute_first_table", 1.0), ("recompute_node_segments", 1.0),
+                  ("gate_epilogue", 1.0), ("recompute_node_region", 1.0))
+
+
+def rescue_stage(enabled) -> str:
+    """The deepest memory-rescue rung among ``enabled`` (record names; gate_epilogue's rung is taken when it is off
+    with the node segments on): ``RESCUE_RESERVE``'s key, or "" for the default plan."""
+    enabled = set(enabled)
+    if "recompute_node_region" in enabled:
+        return "recompute_node_region"
+    if "recompute_node_segments" in enabled:
+        return "recompute_node_segments" if "gate_epilogue" in enabled else "gate_epilogue"
+    for name in ("recompute_first_table", "recompute_conv_weights"):
+        if name in enabled:
+            return name
+    return ""
+
+
 def rescue_value(name: str) -> str:
     """The value the memory rescue sets a ``MEMORY_RESCUE`` record to: "off" for ``RESCUE_OFF``, else "on"."""
     return "off" if name in RESCUE_OFF else "on"
@@ -276,6 +299,8 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
             rewrites.append((name, int(round(term.bytes(edges, nodes)))))
     rewrites = tuple(rewrites)
     kept, remaining = kept_edge + kept_node, remaining_edge + remaining_node
+    # The stage's allocator reserve on what the rescue kept (RESCUE_RESERVE; 1 for the default plan).
+    reserve = dict(RESCUE_RESERVE).get(rescue_stage(name for name, _ in rewrite_terms), 1.0)
     list_width = DTYPE_BYTES[list_dtype or dtype]
     pair_list = capacity * (_INDEX_BYTES_PER_SLOT + _SHIFT_FLOATS_PER_SLOT * list_width + _SHIFT64_BYTES_PER_SLOT)
     weights = dims.parameters * width
@@ -286,6 +311,7 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     terms = [*held,
              ("activations", int(math.ceil(SAFETY * activations))),
              ("rewrites", int(math.ceil(SAFETY * additive + kept - remaining))),
+             ("allocator reserve", int(round((reserve - 1.0) * kept))),
              ("neighbour list", int(pair_list))]
     if d3 is not None:
         terms.append(("d3 list", int(d3.list_bytes + d3.build_bytes)))

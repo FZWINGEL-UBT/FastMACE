@@ -24,6 +24,8 @@ from fastmace.planner import memory, minimal  # noqa: E402
 from fastmace.rewrites import memory as terms  # noqa: E402
 
 HELD_OUT = ("NaNbO3",)
+# Below this the build's fixed transient (about 1.7 GB, the build term's) sets the live peak, not the force call.
+MIN_ATOMS = 15_000
 DATA = FM / "tests/_support/data"
 FIT = json.loads((DATA / "rule12_fit.json").read_text())
 registry = minimal._rewrite_registry()
@@ -48,7 +50,7 @@ for c in cases:
 slope = {}
 print("stage          n  fixed GiB  per atom kB  per edge kB  fit residual")
 for stage in sorted({c["stage"] for c in cases}):
-    v = [c for c in cases if c["stage"] == stage and c["structure"] not in HELD_OUT]
+    v = [c for c in cases if c["stage"] == stage and c["structure"] not in HELD_OUT and c["nodes"] >= MIN_ATOMS]
     A = np.array([[1.0, c["nodes"], c["edges"]] for c in v])
     y = np.array([c["alloc"] for c in v], dtype=float)
     coef, *_ = np.linalg.lstsq(A / y[:, None], np.ones(len(v)), rcond=None)
@@ -56,7 +58,7 @@ for stage in sorted({c["stage"] for c in cases}):
     r = A @ coef / y
     print(f"{stage:13s} {len(v):2d}  {coef[0] / 2**30:8.2f}  {coef[1] / 1e3:10.1f}  {coef[2] / 1e3:10.3f}   "
           f"{r.min():.3f}-{r.max():.3f}")
-    held = [c for c in cases if c["stage"] == stage and c["structure"] in HELD_OUT]
+    held = [c for c in cases if c["stage"] == stage and c["structure"] in HELD_OUT and c["nodes"] >= MIN_ATOMS]
     if held:
         r = np.array([[1.0, c["nodes"], c["edges"]] for c in held]) @ coef / np.array([c["alloc"] for c in held])
         print(f"{'':13s} held out {', '.join(HELD_OUT)}: predicted/measured live peak {r.min():.3f}-{r.max():.3f}")
@@ -82,8 +84,9 @@ if "--keep-code" not in sys.argv:
         setattr(terms, k, round(float(v), 3))
 
 
-# 3. the band
-def estimate(c):
+# 3. the per-stage allocator reserve: the factor on the kept remainder that puts the stage's lowest fit point at its
+# measured peak (the upper envelope over the fit crystals, every size), rounded up to 0.005
+def full(c):
     dims = ModelDims.from_record(FIT["dims"][c["label"]])
     dt = c["dtype"]
     est = memory.estimate(dims, edges=c["edges"], nodes=c["nodes"], dtype=dt, capacity=c["capacity"], list_dtype=dt,
@@ -91,7 +94,32 @@ def estimate(c):
                           rewrite_terms=memory.rewrite_memory_terms(registry, dims, c["rewrites"], dt),
                           selfcheck_terms=memory.selfcheck_memory_terms(registry, dims, c["selfchecks"], dt, c["sms"]),
                           resident_terms=memory.resident_memory_terms(registry, dims, c["resident"], dt))
-    return est.total
+    return est
+
+
+memory.RESCUE_RESERVE = tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE)
+need = defaultdict(list)
+for c in cases:
+    est = full(c)
+    if est.build >= c["reserved"]:
+        continue
+    kept = est.term("activations") + est.term("rewrites")
+    need[memory.rescue_stage(n for n, _ in memory.rewrite_memory_terms(registry, ModelDims.from_record(
+        FIT["dims"][c["label"]]), c["rewrites"], c["dtype"]))].append(
+        ((c["reserved"] - (est.run - kept)) / kept, c["structure"] in HELD_OUT, c["structure"], c["nodes"]))
+factors = {}
+for stage, v in sorted(need.items()):
+    fit = max(x for x in v if not x[1])
+    held = max((x for x in v if x[1]), default=None)
+    factors[stage] = float(np.ceil(fit[0] * 200) / 200)
+    print(f"reserve {stage or 'default':25s} envelope {fit[0]:.3f} ({fit[2]} {fit[3]}) -> {factors[stage]:.3f}"
+          + (f"; held out needs {held[0]:.3f} ({held[3]})" if held else ""))
+if "--no-reserve" not in sys.argv:
+    memory.RESCUE_RESERVE = tuple((name, factors.get(name, 1.0)) for name, _ in memory.RESCUE_RESERVE)
+
+
+def estimate(c):
+    return full(c).total
 
 
 groups = defaultdict(list)
@@ -118,6 +146,7 @@ for name, file in (("fit (60)", "rule12_fit.json"), ("capacity (28)", "rule12_ca
     data = data["cases"] if isinstance(data, dict) else data
     r = [estimate(c) / c["peak_bytes"] for c in data]
     print(f"{name}: {min(r):.3f}-{max(r):.3f}")
-Path("band.json").write_text(json.dumps(dict(fractions=fractions, cases=[
+print("RESCUE_RESERVE =", memory.RESCUE_RESERVE)
+Path("band.json").write_text(json.dumps(dict(fractions=fractions, reserve=memory.RESCUE_RESERVE, cases=[
     {k: c[k] for k in ("structure", "gpu", "stage", "nodes", "edges", "alloc", "reserved", "ratio", "ratio_alloc")}
     for c in cases]), indent=1))
