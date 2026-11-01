@@ -57,8 +57,8 @@ tiled-slot-growth; the merge is not pushed.
 - **Drift over the 3 steps: 0.016 meV/atom.**
 - **MD at 70.96M NbCl5 atoms runs on 20 GB.**
 - A step takes about 1,200-1,280 s. The repeated call took 1,034 s with the list cache. The difference is the
-  cache, which is off here, and the variation from slot changes on a 3-step run; the host integrator adds a few
-  seconds per step.
+  cache, which is off here, and the variation from slot changes on a 3-step run. The host integrator's own time
+  is not measured separately.
 
 ## Left over
 
