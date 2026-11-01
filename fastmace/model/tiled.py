@@ -588,7 +588,8 @@ class TiledForceField:
             if not self._reusing:
                 bins.bin(positions)
             positions64 = positions.to(device=self.device, dtype=torch.float64)
-            cache = self._list_cache = {} if self.config.list_cache and n < 2**31 else None
+            # With kept lists the later sweeps filter them again: no per-call cache beside them (host memory).
+            cache = self._list_cache = {} if self.config.list_cache and n < 2**31 and kept is None else None
 
             def within(receivers):
                 """The tile's edges within the cutoff from the kept ones within cutoff + skin (searched there on a
@@ -1072,6 +1073,11 @@ class TiledForceField:
             list_cache = getattr(self, "_list_cache", None)
             stats["list_cache_bytes"] = int(sum(t.numel() * t.element_size() for entry in (list_cache or {}).values()
                                                 for t in entry))
+            kept = self._kept
+            stats["list_kept_bytes"] = 0 if kept is None else int(
+                sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
+                + kept["reference"].numel() * kept["reference"].element_size())
+            stats["list_reuse"] = self.list_reuse_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
             with torch.no_grad():

@@ -131,7 +131,8 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False, integrat
                            gpu_total_bytes=int(torch.cuda.get_device_properties(field.device).total_memory)
                            if torch.cuda.is_available() else None,
                            **_host_memory(), mode=last.get("mode"), mode_reason=last.get("mode_reason"),
-                           call_receivers=last.get("receivers"), list_cache_bytes=last.get("list_cache_bytes")))
+                           call_receivers=last.get("receivers"), list_cache_bytes=last.get("list_cache_bytes"),
+                           list_kept_bytes=last.get("list_kept_bytes"), list_reuse=last.get("list_reuse")))
         return out, forces
 
     out, f = force(x)
