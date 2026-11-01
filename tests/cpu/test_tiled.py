@@ -520,3 +520,34 @@ def test_deferred_host_state_writes_are_bitwise_the_immediate_ones(mode, alias):
         assert not tiled._g["state"]._pending
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+# ---------------------------------------------------------------- the whole-system stages in chunks
+
+
+def test_binning_and_tile_plan_in_chunks_are_bitwise_unchunked(monkeypatch):
+    """``TileNeighbours.bin`` and ``plan_tiles`` work in chunks of ``CHUNK`` atoms (the call's whole-system
+    transients): with 7-atom chunks the bins, the order, the tiles and the edges are bitwise those of one chunk;
+    and the plan without degrees (``row_ptr`` None) splits blocks exactly as with all-zero degrees."""
+    from fastmace.neighbors import tile_list
+    from fastmace.neighbors.tile_list import TileNeighbours
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    positions = field._prepare_one_off(atoms)
+    cell = torch.as_tensor(atoms.cell.array)
+    n = len(atoms)
+    results = []
+    for chunk in (tile_list.CHUNK, 7):
+        monkeypatch.setattr(tile_list, "CHUNK", chunk)
+        bins = TileNeighbours.like(field.neighbours)
+        bins.bin(positions)
+        tiles, _ = plan_tiles(positions, cell, None, 40, 2**62)
+        degrees, _ = plan_tiles(positions, cell, torch.zeros(n + 1, dtype=torch.int64), 40, 2**62)
+        assert [t.tolist() for t in tiles] == [t.tolist() for t in degrees]
+        results.append((bins.offsets, bins.atom_bin, bins.order, tiles, [bins.edges(t) for t in tiles]))
+    (o1, b1, r1, t1, e1), (o2, b2, r2, t2, e2) = results
+    assert torch.equal(o1, o2) and torch.equal(b1, b2) and torch.equal(r1, r2)
+    assert [t.tolist() for t in t1] == [t.tolist() for t in t2]
+    for x, y in zip(e1, e2):
+        assert all(torch.equal(a, b) for a, b in zip(x, y))
