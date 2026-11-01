@@ -1,0 +1,159 @@
+{
+ "structure": "NbCl5",
+ "atoms": 884736,
+ "mode": "eager",
+ "receivers": 4096,
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "host": "murphy",
+ "source_commit": "946a5cf5",
+ "warm": [
+  27.61268179799663,
+  22.953698139986955
+ ],
+ "plain_call": 23.66509845497785,
+ "timed_call": 23.476256780035328,
+ "stages": {
+  "interaction 0 (sweeps 1, 3)": 10.054,
+  "interaction 1 (sweep 2)": 9.555,
+  "call (rest)": 0.733,
+  "tile list (per-tile neighbour list)": 0.625,
+  "host state: read rows": 0.591,
+  "tile graph (rest)": 0.518,
+  "host state: add rows / window": 0.476,
+  "eager tile (rest: scatter)": 0.456,
+  "host state: put rows": 0.3,
+  "host state: close": 0.122,
+  "host state: touch": 0.032,
+  "host state: plan": 0.012
+ },
+ "stage_counts": {
+  "call (rest)": 1,
+  "tile graph (rest)": 936,
+  "tile list (per-tile neighbour list)": 312,
+  "host state: touch": 312,
+  "eager tile (rest: scatter)": 936,
+  "interaction 0 (sweeps 1, 3)": 624,
+  "host state: put rows": 936,
+  "host state: plan": 1,
+  "interaction 1 (sweep 2)": 312,
+  "host state: read rows": 1248,
+  "host state: add rows / window": 312,
+  "host state: close": 312
+ },
+ "profiled_call": 26.67310684901895,
+ "device_seconds": 18.820303796999813,
+ "device_busy_share": 0.7055909873390708,
+ "kernel_groups": {
+  "elementwise": 7.856,
+  "other": 4.383,
+  "gemm": 4.063,
+  "copies": 1.136,
+  "convolution": 0.769,
+  "index/scatter": 0.328,
+  "reduce": 0.224,
+  "sort/unique": 0.062
+ },
+ "top_kernels": [
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, false>(int",
+   2.602
+  ],
+  [
+   "ampere_sgemm_128x64_nn",
+   2.051
+  ],
+  [
+   "gated_input_grads",
+   1.643
+  ],
+  [
+   "gemm",
+   1.638
+  ],
+  [
+   "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::T",
+   1.503
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at",
+   1.093
+  ],
+  [
+   "oeq_projected_backward_wprime",
+   0.771
+  ],
+  [
+   "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, f",
+   0.703
+  ],
+  [
+   "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, f",
+   0.63
+  ],
+  [
+   "fused_folded_forward",
+   0.581
+  ],
+  [
+   "backward",
+   0.511
+  ],
+  [
+   "Memcpy DtoH (Device -> Pageable)",
+   0.477
+  ],
+  [
+   "Memcpy HtoD (Pageable -> Device)",
+   0.461
+  ],
+  [
+   "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::native::(anonymous namespace)::OpaqueType<4u>",
+   0.283
+  ],
+  [
+   "kernel",
+   0.282
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<float, float, float, at::native::binary_inte",
+   0.272
+  ],
+  [
+   "segmented_polynomial_algo4_4",
+   0.249
+  ],
+  [
+   "segmented_polynomial_bwd_algo4_2",
+   0.222
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std::array<char*, 3ul>, false>(in",
+   0.215
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_4",
+   0.192
+  ],
+  [
+   "Memcpy DtoD (Device -> Device)",
+   0.182
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::neg_kernel_cuda(at::TensorIteratorBase&)::{lambda()#2}::op",
+   0.168
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::binary_inte",
+   0.154
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native:",
+   0.14
+  ],
+  [
+   "forward",
+   0.122
+  ]
+ ],
+ "tiles": 312
+}

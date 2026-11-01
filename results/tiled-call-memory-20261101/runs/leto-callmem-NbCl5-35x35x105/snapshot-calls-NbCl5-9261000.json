@@ -1,0 +1,929 @@
+{
+ "structure": "NbCl5",
+ "atoms": 9261000,
+ "host": "leto",
+ "source_commit": "57fe4556",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "calls": [
+  {
+   "call": 1,
+   "allocated_before": 1154255360,
+   "peak_above": 2432193536,
+   "traced_peak": 1308373380,
+   "live_at_peak": [
+    {
+     "bytes": 550307840,
+     "bytes_per_atom": 59.4,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward",
+      "kernels/oeq_streaming/wprime_backward.py:463 convolution",
+      "rewrites/mh1/modules.py:396 streaming_message"
+     ]
+    },
+    {
+     "bytes": 134217728,
+     "bytes_per_atom": 14.5,
+     "where": [
+      "kernels/triton/segment_gemm.py:114 joined_products_op",
+      "kernels/triton/gated_products.py:249 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 131543040,
+     "bytes_per_atom": 14.2,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:364 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward",
+      "kernels/oeq_streaming/wprime_backward.py:463 convolution",
+      "rewrites/mh1/modules.py:396 streaming_message"
+     ]
+    },
+    {
+     "bytes": 83886080,
+     "bytes_per_atom": 9.1,
+     "where": [
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward",
+      "model/tiled.py:529 _second"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 41943040,
+     "bytes_per_atom": 4.5,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 41943040,
+     "bytes_per_atom": 4.5,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 33554432,
+     "bytes_per_atom": 3.6,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "rewrites/fusion/modules.py:129 forward",
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "rewrites/fusion/modules.py:129 forward",
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 15440892,
+     "bytes_per_atom": 1.7,
+     "where": [
+      "rewrites/mh1/modules.py:269 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward",
+      "model/tiled.py:529 _second"
+     ]
+    },
+    {
+     "bytes": 13154304,
+     "bytes_per_atom": 1.4,
+     "where": [
+      "model/tiled.py:173 rows",
+      "model/tiled.py:521 _second",
+      "model/tiled.py:955 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 8388608,
+     "bytes_per_atom": 0.9,
+     "where": [
+      "rewrites/fusion/modules.py:123 forward",
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward"
+     ]
+    },
+    {
+     "bytes": 8388608,
+     "bytes_per_atom": 0.9,
+     "where": [
+      "kernels/triton/segment_gemm.py:122 joined_products_op",
+      "kernels/triton/gated_products.py:249 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 6878848,
+     "bytes_per_atom": 0.7,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 2286588,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:476 _attrs",
+      "model/tiled.py:516 _second",
+      "model/tiled.py:955 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 1719712,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:419 tiles",
+      "model/tiled.py:389 _tile_graph",
+      "model/tiled.py:775 __call__"
+     ]
+    },
+    {
+     "bytes": 1719712,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:395 _tile_graph",
+      "model/tiled.py:775 __call__"
+     ]
+    },
+    {
+     "bytes": 1572864,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:173 rows",
+      "model/tiled.py:522 _second",
+      "model/tiled.py:955 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "neighbors/tile_list.py:99 shifts",
+      "model/tiled.py:419 tiles",
+      "model/tiled.py:389 _tile_graph",
+      "model/tiled.py:775 __call__"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "model/tiled.py:942 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "model/tiled.py:448 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:449 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    }
+   ],
+   "small": 6445388,
+   "events": 4000000,
+   "largest_allocations": [
+    {
+     "bytes": 550307840,
+     "bytes_per_atom": 59.4,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward"
+     ]
+    },
+    {
+     "bytes": 136601600,
+     "bytes_per_atom": 14.8,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:364 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward"
+     ]
+    },
+    {
+     "bytes": 136601600,
+     "bytes_per_atom": 14.8,
+     "where": []
+    },
+    {
+     "bytes": 134217728,
+     "bytes_per_atom": 14.5,
+     "where": [
+      "kernels/triton/segment_gemm.py:114 joined_products_op",
+      "kernels/triton/gated_products.py:249 forward"
+     ]
+    },
+    {
+     "bytes": 111132000,
+     "bytes_per_atom": 12.0,
+     "where": [
+      "model/tiled.py:817 __call__"
+     ]
+    },
+    {
+     "bytes": 83886080,
+     "bytes_per_atom": 9.1,
+     "where": [
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer"
+     ]
+    },
+    {
+     "bytes": 74088000,
+     "bytes_per_atom": 8.0,
+     "where": [
+      "model/tiled.py:811 __call__"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "kernels/triton/gated_products.py:222 gated_products_input_grads",
+      "kernels/triton/gated_products.py:256 backward"
+     ]
+    },
+    {
+     "bytes": 57314340,
+     "bytes_per_atom": 6.2,
+     "where": [
+      "rewrites/species/modules.py:44 forward",
+      "rewrites/mh1/modules.py:262 cutoff_folded_forward"
+     ]
+    },
+    {
+     "bytes": 55785600,
+     "bytes_per_atom": 6.0,
+     "where": [
+      "kernels/triton/edge_outer_sum.py:67 edge_outer_sum_forward",
+      "kernels/triton/edge_outer_sum.py:141 forward"
+     ]
+    },
+    {
+     "bytes": 54927360,
+     "bytes_per_atom": 5.9,
+     "where": [
+      "rewrites/mh1/modules.py:199 forward",
+      "rewrites/mh1/modules.py:326 cutoff_folded_forward"
+     ]
+    },
+    {
+     "bytes": 37044000,
+     "bytes_per_atom": 4.0,
+     "where": [
+      "model/tiled.py:804 __call__"
+     ]
+    },
+    {
+     "bytes": 35012608,
+     "bytes_per_atom": 3.8,
+     "where": [
+      "rewrites/species/modules.py:186 forward",
+      "model/tiled.py:461 _layer"
+     ]
+    },
+    {
+     "bytes": 35012608,
+     "bytes_per_atom": 3.8,
+     "where": [
+      "model/tiled.py:461 _layer",
+      "model/tiled.py:543 _first_forward"
+     ]
+    },
+    {
+     "bytes": 31457280,
+     "bytes_per_atom": 3.4,
+     "where": [
+      "rewrites/linear/modules.py:202 <listcomp>",
+      "rewrites/linear/modules.py:202 output_rows"
+     ]
+    },
+    {
+     "bytes": 31457280,
+     "bytes_per_atom": 3.4,
+     "where": [
+      "rewrites/linear/modules.py:38 backward"
+     ]
+    },
+    {
+     "bytes": 28017340,
+     "bytes_per_atom": 3.0,
+     "where": [
+      "kernels/triton/radial_table.py:136 radial_table_forward",
+      "kernels/triton/radial_table.py:184 forward"
+     ]
+    },
+    {
+     "bytes": 28017340,
+     "bytes_per_atom": 3.0,
+     "where": [
+      "kernels/triton/edge_outer_sum.py:122 edge_outer_sum_backward",
+      "kernels/triton/edge_outer_sum.py:149 backward"
+     ]
+    }
+   ]
+  },
+  {
+   "call": 2,
+   "allocated_before": 1561722368,
+   "peak_above": 2135838720,
+   "traced_peak": 1308373380,
+   "live_at_peak": [
+    {
+     "bytes": 550307840,
+     "bytes_per_atom": 59.4,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward",
+      "kernels/oeq_streaming/wprime_backward.py:463 convolution",
+      "rewrites/mh1/modules.py:396 streaming_message"
+     ]
+    },
+    {
+     "bytes": 134217728,
+     "bytes_per_atom": 14.5,
+     "where": [
+      "kernels/triton/segment_gemm.py:114 joined_products_op",
+      "kernels/triton/gated_products.py:249 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 131543040,
+     "bytes_per_atom": 14.2,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:364 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward",
+      "kernels/oeq_streaming/wprime_backward.py:463 convolution",
+      "rewrites/mh1/modules.py:396 streaming_message"
+     ]
+    },
+    {
+     "bytes": 83886080,
+     "bytes_per_atom": 9.1,
+     "where": [
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward",
+      "model/tiled.py:529 _second"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 41943040,
+     "bytes_per_atom": 4.5,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 41943040,
+     "bytes_per_atom": 4.5,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 33554432,
+     "bytes_per_atom": 3.6,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>",
+      "rewrites/linear/modules.py:78 block_products",
+      "rewrites/linear/modules.py:203 output_rows"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "rewrites/fusion/modules.py:129 forward",
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "rewrites/fusion/modules.py:129 forward",
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward"
+     ]
+    },
+    {
+     "bytes": 25165824,
+     "bytes_per_atom": 2.7,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 15440892,
+     "bytes_per_atom": 1.7,
+     "where": [
+      "rewrites/mh1/modules.py:269 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward",
+      "model/tiled.py:529 _second"
+     ]
+    },
+    {
+     "bytes": 13154304,
+     "bytes_per_atom": 1.4,
+     "where": [
+      "model/tiled.py:173 rows",
+      "model/tiled.py:521 _second",
+      "model/tiled.py:955 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 8388608,
+     "bytes_per_atom": 0.9,
+     "where": [
+      "rewrites/fusion/modules.py:123 forward",
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer",
+      "model/tiled.py:556 _second_forward"
+     ]
+    },
+    {
+     "bytes": 8388608,
+     "bytes_per_atom": 0.9,
+     "where": [
+      "kernels/triton/segment_gemm.py:122 joined_products_op",
+      "kernels/triton/gated_products.py:249 forward",
+      "kernels/triton/gated_products.py:269 gated_joined_products",
+      "rewrites/fusion/modules.py:110 _gate_epilogue"
+     ]
+    },
+    {
+     "bytes": 6878848,
+     "bytes_per_atom": 0.7,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 2286588,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:476 _attrs",
+      "model/tiled.py:516 _second",
+      "model/tiled.py:955 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 1719712,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:419 tiles",
+      "model/tiled.py:389 _tile_graph",
+      "model/tiled.py:775 __call__"
+     ]
+    },
+    {
+     "bytes": 1719712,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:395 _tile_graph",
+      "model/tiled.py:775 __call__"
+     ]
+    },
+    {
+     "bytes": 1572864,
+     "bytes_per_atom": 0.2,
+     "where": [
+      "model/tiled.py:173 rows",
+      "model/tiled.py:522 _second",
+      "model/tiled.py:955 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "neighbors/tile_list.py:99 shifts",
+      "model/tiled.py:419 tiles",
+      "model/tiled.py:389 _tile_graph",
+      "model/tiled.py:775 __call__"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "model/tiled.py:942 _eager_tile",
+      "model/tiled.py:791 __call__"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "model/tiled.py:448 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 1289784,
+     "bytes_per_atom": 0.1,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:449 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    },
+    {
+     "bytes": 429928,
+     "bytes_per_atom": 0.0,
+     "where": [
+      "model/tiled.py:450 _edges",
+      "model/tiled.py:555 _second_forward",
+      "model/tiled.py:529 _second",
+      "model/tiled.py:955 _eager_tile"
+     ]
+    }
+   ],
+   "small": 6445388,
+   "events": 4000000,
+   "largest_allocations": [
+    {
+     "bytes": 550307840,
+     "bytes_per_atom": 59.4,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:365 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward"
+     ]
+    },
+    {
+     "bytes": 136601600,
+     "bytes_per_atom": 14.8,
+     "where": [
+      "kernels/oeq_streaming/fused_forward.py:364 fused_folded_forward",
+      "kernels/oeq_streaming/wprime_backward.py:394 forward"
+     ]
+    },
+    {
+     "bytes": 136601600,
+     "bytes_per_atom": 14.8,
+     "where": []
+    },
+    {
+     "bytes": 134217728,
+     "bytes_per_atom": 14.5,
+     "where": [
+      "kernels/triton/segment_gemm.py:114 joined_products_op",
+      "kernels/triton/gated_products.py:249 forward"
+     ]
+    },
+    {
+     "bytes": 111132000,
+     "bytes_per_atom": 12.0,
+     "where": [
+      "model/tiled.py:817 __call__"
+     ]
+    },
+    {
+     "bytes": 83886080,
+     "bytes_per_atom": 9.1,
+     "where": [
+      "rewrites/mh1/modules.py:349 cutoff_folded_forward",
+      "model/tiled.py:457 _layer"
+     ]
+    },
+    {
+     "bytes": 74088000,
+     "bytes_per_atom": 8.0,
+     "where": [
+      "model/tiled.py:811 __call__"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "rewrites/linear/modules.py:33 forward",
+      "rewrites/linear/modules.py:78 <listcomp>"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "kernels/triton/gated_products.py:186 _gated_rows",
+      "kernels/triton/gated_products.py:246 forward"
+     ]
+    },
+    {
+     "bytes": 58720256,
+     "bytes_per_atom": 6.3,
+     "where": [
+      "kernels/triton/gated_products.py:222 gated_products_input_grads",
+      "kernels/triton/gated_products.py:256 backward"
+     ]
+    },
+    {
+     "bytes": 57314340,
+     "bytes_per_atom": 6.2,
+     "where": [
+      "rewrites/species/modules.py:44 forward",
+      "rewrites/mh1/modules.py:262 cutoff_folded_forward"
+     ]
+    },
+    {
+     "bytes": 55785600,
+     "bytes_per_atom": 6.0,
+     "where": [
+      "kernels/triton/edge_outer_sum.py:67 edge_outer_sum_forward",
+      "kernels/triton/edge_outer_sum.py:141 forward"
+     ]
+    },
+    {
+     "bytes": 54927360,
+     "bytes_per_atom": 5.9,
+     "where": [
+      "rewrites/mh1/modules.py:199 forward",
+      "rewrites/mh1/modules.py:326 cutoff_folded_forward"
+     ]
+    },
+    {
+     "bytes": 37044000,
+     "bytes_per_atom": 4.0,
+     "where": [
+      "model/tiled.py:804 __call__"
+     ]
+    },
+    {
+     "bytes": 35012608,
+     "bytes_per_atom": 3.8,
+     "where": [
+      "rewrites/species/modules.py:186 forward",
+      "model/tiled.py:461 _layer"
+     ]
+    },
+    {
+     "bytes": 35012608,
+     "bytes_per_atom": 3.8,
+     "where": [
+      "model/tiled.py:461 _layer",
+      "model/tiled.py:543 _first_forward"
+     ]
+    },
+    {
+     "bytes": 31457280,
+     "bytes_per_atom": 3.4,
+     "where": [
+      "rewrites/linear/modules.py:202 <listcomp>",
+      "rewrites/linear/modules.py:202 output_rows"
+     ]
+    },
+    {
+     "bytes": 31457280,
+     "bytes_per_atom": 3.4,
+     "where": [
+      "rewrites/linear/modules.py:38 backward"
+     ]
+    },
+    {
+     "bytes": 28017340,
+     "bytes_per_atom": 3.0,
+     "where": [
+      "kernels/triton/radial_table.py:136 radial_table_forward",
+      "kernels/triton/radial_table.py:184 forward"
+     ]
+    },
+    {
+     "bytes": 28017340,
+     "bytes_per_atom": 3.0,
+     "where": [
+      "kernels/triton/edge_outer_sum.py:122 edge_outer_sum_backward",
+      "kernels/triton/edge_outer_sum.py:149 backward"
+     ]
+    }
+   ]
+  }
+ ]
+}
