@@ -3285,6 +3285,16 @@ launcher remains a requirement. Results: `docs/validation/6-T15.md`.
   self-check holds the certificate. First record: `radial_tables` (opt-in,
   `never_automatic`; refused in float64 plans).
 
+**Rule 12 per side, per stage and probed near the limit (1 November 2026, owner: make the memory estimation more
+accurate; conductor):** §9.1/§9.3 rule 12 and §13 amended. The rescue records' fractions apply to their own side
+(per-edge or per-atom part of the remaining activations), and a per-stage allocator reserve covers what PyTorch
+reserves beyond the live peak (no crystal key). `EngineConfig.memory_probe` ("auto" = near-limit for MD with CUDA
+graphs, else off; "near-limit", "always", "off"): when the chosen stage or the next-cheaper one is within the
+stage band of the free memory, rule 12 measures it in a child on a 15-20k-atom replica of the structure's repeat
+unit and re-plans with the measured scale plus 5 % headroom. The ladder and the probe are recorded in the plan,
+the report and `metadata.json` (§13 keys `plan.memory_ladder`, `plan.memory_probe`); resumes reuse the scales and
+never probe. See `docs/validation/estimate-band.md` and `docs/validation/estimate-probe.md`.
+
 **Decision 67 (29 October 2026, owner: "It should only do this if memory would not be enough"):** rule 12
 (§9.3) turns off the streaming convolution and its dependants only when the plan would not fit with them on and
 turning them off lowers the estimate; decision 51 amended to match. MH-1's fused-path rewrites declare their
