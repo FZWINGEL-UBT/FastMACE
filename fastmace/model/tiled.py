@@ -85,8 +85,8 @@ class TileConfig:
     # neighbours "tiles": each tile's edges found once per call and kept on the host (int32 senders, receiver counts
     # and one-byte unit shifts, about 5 bytes per edge), the later sweeps rebuilding them exactly from it.
     list_cache: bool = True
-    # neighbours "tiles", a fixed cell: the tiles' edges searched within cutoff + skin (the force field's list's
-    # skin) and kept on the host across calls with the tile plan; a call while no atom has moved more than skin / 2
+    # neighbours "tiles": the tiles' edges searched within cutoff + skin (the force field's list's skin) and kept on
+    # the host across calls with the tile plan; a call with the same cell while no atom has moved more than skin / 2
     # since that search filters them at the cutoff (bitwise a fresh search on the same tiles) instead of binning,
     # planning and searching again (MD).
     list_reuse: bool = False
@@ -631,12 +631,12 @@ class TiledForceField:
         return global_list, row_ptr, edge_index.shape[1] / max(n, 1)
 
     def _reuse_skin(self):
-        """``list_reuse``'s skin: the force field's list's, when the lists can be kept (tile lists, a fixed cell,
-        at least three bins of cutoff + skin per axis); else 0."""
+        """``list_reuse``'s skin: the force field's list's, when the lists can be kept (tile lists, at least three
+        bins of cutoff + skin per axis); else 0. A cell that changes (NPT, a strained one-off call) searches again:
+        ``_keep_lists`` compares the cell every call."""
         neighbours = self.field.neighbours
         skin = float(getattr(neighbours, "skin", 0.0) or 0.0)
-        if not (self.config.list_reuse and self.config.neighbours == "tiles" and skin > 0
-                and not getattr(neighbours, "variable_cell", False)):
+        if not (self.config.list_reuse and self.config.neighbours == "tiles" and skin > 0):
             return 0.0
         if self._reuse_ok is None:
             from fastmace.neighbors.tile_list import TileNeighbours

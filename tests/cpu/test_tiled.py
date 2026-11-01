@@ -510,15 +510,17 @@ def test_tile_lists_built_once_per_call_are_bitwise_the_rebuilt_ones(mode, monke
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
 
 
+@pytest.mark.parametrize("stress", [False, True], ids=["fixed", "stress"])
 @pytest.mark.parametrize("mode", ["eager", "padded"])
-def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, monkeypatch):
+def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, stress, monkeypatch):
     """``TileConfig.list_reuse``: the tiles' edges are searched within cutoff + skin and kept across calls with the
     plan; while no atom has moved more than skin / 2 a call filters them at the cutoff (pairs cross it), bitwise a
     fresh search on the same tiles; a larger move searches again."""
     from fastmace.model import tiled as tiled_module
 
     calc, atoms = calculator(), big_structure()
-    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=stress,
+                           rewrites=only(*MH1_PACKAGE))
     kept = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse=True))
     fresh = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles"))
     x0 = field._prepare_one_off(atoms).clone()
