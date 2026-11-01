@@ -639,10 +639,13 @@ def test_gate_epilogue_s_term_depends_on_the_node_segments():
 
 
 @pytest.mark.rule(12)
-def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments():
+def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments(monkeypatch):
     """docs/validation/region-norm.md: gate_epilogue (on by decision 66 on this file's GPU) stays on while the plan
     fits, and while it fits with recompute_node_segments on; otherwise rule 12 turns it off, the memory rescue's
-    fourth rung, with its own reason. The caller's explicit "on" is kept."""
+    fourth rung, with its own reason. The caller's explicit "on" is kept. The stages' allocator reserve is neutral
+    here: fitted on MH-1's widths (the rung lowers its estimate by 3.5-4.5 %, docs/validation/estimate-band.md), it
+    would outweigh the rung on the tiny model, whose kept remainder is mostly per edge."""
+    monkeypatch.setattr(memory, "RESCUE_RESERVE", tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE))
     assert memory.RESCUE_OFF == ("gate_epilogue",) and memory.rescue_value("gate_epilogue") == "off"
     full = plan(label=MH1)
     assert full.rewrites.gate_epilogue == full.rewrites.wprime_backward == "on"
@@ -666,8 +669,10 @@ def test_rule_12_gives_gate_epilogue_back_with_the_chunked_region(monkeypatch):
     """docs/validation/region-norm.md: when the rescue ends with recompute_node_region on, gate_epilogue keeps 0.5 kB
     per atom inside its chunks, so rule 12 turns it on again where the estimate still fits with it. The tiny model
     saves too little for rule 12 to take the rungs itself (``short_by_far``), so the overstatement is set to 1, and
-    reassociate_first is set on, so that decision 51 drops nothing first."""
+    reassociate_first is set on, so that decision 51 drops nothing first. The stages' allocator reserve is neutral,
+    as in the test above."""
     monkeypatch.setattr(memory, "RESCUE_OVERSTATEMENT", 1.0)
+    monkeypatch.setattr(memory, "RESCUE_RESERVE", tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE))
     atoms = nacl(repeat=16)
     base = RewriteConfig(reassociate_first="on")
     full = plan(rewrites=base, atoms=atoms, label=MH1)
