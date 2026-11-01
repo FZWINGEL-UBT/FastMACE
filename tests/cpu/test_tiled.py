@@ -504,8 +504,30 @@ def test_tile_lists_built_once_per_call_are_bitwise_the_rebuilt_ones(mode, monke
         tiles = tiled.last["tiles"]
         assert len(searches) == (tiles if cache else (3 + (mode == "padded")) * tiles)
         assert (tiled.last["list_cache_bytes"] > 0) == cache
+        if cache:  # int32 senders, one-byte shift codes (every cell longer than the cutoff), narrow counts
+            assert tiled.last["list_cache_bytes"] <= 5 * tiled.last["edges"] + len(atoms)
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+def test_list_cache_unit_shifts_one_byte_codes_or_int16_and_back_exactly():
+    """The list cache keeps unit shifts in {-1, 0, 1}^3 as one byte (an index into the 27 combinations), larger
+    ones (a cell shorter than the cutoff) as int16, and gives back the float unit shifts exactly; receiver counts at
+    the narrowest integer dtype that holds them."""
+    from fastmace.model.tiled import _narrow_counts, _pack_units, _unpack_units
+
+    rng = np.random.default_rng(0)
+    for low, high, dtype in ((-1, 1, torch.uint8), (-2, 2, torch.int16), (0, 0, torch.uint8)):
+        unit = torch.tensor(rng.integers(low, high + 1, (50, 3)), dtype=torch.float32)
+        packed = _pack_units(unit)
+        assert packed.dtype == dtype
+        back = _unpack_units(packed, torch.float32, unit.device)
+        assert back.dtype == torch.float32 and torch.equal(back, unit)
+    assert _pack_units(torch.full((2, 3), 2.0**15)) is None
+    assert _pack_units(torch.zeros((0, 3))).dtype == torch.uint8
+    for top, dtype in ((255, torch.uint8), (256, torch.int16), (2**15, torch.int32)):
+        counts = torch.tensor([0, 3, top])
+        assert _narrow_counts(counts).dtype == dtype and torch.equal(_narrow_counts(counts).long(), counts)
 
 
 def test_compiled_tiles_default_to_the_workspace_budget():
