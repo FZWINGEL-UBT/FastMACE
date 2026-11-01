@@ -1,0 +1,53 @@
+ leeloo fastmace=5ff880c3 NVIDIA RTX 4000 Ada Generation, 595.99.02
+ end NbCl5:5x5x18 exit=0 point NbCl5 float32 32400 atoms (5x5x18): ok, 304.75 ms/step, steady peak r
+ end NbCl5:6x6x28 exit=0 point NbCl5 float32 72576 atoms (6x6x28): ok, 821.67 ms/step, steady peak r
+ end NbCl5:6x6x33 exit=0 point NbCl5 float32 85536 atoms (6x6x33): ok, 1015.20 ms/step, steady peak 
+ end NbCl5:6x6x40 exit=0 point NbCl5 float32 103680 atoms (6x6x40): ok, 1368.72 ms/step, steady peak
+ end NbCl5:6x6x47 exit=0 point NbCl5 float32 121824 atoms (6x6x47): ok, 1617.86 ms/step, steady peak
+ end SrTiO3:21x21x21 exit=0 point SrTiO3 float32 46305 atoms (21x21x21): ok, 732.90 ms/step, steady 
+ end SrTiO3:25x25x25 exit=0 point SrTiO3 float32 78125 atoms (25x25x25): ok, 1383.78 ms/step, steady
+ end SrTiO3:28x28x28 exit=0 point SrTiO3 float32 109760 atoms (28x28x28): ok, 2133.77 ms/step, stead
+ DONE
+NbCl5 32400: ok, 305 ms/step, estimate 13.85 GiB, peak 13.22 GiB, ratio 1.047, build 71 s
+   rungs: {'recompute_conv_weights': 'off', 'recompute_first_table': 'off', 'recompute_node_segments': 'off', 'recompute_node_region': 'off'}
+   ladder: free 19.37 GiB, chosen default 13.85, cheaper none
+   probe: default -> default, changed False, 40 s
+     default: replica 16128 estimate 8.22 reserved 6.70 allocated 6.00 scale 0.809; cell 16.24 -> 13.85 GiB, 38 s
+NbCl5 72576: ok, 822 ms/step, estimate 15.19 GiB, peak 14.49 GiB, ratio 1.049, build 122 s
+   rungs: {'recompute_node_region': 'off', 'recompute_conv_weights': 'on', 'recompute_first_table': 'on', 'recompute_node_segments': 'on'}
+   ladder: free 19.37 GiB, chosen recompute_node_segments 15.19, cheaper recompute_first_table 19.99
+   probe: recompute_node_segments -> recompute_node_segments, changed False, 84 s
+     recompute_node_segments: replica 16128 estimate 3.55 reserved 3.42 allocated 2.94 scale 0.961; cell 15.06 -> 15.19 GiB, 41 s
+     recompute_first_table: replica 16128 estimate 4.56 reserved 4.44 allocated 3.65 scale 0.971; cell 19.61 -> 19.99 GiB, 40 s
+NbCl5 85536: ok, 1015 ms/step, estimate 14.27 GiB, peak 13.63 GiB, ratio 1.047, build 123 s
+   rungs: {'recompute_node_region': 'off', 'recompute_conv_weights': 'on', 'recompute_first_table': 'on', 'recompute_node_segments': 'on', 'gate_epilogue': 'off'}
+   ladder: free 19.37 GiB, chosen gate_epilogue 14.27, cheaper recompute_node_segments 17.86
+   probe: gate_epilogue -> gate_epilogue, changed False, 84 s
+     gate_epilogue: replica 16128 estimate 3.40 reserved 2.78 allocated 2.40 scale 0.802; cell 16.89 -> 14.27 GiB, 40 s
+     recompute_node_segments: replica 16128 estimate 3.55 reserved 3.42 allocated 2.94 scale 0.961; cell 17.70 -> 17.86 GiB, 40 s
+NbCl5 103680: ok, 1369 ms/step, estimate 11.97 GiB, peak 11.17 GiB, ratio 1.071, build 179 s
+   rungs: {'gate_epilogue': 'on', 'recompute_conv_weights': 'on', 'recompute_first_table': 'on', 'recompute_node_segments': 'on', 'recompute_node_region': 'on'}
+   ladder: free 19.37 GiB, chosen recompute_node_region 11.97, cheaper recompute_node_segments 21.59
+   probe: recompute_node_region -> recompute_node_region, changed False, 126 s
+     recompute_node_region: replica 16128 estimate 2.14 reserved 2.00 allocated 1.67 scale 0.922; cell 12.35 -> 11.97 GiB, 80 s
+     recompute_node_segments: replica 16128 estimate 3.55 reserved 3.42 allocated 2.94 scale 0.961; cell 21.40 -> 21.59 GiB, 42 s
+NbCl5 121824: ok, 1618 ms/step, estimate 14.01 GiB, peak 13.05 GiB, ratio 1.074, build 113 s
+   rungs: {'gate_epilogue': 'on', 'recompute_conv_weights': 'on', 'recompute_first_table': 'on', 'recompute_node_segments': 'on', 'recompute_node_region': 'on'}
+   ladder: free 19.37 GiB, chosen recompute_node_region 14.01, cheaper recompute_node_segments 25.10
+   probe: recompute_node_region -> recompute_node_region, changed False, 57 s
+     recompute_node_region: replica 16128 estimate 2.14 reserved 2.00 allocated 1.67 scale 0.922; cell 14.46 -> 14.01 GiB, 51 s
+SrTiO3 46305: ok, 733 ms/step, estimate 14.54 GiB, peak 14.24 GiB, ratio 1.021, build 93 s
+   rungs: {'recompute_first_table': 'off', 'recompute_node_segments': 'off', 'recompute_node_region': 'off', 'recompute_conv_weights': 'on'}
+   ladder: free 19.37 GiB, chosen recompute_conv_weights 14.54, cheaper default 39.01
+   probe: recompute_conv_weights -> recompute_conv_weights, changed False, 49 s
+     recompute_conv_weights: replica 16875 estimate 5.41 reserved 5.22 allocated 4.41 scale 0.963; cell 14.38 -> 14.54 GiB, 43 s
+SrTiO3 78125: ok, 1384 ms/step, estimate 17.13 GiB, peak 16.63 GiB, ratio 1.030, build 117 s
+   rungs: {'recompute_node_region': 'off', 'recompute_conv_weights': 'on', 'recompute_first_table': 'on', 'recompute_node_segments': 'on'}
+   ladder: free 19.37 GiB, chosen recompute_node_segments 17.13, cheaper recompute_first_table 22.22
+   probe: recompute_node_segments -> recompute_node_segments, changed False, 56 s
+     recompute_node_segments: replica 16875 estimate 3.95 reserved 3.73 allocated 3.24 scale 0.942; cell 17.31 -> 17.13 GiB, 43 s
+SrTiO3 109760: ok, 2134 ms/step, estimate 13.96 GiB, peak 13.61 GiB, ratio 1.026, build 182 s
+   rungs: {'gate_epilogue': 'on', 'recompute_conv_weights': 'on', 'recompute_first_table': 'on', 'recompute_node_segments': 'on', 'recompute_node_region': 'on'}
+   ladder: free 19.37 GiB, chosen recompute_node_region 13.96, cheaper recompute_node_segments 24.22
+   probe: recompute_node_region -> recompute_node_region, changed False, 107 s
+     recompute_node_region: replica 16875 estimate 2.48 reserved 2.27 allocated 1.90 scale 0.903; cell 14.71 -> 13.96 GiB, 93 s

@@ -1,0 +1,561 @@
+[
+ {
+  "structure": "NbCl5",
+  "atoms": 32400,
+  "status": "ok",
+  "ms": 304.7477076819632,
+  "estimate": 14867068568,
+  "peak": 14195621888,
+  "probe": {
+   "stages": [
+    {
+     "stage": "",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "off"
+      ],
+      [
+       "recompute_first_table",
+       "off"
+      ],
+      [
+       "recompute_node_segments",
+       "off"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 8825164506,
+     "replica_reserved": 7197425664,
+     "replica_allocated": 6442296320,
+     "scale": 0.8094258870505437,
+     "estimate": 17442639784,
+     "corrected": 14867068568,
+     "seconds": 38.40555946202949
+    }
+   ],
+   "before": "",
+   "chosen": "",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 39.85856705601327
+  },
+  "rungs": {
+   "RewriteConfig.recompute_conv_weights": "off",
+   "RewriteConfig.recompute_first_table": "off",
+   "RewriteConfig.recompute_node_segments": "off",
+   "RewriteConfig.recompute_node_region": "off"
+  },
+  "build_s": 70.92721493402496
+ },
+ {
+  "structure": "NbCl5",
+  "atoms": 72576,
+  "status": "ok",
+  "ms": 821.6658518339196,
+  "estimate": 16312885464,
+  "peak": 15554576384,
+  "probe": {
+   "stages": [
+    {
+     "stage": "recompute_node_segments",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 3813762848,
+     "replica_reserved": 3676307456,
+     "replica_allocated": 3159478784,
+     "scale": 0.9610589893105388,
+     "estimate": 16168149398,
+     "corrected": 16312885464,
+     "seconds": 40.55376009293832
+    },
+    {
+     "stage": "recompute_first_table",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "off"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 4899654035,
+     "replica_reserved": 4766826496,
+     "replica_allocated": 3918287872,
+     "scale": 0.971222837531058,
+     "estimate": 21054659729,
+     "corrected": 21465587486,
+     "seconds": 40.04865116300061
+    }
+   ],
+   "before": "recompute_node_segments",
+   "chosen": "recompute_node_segments",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 83.83152143505868
+  },
+  "rungs": {
+   "RewriteConfig.recompute_node_region": "off",
+   "RewriteConfig.recompute_conv_weights": "on",
+   "RewriteConfig.recompute_first_table": "on",
+   "RewriteConfig.recompute_node_segments": "on"
+  },
+  "build_s": 122.40911022410728
+ },
+ {
+  "structure": "NbCl5",
+  "atoms": 85536,
+  "status": "ok",
+  "ms": 1015.1983056178627,
+  "estimate": 15321289380,
+  "peak": 14633926656,
+  "probe": {
+   "stages": [
+    {
+     "stage": "gate_epilogue",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "off"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 3650803293,
+     "replica_reserved": 2984247296,
+     "replica_allocated": 2573193728,
+     "scale": 0.8020254220671543,
+     "estimate": 18140340493,
+     "corrected": 15321289380,
+     "seconds": 39.619909855071455
+    },
+    {
+     "stage": "recompute_node_segments",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 3813762848,
+     "replica_reserved": 3676307456,
+     "replica_allocated": 3159478784,
+     "scale": 0.9610589893105388,
+     "estimate": 19004608243,
+     "corrected": 19175189949,
+     "seconds": 40.208021397003904
+    }
+   ],
+   "before": "gate_epilogue",
+   "chosen": "gate_epilogue",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 83.61768817098346
+  },
+  "rungs": {
+   "RewriteConfig.recompute_node_region": "off",
+   "RewriteConfig.recompute_conv_weights": "on",
+   "RewriteConfig.recompute_first_table": "on",
+   "RewriteConfig.recompute_node_segments": "on",
+   "RewriteConfig.gate_epilogue": "off"
+  },
+  "build_s": 123.11807471001521
+ },
+ {
+  "structure": "NbCl5",
+  "atoms": 103680,
+  "status": "ok",
+  "ms": 1368.7176727340557,
+  "estimate": 12848702936,
+  "peak": 11991515136,
+  "probe": {
+   "stages": [
+    {
+     "stage": "recompute_node_region",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "on"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 2302208905,
+     "replica_reserved": 2145386496,
+     "replica_allocated": 1790535168,
+     "scale": 0.9222990724604417,
+     "estimate": 13258518043,
+     "corrected": 12848702936,
+     "seconds": 79.91672105609905
+    },
+    {
+     "stage": "recompute_node_segments",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 3813762848,
+     "replica_reserved": 3676307456,
+     "replica_allocated": 3159478784,
+     "scale": 0.9610589893105388,
+     "estimate": 22975650590,
+     "corrected": 23182416190,
+     "seconds": 41.520885215955786
+    }
+   ],
+   "before": "recompute_node_region",
+   "chosen": "recompute_node_region",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 126.15706773998681
+  },
+  "rungs": {
+   "RewriteConfig.gate_epilogue": "on",
+   "RewriteConfig.recompute_conv_weights": "on",
+   "RewriteConfig.recompute_first_table": "on",
+   "RewriteConfig.recompute_node_segments": "on",
+   "RewriteConfig.recompute_node_region": "on"
+  },
+  "build_s": 179.4758916500723
+ },
+ {
+  "structure": "NbCl5",
+  "atoms": 121824,
+  "status": "ok",
+  "ms": 1617.8554217835579,
+  "estimate": 15047555712,
+  "peak": 14011072512,
+  "probe": {
+   "stages": [
+    {
+     "stage": "recompute_node_region",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "on"
+      ]
+     ],
+     "replica_atoms": 16128,
+     "replica_estimate": 2302208905,
+     "replica_reserved": 2145386496,
+     "replica_allocated": 1790535168,
+     "scale": 0.9222990724604417,
+     "estimate": 15529089015,
+     "corrected": 15047555712,
+     "seconds": 51.33185316098388
+    }
+   ],
+   "before": "recompute_node_region",
+   "chosen": "recompute_node_region",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 56.79350312903989
+  },
+  "rungs": {
+   "RewriteConfig.gate_epilogue": "on",
+   "RewriteConfig.recompute_conv_weights": "on",
+   "RewriteConfig.recompute_first_table": "on",
+   "RewriteConfig.recompute_node_segments": "on",
+   "RewriteConfig.recompute_node_region": "on"
+  },
+  "build_s": 112.89681613701396
+ },
+ {
+  "structure": "SrTiO3",
+  "atoms": 46305,
+  "status": "ok",
+  "ms": 732.9013826674782,
+  "estimate": 15610934131,
+  "peak": 15288238080,
+  "probe": {
+   "stages": [
+    {
+     "stage": "recompute_conv_weights",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "off"
+      ],
+      [
+       "recompute_node_segments",
+       "off"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16875,
+     "replica_estimate": 5806651055,
+     "replica_reserved": 5603590144,
+     "replica_allocated": 4734910464,
+     "scale": 0.9632317506020565,
+     "estimate": 15438275509,
+     "corrected": 15610934131,
+     "seconds": 43.29221814498305
+    }
+   ],
+   "before": "recompute_conv_weights",
+   "chosen": "recompute_conv_weights",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 49.16147414105944
+  },
+  "rungs": {
+   "RewriteConfig.recompute_first_table": "off",
+   "RewriteConfig.recompute_node_segments": "off",
+   "RewriteConfig.recompute_node_region": "off",
+   "RewriteConfig.recompute_conv_weights": "on"
+  },
+  "build_s": 93.17863703100011
+ },
+ {
+  "structure": "SrTiO3",
+  "atoms": 78125,
+  "status": "ok",
+  "ms": 1383.7765258154832,
+  "estimate": 18395570853,
+  "peak": 17861443584,
+  "probe": {
+   "stages": [
+    {
+     "stage": "recompute_node_segments",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "off"
+      ]
+     ],
+     "replica_atoms": 16875,
+     "replica_estimate": 4238396889,
+     "replica_reserved": 4009754624,
+     "replica_allocated": 3477164544,
+     "scale": 0.9421813171163892,
+     "estimate": 18591639446,
+     "corrected": 18395570853,
+     "seconds": 43.48493755306117
+    }
+   ],
+   "before": "recompute_node_segments",
+   "chosen": "recompute_node_segments",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 56.05314937897492
+  },
+  "rungs": {
+   "RewriteConfig.recompute_node_region": "off",
+   "RewriteConfig.recompute_conv_weights": "on",
+   "RewriteConfig.recompute_first_table": "on",
+   "RewriteConfig.recompute_node_segments": "on"
+  },
+  "build_s": 116.84621715405956
+ },
+ {
+  "structure": "SrTiO3",
+  "atoms": 109760,
+  "status": "ok",
+  "ms": 2133.772558699517,
+  "estimate": 14987588979,
+  "peak": 14612955136,
+  "probe": {
+   "stages": [
+    {
+     "stage": "recompute_node_region",
+     "rewrites": [
+      [
+       "recompute_conv_weights",
+       "on"
+      ],
+      [
+       "recompute_first_table",
+       "on"
+      ],
+      [
+       "recompute_node_segments",
+       "on"
+      ],
+      [
+       "gate_epilogue",
+       "on"
+      ],
+      [
+       "recompute_node_region",
+       "on"
+      ]
+     ],
+     "replica_atoms": 16875,
+     "replica_estimate": 2668057751,
+     "replica_reserved": 2436890624,
+     "replica_allocated": 2044857344,
+     "scale": 0.9030392583159775,
+     "estimate": 15790991051,
+     "corrected": 14987588979,
+     "seconds": 93.27174241899047
+    }
+   ],
+   "before": "recompute_node_region",
+   "chosen": "recompute_node_region",
+   "changed_plan": false,
+   "headroom": 1.05,
+   "setup_s": 106.52449814591091
+  },
+  "rungs": {
+   "RewriteConfig.gate_epilogue": "on",
+   "RewriteConfig.recompute_conv_weights": "on",
+   "RewriteConfig.recompute_first_table": "on",
+   "RewriteConfig.recompute_node_segments": "on",
+   "RewriteConfig.recompute_node_region": "on"
+  },
+  "build_s": 181.5912905370351
+ }
+]
