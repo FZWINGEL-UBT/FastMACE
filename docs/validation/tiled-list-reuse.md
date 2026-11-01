@@ -70,3 +70,42 @@ list cache serves the later sweeps. In MD, almost the same lists are found again
 
 Built, gated and off by default. It gains about 3 % in MD and 4.5 % per call that reuses. Whether to turn it on by
 default (for neighbours "tiles"), and whether to try a larger skin, is the conductor's call.
+
+## On by default (conductor's decision, 1 November)
+
+`TileConfig.list_reuse` is on by default for `neighbours="tiles"`, with a host floor.
+
+- **`TileConfig.list_reuse_floor`:** 20 GiB of the host's `MemAvailable`. The call that searches checks it before it
+  keeps the reference positions and before each tile's superset.
+- **Below the floor** nothing is kept, and reuse stays off from then on. The call's report says why in
+  `list_reuse`, for example "off: 12.3 GiB available on the host when keeping tile 4711's lists, below the floor of
+  20.0 GiB".
+- **No per-call cache beside the kept lists.** While lists are kept, the later sweeps filter the kept supersets
+  again; the list cache serves only calls without kept lists. At 70.96M the cache and the supersets together would
+  have left less than the floor; without the cache, 27 GiB stay free.
+- **The call's report** also gives `list_kept_bytes`.
+
+**CPU** (`test_tiled.py`, `test_layering.py`, `test_neighbors.py` on trillian): 168 passed, 91 skipped.
+- New: `test_tile_lists_not_kept_below_the_host_floor`. With a floor no host meets, nothing is kept, the report
+  gives the reason, and the results are bitwise the plain call's.
+- The tests that count searches now set `list_reuse=False`.
+
+**Tools:** `tiled_md.py --no-list-reuse` (`--list-reuse` is kept as a no-op) and `ab_arms.py +noreuse`.
+
+**The gate at 70.96M** (leto, 6b479d24): `tiled_md.py --mode auto --integrator host --steps 3`, all defaults. Run:
+`results/tiled-list-reuse-20261101/runs/leto-nve-reuse-NbCl5-69x69x207`.
+
+| Step | Call | Wall time | GPU peak (of 19.54 GiB) | Host peak (of 251 GiB) | Lists |
+| ---: | --- | ---: | ---: | ---: | --- |
+| 0 | eager, R = 4,096 | 1,771 s | 14.21 GiB | 214.7 GiB | searched (cutoff + skin), kept |
+| 1 | compiled, R = 16,384 (the budget's switch) | 1,094 s | 18.28 GiB | 221.4 GiB | searched again (new cap), kept |
+| 2 | compiled | 1,000 s | 16.11 GiB | 223.8 GiB | **reused** |
+| 3 | compiled | 1,000 s | 16.11 GiB | 223.8 GiB | **reused** |
+
+- **Host memory of the kept lists:** 13.87 GB, 196 bytes per atom. That is 12.17 GB of supersets, 1.26 times the
+  9.63 GB list cache at the cutoff, plus 1.70 GB of reference positions. The expectation was (1 + 0.3/6)³ = 1.16
+  times the cache: the shell between 6 and 6.3 Å holds more neighbours than the average density predicts.
+- **The steps that reuse take 1,000 s.** With the per-call cache and no reuse
+  ([tiled-cache-compact.md](tiled-cache-compact.md)) the steps took 1,053-1,112 s, so reuse is about 7 % faster here.
+  They also skip the whole-system binning, so their GPU peak is 2.2 GiB lower.
+- **Drift:** 0.016 meV/atom over the 3 steps.

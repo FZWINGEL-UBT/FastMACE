@@ -497,7 +497,8 @@ def test_tile_lists_built_once_per_call_are_bitwise_the_rebuilt_ones(mode, monke
     monkeypatch.setattr(TileNeighbours, "edges", lambda self, receivers: searches.append(1) or edges(self, receivers))
     results = []
     for cache in (False, True):
-        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_cache=cache))
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_cache=cache,
+                                                  list_reuse=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         searches.clear()
         results.append(tiled.evaluate(strained(atoms), stress=True))
@@ -522,7 +523,7 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=stress,
                            rewrites=only(*MH1_PACKAGE))
     kept = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse=True))
-    fresh = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles"))
+    fresh = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse=False))
     x0 = field._prepare_one_off(atoms).clone()
     rng = np.random.default_rng(5)
     direction = torch.tensor(rng.normal(size=(len(atoms), 3)), dtype=x0.dtype)
@@ -548,6 +549,29 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
     kept.receivers = 30  # a new receiver cap (the budget's switch) plans again
     kept(x0 + 0.6 * skin * direction)
     assert kept.last["list_reused"] is False and kept.list_rebuilds == 3
+
+
+def test_tile_lists_not_kept_below_the_host_floor():
+    """``list_reuse`` is the default for tile lists; a host with less than ``list_reuse_floor`` available keeps
+    nothing, says why in the call's report and gives the plain call's results."""
+    from fastmace.model.tiled import _host_available
+
+    if _host_available() is None:
+        pytest.skip("no /proc/meminfo")
+    assert TileConfig(40, neighbours="tiles").list_reuse
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    starved = TiledForceField(field, TileConfig(40, neighbours="tiles", list_reuse_floor=2**62))
+    plain = TiledForceField(field, TileConfig(40, neighbours="tiles", list_reuse=False))
+    x0 = field._prepare_one_off(atoms).clone()
+    results = []
+    for tiled in (starved, plain):
+        tiled(x0)  # TorchScript's first call in a process rounds differently
+        results.append(tiled(x0))
+    assert starved.last["list_reuse"].startswith("off: ") and "below the floor" in starved.last["list_reuse"]
+    assert starved.last["list_reused"] is False and starved._kept is None
+    assert plain.last["list_reuse"] == "off"
+    assert torch.equal(results[0].energy, results[1].energy) and torch.equal(results[0].forces, results[1].forces)
 
 
 def test_list_cache_unit_shifts_one_byte_codes_or_int16_and_back_exactly():
