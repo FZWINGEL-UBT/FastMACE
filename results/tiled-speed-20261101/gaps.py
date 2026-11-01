@@ -94,6 +94,12 @@ def main():
         warm = [call(), call()]
         for owner, name, label in (
                 (TileNeighbours, "edges", "tile list"),
+                (TileNeighbours, "bin", "prelude: binning"),
+                (TiledForceField, "_source", "prelude: source"),
+                (tiled_module, "plan_tiles", "prelude: plan tiles"),
+                (TiledForceField, "_slot_keys", "prelude: slot keys"),
+                (TiledForceField, "_globals", "prelude: globals"),
+                (TiledForceField, "_bind", "prelude: bind"),
                 (TiledForceField, "_tile_graph", "tile graph"),
                 (tiled_module._State, "rows", "host state: read"),
                 (tiled_module._State, "put", "host state: put"),
@@ -148,6 +154,9 @@ def main():
         for table in (buckets, by_stage[label]):
             table[key][0] += 1
             table[key][1] += gap / 1e6
+    stage_seconds = collections.Counter()  # the host's time in each marked stage, nested ones included
+    for start, end, label in stages:
+        stage_seconds[label] += (end - start) / 1e6
     busy_seconds = sum(e - s for s, e in busy) / 1e6
     span = (busy[-1][1] - busy[0][0]) / 1e6
     record = dict(structure=args.structure, atoms=n, mode=args.mode, receivers=args.receivers,
@@ -159,6 +168,7 @@ def main():
                   gaps_by_stage={label: {k: dict(count=c, seconds=round(s, 4)) for k, (c, s) in table.items() if c}
                                  for label, table in sorted(by_stage.items(),
                                                             key=lambda kv: -sum(s for _, s in kv[1].values()))},
+                  stage_seconds={label: round(seconds, 4) for label, seconds in stage_seconds.most_common()},
                   tiles=tiled.last.get("tiles"))
     args.output.mkdir(parents=True, exist_ok=True)
     import numpy as np  # the raw intervals, for analyses without the GPU
