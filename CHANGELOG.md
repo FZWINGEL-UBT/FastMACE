@@ -156,6 +156,20 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   The estimate now stays within 1.08–1.39 times the measured peak at every stage of the rescue ladder, where it was
   2.3–2.6 times with every record on. Rule 12 plans only the rungs a cell needs: on 20 GB, NbCl5 at 121,824 atoms
   fits with `gate_epilogue` back on, where all rungs were planned with it off (docs/validation/estimate-refit.md).
+- Rule 12's memory estimate per side and per stage of the memory rescue:
+  - each rescue record keeps a fraction of its own side only (`planner.memory.MemoryTerm.edge_keep`, `node_keep`):
+    `recompute_conv_weights` and `recompute_first_table` of the per-edge activations, `recompute_node_segments`,
+    `recompute_node_region` and `gate_epilogue` of the per-atom ones;
+  - a per-stage factor for the allocator's reserve (`planner.memory.RESCUE_RESERVE`, keyed by `rescue_stage`);
+  - MH-1's float32 fused path keeps 291 fewer stock floats per edge (`_MH1_STREAMING_SHARE`).
+
+  Estimate against measured, five crystals (27.6–84 edges per atom), three GPUs, Linux and WSL2:
+  - rescue stages 1.00–1.24; s1 and s2 1.00–1.05. On `main` the oxide perovskites came out at up to 2.2;
+  - default stage 1.19–1.28;
+  - held-out NaNbO3 0.996–1.25.
+
+  What remains is the caching allocator's reserve, 1.07–1.44 times the live peak by stage and crystal
+  (docs/validation/estimate-band.md).
 - `gate_epilogue` is on by default for MH-1 on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, by exact device
   name, `planner.fixed.DECISION_66_GATE_EPILOGUE_GPUS`), where `segment_gemm` is on and `tf32x3_gemms` is off: MD
   steps 1.2-4.7 % faster on NbCl5 and NaNbO3, NaCl neutral (docs/validation/speed-def.md). Off elsewhere; the A100
