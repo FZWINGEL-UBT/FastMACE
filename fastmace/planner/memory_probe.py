@@ -264,9 +264,9 @@ class ChildProbe:
     def __call__(self, stage: LadderStage) -> dict:
         from fastmace.config import AdaptationConfig, CalibrationConfig
 
-        options = dataclasses.replace(
-            self.simulation.options, engine=dataclasses.replace(self.simulation.options.engine, memory_probe="off"),
-            adaptation=AdaptationConfig(adapt="off"), calibration=CalibrationConfig())
+        engine = self.simulation._planner.engine  # the planner's (the caller's options may hold none)
+        options = dataclasses.replace(self.simulation.options, engine=dataclasses.replace(engine, memory_probe="off"),
+                                      adaptation=AdaptationConfig(adapt="off"), calibration=CalibrationConfig())
         started = time.perf_counter()
         result = self.runner.memory_probe(self.simulation, options, self.replica_atoms, dict(stage.rewrites),
                                           steps=self.steps)

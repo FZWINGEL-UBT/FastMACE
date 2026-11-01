@@ -281,3 +281,16 @@ def test_a_probe_child_builds_the_stage_on_the_replica_and_leaves_nothing(loaded
     assert runner.children == 2 and [path for path in runner.root.iterdir() if path.is_dir()] == []
     runner.close()
     assert tc._files(tmp_path) == before and sim.committed().step == 0
+
+
+def test_the_child_probe_takes_the_planner_s_engine(loaded):
+    """``ChildProbe`` on a run whose caller passed no ``EngineConfig`` (its options hold none): the child gets the
+    planner's engine with the probe off, and one real child returns the replica's estimate."""
+    sim = tc.simulation(loaded)
+    assert sim.options.engine is None or sim.options.engine == tc.CPU_ENGINE
+    child = memory_probe.ChildProbe(sim, nacl(repeat=2), steps=2)
+    try:
+        result = child(stage("", 0))
+    finally:
+        child.close()
+    assert result["replica_atoms"] == 64 and result["estimate"] > 0 and result["seconds"] > 0
