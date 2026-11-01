@@ -16,7 +16,7 @@ import torch
 
 from fastmace.config import EngineConfig, NeighbourConfig
 from fastmace.model.forces import MACEForceField
-from fastmace.model.tiled import TileConfig, TiledForceField, plan_tiles
+from fastmace.model.tiled import TileConfig, TiledForceField, _split_block, plan_tiles
 from fastmace.rewrites import registry as reg
 
 pytest.importorskip("mace")
@@ -131,6 +131,27 @@ def test_plan_tiles_covers_every_atom_once_within_the_caps(receivers, edges):
         assert len(tile) <= receivers
         assert len(tile) == 1 or int(degree[tile].sum()) <= edges
     assert len(grid) == 3
+
+
+@pytest.mark.parametrize("receivers, edges", [(1, 10**9), (5, 40), (16, 100), (64, 7), (500, 2**62)])
+def test_block_split_by_the_caps_is_the_per_atom_greedy(receivers, edges):
+    """``plan_tiles`` with degrees splits each block by one search per piece over the cumulative degrees: the same
+    pieces as the per-atom greedy rule it replaces (a piece ends before the atom that would take it to ``receivers``
+    atoms or past ``edges`` edges, and holds at least one atom). Degrees with zeros and above the edge cap; blocks
+    that start inside the array."""
+    rng = np.random.default_rng(1)
+    degree = rng.integers(0, 30, 500)
+    cumulative = np.concatenate([[0], np.cumsum(degree)])
+    for start, stop in ((0, 500), (37, 300), (120, 121), (200, 200)):
+        expected, piece, edge_sum = [], start, 0
+        for i in range(start, stop):
+            if i > piece and (i - piece >= receivers or edge_sum + degree[i] > edges):
+                expected.append((piece, i))
+                piece, edge_sum = i, 0
+            edge_sum += degree[i]
+        if stop > piece:
+            expected.append((piece, stop))
+        assert _split_block(cumulative, start, stop, receivers, edges) == expected
 
 
 def test_refuses_compiled_and_unsupported_fields():

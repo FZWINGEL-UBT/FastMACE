@@ -77,7 +77,7 @@ def run(field, call, atoms, steps, dt_fs, temperature, own_lists=False):
         rows.append(dict(step=step, epot=float(out.energy.reshape(-1)[0]), ekin=kinetic,
                          etot=float(out.energy.reshape(-1)[0]) + kinetic,
                          edges=int(getattr(call, "last", {}).get("edges", field.edge_count)),
-                         rebuilds=rebuilds))
+                         rebuilds=rebuilds, seconds=time.perf_counter() - started))
         if step == steps:
             break
         v = v + 0.5 * dt * f / masses
@@ -122,7 +122,9 @@ def main(argv=None):
         raise SystemExit("--tile-list leaves the force field's own list empty: use --path tiled")
     lists = contextlib.ExitStack()
     lists.enter_context(tiled_capacity.no_global_list(args.tile_list))
-    field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index)
+    # The tiled path's tables sized for a tile's rows (as tiled_capacity.py), not the whole system's.
+    rows = {"call_rows": args.receivers} if args.path == "tiled" else {}
+    field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index, **rows)
     config = TileConfig(args.receivers, mode=args.mode, neighbours="tiles" if args.tile_list else "global",
                         state="host" if args.host_state else "device", alias_state=args.alias_state,
                         species="index" if args.species_index else "one_hot")
@@ -145,6 +147,12 @@ def main(argv=None):
         result["drift_meV_per_atom"] = float(1e3 * (etot[-1] - etot[0]) / len(atoms))
         result["etot_spread_meV_per_atom"] = float(1e3 * (etot.max() - etot.min()) / len(atoms))
         result["seconds_per_step"] = result["seconds"] / args.steps
+        # Each step's wall time (the force call and the integrator); the steady value without the first two steps
+        # (a compiled call's budget switches the receiver count, and recompiles, in its second call).
+        marks = [row["seconds"] for row in result["rows"]]
+        result["step_seconds"] = [b - a for a, b in zip(marks, marks[1:])]
+        steady = result["step_seconds"][2:] or result["step_seconds"]
+        result["steady_seconds_per_step"] = float(np.median(steady)) if steady else None
         if path == "tiled":
             result["last_call"] = {k: v for k, v in tiled.last.items() if k != "slots"}
             result["slots"] = {str(k): list(v) for k, v in tiled.last.get("slots", {}).items()}

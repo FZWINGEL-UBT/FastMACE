@@ -382,22 +382,29 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
             start += count
         return tiles, tuple(k)
     degree = (row_ptr[1:] - row_ptr[:-1])[order].cpu()
+    cumulative = torch.cat([torch.zeros(1, dtype=torch.int64), torch.cumsum(degree, 0)]).numpy()
     tiles = []
     start = 0
     for count in counts:
-        stop = start + count
-        piece = start
-        edge_sum = 0
-        for i in range(start, stop):
-            d = int(degree[i])
-            if i > piece and (i - piece >= receivers or edge_sum + d > edges):
-                tiles.append(order[piece:i])
-                piece, edge_sum = i, 0
-            edge_sum += d
-        if stop > piece:
-            tiles.append(order[piece:stop])
-        start = stop
+        tiles.extend(order[a:b] for a, b in _split_block(cumulative, start, start + count, receivers, edges))
+        start += count
     return tiles, tuple(k)
+
+
+def _split_block(cumulative, start, stop, receivers, edges):
+    """The pieces ``(a, b)`` of the atoms ``start:stop`` (in plan order) below both caps, ``cumulative[i]`` the
+    edges of the atoms before ``i``. A piece ends before the first atom that would take it to ``receivers`` atoms or
+    past ``edges`` edges, and holds at least one atom: the edge cap cuts at ``j - 1`` for the first ``j`` with
+    ``cumulative[j] > cumulative[a] + edges``. One search per piece, not a loop per atom."""
+    import numpy as np
+
+    pieces, piece = [], start
+    while piece < stop:
+        over = int(np.searchsorted(cumulative, cumulative[piece] + edges, side="right"))
+        cut = min(piece + receivers, max(over - 1, piece + 1), stop)
+        pieces.append((piece, cut))
+        piece = cut
+    return pieces
 
 
 class TiledForceField:
