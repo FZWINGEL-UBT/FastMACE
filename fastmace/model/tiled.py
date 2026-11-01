@@ -538,11 +538,11 @@ class TiledForceField:
         start = r if halo_start is None else int(halo_start)
         ei, shifts = source(receivers)
         senders = ei[0]
-        local_of[receivers] = torch.arange(r, device=self.device)
+        local_of[receivers] = torch.arange(r, dtype=local_of.dtype, device=self.device)
         outside = senders[local_of[senders] < 0]
         halo = torch.unique(outside)
-        local_of[halo] = torch.arange(start, start + halo.shape[0], device=self.device)
-        local = torch.stack([local_of[senders], local_of[ei[1]]])
+        local_of[halo] = torch.arange(start, start + halo.shape[0], dtype=local_of.dtype, device=self.device)
+        local = torch.stack([local_of[senders], local_of[ei[1]]]).long()  # local_of is int32
         local_of[receivers] = -1
         local_of[halo] = -1
         return torch.cat([receivers, halo]), ei, shifts, local, r, halo.shape[0]
@@ -892,7 +892,7 @@ class TiledForceField:
             2**62 if degree is None else max(1, int(math.ceil(2 * self.receivers * degree))))
         cell = data["cell"].reshape(3, 3) if "cell" in data else torch.as_tensor(field.neighbours.cell)
         tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
-        local_of = torch.full((n,), -1, dtype=torch.int64, device=self.device)
+        local_of = torch.full((n,), -1, dtype=torch.int32, device=self.device)  # int32: 4 bytes per atom
         measure = (not self._budgeted or self._auto) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
