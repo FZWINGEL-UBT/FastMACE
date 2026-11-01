@@ -26,10 +26,13 @@ _STREAMING_INDEX_BYTES = 2 * 4
 # streaming convolution's: the remainder of the fused path (2,000 and 673 floats), fitted so that the estimate
 # stays 1.05-1.34x above the capacity scan's measured peaks (tests/cpu/test_memory_fit.py's capacity cases); per
 # precision, as the fused paths keep different tensors in float32 and float64. Shares, so a smaller model's terms
-# shrink with its widths.
+# shrink with its widths. In float32 291 more floats (2,291): the rescue matrix's default stage
+# (docs/validation/estimate-band.md) measured 5.3 kB per edge against the estimate's 8.4, an overstatement 1.58 times
+# against 1.36 per atom, so crystals with many edges per atom (SrTiO3, NaTaO3) came out 9 % higher; the extra share
+# brings the per-edge overstatement to the per-atom one.
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
 _RADIAL_TABLES_SHARE = 576 / 8265
-_MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
+_MH1_STREAMING_SHARE = {4: 2291 / 8265, 8: 673 / 8265}
 # The memory-rescue records and gate_epilogue as fractions of the remaining activations of their own side they keep
 # (``planner.memory.MemoryTerm.edge_keep`` and ``node_keep``): conv_weights and first_table recompute per-edge
 # tensors, the node segments, the node region and gate_epilogue per-node ones. Each is the ratio of the measured live
@@ -37,18 +40,18 @@ _MH1_STREAMING_SHARE = {4: 2000 / 8265, 8: 673 / 8265}
 # the rescue ladder over NbCl5, NaCl, SrTiO3 and NaTaO3; within 1 % at every point) between consecutive stages
 # (docs/validation/estimate-band.md). As fractions of the whole remainder (estimate-refit) they mixed the two sides,
 # so a crystal with more edges per atom came out 1.2 times higher at the node-side stages.
-# conv_weights keeps 0.59 of 5.87 kB per edge (the second interaction's [E, 1280] weights); first_table 0.31 of 0.59
+# Cells of at least 15,000 atoms (below it the build's fixed transient sets the live peak), five crystals.
+# conv_weights keeps 0.43 of 5.3 kB per edge (the second interaction's [E, 1280] weights go); first_table 0.17 of 0.43
 # (260 B per edge, the table output; what remains is the radial basis and the indices).
-_CONV_WEIGHTS_KEEP = 0.101
-_FIRST_TABLE_KEEP = 0.532
-# Per atom: 210.7 kB with the separate gate, 136.6 with the node segments (0.648), 86.4 with the node region (0.633
-# of the segments').
-_NODE_SEGMENTS_KEEP = 0.648
-_NODE_REGION_KEEP = 0.633
-# gate_epilogue keeps more: 12.3 kB per atom without the node segments (1.058), 35.6 with the separate segments
-# (1.261 of the segments' 136.6), nothing inside recompute_node_region's chunks (planner.memory.CONTEXT_TERMS).
-_GATE_EPILOGUE_KEEP = 1.058
-_GATE_EPILOGUE_SEGMENTS_KEEP = 1.261
+_CONV_WEIGHTS_KEEP = 0.080
+_FIRST_TABLE_KEEP = 0.382
+# Per atom: 226 kB with the separate gate, 140 with the node segments, 90 with the node region (of the segments').
+_NODE_SEGMENTS_KEEP = 0.644
+_NODE_REGION_KEEP = 0.646
+# gate_epilogue keeps more: 12.3 kB per atom without the node segments (1.057), 36 with the separate segments
+# (1.257 of the segments' 140), nothing inside recompute_node_region's chunks (planner.memory.CONTEXT_TERMS).
+_GATE_EPILOGUE_KEEP = 1.057
+_GATE_EPILOGUE_SEGMENTS_KEEP = 1.257
 
 
 def _first_hidden(block) -> int:

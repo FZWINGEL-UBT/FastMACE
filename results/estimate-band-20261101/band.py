@@ -23,7 +23,7 @@ from fastmace.model.capabilities import ModelDims  # noqa: E402
 from fastmace.planner import memory, minimal  # noqa: E402
 from fastmace.rewrites import memory as terms  # noqa: E402
 
-HELD_OUT = ("NaNbO3",)
+HELD_OUT = () if "--all" in sys.argv else ("NaNbO3",)  # --all: the final constants, every crystal
 # Below this the build's fixed transient (about 1.7 GB, the build term's) sets the live peak, not the force call.
 MIN_ATOMS = 15_000
 DATA = FM / "tests/_support/data"
@@ -82,6 +82,13 @@ print("\nfractions:", ", ".join(f"{k} {v:.3f}" for k, v in fractions.items()),
 if "--keep-code" not in sys.argv:
     for k, v in fractions.items():
         setattr(terms, k, round(float(v), 3))
+# --mh1-extra=F: F more of MH-1's stock per-edge floats that the fused path does not keep (float32), so the per-edge
+# part's overstatement matches the per-node part's at s0
+for arg in sys.argv:
+    if arg.startswith("--mh1-extra="):
+        extra = int(arg.split("=", 1)[1])
+        terms._MH1_STREAMING_SHARE = {4: (2000 + extra) / 8265, 8: terms._MH1_STREAMING_SHARE[8]}
+        print(f"MH-1 streaming share, float32: {2000 + extra} of 8265 floats")
 
 
 # 3. the per-stage allocator reserve: the factor on the kept remainder that puts the stage's lowest fit point at its

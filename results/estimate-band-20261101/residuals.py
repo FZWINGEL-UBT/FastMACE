@@ -88,7 +88,7 @@ for name, sel in (("rescue", lambda r: r["group"] == "rescue"),
 
 print("\n== rescue: ratio against edges/atom and stage (the crystal difference)")
 for r in sorted((r for r in rows if r["group"] == "rescue"), key=lambda r: (r["key"], r["structure"], r["atoms"])):
-    print(f"  {r['key']:13s} {r['structure']:6s} {r['atoms']:7d} ratio {r['ratio']:.3f}  edge {r['edge'] / r['peak']:.2f} "
-          f"node {r['node'] / r['peak']:.2f} fixed+list {(r['fixed'] + r['list']) / r['peak']:.2f} (of the peak)")
+    print(f"  {r['key']:13s} {r['structure']:6s} {r['atoms']:7d} ratio {r['ratio']:.3f}  "
+          f"edge {r['edge'] / r['peak']:.2f} node {r['node'] / r['peak']:.2f} fixed+list {(r['fixed'] + r['list']) / r['peak']:.2f} (of the peak)")
 
 Path(sys.argv[2] if len(sys.argv) > 2 else "residuals.json").write_text(json.dumps(rows, indent=1))

@@ -78,8 +78,10 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # the same on Linux and WSL2), so each stage scales the kept activations by its own factor, named by the deepest rung
 # taken (``rescue_stage``): the upper envelope over the rescue matrix of what keeps every point at or above its
 # measured peak (docs/validation/estimate-band.md). Relative to the default plan, whose reserve SAFETY's fit covers.
-RESCUE_RESERVE = (("recompute_conv_weights", 1.0), ("recompute_first_table", 1.0), ("recompute_node_segments", 1.0),
-                  ("gate_epilogue", 1.0), ("recompute_node_region", 1.0))
+# Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's rung
+# above it (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
+RESCUE_RESERVE = (("recompute_conv_weights", 0.875), ("recompute_first_table", 0.87), ("recompute_node_segments", 0.86),
+                  ("gate_epilogue", 1.06), ("recompute_node_region", 0.925))
 
 
 def rescue_stage(enabled) -> str:
@@ -103,7 +105,7 @@ def rescue_value(name: str) -> str:
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
-# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]),
+# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.25]),
 # with the edges counted in the structure (``counted_edges``): the lowest that keeps every case at or above its
 # measured peak (docs/validation/estimate-refit.md). Below 1 because the run term is stock-structured: it counts
 # what stock MACE keeps per edge, while the fused paths (OEq's convolution, the folded MH-1 backward) keep less.
