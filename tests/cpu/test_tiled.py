@@ -7,6 +7,7 @@ the stock model and with MH-1's CPU rewrite package (reassociated first interact
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -103,6 +104,31 @@ def test_padded_slots_are_reused_and_grow_only_when_a_tile_does_not_fit():
     got = smaller.evaluate(atoms)
     assert smaller._slots[key]["sizes"][0] > 2
     assert relative(got[1], expected[1]) <= 1e-12
+
+
+def test_padded_slot_kept_while_its_tiles_fit_and_grown_by_a_quarter_of_the_largest():
+    """The fit test takes the tiles' own sizes: a slot exactly as large as its largest tile (one padding row more)
+    is kept, although its headroom is used up (in MD the tiles' sizes move a little every step, and each growth
+    compiles the slot again). A slot that a tile exceeds grows in that size by at least a quarter of the largest
+    slot's, so a small slot whose tiles keep growing changes once, not every few steps."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.5, bucket=0.3))
+    tiled.evaluate(atoms)
+    step = tiled._edge_step
+    for key, (r, h, _) in tiled.slot_needs.items():
+        tiled._slots[key] = tiled._new_slot((r + 1, h, key * step))  # no headroom left
+    changes = tiled.slot_changes
+    tiled.evaluate(atoms)
+    assert tiled.slot_changes == changes
+    assert all(tiled._slots[key]["sizes"] == (r + 1, h, key * step) for key, (r, h, _) in tiled.slot_needs.items())
+    key, (r, h, _) = next(iter(tiled.slot_needs.items()))
+    tiled._slots[key] = tiled._new_slot((r + 1, h - 1, key * step))  # one halo row short
+    largest = max(slot["sizes"][1] for slot in tiled._slots.values())
+    tiled.evaluate(atoms)
+    assert tiled.slot_changes == changes + 1
+    assert tiled._slots[key]["sizes"][:1] == (r + 1,)  # the sizes that fit stay
+    assert tiled._slots[key]["sizes"][1] >= h - 1 + math.ceil(0.25 * largest)
 
 
 def test_tiled_call_without_stress():
