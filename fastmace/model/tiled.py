@@ -343,23 +343,44 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
 
     Atoms are binned on a k1 x k2 x k3 grid of fractional coordinates, with k_i from the cell's plane spacings so
     that a block is about cubic and holds about ``receivers`` atoms; a block above either cap is split into
-    consecutive pieces (in index order) below both. A rule on the cell geometry and the caps only.
+    consecutive pieces (in index order) below both. A rule on the cell geometry and the caps only. ``row_ptr``
+    None: no degrees (the tiles build their own lists), so a block splits into consecutive pieces of ``receivers``.
+
+    The fractional coordinates are reduced in place and the block index is computed in chunks, so the plan's
+    whole-system transients stay small (tiled-call-memory.md); the values are the unchunked ones.
     """
     import torch
 
+    from fastmace.neighbors.tile_list import CHUNK
+
     n = positions.shape[0]
     cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
-    frac = torch.remainder(positions.to(torch.float64) @ torch.linalg.inv(cell64), 1.0)
+    frac = positions.to(torch.float64) @ torch.linalg.inv(cell64)
+    torch.remainder(frac, 1.0, out=frac)
     volume = abs(float(torch.linalg.det(cell64)))
     recip = torch.linalg.inv(cell64).T
     spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
     side = (volume * min(receivers, n) / n) ** (1 / 3)
     k = [max(1, round(s / side)) for s in spacings]
-    bins = torch.clamp((frac * torch.tensor(k, dtype=torch.float64, device=positions.device)).long(), min=0)
-    bins = torch.minimum(bins, torch.tensor([x - 1 for x in k], device=positions.device))
-    block = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
+    scale = torch.tensor(k, dtype=torch.float64, device=positions.device)
+    top = torch.tensor([x - 1 for x in k], device=positions.device)
+    block = torch.empty(n, dtype=torch.int64, device=positions.device)
+    for start in range(0, n, CHUNK):
+        stop = min(start + CHUNK, n)
+        bins = torch.minimum(torch.clamp((frac[start:stop] * scale).long(), min=0), top)
+        block[start:stop] = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
+        del bins
+    del frac
     order = torch.sort(block, stable=True).indices  # within a block: increasing atom index
     counts = torch.bincount(block, minlength=k[0] * k[1] * k[2]).cpu().tolist()
+    del block
+    if row_ptr is None:  # no degrees: consecutive pieces of ``receivers`` in every block
+        tiles, start = [], 0
+        for count in counts:
+            tiles.extend(order[piece:min(piece + receivers, start + count)]
+                         for piece in range(start, start + count, receivers))
+            start += count
+        return tiles, tuple(k)
     degree = (row_ptr[1:] - row_ptr[:-1])[order].cpu()
     tiles = []
     start = 0
@@ -511,7 +532,7 @@ class TiledForceField:
                 return torch.stack([sender, receiver]), shifts
 
             # No degrees before the tiles' builds: the tiles are planned by receivers only.
-            return tiles, torch.zeros(n + 1, dtype=torch.int64, device=self.device), None
+            return tiles, None, None
         edge_index, shifts = data["edge_index"], data["shifts"]
         row_ptr = torch.searchsorted(edge_index[1], torch.arange(n + 1, device=self.device))
 

@@ -112,8 +112,9 @@ def main():
             plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                           dynamic_edges=False))
         field = planner.build_evaluation(plan, user, atoms, call_rows=args.receivers, release_node_attrs=True)
+        # budget_receivers=(): R as given (a compiled tile would otherwise take the budget's larger caps).
         tiled = TiledForceField(field, TileConfig(args.receivers, mode=args.mode, neighbours="tiles", state="host",
-                                                  alias_state=True, species="index"))
+                                                  alias_state=True, species="index", budget_receivers=()))
         positions = field._prepare_one_off(atoms)
 
         def call():

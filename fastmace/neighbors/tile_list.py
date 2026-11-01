@@ -24,6 +24,8 @@ import torch
 
 from .skin import times_3x3
 
+CHUNK = 1 << 22  # atoms per chunk of the binning
+
 MIN_BINS = 3  # bins per axis: a pair then has one image within the cutoff, and +-1 bin covers it
 
 
@@ -51,15 +53,26 @@ class TileNeighbours:
         self._neighbour_bins = torch.stack(torch.meshgrid(d, d, d, indexing="ij"), dim=-1).reshape(-1, 3)
 
     def bin(self, positions):
-        """Bin float64 ``positions`` (N, 3) by their wrapped fractional coordinates."""
+        """Bin float64 ``positions`` (N, 3) by their wrapped fractional coordinates.
+
+        In chunks of ``CHUNK`` atoms, keeping each atom's integer cell and bin as int32 (the same integer values
+        as their float64 and int64 forms, so ``edges`` is unchanged): the whole-system transients of a tiled call
+        decide its peak at the largest sizes (tiled-call-memory.md)."""
         k = torch.tensor(self.bins, device=self.device)
         self.positions = positions
-        frac = times_3x3(positions, self.inverse)
-        self.offsets = torch.floor(frac)  # integer cell of each atom
-        wrapped = frac - self.offsets
-        b = torch.minimum(torch.clamp((wrapped * k).long(), min=0), k - 1)
-        self.atom_bin = b
-        flat = (b[:, 0] * k[1] + b[:, 1]) * k[2] + b[:, 2]
+        n = positions.shape[0]
+        self.offsets = torch.empty((n, 3), dtype=torch.int32, device=self.device)  # integer cell of each atom
+        self.atom_bin = torch.empty((n, 3), dtype=torch.int32, device=self.device)
+        flat = torch.empty(n, dtype=torch.int64, device=self.device)
+        for start in range(0, n, CHUNK):
+            stop = min(start + CHUNK, n)
+            frac = times_3x3(positions[start:stop], self.inverse)
+            offsets = torch.floor(frac)
+            b = torch.minimum(torch.clamp(((frac - offsets) * k).long(), min=0), k - 1)
+            self.offsets[start:stop] = offsets
+            self.atom_bin[start:stop] = b
+            flat[start:stop] = (b[:, 0] * k[1] + b[:, 1]) * k[2] + b[:, 2]
+            del frac, offsets, b
         self.order = torch.sort(flat, stable=True).indices
         nbins = int(k.prod())
         self.starts = torch.searchsorted(flat[self.order], torch.arange(nbins + 1, device=self.device))
