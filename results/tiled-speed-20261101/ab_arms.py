@@ -1,7 +1,8 @@
 """Tiled call arms at scale, in one process (the speed phase).
 
 Arms (``--arms``, two or more): ``eager`` or ``compiled``, with suffixes ``+budget`` (budget_receivers (8192,
-16384); without it, none, whatever the default) and ``+nocache`` (list_cache off). The compiled
+16384); without it, none, whatever the default), ``+nocache`` (list_cache off) and ``+nooverlap`` (overlap off).
+The compiled
 arms run on a force field of the default compiled evaluation plan (its traceable model), the eager arms on one of
 the eager plan; both with their one-hot on the host, the force field's global list left empty (the tiles build
 their own, as ``tiled_capacity.py --tile-list``). Every arm: TileConfig(tile lists, the state on the host, the
@@ -78,7 +79,8 @@ def main():
             tiled[arm] = TiledForceField(fields[mode], TileConfig(args.receivers, mode=mode, neighbours="tiles",
                                                                   state="host", alias_state=True, species="index",
                                                                   budget_receivers=budget,
-                                                                  list_cache="+nocache" not in arm))
+                                                                  list_cache="+nocache" not in arm,
+                                                                  overlap="+nooverlap" not in arm))
         positions = fields[arms[0].split("+")[0]]._prepare_one_off(atoms)
         outputs = {}
 

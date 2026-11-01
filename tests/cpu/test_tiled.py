@@ -498,3 +498,25 @@ def test_auto_mode_compiles_the_tiles_when_the_residency_fits(headroom, chosen):
     assert (tiled_module.COMPILED_RESIDENCY + tiled_module.COMPILED_MARGIN < headroom * gib) == (chosen == "compiled")
     tiled._choose_mode(None)  # chosen once
     assert tiled.mode == chosen
+
+
+# ---------------------------------------------------------------- the host state's traffic deferred
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("alias", [False, True], ids=["plain", "aliased"])
+def test_deferred_host_state_writes_are_bitwise_the_immediate_ones(mode, alias):
+    """``TileConfig.overlap``: a tile's host-state writes are applied after the next tile's work is queued (on CUDA
+    that work overlaps them), in the same order; every sweep ends with all of them applied. Bitwise the call that
+    applies them at once."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = []
+    for overlap in (False, True):
+        tiled = TiledForceField(field, TileConfig(5, mode=mode, state="host", alias_state=alias, overlap=overlap))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results.append(tiled.evaluate(strained(atoms), stress=True))
+        assert not tiled._g["state"]._pending
+    assert results[0][0] == results[1][0]
+    assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])

@@ -88,6 +88,9 @@ class TileConfig:
     budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
+    # state "host": a tile's writes to the host state are applied after the next tile's work is queued, so the
+    # device runs it while the host indexes (on CUDA through pinned buffers and events); the same order.
+    overlap: bool = True
     species: str = "one_hot"
 
     def __post_init__(self):
@@ -125,8 +128,10 @@ class _State:
     host memory (``TileConfig.state``). Tiles read rows to the device and put or add rows; on the device these
     are the plain indexing and ``index_add_``, in host memory the same on the host after one copy."""
 
-    def __init__(self, device, dtype, host, alias=False):
+    def __init__(self, device, dtype, host, alias=False, overlap=False):
         self.device, self.dtype, self.host, self.alias = device, dtype, host, alias
+        self.overlap = host and overlap
+        self._pending, self._fresh = [], False  # overlap: the host writes not applied yet
         self.tensors = {}
         # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
@@ -174,24 +179,86 @@ class _State:
         return int(sum(t.numel() * t.element_size() for t in tensors))
 
     def rows(self, name, index):
-        """``state[name][index]`` on the device."""
+        """``state[name][index]`` on the device. A tile reads no row that a pending write of its sweep touches
+        (sweep 2 reads sc and x of sweep 1, and its writes go to its own receivers' sc rows and to closed atoms'
+        x rows), and every sweep ends with the writes applied."""
+        import torch
+
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
             return tensor[index]
-        return tensor.index_select(0, index.cpu()).to(self.device)
+        index = index.cpu()
+        if not (self.overlap and self.device.type == "cuda"):
+            return tensor.index_select(0, index).to(self.device)
+        staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
+        torch.index_select(tensor, 0, index, out=staging)
+        return staging.to(self.device, non_blocking=True)
 
     def put(self, name, index, values):
         """``state[name][index] = values``."""
-        tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
-            tensor[index] = values
+            self.tensors[self._storage.get(name, name)][index] = values
         else:
-            tensor[index.cpu()] = values.detach().cpu()
+            self._defer("put", name, index, values)
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
-        if self.alias and name == "gx":
+        if not self.host:
+            self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
+        else:
+            self._defer("add", name, index, values)
+
+    def new_tile(self):
+        """The call starts a tile: its first host write applies the earlier tiles' pending ones, by then behind
+        the new tile's queued work."""
+        self._fresh = True
+
+    def flush(self):
+        """Apply the pending host writes, in order (the end of every sweep)."""
+        for kind, name, index, values, event in self._pending:
+            if event is not None:
+                event.synchronize()
+            if kind == "close":
+                self._close_now(name)
+            elif kind == "put":
+                self.tensors[self._storage.get(name, name)][index] = values
+            else:
+                self._add_now(name, index, values)
+        self._pending.clear()
+
+    def _defer(self, kind, name, index, values):
+        import torch
+
+        if not self.overlap:
             index, values = index.cpu(), values.detach().cpu()
+            if kind == "put":
+                self.tensors[self._storage.get(name, name)][index] = values
+            else:
+                self._add_now(name, index, values)
+            return
+        if self._fresh:
+            self.flush()
+            self._fresh = False
+        event = None
+        if self.device.type == "cuda":
+            index, values = self._to_host(index), self._to_host(values.detach())
+            event = torch.cuda.Event()
+            event.record()
+        else:  # copies: a padded slot's buffers hold the next tile before these writes are applied
+            index, values = index.to("cpu", copy=True), values.detach().to("cpu", copy=True)
+        self._pending.append((kind, name, index, values, event))
+
+    @staticmethod
+    def _to_host(tensor):
+        """A pinned host copy of a device tensor, copied without waiting."""
+        import torch
+
+        out = torch.empty(tensor.shape, dtype=tensor.dtype, pin_memory=True)
+        out.copy_(tensor, non_blocking=True)
+        return out
+
+    def _add_now(self, name, index, values):
+        if self.alias and name == "gx":
             slots = self._slot_of[index]
             opening = index[slots < 0]
             if opening.numel():
@@ -202,11 +269,7 @@ class _State:
                 self._window[new] = 0
             self._window.index_add_(0, self._slot_of[index], values)
             return
-        tensor = self.tensors[self._storage.get(name, name)]
-        if not self.host:
-            tensor.index_add_(0, index, values)
-        else:
-            tensor.index_add_(0, index.cpu(), values.detach().cpu())
+        self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
 
     def touch(self, index, tile, n):
         """Sweep 1: tile ``tile`` holds the atoms ``index`` (receivers and halo) of ``n``."""
@@ -232,7 +295,14 @@ class _State:
         self._top = size
 
     def close(self, tile):
-        """After tile ``tile`` of sweep 2: its closing atoms' dE/dx is final; it takes their rows of x."""
+        """After tile ``tile`` of sweep 2: its closing atoms' dE/dx is final; it takes their rows of x (after the
+        tile's own pending writes, with overlap)."""
+        if self.overlap:
+            self._pending.append(("close", tile, None, None, None))
+        else:
+            self._close_now(tile)
+
+    def _close_now(self, tile):
         atoms = self._closing[tile]
         if atoms.numel():
             slots = self._slot_of[atoms]
@@ -789,6 +859,7 @@ class TiledForceField:
             aliased = self.config.alias_state
             for sweep in (1, 2, 3):
                 for index, receivers in enumerate(tiles):
+                    g["state"].new_tile()
                     slot = self._slots[keys[index]] if padded else None
                     piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
                     self._note(stats, piece)
@@ -810,6 +881,7 @@ class TiledForceField:
                     if sweep == 2 and aliased:
                         g["state"].close(index)
                     del piece
+                g["state"].flush()  # the next sweep reads what this one wrote
                 if sweep == 1 and aliased:
                     g["state"].plan(len(tiles))
             stats["global_bytes"] = state.bytes()
@@ -909,7 +981,7 @@ class TiledForceField:
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
-                                  alias=self.config.alias_state))
+                                  alias=self.config.alias_state, overlap=self.config.overlap))
             self._g = g
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))
