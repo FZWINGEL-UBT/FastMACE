@@ -77,7 +77,8 @@ def main():
     runs = [(label, machine) + rows_of(label, path, machine) for label, path, machine in RUNS
             if (ROOT / path).exists()]
     with open(HERE / "md_proof.csv", "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, COLUMNS)
+        writer = csv.DictWriter(handle, COLUMNS, lineterminator="
+")
         writer.writeheader()
         for *_, rows in runs:
             for row in rows:
