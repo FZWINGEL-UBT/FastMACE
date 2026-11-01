@@ -649,17 +649,19 @@ class TiledForceField:
         return skin if self._reuse_ok else 0.0
 
     def _keep_lists(self, positions, n, cell, skin):
-        """The kept lists for this call: reused (``self._reusing``) while the atom count and cell are those of the
-        search and no atom has moved more than skin / 2 since it; else a new, empty set (this call searches)."""
+        """The kept lists for this call: reused (``self._reusing``) while the atom count, cell and receiver cap
+        (the budget may raise it after the first call) are those of the search and no atom has moved more than
+        skin / 2 since it; else a new, empty set (this call searches and plans)."""
         import torch
 
         here = positions.detach().to("cpu", torch.float64)
         kept = self._kept
-        reuse = (kept is not None and kept["complete"] and kept["n"] == n and torch.equal(kept["cell"], cell.cpu())
+        reuse = (kept is not None and kept["complete"] and kept["n"] == n and kept["receivers"] == self.receivers
+                 and torch.equal(kept["cell"], cell.cpu())
                  and float(((here - kept["reference"]) ** 2).sum(dim=1).max()) <= (skin / 2) ** 2)
         if not reuse:
-            kept = self._kept = dict(n=n, cell=cell.cpu(), reference=here, superset={}, tiles=None, grid=None,
-                                     complete=True)
+            kept = self._kept = dict(n=n, cell=cell.cpu(), receivers=self.receivers, reference=here, superset={},
+                                     tiles=None, grid=None, complete=True)
             self.list_rebuilds += 1
         self._reusing = reuse
         return kept

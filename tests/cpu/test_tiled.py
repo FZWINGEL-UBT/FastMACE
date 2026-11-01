@@ -545,6 +545,9 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
     assert torch.equal(got.energy, expected.energy) and torch.equal(got.forces, expected.forces)
     kept(x0 + 0.6 * skin * direction)
     assert kept.last["list_reused"] is False and kept.list_rebuilds == 2
+    kept.receivers = 30  # a new receiver cap (the budget's switch) plans again
+    kept(x0 + 0.6 * skin * direction)
+    assert kept.last["list_reused"] is False and kept.list_rebuilds == 3
 
 
 def test_list_cache_unit_shifts_one_byte_codes_or_int16_and_back_exactly():
