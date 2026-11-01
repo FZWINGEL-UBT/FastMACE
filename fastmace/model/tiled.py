@@ -82,9 +82,14 @@ class TileConfig:
     # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
-    # neighbours "tiles": each tile's edges found once per call and kept on the host (sender, receiver counts and
-    # unit shifts, about 10 bytes per edge), the later sweeps rebuilding them exactly from it.
+    # neighbours "tiles": each tile's edges found once per call and kept on the host (int32 senders, receiver counts
+    # and one-byte unit shifts, about 5 bytes per edge), the later sweeps rebuilding them exactly from it.
     list_cache: bool = True
+    # neighbours "tiles", a fixed cell: the tiles' edges searched within cutoff + skin (the force field's list's
+    # skin) and kept on the host across calls with the tile plan; a call while no atom has moved more than skin / 2
+    # since that search filters them at the cutoff (bitwise a fresh search on the same tiles) instead of binning,
+    # planning and searching again (MD).
+    list_reuse: bool = False
     budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
@@ -515,6 +520,9 @@ class TiledForceField:
         self._released = False  # the allocator's cache, released once before the first tile
         self._budgeted = not self.config.budget_receivers
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
+        self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
+        self._reuse_ok = None
+        self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
         self._graph_key = None
         self._pool = None
         self._stream = None
@@ -554,11 +562,41 @@ class TiledForceField:
 
         data = self.field.data
         if self.config.neighbours == "tiles":
+            from fastmace.neighbors.skin import times_3x3
             from fastmace.neighbors.tile_list import TileNeighbours
 
-            bins = TileNeighbours.like(self.field.neighbours)
-            bins.bin(positions)
+            skin, cutoff = self._reuse_skin(), float(self.field.neighbours.cutoff)
+            bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + skin)
+            kept = self._keep_lists(positions, n, bins.cell, skin) if skin > 0 else None
+            if not self._reusing:
+                bins.bin(positions)
+            positions64 = positions.to(device=self.device, dtype=torch.float64)
             cache = self._list_cache = {} if self.config.list_cache and n < 2**31 else None
+
+            def within(receivers):
+                """The tile's edges within the cutoff from the kept ones within cutoff + skin (searched there on a
+                call that searches): a fresh search's float64 distance test, its order kept."""
+                index = self._tile_index[receivers.data_ptr()]
+                superset = kept["superset"].get(index)
+                if superset is None:
+                    sender, receiver, unit, _ = bins.edges(receivers)
+                    packed = _pack_units(unit)
+                    if packed is None:  # beyond int16 shifts: not kept, searched again next call
+                        kept["complete"] = False
+                    else:
+                        counts = torch.bincount(torch.searchsorted(receivers, receiver),
+                                                minlength=receivers.shape[0])
+                        kept["superset"][index] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(),
+                                                   packed.cpu())
+                else:
+                    sender, counts, packed = (t.to(self.device) for t in superset)
+                    receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
+                    sender, unit = sender.long(), _unpack_units(packed, bins.float_dtype, self.device)
+                shifts64 = times_3x3(unit.to(torch.float64), bins.cell)
+                vectors = positions64[receiver] - positions64[sender] + shifts64
+                keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
+                del vectors
+                return sender[keep], receiver[keep], unit[keep], shifts64[keep].to(bins.float_dtype)
 
             def tiles(receivers):
                 """The tile's (global edge index, shifts): searched once per call, then from the host cache (int32
@@ -569,7 +607,7 @@ class TiledForceField:
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
                     return torch.stack([sender.long(), receiver]), bins.shifts(unit)
-                sender, receiver, unit, shifts = bins.edges(receivers)
+                sender, receiver, unit, shifts = within(receivers) if kept is not None else bins.edges(receivers)
                 packed = _pack_units(unit) if cache is not None else None
                 if packed is not None:
                     counts = torch.bincount(torch.searchsorted(receivers, receiver), minlength=receivers.shape[0])
@@ -591,6 +629,40 @@ class TiledForceField:
             return edge_index[:, edge_ids], shifts[edge_ids]
 
         return global_list, row_ptr, edge_index.shape[1] / max(n, 1)
+
+    def _reuse_skin(self):
+        """``list_reuse``'s skin: the force field's list's, when the lists can be kept (tile lists, a fixed cell,
+        at least three bins of cutoff + skin per axis); else 0."""
+        neighbours = self.field.neighbours
+        skin = float(getattr(neighbours, "skin", 0.0) or 0.0)
+        if not (self.config.list_reuse and self.config.neighbours == "tiles" and skin > 0
+                and not getattr(neighbours, "variable_cell", False)):
+            return 0.0
+        if self._reuse_ok is None:
+            from fastmace.neighbors.tile_list import TileNeighbours
+
+            try:
+                TileNeighbours.like(neighbours, cutoff=float(neighbours.cutoff) + skin)
+                self._reuse_ok = True
+            except ValueError:  # fewer than three bins per axis at cutoff + skin
+                self._reuse_ok = False
+        return skin if self._reuse_ok else 0.0
+
+    def _keep_lists(self, positions, n, cell, skin):
+        """The kept lists for this call: reused (``self._reusing``) while the atom count and cell are those of the
+        search and no atom has moved more than skin / 2 since it; else a new, empty set (this call searches)."""
+        import torch
+
+        here = positions.detach().to("cpu", torch.float64)
+        kept = self._kept
+        reuse = (kept is not None and kept["complete"] and kept["n"] == n and torch.equal(kept["cell"], cell.cpu())
+                 and float(((here - kept["reference"]) ** 2).sum(dim=1).max()) <= (skin / 2) ** 2)
+        if not reuse:
+            kept = self._kept = dict(n=n, cell=cell.cpu(), reference=here, superset={}, tiles=None, grid=None,
+                                     complete=True)
+            self.list_rebuilds += 1
+        self._reusing = reuse
+        return kept
 
     def _edges(self, vectors, node_attrs, local, strain):
         """Spherical harmonics, radial features and cutoff of the tile's edges from their vectors."""
@@ -891,12 +963,19 @@ class TiledForceField:
         edge_cap = caps.edges if caps.edges is not None else (
             2**62 if degree is None else max(1, int(math.ceil(2 * self.receivers * degree))))
         cell = data["cell"].reshape(3, 3) if "cell" in data else torch.as_tensor(field.neighbours.cell)
-        tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
+        if self._reusing:  # the kept plan, back on the device for this call
+            tiles, grid = [t.to(self.device) for t in self._kept["tiles"]], self._kept["grid"]
+        else:
+            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
+            if self._kept is not None:
+                self._kept["tiles"], self._kept["grid"] = [t.cpu() for t in tiles], grid
+        self._tile_index = {t.data_ptr(): i for i, t in enumerate(tiles)}
         local_of = torch.full((n,), -1, dtype=torch.int32, device=self.device)  # int32: 4 bytes per atom
         measure = (not self._budgeted or self._auto) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
+                     list_reused=self._reusing, list_rebuilds=self.list_rebuilds,
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
