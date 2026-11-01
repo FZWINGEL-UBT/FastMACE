@@ -322,6 +322,28 @@ def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool,
     return (("parity", "not applicable", "the model takes no charge or spin inputs"),)
 
 
+def _memory_ladder(registry, free, enabled, found, rescued, estimate):
+    """Rule 12's memory choice for the near-limit memory probe (``memory.MemoryLadder``): the chosen stage and the
+    next-cheaper one, the chosen without its last rescue rung (``rescued``'s last), estimated as rule 12 does."""
+    from fastmace.planner import memory
+
+    def stage(names, found):
+        values = tuple((registry.config_field(name), "on" if name in names else "off")
+                       for name in memory.MEMORY_RESCUE if name in registry.names())
+        return memory.LadderStage(memory.rescue_stage(names), values, int(found.total), memory.fixed_bytes(found))
+
+    cheaper = None
+    if rescued:
+        last = rescued[-1][0]
+        if memory.rescue_value(last) == "off":  # a rung turned off: on again
+            names = [other for other in registry.order() if other in enabled or other == last]
+        else:
+            group = {last, *registry.dependants(last)}
+            names = [other for other in enabled if other not in group]
+        cheaper = stage(names, estimate(names))
+    return memory.MemoryLadder(int(free), stage(enabled, found), cheaper)
+
+
 class MinimalPlanner:
     """The rule-based planner of phase 1b.
 
@@ -332,7 +354,13 @@ class MinimalPlanner:
     record of ``fastmace.engine.constraints``) can be given for tests; ``environ`` and
     ``torch_version`` as in ``FixedPlanner``; ``versions`` (default: the installed ones) the package
     versions rule 5 checks (``planner.reproducible.installed_versions``).
+
+    ``probe_scales``: the near-limit memory probe's measured scales, ``(stage, scale)`` (``planner.memory_probe``):
+    rule 12 corrects the estimate of a probed stage with them (``memory.probed``). Empty unless the ``Simulation``
+    that probed gives its planner a copy with them.
     """
+
+    probe_scales: tuple[tuple[str, float], ...] = ()
 
     def __init__(self, engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None,
                  polar: PolarConfig | None = None, precision: PrecisionConfig | None = None, *, registry=None,
@@ -938,9 +966,11 @@ class MinimalPlanner:
                 terms += (memory.polar_streaming_backward_term(dims, dtype),)
             checks = memory.selfcheck_memory_terms(registry, dims, names, dtype, getattr(hardware, "sms", None))
             held = memory.resident_memory_terms(registry, dims, names, dtype)
-            return memory.estimate(dims, edges=edges, nodes=natoms, dtype=dtype, capacity=capacity, list_dtype=dtype,
-                                   rewrite_terms=terms, d3=d3_memory, resident_weights=resident, workspace=cuda,
-                                   fused_conv=fused_conv, selfcheck_terms=checks, resident_terms=held)
+            found = memory.estimate(dims, edges=edges, nodes=natoms, dtype=dtype, capacity=capacity, list_dtype=dtype,
+                                    rewrite_terms=terms, d3=d3_memory, resident_weights=resident, workspace=cuda,
+                                    fused_conv=fused_conv, selfcheck_terms=checks, resident_terms=held)
+            scale = dict(self.probe_scales).get(memory.rescue_stage(names))
+            return found if scale is None else memory.probed(found, scale)  # the near-limit memory probe's
 
         found = estimate(enabled)
         dropped = []
@@ -1050,6 +1080,8 @@ class MinimalPlanner:
             book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
             book.decide(f"RewriteConfig.{field}", "off", Reason(why, rule=12, code="rule-12-memory-drop"))
         text = found.text(free)
+        if memory.probe_corrected(found):
+            text += f"; {memory.PROBE_TERM}: corrected by a replica's measured peak (docs/validation/estimate-probe.md)"
         if memory.fits(found, free):
             how = "fits" if free else "not checked"
             why = text if free else f"{text}; no GPU memory to compare (device {self.engine.device})"
@@ -1063,6 +1095,8 @@ class MinimalPlanner:
             warnings.warn(why, ResourceWarning, stacklevel=4)
             book.decide("memory", "warn", Reason(why, rule=12, code="rule-12-memory-warn"))
         parts["decisions"] = tuple(book.decisions)
+        if free:
+            parts["memory_ladder"] = _memory_ladder(registry, free, enabled, found, rescued, estimate)
         return found.total
 
     def _workload_decisions(self, book, workload, rule_11, mode="graph"):

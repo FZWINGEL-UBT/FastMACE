@@ -374,6 +374,7 @@ class Report:
         self.measured = None
         self.runtime = None  # the runtime monitor's line (planner.adapt.report_line; 5-T06), or None
         self.calibration = None  # the optional calibration's line (planner.calibrate.report_line; 5-T09), or None
+        self.memory_probe = None  # the near-limit memory probe's line (planner.memory_probe.report_line), or None
 
     # ------------------------------------------------------------------ the lines
 
@@ -535,6 +536,7 @@ class Report:
         fields += [("setup", self._setup()), ("speed", self._speed())]
         fields += [("runtime", self.runtime)] if self.runtime else []  # re-captures or overflows (5-T06)
         fields += [("backend", self.calibration)] if self.calibration else []  # calibrate=True (5-T09)
+        fields += [("memory", self.memory_probe)] if self.memory_probe else []  # the near-limit memory probe
         fields += [("output", ", ".join(self.outputs) or "none"), ("licence", self.licence_line)]
         warnings = self.warnings() or ["none"]
         fields += [("warn", warnings[0])] + [(None, line) for line in warnings[1:]]

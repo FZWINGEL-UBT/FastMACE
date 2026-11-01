@@ -39,6 +39,7 @@ This module imports nothing from torch or MACE.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass, field
 from typing import Any
@@ -361,10 +362,71 @@ def fits(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
 
 
 def short_by_far(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
-    """CAP-T07: does even the smallest peak the estimate allows (``needed`` divided by ``RESCUE_OVERSTATEMENT``)
-    not fit (decision 51's ``MARGIN`` of the free memory)? Then a build without the memory rescue would only fail,
-    and on WSL2 its out-of-memory error can leave the CUDA context unusable. ``False`` off CUDA."""
-    return bool(free_bytes) and estimate_.needed / RESCUE_OVERSTATEMENT > MARGIN * free_bytes
+    """CAP-T07: does even the smallest peak the estimate allows (``needed`` divided by ``RESCUE_OVERSTATEMENT``, or
+    by ``PROBE_HEADROOM`` for an estimate the memory probe corrected) not fit (decision 51's ``MARGIN`` of the free
+    memory)? Then a build without the memory rescue would only fail, and on WSL2 its out-of-memory error can leave
+    the CUDA context unusable. ``False`` off CUDA."""
+    overstatement = PROBE_HEADROOM if probe_corrected(estimate_) else RESCUE_OVERSTATEMENT
+    return bool(free_bytes) and estimate_.needed / overstatement > MARGIN * free_bytes
+
+
+# The near-limit memory probe (EngineConfig.memory_probe; planner.memory_probe, docs/validation/estimate-probe.md):
+# a stage's estimate corrected by what a small replica of the structure measured with that stage's rewrites. Its
+# term's name in the run's terms.
+PROBE_TERM = "memory probe"
+# The estimate's terms that do not grow with the cell: the replica's and the cell's are the same, so the probe scales
+# the rest only.
+FIXED_TERMS = ("weights (pristine and execution copy)", "rewrites' buffers", "workspace")
+# On the corrected estimate: the replica's measured scale moved by up to 5 % between 15-26k atoms and the larger cells
+# of the rescue matrix (graph-pool packing; docs/validation/estimate-probe.md), so the corrected estimate keeps 5 %.
+PROBE_HEADROOM = 1.05
+
+
+def fixed_bytes(estimate_: MemoryEstimate) -> int:
+    """The estimate's size-independent part (``FIXED_TERMS``)."""
+    return sum(estimate_.term(name) for name in FIXED_TERMS)
+
+
+def probe_corrected(estimate_: MemoryEstimate) -> bool:
+    """Whether the memory probe corrected the estimate (it has the ``PROBE_TERM``)."""
+    return any(name == PROBE_TERM for name, _ in getattr(estimate_, "terms", ()))
+
+
+def probed(estimate_: MemoryEstimate, scale: float, headroom: float = PROBE_HEADROOM) -> MemoryEstimate:
+    """``estimate_`` corrected by the memory probe's ``scale`` (the replica's measured peak over its estimate, both
+    less ``fixed_bytes``): the fixed part stays, the rest is scaled and kept ``headroom`` above, as the run term
+    ``PROBE_TERM`` that brings the run to the corrected total."""
+    fixed = fixed_bytes(estimate_)
+    corrected = fixed + (estimate_.total - fixed) * scale * headroom
+    return dataclasses.replace(estimate_, terms=(*estimate_.terms,
+                                                 (PROBE_TERM, int(math.ceil(corrected - estimate_.run)))))
+
+
+@dataclass(frozen=True)
+class LadderStage:
+    """A stage of the memory rescue as rule 12 planned it (``MemoryLadder``): its key (``rescue_stage``; "" for the
+    default plan), the values of the ``MEMORY_RESCUE`` records' ``RewriteConfig`` fields that make it, its estimate
+    (bytes) and the estimate's ``fixed_bytes``."""
+
+    stage: str
+    rewrites: tuple[tuple[str, str], ...]
+    estimate: int
+    fixed: int
+
+
+@dataclass(frozen=True)
+class MemoryLadder:
+    """Rule 12's memory choice for the memory probe: the free memory it planned against, the stage it chose and
+    the next-cheaper stage (the chosen one without its last rescue rung; ``None`` without a rung)."""
+
+    free_bytes: int
+    chosen: LadderStage
+    cheaper: LadderStage | None = None
+
+    @property
+    def limit(self) -> float:
+        """Decision 51's limit: ``MARGIN`` of the free memory."""
+        return MARGIN * self.free_bytes
 
 
 def drop_order(rewrite_terms: tuple[tuple[str, int], ...], edge_sized: set[str], explicit: set[str]) -> list[str]:
@@ -424,9 +486,10 @@ def annotate_out_of_memory(error, plan) -> Any:
     return error
 
 
-__all__ = ["CONTEXT_TERMS", "DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
-           "MemoryEstimate", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD", "RESCUE_OFF",
-           "RESCUE_OVERSTATEMENT", "SAFETY", "WORKSPACE_BYTES",
-           "annotate_out_of_memory", "counted_edges", "drop_order", "rescue_value", "short_by_far",
+__all__ = ["CONTEXT_TERMS", "DTYPE_BYTES", "FIXED_TERMS", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
+           "LadderStage", "MemoryEstimate", "MemoryLadder", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD",
+           "PROBE_HEADROOM", "PROBE_TERM", "RESCUE_OFF", "RESCUE_OVERSTATEMENT", "RESCUE_RESERVE", "SAFETY",
+           "WORKSPACE_BYTES", "annotate_out_of_memory", "counted_edges", "drop_order", "fixed_bytes", "probe_corrected",
+           "probed", "rescue_stage", "rescue_value", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
            "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]

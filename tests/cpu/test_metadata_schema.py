@@ -124,6 +124,7 @@ PHASE_5 = (
     ("calibration record (5-T09)", "plan.calibration"),
     ("adaptation limits (5-T07)", "plan.adaptation"),
     ("runtime monitor segments (5-T06)", "counters.segments"),
+    ("near-limit memory probe record (estimate-probe)", "plan.memory_probe"),
 )
 # Filled by a later phase: an explicit null until then. Since phase 5 (tier switches, 5-T01) none is left.
 LATER_PHASES = ()

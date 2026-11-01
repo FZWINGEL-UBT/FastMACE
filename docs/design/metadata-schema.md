@@ -68,7 +68,7 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | `model` | the 1a `model_block`, unchanged | `model` |
 | `force_field_identity` | `ForceFieldIdentity.to_dict()` plus `digest` | `identity` (T05's record or its dict) |
 | `reference_record` | the §12.1 record; at least `id` | `reference_record`: a mapping, `to_dict()`, or `.id`; must equal the identity's `reference_record_id` |
-| `plan` | active revision: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`, the sectioned text of 5-T05), `description_full` (`plan.describe(full=True)`: every decision), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried` (each `TriedCandidate` of 2-T06/2-T15: `dimension`, `change`, `outcome`, `reason`, `stage`, `revision`, `reduced_gate_runs`, `full_gate_runs`; `[]` when no fallback ran), `predicted_memory_bytes`, `runner` (`"in-process"` or `"subprocess"`, 2-T07), `calibration` (`CalibrationRecord`, 5-T09; `null` when none ran), `adaptation` (the active `AdaptationConfig`, 5-T07; `null` before) | `plan` (T12's `Plan`) |
+| `plan` | active revision: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`, the sectioned text of 5-T05), `description_full` (`plan.describe(full=True)`: every decision), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried` (each `TriedCandidate` of 2-T06/2-T15: `dimension`, `change`, `outcome`, `reason`, `stage`, `revision`, `reduced_gate_runs`, `full_gate_runs`; `[]` when no fallback ran), `predicted_memory_bytes`, `runner` (`"in-process"` or `"subprocess"`, 2-T07), `calibration` (`CalibrationRecord`, 5-T09; `null` when none ran), `memory_probe` (`MemoryProbeRecord`, the near-limit memory probe; `null` when none ran), `adaptation` (the active `AdaptationConfig`, 5-T07; `null` before) | `plan` (T12's `Plan`) |
 | `plan_revisions` | `[{revision, tier, step, reason, description, description_full, runner, fallback}]`, oldest first, active last (§9.5); `fallback` is the activated candidate that became the revision, else `null` | `plan.chain()` and `plan` |
 | `precision` | `force`, `integration` (always `"float64"`, §7.3), `tf32` (PyTorch's matmul TF32 flag when the record is made), `tf32_requested` (`PrecisionConfig.tf32`), `float64_energy` (T03, D2) | `plan.precision`; without a plan, the identity's force precision |
 | `runtime` | `RuntimeInfo`: `file_locks`, `file_lock_source`, `file_lock_switch_late`, `cuda_driver_cache` (§14) | `fastmace.runtime_info()` |
@@ -159,6 +159,7 @@ A self-check result marked "cached" is not recorded, because 2-T19 added no qual
 | --- | --- | --- |
 | schema minor version | `schema_minor` | 5-T01 |
 | calibration record | `plan.calibration` | 5-T09 |
+| near-limit memory probe record | `plan.memory_probe` | estimate-probe |
 | adaptation limits | `plan.adaptation` | 5-T07 |
 | tier switches | `counters.tier_switches` (no longer `null`) | 5-T07 |
 | runtime monitor segments (within minor 1) | `counters.segments`; `counters.neighbour_lists` filled | 5-T06 |

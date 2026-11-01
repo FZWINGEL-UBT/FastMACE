@@ -8,6 +8,21 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- The near-limit memory probe (`EngineConfig.memory_probe`, `fastmace.planner.memory_probe`). Where rule 12's memory
+  choice is ambiguous:
+  - when it runs: the chosen stage within 1.25 of the free memory's limit, or the next-cheaper stage might fit;
+  - what it measures: the chosen stage and the next-cheaper one, on a 15,000–20,000-atom replica of the structure's
+    own repeat unit, each in a fresh child;
+  - what it does: corrects those stages' estimates from the measured reserved memory, and re-plans.
+
+  Option values: `"auto"` (near the limit, for MD on CUDA), `"near-limit"`, `"always"` or `"off"`. It is recorded in
+  `Plan.memory_probe`, the plan text, the report (`memory:`), `metadata.json` and the setup times. A resume plans
+  with the measured scales (`simulation.json`'s `memory_probe_scales`) and never probes.
+
+  On leeloo (20 GB, NbCl5 and SrTiO3, s0 to the region) the estimate is 1.02–1.07 times the measured peak where it
+  probed, against 1.01–1.24 before. It costs 38–43 s per stage (51–93 s for the region) with a warm cache
+  (docs/validation/estimate-probe.md).
+
 - The memory rescue turns `gate_epilogue` off (`planner.memory.MEMORY_RESCUE`, `RESCUE_OFF`): decision 66 turns it
   on for speed on the RTX 5060 Ti and RTX 4000 Ada, and it keeps more at the force call's peak, 12 kB per atom
   without the node segments, 36 kB with the separate segments and 0.5 kB inside `recompute_node_region`'s chunks.

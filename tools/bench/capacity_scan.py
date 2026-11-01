@@ -25,6 +25,7 @@ Run inside a local GPU reservation (``tools/ci/local_gpu.py run``) on an otherwi
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import importlib.util
 import json
 import math
@@ -415,7 +416,11 @@ def run_point(args):
             record["plan"] = dict(engine=type(sim._engine).__name__, predicted_memory_bytes=plan.predicted_memory_bytes,
                                   memory=list(plan.decision("memory")) if _has(plan, "memory") else None,
                                   rule_12=[list(d) for d in plan.decisions if "rule 12" in str(d[2])],
-                                  text=plan.describe())
+                                  text=plan.describe(),
+                                  memory_probe=None if getattr(plan, "memory_probe", None) is None
+                                  else dataclasses.asdict(plan.memory_probe),
+                                  memory_ladder=None if getattr(plan, "memory_ladder", None) is None
+                                  else dataclasses.asdict(plan.memory_ladder))
             record["edges"] = edges()
             torch.cuda.reset_peak_memory_stats()
             phase = "warmup"

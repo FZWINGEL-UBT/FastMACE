@@ -347,6 +347,8 @@ def _history(plan: Any) -> list[str]:
     else:
         lines = [INDENT + "fallbacks: none"]
     lines.append(INDENT + "calibration: " + _calibration(plan.calibration))
+    if plan.memory_probe is not None:  # the near-limit memory probe ran
+        lines.append(INDENT + "memory probe: " + _memory_probe(plan.memory_probe))
     if plan.selfchecks:
         failed = [check.name for check in plan.selfchecks if check.passed is False]
         lines.append(f"{INDENT}self-checks: {len(plan.selfchecks)} records"
@@ -356,6 +358,14 @@ def _history(plan: Any) -> list[str]:
              for entry in chain]
     lines += _wrap("revisions: ", _tokens([[item] for item in items]), max_lines=2)
     return lines
+
+
+def _memory_probe(record: Any) -> str:
+    stages = ", ".join(f"{stage.stage or 'default'} {stage.corrected / 2**30:.2f} GiB "
+                       f"(was {stage.estimate / 2**30:.2f})" for stage in record.stages)
+    verdict = (f"chose {record.chosen or 'the default'}, not {record.before or 'the default'}" if record.changed_plan
+               else f"kept {record.chosen or 'the default'}")
+    return f"{verdict}; {stages}; {record.setup_s:.0f} s"
 
 
 def _calibration(record: Any) -> str:

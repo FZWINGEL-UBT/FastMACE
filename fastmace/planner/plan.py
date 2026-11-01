@@ -15,12 +15,16 @@ override record (``Plan.overrides``, reasons from ``planner.rules.override``), t
 (``Plan.calibration``, ``CalibrationRecord``; 5-T09 fills it), the active adaptation limits
 (``Plan.adaptation``; 5-T07) and the record of a tier switch (``TierSwitch``, provenance's
 ``counters.tier_switches``). None of them is in the restart record, so its version stays 2.
+
+The near-limit memory probe (``EngineConfig.memory_probe``, ``planner.memory_probe``) adds rule 12's memory
+choice (``Plan.memory_ladder``, ``planner.memory.MemoryLadder``) and what the probe measured (``Plan.memory_probe``,
+``MemoryProbeRecord``), neither in the restart record.
 """
 
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -157,6 +161,55 @@ class CalibrationRecord:
 
 
 @dataclass(frozen=True)
+class MemoryProbeStage:
+    """One stage of the memory rescue the near-limit memory probe measured (``MemoryProbeRecord``).
+
+    - ``stage``: its key (``planner.memory.rescue_stage``; ``""`` for the default plan), and ``rewrites`` the
+      ``RewriteConfig`` values of the rescue records that make it;
+    - ``replica_atoms``, ``replica_estimate``: the replica's size and rule 12's estimate of it at this stage;
+    - ``replica_reserved``, ``replica_allocated``: its measured peaks (bytes, the largest over build and steps);
+    - ``scale``: the measured over the estimated peak, both without the fixed part (``memory.fixed_bytes``);
+    - ``estimate``, ``corrected``: rule 12's estimate of the run's cell, before and after the correction;
+    - ``seconds``: the probe's wall time (its child, build and steps).
+    """
+
+    stage: str
+    rewrites: tuple[tuple[str, str], ...]
+    replica_atoms: int
+    replica_estimate: int
+    replica_reserved: int
+    replica_allocated: int
+    scale: float
+    estimate: int
+    corrected: int
+    seconds: float
+
+    def __post_init__(self):
+        object.__setattr__(self, "rewrites", tuple(tuple(item) for item in self.rewrites))
+
+
+@dataclass(frozen=True)
+class MemoryProbeRecord:
+    """What the near-limit memory probe of this run measured (``Plan.memory_probe``): a record of this run only.
+
+    - ``stages``: every ``MemoryProbeStage``, rule 12's choice first;
+    - ``before``, ``chosen``: the stage rule 12 chose without and with the probe's correction;
+    - ``changed_plan``: whether the correction changed the stage;
+    - ``headroom``: ``memory.PROBE_HEADROOM`` as applied; ``setup_s``: what probing cost, s.
+    """
+
+    stages: tuple[MemoryProbeStage, ...]
+    before: str
+    chosen: str
+    changed_plan: bool
+    headroom: float
+    setup_s: float
+
+    def __post_init__(self):
+        object.__setattr__(self, "stages", tuple(self.stages))
+
+
+@dataclass(frozen=True)
 class TierSwitch:
     """One runtime tier switch (SPEC §9.6; plan task 5-T07): at ``step``, from tier ``from_tier`` to ``to_tier``,
     for ``reason``, as plan ``revision``. ``record()`` is its entry in provenance's ``counters.tier_switches``."""
@@ -216,6 +269,9 @@ class Plan:
       relaxations write no restart files (conductor's choice 5);
     - ``calibration``: the ``CalibrationRecord`` of the optional calibration (SPEC §9.1, 5-T09), or ``None``
       when it did not run. Not in the restart record: it is a record of the run that measured;
+    - ``memory_ladder``: rule 12's memory choice (``planner.memory.MemoryLadder``: the free memory, the chosen and
+      the next-cheaper stage), or ``None`` off CUDA; ``memory_probe``: the ``MemoryProbeRecord`` of the near-limit
+      memory probe, or ``None`` when it did not run. Neither is in the restart record nor compared;
     - ``adaptation``: the ``AdaptationConfig`` whose limits are active for this plan (SPEC §9.6, 5-T07), or
       ``None`` where no runtime adaptation applies (evaluations, relaxations, and every plan until 5-T07).
       Not in the restart record: a resume takes it from the recorded ``PlannerOptions``.
@@ -247,6 +303,8 @@ class Plan:
     optimizer: OptimizerConfig | None = None
     calibration: CalibrationRecord | None = None
     adaptation: AdaptationConfig | None = None
+    memory_ladder: Any = field(default=None, compare=False)
+    memory_probe: MemoryProbeRecord | None = field(default=None, compare=False)
 
     def __post_init__(self):
         if self.runner not in RUNNERS:
