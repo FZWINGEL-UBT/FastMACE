@@ -122,7 +122,9 @@ def main(argv=None):
         raise SystemExit("--tile-list leaves the force field's own list empty: use --path tiled")
     lists = contextlib.ExitStack()
     lists.enter_context(tiled_capacity.no_global_list(args.tile_list))
-    field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index)
+    # The tiled path's tables sized for a tile's rows (as tiled_capacity.py), not the whole system's.
+    rows = {"call_rows": args.receivers} if args.path == "tiled" else {}
+    field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index, **rows)
     config = TileConfig(args.receivers, mode=args.mode, neighbours="tiles" if args.tile_list else "global",
                         state="host" if args.host_state else "device", alias_state=args.alias_state,
                         species="index" if args.species_index else "one_hot")
