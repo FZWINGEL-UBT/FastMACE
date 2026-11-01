@@ -16,7 +16,7 @@ import torch
 
 from fastmace.config import EngineConfig, NeighbourConfig
 from fastmace.model.forces import MACEForceField
-from fastmace.model.tiled import TileConfig, TiledForceField, plan_tiles
+from fastmace.model.tiled import TileConfig, TiledForceField, _split_block, plan_tiles
 from fastmace.rewrites import registry as reg
 
 pytest.importorskip("mace")
@@ -133,30 +133,25 @@ def test_plan_tiles_covers_every_atom_once_within_the_caps(receivers, edges):
     assert len(grid) == 3
 
 
-@pytest.mark.parametrize("receivers, edges", [(1, 10**9), (5, 40), (16, 100), (64, 7), (500, 10**9)])
-def test_plan_tiles_degree_split_is_the_per_atom_greedy(receivers, edges):
-    """The split of a block by the caps (one search per piece over the cumulative degrees) is the per-atom greedy
-    rule it replaces: a piece ends before the atom that would take it to ``receivers`` atoms or past ``edges``
-    edges, and holds at least one atom. Degrees with zeros and above the edge cap."""
+@pytest.mark.parametrize("receivers, edges", [(1, 10**9), (5, 40), (16, 100), (64, 7), (500, 2**62)])
+def test_block_split_by_the_caps_is_the_per_atom_greedy(receivers, edges):
+    """``plan_tiles`` with degrees splits each block by one search per piece over the cumulative degrees: the same
+    pieces as the per-atom greedy rule it replaces (a piece ends before the atom that would take it to ``receivers``
+    atoms or past ``edges`` edges, and holds at least one atom). Degrees with zeros and above the edge cap; blocks
+    that start inside the array."""
     rng = np.random.default_rng(1)
-    n = 500
-    cell = torch.tensor(np.diag([12.0, 13.0, 14.0]), dtype=torch.float64)
-    positions = torch.tensor(rng.uniform(0, 1, (n, 3)), dtype=torch.float64) @ cell
-    degree = torch.tensor(rng.integers(0, 30, n))
-    row_ptr = torch.cat([torch.zeros(1, dtype=torch.int64), torch.cumsum(degree, 0)])
-    blocks, _ = plan_tiles(positions, cell, row_ptr, n, 2**62)  # one piece per block, in block order
-    expected = []
-    for block in blocks:
-        piece, edge_sum = 0, 0
-        for i in range(len(block)):
-            d = int(degree[block[i]])
-            if i > piece and (i - piece >= receivers or edge_sum + d > edges):
-                expected.append(block[piece:i])
+    degree = rng.integers(0, 30, 500)
+    cumulative = np.concatenate([[0], np.cumsum(degree)])
+    for start, stop in ((0, 500), (37, 300), (120, 121), (200, 200)):
+        expected, piece, edge_sum = [], start, 0
+        for i in range(start, stop):
+            if i > piece and (i - piece >= receivers or edge_sum + degree[i] > edges):
+                expected.append((piece, i))
                 piece, edge_sum = i, 0
-            edge_sum += d
-        expected.append(block[piece:])
-    tiles, _ = plan_tiles(positions, cell, row_ptr, receivers, edges)
-    assert [t.tolist() for t in tiles] == [t.tolist() for t in expected]
+            edge_sum += degree[i]
+        if stop > piece:
+            expected.append((piece, stop))
+        assert _split_block(cumulative, start, stop, receivers, edges) == expected
 
 
 def test_refuses_compiled_and_unsupported_fields():
