@@ -39,8 +39,10 @@ RESCUE = json.loads((DATA.parent / "rule12_rescue.json").read_text())
 # docs/validation/estimate-band.md: the highest ratio per stage of the rescue matrix (five crystals, three GPUs),
 # rounded up. The spread within a stage is the allocator's reserve, which differs between crystals by the graph
 # pool's packing.
-RESCUE_HIGH = {"s0-default": 1.30, "s1-conv": 1.10, "s2-table": 1.10, "s3-segments": 1.18, "s4-geoff": 1.33,
-               "s5-region": 1.16, "s6-region-ge": 1.16}
+RESCUE_HIGH = {"s0-default": 1.30, "s1-conv": 1.06, "s2-table": 1.05, "s3-segments": 1.15, "s4-geoff": 1.25,
+               "s5-region": 1.12, "s6-region-ge": 1.12}
+# the rescue is never planned on smaller cells, whose peak is the build's fixed transient (the build term's)
+RESCUE_MIN_ATOMS = 15_000
 
 
 def predicted(case):
@@ -107,7 +109,7 @@ def test_every_stage_of_the_memory_rescue_stays_within_its_band(case):
 def test_the_rescue_fit_covers_the_whole_ladder():
     stages = {case["stage"] for case in RESCUE}
     assert stages == {"s0-default", "s1-conv", "s2-table", "s3-segments", "s4-geoff", "s5-region", "s6-region-ge"}
-    assert set(RESCUE_HIGH) == stages
+    assert set(RESCUE_HIGH) == stages and min(case["natoms"] for case in RESCUE) >= RESCUE_MIN_ATOMS
     for structure in ("NaCl", "NbCl5"):
         sizes = {case["natoms"] for case in RESCUE if case["structure"] == structure and case["stage"] == "s5-region"}
         assert len(sizes) >= 3 and max(sizes) >= 85_000, structure

@@ -78,10 +78,11 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # the same on Linux and WSL2), so each stage scales the kept activations by its own factor, named by the deepest rung
 # taken (``rescue_stage``): the upper envelope over the rescue matrix of what keeps every point at or above its
 # measured peak (docs/validation/estimate-band.md). Relative to the default plan, whose reserve SAFETY's fit covers.
-# Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's rung
-# above it (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
-RESCUE_RESERVE = (("recompute_conv_weights", 0.875), ("recompute_first_table", 0.87), ("recompute_node_segments", 0.86),
-                  ("gate_epilogue", 1.06), ("recompute_node_region", 0.925))
+# Cells of at least 15,000 atoms (the rescue is never planned below; there the build's fixed transient sets the
+# peak). Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's
+# rung at 1 (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
+RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84),
+                  ("gate_epilogue", 1.0), ("recompute_node_region", 0.9))
 
 
 def rescue_stage(enabled) -> str:

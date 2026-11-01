@@ -29,7 +29,7 @@ MIN_ATOMS = 15_000
 DATA = FM / "tests/_support/data"
 FIT = json.loads((DATA / "rule12_fit.json").read_text())
 registry = minimal._rewrite_registry()
-cases = json.loads(Path(sys.argv[2]).read_text())
+cases = [c for c in json.loads(Path(sys.argv[2]).read_text()) if c["nodes"] >= MIN_ATOMS]
 points = {}
 for d in sys.argv[3:]:
     for f in Path(d).rglob("point-*.json"):
@@ -108,7 +108,7 @@ memory.RESCUE_RESERVE = tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE)
 need = defaultdict(list)
 for c in cases:
     est = full(c)
-    if est.build >= c["reserved"]:
+    if est.build >= c["reserved"] or c["nodes"] < MIN_ATOMS:  # the rescue is never planned on build-bound cells
         continue
     kept = est.term("activations") + est.term("rewrites")
     need[memory.rescue_stage(n for n, _ in memory.rewrite_memory_terms(registry, ModelDims.from_record(
