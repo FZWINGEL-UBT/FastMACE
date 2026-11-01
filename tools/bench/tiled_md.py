@@ -51,6 +51,9 @@ def parse_args(argv=None):
                    help="TileConfig.species='index', the force field built with its one-hot on the host")
     p.add_argument("--integrator", choices=("host", "device", "both"), default="host",
                    help="where the integrator's state lives; both: two runs from the same start, compared bitwise")
+    p.add_argument("--no-list-cache", action="store_true",
+                   help="TileConfig.list_cache=False: about 270 bytes per atom less on the host, the tiles' lists "
+                        "searched every sweep")
     p.add_argument("--steps", type=int, default=200)
     p.add_argument("--timestep-fs", type=float, default=2.0)
     p.add_argument("--temperature", type=float, default=600.0)
@@ -158,7 +161,7 @@ def main(argv=None):
     field = planner.build_evaluation(plan, user, atoms, release_node_attrs=args.species_index, **rows)
     config = TileConfig(args.receivers, mode=args.mode, neighbours="tiles" if args.tile_list else "global",
                         state="host" if args.host_state else "device", alias_state=args.alias_state,
-                        species="index" if args.species_index else "one_hot")
+                        species="index" if args.species_index else "one_hot", list_cache=not args.no_list_cache)
     if args.bucket is not None:
         config = dataclasses.replace(config, bucket=args.bucket)
     tiled = TiledForceField(field, config)
