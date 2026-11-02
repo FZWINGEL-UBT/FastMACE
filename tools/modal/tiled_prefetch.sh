@@ -2,8 +2,8 @@
 # Prefetch A/B of the tiled call (docs/validation/tiled-ideas-20261102.md): 1.08M SrTiO3, OMAT-0 medium, wavefront,
 # R = 8192, TileConfig.prefetch off, on, on, off (one process each); then the backward chunk scale 4.
 # Usage (from WSL, Modal client venv):
-#   modal run tools/modal/fastmace_modal.py::job --gpu L4 --timeout-min 60 --commit <sha> \
-#     --command "bash tools/modal/tiled_prefetch.sh" --out ~/fastmace-runs/tiled-prefetch-20261102/modal-L4
+#   modal run tools/modal/fastmace_modal.py::job --gpu RTX-PRO-6000 --timeout-min 45 --commit <sha> \
+#     --command "bash tools/modal/tiled_prefetch.sh" --out ~/fastmace-runs/tiled-prefetch-20261102/modal-RTX-PRO-6000
 set -uo pipefail
 out=${OUT:?the job sets OUT}
 echo "$(date -u +%FT%TZ) Modal $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader); source $(cat .source_commit)" \
