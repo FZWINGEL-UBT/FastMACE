@@ -394,6 +394,13 @@ DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000
 # build orders: RTX 4000 Ada NaCl 8,000 atoms 0.953 / 0.953, SrTiO3 6,655 0.916 / 0.916; RTX 5060 Ti NaCl 5,832
 # 0.972 / 0.972, SrTiO3 3,645 0.949 / 0.951. The A100 was not measured (no Colab compute units).
 DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+# generic_radial_tables (radial_tables on a generic model, docs/validation/generic-radial-tables.md) under decision
+# 66 (owner, 2 November 2026): "auto" on only on these GPUs, exact device names. MACE-OMAT-0 medium, MD step b/a in
+# the two build orders: RTX 4000 Ada NaCl 8,000 atoms 0.864 / 0.862, SrTiO3 6,655 0.845 / 0.844; RTX 5060 Ti NaCl
+# 0.849 / 0.848, SrTiO3 0.821 / 0.821. Tiled compiled calls: Ada 975,560 atoms 0.861 / 0.862, 5060 Ti 320,000 0.912
+# / 0.882. The A100 was not measured.
+DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti",
+                                                           "NVIDIA RTX 4000 Ada Generation")
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -1163,15 +1170,19 @@ class FixedPlanner:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
         v["_generic_folded"] = not support["fold_cutoff"][0]  # the generic folded path (generic records)
         if v["radial_tables"] and not support["fold_cutoff"][0]:
-            # generic_radial_tables (certified, float32 only): opt-in; the default goes to the owner with the A/Bs
-            # (conductor, 2 November 2026; decision 62 was MH-1's).
-            if "radial_tables" not in explicit:
-                reason = "generic radial tables are opt-in (no owner decision on a default yet)"
+            # generic_radial_tables (certified, float32 only): decision 66, "auto" on only on the measured GPUs
+            # (owner, 2 November 2026); the float32 and reproducible rules are _fastmace_rules'.
+            name = getattr(hardware, "name", None)
+            if "radial_tables" in explicit:
+                v["_why"]["radial_tables"] += "; stage 2: on, generic radial tables (explicit)"
+            elif name in DECISION_66_GENERIC_RADIAL_TABLES_GPUS:
+                v["_why"]["radial_tables"] += (f"; stage 2: on, generic radial tables on a measured GPU, "
+                                               f"decision 66 ({name})")
+            else:
+                reason = f"generic radial tables not measured on this GPU, decision 66 ({name})"
                 v["radial_tables"] = False
                 v["_auto_off"]["radial_tables"] = reason
                 v["_why"]["radial_tables"] += f"; stage 2: off, {reason}"
-            else:
-                v["_why"]["radial_tables"] += "; stage 2: on, generic radial tables (explicit)"
         if v["chunked_conv_backward"] and "chunked_conv_backward" not in explicit and not support["fold_cutoff"][0]:
             # The generic folded path (generic_chunked_conv_backward): decision 66, measured GPUs only.
             name = getattr(hardware, "name", None)
@@ -1263,6 +1274,10 @@ class FixedPlanner:
             v["radial_tables"] = False
             v["_why"]["radial_tables"] += ("; off: reproducible=True keeps MACE's radial chain" if reproducible
                                            else f"; off: {dtype} plans keep MACE's radial chain")
+        # generic_radial_tables: "auto" keeps MACE's radial chain outside float32 plans (no float64 generic tables).
+        if v["radial_tables"] and "radial_tables" not in explicit and v.get("_generic_folded") and dtype != "float32":
+            v["radial_tables"] = False
+            v["_why"]["radial_tables"] += f"; off: {dtype} plans keep a generic model's radial chain"
         # Float64 tables (f64-T01): an explicit "on" is allowed in float64 plans outside reproducible ones.
         if v["radial_tables"] and (dtype not in ("float32", "float64") or (dtype == "float64" and reproducible)):
             book.refuse(f"RewriteConfig.radial_tables='on' needs float32, or float64 outside reproducible plans, not "

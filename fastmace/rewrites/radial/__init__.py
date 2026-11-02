@@ -940,7 +940,8 @@ def _apply_first_table(model, context):
 # The generic family (MACE-MP-0, OMAT-0, the density family; fastmace.rewrites.generic): the same tables for the radial
 # chain of a generic interaction, ``r -> [h c, c]`` (the split radial network's last layer input on the folded path,
 # ``generic_chunked_conv_backward``) and its edge density. Certified (decision 61) by the same certificate; float32
-# plans only; opt-in (the conductor, 2 November 2026: the default goes to the owner with the A/Bs).
+# plans only; "auto" on only on the measured GPUs (decision 66, owner 2 November 2026;
+# planner.fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS).
 
 
 def _generic_interactions(model):
@@ -1125,11 +1126,11 @@ RECORDS = {
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck,
         memory=memory_terms.radial_tables),
     # The generic family's tables (conductor, 2 November 2026; docs/validation/generic-radial-tables.md): certified
-    # (decision 61), float32 plans only, opt-in until the owner decides a default (decision 62 was MH-1's).
+    # (decision 61), float32 plans only; "auto" on only on the measured GPUs (decision 66, owner 2 November 2026).
     "generic_radial_tables": dict(
         name="generic_radial_tables", config_field="radial_tables", applies_to=_generic_support,
         requires=("generic_fused_radial_backward",), conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={},
-        exactness="certified", default="off", deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,),
+        exactness="certified", default="auto", deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,),
         apply=_apply_generic, selfcheck=_generic_selfcheck, memory=memory_terms.generic_radial_tables),
     # ideas-20261027 D2: rounding (the series and the folded product reassociated); float64; opt-in.
     "w_tables": Rewrite(
