@@ -1,6 +1,6 @@
 """The generic family: rewrites for MACE-MP-0, the density family and MACE-OFF's later blocks (SPEC §6.2).
 
-``RECORDS`` holds five registry records (``fastmace.rewrites.registry``), each a dict of the §6.1
+``RECORDS`` holds seven registry records (``fastmace.rewrites.registry``), each a dict of the §6.1
 fields plus the ``RewriteConfig`` field that switches it (docs/design/switch-map.md):
 
 - ``generic_species_skip`` (``species_skip``): every generic skip connection restricted to the
@@ -15,7 +15,17 @@ fields plus the ``RewriteConfig`` field that switches it (docs/design/switch-map
   ``folded_linear`` (Triton input gradient on CUDA, PyTorch on the CPU), in every generic
   interaction that is not reassociated;
 - ``generic_streaming`` (``streaming_conv``): the receiver-streaming OEq convolution in every
-  generic interaction with an OEq-fused convolution that is not reassociated (hybrid backend).
+  generic interaction with an OEq-fused convolution that is not reassociated (hybrid backend);
+- ``generic_chunked_conv_backward`` (``chunked_conv_backward``): that convolution on MH-1's folded path
+  (``rewrites.mh1.modules.streaming_message`` with the last radial layer's input ``[h c, c]`` and its weight
+  ``[W, 0]``), so its backward runs in L2-sized edge chunks and the per-edge weight gradient, the largest tensor
+  of a generic force call (``[E, W]``: 5.1 kB per edge in MACE-OMAT-0 medium), is never formed in full
+  (docs/validation/omat0-capacity.md). Rounding class: ``(h c) W`` against ``(h W) c``. Stage 2 keeps it to the
+  GPUs its same-process A/Bs measured (``planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS``);
+- ``generic_recompute_conv_weights`` (``recompute_conv_weights``): the per-edge weights of that path are not kept
+  (``kernels.oeq_streaming.folded_recompute_convolution``): the forward builds them on chip without storing them
+  (``FusedFoldedForward(store_w=False)``), the backward builds each chunk's again with cuBLAS. Rounding class,
+  float32 only; a memory-rescue rung (``planner.memory.MEMORY_RESCUE``), off unless memory requires it.
 
 Every record gives each generic interaction (``modules.GENERIC_INTERACTIONS``, source pinned by
 sha256) the replacement forward ``modules.generic_interaction_forward`` and sets its own
@@ -166,6 +176,51 @@ def apply_fused_radial_backward(model, context):
     return changed
 
 
+def apply_chunked_conv_backward(model, context):
+    """Every streaming generic interaction with a split radial network (``generic_fused_radial_backward``) on MH-1's
+    folded path with its chunked backward; returns their names."""
+    from fastmace.kernels.oeq_streaming import l2_chunk_edges
+
+    changed = []
+    for index, interaction, _ in _generic_interactions(model):
+        kernels = getattr(interaction, "streaming_kernels", None)
+        if kernels is None or getattr(interaction, "radial_last", None) is None:
+            continue
+        device = _device(interaction)
+        if device.type != "cuda":
+            raise ValueError(f"generic_chunked_conv_backward needs the model on a CUDA device (interactions.{index})")
+        folded = gm.GenericFoldedRadial(interaction.radial_last)
+        interaction.generic_folded = folded
+        interaction.chunked_backward_edges = l2_chunk_edges(device, kernels.weight_dim,
+                                                            folded.folded_constant.element_size())
+        changed.append(f"interactions.{index}")
+    return changed
+
+
+def apply_recompute_conv_weights(model, context):
+    """Keep no per-edge weights in every generic interaction on the chunked folded path: the message-only fused
+    forward (float32) and the chunked recompute in the backward; returns their names."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+
+    changed = []
+    for index, interaction, _ in _generic_interactions(model):
+        folded = getattr(interaction, "generic_folded", None)
+        if folded is None or not getattr(interaction, "chunked_backward_edges", 0):
+            continue
+        weight = folded.folded_constant
+        if weight.dtype != torch.float32:
+            raise ValueError(f"generic_recompute_conv_weights is float32 only, interactions.{index} is {weight.dtype}")
+        try:
+            interaction.generic_recompute = FusedFoldedForward(interaction.streaming_kernels, weight.shape[1],
+                                                               weight.device, store_w=False)
+        except ValueError as error:
+            raise ValueError(f"generic_recompute_conv_weights: interactions.{index}: {error}") from error
+        changed.append(f"interactions.{index} ({interaction.chunked_backward_edges} edges per chunk)")
+    return changed
+
+
 def apply_streaming(model, context):
     """Attach the receiver-streaming kernels to every non-reassociated generic OEq-fused convolution."""
     changed = []
@@ -216,6 +271,16 @@ def _support_fused_radial_backward(model):
     if any(_has_fc_radial(i) for _, i, _ in generic):
         return Support(True, "ok")
     return Support(False, "no generic radial network is an e3nn FullyConnectedNet without output activation")
+
+
+def _support_chunked_conv_backward(model):
+    generic = _generic_interactions(model)
+    if not generic:
+        return Support(False, _NOT_GENERIC)
+    if any(_oeq_fused(i) and _has_fc_radial(i) for _, i, _ in generic):
+        return Support(True, "ok")
+    return Support(False, "no generic interaction has an OpenEquivariance-fused convolution with an e3nn "
+                          "FullyConnectedNet radial network (hybrid backend only)")
 
 
 def _support_streaming(model):
@@ -339,6 +404,16 @@ def _selfcheck_fused_radial_backward(original, rewritten, context):
     return _check_interactions(original, rewritten, context, lambda i: getattr(i, "fused_radial_backward", False))
 
 
+def _selfcheck_chunked_conv_backward(original, rewritten, context):
+    return _check_interactions(original, rewritten, context,
+                               lambda i: getattr(i, "chunked_backward_edges", 0) > 0)
+
+
+def _selfcheck_recompute_conv_weights(original, rewritten, context):
+    return _check_interactions(original, rewritten, context,
+                               lambda i: getattr(i, "generic_recompute", None) is not None)
+
+
 def _selfcheck_streaming(original, rewritten, context):
     return _check_interactions(original, rewritten, context,
                                lambda i: getattr(i, "streaming_kernels", None) is not None)
@@ -348,11 +423,11 @@ def _selfcheck_streaming(original, rewritten, context):
 
 
 def _record(name, config_field, applies_to, exactness, constraints, apply, selfcheck, requires=(),
-            deterministic=True, memory=None):
+            deterministic=True, memory=None, default="auto"):
     # deterministic as the MH-1 records (SPEC §9.3, 2-T16): the streaming and segmented variants are not.
     return dict(name=name, config_field=config_field, applies_to=applies_to, requires=requires, conflicts=(),
                 mace_versions=MACE_VERSIONS, source_hashes=gm.source_hashes(), exactness=exactness,
-                default="auto", workload_constraints=constraints, apply=apply, selfcheck=selfcheck,
+                default=default, workload_constraints=constraints, apply=apply, selfcheck=selfcheck,
                 deterministic=deterministic, memory=memory)
 
 
@@ -377,7 +452,19 @@ RECORDS = {
         "generic_streaming", "streaming_conv", _support_streaming, "exact",
         ("sort_receivers", "per_engine_edge_counter"), apply_streaming, _selfcheck_streaming, deterministic=False,
         memory=memory_terms.streaming_conv),
+    "generic_chunked_conv_backward": _record(
+        "generic_chunked_conv_backward", "chunked_conv_backward", _support_chunked_conv_backward, "rounding",
+        ("sort_receivers", "per_engine_edge_counter"), apply_chunked_conv_backward,
+        _selfcheck_chunked_conv_backward, requires=("generic_streaming", "generic_fused_radial_backward"),
+        deterministic=False, memory=memory_terms.generic_chunked_conv_backward),
+    # A memory-rescue rung (planner.memory.MEMORY_RESCUE): off unless memory requires it.
+    "generic_recompute_conv_weights": _record(
+        "generic_recompute_conv_weights", "recompute_conv_weights", _support_chunked_conv_backward, "rounding",
+        ("sort_receivers", "per_engine_edge_counter"), apply_recompute_conv_weights,
+        _selfcheck_recompute_conv_weights, requires=("generic_chunked_conv_backward",), deterministic=False,
+        memory=memory_terms.generic_recompute_conv_weights, default="off"),
 }
 
-__all__ = ["NODE_ATTRS", "RECORDS", "apply_fused_radial_backward", "apply_reassociate", "apply_species_skip",
+__all__ = ["NODE_ATTRS", "RECORDS", "apply_chunked_conv_backward", "apply_fused_radial_backward", "apply_reassociate",
+           "apply_recompute_conv_weights", "apply_species_skip",
            "apply_streaming"]

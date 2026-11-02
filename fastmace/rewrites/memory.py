@@ -128,6 +128,30 @@ def mh1_streaming_conv(dims, width):
     return _STREAMING_INDEX_BYTES - round(share * _stock_edge_floats(dims)) * width, 0
 
 
+def _generic_folded(dims):
+    """(weight_numel, folded input width) of the widest interaction: its tensor product weights per edge and the last
+    radial layer's input ``[h c, c]`` (its hidden width and the cutoff column)."""
+    widest = max(dims.interactions, key=lambda block: block.weight_numel, default=None)
+    if widest is None:
+        return 0, 0
+    return widest.weight_numel, (widest.radial[-2] if len(widest.radial) > 1 else 0) + 1
+
+
+def generic_chunked_conv_backward(dims, width):
+    """The generic chunked backward keeps no per-edge weight gradient of the whole edge set (the estimate's widest
+    backward transient, ``weight_numel`` floats per edge, is not formed), and the folded convolution saves its
+    input ``[h c, c]`` for the backward: per edge, ``weight_numel`` less that width (OMAT-0 medium: 1,280 - 65)."""
+    weights, folded = _generic_folded(dims)
+    return -(weights - folded) * width, 0
+
+
+def generic_recompute_conv_weights(dims, width):
+    """Without stored per-edge weights (the folded path keeps its input ``[h c, c]``, counted with
+    ``generic_chunked_conv_backward``): the widest interaction's ``weight_numel`` per edge."""
+    weights, _ = _generic_folded(dims)
+    return -weights * width, 0
+
+
 def chunked_conv_backward(dims, width):
     """The chunked convolution backward keeps no per-edge weight gradient of the whole edge set (measured)."""
     return -round(_CHUNKED_BACKWARD_SHARE * _stock_edge_floats(dims)) * width, 0

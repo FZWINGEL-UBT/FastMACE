@@ -244,7 +244,9 @@ MH1_LABELS = ("mh1-omat", "mh1-mp", "mh1-r2scan")
 GENERIC_FAMILY_LABELS = tuple(label for label, facts in LABEL_FACTS.items()
                               if facts[0] != "PolarMACE" and set(facts[1]) <= {RESIDUAL, DENSITY_FIRST, DENSITY})
 APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
-           "chunked_conv_backward": FACTORED_LABELS, "radial_tables": FACTORED_LABELS,
+           # chunked_conv_backward: MH-1's class, and every label with a generic interaction on its folded path
+           # (generic_chunked_conv_backward; decision 66: this file's GPU is measured)
+           "chunked_conv_backward": LABELS, "radial_tables": FACTORED_LABELS,
            "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
