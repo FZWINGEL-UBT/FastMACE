@@ -471,6 +471,8 @@ class Rewrite:
 | `radial_tables` (per-species-pair Chebyshev tables for the radial chain r → `[h c, c]` and the edge density, fitted at setup; optimisation round 6, OPT6-T04/T05) | certified (§6.1; deterministic) | factored folded MH-1 class, float32 | stub ceiling per force call NbCl5 −7.2 %, NaNbO3 −16 %, NaCl −10 % (sm_120) | default on by owner decision 62 (float32, not reproducible, with `fold_cutoff`); class by owner decision 61, 27 October 2026 |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
+| `generic_chunked_conv_backward` (interaction 2's streaming convolution on MH-1's folded path, `[W, 0]` on `[h c, c]`, so the backward runs in L2-sized chunks and the `[E, weight_numel]` weight gradient is never formed; OMAT-0 capacity, 2 November 2026) | rounding (`(h c) Wᵀ` instead of `(h Wᵀ) c`; atomic sums as `streaming_conv`) | generic residual/density family with `streaming_conv` | OMAT-0 MD step −4.7 to −8.4 % (RTX 4000 Ada), −2.8 to −5.1 % (RTX 5060 Ti); RTX A4000 (6 MB L2) 3–4× slower; capacity SrTiO3 4.1×, NaCl 3.2× (Ada) | default on only on "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation" (decision 66, `planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS`); `docs/validation/omat0-capacity.md` |
+| `generic_recompute_conv_weights` (no stored weights: the forward builds them on chip, the backward rebuilds each chunk's weights with one GEMM into a slot) | rounding (cuBLAS chunk GEMM vs the on-chip product) | with `generic_chunked_conv_backward`, float32 only | step +4.5 to +9 % (Ada), +11 to +15 % (RTX 5060 Ti) over the chunked path; frees `weight_numel` floats per edge | off; rule 12 rescue rung after MH-1's `recompute_conv_weights` (decision 67); float64 plans refused |
 | `polar_uvu` (PR 1711) | rounding (GEMM form) | PolarMACE | 4–5× faster with the MH-1 rewrites (step time ÷ 4–5) | — |
 | `pipelined`, `async_output` | exact (bit-identical) | engine features (§8.1) | −3.0% NaCl (pipelined); asynchronous output bit-identical | — |
 | `unfuse_full_addmm`, `first_derivative_only`, expandable segments allocator | exact | engine | avoids 2 × 32 MB copies per step | torch ≥ 2.14 |
@@ -2795,7 +2797,14 @@ Open decisions for the owner:
    RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation"
    (`planner.fixed.DECISION_66_WPRIME_GPUS`; MD step b/a in both orders 0.81-0.89
    on the A100, 0.94-0.97 on the RTX 5060 Ti, 0.93-0.96 on the RTX 4000 Ada,
-   every block pair below 1; `docs/validation/opt9-T03.md`).
+   every block pair below 1; `docs/validation/opt9-T03.md`). Third (conductor,
+   2 November 2026, under the owner's OMAT-0 capacity request):
+   `generic_chunked_conv_backward` for the generic family on "NVIDIA GeForce RTX
+   5060 Ti" and "NVIDIA RTX 4000 Ada Generation"
+   (`planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS`; OMAT-0 MD step b/a in both
+   orders 0.916-0.953 on the RTX 4000 Ada, 0.949-0.972 on the RTX 5060 Ti; off on
+   the RTX A4000, slower there, and on the A100, not measured;
+   `docs/validation/omat0-capacity.md`).
 67. Decided (user, 29 October 2026, on the capacity scan, CAP-T02 in
    `plans/capacity.md`: "It should only do this if memory would not be
    enough"): rule 12 turns off `streaming_conv` and the records that require it
@@ -3294,6 +3303,19 @@ stage band of the free memory, rule 12 measures it in a child on a 15-20k-atom r
 unit and re-plans with the measured scale plus 5 % headroom. The ladder and the probe are recorded in the plan,
 the report and `metadata.json` (§13 keys `plan.memory_ladder`, `plan.memory_probe`); resumes reuse the scales and
 never probe. See `docs/validation/estimate-band.md` and `docs/validation/estimate-probe.md`.
+
+**Rule 12 for generic models (2 November 2026, owner: test the capacity on OMAT-0 medium and carry over the MH-1
+changes; conductor):** §6.2, §9.3 rule 12 and decision 66 amended. Two generic records (§6.2):
+`generic_chunked_conv_backward` (default on by decision 66 on the RTX 5060 Ti and RTX 4000 Ada) and
+`generic_recompute_conv_weights` (off; float32 only). Rule 12 declares their per-edge terms (the chunked path
+drops `weight_numel − (P + 1)` floats per edge; the recompute a further `weight_numel`) and places the recompute
+in the rescue ladder after MH-1's `recompute_conv_weights`, with its own allocator reserve. MH-1's radial records
+apply only to MH-1's class. Calibrated on SrTiO3 and NaCl (RTX A4000), NaNbO3 held out (RTX 4000 Ada):
+estimate/reserved 1.00-1.11. OMAT-0 medium limits, default plan, before → after: RTX 4000 Ada SrTiO3 16,875 →
+69,120, NaCl 39,304 → 125,000; RTX 5060 Ti SrTiO3 13,720 → 53,240, NaCl about 27,000 → 85,184. See
+`docs/validation/omat0-capacity.md`. The host batch no longer runs MACE's own neighbour search (its edges were
+replaced unread; every force field, batches otherwise bitwise MACE's own), which lets the tiled path reach 57.0M
+OMAT-0 SrTiO3 atoms on 20 GB with 251 GiB of host memory (`docs/validation/tiled-omat.md`).
 
 **Decision 67 (29 October 2026, owner: "It should only do this if memory would not be enough"):** rule 12
 (§9.3) turns off the streaming convolution and its dependants only when the plan would not fit with them on and

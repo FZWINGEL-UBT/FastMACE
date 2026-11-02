@@ -24,6 +24,11 @@ Owner scope (30 October 2026): no multi-GPU work for now; it is for later. Float
   - Expected to be in the same range as Symmetrix-XL on a matched model and GPU, perhaps somewhat below.
 - **Speed at large sizes, the open point:** the tiled path is eager, about 2.1x main's step. With graph tile bodies (T1) the estimate is 1.3-1.5x main's per-atom cost, which would put it about even with Symmetrix-XL or a bit ahead. This is not measured.
 - **To settle it:** a matched benchmark, MACE-OMAT-0 medium on the same structures and GPU, measuring largest cell and step time. It needs T1 and a tiled path for models whose first interaction is not species-only.
+- **Measured (2 November 2026, MACE-OMAT-0 medium, cubic SrTiO3, merges 6f21ba36 and 1f04ea56):**
+  - Tiled, RTX 4000 Ada 20 GB with 251 GiB host: 57.0M atoms for two calls with defaults (64.9M: eager call ran, compiled call out of GPU memory, open). Symmetrix-XL's paper: 11.24M on an 80 GB A100, 4.15M on a 32 GB RTX 5090. The matched-GPU comparison is still open; our limit is set by host memory (3.7 kB/atom), not by the GPU.
+  - Whole-system, default plan: 69,120 atoms on the RTX 4000 Ada, 53,240 on the RTX 5060 Ti (were 16,875 and 13,720), after the generic chunked backward and weight recompute.
+  - 975,560-atom force call: OMAT-0 18.9 s, MH-1 19.0 s. MD at 5M atoms: 98.7 s/step.
+  - Open: the 64.9M compiled OOM (tile budget) and radial tables for generic models.
 
 ## Taken up
 
