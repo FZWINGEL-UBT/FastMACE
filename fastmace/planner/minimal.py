@@ -206,7 +206,10 @@ def _family_applies(record, traits) -> bool:
     """Whether a record's family fits the model: the MH-1 records, and the radial records built on its folded
     radial networks (tables, wprime_backward, recompute_conv_weights), need its factored interactions, the generic
     ones the generic interactions (the families share their ``RewriteConfig`` fields: a generic model's
-    recompute_conv_weights is generic_recompute_conv_weights, not MH-1's)."""
+    recompute_conv_weights is generic_recompute_conv_weights, not MH-1's). A ``generic_*`` record is the generic
+    family's wherever it lives (``generic_radial_tables`` is in the radial module)."""
+    if record.name.startswith("generic_"):
+        return traits.generic
     family = record.apply.__module__.removeprefix("fastmace.rewrites.").split(".")[0]
     return {"mh1": traits.factored, "radial": traits.factored, "generic": traits.generic}.get(family, True)
 

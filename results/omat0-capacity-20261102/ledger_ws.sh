@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The memory ledger (tools/bench/memory_ledger.py) of OMAT-0 medium's default plan on a workstation, one job per
 # STRUCTURE:REPEAT, idle check before each.
-#   ledger_ws.sh SOURCE_DIR ROOT STRUCTURE:REPEAT...
+#   [REWRITES="FIELD=VALUE ..."] ledger_ws.sh SOURCE_DIR ROOT STRUCTURE:REPEAT...
 set -u
 B=/mnt/homes/zwingel/fastmace-capacity
 FM=$1 ROOT=$2; shift 2
@@ -22,7 +22,7 @@ for job in "$@"; do
   busy=$(ps -eo user,pcpu,comm --no-headers | awk '$1 != "root" && $1 != "zwingel" && $2 > 20 {print $1":"$3":"$2}' | paste -sd, -)
   if [ -n "$gpu$busy" ]; then echo "$(date -u +%FT%TZ) STOP gpu=[$gpu] busy=[$busy]" >> $log; exit 3; fi
   "$E/bin/python" "$FM/tools/bench/memory_ledger.py" --structure "$structure" --model omat0-medium \
-    --precision float32 --repeat "$repeat" --output "$ROOT" > "$ROOT/ledger-$structure-$repeat.log" 2>&1 < /dev/null
+    --precision float32 --repeat "$repeat" --output "$ROOT" ${REWRITES:+--rewrites $REWRITES}     > "$ROOT/ledger-$structure-$repeat.log" 2>&1 < /dev/null
   echo "$(date -u +%FT%TZ) end $job exit=$?" >> $log
 done
 echo "$(date -u +%FT%TZ) DONE" >> $log

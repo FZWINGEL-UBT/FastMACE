@@ -134,3 +134,17 @@ def test_rule_12_takes_the_generic_rung_in_float32_only(monkeypatch, precision):
     if taken:
         assert tight.predicted_memory_bytes < full.predicted_memory_bytes
         assert tight.memory_ladder.chosen.stage == "generic_recompute_conv_weights"
+
+
+def test_rule_12_counts_each_family_s_records():
+    """minimal._family_applies: MH-1's radial records (recompute_conv_weights) for MH-1's class only, the generic
+    records for generic models, generic_radial_tables (in the radial module) included."""
+    from fastmace.planner import minimal
+
+    registry = minimal._rewrite_registry()
+    generic_traits, mh1_traits = tp.traits("omat0-medium"), tp.traits("mh1-r2scan")
+    for name, generic_model in (("generic_radial_tables", True), ("generic_recompute_conv_weights", True),
+                                ("recompute_conv_weights", False), ("radial_tables", False)):
+        record = registry[name]
+        assert minimal._family_applies(record, generic_traits) is generic_model, name
+        assert minimal._family_applies(record, mh1_traits) is (not generic_model), name
