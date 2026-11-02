@@ -159,3 +159,44 @@ trying to map 20971520 bytes": the allocator frees and maps again.
    - **Before any build:** a probe of `cudaMallocAsync` as the allocator backend under green contexts, or the
      driver's fix, would come first.
    - Stage 2 is not started. It needs an owner decision, given the small gain and the allocator conflict.
+
+## The asynchronous allocator (owner: "Test another allocator", 2 November 2026)
+
+**Setup.**
+- `PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync` with the probe unchanged (commit `2941aeed`, which records
+  the setting).
+- Source copy `src-corun-2941aeed`.
+- Results: `results/tiled-corun-20261102/rtx4000ada-leto/leto-*-async/`, `.../leto-alloc-ab-*/` and
+  `rtx5060ti/corun-SrTiO3-163840-R8192-async.json`.
+
+**Green contexts work with it.** No mapping failure on either GPU. Pairs (median ms, ratio to `serial`):
+
+| GPU, R | 2 + 2 serial | streams | split | 2 + 1 split | 2 + 3 split | 1 + 3 split |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ada, 8,192 | 125.6 | 133.7, 0.94× | **115.4, 1.09×** | 1.01× | 1.03× | 0.92× |
+| Ada, 16,384 | 245.4 | 260.9, 0.94× | **224.9, 1.09×** | 1.00× | 1.01× | 0.94× |
+| 5060 Ti, 8,192 | 142.0 | 146.7, 0.97× | 134.9, 1.05× | 0.86× | 0.92× | 0.86× |
+
+- **R = 16,384 on the Ada.** Two sweep-2 tiles now fit side by side without thrashing (with expandable
+  segments: 0.72×). The split still gains 9 %, although one tile alone keeps the device 98 % busy. So the gain
+  is not only filled gaps: some sweep-2 kernels run more efficiently on half the SMs.
+- **The 5060 Ti** gains less (1.05×). Its serial sweep-2 runs are also a little slower under this allocator
+  (69.9-78.1 ms against 66.2-66.9 ms).
+
+**Whole tiled calls, allocator A/B** (leto, 5M SrTiO3 atoms, the scan's settings: host state aliased, species
+index, wavefront "auto" (off at this size), three calls; serial, expandable first):
+
+| Allocator | eager R 4,096 | compiled R 16,384 (1st, 2nd) | GPU peak (allocated) | reserved | host peak |
+| --- | --- | --- | --- | --- | --- |
+| expandable segments | 153.4 s | 127.2 s, 89.1 s | 7.89-7.94 GiB | 8.05-8.08 GiB | 20.9 GiB |
+| cudaMallocAsync | 154.2 s | 120.8 s, 89.4 s | 7.89-7.94 GiB | 8.38 GiB | 20.9 GiB |
+
+- **Results agree:** both runs are valid, and their energies differ by 1.8 meV over 5M atoms (rounding).
+- **Speed and budget unchanged:** the same peaks and the same receiver cap; 0.3 GiB more reserved by the async
+  pool.
+- **Not yet checked:** whether the async pool behaves as well at the device limit (120M+ atoms).
+
+**Result.** The allocator blocker is gone on the Ada.
+- A sweep-2 split under `cudaMallocAsync` gains 9 % per sweep-2 pair at both tile sizes.
+- That is about 5 % of a call, since sweep 2 is about 60 % of it.
+- It costs a second sweep-2 workspace and an allocator change for the tiled path.

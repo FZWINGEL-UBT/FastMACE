@@ -1,0 +1,260 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  40,
+  40,
+  40
+ ],
+ "atoms": 320000,
+ "receivers": 16384,
+ "model": "omat0-medium",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "host": "leto",
+ "source_commit": "2941aeed",
+ "reps": 3,
+ "blocks": 6,
+ "expandable_segments": true,
+ "alloc_conf": "backend:cudaMallocAsync",
+ "rewrites_a": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.0562759614337396e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=5.769702648483092e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.524407248280912e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.7445807662076195e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903558762282e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (177 pieces, 9 pairs, certificate 0.31, cached)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, cached)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "calls": {
+  "A": {
+   "seconds": [
+    28.190397389931604,
+    5.441479758941568
+   ],
+   "tiles": 27,
+   "slots": {
+    "6": [
+     12457,
+     7701,
+     844800
+    ],
+    "7": [
+     13845,
+     8332,
+     985600
+    ]
+   },
+   "max_receivers": 12585,
+   "max_edges": 937854
+  }
+ },
+ "peak_allocated": 8193612713,
+ "split": {
+  "sms": 48,
+  "half": 24,
+  "groups": 2
+ },
+ "lanes": {
+  "2+2": [
+   "sweep2/R13845/E901134",
+   "sweep2/R13845/E859664"
+  ],
+  "2+1": [
+   "sweep2/R13845/E901134",
+   "sweep1/R13845/E901134"
+  ],
+  "2+3": [
+   "sweep2/R13845/E901134",
+   "sweep3/R13845/E901134"
+  ],
+  "1+3": [
+   "sweep1/R13845/E901134",
+   "sweep3/R13845/E901134"
+  ]
+ },
+ "alone": {
+  "A1.0": {
+   "label": "sweep1/R13845/E901134",
+   "seconds": 0.0210755270284911
+  },
+  "A1.1": {
+   "label": "sweep1/R13845/E859664",
+   "seconds": 0.020885930319006245
+  },
+  "A2.0": {
+   "label": "sweep2/R13845/E901134",
+   "seconds": 0.12350942532066256
+  },
+  "A2.1": {
+   "label": "sweep2/R13845/E859664",
+   "seconds": 0.12090727601510783
+  },
+  "A3.0": {
+   "label": "sweep3/R13845/E901134",
+   "seconds": 0.044989981300507985
+  },
+  "A3.1": {
+   "label": "sweep3/R13845/E859664",
+   "seconds": 0.04495764601354798
+  }
+ },
+ "pairs": {
+  "2+2": {
+   "serial": {
+    "median_s": 0.24544042934818816,
+    "all_s": [
+     0.24217114799345532,
+     0.2421029523247853,
+     0.24445696299274763,
+     0.24694422034857175,
+     0.2467667470142866,
+     0.24642389570362866
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.2609486260140935,
+    "all_s": [
+     0.2601365150185302,
+     0.2598406896771242,
+     0.2605014743361001,
+     0.26181751233525574,
+     0.261395777692087,
+     0.26194166232987
+    ],
+    "speedup": 0.940569924039118
+   },
+   "split": {
+    "median_s": 0.2248733198309007,
+    "all_s": [
+     0.22301460267044604,
+     0.22383156865059087,
+     0.22481757666294774,
+     0.22508664630974332,
+     0.22492906299885362,
+     0.2249631746672094
+    ],
+    "speedup": 1.0914608702035147
+   }
+  },
+  "2+1": {
+   "serial": {
+    "median_s": 0.14410410951434943,
+    "all_s": [
+     0.14230825069049993,
+     0.1439308006859695,
+     0.14407261767579863,
+     0.14582556664633253,
+     0.14529745001345873,
+     0.14413560135290027
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.143836641315526,
+    "all_s": [
+     0.1427217956709986,
+     0.14302280199869224,
+     0.14346764997268716,
+     0.14560082333628088,
+     0.14436756000698855,
+     0.14420563265836486
+    ],
+    "speedup": 1.001859527561108
+   },
+   "split": {
+    "median_s": 0.14359340731364983,
+    "all_s": [
+     0.142832472998028,
+     0.1435093629794816,
+     0.1436774516478181,
+     0.1438443046839287,
+     0.14415479432015368,
+     0.14323390799108893
+    ],
+    "speedup": 1.00355658529353
+   }
+  },
+  "2+3": {
+   "serial": {
+    "median_s": 0.16907724233654636,
+    "all_s": [
+     0.16912478631517538,
+     0.16937002465905002,
+     0.16692724400976053,
+     0.16902969835791737,
+     0.1704290253498281,
+     0.16849033732432872
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.16714891799104709,
+    "all_s": [
+     0.16625438700430095,
+     0.1671151586730654,
+     0.1660391763628771,
+     0.1671826773090288,
+     0.16748802666552365,
+     0.16982426533165076
+    ],
+    "speedup": 1.011536564930696
+   },
+   "split": {
+    "median_s": 0.1681430891621858,
+    "all_s": [
+     0.1676446940206612,
+     0.16856956198656312,
+     0.16809485499591878,
+     0.16784506434729943,
+     0.1681913233284528,
+     0.16873603702212372
+    ],
+    "speedup": 1.0055557036510703
+   }
+  },
+  "1+3": {
+   "serial": {
+    "median_s": 0.06597157199090968,
+    "all_s": [
+     0.06599390231228124,
+     0.06594263867009431,
+     0.06600307836197317,
+     0.06585254865543295,
+     0.06594924166953813,
+     0.06606760566743712
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.06653865384093174,
+    "all_s": [
+     0.06643096431313704,
+     0.06650820766420414,
+     0.06642305598749469,
+     0.06656910001765937,
+     0.06665375200100243,
+     0.06683276267722249
+    ],
+    "speedup": 0.9914774072319266
+   },
+   "split": {
+    "median_s": 0.07003316649934277,
+    "all_s": [
+     0.06996885399955015,
+     0.07000981364399195,
+     0.07005651935469359,
+     0.07019308302551508,
+     0.06999735767021775,
+     0.07011641069160153
+    ],
+    "speedup": 0.9420046998949961
+   }
+  }
+ },
+ "blocks_done": 6
+}
