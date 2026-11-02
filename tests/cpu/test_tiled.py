@@ -769,10 +769,10 @@ def test_wavefront_auto_only_where_the_plain_state_would_not_fit(available, on, 
     assert tiled._wave_auto == {len(atoms): on}
 
 
-def test_wavefront_keeps_no_lists_across_calls():
-    """With the wavefront the tile lists are not kept across calls (``list_reuse``): kept, they would hold every
-    tile's; the call's cache holds a tile's lists from its sweep 1 to its sweep 3. The same call as without reuse,
-    bitwise."""
+def test_wavefront_with_and_without_kept_lists_is_the_same_call():
+    """The wavefront with the kept lists (``list_reuse``, filtered again at the cutoff) and without them (the call's
+    cache holds a tile's lists from its sweep 1 to its sweep 3 only: none left after the call) gives bitwise the same
+    call."""
     calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                            rewrites=only(*MH1_PACKAGE))
@@ -784,10 +784,8 @@ def test_wavefront_keeps_no_lists_across_calls():
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         for current in (strained(atoms), atoms):
             results.append(tiled.evaluate(current, stress=True))
-            assert tiled._kept is None and tiled.last["list_kept_bytes"] == 0
-            assert tiled.last["list_cache_bytes"] == 0 and tiled.last["list_reused"] is False
-        if reuse:
-            assert tiled.last["list_reuse"] == "off: the wavefront keeps only its band's lists"
+            assert tiled.last["list_cache_bytes"] == 0
+            assert (tiled.last["list_kept_bytes"] > 0) == reuse
     for one, two in zip(results[:2], results[2:]):
         assert one[0] == two[0]
         assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))

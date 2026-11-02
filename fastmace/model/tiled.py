@@ -783,7 +783,6 @@ class TiledForceField:
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
         self._reuse_ok = None
-        self._lists_note = None  # this call's reason for keeping no lists (the wavefront), beside list_reuse_state
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
         self.list_cache_state = "on" if self.config.list_cache else "off"
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
@@ -836,16 +835,12 @@ class TiledForceField:
             from fastmace.neighbors.skin import times_3x3
             from fastmace.neighbors.tile_list import TileNeighbours
 
-            # The wavefront (host memory short) keeps no lists across calls: kept, they would hold every tile's
-            # lists (55.8 GiB at 122M SrTiO3 atoms, beside a 55 GiB row pool); the call's cache then holds a tile's
-            # lists from its sweep 1 to its sweep 3 only, the band's.
-            wave = self._wave_expected(n)
-            skin = 0.0 if wave else self._reuse_skin()
-            if wave:
-                self._kept = None
-            self._lists_note = ("off: the wavefront keeps only its band's lists"
-                                if wave and self.config.list_reuse else None)
-            cutoff = float(self.field.neighbours.cutoff)
+            # The kept lists hold every tile's (55.8 GiB at 122M SrTiO3 atoms beside a 55 GiB wavefront pool), and
+            # a call that keeps them searches once: dropping them under the wavefront searched every tile twice per
+            # call (the search pass and sweep 1), 9.2 s against 1.8 s each at 5M atoms (+18 % of a call, RTX 4000
+            # Ada). The host floor drops them where the host runs short; ``list_reuse=False`` keeps only the
+            # band's (the call's cache, from a tile's sweep 1 to its sweep 3).
+            skin, cutoff = self._reuse_skin(), float(self.field.neighbours.cutoff)
             self._reusing = False
             kept = (self._keep_lists(positions, n, TileNeighbours.like(self.field.neighbours).cell, skin)
                     if skin > 0 else None)
@@ -1354,7 +1349,7 @@ class TiledForceField:
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      list_reused=self._reusing, list_rebuilds=self.list_rebuilds,
-                     list_reuse=self._lists_note or self.list_reuse_state,
+                     list_reuse=self.list_reuse_state,
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
@@ -1555,7 +1550,7 @@ class TiledForceField:
             stats["list_kept_bytes"] = 0 if kept is None else int(
                 sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
                 + kept["reference"].numel() * kept["reference"].element_size())
-            stats["list_reuse"] = self._lists_note or self.list_reuse_state
+            stats["list_reuse"] = self.list_reuse_state
             stats["list_cache"] = self.list_cache_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
@@ -1764,7 +1759,7 @@ class TiledForceField:
 
     def _wave_expected(self, n):
         """``TileConfig.wavefront`` without the grid's layer test: whether a call at ``n`` atoms runs the wavefront
-        when its grid has the layers (the tile lists are planned on this before the grid exists)."""
+        when its grid has the layers."""
         config = self.config
         if config.wavefront == "off" or not config.alias_state:
             return False
