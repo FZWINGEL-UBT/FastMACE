@@ -1319,11 +1319,13 @@ class MinimalPlanner:
         return True, f"a trial evaluation on {plan.engine.device} ran"
 
     def build_evaluation(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True,
-                         call_rows=None, release_node_attrs=False):
+                         call_rows=None, release_node_attrs=False, release_whole_system=False,
+                         global_list=True):
         """The ``MACEForceField`` of an evaluation ``plan`` (``evaluate`` path, with stress, no graphs); with D3, a
         ``DispersedForceField`` around it (3b-T04). ``call_rows``: ``MACEForceField``'s (a caller that runs the
-        model on fewer rows than the atom count, such as the tiled path) and ``release_node_attrs`` (the one-hot on
-        the host, for the tiled path's species index)."""
+        model on fewer rows than the atom count, such as the tiled path), ``release_node_attrs`` (the one-hot on
+        the host, for the tiled path's species index), ``release_whole_system`` (the whole-system call's per-atom
+        buffers never on the device) and ``global_list`` (False: no whole-system neighbour list, for tile lists)."""
         from fastmace.model.forces import MACEForceField
         from fastmace.rewrites import registry as reg
 
@@ -1339,7 +1341,8 @@ class MinimalPlanner:
                                polar=plan.polar or PolarConfig(), compute_stress=True, compile_cache=compile_cache,
                                registry=registry, check=check, float64_energy=plan.precision.float64_energy,
                                species=plan.superset or None, call_rows=call_rows,
-                               release_node_attrs=release_node_attrs)
+                               release_node_attrs=release_node_attrs,
+                               release_whole_system=release_whole_system, global_list=global_list)
         return fixed._with_d3(field, plan, atoms)
 
 

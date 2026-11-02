@@ -172,6 +172,27 @@ BATCH_EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
 SPECIES_DEPENDENT = "fixed_species_superset"
 
 
+# The batch entries the tiled path's force field keeps on the device (``release_whole_system``): every other
+# per-atom entry is read by the whole-system call only.
+WHOLE_SYSTEM_KEEP = frozenset({"positions", "node_attrs", "edge_index", "shifts", "unit_shifts", "cell", "head", "ptr",
+                               "displacement"})
+
+
+def _whole_system_only(key, value, n):
+    """Whether batch entry ``key`` is a per-atom buffer that only the whole-system call reads."""
+    return key not in WHOLE_SYSTEM_KEEP and value.dim() > 0 and value.shape[0] == n
+
+
+def _released(key, value, dtype, device):
+    """``release_whole_system``'s form of a per-atom batch entry: ``batch`` (one structure: all zeros) a zero-stride
+    view of one zero on ``device``, any other its shape and device dtype on the meta device."""
+    import torch
+
+    if key == "batch" and bool((value == 0).all()):
+        return torch.zeros(1, dtype=value.dtype, device=device).expand(value.shape[0])
+    return torch.empty(value.shape, dtype=dtype if value.is_floating_point() else value.dtype, device="meta")
+
+
 def host_batch(calc, atoms, one_hot=True):
     """MACE's input batch of ``atoms`` as a dict, left on the host, without MACE's neighbour list.
 
@@ -318,6 +339,12 @@ class MACEForceField:
       after, for a caller that builds the rows it needs from the species index (the tiled path's
       ``TileConfig.species="index"``); the species check, the rewrites and E0 read it on the host (its columns,
       sums and argmax: exact), and the field's own call refuses (``release_node_attrs()`` does the same later).
+    - ``release_whole_system`` (with ``release_node_attrs``, not PolarMACE): construct the field as
+      ``release_whole_system()`` leaves it, so the per-atom buffers that only the whole-system call reads never
+      reach the device (the build's device peak at 5M SrTiO3 atoms: 108 bytes per atom of them; tiled capacity).
+    - ``global_list=False``: the force field's own neighbour list stays empty (one slot, no pairs), for a caller
+      that searches its own lists (the tiled path's ``TileConfig.neighbours="tiles"``): its build was the largest
+      memory term at scale. ``rebuild`` and ``compact`` keep it empty, and the field's own call refuses.
     - ``call_rows``: the row count of the model's calls, at which the reassociated first interaction's
       species tables are evaluated from the identity basis (``species_tables``); default the atom count, so
       that the tables are bitwise the features of the whole-system call (3-T02). A caller that runs the
@@ -333,7 +360,7 @@ class MACEForceField:
     def __init__(self, model, atoms, *, rewrites=None, engine=None, neighbours=None, polar=None,
                  compute_stress=False, compile_cache=None, registry=None, charge=None, spin_multiplicity=None,
                  check=True, float64_energy=True, atomic_energies=None, species=None, call_rows=None,
-                 release_node_attrs=False):
+                 release_node_attrs=False, release_whole_system=False, global_list=True):
         import torch
 
         from fastmace import _patches
@@ -461,6 +488,10 @@ class MACEForceField:
                                 for name in enabled if name in registry)
         specs = getattr(source, "embedding_specs", None) or {}
         joint_features = {name: batch[name].to(self._device, self._dtype) for name in specs if name in batch} or None
+        self._embedding_inputs = tuple(specs)  # the per-structure inputs the model reads (total charge, spin)
+        early = bool(release_whole_system)
+        if early and (not release_node_attrs or self.is_polar):
+            raise ValueError("release_whole_system needs release_node_attrs and a model other than PolarMACE")
         context = reg.Context(config=rewrites if isinstance(rewrites, RewriteConfig) else RewriteConfig(),
                               inputs={"node_attrs": node_attrs, "species_columns": self.species_columns,
                                       "joint_features": joint_features, "call_rows": self.call_rows})
@@ -550,7 +581,12 @@ class MACEForceField:
                 dtype = self._dtype if value.is_floating_point() else value.dtype
                 batch[key] = torch.empty(shape, dtype=dtype, device=self._device)
         self.data = {key: (value.to(self._device, self._dtype) if value.is_floating_point() else value.to(self._device))
-                     if torch.is_tensor(value) and value is not node_attrs else value for key, value in batch.items()}
+                     if torch.is_tensor(value) and value is not node_attrs else value for key, value in batch.items()
+                     if not (early and _whole_system_only(key, value, len(atoms)))}
+        if early:  # release_whole_system: their shapes and dtypes only, as the release leaves them
+            for key, value in batch.items():
+                if torch.is_tensor(value) and _whole_system_only(key, value, len(atoms)):
+                    self.data[key] = _released(key, value, self._dtype, self._device)
         # The calculator's own model (eager, no private copy) is never changed: its float64 forward
         # is called as a function.
         self._model_call = self.model
@@ -576,12 +612,14 @@ class MACEForceField:
                                  f"{expected}")
             self.atomic_energies = atomic_energies
             head = int(batch["head"].reshape(-1)[0]) if "head" in batch else 0
-            self.data[energy64.NODE_E0_KEY] = energy64.node_e0_float64(atomic_energies, node_attrs,
-                                                                       head).to(self._device)
+            e0 = energy64.node_e0_float64(atomic_energies, node_attrs, head)
+            self.data[energy64.NODE_E0_KEY] = (torch.empty(e0.shape, dtype=e0.dtype, device="meta") if early
+                                               else e0.to(self._device))  # early: looked up where read (node_e0)
+            del e0
             self._e0_row = torch.atleast_2d(atomic_energies)[head].to(self._device)
         self.node_attrs_released = bool(release_node_attrs)
         self.whole_system_released = False
-        self._setup_species(atoms, z_table)
+        self._setup_species(atoms, z_table, early)
         segmented = any(name in SEGMENTED_RECORDS for name in enabled)
         self.neighbours = SkinNeighbourList(
             cell, calc.r_max, self._device, self._dtype, neighbours,
@@ -599,13 +637,19 @@ class MACEForceField:
         # Leaf tensor that the model differentiates; refilled before every call.
         self.positions = torch.zeros((len(atoms), 3), dtype=self._dtype, device=self._device, requires_grad=True)
         self.data["positions"] = self.positions
-        positions = torch.tensor(atoms.get_positions(), dtype=torch.float64, device=self._device)
+        self.global_list = bool(global_list)
+        # Without the field's own list, no float64 device positions either (24 bytes per atom at the build's peak).
+        positions = (torch.tensor(atoms.get_positions(), dtype=torch.float64, device=self._device)
+                     if self.global_list else None)
         self.rebuild(positions)
         self.compact(positions)
+        del positions
         self.use_edges(int(self.neighbours.count))
         self._bind_streaming_count()
         if release_node_attrs:
             self.release_node_attrs()
+        if early:
+            self.release_whole_system()
 
     # ------------------------------------------------------------------ properties
 
@@ -635,13 +679,17 @@ class MACEForceField:
 
     # ------------------------------------------------------------------ species superset (SPEC §8.5)
 
-    def _setup_species(self, atoms, z_table):
+    def _setup_species(self, atoms, z_table, early=False):
         """The species and charge buffers an event writes, and the derived buffers built from them.
 
         ``atomic_numbers`` (int64, (N,)) and ``charges`` (float64, (N,), the per-atom formal charges)
         are what a transaction writes (3-T03); every other species- or charge-indexed buffer is
         derived from them by a refresh function (``register_derived``). The lookup tables cover every
         atomic number, so a refresh is a few device gathers at fixed addresses.
+
+        ``early`` (``release_whole_system`` at construction): built as the release leaves them, without their
+        int64 device forms: the atomic numbers on the host, int32 species columns and sender groups computed there,
+        and no per-atom charges or totals tracking unless the model reads a total charge or spin.
         """
         import torch
 
@@ -652,20 +700,33 @@ class MACEForceField:
         for group, column in enumerate(self.species_columns):
             column_of[z_table[column]] = column
             group_of[z_table[column]] = group
-        self._column_of, self._group_of = column_of.to(device), group_of.to(device)
-        self.atomic_numbers = torch.as_tensor(atoms.numbers, dtype=torch.int64).to(device)
-        self.charges = torch.as_tensor(atoms.get_initial_charges(), dtype=torch.float64).to(device)
-        # The atoms' node_attrs columns, as every species refresh leaves them (a fresh construction equals a
-        # refreshed one in every tensor, 3-T03's registry check).
-        self._species_index = torch.index_select(self._column_of, 0, self.atomic_numbers)
-        self._ones = torch.ones((n, 1), dtype=self._dtype, device=device)  # the one-hot's dtype
-        self._sender_groups = torch.index_select(self._group_of, 0, self.atomic_numbers)
+        if early:
+            numbers = torch.as_tensor(atoms.numbers, dtype=torch.int64)
+            self._column_of, self._group_of = column_of.to(device, torch.int32), group_of.to(device, torch.int32)
+            self.atomic_numbers = numbers
+            self._species_index = torch.index_select(column_of, 0, numbers).to(device, torch.int32)
+            self._sender_groups = torch.index_select(group_of, 0, numbers).to(device, torch.int32)
+            self._ones = torch.empty((n, 1), dtype=self._dtype, device="meta")
+            tracked = [name for name in ("total_charge", "total_spin")
+                       if torch.is_tensor(self.data.get(name)) and name in self._embedding_inputs]
+            self.charges = (torch.as_tensor(atoms.get_initial_charges(), dtype=torch.float64).to(device) if tracked
+                            else torch.empty((n,), dtype=torch.float64, device="meta"))
+        else:
+            self._column_of, self._group_of = column_of.to(device), group_of.to(device)
+            self.atomic_numbers = torch.as_tensor(atoms.numbers, dtype=torch.int64).to(device)
+            self.charges = torch.as_tensor(atoms.get_initial_charges(), dtype=torch.float64).to(device)
+            # The atoms' node_attrs columns, as every species refresh leaves them (a fresh construction equals a
+            # refreshed one in every tensor, 3-T03's registry check).
+            self._species_index = torch.index_select(self._column_of, 0, self.atomic_numbers)
+            self._ones = torch.ones((n, 1), dtype=self._dtype, device=device)  # the one-hot's dtype
+            self._sender_groups = torch.index_select(self._group_of, 0, self.atomic_numbers)
         # Total charge = its value at construction + the change of the summed per-atom charges, so
         # that it is exactly the given total until a charge changes.
         # Total charge = offset + sum of the per-atom charges, offset = the given total - their sum at
         # construction: a transmutation changes the per-atom charges only, and the total follows on the
         # device. Integer charges keep it exact; a fresh construction has the same offset and scratch.
-        self._has_total = {name: torch.is_tensor(self.data.get(name)) for name in ("total_charge", "total_spin")}
+        self._has_total = {name: torch.is_tensor(self.data.get(name)) and (not early or name in self._embedding_inputs)
+                           for name in ("total_charge", "total_spin")}
         self._charge_sum = torch.zeros(1, dtype=torch.float64, device=device)  # scratch: the total charge
         self._charge_offset = torch.zeros(1, dtype=torch.float64, device=device)
         self._spin_base = None
@@ -919,11 +980,11 @@ class MACEForceField:
 
         if not self.node_attrs_released:
             raise RuntimeError("release_whole_system needs the one-hot released first (release_node_attrs)")
+        if self.whole_system_released:
+            return
         n = self.positions.shape[0]
-        keep = {"positions", "node_attrs", "edge_index", "shifts", "unit_shifts", "cell", "head", "ptr",
-                "displacement"}
         for key, value in list(self.data.items()):
-            if key in keep or not torch.is_tensor(value) or value.dim() == 0 or value.shape[0] != n:
+            if not torch.is_tensor(value) or not _whole_system_only(key, value, n):
                 continue
             if key == "batch":
                 if bool((value == 0).all()):
@@ -932,8 +993,11 @@ class MACEForceField:
             if key == energy64.NODE_E0_KEY and not hasattr(self, "_e0_row"):
                 continue  # no table to look it up from: kept
             self.data[key] = torch.empty(value.shape, dtype=value.dtype, device="meta")
-        if not self.is_polar and not any(self._has_total.values()):
-            self.charges = torch.empty(self.charges.shape, dtype=self.charges.dtype, device="meta")
+        if not self.is_polar:  # the totals of a model that reads none are not tracked: no per-atom charges
+            self._has_total = {name: tracked and name in self._embedding_inputs
+                               for name, tracked in self._has_total.items()}
+            if not any(self._has_total.values()):
+                self.charges = torch.empty(self.charges.shape, dtype=self.charges.dtype, device="meta")
         # The one-hot's scatter source (``_refresh_node_attrs`` returns before it once the one-hot is released).
         self._ones = torch.empty(self._ones.shape, dtype=self._ones.dtype, device="meta")
         # The species source on the host: the tiles read the species index, and a species event's refresh copies
@@ -970,6 +1034,9 @@ class MACEForceField:
         if self.node_attrs_released:
             raise RuntimeError("this force field's one-hot node_attrs were released to the host "
                                "(release_node_attrs, TileConfig.species='index'): its own call needs them")
+        if not self.global_list:
+            raise RuntimeError("this force field was built without its own neighbour list (global_list=False, for "
+                               "TileConfig.neighbours='tiles'): its own call needs it")
         self._bind_streaming_count()
         with torch.no_grad():
             self.positions.copy_(positions)
@@ -1122,6 +1189,9 @@ class MACEForceField:
         return self.neighbours.needs_rebuild(positions, fraction)
 
     def compact(self, positions):
+        if not self.global_list:  # global_list=False: no pairs
+            self.neighbours.count.zero_()
+            return
         self.neighbours.compact(positions)
 
     def rebuild(self, positions):
@@ -1129,8 +1199,16 @@ class MACEForceField:
 
         On a CUDA device with ``gpu_neighbour_list`` the pairs are found on the device, otherwise
         with matscipy on the host. Call ``use_edges`` afterwards: grown buffers have moved.
+        ``global_list=False``: one empty slot, allocated once (True then).
         """
-        return self.neighbours.build(positions)
+        neighbours = self.neighbours
+        if not self.global_list:
+            grew = neighbours.capacity == 0
+            if grew:
+                neighbours._allocate(1, exact=True)
+            neighbours.num_candidates = 0
+            return grew
+        return neighbours.build(positions)
 
     def use_edges(self, num_edges):
         """Let the model read the first ``num_edges`` compacted edges (views, no copy).

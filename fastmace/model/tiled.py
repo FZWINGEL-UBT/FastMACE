@@ -769,6 +769,9 @@ class TiledForceField:
         # TileConfig.species="index": each tile's one-hot rows from the field's species index (the one-hot's
         # column of every atom), bitwise the stored rows; the field's device one-hot goes to the host.
         self._species = None
+        if self.config.neighbours == "global" and not getattr(field, "global_list", True):
+            raise ValueError("TileConfig.neighbours='global' reads the force field's own neighbour list, which this "
+                             "one was built without (global_list=False): use neighbours='tiles'")
         if self.config.species == "index":
             from fastmace.model import energy as energy64
 

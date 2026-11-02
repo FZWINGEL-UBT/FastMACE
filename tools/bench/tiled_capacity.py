@@ -309,8 +309,7 @@ def main(argv=None):
         return dict(allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()),
                     peak_above_before=int(torch.cuda.max_memory_allocated() - before), **host_memory())
 
-    lists = contextlib.ExitStack()
-    lists.enter_context(no_global_list(args.tile_list))
+    lists = contextlib.ExitStack()  # (the force field's own list: global_list=False with --tile-list)
     try:
         record["phase"] = "build"
         if args.memory_history:
@@ -329,7 +328,9 @@ def main(argv=None):
         # --species-index: the one-hot on the host from the construction on (it never reaches the device).
         built = plan if args.mode in ("compiled", "auto") else eager
         field = planner.build_evaluation(built, user, atoms, call_rows=call_rows,
-                                         release_node_attrs=args.species_index)
+                                         release_node_attrs=args.species_index,
+                                         release_whole_system=args.species_index,
+                                         global_list=not args.tile_list)
         record["call_rows"] = field.call_rows
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None

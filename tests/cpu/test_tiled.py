@@ -461,21 +461,56 @@ def test_field_built_with_its_one_hot_on_the_host_gives_bitwise_the_released_fie
     species check and rewrites read it on the host, E0 is looked up there): the tiled call with the species index
     is bitwise the one of a field released after construction, and the field refuses its own call."""
     calc, atoms = calculator(), structure()
-    results = []
-    for at_build in (False, True):
+    results, layouts = [], []
+    # (one-hot released at the construction, whole system released at the construction): the third never puts
+    # the whole-system call's per-atom buffers on the device; afterwards it is the same field.
+    for at_build, whole in ((False, False), (True, False), (True, True)):
         field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
-                               rewrites=only(*MH1_PACKAGE), release_node_attrs=at_build)
-        assert field.node_attrs_released == at_build
+                               rewrites=only(*MH1_PACKAGE), release_node_attrs=at_build,
+                               release_whole_system=whole)
+        assert field.node_attrs_released == at_build and field.whole_system_released == whole
         if at_build:  # dropped after the construction: its shape and dtype only, no storage
             attrs = field.data["node_attrs"]
             assert attrs.is_meta and attrs.shape[0] == len(atoms) and attrs.dtype == field.dtype
         tiled = TiledForceField(field, TileConfig(5, mode="padded", species="index"))
+        layouts.append({key: (tuple(value.shape), value.dtype, value.device.type, value.stride())
+                        for key, value in field.data.items() if torch.is_tensor(value)}
+                       | {name: (tuple(t.shape), t.dtype, t.device.type) for name, t in (
+                           ("atomic_numbers", field.atomic_numbers), ("charges", field.charges),
+                           ("species", field._species_index), ("groups", field._sender_groups))})
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         results.append(tiled.evaluate(strained(atoms), stress=True))
         with pytest.raises(RuntimeError, match="node_attrs"):
             field.evaluate(atoms)
+    assert layouts[0] == layouts[1] == layouts[2]
+    for other in results[1:]:
+        assert results[0][0] == other[0]
+        assert np.array_equal(results[0][1], other[1]) and np.array_equal(results[0][2], other[2])
+
+
+def test_field_without_its_own_list_gives_bitwise_the_tile_list_call():
+    """``MACEForceField(global_list=False)``: the field's own list stays one empty slot (construction and every
+    one-off call), so the tiled call with tile lists is bitwise the one of a field with its list; the field's own
+    call and ``TileConfig.neighbours="global"`` refuse it."""
+    calc, atoms = calculator(), big_structure()
+    results = []
+    for own in (True, False):
+        field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                               rewrites=only(*MH1_PACKAGE), release_node_attrs=True, release_whole_system=True,
+                               global_list=own)
+        assert (field.neighbours.capacity == 1 and int(field.neighbours.count) == 0) != own
+        if not own:
+            with pytest.raises(ValueError, match="global_list"):
+                TiledForceField(field, TileConfig(12, neighbours="global", species="index"))
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", species="index"))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results.append(tiled.evaluate(strained(atoms), stress=True))
+        assert (int(field.neighbours.count) == 0) != own
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+    bare = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(), global_list=False)
+    with pytest.raises(RuntimeError, match="global_list"):
+        bare.evaluate(atoms)
 
 
 # ---------------------------------------------------------------- the host state aliased
