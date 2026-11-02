@@ -52,3 +52,19 @@ are trimmed; the kept neighbour lists are freed at the host floor. Validated at 
 ## 2. Results
 
 (filled in below as the runs finish)
+
+**98.4M atoms on leto (SrTiO3 270×270×270, source `src-wave-0a72f3ff`):** valid, a new capacity record (the
+earlier one was 78.1M).
+- **Edges:** 7,282,710,000 edges in the cutoff, exactly the expected 74 per atom.
+- **Forces:** largest force component 1.3 meV/Å on the perfect crystal.
+- **Calls:**
+
+| Call | R | Tiles | Time | GPU peak | Host peak | Wavefront pool |
+| --- | --- | --- | --- | --- | --- | --- |
+| eager | 4,096 | 32,894 | 3,232 s | 12.0 GiB | 92.4 GiB | 14.2 % of the atoms |
+| compiled | 8,192 | 17,854 | 2,277 s | 13.9 GiB | 127.3 GiB | 18.2 % of the atoms |
+
+- **Run:** `results/tiled-omat-20261102/runs/leto-w-omat-scan-SrTiO3-270x270x270/`.
+
+122M on murphy (290×290×290): the eager call passed (4,054 s, GPU peak 14.4 GiB, host 110 GiB). The compiled
+call is still running.

@@ -96,5 +96,66 @@ streams:
 - The split reaches it only for 2 + 2, and against its own run's baseline.
 - The tensor-core lane adds nothing.
 
-The Ada (RTX 4000 Ada, 48 SMs) still has to be measured before the idea is closed. Section "Ada" below follows
-when leto or murphy is free.
+## Ada (RTX 4000 Ada Generation, leto, 48 SMs)
+
+**Setup.** The same commands, run through `fm-tiled/corun_chain.sh` on the source copy `src-corun-a6ea39dc`, with
+the NAS `mace_cueq_oeq` environment. Each run passed the idle check (`idle_check-*.txt`). Results are in
+`results/tiled-corun-20261102/rtx4000ada-leto/`. The serial timings are tight here (spread at most 2 %).
+
+**Stage 0.**
+- **R = 8,192:** the device is busy 90 % of the profiled span. Kernel-time shares: convolution 27 %,
+  cuEquivariance 23 %, GEMMs 17 %, pointwise 13 %, copies 9 %, index 6 %, other 5 %.
+- **R = 16,384:** busy 98 %, with nearly the same shares.
+
+**Single sweeps (R = 7,322; ms):**
+
+| Sweep | FP32 | 3×TF32 lane |
+| --- | --- | --- |
+| 1 | 11.0-11.4 | 11.7-11.8 |
+| 2 | 62.1-63.9 | 63.4-63.8 |
+| 3 | 23.6-23.9 | 25.4-25.6 |
+
+At R = 13,845 (FP32): sweep 1 20.8-21.0, sweep 2 121.7-122.6, sweep 3 44.8.
+
+**Pairs (R = 8,192; median ms and its ratio to `serial`, the fastest pair in brackets):**
+
+| Pair | serial | streams | streams, default allocator | split (24 + 24 SMs) | streams, lane B 3×TF32 |
+| --- | --- | --- | --- | --- | --- |
+| 2 + 2 | 126.6 | 134.0, 0.95× | 134.8, 0.94× | **116.0, 1.09×** (115.8) | 135.0, 0.95× |
+| 2 + 1 | 73.7 | 73.6, 1.00× | 74.7, 0.99× | 73.3, 1.02× | 75.1, 0.99× |
+| 2 + 3 | 87.2 | 86.6, 1.01× | 86.3, 1.01× | 84.4, 1.03× | 88.3, 1.00× |
+| 1 + 3 | 34.6 | 35.2, 0.99× | 35.1, 0.99× | 37.3, 0.93× | n/a |
+
+**R = 16,384 (320k atoms).** Two sweep-2 tiles at once press against the 20 GB. The run log has "OOM ... while
+trying to map 20971520 bytes": the allocator frees and maps again.
+- 2 + 2 on two streams: 0.72× (342.6 against 245.8 ms).
+- The serial 2 + 1 pairs in the same process are inflated to 255 ms, against 143 ms from the single sweeps, so
+  that run's "1.76×" is an artefact.
+- 2 + 3 gives 1.00× and 1 + 3 gives 0.99×.
+
+## Conclusion
+
+1. **The tensor-core lane is closed.**
+   - On both GPUs, a lane with its GEMMs as 3×TF32 beside an FP32 lane gives 0.95-1.07×, never more than plain two
+     streams.
+   - Its own sweeps are 1-13 % slower.
+   - The GEMMs are only 17-23 % of the tiled call's kernel time, and the convolution and cuEquivariance kernels
+     (about half) have no tensor-core form.
+   - The 9 October precision decision is therefore not needed for this.
+2. **Plain two streams give nothing.** The clean Ada timings show 0.94-1.01×. Two kernels from different tiles
+   time-slice rather than overlap, because each one fills the device.
+3. **Two sweep-2 tiles on disjoint SM halves gain 8-9 %, on both GPUs** (Ada 1.09×, tight; 5060 Ti 1.08×).
+   - Per receiver, the split pair at R = 8,192 (115.8 ms for 2 × 7,322) beats a single tile of twice the size at
+     R = 16,384 (121.7-122.6 ms for 13,845): 7.9 against 8.8 µs per receiver on the Ada.
+   - The memory is about the same: two half-size workspaces against one full-size one.
+   - The gain comes from latency-bound stretches of sweep 2 (the device is busy 90 % at this tile size), which the
+     other half fills.
+   - Mixed pairs gain 1-3 % at best, and 1 + 3 loses 7 %.
+4. **What a stage 2 would be.** Pass the stage-1 criterion only for sweep 2: run its tiles in pairs on two
+   green-context halves at half the receiver cap, and run sweeps 1 and 3 on the whole device as now.
+   - **Expected gain:** sweep 2 is about 60 % of the call, so about 5 % of the call.
+   - **Blocker:** green-context streams fail with expandable segments, which FastMACE's allocator setup turns on
+     (`configure_allocator`). Without them, the large tiled runs fragment.
+   - **Before any build:** a probe of `cudaMallocAsync` as the allocator backend under green contexts, or the
+     driver's fix, would come first.
+   - Stage 2 is not started. It needs an owner decision, given the small gain and the allocator conflict.
