@@ -1,0 +1,120 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  235,
+  235,
+  235
+ ],
+ "atoms": 64889375,
+ "receivers": 4096,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "source_commit": "3bd9f28f",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 4158570496,
+   "host_peak": 5743169536
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 4159811584,
+   "host_peak": 5743169536
+  },
+  "build": {
+   "seconds": 44.89731978299096,
+   "allocated": 5551964160,
+   "reserved": 7941914624,
+   "peak_above_before": 7109308416,
+   "host_rss": 28619321344,
+   "host_peak": 59986784256
+  },
+  "neighbours": {
+   "allocated": 7109309440,
+   "reserved": 7941914624,
+   "peak_above_before": 1557345280,
+   "host_rss": 28620218368,
+   "host_peak": 59986784256
+  }
+ },
+ "phase": "tiled call 1",
+ "call_rows": 4096,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.0562759614337396e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=5.769702648483092e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.524407248280912e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.7445807662076195e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "edges_within_cutoff": 0,
+ "calls": [
+  {
+   "seconds": 2399.291968944017,
+   "allocated": 9964431360,
+   "reserved": 15082717184,
+   "peak_above_before": 7948528128,
+   "host_rss": 232812908544,
+   "host_peak": 232821854208,
+   "tiles": 25125,
+   "grid": [
+    25,
+    25,
+    25
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 4096,
+   "max_halo": 3877,
+   "max_edges": 306284,
+   "list_reused": false,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 4096,
+   "edges": 4801813750,
+   "mode": "eager",
+   "mode_reason": "compiled force field: the first call measures its memory",
+   "neighbours": "tiles",
+   "species": "index",
+   "global_bytes": 169988878320,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 31860683125,
+   "host_bytes": 169988878320,
+   "allocated_before": 7109309440,
+   "total_peak": 15057837568
+  }
+ ],
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 6.09 GiB. GPU 0 has a total capacity of 19.54 GiB of which 5.89 GiB is free. Including non-PyTorch memory, this process has 13.64 GiB memory in use. Of the allocated memory 13.30 GiB is allocated by PyTorch, and 116.49 MiB is reserved by PyTorch but unallocated.",
+ "oom_at": "tiled call 1",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-omat4/tools/bench/tiled_capacity.py:210 main: out = tiled(positions)",
+  "/mnt/homes/zwingel/fm-tiled/src-omat4/fastmace/model/tiled.py:1062 __call__: self._run_slot(sweep, slot, g)",
+  "/mnt/homes/zwingel/fm-tiled/src-omat4/fastmace/model/tiled.py:952 _run_slot: self._body(sweep, slot, g)",
+  "/mnt/homes/zwingel/fm-tiled/src-omat4/fastmace/model/tiled.py:901 _body: es, g_vec, g_x, g_sc, g_eps = self._second(tile, g[\"state\"], strain)",
+  "/mnt/homes/zwingel/fm-tiled/src-omat4/fastmace/model/tiled.py:792 _second: objective, es = self._forward(2)(leaf, x, eps, attrs, local, recv_mask, r)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:1261 compile_wrapper: result = fn(*args, **kwargs)",
+  "/mnt/homes/zwingel/fm-tiled/src-omat4/fastmace/model/tiled.py:814 _second_forward: def _second_forward(self, leaf, x, eps, attrs, local, recv_mask, r):",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:1548 _fn: return fn(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/aot_autograd.py:1289 forward: return compiled_fn(full_args)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py:1189 runtime_wrapper: result = _codegen_runtime_wrapper(",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(runtime_wrapper_orchestration):11 _runtime_wrapper: ",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py:118 g: return f(*args)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py:3521 forward: return CompiledFunction._fwd_fn(",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_forward):2 _compiled_forward: ",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_inductor/output_code.py:828 __call__: return self.current_callable(inputs)",
+  "/mnt/homes/zwingel/fm-tiled/cache/inductor/mn/cmnwhztpj3o5j3xls6jo5ska4pydczfjbkxzccsvx27vobflz5zq.py:2495 call: buf48 = empty_strided_cuda((1277696, 1280), (1280, 1), torch.float32)"
+ ]
+}
