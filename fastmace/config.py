@@ -133,7 +133,8 @@ class RewriteConfig:
     # Certified per-species-pair Chebyshev tables for the MH-1 radial chain (r -> [h c, c] and the edge density),
     # fitted and certified at setup against float64 (opt-6 OPT6-T05; exactness "certified", owner decision 61);
     # auto = on with fold_cutoff in float32 and float64 plans that are not reproducible; "on" is refused in
-    # reproducible float64 plans.
+    # reproducible float64 plans. For the generic family (generic_radial_tables, the same field): float32 plans that
+    # are not reproducible only; auto = on only on the GPUs of decision 66 (owner, 2 November 2026).
     radial_tables: Toggle = "auto"
     # Per-piece w-tables: the second MH-1 interaction's per-edge weights straight from the radial tables
     # (w = sum_k T_k(x) C_k W^T per piece) and their r-gradient without the dw W product (ideas-20261027 D2);

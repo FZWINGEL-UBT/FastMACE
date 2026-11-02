@@ -1,7 +1,8 @@
 """``generic_radial_tables``: certified radial tables for the generic family (MACE-MP-0, OMAT-0, the density family).
 
 The same fit, certificate and kernel as MH-1's ``radial_tables``, for a generic interaction's chain ``r -> [h c, c]``
-(the split radial network's last layer input) and its edge density; float32 only, opt-in.
+(the split radial network's last layer input) and its edge density; float32 only; "auto" on only on the GPUs of
+decision 66 (owner, 2 November 2026).
 """
 
 from __future__ import annotations
@@ -49,11 +50,11 @@ def _rewritten(family, tables, model=None, batch=None):
     return model, out, batch, resolution, applied
 
 
-def test_the_record_is_certified_opt_in_and_on_the_radial_tables_field():
+def test_the_record_is_certified_auto_and_on_the_radial_tables_field():
     regs = _registry()
     record = regs.record("generic_radial_tables") if hasattr(regs, "record") else None
     record = record or next(c for c in regs.candidates(_float32("residual")[0]) if c.name == "generic_radial_tables")
-    assert (record.exactness, record.default) == ("certified", "off")
+    assert (record.exactness, record.default) == ("certified", "auto")
     assert radial.RECORDS["generic_radial_tables"]["deterministic"] is True
     assert record.requires == ("generic_fused_radial_backward",)
     assert regs.config_field("generic_radial_tables") == "radial_tables"
@@ -93,16 +94,34 @@ def test_float64_models_are_refused():
     regs.apply(out, regs.resolve(out, asked, strict=False), context(batch), original=model)
     with pytest.raises(reg.RewriteError, match="float32 models only"):
         radial.tabulate_generic(out, context(batch))
+    # "auto" (the record's default) does not take a float64 model: off at resolution, nothing raised at apply.
+    auto = regs.resolve(model, {"generic_fused_radial_backward": "on"}, strict=False)
+    assert not auto.decision("generic_radial_tables").enabled
+    assert "float32 models only" in auto.decision("generic_radial_tables").reason
 
 
-def test_the_planner_keeps_generic_tables_opt_in_and_float32():
-    from test_planner import plan_for
+def test_the_planner_keeps_generic_tables_to_measured_gpus_and_float32(monkeypatch):
+    from test_planner import GPU, plan_for
 
     from fastmace.config import PrecisionConfig, RewriteConfig
     from fastmace.errors import PlanRefused
+    from fastmace.planner import fixed
 
-    assert plan_for("omat0-medium").rewrites.radial_tables == "off"
+    # Decision 66 (owner, 2 November 2026): "auto" on for the generic family on the measured GPUs only.
+    assert fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS == ("NVIDIA GeForce RTX 5060 Ti",
+                                                            "NVIDIA RTX 4000 Ada Generation")
+    measured = plan_for("omat0-medium")
+    assert measured.rewrites.radial_tables == "on"
+    assert "measured GPU, decision 66" in str(measured.decision("RewriteConfig.radial_tables")[2])
+    assert plan_for("mp0-medium").rewrites.radial_tables == "on"
+    monkeypatch.setattr(fixed, "DECISION_66_GENERIC_RADIAL_TABLES_GPUS", ("NVIDIA A100-SXM4-40GB",))
+    other = plan_for("omat0-medium")
+    _, choice, why = other.decision("RewriteConfig.radial_tables")
+    assert choice == "off" and "decision 66" in str(why) and GPU.name in str(why)
     assert plan_for("omat0-medium", rewrites=RewriteConfig(radial_tables="on")).rewrites.radial_tables == "on"
+    monkeypatch.undo()
+    # Float64: "auto" keeps the radial chain, an explicit "on" is refused.
+    assert plan_for("omat0-medium", precision=PrecisionConfig(dtype="float64")).rewrites.radial_tables == "off"
     with pytest.raises(PlanRefused, match="generic model needs a float32 plan"):
         plan_for("omat0-medium", precision=PrecisionConfig(dtype="float64"),
                  rewrites=RewriteConfig(radial_tables="on"))

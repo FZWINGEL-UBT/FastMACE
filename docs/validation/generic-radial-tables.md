@@ -33,8 +33,7 @@ put the radial MLP's products and SiLU kernels at about 5.6 s of 19-20 s, about 
     0/0 gave. This changes the cache keys of MH-1's tables (the module's source hash), not their values.
 - **Record:** `generic_radial_tables`, on the `radial_tables` config field.
   - Class: certified.
-  - Default: off. The planner turns `auto` off for generic models ("generic radial tables are opt-in (no owner
-    decision on a default yet)"); `radial_tables="on"` turns them on.
+  - Default: `auto`, on only on the GPUs of decision 66 (section 6).
   - Refused for float64 plans and for `reproducible=True`.
   - Requires `generic_fused_radial_backward`.
   - Workload constraint: a fixed species superset.
@@ -122,6 +121,11 @@ Both drifts are negligible, and the fluctuations are the same.
 
 ## 6. Status
 
-- Opt-in (`RewriteConfig(radial_tables="on")`); the default stays off until the owner decides.
-- Float32 plans only; refused for float64 and for `reproducible=True`.
+- **Default on the measured GPUs (owner, 2 November 2026: "Yes make it default"; decision 66).** For the generic
+  family, `radial_tables="auto"` is on only on the "NVIDIA GeForce RTX 5060 Ti" and the
+  "NVIDIA RTX 4000 Ada Generation" (`planner.fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS`, exact device names),
+  and off on every other GPU. `radial_tables="on"` turns them on anywhere.
+- Float32 plans only. In float64 plans "auto" keeps the radial chain and an explicit "on" is refused; the same for
+  `reproducible=True`.
+- The table cache under `FASTMACE_CACHE` covers the setup cost after the first fit (section 3).
 - Tests: `tests/cpu/test_generic_radial_tables.py`, and the capability rows in `tests/cpu/test_capabilities.py`.
