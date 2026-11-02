@@ -62,3 +62,17 @@ def test_host_batch_is_maces_batch_without_its_edges(name):
             assert got[key].dtype == value.dtype and torch.equal(got[key], value), key
         else:
             assert np.array_equal(np.asarray(got[key]), np.asarray(value)), key
+
+
+@pytest.mark.parametrize("name", ["crystal", "molecule"])
+def test_host_batch_without_maces_one_hot_has_it_as_uint8(name):
+    """``one_hot=False``: MACE's float one-hot is not made; ``node_attrs`` is the same one-hot as uint8, and every
+    other entry is the default batch's."""
+    calc, atoms = calculator(), structures()[name]
+    got, expected = host_batch(calc, atoms.copy(), one_hot=False), host_batch(calc, atoms.copy())
+    assert set(got) == set(expected)
+    assert got["node_attrs"].dtype == torch.uint8 and got["node_attrs"].device.type == "cpu"
+    assert torch.equal(got["node_attrs"].to(expected["node_attrs"].dtype), expected["node_attrs"])
+    for key, value in expected.items():
+        if key != "node_attrs" and torch.is_tensor(value):
+            assert got[key].dtype == value.dtype and torch.equal(got[key], value), key

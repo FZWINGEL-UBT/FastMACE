@@ -172,7 +172,7 @@ BATCH_EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
 SPECIES_DEPENDENT = "fixed_species_superset"
 
 
-def host_batch(calc, atoms):
+def host_batch(calc, atoms, one_hot=True):
     """MACE's input batch of ``atoms`` as a dict, left on the host, without MACE's neighbour list.
 
     ``MACECalculator._atoms_to_batch`` (mace-torch 0.3.16) without its last step, which moves the whole batch,
@@ -183,6 +183,10 @@ def host_batch(calc, atoms):
     The batch's edges (``BATCH_EDGE_KEYS``) are empty: the force field replaces them with its own lists before
     anything reads them, so MACE's host neighbour search (``get_neighborhood``: matscipy's list, about 4.7 kB per
     atom at 74 edges per atom, the build's host peak at scale) is not run. Every other entry is MACE's.
+
+    ``one_hot=False``: ``node_attrs`` is the same one-hot as uint8 (1 byte per atom and element), built from the
+    same table indices; MACE's own (the default float dtype) and the batch's copy of it are not made (at 149M atoms
+    of an 89-element model they were 53 GB each, the build's host peak).
     """
     from mace import data as mace_data
     from mace.data import atomic_data
@@ -190,16 +194,43 @@ def host_batch(calc, atoms):
 
     calc.arrays_keys.update({calc.charges_key: "charges"})
     keyspec = mace_data.KeySpecification(info_keys=calc.info_keys, arrays_keys=calc.arrays_keys)
-    search = atomic_data.get_neighborhood
+    search, encode = atomic_data.get_neighborhood, atomic_data.to_one_hot
     atomic_data.get_neighborhood = _no_neighbours
+    if not one_hot:
+        atomic_data.to_one_hot = _shape_only_one_hot
     try:
         with torch_tools.default_dtype(calc.default_dtype):
             config = mace_data.config_from_atoms(atoms, key_specification=keyspec, head_name=calc.head)
             graph = mace_data.AtomicData.from_config(config, z_table=calc.z_table, cutoff=calc.r_max,
                                                      heads=calc.available_heads)
     finally:
-        atomic_data.get_neighborhood = search
-    return torch_geometric.Batch.from_data_list([graph]).to_dict()
+        atomic_data.get_neighborhood, atomic_data.to_one_hot = search, encode
+    batch = torch_geometric.Batch.from_data_list([graph]).to_dict()
+    if not one_hot:
+        batch["node_attrs"] = _uint8_one_hot(atoms.numbers, calc.z_table)
+    return batch
+
+
+def _shape_only_one_hot(indices, num_classes):
+    """``mace.tools.torch_tools.to_one_hot``'s shape and dtype, on the meta device (no storage)."""
+    import torch
+
+    return torch.empty(indices.shape[:-1] + (num_classes,), device="meta")
+
+
+def _uint8_one_hot(numbers, z_table):
+    """The one-hot of ``numbers`` over ``z_table`` (MACE's ``atomic_numbers_to_indices`` columns) as uint8."""
+    import numpy as np
+    import torch
+
+    column = np.full(max(119, max(z_table.zs) + 1), -1, dtype=np.int64)
+    column[list(z_table.zs)] = np.arange(len(z_table.zs))
+    index = torch.from_numpy(column[np.asarray(numbers, dtype=np.int64)])
+    if bool((index < 0).any()):
+        raise ValueError("an atomic number is not in the model's table")
+    out = torch.zeros((len(index), len(z_table.zs)), dtype=torch.uint8)
+    out.scatter_(1, index.unsqueeze(1), 1)
+    return out
 
 
 def _no_neighbours(positions, cutoff, pbc=None, cell=None, true_self_interaction=False):
@@ -400,13 +431,17 @@ class MACEForceField:
         self.species_columns = tuple(sorted(z_table.index(z) for z in wanted if z in z_table))
         self.superset = tuple(z_table[column] for column in self.species_columns)
         self.check_species(atoms.numbers)
-        batch = host_batch(calc, atoms)
+        # release_node_attrs (not PolarMACE): the one-hot as uint8 on the host (host_batch(one_hot=False)), for the
+        # construction's readers only: the species check, the rewrites' columns and E0's argmax (exact in any dtype).
+        compact = release_node_attrs and not self.is_polar
+        batch = host_batch(calc, atoms, one_hot=False) if compact else host_batch(calc, atoms)
         # One device copy of the one-hot species, which ``data`` keeps too (its ``.to`` below then returns this
         # tensor): the species check and the rewrites read only its columns and sums, exact in any float dtype.
         # release_node_attrs: the one-hot stays on the host from here on (the caller builds the rows it needs
         # from the species index), so the construction never holds it on the device.
         where = "cpu" if release_node_attrs else self._device
-        node_attrs = batch["node_attrs"] = batch["node_attrs"].to(where, self._dtype)
+        node_attrs = batch["node_attrs"] = (batch["node_attrs"] if compact
+                                            else batch["node_attrs"].to(where, self._dtype))
         if not bool((node_attrs[:, list(self.species_columns)].sum(dim=1) == 1).all()):
             raise SpeciesNotInSuperset([Reason("a one-hot species row of the structure does not sum to 1 over the "
                                                "superset's columns", rule=2, code="species-not-in-superset")])
@@ -623,7 +658,7 @@ class MACEForceField:
         # The atoms' node_attrs columns, as every species refresh leaves them (a fresh construction equals a
         # refreshed one in every tensor, 3-T03's registry check).
         self._species_index = torch.index_select(self._column_of, 0, self.atomic_numbers)
-        self._ones = torch.ones((n, 1), dtype=self.data["node_attrs"].dtype, device=device)
+        self._ones = torch.ones((n, 1), dtype=self._dtype, device=device)  # the one-hot's dtype
         self._sender_groups = torch.index_select(self._group_of, 0, self.atomic_numbers)
         # Total charge = its value at construction + the change of the summed per-atom charges, so
         # that it is exactly the given total until a charge changes.
@@ -866,8 +901,8 @@ class MACEForceField:
         afterwards; a species refresh updates the index only."""
         import torch
 
-        stored = self.data["node_attrs"]
-        self.data["node_attrs"] = torch.empty(stored.shape, dtype=stored.dtype, device="meta")
+        stored = self.data["node_attrs"]  # the model's dtype (a released construction's host copy is uint8)
+        self.data["node_attrs"] = torch.empty(stored.shape, dtype=self._dtype, device="meta")
         self.node_attrs_released = True
 
     def release_whole_system(self):
