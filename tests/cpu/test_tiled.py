@@ -742,6 +742,7 @@ def test_wavefront_call_equals_the_three_sweep_call(mode, group, overlap):
             results.append(tiled.evaluate(current, stress=True))
         assert tiled.last["wavefront"]["on"] == (wave == "on")
         assert not tiled._g["state"]._pending
+        assert tiled._g["forces"] is None  # handed out: the call keeps no reference to its forces
         assert (tiled.last["list_cache_bytes"] == 0) == (wave == "on")  # each tile's lists dropped after its sweep 3
     assert tiled.last["grid"][0] >= 8
     assert tiled.last["wavefront"]["pool_rows"] < 0.8 * len(atoms)

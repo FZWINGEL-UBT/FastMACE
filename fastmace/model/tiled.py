@@ -1604,6 +1604,9 @@ class TiledForceField:
                     out_stress = (strain_grad / volume).to(self.dtype)  # MACE: dE/d(strain) / V
             self.last = stats
             out = ForceOutput(energy, forces, out_stress)
+            # Handed out: the caller holds the forces, not the call (else a caller that drops them still has them
+            # on the device through the next call, beside its new buffer: 12 bytes per atom of that call's peak).
+            g["forces"] = None
             if self._auto or not self._budgeted:
                 memory = self._memory()  # None without a CUDA device: the mode and the cap stay
                 self._choose_mode(memory)
@@ -1759,7 +1762,7 @@ class TiledForceField:
         g["stress"] = stress
         # A new force buffer every call, handed out as the call's forces (no copy; the scatter runs outside the
         # graphs, so its address may change): 12 bytes per atom less on the device than a kept buffer and its copy.
-        g["forces"] = None
+        g["forces"] = None  # a call that raised left its buffer here
         g["forces"] = torch.zeros((n, 3), dtype=self.dtype, device=self.device)
         for tensor in [g["node_es"], g["strain_grad"]]:
             tensor.zero_()
