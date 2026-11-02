@@ -75,7 +75,10 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     kind = self.generic_kind
     num_nodes = node_feats.shape[0]
     n_real = lammps_natoms[0] if lammps_class is not None else None
-    sc = self.skip_tp(node_feats, node_attrs) if kind != "density" else None
+    # The skip connection of the real rows only: the ghost (halo) rows' are truncated below (a tile's halo is about
+    # 40 % of its rows).
+    real = slice(None) if n_real is None else slice(0, n_real)
+    sc = self.skip_tp(node_feats[real], node_attrs[real]) if kind != "density" else None
     node_feats = self.linear_up(node_feats)
     node_feats = self.handle_lammps(node_feats, lammps_class=lammps_class, lammps_natoms=lammps_natoms,
                                     first_layer=first_layer)

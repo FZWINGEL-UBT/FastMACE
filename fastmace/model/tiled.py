@@ -1344,7 +1344,10 @@ class TiledForceField:
                 self._kept["tiles"], self._kept["grid"] = [t.cpu() for t in tiles], grid
         self._tile_index = {t.data_ptr(): i for i, t in enumerate(tiles)}
         local_of = torch.full((n,), -1, dtype=torch.int32, device=self.device)  # int32: 4 bytes per atom
-        measure = (not self._budgeted or self._auto) and self.device.type == "cuda"
+        # The first padded (compiled) call also measures: the lanes' fit is its own tile workspace, not the eager
+        # first call's scaled to the cap (eager tiles hold several times more: R 16,384 was refused with 12 GiB free).
+        lanes_unmeasured = self._lanes_fit is None and padded and self.mode != "graphs"
+        measure = (not self._budgeted or self._auto or lanes_unmeasured) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
@@ -1572,15 +1575,14 @@ class TiledForceField:
             out = ForceOutput(energy, forces, out_stress)
             if self._auto or not self._budgeted:
                 memory = self._memory()  # None without a CUDA device: the mode and the cap stay
-                measured = self.receivers
                 self._choose_mode(memory)
                 if not self._budgeted:
                     self._budgeted = True
                     if self.config.mode != "auto" or self.mode == "compiled":  # "auto": eager tiles take no budget
                         self._choose_receivers(memory)
-                if memory is not None:  # TileConfig.lanes: a second workspace at the chosen cap, by the same model
-                    workspace, available = memory
-                    self._lanes_fit = 2 * 1.1 * workspace / measured * self.receivers <= available
+            elif lanes_unmeasured and measure:  # TileConfig.lanes: a second workspace of this padded call's
+                workspace, available = self._memory()
+                self._lanes_fit = 2 * 1.1 * workspace <= available
             return out
         finally:
             for module, count in saved:

@@ -259,7 +259,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     from mace.tools.scatter import scatter_sum
     num_nodes = node_feats.shape[0]
     n_real = lammps_natoms[0] if lammps_class is not None else None
-    sc = self.skip_tp(node_feats)
+    sc = self.skip_tp(node_feats if n_real is None else node_feats[:n_real])  # the real rows' (ghosts truncated)
     node_feats = self.linear_up(node_feats)
     residual_linear = getattr(self, "residual_linear", None)  # merged_residual
     node_feats_res = self.linear_res(node_feats) if residual_linear is None else None
