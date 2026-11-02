@@ -432,7 +432,7 @@ def test_species_index_releases_the_whole_system_buffers_and_looks_e0_up_bitwise
     stored float64 E0 column from the species index; the tiled call's heads are one shared element."""
     from fastmace.model import energy as energy64
 
-    calc, atoms = calculator(), structure()
+    calc, atoms = calculator(), big_structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
     stored = field.data[energy64.NODE_E0_KEY].clone()
     tiled = TiledForceField(field, TileConfig(5, mode="padded", species="index", neighbours="tiles"))
@@ -682,6 +682,69 @@ def test_deferred_host_state_writes_are_bitwise_the_immediate_ones(mode, alias):
         assert not tiled._g["state"]._pending
     assert results[0][0] == results[1][0]
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
+
+
+# ---------------------------------------------------------------- the wavefront schedule
+
+
+def test_wavefront_schedule_runs_every_sweep_once_after_what_it_reads():
+    """``wavefront_schedule``: each tile's three sweeps once; sweep 2 in tile order; a tile's sweep 1 before every
+    sweep 2 that needs it, its sweep 3 after the sweep 2 of its ``ready`` tile; the peak is the most receivers
+    between their sweeps 1 and 3."""
+    from fastmace.model.tiled import wavefront_schedule
+
+    # A ring of 8 tiles (periodic): tile t reads its neighbours' x; its receivers sit in their halos too.
+    tiles = 8
+    needs = [sorted({(t - 1) % tiles, t, (t + 1) % tiles}) for t in range(tiles)]
+    ready = [tiles - 1 if t == 0 else min(t + 1, tiles - 1) for t in range(tiles)]
+    counts = [3] * tiles
+    steps, peak = wavefront_schedule(needs, ready, counts)
+    assert sorted(steps) == sorted((s, t) for s in (1, 2, 3) for t in range(tiles))
+    position = {step: i for i, step in enumerate(steps)}
+    assert [t for s, t in steps if s == 2] == list(range(tiles))
+    for t in range(tiles):
+        assert all(position[(1, u)] < position[(2, t)] for u in needs[t])
+        assert position[(3, t)] > position[(2, ready[t])]
+    live = most = 0
+    for sweep, t in steps:
+        live += counts[t] if sweep == 1 else -counts[t] if sweep == 3 else 0
+        most = max(most, live)
+    assert peak == most < sum(counts)
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("overlap", [False, True], ids=["immediate", "deferred"])
+def test_wavefront_call_equals_the_three_sweep_call(mode, overlap):
+    """``TileConfig.wavefront``: the pooled rows hold bitwise the state of the three plain sweeps, so the node
+    energies (and the energy) are bitwise; the forces and the stress are the same sums in another order. The pool
+    holds fewer rows than atoms, and the lists of a tile are dropped after its sweep 3."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))  # 10 tile layers along the long axis
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = []
+    for wave in ("off", "on"):
+        tiled = TiledForceField(field, TileConfig(12, mode=mode, neighbours="tiles", state="host", alias_state=True,
+                                                  overlap=overlap, wavefront=wave, list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        for current in (strained(atoms), atoms):
+            results.append(tiled.evaluate(current, stress=True))
+        assert tiled.last["wavefront"]["on"] == (wave == "on")
+        assert not tiled._g["state"]._pending
+        assert (tiled.last["list_cache_bytes"] == 0) == (wave == "on")  # each tile's lists dropped after its sweep 3
+    assert tiled.last["grid"][0] >= 8
+    assert tiled.last["wavefront"]["pool_rows"] < 0.8 * len(atoms)
+    assert tiled.last["tiles"] > 8
+    for plain, wave in zip(results[:2], results[2:]):
+        assert plain[0] == wave[0]
+        assert relative(wave[1], plain[1]) <= 1e-13
+        assert relative(wave[2], plain[2]) <= 1e-13
+
+
+def test_wavefront_needs_the_aliased_state():
+    with pytest.raises(ValueError, match="wavefront"):
+        TileConfig(5, state="host", wavefront="on")
+    with pytest.raises(ValueError, match="wavefront"):
+        TileConfig(5, wavefront="sometimes")
 
 
 # ---------------------------------------------------------------- the whole-system stages in chunks

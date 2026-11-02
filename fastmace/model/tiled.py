@@ -40,6 +40,9 @@ from fastmace.model.forces import ForceOutput
 # (tiled-compiled-default.md).
 COMPILED_RESIDENCY = int(0.07 * 2**30)
 COMPILED_MARGIN = 2**30
+# TileConfig.wavefront "auto": on from this many layers of the tile grid along its slowest axis. The band of live rows
+# is about five layers (three around sweep 2, and the periodic images' first and last layers, alive for the whole call).
+WAVEFRONT_LAYERS = 12
 
 
 @dataclasses.dataclass(frozen=True)
@@ -101,6 +104,15 @@ class TileConfig:
     # device runs it while the host indexes (on CUDA through pinned buffers and events); the same order.
     overlap: bool = True
     species: str = "one_hot"
+    # ``"auto"``, ``"on"`` or ``"off"`` (with ``alias_state``): the wavefront schedule (docs/design/tiled-wavefront.md).
+    # Sweep 2 visits the tiles in their order; sweep 1 runs on a tile just before the first sweep-2 tile that reads
+    # its x, and sweep 3 just after the last sweep-2 tile that adds to its receivers' dE/dx. x, sc and their adjoints
+    # then live in a pool of the rows of the atoms between their sweeps 1 and 3 instead of [N, width] tensors: per
+    # atom bitwise today's state and node energies, the forces and stress summed in another order (float32 rounding;
+    # the scatter is atomic on the GPU anyway). "auto": on from ``WAVEFRONT_LAYERS`` layers of the tile grid, where the
+    # band of live rows is a small part of the atoms. The search pass that plans it keeps no tile lists, so the tiles
+    # search once more than without it.
+    wavefront: str = "auto"
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -130,6 +142,10 @@ class TileConfig:
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
             raise ValueError(f"TileConfig.edges must be positive or None, got {self.edges!r}")
+        if self.wavefront not in ("auto", "on", "off"):
+            raise ValueError(f"TileConfig.wavefront must be 'auto', 'on' or 'off', got {self.wavefront!r}")
+        if self.wavefront == "on" and not self.alias_state:
+            raise ValueError("TileConfig.wavefront='on' needs alias_state=True (state='host')")
 
 
 class _State:
@@ -144,6 +160,61 @@ class _State:
         self.tensors = {}
         # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
+        # wavefront (``pool``): x and sc (with their aliased adjoints) in pooled rows, ``_row_of`` each atom's
+        self.pooled, self._row_of = False, None
+
+    def pool(self, rows, n):
+        """The wavefront schedule: x, sc and their aliased adjoints in ``rows`` pooled rows instead of ``n``; an atom
+        takes a row before its sweep 1 (``assign``) and returns it after its sweep 3 (``release``). The pool grows,
+        never shrinks, between calls; ``rows`` 0 switches back to [N, width]."""
+        import torch
+
+        pooled = rows > 0
+        size = next(iter(self.tensors.values())).shape[0] if self.tensors else None
+        if size is not None and (pooled != self.pooled or (pooled and size < rows) or (not pooled and size != n)):
+            self.tensors = {}  # allocated again at the right size from sweep 1's first outputs
+        self.pooled = pooled
+        if pooled:
+            self._pool_rows = max(rows, size or 0) if self.tensors else rows
+            self._row_of = torch.full((n,), -1, dtype=torch.int32)
+            self._free_rows = torch.arange(self._pool_rows, dtype=torch.int32)
+            self._rows_top = self._pool_rows
+        else:
+            self._row_of = None
+
+    def assign(self, atoms):
+        """Pooled rows for ``atoms`` (none of which has one)."""
+        atoms = atoms.cpu()
+        top = self._rows_top - atoms.shape[0]
+        if top < 0:
+            raise RuntimeError("the wavefront's row pool is exhausted (its schedule's band was underestimated)")
+        self._row_of[atoms] = self._free_rows[top:self._rows_top]
+        self._rows_top = top
+
+    def release(self, atoms):
+        """Return ``atoms``' pooled rows (after their sweep 3 has read them)."""
+        atoms = atoms.cpu()
+        rows = self._row_of[atoms]
+        self._free_rows[self._rows_top:self._rows_top + rows.shape[0]] = rows
+        self._rows_top += rows.shape[0]
+        self._row_of[atoms] = -1
+
+    def _rows_of(self, name, index, read=False):
+        """The rows of ``index``'s atoms in the storage of ``name``: the atoms themselves, or pooled rows (x and sc's
+        storage). A read maps an atom without a row (a padded slot's padding rows, atom 0) to row 0: padding rows
+        reach no real output (tiled tests: padded equals eager bitwise), and a pooled row holds finite values."""
+        if not self.pooled or self._storage.get(name, name) not in ("x", "sc"):
+            return index
+        rows = self._row_of[index.cpu()].long()
+        return rows.clamp_(min=0) if read else rows
+
+    def touched(self, first, last):
+        """The wavefront's search pass recorded each atom's first and last tile (``touch`` of sweep 1 without it)."""
+        import torch
+
+        self._first, self._last = first, last
+        self._slot_of = torch.full_like(first, -1)
+        self._window = None
 
     def allocate(self, n, widths):
         import torch
@@ -154,9 +225,10 @@ class _State:
         # PyTorch's pinned allocator rounds every block up to a power of two, all of it resident (72 GiB for
         # 42 GiB of state at 9.26M NbCl5 atoms).
         where = "cpu" if self.host else self.device
+        size = self._pool_rows if self.pooled else n
         for name, width in widths.items():
             if name not in self._storage:
-                self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where)
+                self.tensors[name] = torch.zeros((size, width), dtype=self.dtype, device=where)
         if self.alias:
             self._width = widths["gx"]
             self._index(n)
@@ -182,6 +254,8 @@ class _State:
 
     def bytes(self):
         tensors = list(self.tensors.values())
+        if self.pooled:
+            tensors += [self._row_of, self._free_rows]
         if self.alias and getattr(self, "_first", None) is not None:
             tensors += [self._first, self._last, self._slot_of]
             tensors += [self._window] if getattr(self, "_window", None) is not None else []
@@ -196,7 +270,7 @@ class _State:
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
             return tensor[index]
-        index = index.cpu()
+        index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
             return tensor.index_select(0, index).to(self.device)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
@@ -208,14 +282,14 @@ class _State:
         if not self.host:
             self.tensors[self._storage.get(name, name)][index] = values
         else:
-            self._defer("put", name, index, values)
+            self._defer("put", name, self._rows_of(name, index), values)
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
         if not self.host:
             self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
         else:
-            self._defer("add", name, index, values)
+            self._defer("add", name, self._rows_of(name, index) if name != "gx" else index, values)
 
     def new_tile(self):
         """The call starts a tile: its first host write applies the earlier tiles' pending ones, by then behind
@@ -315,7 +389,7 @@ class _State:
         atoms = self._closing[tile]
         if atoms.numel():
             slots = self._slot_of[atoms]
-            self.tensors["x"][atoms] = self._window[slots]
+            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots]
             self._free[self._top:self._top + slots.numel()] = slots
             self._top += slots.numel()
             self._slot_of[atoms] = -1
@@ -414,6 +488,36 @@ def _split_block(cumulative, start, stop, receivers, edges):
         pieces.append((piece, cut))
         piece = cut
     return pieces
+
+
+def wavefront_schedule(needs, ready, counts):
+    """The wavefront's order of the tile sweeps: ``(steps, peak)``, ``steps`` a list of ``(sweep, tile)`` and
+    ``peak`` the most receivers between their sweeps 1 and 3 at once (the row pool's size).
+
+    Sweep 2 visits the tiles in order. Before tile ``t``, sweep 1 runs on every tile of ``needs[t]`` (the tiles that
+    own a receiver or halo atom of ``t``, ascending) it has not run on; after it, sweep 3 runs on every tile whose
+    ``ready`` (the last sweep-2 tile that holds one of its receivers) is ``t``, in the order of ``ready`` then index.
+    A tile's sweep 1 thus precedes every sweep-2 read of its x and sc, and its sweep 3 follows the last addition to
+    its receivers' dE/dx and its own dE/dsc."""
+    tiles = len(counts)
+    order = sorted(range(tiles), key=lambda u: (int(ready[u]), u))
+    done = [False] * tiles
+    steps, live, peak, next3 = [], 0, 0, 0
+    for t in range(tiles):
+        for u in needs[t]:
+            u = int(u)
+            if not done[u]:
+                done[u] = True
+                steps.append((1, u))
+                live += int(counts[u])
+                peak = max(peak, live)
+        steps.append((2, t))
+        while next3 < tiles and int(ready[order[next3]]) <= t:
+            u = order[next3]
+            next3 += 1
+            steps.append((3, u))
+            live -= int(counts[u])
+    return steps, peak
 
 
 _UNIT_WEIGHTS = (9, 3, 1)  # a unit shift in {-1, 0, 1}^3 as one byte: sum((u + 1) * w), 0..26
@@ -546,6 +650,7 @@ class TiledForceField:
         self._graph_key = None
         self._pool = None
         self._stream = None
+        self._cache_paused = False  # the wavefront's search pass: the tile lists are not kept
         self.last = {}
 
     @property
@@ -637,7 +742,8 @@ class TiledForceField:
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
                     return torch.stack([sender.long(), receiver]), bins.shifts(unit)
                 sender, receiver, unit, shifts = within(receivers) if kept is not None else bins.edges(receivers)
-                packed = _pack_units(unit) if cache is not None and self.list_cache_state == "on" else None
+                packed = (_pack_units(unit) if cache is not None and self.list_cache_state == "on"
+                          and not self._cache_paused else None)  # the wavefront's search pass keeps none
                 if packed is not None and not self._host_keeps_cache(cache):
                     packed = None
                 if packed is not None:
@@ -944,6 +1050,11 @@ class TiledForceField:
         if sweep == 1:
             state = self._state(g, out["x"], out["sc"])
             g["node_es"].index_add_(0, recv, out["es"])
+            if state.pooled:  # only the real receivers have pooled rows (their x and sc, written once)
+                r = piece[4]
+                state.put("x", recv[:r], out["x"][:r])
+                state.put("sc", recv[:r], out["sc"][:r])
+                return
             state.add("x", recv, out["x"])
             state.add("sc", recv, out["sc"])
             return
@@ -1079,7 +1190,13 @@ class TiledForceField:
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
-        keys = self._slot_keys(tiles, source, local_of, n) if padded else None
+        wave = self._wavefront_on(grid, n)
+        if wave:
+            keys, steps, pool_rows, first, last = self._wavefront(tiles, source, local_of, n, padded)
+        else:
+            keys = self._slot_keys(tiles, source, local_of, n) if padded else None
+            steps, pool_rows = [(sweep, index) for sweep in (1, 2, 3) for index in range(len(tiles))], 0
+        stats["wavefront"] = dict(on=wave, pool_rows=pool_rows, pool_fraction=pool_rows / max(n, 1))
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
             stats["slot_needs"] = {key: self.slot_needs[key] for key in sorted(self.slot_needs)}
@@ -1103,33 +1220,49 @@ class TiledForceField:
                     self._graph_key = key
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
             aliased = self.config.alias_state
-            for sweep in (1, 2, 3):
-                for index, receivers in enumerate(tiles):
-                    g["state"].new_tile()
-                    slot = self._slots[keys[index]] if padded else None
-                    piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
-                    self._note(stats, piece)
-                    if sweep == 1:
-                        stats["edges"] += piece[1].shape[1]
-                        if aliased:
-                            g["state"].touch(piece[0], index, n)
-                    if padded:
-                        if bound is not slot:  # the streaming kernels read this slot's edge count and tables
-                            for module in field._streaming:
-                                module.register_buffer("streaming_count", slot["count"], persistent=False)
-                            self._bind_tables(slot["tables"])
-                            bound = slot
-                        self._fill(slot, piece)
-                        self._run_slot(sweep, slot, g)
-                        self._scatter(sweep, slot, g, piece)
-                    else:
-                        self._eager_tile(sweep, piece, g)
-                    if sweep == 2 and aliased:
-                        g["state"].close(index)
-                    del piece
-                g["state"].flush()  # the next sweep reads what this one wrote
-                if sweep == 1 and aliased:
-                    g["state"].plan(len(tiles))
+            if aliased:
+                state.pool(pool_rows, n)
+                if wave:
+                    state.touched(first, last)
+                    del first, last
+            planned, previous = False, None
+            for sweep, index in steps:
+                receivers = tiles[index]
+                if sweep != previous and sweep != 1:
+                    state.flush()  # sweep 2 reads what sweep 1 wrote, sweep 3 what sweep 2 wrote (sweep 1 reads none)
+                if sweep == 2 and aliased and not planned:
+                    state.plan(len(tiles))  # after the touches (sweep 1, or the wavefront's search pass)
+                    planned = True
+                previous = sweep
+                if sweep == 1 and wave:
+                    state.assign(receivers)
+                state.new_tile()
+                slot = self._slots[keys[index]] if padded else None
+                piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
+                self._note(stats, piece)
+                if sweep == 1:
+                    stats["edges"] += piece[1].shape[1]
+                    if aliased and not wave:
+                        state.touch(piece[0], index, n)
+                if padded:
+                    if bound is not slot:  # the streaming kernels read this slot's edge count and tables
+                        for module in field._streaming:
+                            module.register_buffer("streaming_count", slot["count"], persistent=False)
+                        self._bind_tables(slot["tables"])
+                        bound = slot
+                    self._fill(slot, piece)
+                    self._run_slot(sweep, slot, g)
+                    self._scatter(sweep, slot, g, piece)
+                else:
+                    self._eager_tile(sweep, piece, g)
+                if sweep == 2 and aliased:
+                    state.close(index)
+                del piece
+                if sweep == 3 and wave:
+                    state.release(receivers)  # its reads are done (rows() copies on the host before it returns)
+                    if self._list_cache is not None:
+                        self._list_cache.pop(receivers.data_ptr(), None)  # no sweep reads this tile's lists again
+            state.flush()
             source = None  # the tile lists' cell bins (per-atom device arrays) before the energy's transients
             stats["global_bytes"] = state.bytes()
             list_cache = getattr(self, "_list_cache", None)
@@ -1267,7 +1400,51 @@ class TiledForceField:
         stats["max_halo"] = max(stats["max_halo"], h)
         stats["max_edges"] = max(stats["max_edges"], ei.shape[1])
 
-    def _slot_keys(self, tiles, source, local_of, n):
+    def _wavefront_on(self, grid, n):
+        """Whether this call runs the wavefront schedule (``TileConfig.wavefront``)."""
+        config = self.config
+        if config.wavefront == "off" or not config.alias_state:
+            return False
+        return config.wavefront == "on" or (int(grid[0]) >= WAVEFRONT_LAYERS and n >= 2**20)
+
+    def _wavefront(self, tiles, source, local_of, n, padded):
+        """The wavefront's search pass: every tile's graph built once (without keeping its lists), recording each
+        atom's first and last tile and the tiles each tile reads x from. ``(keys, steps, peak, first, last)``: the
+        padded slots' keys (None eager), the schedule and its row pool size, and the host int32 first and last tile
+        of every atom (the alias window's plan)."""
+        import torch
+
+        owner = torch.empty(n, dtype=torch.int32, device=self.device)
+        for index, receivers in enumerate(tiles):
+            owner[receivers] = index
+        first = torch.full((n,), -1, dtype=torch.int32)
+        last = torch.full((n,), -1, dtype=torch.int32)
+        needs = [None] * len(tiles)
+
+        def visit(index, piece):
+            nodes = piece[0]
+            needs[index] = torch.unique(owner[nodes]).cpu().tolist()
+            nodes = nodes.cpu()
+            first[nodes[first[nodes] < 0]] = index
+            last[nodes] = index
+
+        self._cache_paused = True
+        try:
+            if padded:
+                keys = self._slot_keys(tiles, source, local_of, n, visit)
+            else:
+                keys = None
+                for index, receivers in enumerate(tiles):
+                    visit(index, self._tile_graph(receivers, source, local_of))
+        finally:
+            self._cache_paused = False
+        ready = torch.full((len(tiles),), -1, dtype=torch.int64).scatter_reduce_(
+            0, owner.cpu().long(), last.long(), "amax")
+        del owner
+        steps, peak = wavefront_schedule(needs, ready.tolist(), [int(t.shape[0]) for t in tiles])
+        return keys, steps, peak, first, last
+
+    def _slot_keys(self, tiles, source, local_of, n, visit=None):
         """Each tile's slot: the edge bucket ``ceil(edges / step)``, with ``step`` set on the first call from the
         largest tile (``TileConfig.bucket`` of its edges, at least 256, a multiple of 256). A slot holds one
         receiver row more than the largest of its tiles with ``TileConfig.headroom``, at most the receiver cap (the
@@ -1278,9 +1455,13 @@ class TiledForceField:
         cent in MD, while a small slot (the remainder pieces of blocks just above the cap) can triple
         (tiled-slot-growth.md)."""
         sizes = []
-        for receivers in tiles:
-            _, ei, _, _, r, h = self._tile_graph(receivers, source, local_of)
+        for index, receivers in enumerate(tiles):
+            piece = self._tile_graph(receivers, source, local_of)
+            _, ei, _, _, r, h = piece
             sizes.append((r, h, int(ei.shape[1])))
+            if visit is not None:  # the wavefront's search pass
+                visit(index, piece)
+            del piece
         if self._edge_step is None:
             largest = max(e for _, _, e in sizes)
             self._edge_step = max(256, 256 * math.ceil(float(self.config.bucket) * largest / 256))
