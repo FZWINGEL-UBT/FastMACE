@@ -4,7 +4,7 @@
 # when it fits), tile lists, the host state aliased, the species index, the default budget.
 # Usage: SRC=... HOST=leto bash scan.sh REPEAT [REPEAT ...]; stops at the first failed or invalid size.
 # Host guard before each size: the last size's host peak per atom (start: BPA, default 4000 bytes) times 1.15, and
-# 20 GB kept free.
+# 20 GB kept free (FACTOR overrides the 1.15, e.g. 1.0 at the limit).
 set -u
 R=/mnt/homes/zwingel/fm-tiled/run.sh
 HOST=${HOST:-$(hostname)}
@@ -12,7 +12,7 @@ bpa=${BPA:-4000}
 for rep in "$@"; do
   atoms=$(echo $rep | awk -F x '{printf "%.0f", $1 * $2 * $3 * 5}')
   avail=$(free -b | awk 'NR==2 {print $7}')
-  need=$(awk -v n=$atoms -v b=$bpa 'BEGIN {printf "%.0f", n * b * 1.15}')
+  need=$(awk -v n=$atoms -v b=$bpa -v f=${FACTOR:-1.15} 'BEGIN {printf "%.0f", n * b * f}')
   echo "$rep: $atoms atoms; host available $((avail / 1000000000)) GB, needs about $((need / 1000000000)) GB"
   if [ $need -gt $((avail - 20000000000)) ]; then echo "$rep skipped: host memory"; break; fi
   n=$HOST-omat-scan-SrTiO3-$rep
