@@ -67,6 +67,8 @@ def parse_args(argv=None):
     p.add_argument("--lanes", choices=("auto", "on", "off"), default="auto",
                    help="TileConfig.lanes: sweep 2's tiles in pairs on two green-context SM halves (needs "
                         "PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync)")
+    p.add_argument("--prefetch", choices=("on", "off"), default="on",
+                   help="TileConfig.prefetch: the next tile's graph and host rows prepared on a side stream")
     p.add_argument("--profile-last", action="store_true",
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")
@@ -295,6 +297,7 @@ def main(argv=None):
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
                                                   wavefront=args.wavefront, lanes=args.lanes,
+                                                  prefetch=args.prefetch == "on",
                                                   species="index" if args.species_index else "one_hot"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
