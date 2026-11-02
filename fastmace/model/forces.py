@@ -872,7 +872,7 @@ class MACEForceField:
         Every per-atom entry of ``data`` but the positions and the lists keeps its shape and dtype only (a meta
         tensor); ``batch`` (all zeros: one structure) becomes a zero-stride view; the float64 E0 is looked up from
         the species index where it is read (``node_e0``); the float64 charges are dropped for a model without
-        charge inputs. 64 bytes per atom on the device for MACE-OMAT-0 (tiled capacity, lever 5)."""
+        charge inputs. 68 bytes per atom on the device for MACE-OMAT-0 (tiled capacity, lever 5)."""
         import torch
 
         from fastmace.model import energy as energy64
@@ -894,6 +894,8 @@ class MACEForceField:
             self.data[key] = torch.empty(value.shape, dtype=value.dtype, device="meta")
         if not self.is_polar and not any(self._has_total.values()):
             self.charges = torch.empty(self.charges.shape, dtype=self.charges.dtype, device="meta")
+        # The one-hot's scatter source (``_refresh_node_attrs`` returns before it once the one-hot is released).
+        self._ones = torch.empty(self._ones.shape, dtype=self._ones.dtype, device="meta")
         # int32 species columns and sender groups (the tiles index with them; their refreshes write int32 from int32
         # tables, the same values): 8 bytes per atom less for each, and the neighbour list's groups are the same tensor.
         self._column_of, self._group_of = self._column_of.to(torch.int32), self._group_of.to(torch.int32)

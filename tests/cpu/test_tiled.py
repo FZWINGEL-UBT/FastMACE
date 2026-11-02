@@ -764,6 +764,86 @@ def test_wavefront_needs_the_aliased_state():
         TileConfig(5, wavefront="sometimes")
 
 
+# ---------------------------------------------------------------- two lanes for sweep 2
+
+
+@pytest.mark.parametrize("wave", [False, True], ids=["three-sweeps", "wavefront"])
+def test_lane_steps_pair_sweep_two_after_what_it_reads(wave):
+    """``lane_steps``: every sweep of every tile once; sweep 2 in tile order, in pairs of consecutive tiles; a pair
+    after the sweep 1 of every tile either of its tiles needs, a sweep 3 after the pair holding its ``ready`` tile;
+    the peak is the most receivers between their sweeps 1 and 3."""
+    from fastmace.model.tiled import lane_steps, wavefront_schedule
+
+    tiles = 9  # odd: the last sweep-2 tile has no partner
+    needs = [sorted({(t - 1) % tiles, t, (t + 1) % tiles}) for t in range(tiles)]
+    ready = [tiles - 1 if t == 0 else min(t + 1, tiles - 1) for t in range(tiles)]
+    counts = [3 + t % 2 for t in range(tiles)]
+    if wave:
+        steps, _ = wavefront_schedule(needs, ready, counts)
+    else:
+        steps = [(s, t) for s in (1, 2, 3) for t in range(tiles)]
+    items, peak = lane_steps(steps, counts)
+    flat = [(item[0], t) for item in items for t in item[1:]]
+    assert sorted(flat) == sorted((s, t) for s in (1, 2, 3) for t in range(tiles))
+    pairs = [item[1:] for item in items if item[0] == 2]
+    assert [t for pair in pairs for t in pair] == list(range(tiles))
+    assert all(len(pair) == 2 for pair in pairs[:-1]) and len(pairs[-1]) == 1
+    position = {}
+    for i, item in enumerate(items):
+        for t in item[1:]:
+            position[(item[0], t)] = i
+    for t in range(tiles):
+        if wave:
+            assert all(position[(1, u)] < position[(2, t)] for u in needs[t])
+            assert position[(3, t)] > position[(2, ready[t])]
+        else:
+            assert position[(1, tiles - 1)] < position[(2, t)] < position[(3, 0)]
+    live = most = 0
+    for sweep, t in flat:
+        live += counts[t] if sweep == 1 else -counts[t] if sweep == 3 else 0
+        most = max(most, live)
+    assert peak == most
+
+
+@pytest.mark.parametrize("wave", ["off", "on"])
+def test_lanes_call_equals_one_lane(wave):
+    """``TileConfig.lanes="on"`` off a CUDA device runs sweep 2's pairs one after the other, the second tile of a pair
+    on the second lane's own padded slot and strain gradient: the node energies (and the energy) bitwise one lane's,
+    the forces and the stress the same sums in another order."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = []
+    for lanes in ("off", "on"):
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
+                                                  alias_state=True, wavefront=wave, lanes=lanes, list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        for current in (strained(atoms), atoms):
+            results.append(tiled.evaluate(current, stress=True))
+        assert tiled.last["lanes"] == ("on: one after the other (no CUDA device)" if lanes == "on" else "off")
+        assert tiled.last["wavefront"]["on"] == (wave == "on")
+        assert not tiled._g["state"]._pending
+    assert tiled._lane_slots and all(slot is not tiled._slots[key] for key, slot in tiled._lane_slots.items())
+    assert tiled.last["tiles"] > 8
+    for one, two in zip(results[:2], results[2:]):
+        assert one[0] == two[0]
+        assert relative(two[1], one[1]) <= 1e-13
+        assert relative(two[2], one[2]) <= 1e-13
+
+
+def test_lanes_need_padded_tiles_and_stay_off_without_a_cuda_device():
+    with pytest.raises(ValueError, match="lanes"):
+        TileConfig(5, mode="eager", lanes="on")
+    with pytest.raises(ValueError, match="lanes"):
+        TileConfig(5, lanes="sometimes")
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    for mode, state in (("padded", "off: no CUDA device"), ("eager", "off: eager tiles")):
+        tiled = TiledForceField(field, TileConfig(20, mode=mode))
+        tiled.evaluate(atoms)
+        assert tiled.last["lanes"] == state
+
+
 # ---------------------------------------------------------------- the whole-system stages in chunks
 
 

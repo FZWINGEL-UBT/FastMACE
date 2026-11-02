@@ -62,7 +62,8 @@ def parse_args(argv=None):
     p.add_argument("--no-budget", action="store_true",
                    help="budget_receivers=(): R stays --receivers (several compiled tiles at small sizes)")
     p.add_argument("--wavefront", choices=("auto", "on", "off"), default="auto",
-                   help="TileConfig.wavefront (with --alias-state): the tile sweeps interleaved, x and sc in a row pool")
+                   help="TileConfig.wavefront (with --alias-state): the tile sweeps interleaved, x and sc in a row "
+                        "pool")
     p.add_argument("--profile-last", action="store_true",
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")
@@ -321,6 +322,10 @@ def main(argv=None):
                 out = tiled(positions)
             torch.cuda.synchronize()
             entry = dict(seconds=time.perf_counter() - started, **mem(before), **tiled.last)
+            # A call that measures its tiles' workspace resets the peak at its first tile: its peak is the larger of
+            # the one before the tiles and the one since.
+            entry["peak_above_before"] = max(entry["peak_above_before"],
+                                             int(tiled.last.get("peak_before_tiles", 0)) - int(before))
             # ``allocated`` is after the call (the tiled field keeps its global state between calls); the call's
             # true peak is what was allocated before it plus its peak above that.
             entry.update(allocated_before=int(before), total_peak=int(before) + entry["peak_above_before"])

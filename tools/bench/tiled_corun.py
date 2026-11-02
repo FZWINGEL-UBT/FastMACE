@@ -56,7 +56,8 @@ def parse_args(argv=None):
     p.add_argument("--receivers", type=int, default=8192)
     p.add_argument("--reps", type=int, default=4, help="pairs per block")
     p.add_argument("--blocks", type=int, default=6)
-    p.add_argument("--tf32x3", action="store_true", help="also lane B with tf32x3_gemms='on' (grouped_launch off: both reroute the block linears)")
+    p.add_argument("--tf32x3", action="store_true",
+                   help="also lane B with tf32x3_gemms='on' (grouped_launch off: both reroute the block linears)")
     p.add_argument("--no-split", action="store_true", help="skip the green-context mode")
     p.add_argument("--split-only", action="store_true",
                    help="only serial against split, without expandable segments (their mappings fail on green-"
@@ -264,7 +265,8 @@ def main(argv=None):
                   expandable_segments=not (args.split_only or args.no_expandable),
                   alloc_conf=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"))
     args.output.mkdir(parents=True, exist_ok=True)
-    path = args.output / f"corun-{args.structure}-{n}-R{args.receivers}{'-split' if args.split_only else ''}{args.tag}.json"
+    split = "-split" if args.split_only else ""
+    path = args.output / f"corun-{args.structure}-{n}-R{args.receivers}{split}{args.tag}.json"
 
     def save():
         path.write_text(json.dumps(record, indent=1, default=str))
@@ -277,7 +279,8 @@ def main(argv=None):
         if args.tf32x3:
             from fastmace.config import RewriteConfig
 
-            user_b, field_b, tiled_b = build(args, atoms, RewriteConfig(tf32x3_gemms="on", grouped_launch="off"))
+            rewrites = RewriteConfig(tf32x3_gemms="on", grouped_launch="off")
+            user_b, field_b, tiled_b = build(args, atoms, rewrites)
             fields["B"] = (field_b, tiled_b, field_b._prepare_one_off(atoms))
             record["rewrites_b"] = list(getattr(field_b, "applied", ()))
         record["rewrites_a"] = list(getattr(field, "applied", ()))
