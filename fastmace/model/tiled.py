@@ -49,6 +49,11 @@ WAVEFRONT_LAYERS = 12
 # the other (docs/validation/tiled-concurrent-tiles.md: 1.09x per pair on the RTX 4000 Ada, 1.05x on the RTX 5060 Ti,
 # under cudaMallocAsync); by exact device name (decision 66).
 LANE_GPUS = ("NVIDIA RTX 4000 Ada Generation",)
+# TileConfig.backward_chunk_scale "auto" (decision 66, by exact device name): the chunked streaming backward's edges
+# per chunk times this in the tiles, where it measured faster (results/tiled-ideas-20261102, 1.08M SrTiO3,
+# wavefront, R 8,192: x4 -10.5 % on the RTX 5060 Ti, -3.2 % on the RTX 4000 Ada; the RTX PRO 6000's tiles do not
+# chunk). A tile's backward runs eagerly, one launch pair per chunk: the L2 rule's chunks were launch-bound there.
+TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Generation": 4}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -133,6 +138,9 @@ class TileConfig:
     # and every change of sweep applies the pending host writes, which waits for the device (two drains per tile);
     # a group pays them once and keeps the rows' prefetch within its runs. The pool grows by about two groups' tiles.
     wavefront_group: int = 16
+    # The chunked streaming backward's edges per chunk in the tiles, times this (``None``: ``TILE_CHUNK_SCALE`` by
+    # device name, else 1). The chunks only change which edges' weight gradients share an L2-sized buffer.
+    backward_chunk_scale: int | None = None
     # Padded tiles with the state on the host (CUDA): the next tile's graph is built, and the host rows its sweep
     # reads gathered and copied, on a side stream while the current tile runs, so the host's syncs and gathers no
     # longer drain the device's queue at every tile (a profiled 5M call left the GPU idle 17 % of the time).
@@ -172,6 +180,8 @@ class TileConfig:
             raise ValueError(f"TileConfig.wavefront must be 'auto', 'on' or 'off', got {self.wavefront!r}")
         if self.wavefront == "on" and not self.alias_state:
             raise ValueError("TileConfig.wavefront='on' needs alias_state=True (state='host')")
+        if self.backward_chunk_scale is not None and int(self.backward_chunk_scale) < 1:
+            raise ValueError(f"TileConfig.backward_chunk_scale must be positive, got {self.backward_chunk_scale!r}")
         if int(self.wavefront_group) < 1:
             raise ValueError(f"TileConfig.wavefront_group must be positive, got {self.wavefront_group!r}")
         if self.lanes not in ("auto", "on", "off"):
@@ -744,6 +754,16 @@ class TiledForceField:
             field.release_node_attrs()
             field.release_whole_system()  # the per-atom buffers only the whole-system call reads
             self._species = field._species_index  # now int32
+        scale = self.config.backward_chunk_scale
+        if scale is None:
+            name = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else None
+            scale = TILE_CHUNK_SCALE.get(name, 1)
+        self.backward_chunk_scale = int(scale)
+        for module in model.modules():  # from each module's own value: a second tiled field scales it once
+            if getattr(module, "chunked_backward_edges", 0) > 0:
+                base = getattr(module, "_tile_chunk_base", module.chunked_backward_edges)
+                module._tile_chunk_base = base
+                module.chunked_backward_edges = base * self.backward_chunk_scale
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
@@ -832,7 +852,8 @@ class TiledForceField:
             bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + (skin if kept is not None else 0.0))
             if not self._reusing:
                 bins.bin(positions)
-            positions64 = positions.to(device=self.device, dtype=torch.float64)
+            # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device).
+            positions64 = positions.to(device=self.device, dtype=torch.float64) if kept is not None else None
             # With kept lists the later sweeps filter them again: no per-call cache beside them (host memory).
             # At the host limit (the floor reached while it fills) the cache is dropped for this and later calls:
             # the later sweeps search again, bitwise the same edges.

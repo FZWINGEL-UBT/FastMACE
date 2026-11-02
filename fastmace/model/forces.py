@@ -717,7 +717,7 @@ class MACEForceField:
     def _refresh_node_attrs(self):
         import torch
 
-        torch.index_select(self._column_of, 0, self.atomic_numbers, out=self._species_index)
+        torch.index_select(self._column_of, 0, self._numbers_here(), out=self._species_index)
         if self.node_attrs_released:  # the one-hot was dropped: the species index is what the caller reads
             return
         node_attrs = self.data["node_attrs"]
@@ -730,7 +730,7 @@ class MACEForceField:
         from fastmace.model import energy as energy64
 
         # One table entry per atom: exactly the one-hot product of node_e0_float64.
-        torch.index_select(self._column_of, 0, self.atomic_numbers, out=self._species_index)
+        torch.index_select(self._column_of, 0, self._numbers_here(), out=self._species_index)
         if self.whole_system_released:  # looked up from the species index where it is read (the tiled call)
             return
         torch.index_select(self._e0_row, 0, self._species_index, out=self.data[energy64.NODE_E0_KEY])
@@ -738,7 +738,11 @@ class MACEForceField:
     def _refresh_sender_groups(self):
         import torch
 
-        torch.index_select(self._group_of, 0, self.atomic_numbers, out=self._sender_groups)
+        torch.index_select(self._group_of, 0, self._numbers_here(), out=self._sender_groups)
+
+    def _numbers_here(self):
+        """``atomic_numbers`` on the tables' device (after ``release_whole_system`` they live on the host)."""
+        return self.atomic_numbers.to(self._column_of.device)
 
     def _refresh_total_charge(self):
         import torch
@@ -872,7 +876,8 @@ class MACEForceField:
         Every per-atom entry of ``data`` but the positions and the lists keeps its shape and dtype only (a meta
         tensor); ``batch`` (all zeros: one structure) becomes a zero-stride view; the float64 E0 is looked up from
         the species index where it is read (``node_e0``); the float64 charges are dropped for a model without
-        charge inputs. 68 bytes per atom on the device for MACE-OMAT-0 (tiled capacity, lever 5)."""
+        charge inputs; ``atomic_numbers`` moves to the host. 60 bytes per atom on the device for MACE-OMAT-0 (tiled
+        capacity, lever 5)."""
         import torch
 
         from fastmace.model import energy as energy64
@@ -896,6 +901,9 @@ class MACEForceField:
             self.charges = torch.empty(self.charges.shape, dtype=self.charges.dtype, device="meta")
         # The one-hot's scatter source (``_refresh_node_attrs`` returns before it once the one-hot is released).
         self._ones = torch.empty(self._ones.shape, dtype=self._ones.dtype, device="meta")
+        # The species source on the host: the tiles read the species index, and a species event's refresh copies
+        # it to the device for its lookups (8 bytes per atom less on the device).
+        self.atomic_numbers = self.atomic_numbers.cpu()
         # int32 species columns and sender groups (the tiles index with them; their refreshes write int32 from int32
         # tables, the same values): 8 bytes per atom less for each, and the neighbour list's groups are the same tensor.
         self._column_of, self._group_of = self._column_of.to(torch.int32), self._group_of.to(torch.int32)

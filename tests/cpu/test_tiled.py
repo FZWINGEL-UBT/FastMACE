@@ -420,6 +420,10 @@ def test_tiled_call_from_the_species_index_equals_the_one_hot_call_bitwise(mode)
         if species == "index":
             assert field.node_attrs_released and tiled.last["species"] == "index"
             assert field.data["node_attrs"].is_meta  # the one-hot is dropped, not copied to the host
+            assert field.atomic_numbers.device.type == "cpu"  # the species source on the host
+            index = field._species_index.clone()
+            field._refresh_node_attrs()  # a species event's refresh still looks up from it
+            assert torch.equal(field._species_index, index)
             with pytest.raises(RuntimeError, match="node_attrs"):
                 field.evaluate(atoms)
     assert results[0][0] == results[1][0]
@@ -900,6 +904,21 @@ def test_prefetch_call_is_bitwise_the_call_without(wave, lanes, monkeypatch):
         assert one[0] == two[0]
         assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+def test_backward_chunk_scale_multiplies_each_modules_own_chunk_once():
+    """``TileConfig.backward_chunk_scale``: the chunked backward's edges per chunk times the scale, from each module's
+    own value (a second tiled field on the same model does not scale it twice); off CUDA "auto" is 1."""
+    with pytest.raises(ValueError, match="backward_chunk_scale"):
+        TileConfig(5, backward_chunk_scale=0)
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    model = getattr(field.model, "_orig_mod", field.model)
+    model.interactions[0].chunked_backward_edges = 128
+    for scale, edges in ((4, 512), (2, 256), (None, 128)):
+        tiled = TiledForceField(field, TileConfig(5, backward_chunk_scale=scale))
+        assert model.interactions[0].chunked_backward_edges == edges
+        assert tiled.backward_chunk_scale == (scale or 1)
 
 
 def test_lanes_need_padded_tiles_and_stay_off_without_a_cuda_device():
