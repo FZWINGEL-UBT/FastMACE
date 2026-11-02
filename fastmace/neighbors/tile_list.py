@@ -61,21 +61,33 @@ class TileNeighbours:
         k = torch.tensor(self.bins, device=self.device)
         self.positions = positions
         n = positions.shape[0]
+        nbins = int(k.prod())
+        # The narrowest integer dtypes that hold the values (bins per axis and the atoms' cell images below 2**14:
+        # int16; bins and atoms below 2**31: int32 flat bin and order), each value unchanged; 30 bytes per atom
+        # against 56 in int32 and int64 (tiled capacity, lever 5).
+        narrow = max(self.bins) < 2**14 and n < 2**31 and nbins < 2**31
         self.offsets = torch.empty((n, 3), dtype=torch.int32, device=self.device)  # integer cell of each atom
-        self.atom_bin = torch.empty((n, 3), dtype=torch.int32, device=self.device)
-        flat = torch.empty(n, dtype=torch.int64, device=self.device)
+        self.atom_bin = torch.empty((n, 3), dtype=torch.int16 if narrow else torch.int32, device=self.device)
+        flat = torch.empty(n, dtype=torch.int32 if narrow else torch.int64, device=self.device)
+        wide = 0  # the largest cell image, for the offsets' dtype
         for start in range(0, n, CHUNK):
             stop = min(start + CHUNK, n)
             frac = times_3x3(positions[start:stop], self.inverse)
             offsets = torch.floor(frac)
             b = torch.minimum(torch.clamp(((frac - offsets) * k).long(), min=0), k - 1)
             self.offsets[start:stop] = offsets
+            wide = max(wide, int(offsets.abs().max()) if stop > start else 0)
             self.atom_bin[start:stop] = b
             flat[start:stop] = (b[:, 0] * k[1] + b[:, 1]) * k[2] + b[:, 2]
             del frac, offsets, b
+        if narrow and wide < 2**14:
+            self.offsets = self.offsets.to(torch.int16)
         self.order = torch.sort(flat, stable=True).indices
-        nbins = int(k.prod())
-        self.starts = torch.searchsorted(flat[self.order], torch.arange(nbins + 1, device=self.device))
+        if narrow:
+            self.order = self.order.to(torch.int32)
+        self.starts = torch.searchsorted(flat[self.order], torch.arange(nbins + 1, dtype=flat.dtype,
+                                                                         device=self.device))
+        del flat
         self._k = k
 
     def edges(self, receivers):
@@ -91,7 +103,7 @@ class TileNeighbours:
         total = int(counts.sum())
         slot = torch.repeat_interleave(torch.arange(ids.shape[0], device=self.device), counts, output_size=total)
         first = torch.cumsum(counts, 0) - counts
-        sender = self.order[self.starts[ids][slot] + torch.arange(total, device=self.device) - first[slot]]
+        sender = self.order[self.starts[ids][slot] + torch.arange(total, device=self.device) - first[slot]].long()
         receiver = receivers.repeat_interleave(27)[slot]
         image = t.reshape(-1, 3)[slot].to(torch.float64)
         # The sender's image at its bin's wrap: x_r - x_s + S cell with S = off_s - off_r - t.

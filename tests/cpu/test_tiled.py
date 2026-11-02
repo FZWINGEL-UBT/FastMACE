@@ -426,6 +426,27 @@ def test_tiled_call_from_the_species_index_equals_the_one_hot_call_bitwise(mode)
     assert np.array_equal(results[0][1], results[1][1]) and np.array_equal(results[0][2], results[1][2])
 
 
+def test_species_index_releases_the_whole_system_buffers_and_looks_e0_up_bitwise():
+    """With the species index the field keeps only what the tiles read (tiled capacity, lever 5): every other
+    per-atom entry of ``data`` is a meta tensor, ``batch`` a zero-stride view, and ``node_e0()`` gives bitwise the
+    stored float64 E0 column from the species index; the tiled call's heads are one shared element."""
+    from fastmace.model import energy as energy64
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    stored = field.data[energy64.NODE_E0_KEY].clone()
+    tiled = TiledForceField(field, TileConfig(5, mode="padded", species="index", neighbours="tiles"))
+    assert field.whole_system_released and field.data[energy64.NODE_E0_KEY].is_meta
+    assert torch.equal(field.node_e0(), stored)
+    assert field.data["batch"].stride(0) == 0 and not bool(field.data["batch"].any())
+    n = len(atoms)
+    for key, value in field.data.items():
+        if torch.is_tensor(value) and value.dim() and value.shape[0] == n and key not in ("positions", "batch"):
+            assert value.is_meta, key
+    tiled.evaluate(atoms)
+    assert tiled._g["heads"].stride(0) == 0 and tiled._g["arange"].shape[0] <= n + 1
+
+
 def test_species_index_refuses_unknown_values():
     with pytest.raises(ValueError, match="species"):
         TileConfig(5, species="bits")

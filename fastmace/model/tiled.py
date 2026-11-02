@@ -520,6 +520,7 @@ class TiledForceField:
             stored = field.data["node_attrs"]
             self._species, self._width, self._attrs_dtype = field._species_index, stored.shape[1], stored.dtype
             field.release_node_attrs()
+            field.release_whole_system()  # the per-atom buffers only the whole-system call reads
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
@@ -1050,7 +1051,12 @@ class TiledForceField:
         pos = field.positions.detach()
         n = pos.shape[0]
         self.node_attrs = data["node_attrs"] if self._species is None else None
-        heads = (data["head"][data["batch"]] if "head" in data else torch.zeros_like(data["batch"])).long()
+        batch = data["batch"]
+        if batch.dim() == 1 and batch.stride(0) == 0:  # one structure (release_whole_system): one head for all
+            heads = (data["head"].reshape(-1)[:1] if "head" in data
+                     else torch.zeros(1, dtype=torch.int64, device=batch.device)).long().expand(n)
+        else:
+            heads = (data["head"][batch] if "head" in data else torch.zeros_like(batch)).long()
         source, row_ptr, degree = self._source(positions, n)
         caps = self.config
         edge_cap = caps.edges if caps.edges is not None else (
@@ -1124,6 +1130,7 @@ class TiledForceField:
                 g["state"].flush()  # the next sweep reads what this one wrote
                 if sweep == 1 and aliased:
                     g["state"].plan(len(tiles))
+            source = None  # the tile lists' cell bins (per-atom device arrays) before the energy's transients
             stats["global_bytes"] = state.bytes()
             list_cache = getattr(self, "_list_cache", None)
             stats["list_cache_bytes"] = int(sum(t.numel() * t.element_size() for entry in (list_cache or {}).values()
@@ -1141,9 +1148,10 @@ class TiledForceField:
                 from fastmace.model import energy as energy64
 
                 if energy64.NODE_E0_KEY in data:
-                    e0 = data[energy64.NODE_E0_KEY]
+                    e0 = field.node_e0()  # the stored column, or looked up from the species index
                 else:  # a float64 model summed natively: its own table
-                    e0 = self.model.atomic_energies_fn(self.node_attrs)[self.arange[:n], self.heads[:n]].double()
+                    rows = torch.arange(n, device=self.device)
+                    e0 = self.model.atomic_energies_fn(self.node_attrs)[rows, self.heads[:n]].double()
                 energy = (e0 + node_inter.double()).sum().reshape(1)
                 out_stress = None
                 if stress:
@@ -1220,16 +1228,24 @@ class TiledForceField:
         import torch
 
         g = getattr(self, "_g", None)
-        if g is None or g["n"] != n:
-            # n + 1 rows: a padded slot has at most n + 1 receiver rows (one padding row past the largest tile).
-            g = dict(n=n, pos=pos, heads=torch.cat([heads, heads[-1:]]),
-                     arange=torch.arange(n + 1, device=self.device),
+        shared = heads.dim() == 1 and heads.stride(0) == 0  # one head for every atom: a zero-stride view
+        if g is None or g["n"] != n or (g["head"] is not None) != shared:
+            # n + 1 rows: a padded slot has at most n + 1 receiver rows (one padding row past the largest tile);
+            # the tiles read the first rows of ``arange`` only (at most the largest receiver cap and its padding
+            # row), and one shared head as a view of one element (tiled capacity, lever 5).
+            caps = (int(self.config.receivers), *map(int, self.config.budget_receivers))
+            head = heads[:1].clone() if shared else None
+            g = dict(n=n, pos=pos, head=head,
+                     heads=head.expand(n + 1) if shared else torch.cat([heads, heads[-1:]]),
+                     arange=torch.arange(min(n, max(caps)) + 1, device=self.device),
                      forces=torch.zeros((n, 3), dtype=self.dtype, device=self.device),
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
                                   alias=self.config.alias_state, overlap=self.config.overlap))
             self._g = g
+        elif g["head"] is not None and shared:
+            g["head"].copy_(heads[:1])
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))
         g["stress"] = stress

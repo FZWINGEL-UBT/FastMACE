@@ -545,6 +545,7 @@ class MACEForceField:
                                                                        head).to(self._device)
             self._e0_row = torch.atleast_2d(atomic_energies)[head].to(self._device)
         self.node_attrs_released = bool(release_node_attrs)
+        self.whole_system_released = False
         self._setup_species(atoms, z_table)
         segmented = any(name in SEGMENTED_RECORDS for name in enabled)
         self.neighbours = SkinNeighbourList(
@@ -730,6 +731,8 @@ class MACEForceField:
 
         # One table entry per atom: exactly the one-hot product of node_e0_float64.
         torch.index_select(self._column_of, 0, self.atomic_numbers, out=self._species_index)
+        if self.whole_system_released:  # looked up from the species index where it is read (the tiled call)
+            return
         torch.index_select(self._e0_row, 0, self._species_index, out=self.data[energy64.NODE_E0_KEY])
 
     def _refresh_sender_groups(self):
@@ -740,6 +743,8 @@ class MACEForceField:
     def _refresh_total_charge(self):
         import torch
 
+        if self.whole_system_released:
+            return
         torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum)
         self._charge_sum.add_(self._charge_offset)
         self.data["total_charge"].copy_(self._charge_sum.reshape(self.data["total_charge"].shape))
@@ -860,6 +865,50 @@ class MACEForceField:
         stored = self.data["node_attrs"]
         self.data["node_attrs"] = torch.empty(stored.shape, dtype=stored.dtype, device="meta")
         self.node_attrs_released = True
+
+    def release_whole_system(self):
+        """After ``release_node_attrs``: drop the per-atom buffers that only the whole-system call reads, for a
+        caller that evaluates the model on tiles of the atoms (the tiled path, ``TileConfig.species="index"``).
+        Every per-atom entry of ``data`` but the positions and the lists keeps its shape and dtype only (a meta
+        tensor); ``batch`` (all zeros: one structure) becomes a zero-stride view; the float64 E0 is looked up from
+        the species index where it is read (``node_e0``); the float64 charges are dropped for a model without
+        charge inputs. 64 bytes per atom on the device for MACE-OMAT-0 (tiled capacity, lever 5)."""
+        import torch
+
+        from fastmace.model import energy as energy64
+
+        if not self.node_attrs_released:
+            raise RuntimeError("release_whole_system needs the one-hot released first (release_node_attrs)")
+        n = self.positions.shape[0]
+        keep = {"positions", "node_attrs", "edge_index", "shifts", "unit_shifts", "cell", "head", "ptr",
+                "displacement"}
+        for key, value in list(self.data.items()):
+            if key in keep or not torch.is_tensor(value) or value.dim() == 0 or value.shape[0] != n:
+                continue
+            if key == "batch":
+                if bool((value == 0).all()):
+                    self.data[key] = torch.zeros(1, dtype=value.dtype, device=value.device).expand(n)
+                continue
+            if key == energy64.NODE_E0_KEY and not hasattr(self, "_e0_row"):
+                continue  # no table to look it up from: kept
+            self.data[key] = torch.empty(value.shape, dtype=value.dtype, device="meta")
+        if not self.is_polar and not any(self._has_total.values()):
+            self.charges = torch.empty(self.charges.shape, dtype=self.charges.dtype, device="meta")
+        self.whole_system_released = True
+
+    def node_e0(self, rows=None):
+        """The float64 per-atom E0 (of ``rows``, default every atom): the stored column, or after
+        ``release_whole_system`` the same table entries looked up from the species index (bitwise its
+        ``_refresh_node_e0``)."""
+        import torch
+
+        from fastmace.model import energy as energy64
+
+        stored = self.data.get(energy64.NODE_E0_KEY)
+        if stored is not None and not stored.is_meta:
+            return stored if rows is None else stored[rows]
+        species = self._species_index if rows is None else self._species_index[rows]
+        return torch.index_select(self._e0_row, 0, species)
 
     def _outputs(self, positions):
         """The model's output dict at float64 ``positions`` on the current edges."""
