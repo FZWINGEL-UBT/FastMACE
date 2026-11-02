@@ -62,8 +62,13 @@ MARGIN = 0.9
 # (speed-def E2, 1.00-1.05x), and it keeps more for the backward, so the rescue turns it off. It keeps 12 kB per atom
 # more without the node segments and 36 kB with the separate segments, so it comes after recompute_node_segments:
 # there it frees about 9 kB per atom for each percent of step time, recompute_node_region about 5.
-MEMORY_RESCUE = ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments", "gate_epilogue",
-                 "recompute_node_region")
+#
+# A generic model (MACE-MP-0 class) has one rung, generic_recompute_conv_weights (docs/validation/omat0-capacity.md):
+# its per-edge weights are not kept, on the chunked folded path; float32 only (RESCUE_FLOAT32_ONLY).
+MEMORY_RESCUE = ("recompute_conv_weights", "generic_recompute_conv_weights", "recompute_first_table",
+                 "recompute_node_segments", "gate_epilogue", "recompute_node_region")
+# Rungs whose kernels are float32 only: never taken in a float64 plan.
+RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights",)
 # The rungs the rescue turns off rather than on.
 RESCUE_OFF = ("gate_epilogue",)
 # Records whose term depends on another enabled record, in priority order: (record, other record, the term's name in
@@ -82,14 +87,17 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # Cells of at least 15,000 atoms (the rescue is never planned below; there the build's fixed transient sets the
 # peak). Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's
 # rung at 1 (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
-RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84),
-                  ("gate_epilogue", 1.0), ("recompute_node_region", 0.9))
+RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("generic_recompute_conv_weights", 1.0),
+                  ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84), ("gate_epilogue", 1.0),
+                  ("recompute_node_region", 0.9))
 
 
 def rescue_stage(enabled) -> str:
     """The deepest memory-rescue rung among ``enabled`` (record names; gate_epilogue's rung is taken when it is off
     with the node segments on): ``RESCUE_RESERVE``'s key, or "" for the default plan."""
     enabled = set(enabled)
+    if "generic_recompute_conv_weights" in enabled:  # a generic model's one rung
+        return "generic_recompute_conv_weights"
     if "recompute_node_region" in enabled:
         return "recompute_node_region"
     if "recompute_node_segments" in enabled:

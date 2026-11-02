@@ -1008,6 +1008,8 @@ class MinimalPlanner:
                     return name in enabled and not explicit.intersection(registry.dependants(name))
                 if name in enabled:
                     return False
+                if name in memory.RESCUE_FLOAT32_ONLY and dtype != "float32":
+                    return False
                 record = registry[name]
                 return _family_applies(record, traits) and all(other in enabled for other in record.requires)
 

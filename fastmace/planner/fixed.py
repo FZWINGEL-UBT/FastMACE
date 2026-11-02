@@ -1159,6 +1159,7 @@ class FixedPlanner:
                 v["_why"][name] += f"; stage 2: off, not supported by the model ({reason})"
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
+        v["_generic_folded"] = not support["fold_cutoff"][0]  # the generic folded path (generic records)
         if v["chunked_conv_backward"] and "chunked_conv_backward" not in explicit and not support["fold_cutoff"][0]:
             # The generic folded path (generic_chunked_conv_backward): decision 66, measured GPUs only.
             name = getattr(hardware, "name", None)
@@ -1388,10 +1389,17 @@ class FixedPlanner:
                         "are not both on", "rewrite-requirement-missing")
         # plans/capacity.md CAP-T07: "auto" stays off here; rule 12 turns it on only when the plan would not fit the
         # free memory without it (decision 67's counterpart, planner.minimal._rule_12).
-        if self.rewrites.recompute_conv_weights == "on" and not v["wprime_backward"]:
-            book.refuse("RewriteConfig.recompute_conv_weights='on' requires wprime_backward, which is off",
+        # A generic model's rung (generic_recompute_conv_weights) runs on the chunked folded path, float32 only.
+        generic = v.get("_generic_folded", False)
+        carrier = v["chunked_conv_backward"] if generic else v["wprime_backward"]
+        if self.rewrites.recompute_conv_weights == "on" and not carrier:
+            book.refuse("RewriteConfig.recompute_conv_weights='on' requires "
+                        f"{'chunked_conv_backward' if generic else 'wprime_backward'}, which is off",
                         "rewrite-requirement-missing")
-        v["recompute_conv_weights"] = self.rewrites.recompute_conv_weights == "on" and v["wprime_backward"]
+        elif self.rewrites.recompute_conv_weights == "on" and generic and dtype != "float32":
+            book.refuse(f"RewriteConfig.recompute_conv_weights='on' on a generic model needs float32, not {dtype} (the "
+                        "message-only fused forward is float32 only)", "recompute-conv-weights-needs-float32")
+        v["recompute_conv_weights"] = self.rewrites.recompute_conv_weights == "on" and carrier
         v["_why"]["recompute_conv_weights"] = (
             "on: requested" if v["recompute_conv_weights"] else
             "off: on only when memory would not be enough without it: rule 12 for a cell that cannot fit, or a "

@@ -134,6 +134,16 @@ def generic_chunked_conv_backward(dims, width):
     return -max((block.weight_numel for block in dims.interactions), default=0) * width, 0
 
 
+def generic_recompute_conv_weights(dims, width):
+    """Without stored per-edge weights the generic folded path keeps the last radial layer's input ``[h c, c]``
+    instead (its hidden width and the cutoff column): the widest interaction's ``weight_numel`` less that, per edge."""
+    widest = max(dims.interactions, key=lambda block: block.weight_numel, default=None)
+    if widest is None:
+        return 0, 0
+    kept = (widest.radial[-2] if len(widest.radial) > 1 else 0) + 1
+    return -(widest.weight_numel - kept) * width, 0
+
+
 def chunked_conv_backward(dims, width):
     """The chunked convolution backward keeps no per-edge weight gradient of the whole edge set (measured)."""
     return -round(_CHUNKED_BACKWARD_SHARE * _stock_edge_floats(dims)) * width, 0

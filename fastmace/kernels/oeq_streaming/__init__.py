@@ -17,11 +17,13 @@ Importing this package imports neither OpenEquivariance nor ``cuda.bindings``;
 
 from fastmace.kernels.oeq_streaming.runtime import (
                                                     StreamingKernels,
+                                                    folded_recompute_convolution,
                                                     folded_streaming_convolution,
                                                     l2_chunk_edges,
                                                     render_kernels,
                                                     streaming_convolution,
 )
 
-__all__ = ["StreamingKernels", "folded_streaming_convolution", "l2_chunk_edges", "render_kernels",
+__all__ = ["StreamingKernels", "folded_recompute_convolution", "folded_streaming_convolution", "l2_chunk_edges",
+           "render_kernels",
            "streaming_convolution"]

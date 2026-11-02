@@ -412,17 +412,23 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
 
     if not _out_of_memory(error):
         return None
+    from fastmace.planner.memory import RESCUE_FLOAT32_ONLY
+
     requested = getattr(force_field, "rewrites", "auto")
+    traits = getattr(force_field, "traits", None)
     names = []
-    for name in MEMORY_RESCUE:
-        if requested != "auto" and getattr(requested, name, "auto") != "auto":
-            continue  # the caller's explicit value is kept
-        if not _rescuable(plan, name):
-            continue
-        record = _record(name)
+    for rung in MEMORY_RESCUE:
+        record = _record(rung)
         if record is None:
             continue
-        if rescue_value(name) == "off" or all(not _off(getattr(plan.rewrites, other, "off"))
+        name = _field(rung)  # the RewriteConfig field it sets (a generic rung sets MH-1's field)
+        if requested != "auto" and getattr(requested, name, "auto") != "auto":
+            continue  # the caller's explicit value is kept
+        if not _rescuable(plan, name) or not _rung_fits(rung, traits, plan):
+            continue
+        if rung in RESCUE_FLOAT32_ONLY and getattr(plan.precision, "dtype", "float32") != "float32":
+            continue
+        if rescue_value(rung) == "off" or all(not _off(getattr(plan.rewrites, _field(other), "off"))
                                               for other in record.requires):
             names.append(name)
             break  # one record per rebuild, in MEMORY_RESCUE's order
@@ -508,6 +514,24 @@ def raise_if_context_unusable(failure: Any, force_field: Any, *,
     if note not in message:
         error.args = (f"{message}\n{note}" if message else note, *error.args[1:])
     raise error
+
+
+def _field(name):
+    """The RewriteConfig field of rewrite record ``name`` (the name itself without a record)."""
+    from fastmace.planner import minimal
+
+    registry = minimal._rewrite_registry()
+    return registry.config_field(name) if name in registry.names() else name
+
+
+def _rung_fits(rung, traits, plan):
+    """Whether a memory-rescue rung belongs to the model's family: a generic rung (``generic_*``) to a generic model
+    (the MH-1 folded path's ``fold_cutoff`` off), the others to the rest."""
+    if traits is not None and hasattr(traits, "rewrite_support"):
+        folded = traits.rewrite_support["fold_cutoff"][0]
+    else:
+        folded = not _off(getattr(plan.rewrites, "fold_cutoff", "off"))
+    return rung.startswith("generic_") != folded
 
 
 def _record(name):
