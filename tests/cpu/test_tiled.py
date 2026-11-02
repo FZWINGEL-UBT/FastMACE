@@ -684,3 +684,34 @@ def test_binning_and_tile_plan_in_chunks_are_bitwise_unchunked(monkeypatch):
     assert [t.tolist() for t in t1] == [t.tolist() for t in t2]
     for x, y in zip(e1, e2):
         assert all(torch.equal(a, b) for a, b in zip(x, y))
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_out_of_memory_at_a_budget_raised_cap_retries_at_the_lower_cap(mode, monkeypatch):
+    """A call that runs out of device memory at a receiver cap the budget raised (its first measurement, eager,
+    under-predicts a compiled tile's workspace) plans again at the next lower cap and retries; the lower cap stays,
+    and the call's report says why. Bitwise a field built at that cap. An error at the configured cap is raised."""
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    expected_field = TiledForceField(field, TileConfig(20, mode=mode, budget_receivers=(40,)))
+    expected_field.evaluate(atoms)  # TorchScript's first call in a process rounds differently
+    expected = expected_field.evaluate(atoms)
+    tiled = TiledForceField(field, TileConfig(20, mode=mode, budget_receivers=(40,)))
+    tiled.evaluate(atoms)
+    tiled.receivers, tiled._budget_raised = 40, True  # as the budget's switch after a first call would
+    tiled._slots.clear()
+    step = TiledForceField._first
+
+    def starved(self, *args, **kwargs):
+        if self.receivers > 20:
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory (test)")
+        return step(self, *args, **kwargs)
+
+    monkeypatch.setattr(TiledForceField, "_first", starved)
+    got = tiled.evaluate(atoms)
+    assert tiled.receivers == 20 and "40 -> 20" in tiled.last["budget_fallback"]
+    assert got[0] == expected[0] and np.array_equal(got[1], expected[1])
+    with pytest.raises(torch.cuda.OutOfMemoryError):
+        tiled.receivers = 40  # the configured cap itself: nothing lower to fall back to
+        tiled._budget_raised = False
+        tiled.evaluate(atoms)
