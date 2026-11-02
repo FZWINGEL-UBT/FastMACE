@@ -93,8 +93,10 @@ def test_an_explicit_rung_needs_the_chunked_path_and_float32():
 @pytest.mark.rule(12)
 @pytest.mark.parametrize("precision", ["float32", "float64"])
 def test_rule_12_takes_the_generic_rung_in_float32_only(monkeypatch, precision):
-    """A tiny generic model on a cell that cannot fit (the overstatement at 1, as test_memory_estimate's rung tests):
-    rule 12 turns recompute_conv_weights on with the chunked path on, never in float64."""
+    """A tiny generic model with MACE-OMAT-0 medium's widths (the tiny model's weights are narrower than the hidden
+    layer the rung keeps, so it would save nothing) on a cell that cannot fit (the overstatement at 1, as
+    test_memory_estimate's rung tests): rule 12 turns recompute_conv_weights on with the chunked path on, never in
+    float64."""
     import dataclasses
     import types
 
@@ -108,7 +110,8 @@ def test_rule_12_takes_the_generic_rung_in_float32_only(monkeypatch, precision):
     from fastmace.planner import memory
 
     monkeypatch.setattr(memory, "RESCUE_OVERSTATEMENT", 1.0)
-    traits = capabilities.model_traits(tiny_mace_model(list(tme.Z), **FAMILIES["density"]))
+    traits = dataclasses.replace(capabilities.model_traits(tiny_mace_model(list(tme.Z), **FAMILIES["density"])),
+                                 dims=ModelDims.from_record(FIT["dims"]["omat0-medium"]))
     rewrites = RewriteConfig(chunked_conv_backward="on")
 
     def plan(memory_bytes):
@@ -121,7 +124,7 @@ def test_rule_12_takes_the_generic_rung_in_float32_only(monkeypatch, precision):
 
     full = plan(tmp.GPU.memory_bytes)
     assert full.rewrites.recompute_conv_weights == "off"
-    tight = plan(full.predicted_memory_bytes / memory.MARGIN * 0.97)
+    tight = plan(full.predicted_memory_bytes / memory.MARGIN * 0.8)  # below what it needs (the weights resident)
     taken = tight.rewrites.recompute_conv_weights == "on"
     assert taken is (precision == "float32"), (tight.decision("RewriteConfig.recompute_conv_weights"),
                                                tight.decision("memory"), tight.rewrites.chunked_conv_backward)
