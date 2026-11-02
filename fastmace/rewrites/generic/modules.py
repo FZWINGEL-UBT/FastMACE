@@ -14,7 +14,10 @@ records set on an interaction:
   ``GenericFoldedRadial``), so its backward runs in L2-sized edge chunks and the ``[E, W]`` weight gradient is
   never formed in full;
 - ``skip_tp`` replaced by a ``SpeciesSkip`` (``generic_species_skip``), which needs no change of
-  the forward.
+  the forward;
+- ``radial_table`` (``generic_radial_tables``, fastmace.rewrites.radial): with edge lengths ``[E, 1]`` as
+  ``edge_feats`` (the record's ``LengthsEmbedding``), the certified table gives ``[h c, c]`` and the edge density in
+  place of the radial network, the cutoff product and the density network.
 
 ``density_before_linear`` (the research engine's ``GENERIC_DENSITY_FIRST``) is still read, so the
 forward stays a faithful copy, but no record sets it: it was not carried over (phase 1a
@@ -79,7 +82,16 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     reassociation = getattr(self, "first_reassociation", None)
     # generic_chunked_conv_backward: the streaming convolution builds the weights from the last radial layer's input.
     chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
-    if chunked:
+    table = getattr(self, "radial_table", None)
+    tabled = table is not None and edge_feats.shape[1] == 1  # generic_radial_tables: edge_feats are the lengths
+    if tabled:
+        augmented, table_density = table(edge_feats, node_attrs, edge_index)  # [h c, c] and the density
+    if tabled and chunked:
+        pass
+    elif tabled and reassociation is None:
+        from fastmace.kernels.triton.skinny_linear import folded_linear
+        tp_weights = folded_linear(augmented[:, :-1].contiguous(), fc_last_weight(self.radial_last).contiguous())
+    elif chunked:
         hidden = self.radial_hidden(edge_feats)
         augmented = (torch.cat([hidden, torch.ones_like(hidden[:, :1])], dim=1) if cutoff is None
                      else torch.cat([hidden * cutoff, cutoff], dim=1))  # (h W) c = [h c, c] [W, 0]
@@ -93,14 +105,20 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             tp_weights = tp_weights * cutoff
     density = None
     if kind != "residual":
-        edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
-        if cutoff is not None:
-            edge_density = edge_density * cutoff
+        if tabled:
+            edge_density = table_density
+        else:
+            edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
+            if cutoff is not None:
+                edge_density = edge_density * cutoff
         density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
     if reassociation is not None:
-        hidden = self.radial_hidden(edge_feats)
-        if cutoff is not None:  # (h W) c = (h c) W
-            hidden = hidden * cutoff
+        if tabled:
+            hidden = augmented[:, :-1]  # h c
+        else:
+            hidden = self.radial_hidden(edge_feats)
+            if cutoff is not None:  # (h W) c = (h c) W
+                hidden = hidden * cutoff
         message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index,
                                 fc_last_weight(self.radial_last))
     elif getattr(self, "streaming_kernels", None) is not None:

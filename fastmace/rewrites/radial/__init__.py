@@ -127,7 +127,9 @@ def _padded(tables):
                 starts=repeat_last(tables["starts"], 0), scales=repeat_last(tables["scales"], 0))
 
 
-def _table_module(tables, columns, device):
+def _table_module(tables, columns, device, single=False):
+    """``single``: one table for every species pair (a radial chain without species input): every edge reads
+    pair 0."""
     import torch
 
     pieces = tables["coef"].shape[1]
@@ -143,13 +145,16 @@ def _table_module(tables, columns, device):
             self.register_buffer("columns", torch.as_tensor(columns, dtype=torch.long, device=device),
                                  persistent=False)
             self.species = len(columns)
+            self.single = bool(single)
             self.pieces = pieces  # fitted; coef.shape[1] is padded to PIECE_BUCKET
             self.r_lo, self.bin_scale, self.r_max = tables["r_lo"], tables["bin_scale"], tables["r_max"]
             self.fit_error = tables["fit_error"]
             self.certificate = {}
 
         def pair(self, node_attrs, edge_index):
-            """Per edge the table's (sender species, receiver species) index (int32)."""
+            """Per edge the table's (sender species, receiver species) index (int32); 0 with one table."""
+            if self.single:
+                return torch.zeros(edge_index.shape[1], dtype=torch.int32, device=edge_index.device)
             species = node_attrs[:, self.columns].argmax(dim=1).to(torch.int32)
             return species[edge_index[0]] * self.species + species[edge_index[1]]
 
@@ -306,6 +311,11 @@ def fit(chain, pairs, r_max, table_dtype=None):
             values.abs().amax(dim=2, keepdim=True), floor[:, None])
         derror = (_series(dcoef, x) - slopes[:, :, terms:]).abs() / torch.maximum(
             slopes.abs().amax(dim=2, keepdim=True), dfloor[:, None])
+        # An output (or its derivative) that is zero on the whole domain has nothing to fit: a residual block's
+        # density column, a constant cutoff column when the embedding applies the cutoff itself (generic tables).
+        # Without this, 0/0 and x/0 would decide the split.
+        error = torch.where(floor[:, None] > 0, error, torch.zeros_like(error))
+        derror = torch.where(dfloor[:, None] > 0, derror, torch.zeros_like(derror))
         relative = torch.maximum(error.amax(dim=(0, 2, 3)), derror.amax(dim=(0, 2, 3)))  # per piece
         following = []
         for (a, b, level), err, piece_coef, piece_dcoef in zip(pending, relative.tolist(), coef.unbind(1),
@@ -925,12 +935,202 @@ def _apply_first_table(model, context):
     return attach_first_table(model)
 
 
+# --------------------------------------------------------------------------- generic_radial_tables
+
+# The generic family (MACE-MP-0, OMAT-0, the density family; fastmace.rewrites.generic): the same tables for the radial
+# chain of a generic interaction, ``r -> [h c, c]`` (the split radial network's last layer input on the folded path,
+# ``generic_chunked_conv_backward``) and its edge density. Certified (decision 61) by the same certificate; float32
+# plans only; opt-in (the conductor, 2 November 2026: the default goes to the owner with the A/Bs).
+
+
+def _generic_interactions(model):
+    from fastmace.rewrites.generic import modules as gm
+
+    return [(index, interaction) for index, interaction in enumerate(getattr(model, "interactions", ()))
+            if type(interaction).__name__ in gm.GENERIC_INTERACTIONS]
+
+
+def _species_radial(model):
+    """Whether the radial embedding reads the species (a distance transform such as Agnesi's): then one table per
+    ordered species pair, else one table per interaction."""
+    return getattr(getattr(model, "radial_embedding", None), "distance_transform", None) is not None
+
+
+def _generic_support(model):
+    import torch
+
+    from fastmace.rewrites.generic import modules as gm
+
+    interactions = list(getattr(model, "interactions", ()))
+    generic = _generic_interactions(model)
+    if not interactions or len(generic) != len(interactions):
+        return Support(False, "every interaction must be a generic MACE interaction (the embedding is shared)")
+    for index, interaction in generic:
+        try:
+            gm.fc_split(interaction.conv_tp_weights)
+        except (AttributeError, ValueError) as error:
+            return Support(False, f"interactions.{index}: {error}")
+    parameter = next(model.parameters(), None)
+    if parameter is not None and parameter.dtype not in (torch.float32, torch.float64):
+        return Support(False, f"float32 models only (float64 plans are refused), not {parameter.dtype}")
+    return Support(True, "ok")
+
+
+class _GenericChain:
+    """One generic interaction's radial chain ``r -> [h c, c, density]`` (``c`` the cutoff, 1 when the embedding
+    applies it itself; the density column 0 for a residual block), per species pair, in one dtype and device.
+
+    ``radial`` is the radial embedding (default ``model.radial_embedding``); the hidden layers are a copy of the
+    split network's (``generic_fused_radial_backward``'s ``radial_hidden``), so forward-mode derivatives exist."""
+
+    def __init__(self, model, interaction, columns, dtype, device, radial=None):
+        import torch
+
+        from fastmace.rewrites.generic import modules as gm
+
+        self.dtype, self.device = dtype, device
+        self.elements = len(model.atomic_numbers)
+        self.atomic_numbers = model.atomic_numbers.to(device)
+        self.columns = list(columns)
+        self.radial = copy.deepcopy(radial if radial is not None else model.radial_embedding).to(
+            device=device, dtype=dtype)
+        hidden, last = gm.fc_split(interaction.conv_tp_weights)
+        self.hidden = copy.deepcopy(hidden).to(device=device, dtype=dtype)
+        kind = gm.GENERIC_INTERACTIONS[type(interaction).__name__][0]
+        self.density = (copy.deepcopy(interaction.density_fn).to(device=device, dtype=dtype)
+                        if kind != "residual" else None)
+        weight = gm.fc_last_weight(last).detach().to(device=device, dtype=dtype)
+        self.folded = torch.cat([weight, weight.new_zeros(weight.shape[0], 1)], dim=1)  # [W, 0]: (h W) c
+
+    def __call__(self, r, sender, receiver):
+        """``[n, Q_in + 2]``: ``[h c, c]`` and the edge density for edges ``sender -> receiver`` (superset indices)
+        of lengths ``r`` (``[n]``)."""
+        import torch
+
+        n = r.shape[0]
+        node_attrs = torch.zeros((2, self.elements), dtype=self.dtype, device=self.device)
+        node_attrs[0, self.columns[sender]] = 1
+        node_attrs[1, self.columns[receiver]] = 1
+        edge_index = torch.stack([torch.zeros(n, dtype=torch.long, device=self.device),
+                                  torch.ones(n, dtype=torch.long, device=self.device)])
+        out = self.radial(r[:, None], node_attrs, edge_index, self.atomic_numbers)
+        feats, cutoff = out if isinstance(out, tuple) else (out, None)
+        cutoff = torch.ones_like(r[:, None]) if cutoff is None else cutoff
+        hidden = self.hidden(feats)
+        density = (torch.tanh(self.density(feats) ** 2) * cutoff if self.density is not None
+                   else torch.zeros_like(cutoff))
+        return torch.cat([hidden * cutoff, cutoff, density], dim=1)
+
+    def with_derivative(self, r, sender, receiver):
+        import torch
+
+        return torch.func.jvp(lambda x: self(x, sender, receiver), (r,), (torch.ones_like(r),))
+
+
+def tabulate_generic(model, context):
+    """Fit, certify and install the tables of every generic interaction of ``model``; returns the applied names."""
+    import torch
+
+    parameter = next(model.parameters())
+    if parameter.dtype != torch.float32:
+        raise RewriteError(f"generic_radial_tables: float32 models only, not {parameter.dtype}")
+    generic = _generic_interactions(model)
+    if not generic or len(generic) != len(model.interactions):
+        raise RewriteError("generic_radial_tables: every interaction must be a generic MACE interaction")
+    for index, interaction in generic:
+        if getattr(interaction, "radial_hidden", None) is None:
+            raise RewriteError(f"generic_radial_tables requires the split radial network "
+                               f"(generic_fused_radial_backward) in interactions.{index}")
+    superset = _superset(model, context)
+    per_pair = _species_radial(model)
+    columns = superset if per_pair else superset[:1]
+    pairs = [(s, t) for s in range(len(columns)) for t in range(len(columns))]
+    r_max = float(model.r_max)
+    names = []
+    digest = _state_digest(model)
+    for index, interaction in generic:
+        key = cache_key(model, f"generic-{index}", columns, parameter.dtype, r_max, state_digest=digest)
+        cached = _load_cached(key)
+        if cached is not None:
+            tables, certificate = cached
+            source = "cached"
+        else:
+            chain64 = _GenericChain(model, interaction, columns, torch.float64, torch.device("cpu"))
+            chain32 = _GenericChain(model, interaction, columns, parameter.dtype, parameter.device)
+            tables = fit(chain64, pairs, r_max, table_dtype=parameter.dtype)
+            certificate = certify(_table_module(tables, columns, parameter.device, single=not per_pair), chain64,
+                                  chain32, pairs, r_max, seed=index)
+            _store_cached(key, tables, certificate)
+            source = "fitted"
+        table = _table_module(tables, columns, parameter.device, single=not per_pair)
+        table.certificate = certificate
+        interaction.radial_table = table
+        names.append(f"interactions.{index} ({table.pieces} pieces, {len(pairs)} "
+                     f"{'pairs' if per_pair else 'table, no species input'}, "
+                     f"certificate {table.certificate['worst']:.2f}, {source})")
+    model.radial_embedding = _lengths_embedding(model.radial_embedding)
+    return names
+
+
+def _generic_selfcheck(original, rewritten, context):
+    """As ``_selfcheck``, for the generic interactions: the certificate, and the table kernels against the float64
+    chain of the same weights at random lengths of ``[R_PHYSICAL, r_max)`` (w level, density, r-gradient), held to
+    the float32 limit. The reference is float64, not the float32 network: a certified table is the more accurate of
+    the two, and the float32 network's own error can exceed the limit (MACE-OMAT-0 medium near its cutoff: 5.5e-5 of
+    the largest weight, against the table's 4e-8; docs/validation/generic-radial-tables.md)."""
+    import torch
+
+    cases, failures, dtype = CaseErrors(), [], None
+    generator = torch.Generator().manual_seed(context.seed + 17)
+    radial = getattr(rewritten.radial_embedding, "original", None)
+    for index, interaction in _generic_interactions(rewritten):
+        table = getattr(interaction, "radial_table", None)
+        if table is None or radial is None:
+            failures.append(f"interactions.{index}: no table")
+            continue
+        if not table.certificate.get("worst", float("inf")) <= 1.0:
+            failures.append(f"interactions.{index}: certificate {table.certificate.get('worst')} > 1 "
+                            f"(pairs {table.certificate.get('pairs')})")
+        device, dtype = table.coef.device, table.coef.dtype
+        chain = _GenericChain(rewritten, interaction, table.columns.tolist(), torch.float64, torch.device("cpu"),
+                              radial=radial)
+        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=torch.float64)
+        r = r.to(dtype).to(torch.float64)  # the lengths the table sees
+        for number in range(table.species ** 2):
+            s, t = divmod(number, table.species)
+            truth, dtruth = chain.with_derivative(r, s, t)
+            pair = torch.full((r.numel(),), number, dtype=torch.int32, device=device)
+            tab, dtab = _table_values(table, r.to(device=device, dtype=dtype), pair)
+            tab, dtab = tab.double().cpu(), dtab.double().cpu()
+            name = f"interactions.{index}.{s}-{t}"
+            cases.add(f"{name}.w", truth[:, :-1] @ chain.folded.T, tab[:, :-1] @ chain.folded.T)
+            cases.add(f"{name}.density", truth[:, -1:], tab[:, -1:])
+            weights = torch.randn(truth.shape, generator=generator, dtype=torch.float64)
+            cases.add(f"{name}.dr", (weights * dtruth).sum(dim=1), (weights * dtab).sum(dim=1))
+    result = cases.result(dtype)
+    if failures:
+        return CheckResult(False, result.max_relative_error, result.threshold, result.modules,
+                           "; ".join(failures), result.dtype)
+    return result
+
+
+def _apply_generic(model, context):
+    return tabulate_generic(model, context)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="certified", default="auto", deterministic=True,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck,
         memory=memory_terms.radial_tables),
+    # The generic family's tables (conductor, 2 November 2026; docs/validation/generic-radial-tables.md): certified
+    # (decision 61), float32 plans only, opt-in until the owner decides a default (decision 62 was MH-1's).
+    "generic_radial_tables": dict(
+        name="generic_radial_tables", config_field="radial_tables", applies_to=_generic_support,
+        requires=("generic_fused_radial_backward",), conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={},
+        exactness="certified", default="off", deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,),
+        apply=_apply_generic, selfcheck=_generic_selfcheck, memory=memory_terms.generic_radial_tables),
     # ideas-20261027 D2: rounding (the series and the folded product reassociated); float64; opt-in.
     "w_tables": Rewrite(
         name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),
@@ -963,4 +1163,4 @@ RECORDS = {
 
 __all__ = ["DEGREE", "PIECE_BUCKET", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
            "attach_first_table", "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit",
-           "tabulate_radials"]
+           "tabulate_generic", "tabulate_radials"]

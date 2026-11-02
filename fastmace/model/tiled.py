@@ -533,6 +533,7 @@ class TiledForceField:
             self.mode, self.mode_reason = "eager", "the force field is not compiled"
         self._released = False  # the allocator's cache, released once before the first tile
         self._budgeted = not self.config.budget_receivers
+        self._budget_raised, self._fallback = False, None  # the budget raised the cap; the last step down
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
         self._reuse_ok = None
@@ -983,7 +984,41 @@ class TiledForceField:
         return saved
 
     def __call__(self, positions):
-        """Energy [1] (float64), forces [N, 3] and stress [3, 3] or None at float64 ``positions``."""
+        """Energy [1] (float64), forces [N, 3] and stress [3, 3] or None at float64 ``positions``.
+
+        A call that runs out of device memory at a receiver cap the budget raised plans again at the next lower cap
+        of ``(receivers, *budget_receivers)`` and runs again; the lower cap stays (the budget's measurement is the
+        first, eager call's, and a compiled tile's workspace can exceed it: tiled-omat.md)."""
+        import torch
+
+        while True:
+            fallback = None
+            try:
+                out = self._call(positions)
+                if self._fallback is not None:
+                    self.last["budget_fallback"] = self._fallback
+                return out
+            except (torch.cuda.OutOfMemoryError, RuntimeError) as error:
+                oom = isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in str(error)
+                lower = [int(r) for r in (self.config.receivers, *self.config.budget_receivers)
+                         if int(r) < self.receivers]
+                if not (oom and self._budget_raised and lower):
+                    raise
+                fallback = (self.receivers, max(lower), str(error).splitlines()[0][:200])
+            # Outside the handler, so the failed call's frames (and their tensors) are released.
+            old, new, why = fallback
+            self.receivers = new
+            self._budget_raised = new > int(self.config.receivers)
+            self._slots.clear()
+            self._edge_step = None
+            self._graph_key = None
+            self._g = None  # the global buffers and the state are allocated again, zeroed
+            self._list_cache = None
+            self._fallback = f"receiver cap {old} -> {new} after running out of device memory ({why})"
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
+
+    def _call(self, positions):
         import torch
 
         field = self.field
@@ -1150,6 +1185,7 @@ class TiledForceField:
                 if 1.1 * per_receiver * r <= available]
         chosen = max(fits, default=self.receivers)
         if chosen != self.receivers:
+            self._budget_raised = chosen > int(self.config.receivers)
             self.receivers = chosen
             self._slots.clear()  # their sizes and edge buckets were for the old cap
             self._edge_step = None

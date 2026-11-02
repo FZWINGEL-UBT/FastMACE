@@ -286,6 +286,12 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
     # same folded path (generic_chunked_conv_backward, docs/validation/omat0-capacity.md).
     support["chunked_conv_backward"] = RewriteSupport(
         fold or generic, "ok" if fold else "ok (generic folded path)" if generic else support["fold_cutoff"].reason)
+    # Certified radial tables: MH-1's folded class (radial_tables), or a model whose every interaction is generic
+    # (generic_radial_tables: the radial embedding is replaced by the lengths, so every interaction must take them).
+    all_generic = bool(interactions) and all(name in GENERIC_INTERACTIONS for name in interactions)
+    support["radial_tables"] = RewriteSupport(
+        fold or all_generic, "ok" if fold else "ok (generic radial tables)" if all_generic else
+        support["fold_cutoff"].reason if not generic else "not every interaction is generic")
     # OPT-T08 (fastmace.rewrites.species): ScaleShiftMACE only (its forward is pinned). species_tables and
     # fold_product_linear: a factored first interaction with species-only inputs; fold_readout_tail: a factored
     # last interaction (its skip_tp is a linear layer).

@@ -47,6 +47,18 @@ def strained(seed=3):
     return atoms
 
 
+_WARM = []
+
+
+def _warm_once(loaded):
+    """TorchScript's first call in a process rounds differently (1.5e-11 in the positions after two steps, when a
+    worker runs one of this module's bitwise comparisons first): one relaxation step, once per process, before
+    them."""
+    if not _WARM:
+        _ours("LBFGS", structure(), loaded).run(fmax=1e-9, steps=1)
+        _WARM.append(True)
+
+
 def _ours(name, atoms, loaded, **options):
     import fastmace.ase
 
@@ -162,6 +174,7 @@ def test_todict_as_ase_3_27(loaded, name):
 
 @pytest.mark.parametrize("name", NAMES)
 def test_a_ported_script_gets_the_plan_and_relaxation_of_the_equivalent_simulation(loaded, name):
+    _warm_once(loaded)
     atoms = structure()
     dyn = _ours(name, atoms, loaded)
     converged = dyn.run(fmax=0.05, steps=6)
@@ -174,6 +187,7 @@ def test_a_ported_script_gets_the_plan_and_relaxation_of_the_equivalent_simulati
 
 
 def test_frechet_relaxation_equals_the_simulations(loaded):
+    _warm_once(loaded)
     atoms = strained()
     dyn = _ours("LBFGS", FrechetCellFilter(atoms, scalar_pressure=0.05 * units.GPa), loaded)
     dyn.run(fmax=0.01, steps=5)
@@ -231,6 +245,8 @@ def test_the_log_file_appends_as_ases(loaded):
 def test_trajectory_reads_back_frame_for_frame(loaded, loginterval):
     from ase.io import read
 
+    _warm_once(loaded)
+
     dyn = _ours("LBFGS", structure(), loaded, trajectory="opt.traj", loginterval=loginterval)
     dyn.run(fmax=1e-9, steps=4)
     frames = read("opt.traj", index=":")
@@ -278,6 +294,7 @@ def test_observers_are_called_at_ases_steps(loaded):
 
 
 def test_observers_see_the_relaxed_state(loaded):
+    _warm_once(loaded)
     atoms = structure()
     dyn = _ours("LBFGS", atoms, loaded)
     seen = []
@@ -304,6 +321,7 @@ def test_an_observer_that_changes_atoms_is_refused(loaded):
 
 
 def test_irun_and_step_as_ase(loaded):
+    _warm_once(loaded)
     dyn = _ours("LBFGS", structure(), loaded)
     flags = list(dyn.irun(fmax=1e-9, steps=3))
     assert flags == [False] * 4 and dyn.nsteps == 3
@@ -336,6 +354,7 @@ def _fixed(make=structure):
 
 @pytest.mark.parametrize("name", NAMES)
 def test_fix_atoms_relaxes_at_fixed_cell(loaded, name):
+    _warm_once(loaded)
     atoms = _fixed()
     start = atoms.positions[FIXED].copy()
     dyn = _ours(name, atoms, loaded)

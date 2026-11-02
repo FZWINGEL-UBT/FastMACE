@@ -1,8 +1,9 @@
 """Tiled call arms at scale, in one process (the speed phase).
 
 Arms (``--arms``, two or more): ``eager`` or ``compiled``, with suffixes ``+budget`` (budget_receivers (8192,
-16384); without it, none, whatever the default), ``+nocache`` (list_cache off), ``+noreuse`` (list_reuse off;
-on by default, repeated calls on the same positions reuse the lists after the first; ``+reuse`` names the default),
+16384); without it, none, whatever the default), ``+nocache`` (list_cache off), ``+tables``
+(radial_tables="on": the generic tables on a generic model; ``--model``), ``+noreuse`` (list_reuse off; on by
+default, repeated calls on the same positions reuse the lists after the first; ``+reuse`` names the default),
 ``+nooverlap`` (overlap off) and
 ``+old`` (the tiled call of an older tree, ``--old-tree``: its ``fastmace/model/tiled.py`` and
 ``fastmace/neighbors/tile_list.py`` loaded as modules of their own, everything else this tree's; only for trees that
@@ -64,6 +65,7 @@ def old_tiled(tree):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--structure", default="NbCl5")
+    p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--repeat", required=True)
     p.add_argument("--receivers", type=int, default=4096)
     p.add_argument("--arms", default="eager,compiled")
@@ -90,30 +92,43 @@ def main():
                   source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"), builds={}, warm={})
     with contextlib.ExitStack() as stack:
         stack.enter_context(tiled_capacity.no_global_list(True))
-        user = fm.ForceField(fm.load("mh1-r2scan"), atoms, precision="float32")
-        planner = minimal.default_planner(user)
-        plan = planner.plan_evaluation(user, atoms)
-        plans = dict(compiled=plan, eager=dataclasses.replace(plan, engine=dataclasses.replace(
-            plan.engine, compile_mode="none", dynamic_edges=False)))
+        from fastmace.config import RewriteConfig
+
+        loaded = fm.load(args.model)
+        users = {False: fm.ForceField(loaded, atoms, precision="float32")}
+        if any("+tables" in arm for arm in arms):  # radial tables (generic_radial_tables or MH-1's) on
+            users[True] = fm.ForceField(loaded, atoms, precision="float32",
+                                        rewrites=RewriteConfig(radial_tables="on"))
+        planner = minimal.default_planner(users[False])
+        plans = {}
+        for tables, user in users.items():
+            plan = planner.plan_evaluation(user, atoms)
+            plans[("compiled", tables)] = plan
+            plans[("eager", tables)] = dataclasses.replace(plan, engine=dataclasses.replace(
+                plan.engine, compile_mode="none", dynamic_edges=False))
         fields, tiled = {}, {}
         for arm in arms:
             mode = arm.split("+")[0]
-            if mode not in fields:
+            key = (mode, "+tables" in arm)
+            if key not in fields:
                 started = time.perf_counter()
-                fields[mode] = planner.build_evaluation(plans[mode], user, atoms, call_rows=args.receivers,
-                                                        release_node_attrs=True)
-                record["builds"][mode] = time.perf_counter() - started
+                fields[key] = planner.build_evaluation(plans[key], users[key[1]], atoms, call_rows=args.receivers,
+                                                       release_node_attrs=True)
+                record["builds"][f"{mode}{'+tables' if key[1] else ''}"] = time.perf_counter() - started
+                record.setdefault("rewrites", {})[f"{mode}{'+tables' if key[1] else ''}"] = [
+                    str(a)[:200] for a in getattr(fields[key], "applied", ()) if "radial" in str(a)]
             budget = (8192, 16384) if "+budget" in arm else ()
             options = dict(mode=mode, neighbours="tiles", state="host", alias_state=True, species="index",
                            budget_receivers=budget, list_cache="+nocache" not in arm,
                            list_reuse="+noreuse" not in arm)
             if "+old" in arm:
                 old = old_tiled(args.old_tree)
-                tiled[arm] = old.TiledForceField(fields[mode], old.TileConfig(args.receivers, **options))
+                tiled[arm] = old.TiledForceField(fields[key], old.TileConfig(args.receivers, **options))
             else:
-                tiled[arm] = TiledForceField(fields[mode], TileConfig(args.receivers, overlap="+nooverlap" not in arm,
-                                                                      **options))
-        positions = fields[arms[0].split("+")[0]]._prepare_one_off(atoms)
+                tiled[arm] = TiledForceField(fields[key], TileConfig(args.receivers, overlap="+nooverlap" not in arm,
+                                                                     **options))
+        first = arms[0].split("+")[0], "+tables" in arms[0]
+        positions = fields[first]._prepare_one_off(atoms)
         outputs = {}
 
         def call(arm):
