@@ -971,9 +971,11 @@ def _generic_support(model):
             gm.fc_split(interaction.conv_tp_weights)
         except (AttributeError, ValueError) as error:
             return Support(False, f"interactions.{index}: {error}")
+    # Float32 only (decision 61): a float64 model does not take it, so "auto" resolves to off there before any
+    # apply (an explicit "on" in a float64 plan is refused by the planner).
     parameter = next(model.parameters(), None)
-    if parameter is not None and parameter.dtype not in (torch.float32, torch.float64):
-        return Support(False, f"float32 models only (float64 plans are refused), not {parameter.dtype}")
+    if parameter is not None and parameter.dtype != torch.float32:
+        return Support(False, f"float32 models only, not {parameter.dtype}")
     return Support(True, "ok")
 
 
