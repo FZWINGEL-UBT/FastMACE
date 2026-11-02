@@ -71,4 +71,15 @@ earlier one was 78.1M).
   peak 16.31 GiB, host peak 144.7 GiB).
 - **Run:** `results/tiled-omat-20261102/runs/murphy-w-omat-scan-SrTiO3-290x290x290/`.
 
-149M on murphy (310×310×310, host needs about 193 GB of 265 GB available) is running.
+**149M atoms on murphy (SrTiO3 310×310×310, the same source):** valid, the new record (148,955,000 atoms).
+- **Edges:** 11,022,670,000 in the cutoff, exactly 74 per atom; largest force component 1.3 meV/Å.
+- **Calls:** eager 5,077 s; compiled 3,457 s (23.2 µs per atom), both at R = 4,096 over 57,062 tiles: the budget
+  found no room for 8,192 (GPU peak 17.1 GiB). Host peak 139.5 GiB, of which 73.1 GB were the kept tile lists (the
+  wavefront keeps none since `f78292be`); row pool 12.3 % of the atoms.
+- **Run:** `results/tiled-omat-20261102/runs/murphy-w-omat-scan-SrTiO3-310x310x310/`.
+
+| Atoms | Compiled call | µs per atom | R | GPU peak | Host peak | Kept lists |
+| --- | --- | --- | --- | --- | --- | --- |
+| 98.4M | 2,277 s | 23.1 | 8,192 | 13.9 GiB | 127.3 GiB | 45.0 GiB |
+| 122M | 2,710 s | 22.2 | 8,192 | 16.3 GiB | 144.7 GiB | 55.8 GiB |
+| 149M | 3,457 s | 23.2 | 4,096 | 16.9 GiB | 139.5 GiB | 68.1 GiB |
