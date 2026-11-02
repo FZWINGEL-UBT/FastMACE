@@ -831,6 +831,42 @@ def test_lanes_call_equals_one_lane(wave):
         assert relative(two[2], one[2]) <= 1e-13
 
 
+@pytest.mark.parametrize("wave, lanes", [("off", "off"), ("on", "off"), ("on", "on")],
+                         ids=["three-sweeps", "wavefront", "wavefront-lanes"])
+def test_prefetch_call_is_bitwise_the_call_without(wave, lanes, monkeypatch):
+    """``TileConfig.prefetch`` builds the next tile's graph and gathers its host rows ahead: the same values summed in
+    the same order, so the energy, the forces and the stress are bitwise those without it; tiles read rows that
+    were prefetched."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    taken = []
+    rows = tiled_module._State.rows
+
+    def counting(self, name, index):
+        taken.append(name in self.prefetched)
+        return rows(self, name, index)
+
+    monkeypatch.setattr(tiled_module._State, "rows", counting)
+    results = []
+    for prefetch in (False, True):
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
+                                                  alias_state=True, wavefront=wave, lanes=lanes, list_reuse=False,
+                                                  prefetch=prefetch))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        taken.clear()
+        for current in (strained(atoms), atoms):
+            results.append(tiled.evaluate(current, stress=True))
+        assert any(taken) == prefetch
+        assert not tiled._g["state"].prefetched and not tiled._g["state"]._pending
+    for one, two in zip(results[:2], results[2:]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
 def test_lanes_need_padded_tiles_and_stay_off_without_a_cuda_device():
     with pytest.raises(ValueError, match="lanes"):
         TileConfig(5, mode="eager", lanes="on")
