@@ -128,6 +128,11 @@ class TileConfig:
     # ``LANE_GPUS`` when the first call's memory model fits a second tile workspace; "on" refuses elsewhere (off a
     # CUDA device the lanes run one after the other: the CPU tests' stand-in).
     lanes: str = "auto"
+    # The wavefront's sweeps by groups of this many sweep-2 tiles: sweep 1 on every tile the group reads, then the
+    # group's sweep 2, then sweep 3 on every tile it closes. One tile at a time alternates the sweeps at every tile,
+    # and every change of sweep applies the pending host writes, which waits for the device (two drains per tile);
+    # a group pays them once and keeps the rows' prefetch within its runs. The pool grows by about two groups' tiles.
+    wavefront_group: int = 16
     # Padded tiles with the state on the host (CUDA): the next tile's graph is built, and the host rows its sweep
     # reads gathered and copied, on a side stream while the current tile runs, so the host's syncs and gathers no
     # longer drain the device's queue at every tile (a profiled 5M call left the GPU idle 17 % of the time).
@@ -167,6 +172,8 @@ class TileConfig:
             raise ValueError(f"TileConfig.wavefront must be 'auto', 'on' or 'off', got {self.wavefront!r}")
         if self.wavefront == "on" and not self.alias_state:
             raise ValueError("TileConfig.wavefront='on' needs alias_state=True (state='host')")
+        if int(self.wavefront_group) < 1:
+            raise ValueError(f"TileConfig.wavefront_group must be positive, got {self.wavefront_group!r}")
         if self.lanes not in ("auto", "on", "off"):
             raise ValueError(f"TileConfig.lanes must be 'auto', 'on' or 'off', got {self.lanes!r}")
         if self.lanes == "on" and self.mode in ("eager", "graphs"):
@@ -539,29 +546,31 @@ def _split_block(cumulative, start, stop, receivers, edges):
     return pieces
 
 
-def wavefront_schedule(needs, ready, counts):
+def wavefront_schedule(needs, ready, counts, group=1):
     """The wavefront's order of the tile sweeps: ``(steps, peak)``, ``steps`` a list of ``(sweep, tile)`` and
     ``peak`` the most receivers between their sweeps 1 and 3 at once (the row pool's size).
 
-    Sweep 2 visits the tiles in order. Before tile ``t``, sweep 1 runs on every tile of ``needs[t]`` (the tiles that
-    own a receiver or halo atom of ``t``, ascending) it has not run on; after it, sweep 3 runs on every tile whose
-    ``ready`` (the last sweep-2 tile that holds one of its receivers) is ``t``, in the order of ``ready`` then index.
-    A tile's sweep 1 thus precedes every sweep-2 read of its x and sc, and its sweep 3 follows the last addition to
-    its receivers' dE/dx and its own dE/dsc."""
+    Sweep 2 visits the tiles in order, ``group`` at a time. Before a group, sweep 1 runs on every tile of its tiles'
+    ``needs`` (the tiles that own a receiver or halo atom of ``t``, ascending) it has not run on; after it, sweep 3
+    runs on every tile whose ``ready`` (the last sweep-2 tile that holds one of its receivers) is in or before the
+    group, in the order of ``ready`` then index. A tile's sweep 1 thus precedes every sweep-2 read of its x and sc,
+    and its sweep 3 follows the last addition to its receivers' dE/dx and its own dE/dsc."""
     tiles = len(counts)
     order = sorted(range(tiles), key=lambda u: (int(ready[u]), u))
     done = [False] * tiles
     steps, live, peak, next3 = [], 0, 0, 0
-    for t in range(tiles):
-        for u in needs[t]:
-            u = int(u)
-            if not done[u]:
-                done[u] = True
-                steps.append((1, u))
-                live += int(counts[u])
-                peak = max(peak, live)
-        steps.append((2, t))
-        while next3 < tiles and int(ready[order[next3]]) <= t:
+    for start in range(0, tiles, max(1, int(group))):
+        stop = min(tiles, start + max(1, int(group)))
+        for t in range(start, stop):
+            for u in needs[t]:
+                u = int(u)
+                if not done[u]:
+                    done[u] = True
+                    steps.append((1, u))
+                    live += int(counts[u])
+                    peak = max(peak, live)
+        steps.extend((2, t) for t in range(start, stop))
+        while next3 < tiles and int(ready[order[next3]]) < stop:
             u = order[next3]
             next3 += 1
             steps.append((3, u))
@@ -754,6 +763,7 @@ class TiledForceField:
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
         self._reuse_ok = None
+        self._lists_note = None  # this call's reason for keeping no lists (the wavefront), beside list_reuse_state
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
         self.list_cache_state = "on" if self.config.list_cache else "off"
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
@@ -806,7 +816,16 @@ class TiledForceField:
             from fastmace.neighbors.skin import times_3x3
             from fastmace.neighbors.tile_list import TileNeighbours
 
-            skin, cutoff = self._reuse_skin(), float(self.field.neighbours.cutoff)
+            # The wavefront (host memory short) keeps no lists across calls: kept, they would hold every tile's
+            # lists (55.8 GiB at 122M SrTiO3 atoms, beside a 55 GiB row pool); the call's cache then holds a tile's
+            # lists from its sweep 1 to its sweep 3 only, the band's.
+            wave = self._wave_expected(n)
+            skin = 0.0 if wave else self._reuse_skin()
+            if wave:
+                self._kept = None
+            self._lists_note = ("off: the wavefront keeps only its band's lists"
+                                if wave and self.config.list_reuse else None)
+            cutoff = float(self.field.neighbours.cutoff)
             self._reusing = False
             kept = (self._keep_lists(positions, n, TileNeighbours.like(self.field.neighbours).cell, skin)
                     if skin > 0 else None)
@@ -1314,7 +1333,7 @@ class TiledForceField:
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      list_reused=self._reusing, list_rebuilds=self.list_rebuilds,
-                     list_reuse=self.list_reuse_state,
+                     list_reuse=self._lists_note or self.list_reuse_state,
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
@@ -1720,6 +1739,16 @@ class TiledForceField:
             return True
         if int(grid[0]) < WAVEFRONT_LAYERS:
             return False
+        return self._wave_expected(n)
+
+    def _wave_expected(self, n):
+        """``TileConfig.wavefront`` without the grid's layer test: whether a call at ``n`` atoms runs the wavefront
+        when its grid has the layers (the tile lists are planned on this before the grid exists)."""
+        config = self.config
+        if config.wavefront == "off" or not config.alias_state:
+            return False
+        if config.wavefront == "on":
+            return True
         # "auto": only where the plain state (x and sc, and the alias window, about a quarter more) would leave the
         # host below the floor: the schedule costs about 3 % of a call (its search pass; 5M SrTiO3, both Ada GPUs).
         # Decided on the first call at an atom count, then kept.
@@ -1780,7 +1809,8 @@ class TiledForceField:
         ready = torch.full((len(tiles),), -1, dtype=torch.int64).scatter_reduce_(
             0, owner.cpu().long(), last.long(), "amax")
         owner = None  # 4 bytes per atom on the device, before the sweeps
-        steps, peak = wavefront_schedule(needs, ready.tolist(), [int(t.shape[0]) for t in tiles])
+        steps, peak = wavefront_schedule(needs, ready.tolist(), [int(t.shape[0]) for t in tiles],
+                                         self.config.wavefront_group)
         return keys, steps, peak, first, last
 
     def _slot_keys(self, tiles, source, local_of, n, visit=None):

@@ -687,18 +687,19 @@ def test_deferred_host_state_writes_are_bitwise_the_immediate_ones(mode, alias):
 # ---------------------------------------------------------------- the wavefront schedule
 
 
-def test_wavefront_schedule_runs_every_sweep_once_after_what_it_reads():
-    """``wavefront_schedule``: each tile's three sweeps once; sweep 2 in tile order; a tile's sweep 1 before every
-    sweep 2 that needs it, its sweep 3 after the sweep 2 of its ``ready`` tile; the peak is the most receivers
-    between their sweeps 1 and 3."""
+@pytest.mark.parametrize("group", [1, 3, 5])
+def test_wavefront_schedule_runs_every_sweep_once_after_what_it_reads(group):
+    """``wavefront_schedule``: each tile's three sweeps once; sweep 2 in tile order, ``group`` tiles in a run; a
+    tile's sweep 1 before every sweep 2 that needs it, its sweep 3 after the sweep 2 of its ``ready`` tile; the peak
+    is the most receivers between their sweeps 1 and 3. A group changes sweep at most three times."""
     from fastmace.model.tiled import wavefront_schedule
 
-    # A ring of 8 tiles (periodic): tile t reads its neighbours' x; its receivers sit in their halos too.
-    tiles = 8
+    # A ring of 16 tiles (periodic): tile t reads its neighbours' x; its receivers sit in their halos too.
+    tiles = 16
     needs = [sorted({(t - 1) % tiles, t, (t + 1) % tiles}) for t in range(tiles)]
     ready = [tiles - 1 if t == 0 else min(t + 1, tiles - 1) for t in range(tiles)]
     counts = [3] * tiles
-    steps, peak = wavefront_schedule(needs, ready, counts)
+    steps, peak = wavefront_schedule(needs, ready, counts, group)
     assert sorted(steps) == sorted((s, t) for s in (1, 2, 3) for t in range(tiles))
     position = {step: i for i, step in enumerate(steps)}
     assert [t for s, t in steps if s == 2] == list(range(tiles))
@@ -710,11 +711,17 @@ def test_wavefront_schedule_runs_every_sweep_once_after_what_it_reads():
         live += counts[t] if sweep == 1 else -counts[t] if sweep == 3 else 0
         most = max(most, live)
     assert peak == most < sum(counts)
+    def changes(order):
+        return sum(a[0] != b[0] for a, b in zip(order, order[1:]))
+
+    assert changes(steps) <= 3 * -(-tiles // group)
+    if group > 1:
+        assert changes(steps) < changes(wavefront_schedule(needs, ready, counts)[0])
 
 
-@pytest.mark.parametrize("mode", ["eager", "padded"])
+@pytest.mark.parametrize("mode, group", [("eager", 1), ("padded", 1), ("padded", 3)])
 @pytest.mark.parametrize("overlap", [False, True], ids=["immediate", "deferred"])
-def test_wavefront_call_equals_the_three_sweep_call(mode, overlap):
+def test_wavefront_call_equals_the_three_sweep_call(mode, group, overlap):
     """``TileConfig.wavefront``: the pooled rows hold bitwise the state of the three plain sweeps, so the node
     energies (and the energy) are bitwise; the forces and the stress are the same sums in another order. The pool
     holds fewer rows than atoms, and the lists of a tile are dropped after its sweep 3."""
@@ -724,7 +731,8 @@ def test_wavefront_call_equals_the_three_sweep_call(mode, overlap):
     results = []
     for wave in ("off", "on"):
         tiled = TiledForceField(field, TileConfig(12, mode=mode, neighbours="tiles", state="host", alias_state=True,
-                                                  overlap=overlap, wavefront=wave, list_reuse=False))
+                                                  overlap=overlap, wavefront=wave, wavefront_group=group,
+                                                  list_reuse=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         for current in (strained(atoms), atoms):
             results.append(tiled.evaluate(current, stress=True))
@@ -755,6 +763,31 @@ def test_wavefront_auto_only_where_the_plain_state_would_not_fit(available, on, 
     tiled.evaluate(atoms)
     assert tiled.last["wavefront"]["on"] is on
     assert tiled._wave_auto == {len(atoms): on}
+
+
+def test_wavefront_keeps_no_lists_across_calls():
+    """With the wavefront the tile lists are not kept across calls (``list_reuse``): kept, they would hold every
+    tile's; the call's cache holds a tile's lists from its sweep 1 to its sweep 3. The same call as without reuse,
+    bitwise."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = []
+    for reuse in (False, True):
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
+                                                  alias_state=True, wavefront="on", wavefront_group=2,
+                                                  list_reuse=reuse))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        for current in (strained(atoms), atoms):
+            results.append(tiled.evaluate(current, stress=True))
+            assert tiled._kept is None and tiled.last["list_kept_bytes"] == 0
+            assert tiled.last["list_cache_bytes"] == 0 and tiled.last["list_reused"] is False
+        if reuse:
+            assert tiled.last["list_reuse"] == "off: the wavefront keeps only its band's lists"
+    for one, two in zip(results[:2], results[2:]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
 def test_wavefront_needs_the_aliased_state():
@@ -816,7 +849,8 @@ def test_lanes_call_equals_one_lane(wave):
     results = []
     for lanes in ("off", "on"):
         tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
-                                                  alias_state=True, wavefront=wave, lanes=lanes, list_reuse=False))
+                                                  alias_state=True, wavefront=wave, wavefront_group=3, lanes=lanes,
+                                                  list_reuse=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         for current in (strained(atoms), atoms):
             results.append(tiled.evaluate(current, stress=True))
@@ -853,7 +887,8 @@ def test_prefetch_call_is_bitwise_the_call_without(wave, lanes, monkeypatch):
     results = []
     for prefetch in (False, True):
         tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
-                                                  alias_state=True, wavefront=wave, lanes=lanes, list_reuse=False,
+                                                  alias_state=True, wavefront=wave, wavefront_group=3, lanes=lanes,
+                                                  list_reuse=False,
                                                   prefetch=prefetch))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         taken.clear()
