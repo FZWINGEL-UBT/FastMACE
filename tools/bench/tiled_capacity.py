@@ -225,7 +225,13 @@ def main(argv=None):
 
         if args.compare != "none":
             record["phase"] = f"compare {args.compare}"
+            # --tile-list left the force field's own list empty: the whole-system reference needs it, so it is
+            # built here, at the same positions (the tiled calls are done).
+            lists.close()
             ref_field = field
+            if args.tile_list and args.compare == "eager":
+                positions = field._prepare_one_off(atoms)
+                record["reference_edges_within_cutoff"] = int(field.neighbours.count)
             if args.compare == "compiled":
                 ref_field = planner.build_evaluation(plan, user, atoms)
                 record["reference_rewrites"] = list(getattr(ref_field, "applied", ()))
