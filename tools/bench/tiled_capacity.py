@@ -61,6 +61,8 @@ def parse_args(argv=None):
                         "given: TileConfig's default)")
     p.add_argument("--no-budget", action="store_true",
                    help="budget_receivers=(): R stays --receivers (several compiled tiles at small sizes)")
+    p.add_argument("--wavefront", choices=("auto", "on", "off"), default="auto",
+                   help="TileConfig.wavefront (with --alias-state): the tile sweeps interleaved, x and sc in a row pool")
     p.add_argument("--tag", default="")
     p.add_argument("--ledger", action="store_true",
                    help="after the calls, record every live tensor and NumPy array by device, dtype and shape, named "
@@ -284,6 +286,7 @@ def main(argv=None):
                                                   tuple(args.budget_receivers) or None,
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
+                                                  wavefront=args.wavefront,
                                                   species="index" if args.species_index else "one_hot"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
