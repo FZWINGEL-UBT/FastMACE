@@ -128,6 +128,12 @@ def mh1_streaming_conv(dims, width):
     return _STREAMING_INDEX_BYTES - round(share * _stock_edge_floats(dims)) * width, 0
 
 
+def generic_chunked_conv_backward(dims, width):
+    """The generic chunked backward keeps no per-edge weight gradient of the whole edge set: the estimate's widest
+    backward transient (the tensor product weights' gradient, ``weight_numel`` floats per edge) is not formed."""
+    return -max((block.weight_numel for block in dims.interactions), default=0) * width, 0
+
+
 def chunked_conv_backward(dims, width):
     """The chunked convolution backward keeps no per-edge weight gradient of the whole edge set (measured)."""
     return -round(_CHUNKED_BACKWARD_SHARE * _stock_edge_floats(dims)) * width, 0

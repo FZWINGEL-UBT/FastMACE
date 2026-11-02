@@ -134,7 +134,7 @@ STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"), ("gate_epilogue", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
-    ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
+    ("chunked_conv_backward", "chunked_conv_backward"), ("fused_folded_forward", "fold_cutoff"),
     ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"), ("wprime_backward", "fold_cutoff"),
     ("recompute_node_segments", "fold_cutoff"), ("recompute_node_region", "fold_cutoff"),
     ("species_tables", "species_tables"),
@@ -388,6 +388,10 @@ DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"
 # 0.968; NaCl 1.000 / 1.005. RTX 4000 Ada: NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969;
 # NaCl 0.998 / 1.003 (docs/validation/speed-def.md). The A100 was not measured.
 DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+# generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
+# docs/validation/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
+# in both build orders, found the MD step no slower; exact device names.
+DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ()
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -1155,6 +1159,17 @@ class FixedPlanner:
                 v["_why"][name] += f"; stage 2: off, not supported by the model ({reason})"
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
+        if v["chunked_conv_backward"] and "chunked_conv_backward" not in explicit and not support["fold_cutoff"][0]:
+            # The generic folded path (generic_chunked_conv_backward): decision 66, measured GPUs only.
+            name = getattr(hardware, "name", None)
+            if name in DECISION_66_GENERIC_CHUNKED_GPUS:
+                v["_why"]["chunked_conv_backward"] += (f"; stage 2: on, generic model on a measured GPU, "
+                                                       f"decision 66 ({name})")
+            else:
+                reason = f"generic folded path not measured on this GPU, decision 66 ({name})"
+                v["chunked_conv_backward"] = False
+                v["_auto_off"]["chunked_conv_backward"] = reason
+                v["_why"]["chunked_conv_backward"] += f"; stage 2: off, {reason}"
         if v["grouped_launch"] and "grouped_launch" not in explicit and not _generic_mace_family(traits):
             # Measured on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b) and gains on the
             # RTX 5060 Ti (decision 66).

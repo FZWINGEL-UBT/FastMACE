@@ -9,6 +9,10 @@ records set on an interaction:
 - ``fused_radial_backward`` (``generic_fused_radial_backward``): the last radial layer as
   ``hidden @ W.T`` through ``folded_linear``, whose Triton input gradient replaces cuBLAS's;
 - ``streaming_kernels`` (``generic_streaming``): the receiver-streaming OEq convolution;
+- ``chunked_backward_edges`` and ``generic_folded`` (``generic_chunked_conv_backward``): the streaming convolution
+  takes the last radial layer's input ``[h c, c]`` and its weight ``[W, 0]`` (MH-1's folded layer,
+  ``GenericFoldedRadial``), so its backward runs in L2-sized edge chunks and the ``[E, W]`` weight gradient is
+  never formed in full;
 - ``skip_tp`` replaced by a ``SpeciesSkip`` (``generic_species_skip``), which needs no change of
   the forward.
 
@@ -73,7 +77,13 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     node_feats = self.handle_lammps(node_feats, lammps_class=lammps_class, lammps_natoms=lammps_natoms,
                                     first_layer=first_layer)
     reassociation = getattr(self, "first_reassociation", None)
-    if reassociation is None:
+    # generic_chunked_conv_backward: the streaming convolution builds the weights from the last radial layer's input.
+    chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
+    if chunked:
+        hidden = self.radial_hidden(edge_feats)
+        augmented = (torch.cat([hidden, torch.ones_like(hidden[:, :1])], dim=1) if cutoff is None
+                     else torch.cat([hidden * cutoff, cutoff], dim=1))  # (h W) c = [h c, c] [W, 0]
+    elif reassociation is None:
         if getattr(self, "fused_radial_backward", False):
             from fastmace.kernels.triton.skinny_linear import folded_linear
             tp_weights = folded_linear(self.radial_hidden(edge_feats), fc_last_weight(self.radial_last).contiguous())
@@ -95,7 +105,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
                                 fc_last_weight(self.radial_last))
     elif getattr(self, "streaming_kernels", None) is not None:
         from fastmace.rewrites.mh1.modules import streaming_message
-        message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes)
+        message = streaming_message(self, node_feats, edge_attrs, None if chunked else tp_weights, edge_index,
+                                    num_nodes, augmented=augmented if chunked else None)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
@@ -117,6 +128,28 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         return self.reshape(message), None
     sc = self.truncate_ghosts(sc, n_real)
     return self.reshape(message), sc
+
+
+class GenericFoldedRadial(torch.nn.Module):
+    """A generic interaction's last radial layer as MH-1's folded layer (``generic_chunked_conv_backward``): the
+    weight ``[W, 0]`` applied to ``[h c, c]`` (``(h W) c``; the zero column keeps MH-1's ``[W, b]`` layout for a
+    bias-free layer), with its two halves as buffers for the fused input gradient (as ``folded_constants``)."""
+
+    def __init__(self, last):
+        super().__init__()
+        weight = fc_last_weight(last).detach()
+        zero = weight.new_zeros(weight.shape[0])
+        self.register_buffer("folded_constant", torch.cat([weight, zero[:, None]], dim=1).contiguous())
+        self.register_buffer("folded_main", weight.contiguous())
+        self.register_buffer("folded_last", zero)
+        self.folded_tiles = "fixed"
+
+    def folded_weight(self):
+        return self.folded_constant
+
+    @property
+    def folded_parts(self):
+        return self.folded_main, self.folded_last
 
 
 class SpeciesSkip(torch.nn.Module):

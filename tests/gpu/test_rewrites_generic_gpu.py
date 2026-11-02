@@ -9,6 +9,10 @@ the in-process OEq runtime must be prepared before anything imports MACE. Each m
 twice and the second copy rewritten, so no deep copy of a hybrid model is needed. Edges are
 sorted by receiver, as the streaming convolution requires (``sort_receivers``).
 
+``generic_chunked_conv_backward`` (the streaming convolution on MH-1's folded path with its chunked backward) is
+also checked with every cell forced into chunks of 37 edges, on MACE-OMAT-0 medium too
+(docs/validation/omat0-capacity.md).
+
 Real checkpoints need ``FASTMACE_MODELS``.
 """
 
@@ -30,14 +34,15 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MODELS = os.environ.get("FASTMACE_MODELS")
 HYBRID_PYTHON = os.environ.get("FASTMACE_HYBRID_PYTHON") or sys.executable
 THRESHOLDS = {"float64": 1e-10, "float32": 1e-4}
-MP0, OFF = "mp0-medium", "off23-small"
+MP0, OFF, OMAT = "mp0-medium", "off23-small", "omat0-medium"
 
 STACKED = '''
 import json
 import torch
 
-def stacked(label, backend, dtype):
-    """Stacked generic rewrites on a released model against the same model unrewritten (JSON-friendly dict)."""
+def stacked(label, backend, dtype, force_chunks=False):
+    """Stacked generic rewrites on a released model against the same model unrewritten (JSON-friendly dict).
+    ``force_chunks``: the chunked streaming backward runs in chunks of 37 edges whatever the cell's size."""
     import fastmace  # noqa: F401
     from fastmace.model import loading
     from fastmace.rewrites import generic
@@ -67,9 +72,16 @@ def stacked(label, backend, dtype):
     context = reg.Context(inputs=reg.structure_inputs(data))
     applied = registry.apply(rewritten.model, resolution, context, original=original.model)
     edges = int(data["edge_index"].shape[1])
+    chunked = []
     for interaction in rewritten.model.interactions:
         if getattr(interaction, "streaming_kernels", None) is not None:
             interaction.streaming_count = torch.tensor(edges, device="cuda:0")
+        if force_chunks and getattr(interaction, "chunked_backward_edges", 0):
+            interaction.chunked_backward_edges = 37
+            chunked.append(type(interaction).__name__)
+    if force_chunks:
+        from fastmace.kernels.oeq_streaming import runtime
+        runtime.chunks_the_backward = lambda *args: True
     outputs = []
     for model in (original.model, rewritten.model, rewritten.model):
         out = model(dict(data), training=False, compute_force=True, compute_stress=stress)
@@ -86,6 +98,7 @@ def stacked(label, backend, dtype):
             "reasons": resolution.reasons(),
             "relative": {key: relative(key) for key in outputs[0]},
             "repeat_equal": all(torch.equal(outputs[1][k], outputs[2][k]) for k in outputs[1]),
+            "forced_chunks": chunked,
             "energy": float(outputs[0]["energy"].sum())}
 '''
 
@@ -133,7 +146,7 @@ def expected_records(label, backend):
     if not label.startswith("off"):
         names += ["generic_reassociate", "generic_segmented_first_sum"]  # SEGMENTED_FIRST_SUM acts on it (1b-T11)
     if backend == "hybrid":
-        names.append("generic_streaming")
+        names += ["generic_streaming", "generic_chunked_conv_backward"]
     return names
 
 
@@ -186,6 +199,32 @@ def test_stacked_generic_rewrites_hybrid_in_a_fresh_process(label, dtype):
     result = json.loads(result.stdout.strip().splitlines()[-1])
     report(result)
     check(result, expected_records(label, "hybrid"))
+
+
+@pytest.mark.slow
+@needs_mh1
+@needs_models
+@needs_oeq
+@pytest.mark.parametrize("dtype", ["float64", "float32"])
+@pytest.mark.parametrize("label", [OMAT, MP0])
+def test_generic_chunked_backward_in_forced_chunks(label, dtype):
+    """generic_chunked_conv_backward with every cell in chunks of 37 edges: the forces as the unrewritten model's."""
+    if not has_checkpoint(label):
+        pytest.skip(f"{label} not in FASTMACE_MODELS")
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
+               PYTHONDONTWRITEBYTECODE="1")
+    if HYBRID_PYTHON != sys.executable:
+        env.pop("LD_LIBRARY_PATH", None)
+    code = STACKED + textwrap.dedent(f"""
+        print(json.dumps(stacked({label!r}, "hybrid", {dtype!r}, force_chunks=True)))
+    """)
+    result = subprocess.run([HYBRID_PYTHON, "-c", code], cwd=REPOSITORY_ROOT, env=env, capture_output=True,
+                            text=True, timeout=1800, check=False)
+    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
+    result = json.loads(result.stdout.strip().splitlines()[-1])
+    report(result)
+    check(result, expected_records(label, "hybrid"))
+    assert result["forced_chunks"], result
 
 
 # --------------------------------------------------------------------------- tiny models on CUDA

@@ -402,7 +402,7 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
                                            self.streaming_kernels)
     elif augmented is not None:
-        radial = self.conv_tp_weights
+        radial = getattr(self, "generic_folded", None) or self.conv_tp_weights  # generic_chunked_conv_backward
         message = folded_streaming_convolution(augmented, radial.folded_weight(), feats, edge_attrs,
                                                sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
                                                self.streaming_kernels, self.chunked_backward_edges,

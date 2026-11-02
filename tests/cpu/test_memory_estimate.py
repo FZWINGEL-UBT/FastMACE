@@ -302,7 +302,7 @@ def test_declared_terms():
     assert fusion.RECORDS["segment_gemm"].selfcheck_memory is not None
     assert declared == {"factor_species", "fold_cutoff", "joint_radial_input", "fused_radial_hidden",
                         "reassociate_first", "streaming_conv", "chunked_conv_backward", "generic_reassociate",
-                        "generic_streaming"}
+                        "generic_streaming", "generic_chunked_conv_backward"}
     assert radial.RECORDS["radial_tables"].memory is terms.radial_tables
     assert radial.RECORDS["recompute_conv_weights"].memory is terms.recompute_conv_weights
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
