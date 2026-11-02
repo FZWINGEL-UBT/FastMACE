@@ -1534,7 +1534,7 @@ class TiledForceField:
             stats["list_kept_bytes"] = 0 if kept is None else int(
                 sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
                 + kept["reference"].numel() * kept["reference"].element_size())
-            stats["list_reuse"] = self.list_reuse_state
+            stats["list_reuse"] = self._lists_note or self.list_reuse_state
             stats["list_cache"] = self.list_cache_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
