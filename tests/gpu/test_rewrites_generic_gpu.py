@@ -40,9 +40,10 @@ STACKED = '''
 import json
 import torch
 
-def stacked(label, backend, dtype, force_chunks=False):
+def stacked(label, backend, dtype, force_chunks=False, recompute=False):
     """Stacked generic rewrites on a released model against the same model unrewritten (JSON-friendly dict).
-    ``force_chunks``: the chunked streaming backward runs in chunks of 37 edges whatever the cell's size."""
+    ``force_chunks``: the chunked streaming backward runs in chunks of 37 edges whatever the cell's size.
+    ``recompute``: generic_recompute_conv_weights on too (float32)."""
     import fastmace  # noqa: F401
     from fastmace.model import loading
     from fastmace.rewrites import generic
@@ -68,7 +69,8 @@ def stacked(label, backend, dtype, force_chunks=False):
         for parameter in model.parameters():
             parameter.requires_grad_(False)
     registry = reg.Registry(list(generic.RECORDS.values()))
-    resolution = registry.resolve(rewritten.model, strict=False)
+    resolution = registry.resolve(rewritten.model, {"generic_recompute_conv_weights": "on"} if recompute else None,
+                                  strict=False)
     context = reg.Context(inputs=reg.structure_inputs(data))
     applied = registry.apply(rewritten.model, resolution, context, original=original.model)
     edges = int(data["edge_index"].shape[1])
@@ -199,6 +201,32 @@ def test_stacked_generic_rewrites_hybrid_in_a_fresh_process(label, dtype):
     result = json.loads(result.stdout.strip().splitlines()[-1])
     report(result)
     check(result, expected_records(label, "hybrid"))
+
+
+@pytest.mark.slow
+@needs_mh1
+@needs_models
+@needs_oeq
+@pytest.mark.parametrize("label", [OMAT, MP0])
+def test_generic_recompute_conv_weights_in_forced_chunks(label):
+    """generic_recompute_conv_weights (float32): no stored per-edge weights, every cell in chunks of 37 edges; the
+    forces as the unrewritten model's at the float32 threshold."""
+    if not has_checkpoint(label):
+        pytest.skip(f"{label} not in FASTMACE_MODELS")
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
+               PYTHONDONTWRITEBYTECODE="1")
+    if HYBRID_PYTHON != sys.executable:
+        env.pop("LD_LIBRARY_PATH", None)
+    code = STACKED + textwrap.dedent(f"""
+        print(json.dumps(stacked({label!r}, "hybrid", "float32", force_chunks=True, recompute=True)))
+    """)
+    result = subprocess.run([HYBRID_PYTHON, "-c", code], cwd=REPOSITORY_ROOT, env=env, capture_output=True,
+                            text=True, timeout=1800, check=False)
+    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
+    result = json.loads(result.stdout.strip().splitlines()[-1])
+    report(result)
+    check(result, expected_records(label, "hybrid") + ["generic_recompute_conv_weights"])
+    assert result["forced_chunks"], result
 
 
 @pytest.mark.slow
