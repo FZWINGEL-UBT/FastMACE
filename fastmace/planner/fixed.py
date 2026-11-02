@@ -135,7 +135,7 @@ STAGE2_SUPPORT = (
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"), ("gate_epilogue", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "chunked_conv_backward"), ("fused_folded_forward", "fold_cutoff"),
-    ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"), ("wprime_backward", "fold_cutoff"),
+    ("radial_tables", "radial_tables"), ("w_tables", "fold_cutoff"), ("wprime_backward", "fold_cutoff"),
     ("recompute_node_segments", "fold_cutoff"), ("recompute_node_region", "fold_cutoff"),
     ("species_tables", "species_tables"),
     ("fold_product_linear", "species_tables"),
@@ -1162,6 +1162,16 @@ class FixedPlanner:
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
         v["_generic_folded"] = not support["fold_cutoff"][0]  # the generic folded path (generic records)
+        if v["radial_tables"] and not support["fold_cutoff"][0]:
+            # generic_radial_tables (certified, float32 only): opt-in; the default goes to the owner with the A/Bs
+            # (conductor, 2 November 2026; decision 62 was MH-1's).
+            if "radial_tables" not in explicit:
+                reason = "generic radial tables are opt-in (no owner decision on a default yet)"
+                v["radial_tables"] = False
+                v["_auto_off"]["radial_tables"] = reason
+                v["_why"]["radial_tables"] += f"; stage 2: off, {reason}"
+            else:
+                v["_why"]["radial_tables"] += "; stage 2: on, generic radial tables (explicit)"
         if v["chunked_conv_backward"] and "chunked_conv_backward" not in explicit and not support["fold_cutoff"][0]:
             # The generic folded path (generic_chunked_conv_backward): decision 66, measured GPUs only.
             name = getattr(hardware, "name", None)
@@ -1257,6 +1267,11 @@ class FixedPlanner:
         if v["radial_tables"] and (dtype not in ("float32", "float64") or (dtype == "float64" and reproducible)):
             book.refuse(f"RewriteConfig.radial_tables='on' needs float32, or float64 outside reproducible plans, not "
                         f"{dtype}{' (reproducible)' if reproducible else ''}", "radial-tables-needs-float32")
+        # generic_radial_tables: float32 plans outside reproducible ones only (no float64 tables for generic models).
+        elif v["radial_tables"] and v.get("_generic_folded") and (dtype != "float32" or reproducible):
+            book.refuse(f"RewriteConfig.radial_tables='on' for a generic model needs a float32 plan outside "
+                        f"reproducible ones, not {dtype}{' (reproducible)' if reproducible else ''}",
+                        "radial-tables-needs-float32")
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).

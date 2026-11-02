@@ -203,6 +203,14 @@ def radial_tables(dims, width):
     return -round(_RADIAL_TABLES_SHARE * _stock_edge_floats(dims)) * width, 0
 
 
+def generic_radial_tables(dims, width):
+    """Tabulated generic radial networks keep, per edge, none of the network's saved layer inputs and activations
+    (every hidden layer's input and its activation's input: ``sum(radial[:-1]) + sum(radial[1:-1])`` floats per
+    interaction); the table keeps its output ``[h c, c, density]``, which the folded path saves anyway."""
+    saved = sum(sum(i.radial[:-1]) + sum(i.radial[1:-1]) for i in dims.interactions)
+    return -saved * width, 0
+
+
 def block_linear_resident(dims, width):
     """Each converted linear keeps its extracted weight and a contiguous transposed copy as buffers
     (``BlockLinear.weight_k``, ``weight_t_k``), beside the execution copy's own parameters."""
