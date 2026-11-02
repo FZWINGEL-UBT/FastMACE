@@ -180,7 +180,8 @@ def main():
                   top_kernels=[(k[:120], round(s, 3)) for k, s in kernels.most_common(25)],
                   tiles=tiled.last.get("tiles"))
     args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / f"profile-{args.mode}-{args.model}-{args.structure}-{n}.json").write_text(json.dumps(record, indent=1))
+    name = f"profile-{args.mode}-{args.model}-{args.structure}-{n}.json"
+    (args.output / name).write_text(json.dumps(record, indent=1))
     print(json.dumps({k: v for k, v in record.items() if k != "top_kernels"}))
     for k, s in record["top_kernels"][:15]:
         print(f"{s:9.3f} s  {k}")
