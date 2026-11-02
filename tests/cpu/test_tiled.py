@@ -736,7 +736,7 @@ def test_wavefront_call_equals_the_three_sweep_call(mode, group, overlap):
     for wave in ("off", "on"):
         tiled = TiledForceField(field, TileConfig(12, mode=mode, neighbours="tiles", state="host", alias_state=True,
                                                   overlap=overlap, wavefront=wave, wavefront_group=group,
-                                                  list_reuse=False))
+                                                  list_reuse=False, boundary_skin=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         for current in (strained(atoms), atoms):
             results.append(tiled.evaluate(current, stress=True))
@@ -780,7 +780,7 @@ def test_wavefront_with_and_without_kept_lists_is_the_same_call():
     for reuse in (False, True):
         tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
                                                   alias_state=True, wavefront="on", wavefront_group=2,
-                                                  list_reuse=reuse))
+                                                  list_reuse=reuse, boundary_skin=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         for current in (strained(atoms), atoms):
             results.append(tiled.evaluate(current, stress=True))
@@ -790,6 +790,57 @@ def test_wavefront_with_and_without_kept_lists_is_the_same_call():
         assert one[0] == two[0]
         assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+def test_boundary_skin_plan_splits_the_first_and_last_layer_at_the_reach():
+    """``plan_tiles(reach=...)``: along the first axis, layer 0 holds the atoms within ``reach`` of the periodic
+    boundary from below, the last layer those within ``reach`` of it from above, the k layers between them the
+    plain layers less the skins; every atom once."""
+    rng = np.random.default_rng(1)
+    n, reach = 3000, 2.5
+    cell = torch.tensor(np.diag([60.0, 12.0, 12.0]) + rng.uniform(-0.5, 0.5, (3, 3)), dtype=torch.float64)
+    frac = torch.tensor(rng.uniform(0, 1, (n, 3)), dtype=torch.float64)
+    positions = frac @ cell
+    row_ptr = torch.arange(n + 1, dtype=torch.int64) * 10
+    plain, grid = plan_tiles(positions, cell, row_ptr, 200, 10**9)
+    tiles, split = plan_tiles(positions, cell, row_ptr, 200, 10**9, reach=reach)
+    assert split == (grid[0] + 2, grid[1], grid[2]) and grid[0] >= 4
+    assert sorted(torch.cat(tiles).tolist()) == list(range(n))
+    spacing = 1.0 / float(torch.linalg.norm(torch.linalg.inv(cell).T[0]))
+    skin = reach / spacing
+    first = frac[:, 0]
+    low = torch.cat([t for t in tiles if bool(torch.all(first[t] < skin))])
+    high = torch.cat([t for t in tiles if bool(torch.all(first[t] >= 1 - skin))])
+    assert sorted(low.tolist()) == torch.nonzero(first < skin).flatten().tolist()
+    assert sorted(high.tolist()) == torch.nonzero(first >= 1 - skin).flatten().tolist()
+    assert len(tiles) >= len(plain)
+    # Without the reach, or with a reach above half a layer, the plan is the plain one.
+    assert plan_tiles(positions, cell, row_ptr, 200, 10**9, reach=0.6 * spacing / grid[0])[1] == grid
+
+
+def test_wavefront_with_the_boundary_skin_is_the_same_call_in_another_tile_order():
+    """``TileConfig.boundary_skin``: the wavefront's plan splits the first and last layer at the cutoff (the tiles'
+    reach without kept lists); another tile plan, so the energy, forces and stress agree to the summation order, and
+    the row pool holds no more rows than without the split."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))  # 8 tile layers of 8.4 A at 32 receivers
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results, reports = [], []
+    for skin in (False, True):
+        tiled = TiledForceField(field, TileConfig(32, mode="padded", neighbours="tiles", state="host",
+                                                  alias_state=True, wavefront="on", wavefront_group=2,
+                                                  list_reuse=False, boundary_skin=skin))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results.append(tiled.evaluate(strained(atoms), stress=True))
+        reports.append(tiled.last)
+    off, on = reports
+    assert off["wavefront"]["boundary_skin"] == 0.0
+    assert on["wavefront"]["boundary_skin"] == pytest.approx(float(field.neighbours.cutoff))
+    assert on["grid"] == (off["grid"][0] + 2, *off["grid"][1:])
+    assert on["wavefront"]["pool_rows"] <= off["wavefront"]["pool_rows"]
+    assert results[1][0] == pytest.approx(results[0][0], rel=1e-13, abs=0)
+    assert relative(results[1][1], results[0][1]) <= 1e-12
+    assert relative(results[1][2], results[0][2]) <= 1e-12
 
 
 def test_wavefront_needs_the_aliased_state():

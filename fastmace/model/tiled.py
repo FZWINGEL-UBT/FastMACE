@@ -147,6 +147,12 @@ class TileConfig:
     # Bitwise the same call: the same graphs and rows, read where the sweep would read them. Rows are fetched ahead
     # only within a run of one sweep (2 or 3), where no host write reaches a row the next tile reads.
     prefetch: bool = True
+    # With the wavefront: the tile grid's first and last layer along its slowest axis each split into a skin of one
+    # reach (cutoff + the kept lists' skin) at the periodic boundary and the rest. Only the skins are read across the
+    # boundary, so only they stay in the row pool for the whole call, not two whole layers (a block model of 149M
+    # SrTiO3 at R 8,192: the pool from 16 % to 9 % of the atoms; results/tiled-ideas-20261102/band_model.py). Another
+    # tile plan: the forces and stress are the same sums in another order (float32 rounding).
+    boundary_skin: bool = True
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -482,13 +488,33 @@ def _holder_class():
     return Holder
 
 
-def plan_tiles(positions, cell, row_ptr, receivers, edges):
+def _grid_shape(cell, n, receivers, reach=0.0, min_layers=4):
+    """The tile grid of ``plan_tiles``: blocks per axis from the cell's plane spacings (about cubic blocks of about
+    ``receivers`` atoms), and the fractional thickness of the boundary skin along the first axis (0: no split). The
+    first axis splits when ``reach`` > 0, it has at least ``min_layers`` layers and a skin is at most half a layer."""
+    import torch
+
+    cell64 = torch.as_tensor(cell, dtype=torch.float64)
+    volume = abs(float(torch.linalg.det(cell64)))
+    recip = torch.linalg.inv(cell64).T
+    spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
+    side = (volume * min(receivers, n) / n) ** (1 / 3)
+    k = [max(1, round(s / side)) for s in spacings]
+    skin = float(reach) / spacings[0]  # fractional: a plane's distance bounds every distance across it
+    return k, (skin if reach > 0 and k[0] >= min_layers and skin * k[0] <= 0.5 else 0.0)
+
+
+def plan_tiles(positions, cell, row_ptr, receivers, edges, reach=0.0, min_layers=4):
     """Receiver tiles: a list of sorted int64 device index tensors covering every atom once.
 
     Atoms are binned on a k1 x k2 x k3 grid of fractional coordinates, with k_i from the cell's plane spacings so
     that a block is about cubic and holds about ``receivers`` atoms; a block above either cap is split into
     consecutive pieces (in index order) below both. A rule on the cell geometry and the caps only. ``row_ptr``
     None: no degrees (the tiles build their own lists), so a block splits into consecutive pieces of ``receivers``.
+
+    ``reach`` > 0 (``TileConfig.boundary_skin``): the first and the last layer along the first axis each split into
+    a skin of ``reach`` at the periodic boundary and the rest (``_grid_shape``), so k1 + 2 layers; only the skins'
+    atoms are within ``reach`` of an atom across the boundary.
 
     The fractional coordinates and the block index are computed in chunks, element-wise, so the plan's whole-system
     transients stay small (tiled-call-memory.md); the values are the unchunked ones.
@@ -501,27 +527,27 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     n = positions.shape[0]
     cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
     inverse = torch.linalg.inv(cell64)
-    volume = abs(float(torch.linalg.det(cell64)))
-    recip = torch.linalg.inv(cell64).T
-    spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
-    side = (volume * min(receivers, n) / n) ** (1 / 3)
-    k = [max(1, round(s / side)) for s in spacings]
+    k, skin = _grid_shape(cell64.cpu(), n, receivers, reach, min_layers)
     scale = torch.tensor(k, dtype=torch.float64, device=positions.device)
     top = torch.tensor([x - 1 for x in k], device=positions.device)
+    layers = k[0] + 2 if skin else k[0]
     # The fractional coordinates per chunk (element-wise, as the tile lists' bins: no float64 GEMM, whose emulated
     # forms round coarsely), and the block index in int32 below 2**31 blocks: no whole-system float64 transient,
     # 4 bytes per atom of keys (tiled capacity, lever 5).
-    blocks = k[0] * k[1] * k[2]
+    blocks = layers * k[1] * k[2]
     block = torch.empty(n, dtype=torch.int32 if blocks < 2**31 else torch.int64, device=positions.device)
     for start in range(0, n, CHUNK):
         stop = min(start + CHUNK, n)
         frac = times_3x3(positions[start:stop].to(torch.float64), inverse)
         torch.remainder(frac, 1.0, out=frac)
         bins = torch.minimum(torch.clamp((frac * scale).long(), min=0), top)
+        if skin:  # layer 0 the skin below ``skin``, the last one the skin from 1 - ``skin``, the others one up
+            first = frac[:, 0]
+            bins[:, 0] = torch.where(first < skin, 0, torch.where(first >= 1 - skin, layers - 1, bins[:, 0] + 1))
         block[start:stop] = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
         del bins, frac
     order = torch.sort(block, stable=True).indices  # within a block: increasing atom index
-    counts = torch.bincount(block, minlength=k[0] * k[1] * k[2]).cpu().tolist()
+    counts = torch.bincount(block, minlength=blocks).cpu().tolist()
     del block
     if row_ptr is None:  # no degrees: consecutive pieces of ``receivers`` in every block
         tiles, start = [], 0
@@ -529,7 +555,7 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
             tiles.extend(order[piece:min(piece + receivers, start + count)]
                          for piece in range(start, start + count, receivers))
             start += count
-        return tiles, tuple(k)
+        return tiles, (layers, k[1], k[2])
     degree = (row_ptr[1:] - row_ptr[:-1])[order].cpu()
     cumulative = torch.cat([torch.zeros(1, dtype=torch.int64), torch.cumsum(degree, 0)]).numpy()
     tiles = []
@@ -537,7 +563,7 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     for count in counts:
         tiles.extend(order[a:b] for a, b in _split_block(cumulative, start, start + count, receivers, edges))
         start += count
-    return tiles, tuple(k)
+    return tiles, (layers, k[1], k[2])
 
 
 def _split_block(cumulative, start, stop, receivers, edges):
@@ -794,6 +820,7 @@ class TiledForceField:
         # TileConfig.lanes: the second lane's padded slots (by edge bucket), its green-context streams (with their
         # contexts) once made, whether the first call's memory model fits a second workspace, and the decision.
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
+        self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
@@ -1339,7 +1366,10 @@ class TiledForceField:
         if self._reusing:  # the kept plan, back on the device for this call
             tiles, grid = [t.to(self.device) for t in self._kept["tiles"]], self._kept["grid"]
         else:
-            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
+            reach, layers = self._boundary_reach(n)
+            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap, reach, layers)
+            split = _grid_shape(cell.detach().cpu(), n, self.receivers, reach, layers)[1] > 0
+            self._plan_skin = reach if split else 0.0
             if self._kept is not None:
                 self._kept["tiles"], self._kept["grid"] = [t.cpu() for t in tiles], grid
         self._tile_index = {t.data_ptr(): i for i, t in enumerate(tiles)}
@@ -1369,7 +1399,8 @@ class TiledForceField:
             steps, lane_peak = lane_steps(steps, [int(t.shape[0]) for t in tiles])
             pool_rows = max(pool_rows, lane_peak) if wave else pool_rows
         stats["lanes"] = self.lanes_state
-        stats["wavefront"] = dict(on=wave, pool_rows=pool_rows, pool_fraction=pool_rows / max(n, 1))
+        stats["wavefront"] = dict(on=wave, pool_rows=pool_rows, pool_fraction=pool_rows / max(n, 1),
+                                  boundary_skin=self._plan_skin)  # the split's reach (Angstrom), 0: none
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
             stats["slot_needs"] = {key: self.slot_needs[key] for key in sorted(self.slot_needs)}
@@ -1747,6 +1778,14 @@ class TiledForceField:
         stats["max_receivers"] = max(stats["max_receivers"], r)
         stats["max_halo"] = max(stats["max_halo"], h)
         stats["max_edges"] = max(stats["max_edges"], ei.shape[1])
+
+    def _boundary_reach(self, n):
+        """``TileConfig.boundary_skin``: the plan's ``reach`` and ``min_layers`` (``plan_tiles``); no split without
+        the wavefront, and with "auto" only where its grid would have the layers anyway."""
+        if not self.config.boundary_skin or not self._wave_expected(n):
+            return 0.0, 0
+        reach = float(self.field.neighbours.cutoff) + self._reuse_skin()
+        return reach, (4 if self.config.wavefront == "on" else WAVEFRONT_LAYERS)
 
     def _wavefront_on(self, grid, n):
         """Whether this call runs the wavefront schedule (``TileConfig.wavefront``)."""
