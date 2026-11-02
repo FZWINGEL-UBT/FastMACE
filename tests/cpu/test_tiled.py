@@ -832,6 +832,51 @@ def test_wavefront_with_and_without_kept_lists_is_the_same_call():
             assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
+def test_wavefront_band_cache_of_kept_lists_after_motion_is_a_fresh_search(monkeypatch):
+    """The band cache of the filtered kept lists (wavefront, ``list_reuse``): on a call that reuses the kept lists
+    after a move within skin / 2 (pairs cross the cutoff), sweeps 2 and 3 read the tiles' lists filtered at the
+    current positions in sweep 1, bitwise a fresh search on the same tiles; the next call filters again. With the
+    host below the floor on that call, the cache is dropped and the kept lists are still reused, bitwise the same."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, wavefront="on",
+                  wavefront_group=2, boundary_skin=False)
+    cached = TiledForceField(field, TileConfig(12, list_reuse=True, **config))
+    starved = TiledForceField(field, TileConfig(12, list_reuse=True, **config))
+    fresh = TiledForceField(field, TileConfig(12, list_reuse=False, **config))
+    x0 = field._prepare_one_off(atoms).clone()
+    rng = np.random.default_rng(11)
+    direction = torch.tensor(rng.normal(size=(len(atoms), 3)), dtype=x0.dtype)
+    direction /= direction.norm(dim=1, keepdim=True)
+    moves = [x0 + 0.4 * field.neighbours.skin * direction, x0 - 0.3 * field.neighbours.skin * direction]
+    for tiled in (cached, starved, fresh):
+        tiled(x0)  # TorchScript's first call in a process rounds differently
+    edges0 = cached.last["edges"]
+    tiles = [t.to(x0.device) for t in cached._kept["tiles"]]
+    original = tiled_module.plan_tiles
+    for x in moves:
+        got = cached(x)
+        assert cached.last["list_reused"] is True and cached.last["list_cache"] == "on"
+        assert cached.last["list_cache_hits"] == 2 * cached.last["tiles"] and cached.last["list_cache_bytes"] == 0
+        with monkeypatch.context() as patch:
+            patch.setattr(tiled_module, "_host_available", lambda: 0)  # below the floor while the cache fills
+            low = starved(x)
+        assert starved.last["list_reused"] is True and starved._kept is not None
+        assert starved.last["list_cache"].startswith("off: ") and starved.last["list_cache_hits"] == 0
+        with monkeypatch.context() as patch:
+            patch.setattr(tiled_module, "plan_tiles", lambda *a, **k: (tiles, cached._kept["grid"]))
+            expected = fresh(x)
+        assert tiled_module.plan_tiles is original
+        assert fresh.last["edges"] == cached.last["edges"] == starved.last["edges"]
+        for one in (got, low):
+            assert torch.equal(one.energy, expected.energy) and torch.equal(one.forces, expected.forces)
+            assert torch.equal(one.stress, expected.stress)
+        assert cached.last["edges"] != edges0  # pairs crossed the cutoff
+
+
 def test_boundary_skin_plan_splits_the_first_and_last_layer_at_the_reach():
     """``plan_tiles(reach=...)``: along the first axis, layer 0 holds the atoms within ``reach`` of the periodic
     boundary from below, the last layer those within ``reach`` of it from above, the k layers between them the
