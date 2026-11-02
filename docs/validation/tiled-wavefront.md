@@ -66,5 +66,9 @@ earlier one was 78.1M).
 
 - **Run:** `results/tiled-omat-20261102/runs/leto-w-omat-scan-SrTiO3-270x270x270/`.
 
-122M on murphy (290×290×290): the eager call passed (4,054 s, GPU peak 14.4 GiB, host 110 GiB). The compiled
-call is still running.
+**122M atoms on murphy (SrTiO3 290×290×290, the same source):** valid, the new record.
+- **Calls:** eager 4,054 s (GPU peak 14.4 GiB, host 110 GiB); compiled 2,710 s at R = 8,192 over 17,250 tiles (GPU
+  peak 16.31 GiB, host peak 144.7 GiB).
+- **Run:** `results/tiled-omat-20261102/runs/murphy-w-omat-scan-SrTiO3-290x290x290/`.
+
+149M on murphy (310×310×310, host needs about 193 GB of 265 GB available) is running.

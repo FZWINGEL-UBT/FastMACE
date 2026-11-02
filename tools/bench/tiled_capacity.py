@@ -69,6 +69,9 @@ def parse_args(argv=None):
                         "PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync)")
     p.add_argument("--prefetch", choices=("on", "off"), default="on",
                    help="TileConfig.prefetch: the next tile's graph and host rows prepared on a side stream")
+    p.add_argument("--backward-chunk-scale", type=int, default=1,
+                   help="screen: the chunked streaming backward's edges per chunk times this (fewer launches per "
+                        "tile; 1: the L2 rule)")
     p.add_argument("--profile-last", action="store_true",
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")
@@ -290,6 +293,11 @@ def main(argv=None):
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
         record["mode"] = args.mode
+        chunked = [module for module in getattr(field.model, "_orig_mod", field.model).modules()
+                   if getattr(module, "chunked_backward_edges", 0) > 0]
+        for module in chunked:
+            module.chunked_backward_edges *= args.backward_chunk_scale
+        record["backward_chunk_edges"] = [module.chunked_backward_edges for module in chunked]
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges, mode=args.mode,
                                                   neighbours="tiles" if args.tile_list else "global",
                                                   budget_receivers=() if args.no_budget else
