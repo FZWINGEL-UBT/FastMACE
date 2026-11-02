@@ -27,6 +27,7 @@ readout. Tiles are planned on the host from a spatial binning of the fractional 
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import functools
 import inspect
@@ -127,6 +128,12 @@ class TileConfig:
     # ``LANE_GPUS`` when the first call's memory model fits a second tile workspace; "on" refuses elsewhere (off a
     # CUDA device the lanes run one after the other: the CPU tests' stand-in).
     lanes: str = "auto"
+    # Padded tiles with the state on the host (CUDA): the next tile's graph is built, and the host rows its sweep
+    # reads gathered and copied, on a side stream while the current tile runs, so the host's syncs and gathers no
+    # longer drain the device's queue at every tile (a profiled 5M call left the GPU idle 17 % of the time).
+    # Bitwise the same call: the same graphs and rows, read where the sweep would read them. Rows are fetched ahead
+    # only within a run of one sweep (2 or 3), where no host write reaches a row the next tile reads.
+    prefetch: bool = True
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -180,6 +187,7 @@ class _State:
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
         # wavefront (``pool``): x and sc (with their aliased adjoints) in pooled rows, ``_row_of`` each atom's
         self.pooled, self._row_of = False, None
+        self.prefetched = {}  # TileConfig.prefetch: the running tile's rows, fetched ahead (name -> device rows)
 
     def pool(self, rows, n):
         """The wavefront schedule: x, sc and their aliased adjoints in ``rows`` pooled rows instead of ``n``; an atom
@@ -285,11 +293,29 @@ class _State:
         x rows), and every sweep ends with the writes applied."""
         import torch
 
+        fetched = self.prefetched.pop(name, None)
+        if fetched is not None and fetched.shape[0] == index.shape[0]:
+            if fetched.is_cuda:  # made on the prefetch stream
+                fetched.record_stream(torch.cuda.current_stream(fetched.device))
+            return fetched
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
             return tensor[index]
         index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
+            return tensor.index_select(0, index).to(self.device)
+        staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
+        torch.index_select(tensor, 0, index, out=staging)
+        return staging.to(self.device, non_blocking=True)
+
+    def fetch(self, name, index):
+        """``rows(name, index)`` for a host ``index``, copied on the current stream without waiting (the prefetch
+        stream's: its event orders the read)."""
+        import torch
+
+        tensor = self.tensors[self._storage.get(name, name)]
+        index = self._rows_of(name, index, read=True)
+        if self.device.type != "cuda":
             return tensor.index_select(0, index).to(self.device)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
         torch.index_select(tensor, 0, index, out=staging)
@@ -739,6 +765,7 @@ class TiledForceField:
         # TileConfig.lanes: the second lane's padded slots (by edge bucket), its green-context streams (with their
         # contexts) once made, whether the first call's memory model fits a second workspace, and the decision.
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
+        self._prep_stream = None  # TileConfig.prefetch's side stream
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
 
@@ -1128,7 +1155,7 @@ class TiledForceField:
                 out[name] = torch.empty_like(value)
             out[name].copy_(value)
 
-    def _scatter(self, sweep, slot, g, piece):
+    def _scatter(self, sweep, slot, g, piece, host_nodes=None):
         """Add the slot's outputs into the global buffers (outside the graphs: warm-ups and captures have no side
         effects). Padding rows read atom 0 and add exact zeros to it; with the state aliased, only the tile's real
         rows are written (dE/dsc overwrites sc, and dE/dx sums in the window of the tile's own atoms)."""
@@ -1141,8 +1168,9 @@ class TiledForceField:
             g["node_es"].index_add_(0, recv, out["es"])
             if state.pooled:  # only the real receivers have pooled rows (their x and sc, written once)
                 r = piece[4]
-                state.put("x", recv[:r], out["x"][:r])
-                state.put("sc", recv[:r], out["sc"][:r])
+                index = recv[:r] if host_nodes is None else host_nodes[:r]  # host nodes: no sync for the pool rows
+                state.put("x", index, out["x"][:r])
+                state.put("sc", index, out["sc"][:r])
                 return
             state.add("x", recv, out["x"])
             state.add("sc", recv, out["sc"])
@@ -1155,7 +1183,7 @@ class TiledForceField:
                               torch.arange(receivers, receivers + h, device=self.device)])
             g["node_es"].index_add_(0, recv, out["es"])
             state.add("gx", nodes, out["g_x"][rows])
-            state.put("gsc", nodes[:r], out["g_sc"][:r])
+            state.put("gsc", nodes[:r] if host_nodes is None else host_nodes[:r], out["g_sc"][:r])
         elif sweep == 2:
             g["node_es"].index_add_(0, recv, out["es"])
             state.add("gx", slot["nodes"], out["g_x"])
@@ -1340,20 +1368,67 @@ class TiledForceField:
             streams = self._lane_streams[0] if lanes and self.device.type == "cuda" else None
             lane_strain = [torch.zeros_like(strain_grad) for _ in range(2)] if lanes else None
 
-            def tile(sweep, index, lane=None):
+            # TileConfig.prefetch: the next tile's graph (and, within a run of sweep 2 or 3, its host rows) on a side
+            # stream; the tiles' receivers on the host (the pool's assign and release index with them, no sync).
+            ahead = self.config.prefetch and padded and state.host
+            prep = None
+            if ahead and self.device.type == "cuda":
+                if self._prep_stream is None:
+                    self._prep_stream = torch.cuda.Stream(self.device)
+                prep = self._prep_stream
+                prep.wait_stream(torch.cuda.current_stream())  # the call's positions, bins and plan
+            host_tiles = [t.cpu() for t in tiles] if ahead and wave else None
+            order = [(item[0], index, (k if len(item) == 3 or (lanes and item[0] == 2) else None))
+                     for item in steps for k, index in enumerate(item[1:])]
+            prepared = {}
+
+            def prepare(position):
+                """Build tile ``order[position]``'s graph ahead; fetch its rows when the sweep before it is its own."""
+                sweep, index, lane = order[position]
+                slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]]
+                rows = position > 0 and order[position - 1][0] == sweep and sweep in (2, 3)
+                with torch.cuda.stream(prep) if prep is not None else contextlib.nullcontext():
+                    piece = self._tile_graph(tiles[index], source, local_of, slot["sizes"][0])
+                    nodes = piece[0].cpu()  # waits for the prefetch stream only
+                    fetched = {}
+                    if rows:  # the slot's layout (_fill): receivers, then the halo after the receiver slots
+                        size, halo = slot["sizes"][0], slot["sizes"][1]
+                        r, h = piece[4], piece[5]
+                        layout = torch.zeros(size + halo, dtype=torch.int64)
+                        layout[:r] = nodes[:r]
+                        layout[size:size + h] = nodes[r:]
+                        names = (("x", layout), ("sc", layout[:size])) if sweep == 2 else (
+                            ("gx", layout[:size]), ("gsc", layout[:size]))
+                        fetched = {name: state.fetch(name, rows_) for name, rows_ in names}
+                    event = None
+                    if prep is not None:
+                        event = torch.cuda.Event()
+                        event.record(prep)
+                prepared[position] = (piece, nodes, fetched, event)
+
+            def tile(sweep, index, lane=None, position=None):
                 """One sweep on one tile; ``lane`` 0 or 1: sweep 2 of a pair, on that lane's stream and slots."""
                 nonlocal bound
                 receivers = tiles[index]
                 if sweep == 1 and wave:
-                    state.assign(receivers)
+                    state.assign(receivers if host_tiles is None else host_tiles[index])
                 state.new_tile()
                 slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]] if padded else None
-                piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
+                ready = prepared.pop(position, None)
+                host_nodes, fetched = None, {}
+                if ready is None:
+                    piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
+                else:
+                    piece, host_nodes, fetched, event = ready
+                    if event is not None:
+                        torch.cuda.current_stream().wait_event(event)
+                        for tensor in piece[:4]:  # made on the prefetch stream
+                            tensor.record_stream(torch.cuda.current_stream())
                 self._note(stats, piece)
                 if sweep == 1:
                     stats["edges"] += piece[1].shape[1]
                     if aliased and not wave:
-                        state.touch(piece[0], index, n)
+                        state.touch(piece[0] if host_nodes is None else host_nodes, index, n)
                 if padded:
                     if bound is not slot:  # the streaming kernels read this slot's edge count and tables
                         for module in field._streaming:
@@ -1364,35 +1439,48 @@ class TiledForceField:
                         torch.cuda.current_stream().wait_event(slot["event"])
                         slot["event"] = None
                     self._fill(slot, piece)
+                    state.prefetched = fetched  # rows() takes these instead of gathering them now
+                    following = position is not None and position + 1 < len(order)
                     if lane is None:
                         self._run_slot(sweep, slot, g)
-                        self._scatter(sweep, slot, g, piece)
+                        if following:
+                            prepare(position + 1)  # while this tile runs (its scatter only queues)
+                        self._scatter(sweep, slot, g, piece, host_nodes)
                     else:  # the lane's own strain gradient (a plain add_); forces and node energies add atomically
                         lane_g = dict(g, strain_grad=lane_strain[lane])
                         if streams is None:  # off a CUDA device: the lanes one after the other
                             self._run_slot(sweep, slot, lane_g)
-                            self._scatter(sweep, slot, lane_g, piece)
+                            if following:
+                                prepare(position + 1)
+                            self._scatter(sweep, slot, lane_g, piece, host_nodes)
                         else:
                             stream = streams[lane]
                             stream.wait_stream(torch.cuda.current_stream())  # the slot's filled buffers
                             with torch.cuda.stream(stream):
+                                for tensor in fetched.values():
+                                    tensor.record_stream(stream)
                                 self._run_slot(sweep, slot, lane_g)
-                                self._scatter(sweep, slot, lane_g, piece)
+                            if following:
+                                prepare(position + 1)
+                            with torch.cuda.stream(stream):
+                                self._scatter(sweep, slot, lane_g, piece, host_nodes)
                                 slot["event"] = torch.cuda.Event()
                                 slot["event"].record(stream)
-                            for tensor in piece[:4]:  # made on this stream, read by the lane's scatter
+                            for tensor in piece[:4]:  # read by the lane's scatter
                                 tensor.record_stream(stream)
+                    state.prefetched = {}
                 else:
                     self._eager_tile(sweep, piece, g)
                 if sweep == 2 and aliased:
                     state.close(index)
                 del piece
-                if sweep == 3 and wave:
-                    state.release(receivers)  # its reads are done (rows() copies on the host before it returns)
+                if sweep == 3 and wave:  # its reads are done (rows() copies on the host before it returns)
+                    state.release(receivers if host_tiles is None else host_tiles[index])
                     if self._list_cache is not None:
                         self._list_cache.pop(receivers.data_ptr(), None)  # no sweep reads this tile's lists again
 
             loop_started = time.perf_counter()
+            position = 0
             for item in steps:
                 sweep = item[0]
                 if sweep != previous and sweep != 1:
@@ -1404,13 +1492,10 @@ class TiledForceField:
                     for stream in streams:
                         torch.cuda.current_stream().wait_stream(stream)
                 previous = sweep
-                if len(item) == 3:
-                    tile(2, item[1], lane=0)
-                    tile(2, item[2], lane=1)
-                elif lanes and sweep == 2:
-                    tile(2, item[1], lane=0)
-                else:
-                    tile(sweep, item[1])
+                for k, index in enumerate(item[1:]):
+                    lane = k if len(item) == 3 or (lanes and sweep == 2) else None
+                    tile(sweep, index, lane=lane, position=position if ahead else None)
+                    position += 1
             if streams is not None:
                 for stream in streams:
                     torch.cuda.current_stream().wait_stream(stream)
