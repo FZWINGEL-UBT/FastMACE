@@ -40,8 +40,8 @@ from fastmace.model.forces import ForceOutput
 # (tiled-compiled-default.md).
 COMPILED_RESIDENCY = int(0.07 * 2**30)
 COMPILED_MARGIN = 2**30
-# TileConfig.wavefront "auto": on from this many layers of the tile grid along its slowest axis. The band of live rows
-# is about five layers (three around sweep 2, and the periodic images' first and last layers, alive for the whole call).
+# TileConfig.wavefront "auto": considered from this many layers of the tile grid along its slowest axis (the band of
+# live rows is about five layers: three around sweep 2, and the first and last layers, alive for the whole call).
 WAVEFRONT_LAYERS = 12
 
 
@@ -109,9 +109,9 @@ class TileConfig:
     # its x, and sweep 3 just after the last sweep-2 tile that adds to its receivers' dE/dx. x, sc and their adjoints
     # then live in a pool of the rows of the atoms between their sweeps 1 and 3 instead of [N, width] tensors: per
     # atom bitwise today's state and node energies, the forces and stress summed in another order (float32 rounding;
-    # the scatter is atomic on the GPU anyway). "auto": on from ``WAVEFRONT_LAYERS`` layers of the tile grid, where the
-    # band of live rows is a small part of the atoms. The search pass that plans it keeps no tile lists, so the tiles
-    # search once more than without it.
+    # the scatter is atomic on the GPU anyway). The search pass that plans it keeps no tile lists, so the tiles
+    # search once more (about 3 % of a call). "auto": on from ``WAVEFRONT_LAYERS`` layers of the tile grid when the
+    # plain state would leave the host below ``list_reuse_floor``.
     wavefront: str = "auto"
 
     def __post_init__(self):
@@ -429,17 +429,17 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     consecutive pieces (in index order) below both. A rule on the cell geometry and the caps only. ``row_ptr``
     None: no degrees (the tiles build their own lists), so a block splits into consecutive pieces of ``receivers``.
 
-    The fractional coordinates are reduced in place and the block index is computed in chunks, so the plan's
-    whole-system transients stay small (tiled-call-memory.md); the values are the unchunked ones.
+    The fractional coordinates and the block index are computed in chunks, element-wise, so the plan's whole-system
+    transients stay small (tiled-call-memory.md); the values are the unchunked ones.
     """
     import torch
 
+    from fastmace.neighbors.skin import times_3x3
     from fastmace.neighbors.tile_list import CHUNK
 
     n = positions.shape[0]
     cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
-    frac = positions.to(torch.float64) @ torch.linalg.inv(cell64)
-    torch.remainder(frac, 1.0, out=frac)
+    inverse = torch.linalg.inv(cell64)
     volume = abs(float(torch.linalg.det(cell64)))
     recip = torch.linalg.inv(cell64).T
     spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
@@ -447,13 +447,18 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     k = [max(1, round(s / side)) for s in spacings]
     scale = torch.tensor(k, dtype=torch.float64, device=positions.device)
     top = torch.tensor([x - 1 for x in k], device=positions.device)
-    block = torch.empty(n, dtype=torch.int64, device=positions.device)
+    # The fractional coordinates per chunk (element-wise, as the tile lists' bins: no float64 GEMM, whose emulated
+    # forms round coarsely), and the block index in int32 below 2**31 blocks: no whole-system float64 transient,
+    # 4 bytes per atom of keys (tiled capacity, lever 5).
+    blocks = k[0] * k[1] * k[2]
+    block = torch.empty(n, dtype=torch.int32 if blocks < 2**31 else torch.int64, device=positions.device)
     for start in range(0, n, CHUNK):
         stop = min(start + CHUNK, n)
-        bins = torch.minimum(torch.clamp((frac[start:stop] * scale).long(), min=0), top)
+        frac = times_3x3(positions[start:stop].to(torch.float64), inverse)
+        torch.remainder(frac, 1.0, out=frac)
+        bins = torch.minimum(torch.clamp((frac * scale).long(), min=0), top)
         block[start:stop] = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
-        del bins
-    del frac
+        del bins, frac
     order = torch.sort(block, stable=True).indices  # within a block: increasing atom index
     counts = torch.bincount(block, minlength=k[0] * k[1] * k[2]).cpu().tolist()
     del block
@@ -625,6 +630,7 @@ class TiledForceField:
             self._species, self._width, self._attrs_dtype = field._species_index, stored.shape[1], stored.dtype
             field.release_node_attrs()
             field.release_whole_system()  # the per-atom buffers only the whole-system call reads
+            self._species = field._species_index  # now int32
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
@@ -651,6 +657,7 @@ class TiledForceField:
         self._pool = None
         self._stream = None
         self._cache_paused = False  # the wavefront's search pass: the tile lists are not kept
+        self._wave_auto = {}  # TileConfig.wavefront "auto": the decision per atom count
         self.last = {}
 
     @property
@@ -864,7 +871,7 @@ class TiledForceField:
 
         if self._species is None:
             return self.node_attrs[nodes]
-        return torch.nn.functional.one_hot(self._species[nodes], self._width).to(self._attrs_dtype)
+        return torch.nn.functional.one_hot(self._species[nodes].long(), self._width).to(self._attrs_dtype)
 
     @staticmethod
     def _masked(value, mask):
@@ -1291,7 +1298,7 @@ class TiledForceField:
                     volume = torch.linalg.det(cell.to(torch.float64)).abs()
                     out_stress = (strain_grad / volume).to(self.dtype)  # MACE: dE/d(strain) / V
             self.last = stats
-            out = ForceOutput(energy, forces.clone(), out_stress)
+            out = ForceOutput(energy, forces, out_stress)
             if self._auto or not self._budgeted:
                 memory = self._memory()  # None without a CUDA device: the mode and the cap stay
                 self._choose_mode(memory)
@@ -1371,7 +1378,6 @@ class TiledForceField:
             g = dict(n=n, pos=pos, head=head,
                      heads=head.expand(n + 1) if shared else torch.cat([heads, heads[-1:]]),
                      arange=torch.arange(min(n, max(caps)) + 1, device=self.device),
-                     forces=torch.zeros((n, 3), dtype=self.dtype, device=self.device),
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
@@ -1382,7 +1388,11 @@ class TiledForceField:
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))
         g["stress"] = stress
-        for tensor in [g["forces"], g["node_es"], g["strain_grad"]]:
+        # A new force buffer every call, handed out as the call's forces (no copy; the scatter runs outside the
+        # graphs, so its address may change): 12 bytes per atom less on the device than a kept buffer and its copy.
+        g["forces"] = None
+        g["forces"] = torch.zeros((n, 3), dtype=self.dtype, device=self.device)
+        for tensor in [g["node_es"], g["strain_grad"]]:
             tensor.zero_()
         g["state"].zero()
         return g
@@ -1405,7 +1415,35 @@ class TiledForceField:
         config = self.config
         if config.wavefront == "off" or not config.alias_state:
             return False
-        return config.wavefront == "on" or (int(grid[0]) >= WAVEFRONT_LAYERS and n >= 2**20)
+        if config.wavefront == "on":
+            return True
+        if int(grid[0]) < WAVEFRONT_LAYERS:
+            return False
+        # "auto": only where the plain state (x and sc, and the alias window, about a quarter more) would leave the
+        # host below the floor: the schedule costs about 3 % of a call (its search pass; 5M SrTiO3, both Ada GPUs).
+        # Decided on the first call at an atom count, then kept.
+        decided = self._wave_auto.get(n)
+        if decided is None:
+            width, available = self._state_width(), _host_available()
+            if width is None or available is None:
+                decided = n >= 2**20
+            else:
+                itemsize = 8 if str(self.dtype) == "torch.float64" else 4
+                decided = 1.25 * n * width * itemsize + int(config.list_reuse_floor) > available
+            self._wave_auto[n] = decided
+        return decided
+
+    def _state_width(self):
+        """Floats per atom of the plain host state (x and sc): from the allocated state, else the model's
+        ``linear_up`` and ``skip_tp`` output widths; None when unknown."""
+        g = getattr(self, "_g", None)
+        if g is not None and g["state"].tensors:
+            return sum(int(t.shape[1]) for name, t in g["state"].tensors.items() if name in ("x", "sc"))
+        interaction = self.model.interactions[1]
+        try:
+            return int(interaction.linear_up.irreps_out.dim) + int(interaction.skip_tp.irreps_out.dim)
+        except AttributeError:
+            return None
 
     def _wavefront(self, tiles, source, local_of, n, padded):
         """The wavefront's search pass: every tile's graph built once (without keeping its lists), recording each
@@ -1440,7 +1478,7 @@ class TiledForceField:
             self._cache_paused = False
         ready = torch.full((len(tiles),), -1, dtype=torch.int64).scatter_reduce_(
             0, owner.cpu().long(), last.long(), "amax")
-        del owner
+        owner = None  # 4 bytes per atom on the device, before the sweeps
         steps, peak = wavefront_schedule(needs, ready.tolist(), [int(t.shape[0]) for t in tiles])
         return keys, steps, peak, first, last
 

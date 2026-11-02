@@ -740,6 +740,23 @@ def test_wavefront_call_equals_the_three_sweep_call(mode, overlap):
         assert relative(wave[2], plain[2]) <= 1e-13
 
 
+@pytest.mark.parametrize("available, on", [(2**40, False), (2**20, True)])
+def test_wavefront_auto_only_where_the_plain_state_would_not_fit(available, on, monkeypatch):
+    """``wavefront="auto"``: from ``WAVEFRONT_LAYERS`` grid layers, on only when the plain state would leave the host
+    below the floor (decided once per atom count)."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "WAVEFRONT_LAYERS", 8)
+    monkeypatch.setattr(tiled_module, "_host_available", lambda: available)
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(12, neighbours="tiles", state="host", alias_state=True,
+                                              list_reuse=False, list_reuse_floor=2**21))
+    tiled.evaluate(atoms)
+    assert tiled.last["wavefront"]["on"] is on
+    assert tiled._wave_auto == {len(atoms): on}
+
+
 def test_wavefront_needs_the_aliased_state():
     with pytest.raises(ValueError, match="wavefront"):
         TileConfig(5, state="host", wavefront="on")

@@ -894,6 +894,14 @@ class MACEForceField:
             self.data[key] = torch.empty(value.shape, dtype=value.dtype, device="meta")
         if not self.is_polar and not any(self._has_total.values()):
             self.charges = torch.empty(self.charges.shape, dtype=self.charges.dtype, device="meta")
+        # int32 species columns and sender groups (the tiles index with them; their refreshes write int32 from int32
+        # tables, the same values): 8 bytes per atom less for each, and the neighbour list's groups are the same tensor.
+        self._column_of, self._group_of = self._column_of.to(torch.int32), self._group_of.to(torch.int32)
+        self._species_index = self._species_index.to(torch.int32)
+        shared = getattr(self.neighbours, "sender_groups", None) is self._sender_groups
+        self._sender_groups = self._sender_groups.to(torch.int32)
+        if shared:
+            self.neighbours.sender_groups = self._sender_groups
         self.whole_system_released = True
 
     def node_e0(self, rows=None):
