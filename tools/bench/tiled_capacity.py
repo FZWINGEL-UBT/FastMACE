@@ -76,6 +76,13 @@ def parse_args(argv=None):
     p.add_argument("--backward-chunk-scale", type=int, default=None,
                    help="TileConfig.backward_chunk_scale: the chunked streaming backward's edges per chunk in the "
                         "tiles times this (none: by device name)")
+    p.add_argument("--list-cache", choices=("on", "off"), default="on",
+                   help="TileConfig.list_cache: a tile's lists kept on the host within the call (with kept lists: "
+                        "its filtered ones in the wavefront's band)")
+    p.add_argument("--backward-single-stream", type=float, default=None, metavar="FRACTION",
+                   help="oeq_streaming SINGLE_STREAM_SLOT_L2_FRACTION: the chunked backward on one slot and the "
+                        "current stream where a chunk's slot is at least this fraction of the L2 (none: two slots, "
+                        "side stream)")
     p.add_argument("--profile-last", action="store_true",
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")
@@ -290,11 +297,15 @@ def main(argv=None):
     from fastmace.model.tiled import TileConfig, TiledForceField
     from fastmace.planner import minimal
 
+    if args.backward_single_stream is not None:
+        from fastmace.kernels.oeq_streaming import runtime as oeq_runtime
+        oeq_runtime.SINGLE_STREAM_SLOT_L2_FRACTION = float(args.backward_single_stream)
     repeat = tuple(int(x) for x in args.repeat.lower().split("x"))
     atoms = supercell(args.structure, repeat, args.rattle, args.strain)
     n = len(atoms)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, receivers=args.receivers,
                   edges=args.edges, rattle=args.rattle, strain=args.strain, model=args.model,
+                  backward_single_stream=args.backward_single_stream,
                   device=torch.cuda.get_device_name(), torch=torch.__version__,
                   alloc_conf=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"),
                   source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"), phases={})
@@ -345,6 +356,7 @@ def main(argv=None):
                                                   prefetch=args.prefetch == "on",
                                                   boundary_skin=args.boundary_skin == "on",
                                                   backward_chunk_scale=args.backward_chunk_scale,
+                                                  list_cache=args.list_cache == "on",
                                                   **({} if args.wavefront_group is None else
                                                      dict(wavefront_group=args.wavefront_group)),
                                                   species="index" if args.species_index else "one_hot"))

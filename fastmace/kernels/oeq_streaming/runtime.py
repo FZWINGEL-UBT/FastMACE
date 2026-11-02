@@ -239,6 +239,12 @@ def chunks_the_backward(edges, weight_dim, itemsize, device):
 
 _SIDE_STREAMS = {}  # device index -> the side stream of the chunked backward's input gradients
 
+# The chunked backward on one slot and the current stream (each chunk's input gradient right after its weight
+# gradient, as the recomputing backward runs) where a chunk's slot is at least this fraction of the L2: the two
+# slots of the side-stream path then no longer fit in it together (the tiles' backward_chunk_scale makes a slot up
+# to a whole L2). None: always two slots and the side stream. Under A/B (tiled band lists, #2); not a default yet.
+SINGLE_STREAM_SLOT_L2_FRACTION = None
+
 
 def _side_stream(device):
     index = torch.device(device).index
@@ -279,6 +285,14 @@ def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: t
         input_grad_into(dweights, weight, main, last, da, tile_rule)
         return dx, dsh, da
     rows = max(1, min(int(chunk_edges), edges))
+    fraction = SINGLE_STREAM_SLOT_L2_FRACTION
+    if fraction is not None and rows * weights.shape[1] * weights.element_size() >= fraction * l2_bytes(x.device):
+        slot = weights.new_empty((rows, weights.shape[1]))
+        for start in range(0, edges, rows):
+            stop = min(edges, start + rows)
+            kernels.backward_edges(x, sh, weights, senders, receivers, dout, dx, dsh, slot, start, stop)
+            input_grad_into(slot[:stop - start], weight, main, last, da[start:stop], tile_rule)
+        return dx, dsh, da
     slots = weights.new_empty((2, rows, weights.shape[1]))
     current, side = torch.cuda.current_stream(x.device), _side_stream(x.device)
     side.wait_stream(current)
