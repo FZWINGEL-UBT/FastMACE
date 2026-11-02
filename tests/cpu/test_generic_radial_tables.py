@@ -94,6 +94,10 @@ def test_float64_models_are_refused():
     regs.apply(out, regs.resolve(out, asked, strict=False), context(batch), original=model)
     with pytest.raises(reg.RewriteError, match="float32 models only"):
         radial.tabulate_generic(out, context(batch))
+    # "auto" (the record's default) does not take a float64 model: off at resolution, nothing raised at apply.
+    auto = regs.resolve(model, {"generic_fused_radial_backward": "on"}, strict=False)
+    assert not auto.decision("generic_radial_tables").enabled
+    assert "float32 models only" in auto.decision("generic_radial_tables").reason
 
 
 def test_the_planner_keeps_generic_tables_to_measured_gpus_and_float32(monkeypatch):
