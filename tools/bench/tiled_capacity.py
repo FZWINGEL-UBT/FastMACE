@@ -81,8 +81,12 @@ def parse_args(argv=None):
                         "host operations with the most self time (tiled_corun.profile_call)")
     p.add_argument("--tag", default="")
     p.add_argument("--ledger", action="store_true",
-                   help="after the calls, record every live tensor and NumPy array by device, dtype and shape, named "
-                        "where reachable from the user's force field, the evaluation field or the tiled call")
+                   help="after the build and after every call, record every live tensor and NumPy array by device, "
+                        "dtype and shape, named where reachable from the user's force field, the evaluation field "
+                        "or the tiled call (ledgers in the record)")
+    p.add_argument("--memory-history", action="store_true",
+                   help="record the CUDA allocator's trace during the build and keep the allocations live at the "
+                        "build's device peak, by the source line that made them (build_peak in the record)")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
                         "left empty, so it costs no memory")
@@ -221,6 +225,37 @@ def memory_ledger(roots, depth=4):
     return sorted(groups.values(), key=lambda g: -g["bytes"])
 
 
+def peak_live_set(snapshot, top=30):
+    """The device allocations live at the trace's peak, grouped by the first FastMACE or MACE source line of their
+    stack (else the first frame), largest first: ``{peak, groups: [{site, count, bytes}]}``."""
+    live, total, peak, at_peak = {}, 0, 0, {}
+    for trace in snapshot.get("device_traces", []):
+        for entry in trace:
+            action, address, size = entry.get("action"), entry.get("addr"), int(entry.get("size", 0))
+            if action == "alloc":
+                live[address] = (size, entry.get("frames") or [])
+                total += size
+                if total > peak:
+                    peak, at_peak = total, dict(live)
+            elif action in ("free_completed",) and address in live:
+                total -= live.pop(address)[0]
+
+    def site(frames):
+        for frame in frames:
+            name = frame.get("filename", "")
+            if ("fastmace" in name or "/mace/" in name) and "torch" not in name:
+                short = name.split("site-packages/")[-1].split("src-all-")[-1]
+                return f"{short}:{frame.get('line')} {frame.get('name')}"
+        return f"{frames[0].get('filename')}:{frames[0].get('line')}" if frames else "?"
+
+    groups = {}
+    for size, frames in at_peak.values():
+        group = groups.setdefault(site(frames), dict(site=site(frames), count=0, bytes=0))
+        group["count"] += 1
+        group["bytes"] += size
+    return dict(peak=peak, groups=sorted(groups.values(), key=lambda g: -g["bytes"])[:top])
+
+
 def owners(obj, levels=3):
     """What holds an unnamed array: the types (and dict keys) of its referrers, ``levels`` deep."""
     import gc
@@ -278,6 +313,8 @@ def main(argv=None):
     lists.enter_context(no_global_list(args.tile_list))
     try:
         record["phase"] = "build"
+        if args.memory_history:
+            torch.cuda.memory._record_memory_history(max_entries=1_000_000, stacks="python")
         started = time.perf_counter()
         user = fm.ForceField(fm.load(args.model), atoms, precision="float32")
         record["phases"]["user"] = mem()
@@ -313,6 +350,16 @@ def main(argv=None):
         record["backward_chunk_edges"] = [module.chunked_backward_edges for module in tiled.model.modules()
                                           if getattr(module, "chunked_backward_edges", 0) > 0]
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
+        if args.memory_history:
+            record["build_peak"] = peak_live_set(torch.cuda.memory._snapshot())
+            torch.cuda.memory._record_memory_history(enabled=None)
+        ledgers = record["ledgers"] = {}
+
+        def ledger(name):
+            if args.ledger:
+                ledgers[name] = memory_ledger(dict(user=user, field=field, tiled=tiled, atoms=atoms))[:25]
+
+        ledger("build")
         save()
 
         record["phase"] = "neighbours"
@@ -351,6 +398,7 @@ def main(argv=None):
             entry.update(allocated_before=int(before), total_peak=int(before) + entry["peak_above_before"])
             calls.append(entry)
             record["calls"] = calls
+            ledger(f"after call {call}")
             save()
         if args.ledger:
             record["ledger"] = memory_ledger(dict(user=user, field=field, tiled=tiled, atoms=atoms, out=out,

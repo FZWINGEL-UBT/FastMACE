@@ -165,7 +165,10 @@ class FirstInteractionReassociation(torch.nn.Module):
         if self._buffers.get("species_feats") is not species_feats:
             self.register_buffer("species_feats", species_feats, persistent=False)
 
-    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight):
+    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None):
+        """``rows``: the message of the first ``rows`` nodes only, when every edge's receiver is one of them (the
+        tiled call's tiles: the halo's rows are senders only, and the padding edges join a receiver slot); the
+        senders' species still come from every row. None: every node's."""
         onehot = node_attrs[:, self.columns]
         species = onehot.argmax(dim=1)
         x = self.species_feats  # identity basis of the superset (SPEC §8.5), not the first atom of each species
@@ -173,6 +176,8 @@ class FirstInteractionReassociation(torch.nn.Module):
             raise RuntimeError("FirstInteractionReassociation has no species_feats table: bind one "
                                "(identity_species_feats) before calling it")
         nodes, slots = onehot.shape
+        if rows is not None:
+            nodes = int(rows)
         width, dim = augmented.shape[1], edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
         # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
@@ -230,22 +235,22 @@ def identity_species_feats(model, interaction, attrs, count, joint=None):
         return interaction.linear_up(feats)[:count]
 
 
-def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
     """``(message, edge density)`` of a reassociated interaction with a radial table: the table, then the
     reassociation. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward keeps the
     lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again; the reassociation's
     backward needs nothing else of the region, so the compiled backward rebuilds only the table."""
     folded_input, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
     message = self.first_reassociation(node_feats, node_attrs, edge_attrs, folded_input, edge_index,
-                                       self.conv_tp_weights.folded_weight())
+                                       self.conv_tp_weights.folded_weight(), rows)
     return message, edge_density
 
 
-def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
     """``first_table_region`` under non-reentrant checkpoint (``recompute_first_table``)."""
     from torch.utils.checkpoint import checkpoint
 
-    return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+    return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows,
                       use_reentrant=False, preserve_rng_state=False)
 
 
@@ -282,7 +287,8 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         wprime_lengths = edge_feats  # the message and the edge density from one op
     elif table is not None and edge_feats.shape[-1] == 1 and reassociation is not None and getattr(
             self, "recompute_first_table", False):  # recompute_first_table: the table's output is not kept
-        message, edge_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index)
+        message, edge_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                                                       n_real)  # the tiles' receivers only (n_real rows)
     elif table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
         if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
@@ -324,7 +330,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         pass
     elif reassociation is not None:
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
-                                self.conv_tp_weights.folded_weight())
+                                self.conv_tp_weights.folded_weight(), rows=n_real)  # the tiles' receivers only
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv
         message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented,
                                     w_lengths, node_attrs)
