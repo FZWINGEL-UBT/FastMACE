@@ -1118,6 +1118,76 @@ def _apply_generic(model, context):
     return tabulate_generic(model, context)
 
 
+# --------------------------------------------------------------------------- generic_recompute_first_table
+
+
+def attach_generic_first_table(model):
+    """``generic_recompute_first_table``: the generic interactions' table outputs ``[h c, c]`` are not kept for the
+    backward, which evaluates the tables again. The reassociated first interaction runs the table and its message
+    under checkpoint (``generic.modules.first_table_region``); an interaction on the chunked folded path does it
+    inside its convolution when its weights are recomputed too (``generic_recompute_conv_weights``,
+    ``tabled_recompute_convolution``), the one path that keeps ``a`` (with stored weights the backward keeps them
+    and not ``a``). Returns their names."""
+    names = []
+    for index, interaction in _generic_interactions(model):
+        if getattr(interaction, "radial_table", None) is None:
+            continue
+        if getattr(interaction, "first_reassociation", None) is not None:
+            names.append(f"interactions.{index} (reassociated, under checkpoint)")
+        elif getattr(interaction, "chunked_backward_edges", 0) > 0:
+            names.append(f"interactions.{index} (in the convolution, with generic_recompute_conv_weights)")
+        else:
+            continue
+        interaction.recompute_table = True
+    if not names:
+        raise RewriteError("generic_recompute_first_table: no reassociated or chunked interaction with a radial table")
+    return names
+
+
+def _generic_first_table_selfcheck(original, rewritten, context):
+    """Per interaction with the record, the interaction with the record against itself without it, on random
+    leaves (``generic._probe_inputs``) with edge lengths in ``[R_PHYSICAL, r_max)`` and a twelfth at or beyond the
+    cutoff: the outputs and the gradients to the node features (or the species table), the spherical harmonics and
+    the lengths. The same kernels on the same values: equal up to the sender gradients' atomic order."""
+    import torch
+
+    from fastmace.rewrites import generic
+    from fastmace.rewrites.registry import check_tensors
+
+    cases, dtype = [], None
+    generator = torch.Generator().manual_seed(context.seed + 59)
+    for index, interaction in _generic_interactions(rewritten):
+        if not getattr(interaction, "recompute_table", False):
+            continue
+        table = interaction.radial_table
+        probe = generic._probe_inputs(interaction, table.columns, generator,
+                                      getattr(interaction, "first_reassociation", None) is not None)
+        edges = probe["edge_feats"].shape[0]
+        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand((edges, 1), generator=generator, dtype=torch.float64)
+        r[::12] = table.r_max + 0.5 * torch.rand((r[::12].shape[0], 1), generator=generator, dtype=torch.float64)
+        probe["edge_feats"] = r.to(probe["edge_attrs"]).requires_grad_()
+        added = getattr(interaction, "streaming_kernels", None) is not None and not hasattr(interaction,
+                                                                                            "streaming_count")
+        if added:
+            interaction.streaming_count = torch.tensor(edges, device=r.device)
+        results, cotangents = [], []
+        try:
+            for flag in (False, True):
+                interaction.recompute_table = flag
+                results.append(generic._run(interaction, probe, False, cotangents, generator))
+        finally:
+            interaction.recompute_table = True
+            if added:
+                del interaction.streaming_count
+        cases += [(f"interactions.{index}", a, b) for a, b in zip(*results)]
+        dtype = dtype or table.coef.dtype
+    return check_tensors(cases, dtype)
+
+
+def _apply_generic_first_table(model, context):
+    return attach_generic_first_table(model)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
@@ -1131,6 +1201,14 @@ RECORDS = {
         requires=("generic_fused_radial_backward",), conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={},
         exactness="certified", default="off", deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,),
         apply=_apply_generic, selfcheck=_generic_selfcheck, memory=memory_terms.generic_radial_tables),
+    # The generic tables' outputs evaluated again in the backward (omat0-capacity-2, lever 1; MH-1's rebuild-a):
+    # exact (the same table kernel on the same lengths); docs/validation/omat0-capacity-2.md.
+    "generic_recompute_first_table": dict(
+        name="generic_recompute_first_table", config_field="recompute_first_table", applies_to=_generic_support,
+        requires=("generic_radial_tables", "generic_reassociate"), conflicts=(), mace_versions=MACE_VERSIONS,
+        source_hashes={}, exactness="exact", default="off", deterministic=False,
+        workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_generic_first_table,
+        selfcheck=_generic_first_table_selfcheck, memory=memory_terms.generic_recompute_first_table),
     # ideas-20261027 D2: rounding (the series and the folded product reassociated); float64; opt-in.
     "w_tables": Rewrite(
         name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),

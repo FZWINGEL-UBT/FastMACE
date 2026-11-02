@@ -220,6 +220,24 @@ def generic_radial_tables(dims, width):
     return -removed * width, 0
 
 
+def _table_output(interaction):
+    """The floats per edge of a generic interaction's table output ``[h c, c]``: the last radial layer's input and
+    the cutoff column."""
+    return interaction.radial[-2] + 1
+
+
+def generic_recompute_first_table(dims, width):
+    """The reassociated first interaction's table output is not kept for the backward (it keeps the lengths, which
+    the table keeps anyway). With stored weights the other interactions keep the weights, not the table output."""
+    return -_table_output(dims.interactions[0]) * width, 0
+
+
+def generic_recompute_first_table_with_weights(dims, width):
+    """``generic_recompute_first_table`` with ``generic_recompute_conv_weights``: no interaction keeps its table
+    output (the chunked convolution evaluates it again)."""
+    return -sum(_table_output(i) for i in dims.interactions) * width, 0
+
+
 def block_linear_resident(dims, width):
     """Each converted linear keeps its extracted weight and a contiguous transposed copy as buffers
     (``BlockLinear.weight_k``, ``weight_t_k``), beside the execution copy's own parameters."""

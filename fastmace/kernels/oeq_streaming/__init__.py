@@ -22,8 +22,9 @@ from fastmace.kernels.oeq_streaming.runtime import (
                                                     l2_chunk_edges,
                                                     render_kernels,
                                                     streaming_convolution,
+                                                    tabled_recompute_convolution,
 )
 
 __all__ = ["StreamingKernels", "folded_recompute_convolution", "folded_streaming_convolution", "l2_chunk_edges",
            "render_kernels",
-           "streaming_convolution"]
+           "streaming_convolution", "tabled_recompute_convolution"]

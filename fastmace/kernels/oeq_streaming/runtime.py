@@ -417,6 +417,130 @@ def folded_recompute_convolution(a, weight, x, sh, senders, receivers, row_ptr, 
                                              kernels.id, int(chunk_edges), tile_rule, message.id)
 
 
+# generic_recompute_first_table with generic_recompute_conv_weights: the backward consumes the table's input gradient
+# chunk by chunk (the table's backward per chunk), so no [E, P + 1] gradient exists either. Every edge's values are the
+# same either way (the table kernels work per edge); a constant for same-process A/Bs (ab_rewrites --a-constant).
+TABLE_GRADIENT_PER_CHUNK = True
+
+
+@torch.library.custom_op("fastmace::tabled_folded_message", mutates_args=())
+def tabled_folded_message(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor, starts: torch.Tensor,
+                          scales: torch.Tensor, bins: torch.Tensor, r_lo: float, bin_scale: float, r_max: float,
+                          weight: torch.Tensor, x: torch.Tensor, sh: torch.Tensor, senders: torch.Tensor,
+                          receivers: torch.Tensor, row_ptr: torch.Tensor,
+                          fused_id: int) -> tuple[torch.Tensor, torch.Tensor]:
+    """(message, edge density) of the radial table's ``a = [h c, c]`` of the lengths ``r`` and ``fused_folded_message``
+    in one op, so ``a`` is a transient of the op and never an output a compiled graph could keep."""
+    from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message
+    from fastmace.kernels.triton.radial_table import radial_table_forward
+
+    a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
+    return fused_folded_message(a, weight, x, sh, senders, receivers, row_ptr, fused_id), density
+
+
+@tabled_folded_message.register_fake
+def _(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, weight, x, sh, senders, receivers, row_ptr,
+      fused_id):
+    from fastmace.kernels.oeq_streaming import fused_forward
+
+    return x.new_empty((x.shape[0], fused_forward._REGISTRY[fused_id].output_dim)), r.new_empty((r.numel(), 1))
+
+
+@torch.library.custom_op("fastmace::streaming_conv_tabled_recompute_backward", mutates_args=())
+def streaming_conv_tabled_recompute_backward(
+        x: torch.Tensor, sh: torch.Tensor, r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor,
+        dcoef: torch.Tensor, starts: torch.Tensor, scales: torch.Tensor, bins: torch.Tensor, senders: torch.Tensor,
+        receivers: torch.Tensor, dout: torch.Tensor, grad_density: torch.Tensor, weight: torch.Tensor,
+        main: torch.Tensor, last: torch.Tensor, r_lo: float, bin_scale: float, r_max: float, kernel_id: int,
+        chunk_edges: int, tile_rule: str, per_chunk: bool) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """``streaming_conv_folded_recompute_backward`` on the table's ``a`` evaluated again from the lengths, followed by
+    the table's backward: (dx, dsh, dr). The same kernels on the same values as with ``a`` kept, so every edge's
+    values are bitwise those of the kept path (the sender gradients' atomic additions aside). ``per_chunk``: each
+    chunk evaluates its rows of ``a`` and hands its input gradient to the table's backward at once, so neither
+    ``[E, P + 1]`` tensor exists (``TABLE_GRADIENT_PER_CHUNK``)."""
+    from fastmace.kernels.triton.radial_table import radial_table_backward, radial_table_forward
+    from fastmace.kernels.triton.skinny_linear import input_grad_into
+
+    constants = (r_lo, bin_scale, r_max)
+    if not per_chunk:
+        a, _ = radial_table_forward(r, pair, coef, starts, scales, bins, *constants)
+        dx, dsh, da = streaming_conv_folded_recompute_backward(x, sh, a, senders, receivers, dout, weight, main, last,
+                                                               kernel_id, chunk_edges, tile_rule)
+        del a
+        return dx, dsh, radial_table_backward(r, pair, dcoef, starts, scales, bins, da, grad_density, *constants)
+    kernels = _REGISTRY[kernel_id]
+    shape = r.shape
+    x, sh, dout = x.contiguous(), sh.contiguous(), dout.contiguous()
+    r, pair, grad_density = r.reshape(-1).contiguous(), pair.contiguous(), grad_density.reshape(-1).contiguous()
+    senders, receivers = senders.contiguous(), receivers.contiguous()
+    edges = sh.shape[0]
+    dx = torch.zeros_like(x)  # sender gradients are added atomically
+    dsh = torch.empty_like(sh)
+    dr = r.new_empty((edges,))
+    rows = max(1, min(int(chunk_edges), edges))
+    w = x.new_empty((rows, weight.shape[0]))
+    dw = x.new_empty((rows, weight.shape[0]))
+    da = x.new_empty((rows, weight.shape[1]))
+    transposed = weight.t()
+    for start in range(0, edges, rows):
+        stop = min(edges, start + rows)
+        count = stop - start
+        a, _ = radial_table_forward(r[start:stop], pair[start:stop], coef, starts, scales, bins, *constants)
+        torch.matmul(a, transposed, out=w[:count])
+        kernels.backward_edges(x, sh[start:stop], w[:count], senders[start:stop], receivers[start:stop], dout, dx,
+                               dsh[start:stop], dw[:count], 0, count)
+        input_grad_into(dw[:count], weight, main, last, da[:count], tile_rule)
+        dr[start:stop] = radial_table_backward(r[start:stop], pair[start:stop], dcoef, starts, scales, bins, da[:count],
+                                               grad_density[start:stop], *constants)
+    return dx, dsh, dr.reshape(shape)
+
+
+@streaming_conv_tabled_recompute_backward.register_fake
+def _(x, sh, r, pair, coef, dcoef, starts, scales, bins, senders, receivers, dout, grad_density, weight, main, last,
+      r_lo, bin_scale, r_max, kernel_id, chunk_edges, tile_rule, per_chunk):
+    return torch.empty_like(x), torch.empty_like(sh), torch.empty_like(r)
+
+
+class _TabledRecomputeConvolution(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, main, last, x, sh,
+                senders, receivers, row_ptr, kernel_id, chunk_edges, tile_rule, message_id, per_chunk):
+        message, density = tabled_folded_message(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, weight,
+                                                 x, sh, senders, receivers, row_ptr, message_id)
+        ctx.save_for_backward(x, sh, r, pair, coef, dcoef, starts, scales, bins, senders, receivers, weight, main,
+                              last)
+        ctx.constants = (r_lo, bin_scale, r_max, kernel_id, chunk_edges, tile_rule, per_chunk)
+        return message, density
+
+    @staticmethod
+    def backward(ctx, dout, grad_density):
+        x, sh, r, pair, coef, dcoef, starts, scales, bins, senders, receivers, weight, main, last = ctx.saved_tensors
+        if grad_density is None:
+            grad_density = r.new_zeros((r.numel(), 1))
+        dx, dsh, dr = streaming_conv_tabled_recompute_backward(
+            x, sh, r, pair, coef, dcoef, starts, scales, bins, senders, receivers, dout, grad_density, weight, main,
+            last, *ctx.constants)
+        return (dr, *([None] * 12), dx, dsh, *([None] * 8))
+
+
+def tabled_recompute_convolution(r, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, chunk_edges,
+                                 message, tile_rule="fixed", parts=None, per_chunk=None):
+    """``folded_recompute_convolution`` of the radial table's output ``a`` of the lengths ``r`` (``[E, 1]``) and pair
+    indices ``pair``, keeping the lengths instead of ``a`` (``generic_recompute_first_table``): the backward
+    evaluates the table again. ``table`` is a ``RadialTableModule``. Returns (message, edge density); the gradient
+    reaches r, x and sh."""
+    if weight.requires_grad:
+        raise ValueError("tabled_recompute_convolution: the folded weight must not require a gradient")
+    if parts is None:
+        p = weight.shape[1] - 1
+        parts = (weight[:, :p].contiguous(), weight[:, p].contiguous())
+    per_chunk = TABLE_GRADIENT_PER_CHUNK if per_chunk is None else per_chunk
+    return _TabledRecomputeConvolution.apply(r, pair, table.coef, table.dcoef, table.starts, table.scales, table.bins,
+                                             float(table.r_lo), float(table.bin_scale), float(table.r_max), weight,
+                                             parts[0], parts[1], x, sh, senders, receivers, row_ptr, kernels.id,
+                                             int(chunk_edges), tile_rule, message.id, bool(per_chunk))
+
+
 class _StreamingConvolution(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, sh, weights, senders, receivers, row_ptr, kernel_id):

@@ -368,14 +368,16 @@ setattr(cutoff_folded_forward, READS_SPECIES_RESIDUAL, True)
 
 
 def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,
-                      w_lengths=None, node_attrs=None, wprime_lengths=None):
+                      w_lengths=None, node_attrs=None, wprime_lengths=None, table_lengths=None):
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
     radial layer, built inside the convolution, whose backward runs in L2-sized edge chunks; with
     ``fused_folded_forward`` attached (opt-8 OPT8-T02) one kernel builds them and the message. With
     ``wprime_lengths`` (wprime_backward, opt-9 OPT9-T03) the radial table runs inside the op too, which returns
-    ``(message, edge density)``; its backward forms the lengths' gradient without the weight gradient.
+    ``(message, edge density)``; its backward forms the lengths' gradient without the weight gradient. With
+    ``table_lengths`` (generic_recompute_first_table on generic_recompute_conv_weights' path) the op evaluates the
+    radial table itself and keeps the lengths instead of its output; it also returns ``(message, edge density)``.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
@@ -401,6 +403,13 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
         message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
                                            self.streaming_kernels)
+    elif table_lengths is not None:
+        from fastmace.kernels.oeq_streaming import tabled_recompute_convolution
+        radial = self.generic_folded
+        message, density = tabled_recompute_convolution(
+            table_lengths, self.radial_table.pair(node_attrs, edge_index), self.radial_table, radial.folded_weight(),
+            feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,
+            self.chunked_backward_edges, self.generic_recompute, radial.folded_tiles, radial.folded_parts)
     elif augmented is not None and getattr(self, "generic_recompute", None) is not None:
         from fastmace.kernels.oeq_streaming import folded_recompute_convolution
         radial = self.generic_folded  # generic_recompute_conv_weights: no per-edge weights kept

@@ -67,6 +67,26 @@ def bias_free(linear):
                 if "bias" in name and tensor.numel() > 0]
 
 
+def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+    """``(message, edge density)`` of a reassociated generic interaction with a radial table: the table, then the
+    reassociation of its ``h c``. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward
+    keeps the lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again (MH-1's
+    ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
+    backward rebuilds only the table."""
+    augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
+    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, augmented[:, :-1], edge_index,
+                                       fc_last_weight(self.radial_last))
+    return message, edge_density
+
+
+def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+    """``first_table_region`` under non-reentrant checkpoint (``generic_recompute_first_table``)."""
+    from torch.utils.checkpoint import checkpoint
+
+    return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                      use_reentrant=False, preserve_rng_state=False)
+
+
 def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
                                 cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False):
     """RealAgnosticResidual / Density / DensityResidual InteractionBlock.forward (mace-torch 0.3.16)
@@ -84,9 +104,21 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
     table = getattr(self, "radial_table", None)
     tabled = table is not None and edge_feats.shape[1] == 1  # generic_radial_tables: edge_feats are the lengths
-    if tabled:
+    # generic_recompute_first_table: the table's output is not kept for the backward, which evaluates it again.
+    recompute_table = tabled and getattr(self, "recompute_table", False)
+    table_lengths = (edge_feats if recompute_table and chunked and getattr(self, "generic_recompute", None) is not None
+                     else None)
+    message = None
+    if recompute_table and reassociation is not None:
+        message, table_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
+                                                        edge_index)
+    elif table_lengths is not None:
+        from fastmace.rewrites.mh1.modules import streaming_message
+        message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
+                                                   node_attrs=node_attrs, table_lengths=table_lengths)
+    elif tabled:
         augmented, table_density = table(edge_feats, node_attrs, edge_index)  # [h c, c] and the density
-    if tabled and chunked:
+    if tabled and (chunked or message is not None):
         pass
     elif tabled and reassociation is None:
         from fastmace.kernels.triton.skinny_linear import folded_linear
@@ -112,7 +144,9 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             if cutoff is not None:
                 edge_density = edge_density * cutoff
         density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
-    if reassociation is not None:
+    if message is not None:
+        pass
+    elif reassociation is not None:
         if tabled:
             hidden = augmented[:, :-1]  # h c
         else:

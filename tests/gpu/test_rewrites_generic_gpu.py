@@ -105,6 +105,69 @@ def stacked(label, backend, dtype, force_chunks=False, recompute=False):
 '''
 
 
+TABLES = '''
+import json
+import torch
+
+def tables(label):
+    """generic_recompute_first_table (float32, with the radial tables and generic_recompute_conv_weights, every cell
+    in chunks of 37 edges): the energy, forces and stress with the tables' outputs evaluated again in the backward,
+    the input gradient consumed per chunk or whole, against the same model keeping the outputs."""
+    import fastmace  # noqa: F401
+    from fastmace.kernels.oeq_streaming import runtime
+    from fastmace.model import loading
+    from fastmace.rewrites import generic, radial
+    from fastmace.rewrites import registry as reg
+    from _support.structures import nacl
+    original = loading.load(label, backend="hybrid", dtype="float32", device="cuda:0")
+    loaded = loading.load(label, backend="hybrid", dtype="float32", device="cuda:0")
+    model = loaded.model
+    batch = loaded.calculator._atoms_to_batch(nacl(repeat=2, rattle=0.05, seed=17)).to("cuda:0")
+    order = torch.sort(batch.edge_index[1], stable=True).indices
+    batch.edge_index, batch.shifts, batch.unit_shifts = (batch.edge_index[:, order], batch.shifts[order],
+                                                         batch.unit_shifts[order])
+    data = {key: value.float() if torch.is_tensor(value) and value.is_floating_point() else value
+            for key, value in batch.to_dict().items()}
+    for parameter in [*model.parameters(), *original.model.parameters()]:
+        parameter.requires_grad_(False)
+    names = ("generic_radial_tables", "generic_recompute_first_table")
+    registry = reg.Registry([*generic.RECORDS.values(), *(radial.RECORDS[name] for name in names)])
+    asked = {name: "on" for name in ("generic_recompute_conv_weights", *names)}
+    resolution = registry.resolve(model, asked, strict=False)
+    applied = registry.apply(model, resolution, reg.Context(inputs=reg.structure_inputs(data)),
+                             original=original.model)
+    edges = int(data["edge_index"].shape[1])
+    for interaction in model.interactions:
+        if getattr(interaction, "streaming_kernels", None) is not None:
+            interaction.streaming_count = torch.tensor(edges, device="cuda:0")
+        if getattr(interaction, "chunked_backward_edges", 0):
+            interaction.chunked_backward_edges = 37
+    runtime.chunks_the_backward = lambda *args: True
+
+    def run(recompute, per_chunk):
+        for interaction in model.interactions:
+            if hasattr(interaction, "recompute_table"):
+                interaction.recompute_table = recompute
+        runtime.TABLE_GRADIENT_PER_CHUNK = per_chunk
+        out = model(dict(data), training=False, compute_force=True, compute_stress=True)
+        return {key: out[key].detach().double() for key in ("energy", "forces", "stress")}
+
+    kept = run(False, True)
+    again = run(False, True)
+    compared = {}
+    for per_chunk in (False, True):
+        got = run(True, per_chunk)
+        compared["per_chunk" if per_chunk else "whole"] = {
+            key: {"relative": float((got[key] - kept[key]).abs().max()) / float(kept[key].abs().max()),
+                  "equal": bool(torch.equal(got[key], kept[key]))} for key in kept}
+    return {"label": label, "edges": edges,
+            "applied": {entry.name: {"detail": entry.detail, "passed": entry.result.passed,
+                                     "error": entry.result.max_relative_error} for entry in applied},
+            "kept_repeat_equal": all(torch.equal(kept[key], again[key]) for key in kept),
+            "compared": compared}
+'''
+
+
 def has_checkpoint(label):
     return bool(MODELS) and (Path(MODELS) / table.LABELS[label].checkpoint.file_name).is_file()
 
@@ -253,6 +316,38 @@ def test_generic_chunked_backward_in_forced_chunks(label, dtype):
     report(result)
     check(result, expected_records(label, "hybrid"))
     assert result["forced_chunks"], result
+
+
+@pytest.mark.slow
+@needs_mh1
+@needs_models
+@needs_oeq
+@pytest.mark.parametrize("label", [OMAT, MP0])
+def test_generic_recompute_first_table_against_the_kept_tables(label):
+    """generic_recompute_first_table is exact: with the input gradient consumed whole or per chunk, the energy, forces
+    and stress equal those of the kept table outputs wherever the kept path repeats itself bitwise (the sender
+    gradients' atomic order aside), and stay within 1e-6 relative otherwise."""
+    if not has_checkpoint(label):
+        pytest.skip(f"{label} not in FASTMACE_MODELS")
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
+               PYTHONDONTWRITEBYTECODE="1")
+    if HYBRID_PYTHON != sys.executable:
+        env.pop("LD_LIBRARY_PATH", None)
+    code = TABLES + textwrap.dedent(f"""
+        print(json.dumps(tables({label!r})))
+    """)
+    result = subprocess.run([HYBRID_PYTHON, "-c", code], cwd=REPOSITORY_ROOT, env=env, capture_output=True,
+                            text=True, timeout=1800, check=False)
+    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
+    result = json.loads(result.stdout.strip().splitlines()[-1])
+    report(result)
+    assert "generic_recompute_first_table" in result["applied"], result
+    assert all(entry["passed"] for entry in result["applied"].values()), result["applied"]
+    for mode, keys in result["compared"].items():
+        for key, entry in keys.items():
+            assert entry["relative"] <= 1e-6, (mode, key, result)
+            if result["kept_repeat_equal"]:
+                assert entry["equal"], (mode, key, result)
 
 
 # --------------------------------------------------------------------------- tiny models on CUDA
