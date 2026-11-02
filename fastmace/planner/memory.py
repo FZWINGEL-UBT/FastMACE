@@ -87,7 +87,9 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # Cells of at least 15,000 atoms (the rescue is never planned below; there the build's fixed transient sets the
 # peak). Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's
 # rung at 1 (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
-RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("generic_recompute_conv_weights", 1.0),
+# generic_recompute_conv_weights: MACE-OMAT-0 medium's rescue matrix, SrTiO3 and NaCl (NaNbO3 held out; RTX A4000,
+# RTX 4000 Ada), the same envelope (docs/validation/omat0-capacity.md).
+RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("generic_recompute_conv_weights", 0.975),
                   ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84), ("gate_epilogue", 1.0),
                   ("recompute_node_region", 0.9))
 
