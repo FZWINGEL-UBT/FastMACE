@@ -302,7 +302,7 @@ def test_declared_terms():
     assert fusion.RECORDS["segment_gemm"].selfcheck_memory is not None
     assert declared == {"factor_species", "fold_cutoff", "joint_radial_input", "fused_radial_hidden",
                         "reassociate_first", "streaming_conv", "chunked_conv_backward", "generic_reassociate",
-                        "generic_streaming"}
+                        "generic_streaming", "generic_chunked_conv_backward", "generic_recompute_conv_weights"}
     assert radial.RECORDS["radial_tables"].memory is terms.radial_tables
     assert radial.RECORDS["recompute_conv_weights"].memory is terms.recompute_conv_weights
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
@@ -598,7 +598,8 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     recompute_conv_weights on; otherwise rule 12 turns it on after recompute_conv_weights, with its own reason."""
     from fastmace.planner.fixed import AUTO_RULES
 
-    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "recompute_first_table", "recompute_node_segments",
+    assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "generic_recompute_conv_weights", "recompute_first_table",
+                                    "recompute_node_segments",
                                     "gate_epilogue", "recompute_node_region")
     assert AUTO_RULES["RewriteConfig.recompute_node_segments"] == (
         "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights")

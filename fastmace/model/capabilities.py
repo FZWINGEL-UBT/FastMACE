@@ -282,6 +282,10 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
                                              "no MACE-MP-0 or density-family interaction")
     support["fused_folded_backward"] = RewriteSupport(fold or generic,
                                                       "ok" if fold or generic else support["fold_cutoff"].reason)
+    # The chunked streaming backward: MH-1's folded class, or a generic interaction's split radial network on the
+    # same folded path (generic_chunked_conv_backward, docs/validation/omat0-capacity.md).
+    support["chunked_conv_backward"] = RewriteSupport(
+        fold or generic, "ok" if fold else "ok (generic folded path)" if generic else support["fold_cutoff"].reason)
     # OPT-T08 (fastmace.rewrites.species): ScaleShiftMACE only (its forward is pinned). species_tables and
     # fold_product_linear: a factored first interaction with species-only inputs; fold_readout_tail: a factored
     # last interaction (its skip_tp is a linear layer).

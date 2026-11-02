@@ -106,6 +106,32 @@ def test_every_stage_of_the_memory_rescue_stays_within_its_band(case):
     assert LOW <= ratio <= RESCUE_HIGH[case["stage"]], (ratio, found.text(), case["peak_bytes"])
 
 
+GENERIC_RESCUE = json.loads((DATA.parent / "rule12_generic_rescue.json").read_text())
+# docs/validation/omat0-capacity.md: MACE-OMAT-0 medium's three stages (the default plan without and with
+# generic_chunked_conv_backward, and generic_recompute_conv_weights), [low, high] rounded out. The chunked stage's
+# low is NaNbO3's (held out) 0.995 at 19,360 atoms.
+GENERIC_BAND = {"s0-default": (1.0, 1.05), "s1-chunked": (0.99, 1.08), "s2-recompute": (1.0, 1.12)}
+
+
+@pytest.mark.rule(12)
+@pytest.mark.parametrize("case", GENERIC_RESCUE, ids=[
+    f"{c['structure']}-{c['natoms']}-{c['stage']}-{c['gpu'].split()[-1]}" for c in GENERIC_RESCUE])
+def test_the_generic_stages_stay_within_their_band(case):
+    """The generic folded path's terms and rescue rung on OMAT-0 medium's matrix: SrTiO3, NaCl, NaNbO3."""
+    found = predicted(case)
+    low, high = GENERIC_BAND[case["stage"]]
+    ratio = found.total / case["peak_bytes"]
+    assert low <= ratio <= high, (ratio, found.text(), case["peak_bytes"])
+
+
+def test_the_generic_matrix_covers_three_crystals():
+    assert {case["structure"] for case in GENERIC_RESCUE} == {"SrTiO3", "NaCl", "NaNbO3"}
+    assert {case["stage"] for case in GENERIC_RESCUE} == set(GENERIC_BAND)
+    for structure in ("SrTiO3", "NaCl", "NaNbO3"):
+        sizes = {case["natoms"] for case in GENERIC_RESCUE if case["structure"] == structure}
+        assert len(sizes) >= 3, structure
+
+
 def test_the_rescue_fit_covers_the_whole_ladder():
     stages = {case["stage"] for case in RESCUE}
     assert stages == {"s0-default", "s1-conv", "s2-table", "s3-segments", "s4-geoff", "s5-region", "s6-region-ge"}

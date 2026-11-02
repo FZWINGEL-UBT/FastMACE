@@ -8,6 +8,28 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
+  records:
+  - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming
+    convolution on MH-1's folded path. Its backward runs in L2-sized edge chunks, so the `[E, W]` weight gradient
+    is never formed. Rounding class.
+    - On by default on the RTX 5060 Ti and the RTX 4000 Ada (decision 66,
+      `planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS`).
+    - MD step b/a: 0.916–0.972 in both build orders.
+  - `generic_recompute_conv_weights` (field `recompute_conv_weights`) keeps no per-edge weights. The forward builds
+    them on chip, and the backward builds each chunk's again.
+    - A float32 memory-rescue rung (`planner.memory.MEMORY_RESCUE`, `RESCUE_FLOAT32_ONLY`).
+    - 1.045–1.148 of the step.
+  - Rule 12 has a term for each and a rescue stage calibrated on SrTiO3, NaCl and NaNbO3.
+  - MACE-OMAT-0 medium's default-plan limit rose 3.2–4.1 times: SrTiO3 16,875 → 69,120 and NaCl 39,304 → 125,000
+    atoms on the 20 GB RTX 4000 Ada, SrTiO3 13,720 → 53,240 on the 16 GB RTX 5060 Ti
+    (docs/validation/omat0-capacity.md).
+
+### Fixed
+
+- Rule 12 no longer counts MH-1's radial records for a generic model. Before, `recompute_conv_weights` applied MH-1's
+  keep fraction there too.
+
 - The near-limit memory probe (`EngineConfig.memory_probe`, `fastmace.planner.memory_probe`). Where rule 12's memory
   choice is ambiguous:
   - when it runs: the chosen stage within 1.25 of the free memory's limit, or the next-cheaper stage might fit;

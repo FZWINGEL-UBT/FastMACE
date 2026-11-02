@@ -36,7 +36,9 @@ from fastmace.rewrites.generic import modules as gm
 
 GENERIC_FIELDS = {"generic_species_skip": "species_skip", "generic_reassociate": "reassociate_first",
                   "generic_segmented_first_sum": "segmented_first_sum",
-                  "generic_fused_radial_backward": "fused_folded_backward", "generic_streaming": "streaming_conv"}
+                  "generic_fused_radial_backward": "fused_folded_backward", "generic_streaming": "streaming_conv",
+                  "generic_chunked_conv_backward": "chunked_conv_backward",
+                  "generic_recompute_conv_weights": "recompute_conv_weights"}
 FAMILIES = ("residual", "density", "off")
 
 
@@ -123,14 +125,19 @@ def test_records_have_the_spec_fields():
     for name, field in GENERIC_FIELDS.items():
         rewrite_ = registry[name]
         assert registry.config_field(name) == field  # docs/design/switch-map.md
-        requires = ("generic_reassociate",) if name == "generic_segmented_first_sum" else ()
-        assert rewrite_.default == "auto" and rewrite_.requires == requires and rewrite_.conflicts == ()
+        requires = {"generic_segmented_first_sum": ("generic_reassociate",),
+                    "generic_chunked_conv_backward": ("generic_streaming", "generic_fused_radial_backward"),
+                    "generic_recompute_conv_weights": ("generic_chunked_conv_backward",),
+                    }.get(name, ())
+        default = "off" if name == "generic_recompute_conv_weights" else "auto"  # a memory-rescue rung
+        assert rewrite_.default == default and rewrite_.requires == requires and rewrite_.conflicts == ()
         assert rewrite_.source_hashes == gm.source_hashes() and len(rewrite_.source_hashes) == 3
         assert registry.qualification(name).supported  # the pins match the installed MACE 0.3.16
     assert registry["generic_species_skip"].exactness == "exact"
     assert registry["generic_streaming"].exactness == "exact"
     assert registry["generic_reassociate"].exactness == "rounding"
     assert registry["generic_fused_radial_backward"].exactness == "rounding"
+    assert registry["generic_chunked_conv_backward"].exactness == "rounding"  # (h c) W against (h W) c
     assert "fixed_species_superset" in registry["generic_species_skip"].workload_constraints
     assert "single_graph" in registry["generic_reassociate"].workload_constraints
     assert registry["generic_segmented_first_sum"].exactness == "exact"  # summation order only, as MH-1's
