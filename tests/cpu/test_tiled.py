@@ -600,6 +600,7 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
     x1 = x0 + 0.4 * skin * direction
     got = kept(x1)
     assert kept.last["list_reused"] is True and kept.last["edges"] != edges0
+    assert kept.last["list_cache_hits"] == 2 * kept.last["tiles"]  # sweeps 2 and 3 from the call's filtered lists
     tiles = [t.to(x0.device) for t in kept._kept["tiles"]]
     grid = kept._kept["grid"]
     original = tiled_module.plan_tiles

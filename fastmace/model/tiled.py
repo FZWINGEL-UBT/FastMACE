@@ -884,14 +884,13 @@ class TiledForceField:
                 bins.bin(positions)
             # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device).
             positions64 = positions.to(device=self.device, dtype=torch.float64) if kept is not None else None
-            # With kept lists, the cache holds a tile's filtered lists from its sweep 1 to its sweep 3 only under
-            # the wavefront (the band: sweep 3 drops them), so sweeps 2 and 3 skip the superset's copy and float64
-            # filter; without the wavefront it would hold every tile's beside the kept ones (``_call`` drops
-            # it then). At the host limit (the floor reached while it fills) the cache is dropped for this and later
-            # calls: the later sweeps search or filter again, bitwise the same edges.
+            # With kept lists, the cache holds the tiles' filtered lists from their sweep 1 (under the wavefront until
+            # their sweep 3: the band), so sweeps 2 and 3 skip the superset's copy and float64 filter. At the host
+            # limit (the floor reached while it fills) the cache is dropped for this and later calls: the later sweeps
+            # search or filter again, bitwise the same edges.
             self._list_hits = 0
             self._list_cache = ({} if self.config.list_cache and n < 2**31 and self.list_cache_state == "on"
-                                and (kept is None or self._wave_expected(n)) else None)
+                                else None)
 
             def within(receivers):
                 """The tile's edges within the cutoff from the kept ones within cutoff + skin (searched there on a
@@ -930,7 +929,7 @@ class TiledForceField:
                 """The tile's (global edge index, shifts): searched once per call, then from the host cache (int32
                 senders, the receivers' edge counts at their narrowest dtype, the unit shifts packed)."""
                 key = receivers.data_ptr()  # the call's tile tensors live through all its sweeps
-                cache = self._list_cache  # (dropped after the wavefront's decision when it is off with kept lists)
+                cache = self._list_cache  # (None once a fallback or the host floor dropped it)
                 if cache is not None and key in cache:
                     self._list_hits += 1
                     sender, counts, packed = (t.to(self.device) for t in cache[key])
@@ -1409,8 +1408,6 @@ class TiledForceField:
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
         wave = self._wavefront_on(grid, n)
-        if not wave and self._kept is not None:
-            self._list_cache = None  # kept lists without the wavefront: no band, so no cache beside them
         started = time.perf_counter()  # the search pass before the sweeps (its syncs make the wall time its cost)
         if wave:
             keys, steps, pool_rows, first, last = self._wavefront(tiles, source, local_of, n, padded)
