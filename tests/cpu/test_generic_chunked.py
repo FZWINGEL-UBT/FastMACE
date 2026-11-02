@@ -33,7 +33,8 @@ def test_the_record():
     assert record["workload_constraints"] == ("sort_receivers", "per_engine_edge_counter")
     assert record["memory"] is terms.generic_chunked_conv_backward
     dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
-    assert terms.generic_chunked_conv_backward(dims, 4) == (-1280 * 4, 0)  # the second interaction's [E, 1280]
+    # the second interaction's [E, 1280] weight gradient, less the saved folded input [h c, c] (65 floats)
+    assert terms.generic_chunked_conv_backward(dims, 4) == (-(1280 - 65) * 4, 0)
 
 
 @pytest.mark.parametrize(("label", "reason"), [("mh1-r2scan", "ok"), ("omat0-medium", "ok (generic folded path)"),
@@ -71,7 +72,7 @@ def test_the_rescue_rung():
     assert record["config_field"] == "recompute_conv_weights" and record["default"] == "off"
     assert record["requires"] == ("generic_chunked_conv_backward",) and record["exactness"] == "rounding"
     dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
-    assert terms.generic_recompute_conv_weights(dims, 4) == (-(1280 - 65) * 4, 0)  # keeps [h c, c], 65 floats
+    assert terms.generic_recompute_conv_weights(dims, 4) == (-1280 * 4, 0)  # the stored [E, 1280] weights
     rescue = memory.MEMORY_RESCUE
     assert rescue.index("generic_recompute_conv_weights") == rescue.index("recompute_conv_weights") + 1
     assert memory.RESCUE_FLOAT32_ONLY == ("generic_recompute_conv_weights",)
