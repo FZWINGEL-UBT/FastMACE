@@ -173,23 +173,54 @@ SPECIES_DEPENDENT = "fixed_species_superset"
 
 
 def host_batch(calc, atoms):
-    """MACE's input batch of ``atoms`` as a dict, left on the host.
+    """MACE's input batch of ``atoms`` as a dict, left on the host, without MACE's neighbour list.
 
     ``MACECalculator._atoms_to_batch`` (mace-torch 0.3.16) without its last step, which moves the whole batch,
     MACE's own neighbour list included, to the calculator's device (about 1.6 kB per atom in float64). The force
     field moves what it keeps itself. No padding graph: the force field takes uncompiled calculators only, and
     MACE pads only compiled ones.
+
+    The batch's edges (``BATCH_EDGE_KEYS``) are empty: the force field replaces them with its own lists before
+    anything reads them, so MACE's host neighbour search (``get_neighborhood``: matscipy's list, about 4.7 kB per
+    atom at 74 edges per atom, the build's host peak at scale) is not run. Every other entry is MACE's.
     """
     from mace import data as mace_data
+    from mace.data import atomic_data
     from mace.tools import torch_geometric, torch_tools
 
     calc.arrays_keys.update({calc.charges_key: "charges"})
     keyspec = mace_data.KeySpecification(info_keys=calc.info_keys, arrays_keys=calc.arrays_keys)
-    with torch_tools.default_dtype(calc.default_dtype):
-        config = mace_data.config_from_atoms(atoms, key_specification=keyspec, head_name=calc.head)
-        graph = mace_data.AtomicData.from_config(config, z_table=calc.z_table, cutoff=calc.r_max,
-                                                 heads=calc.available_heads)
+    search = atomic_data.get_neighborhood
+    atomic_data.get_neighborhood = _no_neighbours
+    try:
+        with torch_tools.default_dtype(calc.default_dtype):
+            config = mace_data.config_from_atoms(atoms, key_specification=keyspec, head_name=calc.head)
+            graph = mace_data.AtomicData.from_config(config, z_table=calc.z_table, cutoff=calc.r_max,
+                                                     heads=calc.available_heads)
+    finally:
+        atomic_data.get_neighborhood = search
     return torch_geometric.Batch.from_data_list([graph]).to_dict()
+
+
+def _no_neighbours(positions, cutoff, pbc=None, cell=None, true_self_interaction=False):
+    """``mace.data.neighborhood.get_neighborhood`` (mace-torch 0.3.16) without the search: its cell (an all-zero
+    or missing cell becomes the identity; a non-periodic axis is extended to 5 cutoffs times the largest
+    coordinate plus 1), and no edges."""
+    import numpy as np
+
+    if pbc is None:
+        pbc = (False, False, False)
+    if cell is None or cell.any() == np.zeros((3, 3)).any():
+        cell = np.identity(3, dtype=float)
+    assert len(pbc) == 3 and all(isinstance(i, (bool, np.bool_)) for i in pbc)
+    assert cell.shape == (3, 3)
+    identity = np.identity(3, dtype=float)
+    max_positions = np.max(np.absolute(positions)) + 1
+    for axis in range(3):
+        if not pbc[axis]:
+            cell[axis, :] = max_positions * 5 * cutoff * identity[axis, :]
+    unit_shifts = np.zeros((0, 3), dtype=int)
+    return np.zeros((2, 0), dtype=int), np.dot(unit_shifts, cell), unit_shifts, cell
 
 
 def _numbers(species):

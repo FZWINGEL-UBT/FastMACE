@@ -783,7 +783,8 @@ def test_configure_allocator_sets_expandable_segments_only_when_unset_and_on_new
 def test_construction_never_moves_the_batchs_edges(monkeypatch):
     """The batch's edge arrays (MACE's own neighbour list) are replaced by the skin list's before anything reads
     them, so the construction keeps them off the device: here they are meta tensors, which cannot be copied. The
-    host batch is MACE's own, without its move to the device."""
+    host batch is MACE's own, without its move to the device and without its neighbour list (empty edge arrays
+    of MACE's dtypes)."""
     from fastmace.model import forces
 
     calc, atoms = calculator(), structure()
@@ -791,7 +792,10 @@ def test_construction_never_moves_the_batchs_edges(monkeypatch):
     host = forces.host_batch(calc, atoms)
     assert set(host) == set(mace_batch)
     for key, value in mace_batch.items():
-        if torch.is_tensor(value):
+        if key in forces.BATCH_EDGE_KEYS:
+            empty = (value.shape[0], 0) if key == "edge_index" else (0, *value.shape[1:])
+            assert host[key].dtype == value.dtype and tuple(host[key].shape) == empty
+        elif torch.is_tensor(value):
             assert host[key].device.type == "cpu" and torch.equal(host[key], value.cpu())
 
     def meta_edges(calc, atoms):
