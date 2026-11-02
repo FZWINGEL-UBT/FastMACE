@@ -123,7 +123,8 @@ def test_rule_12_takes_the_generic_rung_in_float32_only(monkeypatch, precision):
     assert full.rewrites.recompute_conv_weights == "off"
     tight = plan(full.predicted_memory_bytes / memory.MARGIN * 0.97)
     taken = tight.rewrites.recompute_conv_weights == "on"
-    assert taken is (precision == "float32"), tight.decision("RewriteConfig.recompute_conv_weights")
+    assert taken is (precision == "float32"), (tight.decision("RewriteConfig.recompute_conv_weights"),
+                                               tight.decision("memory"), tight.rewrites.chunked_conv_backward)
     if taken:
         assert tight.predicted_memory_bytes < full.predicted_memory_bytes
         assert tight.memory_ladder.chosen.stage == "generic_recompute_conv_weights"

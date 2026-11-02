@@ -418,15 +418,17 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
     traits = getattr(force_field, "traits", None)
     names = []
     for rung in MEMORY_RESCUE:
-        record = _record(rung)
-        if record is None:
+        if not _rung_fits(rung, traits, plan):
             continue
         name = _field(rung)  # the RewriteConfig field it sets (a generic rung sets MH-1's field)
         if requested != "auto" and getattr(requested, name, "auto") != "auto":
             continue  # the caller's explicit value is kept
-        if not _rescuable(plan, name) or not _rung_fits(rung, traits, plan):
+        if not _rescuable(plan, name):
             continue
-        if rung in RESCUE_FLOAT32_ONLY and getattr(plan.precision, "dtype", "float32") != "float32":
+        if rung in RESCUE_FLOAT32_ONLY and getattr(getattr(plan, "precision", None), "dtype", "float32") != "float32":
+            continue
+        record = _record(rung)
+        if record is None:
             continue
         if rescue_value(rung) == "off" or all(not _off(getattr(plan.rewrites, _field(other), "off"))
                                               for other in record.requires):
@@ -530,7 +532,7 @@ def _rung_fits(rung, traits, plan):
     if traits is not None and hasattr(traits, "rewrite_support"):
         folded = traits.rewrite_support["fold_cutoff"][0]
     else:
-        folded = not _off(getattr(plan.rewrites, "fold_cutoff", "off"))
+        folded = not _off(getattr(plan.rewrites, "fold_cutoff", "on"))  # unknown: MH-1's rungs
     return rung.startswith("generic_") != folded
 
 

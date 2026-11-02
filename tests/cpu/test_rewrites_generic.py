@@ -37,7 +37,8 @@ from fastmace.rewrites.generic import modules as gm
 GENERIC_FIELDS = {"generic_species_skip": "species_skip", "generic_reassociate": "reassociate_first",
                   "generic_segmented_first_sum": "segmented_first_sum",
                   "generic_fused_radial_backward": "fused_folded_backward", "generic_streaming": "streaming_conv",
-                  "generic_chunked_conv_backward": "chunked_conv_backward"}
+                  "generic_chunked_conv_backward": "chunked_conv_backward",
+                  "generic_recompute_conv_weights": "recompute_conv_weights"}
 FAMILIES = ("residual", "density", "off")
 
 
@@ -126,8 +127,10 @@ def test_records_have_the_spec_fields():
         assert registry.config_field(name) == field  # docs/design/switch-map.md
         requires = {"generic_segmented_first_sum": ("generic_reassociate",),
                     "generic_chunked_conv_backward": ("generic_streaming", "generic_fused_radial_backward"),
+                    "generic_recompute_conv_weights": ("generic_chunked_conv_backward",),
                     }.get(name, ())
-        assert rewrite_.default == "auto" and rewrite_.requires == requires and rewrite_.conflicts == ()
+        default = "off" if name == "generic_recompute_conv_weights" else "auto"  # a memory-rescue rung
+        assert rewrite_.default == default and rewrite_.requires == requires and rewrite_.conflicts == ()
         assert rewrite_.source_hashes == gm.source_hashes() and len(rewrite_.source_hashes) == 3
         assert registry.qualification(name).supported  # the pins match the installed MACE 0.3.16
     assert registry["generic_species_skip"].exactness == "exact"
