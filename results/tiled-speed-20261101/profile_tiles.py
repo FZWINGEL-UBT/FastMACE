@@ -84,6 +84,7 @@ class Stages:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--structure", default="NbCl5")
+    p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--repeat", required=True)
     p.add_argument("--receivers", type=int, default=4096)
     p.add_argument("--mode", choices=("eager", "compiled"), default="eager")
@@ -105,7 +106,7 @@ def main():
     n = len(atoms)
     with contextlib.ExitStack() as stack:
         stack.enter_context(tiled_capacity.no_global_list(True))
-        user = fm.ForceField(fm.load("mh1-r2scan"), atoms, precision="float32")
+        user = fm.ForceField(fm.load(args.model), atoms, precision="float32")
         planner = minimal.default_planner(user)
         plan = planner.plan_evaluation(user, atoms)
         if args.mode == "eager":
@@ -170,7 +171,7 @@ def main():
         group = next((g for pattern, g in GROUPS if pattern in key), "other")
         groups[group] += seconds
     device_total = sum(kernels.values())
-    record = dict(structure=args.structure, atoms=n, mode=args.mode, receivers=args.receivers,
+    record = dict(structure=args.structure, model=args.model, atoms=n, mode=args.mode, receivers=args.receivers,
                   device=torch.cuda.get_device_name(), host=os.uname().nodename,
                   source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"), warm=warm, plain_call=plain,
                   timed_call=timed, stages=totals, stage_counts=dict(stages.counts), profiled_call=profiled,
@@ -179,7 +180,7 @@ def main():
                   top_kernels=[(k[:120], round(s, 3)) for k, s in kernels.most_common(25)],
                   tiles=tiled.last.get("tiles"))
     args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / f"profile-{args.mode}-{args.structure}-{n}.json").write_text(json.dumps(record, indent=1))
+    (args.output / f"profile-{args.mode}-{args.model}-{args.structure}-{n}.json").write_text(json.dumps(record, indent=1))
     print(json.dumps({k: v for k, v in record.items() if k != "top_kernels"}))
     for k, s in record["top_kernels"][:15]:
         print(f"{s:9.3f} s  {k}")
