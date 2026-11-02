@@ -290,14 +290,16 @@ class _State:
         if getattr(self, "_first", None) is None:
             self._first = torch.full((n,), -1, dtype=torch.int32)
             self._last = torch.full((n,), -1, dtype=torch.int32)
-            self._slot_of = torch.full((n,), -1, dtype=torch.int32)  # int32: 4 bytes per atom on the host
+            if getattr(self, "_slot_of", None) is None or self._slot_of.shape[0] != n:
+                self._slot_of = torch.full((n,), -1, dtype=torch.int32)  # int32: 4 bytes per atom on the host
 
     def zero(self):
         for tensor in self.tensors.values():
             tensor.zero_()
-        if self.alias and getattr(self, "_first", None) is not None:
-            self._first.fill_(-1)
-            self._last.fill_(-1)
+        if self.alias and getattr(self, "_slot_of", None) is not None:
+            if self._first is not None:
+                self._first.fill_(-1)
+                self._last.fill_(-1)
             self._slot_of.fill_(-1)
             self._window = None
 
@@ -305,8 +307,8 @@ class _State:
         tensors = list(self.tensors.values())
         if self.pooled:
             tensors += [self._row_of, self._free_rows]
-        if self.alias and getattr(self, "_first", None) is not None:
-            tensors += [self._first, self._last, self._slot_of]
+        if self.alias and getattr(self, "_slot_of", None) is not None:
+            tensors += [t for t in (self._first, self._last, self._slot_of) if t is not None]
             tensors += [self._window] if getattr(self, "_window", None) is not None else []
         return int(sum(t.numel() * t.element_size() for t in tensors))
 
@@ -440,6 +442,9 @@ class _State:
         closed = torch.bincount(last, minlength=tiles)
         # During tile t: the atoms open after it plus those it closes.
         size = int((torch.cumsum(opened - closed, 0) + closed).max().item())
+        del last, order, opened, closed
+        # Read no more this call (8 bytes per atom on the host); the next call's touches start new ones.
+        self._first = self._last = None
         self._window = torch.zeros((size, self._width), dtype=self.dtype)
         self._free = torch.arange(size, dtype=torch.int32)
         self._top = size
