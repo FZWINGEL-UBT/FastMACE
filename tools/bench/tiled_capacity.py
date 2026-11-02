@@ -64,6 +64,9 @@ def parse_args(argv=None):
     p.add_argument("--wavefront", choices=("auto", "on", "off"), default="auto",
                    help="TileConfig.wavefront (with --alias-state): the tile sweeps interleaved, x and sc in a row "
                         "pool")
+    p.add_argument("--lanes", choices=("auto", "on", "off"), default="auto",
+                   help="TileConfig.lanes: sweep 2's tiles in pairs on two green-context SM halves (needs "
+                        "PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync)")
     p.add_argument("--profile-last", action="store_true",
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")
@@ -249,6 +252,7 @@ def main(argv=None):
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, receivers=args.receivers,
                   edges=args.edges, rattle=args.rattle, strain=args.strain, model=args.model,
                   device=torch.cuda.get_device_name(), torch=torch.__version__,
+                  alloc_conf=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"),
                   source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"), phases={})
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"tiled-{args.structure}-{n}-R{args.receivers}{args.tag}.json"
@@ -290,7 +294,7 @@ def main(argv=None):
                                                   tuple(args.budget_receivers) or None,
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
-                                                  wavefront=args.wavefront,
+                                                  wavefront=args.wavefront, lanes=args.lanes,
                                                   species="index" if args.species_index else "one_hot"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
