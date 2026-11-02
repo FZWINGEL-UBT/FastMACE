@@ -29,14 +29,14 @@ idle() {  # 6 samples, 5 s apart, all idle
   done
   note "idle: mem=$($WSMI --query-gpu=memory.used,memory.total --format=csv,noheader | tr -d '\r')"
 }
-note "fastmace=$(cat "$FM/.source_commit") gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) b=[$SIDE_B]"
+note "fastmace=$(cat "$FM/.source_commit") gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) a=[${SIDE_A:-}] b=[$SIDE_B]"
 for spec in "$@"; do
   for order in ab ba; do
     if [ "$order" = ab ]; then pattern=abab; else pattern=abba; fi
     idle || exit 3
     name=$(basename "${spec%%@*}" .cif)-${spec##*@}-$order
     "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/$name" --checkpoint "$CK" --model omat0-medium \
-      --structures "$spec" --b $SIDE_B --order "$order" --pattern "$pattern" > "$ROOT/$name.log" 2>&1 < /dev/null
+      --structures "$spec" ${SIDE_A:+--a $SIDE_A} --b $SIDE_B --order "$order" --pattern "$pattern" > "$ROOT/$name.log" 2>&1 < /dev/null
     note "end $name exit=$? $(grep -E 'b/a' "$ROOT/$name.log" | tail -n 1 | cut -c1-200)"
   done
 done

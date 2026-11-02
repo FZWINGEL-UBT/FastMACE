@@ -17,7 +17,7 @@ export PYTHONPATH=$FM PYTHONDONTWRITEBYTECODE=1 FASTMACE_CACHE=$C FASTMACE_MODEL
   TMPDIR=$ROOT/tmp TMP=$ROOT/tmp TEMP=$ROOT/tmp TORCHINDUCTOR_COMPILE_THREADS=4 CUDA_CACHE_DISABLE=1 \
   FASTMACE_HYBRID_PYTHON=$E/bin/python \
   LD_LIBRARY_PATH=$E/lib/python3.10/site-packages/nvidia/cu13/lib:$E/lib/python3.10/site-packages/cuequivariance_ops/lib:${LD_LIBRARY_PATH:-}
-echo "$(date -u +%FT%TZ) $(hostname) fastmace=$(cat $FM/.source_commit) $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) b=[$SIDE_B]" >> $log
+echo "$(date -u +%FT%TZ) $(hostname) fastmace=$(cat $FM/.source_commit) $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) a=[${SIDE_A:-}] b=[$SIDE_B]" >> $log
 for spec in "$@"; do
   for order in ab ba; do
     if [ "$order" = ab ]; then pattern=abab; else pattern=abba; fi
@@ -26,7 +26,7 @@ for spec in "$@"; do
     if [ -n "$gpu$busy" ]; then echo "$(date -u +%FT%TZ) STOP gpu=[$gpu] busy=[$busy]" >> $log; exit 3; fi
     name=$(basename "${spec%%@*}" .cif)-${spec##*@}-$order
     "$E/bin/python" "$FM/tools/ab_rewrites.py" --output "$ROOT/$name" --checkpoint "$CK" --model omat0-medium \
-      --structures "$spec" --b $SIDE_B --order "$order" --pattern "$pattern" > "$ROOT/$name.log" 2>&1 < /dev/null
+      --structures "$spec" ${SIDE_A:+--a $SIDE_A} --b $SIDE_B --order "$order" --pattern "$pattern" > "$ROOT/$name.log" 2>&1 < /dev/null
     echo "$(date -u +%FT%TZ) end $name exit=$? $(grep -E 'b/a|ratio' "$ROOT/$name.log" | tail -n 2 | tr '\n' ' ' | cut -c1-250)" >> $log
   done
 done
