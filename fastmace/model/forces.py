@@ -283,10 +283,10 @@ class MACEForceField:
       reproduces 1a's energy, for A/B against the research engine only. ``atomic_energies``: the
       exact float64 E0 table; default the ``LoadedModel``'s (captured from the checkpoint before
       MACE converted the model), else the model's own table upcast.
-    - ``release_node_attrs``: keep the one-hot ``node_attrs`` on the host from the construction on, for a
-      caller that builds the rows it needs from the species index (the tiled path's
-      ``TileConfig.species="index"``); the species check, the rewrites and E0 read it there (its columns, sums
-      and argmax: exact), and the field's own call refuses (``release_node_attrs()`` does the same later).
+    - ``release_node_attrs``: keep the one-hot ``node_attrs`` on the host during the construction and drop it
+      after, for a caller that builds the rows it needs from the species index (the tiled path's
+      ``TileConfig.species="index"``); the species check, the rewrites and E0 read it on the host (its columns,
+      sums and argmax: exact), and the field's own call refuses (``release_node_attrs()`` does the same later).
     - ``call_rows``: the row count of the model's calls, at which the reassociated first interaction's
       species tables are evaluated from the identity basis (``species_tables``); default the atom count, so
       that the tables are bitwise the features of the whole-system call (3-T02). A caller that runs the
@@ -568,6 +568,8 @@ class MACEForceField:
         self.compact(positions)
         self.use_edges(int(self.neighbours.count))
         self._bind_streaming_count()
+        if release_node_attrs:
+            self.release_node_attrs()
 
     # ------------------------------------------------------------------ properties
 
@@ -715,6 +717,8 @@ class MACEForceField:
         import torch
 
         torch.index_select(self._column_of, 0, self.atomic_numbers, out=self._species_index)
+        if self.node_attrs_released:  # the one-hot was dropped: the species index is what the caller reads
+            return
         node_attrs = self.data["node_attrs"]
         node_attrs.zero_()
         node_attrs.scatter_(1, self._species_index.unsqueeze(1), self._ones)
@@ -846,11 +850,15 @@ class MACEForceField:
         return ForceOutput(out["energy"], out["forces"], stress)
 
     def release_node_attrs(self):
-        """Move the one-hot ``data["node_attrs"]`` [N, n_elements] to the host (356 bytes per atom on the device
-        for an 89-element float32 model), for a caller that builds the rows it needs from ``_species_index``
-        (the tiled path's ``TileConfig.species="index"``). The whole-system call reads the one-hot on the
-        device, so it refuses afterwards."""
-        self.data["node_attrs"] = self.data["node_attrs"].cpu()
+        """Drop the one-hot ``data["node_attrs"]`` [N, n_elements] (356 bytes per atom for an 89-element float32
+        model, on the device or, released at construction, on the host), for a caller that builds the rows it
+        needs from ``_species_index`` (the tiled path's ``TileConfig.species="index"``). Its shape and dtype stay
+        (a tensor on the meta device, no storage). The whole-system call reads the one-hot, so it refuses
+        afterwards; a species refresh updates the index only."""
+        import torch
+
+        stored = self.data["node_attrs"]
+        self.data["node_attrs"] = torch.empty(stored.shape, dtype=stored.dtype, device="meta")
         self.node_attrs_released = True
 
     def _outputs(self, positions):

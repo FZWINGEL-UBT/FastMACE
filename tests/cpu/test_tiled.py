@@ -419,6 +419,7 @@ def test_tiled_call_from_the_species_index_equals_the_one_hot_call_bitwise(mode)
         results.append(tiled.evaluate(strained(atoms), stress=True))
         if species == "index":
             assert field.node_attrs_released and tiled.last["species"] == "index"
+            assert field.data["node_attrs"].is_meta  # the one-hot is dropped, not copied to the host
             with pytest.raises(RuntimeError, match="node_attrs"):
                 field.evaluate(atoms)
     assert results[0][0] == results[1][0]
@@ -440,6 +441,9 @@ def test_field_built_with_its_one_hot_on_the_host_gives_bitwise_the_released_fie
         field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                                rewrites=only(*MH1_PACKAGE), release_node_attrs=at_build)
         assert field.node_attrs_released == at_build
+        if at_build:  # dropped after the construction: its shape and dtype only, no storage
+            attrs = field.data["node_attrs"]
+            assert attrs.is_meta and attrs.shape[0] == len(atoms) and attrs.dtype == field.dtype
         tiled = TiledForceField(field, TileConfig(5, mode="padded", species="index"))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         results.append(tiled.evaluate(strained(atoms), stress=True))
@@ -553,7 +557,8 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
 
 def test_tile_lists_not_kept_below_the_host_floor():
     """``list_reuse`` is the default for tile lists; a host with less than ``list_reuse_floor`` available keeps
-    nothing, says why in the call's report and gives the plain call's results."""
+    nothing (neither the kept lists nor the list cache: the later sweeps search again), says why in the call's
+    report and gives bitwise the plain call's results, which keep the cache."""
     from fastmace.model.tiled import _host_available
 
     if _host_available() is None:
@@ -571,6 +576,9 @@ def test_tile_lists_not_kept_below_the_host_floor():
     assert starved.last["list_reuse"].startswith("off: ") and "below the floor" in starved.last["list_reuse"]
     assert starved.last["list_reused"] is False and starved._kept is None
     assert plain.last["list_reuse"] == "off"
+    assert starved.last["list_cache"].startswith("off: ") and "below the floor" in starved.last["list_cache"]
+    assert starved.last["list_cache_bytes"] == 0
+    assert plain.last["list_cache"] == "on" and plain.last["list_cache_bytes"] > 0
     assert torch.equal(results[0].energy, results[1].energy) and torch.equal(results[0].forces, results[1].forces)
 
 

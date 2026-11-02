@@ -83,7 +83,9 @@ class TileConfig:
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
     # neighbours "tiles": each tile's edges found once per call and kept on the host (int32 senders, receiver counts
-    # and one-byte unit shifts, about 5 bytes per edge), the later sweeps rebuilding them exactly from it.
+    # and one-byte unit shifts, about 5 bytes per edge), the later sweeps rebuilding them exactly from it. At the
+    # host limit (below ``list_reuse_floor`` available while it fills) it is dropped, for this call and the later
+    # ones: the later sweeps search again (bitwise), the reason in the call's report (``list_cache``).
     list_cache: bool = True
     # neighbours "tiles": the tiles' edges searched within cutoff + skin (the force field's list's skin) and kept on
     # the host across calls with the tile plan; a call with the same cell while no atom has moved more than skin / 2
@@ -167,7 +169,7 @@ class _State:
         if getattr(self, "_first", None) is None:
             self._first = torch.full((n,), -1, dtype=torch.int32)
             self._last = torch.full((n,), -1, dtype=torch.int32)
-            self._slot_of = torch.full((n,), -1, dtype=torch.int64)
+            self._slot_of = torch.full((n,), -1, dtype=torch.int32)  # int32: 4 bytes per atom on the host
 
     def zero(self):
         for tensor in self.tensors.values():
@@ -291,14 +293,14 @@ class _State:
         import torch
 
         last = self._last.long()
-        order = torch.sort(last, stable=True).indices
+        order = torch.sort(last, stable=True).indices.to(torch.int32)  # kept until the call ends: int32
         self._closing = torch.split(order, torch.bincount(last, minlength=tiles).tolist())
         opened = torch.bincount(self._first.long(), minlength=tiles)
         closed = torch.bincount(last, minlength=tiles)
         # During tile t: the atoms open after it plus those it closes.
         size = int((torch.cumsum(opened - closed, 0) + closed).max().item())
         self._window = torch.zeros((size, self._width), dtype=self.dtype)
-        self._free = torch.arange(size, dtype=torch.int64)
+        self._free = torch.arange(size, dtype=torch.int32)
         self._top = size
 
     def close(self, tile):
@@ -538,6 +540,7 @@ class TiledForceField:
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
+        self.list_cache_state = "on" if self.config.list_cache else "off"
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
         self._graph_key = None
         self._pool = None
@@ -590,7 +593,10 @@ class TiledForceField:
                 bins.bin(positions)
             positions64 = positions.to(device=self.device, dtype=torch.float64)
             # With kept lists the later sweeps filter them again: no per-call cache beside them (host memory).
-            cache = self._list_cache = {} if self.config.list_cache and n < 2**31 and kept is None else None
+            # At the host limit (the floor reached while it fills) the cache is dropped for this and later calls:
+            # the later sweeps search again, bitwise the same edges.
+            cache = self._list_cache = ({} if self.config.list_cache and n < 2**31 and kept is None
+                                        and self.list_cache_state == "on" else None)
 
             def within(receivers):
                 """The tile's edges within the cutoff from the kept ones within cutoff + skin (searched there on a
@@ -630,7 +636,9 @@ class TiledForceField:
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
                     return torch.stack([sender.long(), receiver]), bins.shifts(unit)
                 sender, receiver, unit, shifts = within(receivers) if kept is not None else bins.edges(receivers)
-                packed = _pack_units(unit) if cache is not None else None
+                packed = _pack_units(unit) if cache is not None and self.list_cache_state == "on" else None
+                if packed is not None and not self._host_keeps_cache(cache):
+                    packed = None
                 if packed is not None:
                     counts = torch.bincount(torch.searchsorted(receivers, receiver), minlength=receivers.shape[0])
                     cache[key] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(), packed.cpu())
@@ -680,6 +688,18 @@ class TiledForceField:
         self._reuse_ok, self._kept = False, None
         self.list_reuse_state = (f"off: {available / 2**30:.1f} GiB available on the host when {what}, below the "
                                  f"floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
+        return False
+
+    def _host_keeps_cache(self, cache):
+        """Whether the host keeps ``list_reuse_floor`` bytes available (MemAvailable; always off Linux) with the
+        list cache filling. If not, the cache is emptied and off from now on (the later sweeps search again),
+        with the reason in ``list_cache_state``."""
+        available = _host_available()
+        if available is None or available >= int(self.config.list_reuse_floor):
+            return True
+        cache.clear()
+        self.list_cache_state = (f"off: {available / 2**30:.1f} GiB available on the host while the list cache "
+                                 f"filled, below the floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
         return False
 
     def _keep_lists(self, positions, n, cell, skin):
@@ -1113,6 +1133,7 @@ class TiledForceField:
                 sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
                 + kept["reference"].numel() * kept["reference"].element_size())
             stats["list_reuse"] = self.list_reuse_state
+            stats["list_cache"] = self.list_cache_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
             with torch.no_grad():

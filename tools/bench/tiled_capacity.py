@@ -62,6 +62,9 @@ def parse_args(argv=None):
     p.add_argument("--no-budget", action="store_true",
                    help="budget_receivers=(): R stays --receivers (several compiled tiles at small sizes)")
     p.add_argument("--tag", default="")
+    p.add_argument("--ledger", action="store_true",
+                   help="after the calls, record every live tensor and NumPy array by device, dtype and shape, named "
+                        "where reachable from the user's force field, the evaluation field or the tiled call")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
                         "left empty, so it costs no memory")
@@ -125,6 +128,102 @@ def host_memory():
         return {}
     values = {line.split(":")[0]: int(line.split()[1]) * 1024 for line in lines if line.startswith(("VmRSS", "VmHWM"))}
     return dict(host_rss=values.get("VmRSS"), host_peak=values.get("VmHWM"))
+
+
+def memory_ledger(roots, depth=4):
+    """Every live torch tensor and NumPy array (by storage, counted once), grouped by device, dtype and shape, with
+    the attribute paths from ``roots`` ({name: object}) that reach it, largest first."""
+    import gc
+
+    import numpy as np
+    import torch
+
+    names = {}
+
+    def key(value):
+        if isinstance(value, torch.Tensor):
+            return ("torch", value.untyped_storage().data_ptr()) if value.numel() else None
+        if isinstance(value, np.ndarray):
+            base = value
+            while isinstance(base.base, np.ndarray):
+                base = base.base
+            return ("numpy", base.__array_interface__["data"][0]) if value.size else None
+        return None
+
+    seen = set()
+
+    def walk(value, path, level):
+        k = key(value)
+        if k is not None:
+            names.setdefault(k, []).append(path)
+            return
+        if level > depth or id(value) in seen or isinstance(value, (str, bytes, int, float, bool, type(None))):
+            return
+        seen.add(id(value))
+        if isinstance(value, dict):
+            items = list(value.items())[:64]
+        elif isinstance(value, (list, tuple)):
+            items = list(enumerate(value))[:64]
+        elif hasattr(value, "__dict__") and not isinstance(value, type):
+            items = list(vars(value).items())
+            if isinstance(value, torch.nn.Module):
+                items += list(value.named_buffers(recurse=False)) + list(value.named_parameters(recurse=False))
+        else:
+            return
+        for name, item in items:
+            walk(item, f"{path}.{name}", level + 1)
+
+    for name, root in roots.items():
+        walk(root, name, 0)
+    groups = {}
+    counted = set()
+    for obj in gc.get_objects():
+        try:
+            k = key(obj)
+        except Exception:  # noqa: BLE001  (a tensor subclass or a freed storage)
+            continue
+        if k is None or k in counted:
+            continue
+        counted.add(k)
+        if isinstance(obj, torch.Tensor):
+            nbytes = obj.untyped_storage().nbytes()
+            where, dtype, shape = str(obj.device), str(obj.dtype), list(obj.shape)
+        else:
+            base = obj
+            while isinstance(base.base, np.ndarray):
+                base = base.base
+            nbytes, where, dtype, shape = base.nbytes, "cpu (numpy)", str(obj.dtype), list(obj.shape)
+        group = groups.setdefault((where, dtype, str(shape)), dict(device=where, dtype=dtype, shape=shape, count=0,
+                                                                     bytes=0, names=[]))
+        group["count"] += 1
+        group["bytes"] += nbytes
+        group["names"] = (group["names"] + names.get(k, [])[:3])[:6]
+        if not names.get(k) and nbytes >= 2**20 and "owners" not in group:
+            group["owners"] = owners(obj)
+    return sorted(groups.values(), key=lambda g: -g["bytes"])
+
+
+def owners(obj, levels=3):
+    """What holds an unnamed array: the types (and dict keys) of its referrers, ``levels`` deep."""
+    import gc
+    import inspect
+
+    chain, frontier = [], [obj]
+    for _ in range(levels):
+        found = []
+        for item in frontier:
+            for ref in gc.get_referrers(item):
+                if ref is frontier or ref is chain or inspect.isframe(ref):
+                    continue
+                label = type(ref).__qualname__
+                if isinstance(ref, dict):
+                    label += "[" + ",".join(str(key) for key, value in ref.items() if value is item)[:80] + "]"
+                elif hasattr(ref, "__name__"):
+                    label += f" {ref.__name__}"
+                found.append((label, ref))
+        chain.append([label for label, _ in found][:6])
+        frontier = [ref for _, ref in found][:6]
+    return chain
 
 
 def main(argv=None):
@@ -215,6 +314,10 @@ def main(argv=None):
             entry.update(allocated_before=int(before), total_peak=int(before) + entry["peak_above_before"])
             calls.append(entry)
             record["calls"] = calls
+            save()
+        if args.ledger:
+            record["ledger"] = memory_ledger(dict(user=user, field=field, tiled=tiled, atoms=atoms, out=out,
+                                                  positions=positions))
             save()
         energy = float(out.energy.reshape(-1)[0])
         forces = out.forces.detach().double()
