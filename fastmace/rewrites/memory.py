@@ -204,11 +204,20 @@ def radial_tables(dims, width):
 
 
 def generic_radial_tables(dims, width):
-    """Tabulated generic radial networks keep, per edge, none of the network's saved layer inputs and activations
-    (every hidden layer's input and its activation's input: ``sum(radial[:-1]) + sum(radial[1:-1])`` floats per
-    interaction); the table keeps its output ``[h c, c, density]``, which the folded path saves anyway."""
-    saved = sum(sum(i.radial[:-1]) + sum(i.radial[1:-1]) for i in dims.interactions)
-    return -saved * width, 0
+    """Tabulated generic radial networks keep, per edge, none of what the estimate counts for them besides their
+    outputs: each network's input and its saved hidden units (``planner.memory._network_floats`` less the output,
+    for the radial network and the interaction's other ones, the density's). The table's output ``[h c, c,
+    density]`` stays (the folded path saves it; generic_chunked_conv_backward's term counts it). Not the real saved
+    tensors (two per hidden unit): the estimate's stock count holds one, and removing more made rule 12 predict a
+    third of the measured peak (docs/validation/omat0-capacity-2.md)."""
+    from fastmace.planner import memory as estimate  # planner.memory imports nothing from torch or MACE
+
+    def network(widths, saved):
+        return estimate._network_floats(widths, saved) - (widths[-1] if len(widths) > 1 else 0)
+
+    removed = sum(network(i.radial, i.radial_saved) + sum(network(w, s) for w, s in i.other_radials)
+                  for i in dims.interactions)
+    return -removed * width, 0
 
 
 def block_linear_resident(dims, width):

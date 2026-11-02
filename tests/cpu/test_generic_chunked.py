@@ -148,3 +148,18 @@ def test_rule_12_counts_each_family_s_records():
         record = registry[name]
         assert minimal._family_applies(record, generic_traits) is generic_model, name
         assert minimal._family_applies(record, mh1_traits) is (not generic_model), name
+
+
+def test_the_generic_tables_term_matches_the_estimate_s_count():
+    """generic_radial_tables removes what rule 12's stock count holds for the tabulated networks: each network's
+    input and its saved hidden units (``planner.memory.interaction_floats``), not its output (the folded path's
+    ``[h c, c]``, counted with generic_chunked_conv_backward) and not more: the real saved tensors (two per hidden
+    unit) were never in the count (docs/validation/omat0-capacity-2.md)."""
+    from fastmace.planner import memory
+
+    dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
+    counted = sum(memory._network_floats(block.radial, block.radial_saved) - block.radial[-1]
+                  + sum(memory._network_floats(widths, saved) - widths[-1] for widths, saved in block.other_radials)
+                  for block in dims.interactions)
+    assert counted == 2 * ((10 + 64 * 3) + 10)  # OMAT-0 medium: two interactions, the radial net and the density's
+    assert terms.generic_radial_tables(dims, 4) == (-counted * 4, 0)
