@@ -1073,8 +1073,11 @@ def tabulate_generic(model, context):
 
 
 def _generic_selfcheck(original, rewritten, context):
-    """As ``_selfcheck``, for the generic interactions: the certificate, and the table kernels against the model's
-    float32 chain at random lengths of ``[R_PHYSICAL, r_max)`` (w level, density, r-gradient)."""
+    """As ``_selfcheck``, for the generic interactions: the certificate, and the table kernels against the float64
+    chain of the same weights at random lengths of ``[R_PHYSICAL, r_max)`` (w level, density, r-gradient), held to
+    the float32 limit. The reference is float64, not the float32 network: a certified table is the more accurate of
+    the two, and the float32 network's own error can exceed the limit (MACE-OMAT-0 medium near its cutoff: 5.5e-5 of
+    the largest weight, against the table's 4e-8; docs/validation/generic-radial-tables.md)."""
     import torch
 
     cases, failures, dtype = CaseErrors(), [], None
@@ -1089,18 +1092,21 @@ def _generic_selfcheck(original, rewritten, context):
             failures.append(f"interactions.{index}: certificate {table.certificate.get('worst')} > 1 "
                             f"(pairs {table.certificate.get('pairs')})")
         device, dtype = table.coef.device, table.coef.dtype
-        chain = _GenericChain(rewritten, interaction, table.columns.tolist(), dtype, device, radial=radial)
-        r = (R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=dtype)).to(device)
+        chain = _GenericChain(rewritten, interaction, table.columns.tolist(), torch.float64, torch.device("cpu"),
+                              radial=radial)
+        r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=torch.float64)
+        r = r.to(dtype).to(torch.float64)  # the lengths the table sees
         for number in range(table.species ** 2):
             s, t = divmod(number, table.species)
-            net, dnet = chain.with_derivative(r, s, t)
+            truth, dtruth = chain.with_derivative(r, s, t)
             pair = torch.full((r.numel(),), number, dtype=torch.int32, device=device)
-            tab, dtab = _table_values(table, r, pair)
+            tab, dtab = _table_values(table, r.to(device=device, dtype=dtype), pair)
+            tab, dtab = tab.double().cpu(), dtab.double().cpu()
             name = f"interactions.{index}.{s}-{t}"
-            cases.add(f"{name}.w", net[:, :-1] @ chain.folded.T, tab[:, :-1] @ chain.folded.T)
-            cases.add(f"{name}.density", net[:, -1:], tab[:, -1:])
-            weights = torch.randn(net.shape, generator=generator, dtype=dtype).to(device)
-            cases.add(f"{name}.dr", (weights * dnet).sum(dim=1), (weights * dtab).sum(dim=1))
+            cases.add(f"{name}.w", truth[:, :-1] @ chain.folded.T, tab[:, :-1] @ chain.folded.T)
+            cases.add(f"{name}.density", truth[:, -1:], tab[:, -1:])
+            weights = torch.randn(truth.shape, generator=generator, dtype=torch.float64)
+            cases.add(f"{name}.dr", (weights * dtruth).sum(dim=1), (weights * dtab).sum(dim=1))
     result = cases.result(dtype)
     if failures:
         return CheckResult(False, result.max_relative_error, result.threshold, result.modules,
