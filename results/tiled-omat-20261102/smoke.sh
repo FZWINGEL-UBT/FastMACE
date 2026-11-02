@@ -5,10 +5,12 @@
 set -u
 R=/mnt/homes/zwingel/fm-tiled/run.sh
 TAG=${TAG:-smoke}
+ONLY=${ONLY:-}
 common="--rattle 0.05 --strain 0.01 --calls 2 --tile-list --host-state --alias-state"
 row() {  # name structure model repeat receivers mode compare [extra]
   local name=$1 structure=$2 model=$3 repeat=$4 receivers=$5 mode=$6 compare=$7
   shift 7
+  [ -n "$ONLY" ] && [ "$ONLY" != "$name" ] && return
   bash $R murphy-omat-$TAG-$name tools/bench/tiled_capacity.py --structure $structure --model $model \
     --repeat $repeat --receivers $receivers --mode $mode --compare $compare $common "$@" > /dev/null 2>&1
   echo "$name exit $?"
@@ -31,6 +33,7 @@ EOF
 }
 row srtio3-eager SrTiO3 omat0-medium 10x10x10 512 eager eager
 row srtio3-auto SrTiO3 omat0-medium 10x10x10 512 auto compiled --species-index
+row srtio3-auto-tiles SrTiO3 omat0-medium 12x12x12 1024 auto compiled --species-index --no-budget
 row nacl-eager NaCl mh1-r2scan 6x6x6 256 eager eager
 row nacl-auto NaCl mh1-r2scan 6x6x6 256 auto compiled --species-index
 row nbcl5-eager NbCl5 mh1-r2scan 4x4x12 512 eager eager
