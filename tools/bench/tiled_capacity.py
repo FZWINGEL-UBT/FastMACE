@@ -67,6 +67,8 @@ def parse_args(argv=None):
     p.add_argument("--lanes", choices=("auto", "on", "off"), default="auto",
                    help="TileConfig.lanes: sweep 2's tiles in pairs on two green-context SM halves (needs "
                         "PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync)")
+    p.add_argument("--wavefront-group", type=int, default=None,
+                   help="TileConfig.wavefront_group: sweep-2 tiles per run of the wavefront (none: the default)")
     p.add_argument("--prefetch", choices=("on", "off"), default="on",
                    help="TileConfig.prefetch: the next tile's graph and host rows prepared on a side stream")
     p.add_argument("--backward-chunk-scale", type=int, default=1,
@@ -306,6 +308,8 @@ def main(argv=None):
                                                   alias_state=args.alias_state,
                                                   wavefront=args.wavefront, lanes=args.lanes,
                                                   prefetch=args.prefetch == "on",
+                                                  **({} if args.wavefront_group is None else
+                                                     dict(wavefront_group=args.wavefront_group)),
                                                   species="index" if args.species_index else "one_hot"))
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
         save()
