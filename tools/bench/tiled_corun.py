@@ -62,7 +62,8 @@ def parse_args(argv=None):
                    help="only serial against split, without expandable segments (their mappings fail on green-"
                         "context streams: 'device not ready', 2 November 2026)")
     p.add_argument("--no-expandable", action="store_true",
-                   help="PyTorch's default allocator instead of expandable segments (implied by --split-only)")
+                   help="PyTorch's default allocator instead of expandable segments (implied by --split-only); a "
+                        "PYTORCH_CUDA_ALLOC_CONF set by the caller (e.g. backend:cudaMallocAsync) is kept either way")
     p.add_argument("--tag", default="")
     p.add_argument("--no-profile", action="store_true")
     p.add_argument("--output", required=True, type=Path)
@@ -253,7 +254,8 @@ def main(argv=None):
                   model=args.model, device=torch.cuda.get_device_name(), torch=torch.__version__,
                   host=os.uname().nodename, source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"),
                   reps=args.reps, blocks=args.blocks,
-                  expandable_segments=not (args.split_only or args.no_expandable))
+                  expandable_segments=not (args.split_only or args.no_expandable),
+                  alloc_conf=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"))
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"corun-{args.structure}-{n}-R{args.receivers}{'-split' if args.split_only else ''}{args.tag}.json"
 
