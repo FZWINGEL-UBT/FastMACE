@@ -44,6 +44,8 @@ def test_support(label, reason):
 
 
 def test_stage_2_keeps_it_to_measured_gpus(monkeypatch):
+    assert fixed.DECISION_66_GENERIC_CHUNKED_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+    monkeypatch.setattr(fixed, "DECISION_66_GENERIC_CHUNKED_GPUS", ("NVIDIA A100-SXM4-40GB",))
     plan = tp.plan_for("omat0-medium")
     _, choice, why = plan.decision("RewriteConfig.chunked_conv_backward")
     assert choice == "off" and "decision 66" in str(why) and tp.GPU.name in str(why)

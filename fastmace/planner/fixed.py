@@ -390,8 +390,10 @@ DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"
 DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
-# in both build orders, found the MD step no slower; exact device names.
-DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ()
+# in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
+# build orders: RTX 4000 Ada NaCl 8,000 atoms 0.953 / 0.953, SrTiO3 6,655 0.916 / 0.916; RTX 5060 Ti NaCl 5,832
+# 0.972 / 0.972, SrTiO3 3,645 0.949 / 0.951. The A100 was not measured (no Colab compute units).
+DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
