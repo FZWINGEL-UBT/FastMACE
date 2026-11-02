@@ -213,7 +213,8 @@ def host_batch(calc, atoms, one_hot=True):
     atom at 74 edges per atom, the build's host peak at scale) is not run. Every other entry is MACE's.
 
     ``one_hot=False``: ``node_attrs`` is the same one-hot as uint8 (1 byte per atom and element), built from the
-    same table indices; MACE's own (the default float dtype) and the batch's copy of it are not made (at 149M atoms
+    same table indices after the batch (which sees a zero-width stand-in); MACE's own (the default float dtype)
+    and the batch's copy of it are not made (at 149M atoms
     of an 89-element model they were 53 GB each, the build's host peak).
     """
     from mace import data as mace_data
@@ -240,10 +241,11 @@ def host_batch(calc, atoms, one_hot=True):
 
 
 def _shape_only_one_hot(indices, num_classes):
-    """``mace.tools.torch_tools.to_one_hot``'s shape and dtype, on the meta device (no storage)."""
+    """A zero-width stand-in for ``mace.tools.torch_tools.to_one_hot`` (no storage), on the host: the batch derives
+    its ``batch`` vector from it (on the meta device that vector was meta too and could not be read)."""
     import torch
 
-    return torch.empty(indices.shape[:-1] + (num_classes,), device="meta")
+    return torch.empty(indices.shape[:-1] + (0,))
 
 
 def _uint8_one_hot(numbers, z_table):
