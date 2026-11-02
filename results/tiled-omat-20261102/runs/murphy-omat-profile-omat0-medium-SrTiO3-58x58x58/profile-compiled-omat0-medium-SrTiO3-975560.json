@@ -1,0 +1,164 @@
+{
+ "structure": "SrTiO3",
+ "model": "omat0-medium",
+ "atoms": 975560,
+ "mode": "compiled",
+ "receivers": 16384,
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "host": "murphy",
+ "source_commit": "eeeb1085",
+ "warm": [
+  58.71752774796914,
+  18.906583170988597
+ ],
+ "plain_call": 18.867958573973738,
+ "timed_call": 19.479006042005494,
+ "stages": {
+  "interaction 1 (sweep 2)": 9.897,
+  "interaction 0 (sweeps 1, 3)": 6.668,
+  "tile graph (rest)": 1.252,
+  "host state: add rows / window": 0.694,
+  "host state: read rows": 0.512,
+  "padded: body (rest)": 0.145,
+  "padded: scatter (rest)": 0.112,
+  "padded: fill": 0.088,
+  "call (rest)": 0.06,
+  "host state: put rows": 0.021,
+  "host state: touch": 0.015,
+  "host state: plan": 0.013,
+  "host state: close": 0.0
+ },
+ "stage_counts": {
+  "call (rest)": 1,
+  "tile graph (rest)": 272,
+  "host state: touch": 68,
+  "padded: fill": 204,
+  "padded: body (rest)": 204,
+  "interaction 0 (sweeps 1, 3)": 136,
+  "padded: scatter (rest)": 204,
+  "host state: add rows / window": 204,
+  "host state: plan": 1,
+  "interaction 1 (sweep 2)": 68,
+  "host state: read rows": 272,
+  "host state: put rows": 68,
+  "host state: close": 68
+ },
+ "profiled_call": 19.040799561073072,
+ "device_seconds": 18.331131611999755,
+ "device_busy_share": 0.9627290888285931,
+ "kernel_groups": {
+  "other": 6.064,
+  "triton": 4.761,
+  "gemm": 4.349,
+  "elementwise": 0.994,
+  "index/scatter": 0.855,
+  "copies": 0.818,
+  "convolution": 0.414,
+  "reduce": 0.052,
+  "sort/unique": 0.015,
+  "cuequivariance": 0.011
+ },
+ "top_kernels": [
+  [
+   "oeq_projected_backward",
+   2.848
+  ],
+  [
+   "kernel",
+   1.825
+  ],
+  [
+   "ampere_sgemm_64x64_tn",
+   1.432
+  ],
+  [
+   "oeq_projected_forward",
+   1.292
+  ],
+  [
+   "ampere_sgemm_128x64_nn",
+   0.935
+  ],
+  [
+   "ampere_sgemm_128x64_tn",
+   0.839
+  ],
+  [
+   "ampere_sgemm_64x64_nn",
+   0.817
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_19",
+   0.587
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_10",
+   0.577
+  ],
+  [
+   "triton_poi_fused_mul_silu_16",
+   0.395
+  ],
+  [
+   "triton_poi_fused_mul_silu_12",
+   0.391
+  ],
+  [
+   "Memcpy HtoD (Pinned -> Device)",
+   0.384
+  ],
+  [
+   "triton_poi_fused_mul_silu_15",
+   0.382
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std::array<char*, 3ul>, false>(in",
+   0.338
+  ],
+  [
+   "ampere_sgemm_128x128_nn",
+   0.257
+  ],
+  [
+   "Memcpy DtoH (Device -> Pinned)",
+   0.243
+  ],
+  [
+   "triton_poi_fused__to_copy_add_select_slice_slice_backward_streaming_conv_backward_9",
+   0.181
+  ],
+  [
+   "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<double, double,",
+   0.168
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native:",
+   0.15
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at",
+   0.14
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_7",
+   0.134
+  ],
+  [
+   "triton_poi_fused_add_edge_outer_sum_backward_slice_backward_transpose_view_18",
+   0.131
+  ],
+  [
+   "Memcpy HtoD (Pageable -> Device)",
+   0.122
+  ],
+  [
+   "triton_poi_fused_cat_index_mul_slice_sum_unsqueeze_view_33",
+   0.107
+  ],
+  [
+   "segmented_polynomial_algo1_2",
+   0.105
+  ]
+ ],
+ "tiles": 68
+}
