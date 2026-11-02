@@ -807,26 +807,29 @@ def test_wavefront_auto_only_where_the_plain_state_would_not_fit(available, on, 
 
 
 def test_wavefront_with_and_without_kept_lists_is_the_same_call():
-    """The wavefront with the kept lists (``list_reuse``, filtered again at the cutoff) and without them (the call's
-    cache holds a tile's lists from its sweep 1 to its sweep 3 only: none left after the call) gives bitwise the same
-    call."""
+    """The wavefront with the kept lists (``list_reuse``, filtered again at the cutoff) and without them, each with
+    and without the call's cache (a tile's lists from its sweep 1 to its sweep 3 only: none left after the call;
+    with kept lists the filtered ones, so sweeps 2 and 3 filter none), gives bitwise the same call."""
     calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                            rewrites=only(*MH1_PACKAGE))
+    arms = [(False, True), (True, True), (True, False)]  # (list_reuse, list_cache)
     results = []
-    for reuse in (False, True):
+    for reuse, cache in arms:
         tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
                                                   alias_state=True, wavefront="on", wavefront_group=2,
-                                                  list_reuse=reuse, boundary_skin=False))
+                                                  list_reuse=reuse, list_cache=cache, boundary_skin=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         for current in (strained(atoms), atoms):
             results.append(tiled.evaluate(current, stress=True))
             assert tiled.last["list_cache_bytes"] == 0
             assert (tiled.last["list_kept_bytes"] > 0) == reuse
-    for one, two in zip(results[:2], results[2:]):
-        assert one[0] == two[0]
-        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
-        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+            assert (tiled.last["list_cache_hits"] == 2 * tiled.last["tiles"]) == cache  # sweeps 2 and 3
+    for arm in range(1, len(arms)):
+        for one, two in zip(results[:2], results[2 * arm:2 * arm + 2]):
+            assert one[0] == two[0]
+            assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+            assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
 def test_boundary_skin_plan_splits_the_first_and_last_layer_at_the_reach():
