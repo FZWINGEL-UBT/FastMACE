@@ -105,32 +105,34 @@ the model sees are unchanged: bitwise, they are the skin list's or the tiles'.
 - **The budget picks R = 8,192 here.** The whole-system device state (forces, energies, indices: about 0.1 kB per
   atom) grows with N.
 
-**64.9M atoms** (leto, at 3bd9f28f, with main's chunked backward; host guard at 3.68 kB per atom, keeping 20 GB
-free):
-- **The eager first call ran:** 2,399 s, GPU peak 14.02 GiB, host peak 216.8 GiB of 251 GiB.
-- **The compiled second call ran out of GPU memory** on a 6.09 GiB allocation (13.30 GiB allocated, 5.89 GiB free).
-  The run did not reach the edge check.
-- **Not diagnosed; the tool saved no traceback.** After the first call the device held 9.28 GiB against 6.62 GiB
-  before it.
-  - Auto mode and the budget both measure after the call (`_memory`), so that growth is in their numbers.
-  - The likelier fault is the budget's model. It divides the first call's whole workspace by R, and at this size
-    that workspace is mostly whole-system transients, not per-tile memory. It may then have chosen R = 8,192, which
-    did not fit.
-  - The allocation's source needs a traceback, or a run with the budget off.
+**64.9M atoms** (leto; host guard at 3.68 kB per atom, keeping 20 GB free):
+- **First run (3bd9f28f): the compiled second call ran out of GPU memory.**
+  - The eager first call ran: 2,399 s, GPU peak 14.02 GiB, host peak 216.8 GiB of 251 GiB.
+  - The compiled call failed on a 6.09 GiB allocation (13.30 GiB allocated, 5.89 GiB free).
+  - The traceback in the record names the allocation: the compiled forward's radial weights for one tile,
+    `empty_strided_cuda((1277696, 1280))`. That is a tile's edges times the radial MLP's output width, in float32.
+  - The budget had raised the receiver cap from the eager call's measurement at R = 4,096. A compiled tile at the
+    raised cap needs more than that measurement predicts.
+- **The fix (f14daf92):** when a call runs out of device memory at a cap the budget raised, the tiled call plans
+  again at the next lower cap and retries. The lower cap stays for later calls, and the call's record says why
+  (`budget_fallback`). A call at the configured cap still raises the error.
+- **Rerun with the fix (8db73835 = f14daf92 rebased; `runs/leto-omat-scan-SrTiO3-235x235x235`): valid.**
+  - Eager, R = 4,096: 2,398 s, GPU peak 14.02 GiB, host peak 216.8 GiB.
+  - Compiled: `receiver cap 16384 -> 8192 after running out of device memory`. It then took 2,097 s at
+    R = 8,192 (12,000 tiles), with a GPU peak of 16.06 GiB and a host peak of 226.7 GiB.
+  - 4,801,813,750 initial edges, as expected; forces checked.
+  - The list reuse turned itself off: keeping the lists would have left 20.0 GiB on the host, at the floor.
 
 **The limit, then:**
 
 | | Atoms |
 | --- | ---: |
-| Largest valid size, two calls (eager, then compiled), all defaults | 56,953,125 |
-| First call, eager, ran | 64,889,375 |
+| Largest valid size, two calls (eager, then compiled), all defaults | 64,889,375 |
 | Host bound without the list cache and kept lists (3.2 kB per atom) | about 70M |
 
-- **What limits it:** the host, at 3.7 kB per atom on 250 GiB, puts the limit near 65M with the 20 GB floor. Before
-  that, the compiled second call's memory model fails, somewhere between 57M and 65M.
+- **What limits it:** the host, at 3.7 kB per atom on 250 GiB, puts the limit near 65M with the 20 GB floor.
 - **Against symmetrix-xl's tiled numbers** (one force call, float32): 11.24M on an A100 80 GB and 4.15M on an RTX
-  5090 32 GB. This path reaches 57M with two calls, and ran 64.9M for one eager call, on a 20 GB RTX 4000 Ada with a
-  250 GiB host.
+  5090 32 GB. This path runs 64.9M with two calls on a 20 GB RTX 4000 Ada with a 250 GiB host.
   - The host memory is what makes the difference; the device holds 14-18 GiB at every size.
   - Symmetrix's runs keep everything on the device.
 

@@ -1,0 +1,84 @@
+{
+ "model": "omat0-medium",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "host": "murphy",
+ "source_commit": "b8b1f7fb",
+ "rattle": 0.05,
+ "strain": 0.01,
+ "structures": {
+  "SrTiO3": {
+   "atoms": 1080,
+   "max_abs_force": 4.296531838458869,
+   "tables_vs_network": {
+    "energy_meV_per_atom": -1.8764421838568524e-05,
+    "max_force": 3.528594970703125e-05,
+    "max_stress": 3.5390257835388184e-08
+   },
+   "tables_vs_float64": {
+    "energy_meV_per_atom": 0.00041570105235290677,
+    "max_force": 6.424338758481696e-05,
+    "max_stress": 2.0456990164341438e-07
+   },
+   "network_vs_float64": {
+    "energy_meV_per_atom": 0.0004344654741914753,
+    "max_force": 5.566031873716071e-05,
+    "max_stress": 2.273133674554617e-07
+   },
+   "first_vs_cached": {
+    "energy_meV_per_atom": -2.847777641026941e-05,
+    "max_force": 2.6226043701171875e-06,
+    "max_stress": 1.280568540096283e-08
+   },
+   "setup_seconds": {
+    "tables_fit": 46.28956826298963,
+    "tables_cached": 10.746774928993545,
+    "network": 25.486432594945654,
+    "float64": 81.36685817199759
+   },
+   "applied": [
+    "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+    "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903561267464e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (162 pieces, 9 pairs, certificate 0.31, fitted)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, fitted)'])"
+   ]
+  },
+  "NaCl": {
+   "atoms": 512,
+   "max_abs_force": 0.5558052831384505,
+   "tables_vs_network": {
+    "energy_meV_per_atom": -4.160608213510386e-05,
+    "max_force": 4.038214683532715e-06,
+    "max_stress": 1.909211277961731e-08
+   },
+   "tables_vs_float64": {
+    "energy_meV_per_atom": -0.00014052120267393775,
+    "max_force": 3.910840085413758e-06,
+    "max_stress": 1.2713052045983109e-08
+   },
+   "network_vs_float64": {
+    "energy_meV_per_atom": -9.891512053883389e-05,
+    "max_force": 4.7602062734630746e-06,
+    "max_stress": 6.379060733634201e-09
+   },
+   "first_vs_cached": {
+    "energy_meV_per_atom": -1.3322676295501878e-12,
+    "max_force": 1.5087425708770752e-07,
+    "max_stress": 1.862645149230957e-09
+   },
+   "setup_seconds": {
+    "tables_fit": 52.72538102406543,
+    "tables_cached": 19.649867441970855,
+    "network": 54.2073369610589,
+    "float64": 53.135082668974064
+   },
+   "applied": [
+    "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+    "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=2.425877946894988e-07, threshold=0.0001, modules=24, detail='ok', dtype='float32'), detail=['interactions.0 (84 pieces, 4 pairs, certificate 0.30, fitted)', 'interactions.1 (49 pieces, 4 pairs, certificate 0.30, fitted)'])"
+   ]
+  }
+ },
+ "cache_files": [
+  "radial-tables/19c35ac48e5403ad143306db9da7d7e4e03af194e51f75b666dcdecd6c37795b.pt",
+  "radial-tables/1dda55ae1bcbbdec8558420c8bf8ccdb4830561ffae06db2fe55ee6acdcde754.pt",
+  "radial-tables/6c634bff7077a556b48e62c3aaf8ecc04583a58908ecc9386b5144052479fe43.pt",
+  "radial-tables/bfe60e5cdc06a82b59a709d0cf1a15929a66ba43e884888337b4d6ea6d90514d.pt"
+ ]
+}
