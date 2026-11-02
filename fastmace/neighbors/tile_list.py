@@ -90,9 +90,11 @@ class TileNeighbours:
         del flat
         self._k = k
 
-    def edges(self, receivers):
+    def edges(self, receivers, inner=None):
         """(sender, receiver, unit_shifts, shifts) of the edges into ``receivers`` (sorted int64 atom indices),
-        in the global list's order; unit shifts and shifts in the float dtype."""
+        in the global list's order; unit shifts and shifts in the float dtype. ``inner`` (a cutoff below this
+        one): also the edges' mask of distances below it, from the same float64 vectors (a kept superset's
+        filter on the call that searches it)."""
         k = self._k
         natoms = self.positions.shape[0]
         nb = self.atom_bin[receivers][:, None, :] + self._neighbour_bins[None, :, :]  # (R, 27, 3)
@@ -105,18 +107,22 @@ class TileNeighbours:
         first = torch.cumsum(counts, 0) - counts
         sender = self.order[self.starts[ids][slot] + torch.arange(total, device=self.device) - first[slot]].long()
         receiver = receivers.repeat_interleave(27)[slot]
-        image = t.reshape(-1, 3)[slot].to(torch.float64)
-        # The sender's image at its bin's wrap: x_r - x_s + S cell with S = off_s - off_r - t.
-        unit = (self.offsets[sender] - self.offsets[receiver] - image).to(self.float_dtype)
+        image = t.reshape(-1, 3)[slot].to(torch.int32)
+        # The sender's image at its bin's wrap: x_r - x_s + S cell with S = off_s - off_r - t (small integers: exact
+        # in int32 as in float64, half the transient).
+        unit = (self.offsets[sender].to(torch.int32) - self.offsets[receiver].to(torch.int32) - image).to(
+            self.float_dtype)
+        del image
         shifts64 = times_3x3(unit.to(torch.float64), self.cell)
         vectors = self.positions[receiver] - self.positions[sender] + shifts64
-        keep = ((vectors * vectors).sum(dim=1) < self.cutoff ** 2) & ~(
-            (sender == receiver) & (unit == 0).all(dim=1))
+        r2 = (vectors * vectors).sum(dim=1)
         del vectors
-        sender, receiver, unit, shifts64 = sender[keep], receiver[keep], unit[keep], shifts64[keep]
+        keep = (r2 < self.cutoff ** 2) & ~((sender == receiver) & (unit == 0).all(dim=1))
+        sender, receiver, unit, shifts64, r2 = sender[keep], receiver[keep], unit[keep], shifts64[keep], r2[keep]
         primary = receiver if self.groups is None else receiver * self.group_count + self.groups[sender]
         order = torch.sort(primary * natoms + sender).indices
-        return sender[order], receiver[order], unit[order], shifts64[order].to(self.float_dtype)
+        out = sender[order], receiver[order], unit[order], shifts64[order].to(self.float_dtype)
+        return out if inner is None else out + (r2[order] < inner ** 2,)
 
     def shifts(self, unit):
         """The shifts of unit shifts ``unit`` (the float dtype), as ``edges`` gives them: ``times_3x3`` with the

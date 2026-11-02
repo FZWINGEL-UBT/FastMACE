@@ -899,7 +899,9 @@ class TiledForceField:
                 index = self._tile_index[receivers.data_ptr()]
                 superset = kept["superset"].get(index)
                 if superset is None:
-                    sender, receiver, unit, _ = bins.edges(receivers)
+                    # Float64 positions: the search's own vectors are the filter's below, so they give its mask.
+                    exact = bins.positions.dtype == torch.float64
+                    sender, receiver, unit, shifts, *inner = bins.edges(receivers, inner=cutoff if exact else None)
                     packed = _pack_units(unit)
                     if packed is None:  # beyond int16 shifts: not kept, searched again next call
                         kept["complete"] = False
@@ -911,6 +913,9 @@ class TiledForceField:
                                                 minlength=receivers.shape[0])
                         kept["superset"][index] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(),
                                                    packed.cpu())
+                    if exact:
+                        inner = inner[0]
+                        return sender[inner], receiver[inner], unit[inner], shifts[inner]
                 else:
                     sender, counts, packed = (t.to(self.device) for t in superset)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
@@ -1193,14 +1198,15 @@ class TiledForceField:
         slot["node_mask"][receivers:receivers + h] = 1
         slot["recv_mask"].zero_()
         slot["recv_mask"][:r] = 1
-        slot["ei"].zero_()
+        # The edge buffers: the tile's edges, then the padding tail (the edges' rows are written, not cleared first).
         slot["ei"][:, :e] = ei
-        slot["shifts"].zero_()
+        slot["ei"][:, e:].zero_()
         slot["shifts"][:e] = shifts
-        slot["local"].fill_(receivers - 1)
+        slot["shifts"][e:].zero_()
         slot["local"][:, :e] = local
-        slot["edge_mask"].zero_()
+        slot["local"][:, e:].fill_(receivers - 1)
         slot["edge_mask"][:e] = 1
+        slot["edge_mask"][e:].zero_()
         slot["count"].fill_(e)
 
     def _body(self, sweep, slot, g):
@@ -1224,6 +1230,9 @@ class TiledForceField:
             _, g_vec, g_eps = self._first(tile, g["state"], adjoint=True, strain=strain)
             values = (self._masked(g_vec, slot["edge_mask"]),) + ((g_eps,) if strain else ())
             names = ("g_vec", "g_eps")[:len(values)]
+        if self.mode != "graphs":  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
+            slot["out"] = {sweep: dict(zip(names, values))}  # no copy, and no other sweep's kept beside them
+            return
         out = slot["out"].setdefault(sweep, {})
         for name, value in zip(names, values):
             if name not in out:
@@ -1882,10 +1891,10 @@ class TiledForceField:
                     visit(index, self._tile_graph(receivers, source, local_of))
         finally:
             self._cache_paused = False
-        ready = torch.full((len(tiles),), -1, dtype=torch.int64).scatter_reduce_(
-            0, owner.cpu().long(), last.long(), "amax")
         owner = None  # 4 bytes per atom on the device, before the sweeps
-        steps, peak = wavefront_schedule(needs, ready.tolist(), [int(t.shape[0]) for t in tiles],
+        # Each tile's last reader among its own atoms (its receivers): no whole-system int64 copies on the host.
+        ready = [int(last[t.cpu()].max()) if t.numel() else -1 for t in tiles]
+        steps, peak = wavefront_schedule(needs, ready, [int(t.shape[0]) for t in tiles],
                                          self.config.wavefront_group)
         return keys, steps, peak, first, last
 
