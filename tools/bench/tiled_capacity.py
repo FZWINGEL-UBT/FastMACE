@@ -63,6 +63,9 @@ def parse_args(argv=None):
                    help="budget_receivers=(): R stays --receivers (several compiled tiles at small sizes)")
     p.add_argument("--wavefront", choices=("auto", "on", "off"), default="auto",
                    help="TileConfig.wavefront (with --alias-state): the tile sweeps interleaved, x and sc in a row pool")
+    p.add_argument("--profile-last", action="store_true",
+                   help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
+                        "host operations with the most self time (tiled_corun.profile_call)")
     p.add_argument("--tag", default="")
     p.add_argument("--ledger", action="store_true",
                    help="after the calls, record every live tensor and NumPy array by device, dtype and shape, named "
@@ -308,8 +311,14 @@ def main(argv=None):
             torch.cuda.synchronize()
             before = torch.cuda.memory_allocated()
             torch.cuda.reset_peak_memory_stats()
-            started = time.perf_counter()
-            out = tiled(positions)
+            if args.profile_last and call == args.calls - 1:
+                import tiled_corun
+
+                started = time.perf_counter()
+                record["profile"], out = tiled_corun.profile_call(tiled, positions, host_ops=25)
+            else:
+                started = time.perf_counter()
+                out = tiled(positions)
             torch.cuda.synchronize()
             entry = dict(seconds=time.perf_counter() - started, **mem(before), **tiled.last)
             # ``allocated`` is after the call (the tiled field keeps its global state between calls); the call's

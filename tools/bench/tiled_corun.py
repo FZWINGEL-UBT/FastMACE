@@ -77,15 +77,16 @@ def classify(name):
     return "other"
 
 
-def profile_call(tiled, positions):
-    """Stage 0: one compiled call under torch.profiler; kernel time by class and the device's busy fraction."""
+def profile_call(tiled, positions, host_ops=0):
+    """Stage 0: one compiled call under torch.profiler; kernel time by class and the device's busy fraction. With
+    ``host_ops``, returns ``(summary, output)`` and the summary lists the host operations with the most self time."""
     import torch
     from torch.profiler import ProfilerActivity, profile
 
     torch.cuda.synchronize()
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
         started = time.perf_counter()
-        tiled(positions)
+        output = tiled(positions)
         torch.cuda.synchronize()
         wall = time.perf_counter() - started
     kernels = [e for e in prof.events() if e.device_type == torch.autograd.DeviceType.CUDA]
@@ -106,13 +107,19 @@ def profile_call(tiled, positions):
         classes[label] = classes.get(label, 0.0) + us
         top[e.name] = top.get(e.name, 0.0) + us
     total = sum(classes.values()) or 1.0
-    return dict(wall_s=wall, kernel_s=total / 1e6, busy_s=busy / 1e6, span_s=span / 1e6,
+    summary = dict(wall_s=wall, kernel_s=total / 1e6, busy_s=busy / 1e6, span_s=span / 1e6,
                 busy_fraction_of_span=busy / span if span else None,
                 kernel_sum_over_busy=total / busy if busy else None,
                 classes={k: dict(seconds=v / 1e6, share=v / total) for k, v in sorted(classes.items(),
                                                                                      key=lambda kv: -kv[1])},
                 top=[dict(name=k[:160], seconds=v / 1e6, share=v / total, cls=classify(k))
                      for k, v in sorted(top.items(), key=lambda kv: -kv[1])[:30]])
+    if not host_ops:
+        return summary
+    averages = prof.key_averages()
+    summary["host_ops"] = [dict(name=a.key[:120], self_cpu_s=a.self_cpu_time_total / 1e6, calls=a.count)
+                           for a in sorted(averages, key=lambda a: -a.self_cpu_time_total)[:host_ops]]
+    return summary, output
 
 
 def capture_slots(tiled, positions, per_sweep=2, skip=1):
