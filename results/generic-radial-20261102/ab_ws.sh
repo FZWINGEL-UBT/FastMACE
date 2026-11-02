@@ -9,15 +9,16 @@ set -u
 R=/mnt/homes/zwingel/fm-tiled/run.sh
 HOST=${HOST:-$(hostname)}
 CK=/mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model
-for spec in NaCl@10x10x10 SrTiO3@11x11x11; do
+for spec in ${SPECS:-NaCl@10x10x10 $PWD/results/generic-radial-20261102/SrTiO3.cif@11x11x11}; do
   for order in ab ba; do
     if [ $order = ab ]; then pattern=abab; else pattern=abba; fi
-    n=$HOST-grt-ab-${spec%%@*}-${spec##*@}-$order
+    n=$HOST-grt-ab-$(basename ${spec%%@*} .cif)-${spec##*@}-$order
     bash $R $n tools/ab_rewrites.py --checkpoint $CK --model omat0-medium --structures $spec \
       --b radial_tables=on --order $order --pattern $pattern > /dev/null 2>&1
     echo "$n exit $? $(grep -E 'b/a' /mnt/homes/zwingel/fm-tiled/runs/$n/run.log | tail -1 | cut -c1-200)"
   done
 done
+[ -n "${SKIP_TILED:-}" ] && exit 0
 n=$HOST-grt-tiled-SrTiO3-58x58x58
 bash $R $n results/tiled-speed-20261101/ab_arms.py --structure SrTiO3 --model omat0-medium --repeat 58x58x58 \
   --arms compiled+budget,compiled+budget+tables --calls 1 > /dev/null 2>&1
