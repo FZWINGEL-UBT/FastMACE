@@ -183,6 +183,13 @@ def _whole_system_only(key, value, n):
     return key not in WHOLE_SYSTEM_KEEP and value.dim() > 0 and value.shape[0] == n
 
 
+def _replaced(key, early):
+    """Whether the construction replaces batch entry ``key`` before reading it: with ``release_whole_system``, the
+    positions (the force field's own leaf takes their place), so they never reach the device (12 bytes per atom of
+    the build's peak)."""
+    return early and key == "positions"
+
+
 def _released(key, value, dtype, device):
     """``release_whole_system``'s form of a per-atom batch entry: ``batch`` (one structure: all zeros) a zero-stride
     view of one zero on ``device``, any other its shape and device dtype on the meta device."""
@@ -582,7 +589,7 @@ class MACEForceField:
                 batch[key] = torch.empty(shape, dtype=dtype, device=self._device)
         self.data = {key: (value.to(self._device, self._dtype) if value.is_floating_point() else value.to(self._device))
                      if torch.is_tensor(value) and value is not node_attrs else value for key, value in batch.items()
-                     if not (early and _whole_system_only(key, value, len(atoms)))}
+                     if not (early and _whole_system_only(key, value, len(atoms))) and not _replaced(key, early)}
         if early:  # release_whole_system: their shapes and dtypes only, as the release leaves them
             for key, value in batch.items():
                 if torch.is_tensor(value) and _whole_system_only(key, value, len(atoms)):
