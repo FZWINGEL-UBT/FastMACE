@@ -76,12 +76,12 @@ def main(argv=None) -> int:
         return statistics.median(times)
 
     def triton_into(a, b, out):
-        saved = triton_gemm.CUTLASS
-        triton_gemm.CUTLASS = False
+        saved = triton_gemm.CUTLASS_CAPABILITIES
+        triton_gemm.CUTLASS_CAPABILITIES = ()
         try:
             triton_gemm._launch(a, b, out)
         finally:
-            triton_gemm.CUTLASS = saved
+            triton_gemm.CUTLASS_CAPABILITIES = saved
 
     worst = {}
     for m, k, n in SHAPES:

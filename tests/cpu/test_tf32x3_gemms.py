@@ -128,7 +128,7 @@ def _plan(rewrites, hardware=GPU, dtype=None, label="mh1-r2scan"):
     configs = dict(rewrites=rewrites, engine=dataclasses.replace(EngineConfig(), backend="auto"))
     if dtype:
         configs["precision"] = PrecisionConfig(dtype=dtype)
-    return planner(**configs).plan(traits(label), nacl(), IntegratorConfig(), hardware)
+    return planner(**configs).plan(traits(label), nacl(), IntegratorConfig(), hardware, model_label=label)
 
 
 A100 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)

@@ -1,0 +1,147 @@
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+FF...FF.                                                                 [100%]
+=================================== FAILURES ===================================
+_____________ test_error_is_fp32_class_and_repeats_bitwise[shape0] _____________
+
+shape = (216, 512, 512)
+
+    @pytest.mark.parametrize("shape", SHAPES)
+    def test_error_is_fp32_class_and_repeats_bitwise(shape):
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+    
+        torch.backends.cuda.matmul.fp32_precision = "ieee"
+        a, b = _operands(*shape)
+        reference = a.double() @ b.double()
+        got = tf32x3_mm(a, b)
+        ieee = a @ b
+        error = float((got.double() - reference).abs().max())
+        assert error <= 4 * float((ieee.double() - reference).abs().max()) + 1e-30
+        assert torch.equal(tf32x3_mm(a, b), got)
+>       assert torch.equal(tf32x3_mm(a.t().contiguous().t(), b), got)  # strided A, same arithmetic
+E       AssertionError: assert False
+E        +  where False = <built-in method equal of type object at 0x2b525a1a6400>(tensor([[-10.9439,  -4.7062,  15.6886,  ..., -28.4123,   4.3288, -26.4159],\n        [ 26.8293,  10.0454,  -5.4273,  .....0.7468,   3.4234],\n        [-21.6593,  13.6124,  -8.6265,  ...,  19.7258,  24.6511,   8.5719]],\n       device='cuda:0'), tensor([[-10.9439,  -4.7062,  15.6886,  ..., -28.4123,   4.3288, -26.4159],\n        [ 26.8293,  10.0454,  -5.4273,  .....0.7468,   3.4234],\n        [-21.6593,  13.6124,  -8.6265,  ...,  19.7258,  24.6511,   8.5719]],\n       device='cuda:0'))
+E        +    where <built-in method equal of type object at 0x2b525a1a6400> = torch.equal
+E        +    and   tensor([[-10.9439,  -4.7062,  15.6886,  ..., -28.4123,   4.3288, -26.4159],\n        [ 26.8293,  10.0454,  -5.4273,  .....0.7468,   3.4234],\n        [-21.6593,  13.6124,  -8.6265,  ...,  19.7258,  24.6511,   8.5719]],\n       device='cuda:0') = <CustomOpDef(fastmace::tf32x3_mm)>(tensor([[-0.9247, -0.4253, -2.6438,  ..., -0.3188,  1.4025,  0.6559],\n        [-1.1099, -0.3763,  1.0076,  ..., -1.236...8458, -0.0771,  0.3183],\n        [ 1.1135,  1.4422, -1.1206,  ..., -1.5392, -1.5835,  0.5070]],\n       device='cuda:0'), tensor([[ 0.1808, -0.5523,  0.9238,  ..., -2.0716,  0.2073,  0.3451],\n        [ 0.5980, -1.8783,  0.3032,  ..., -0.830...2241,  0.0132, -0.0626],\n        [ 0.4674, -0.2345,  0.6832,  ...,  1.0556,  0.8478, -0.6737]],\n       device='cuda:0'))
+E        +      where tensor([[-0.9247, -0.4253, -2.6438,  ..., -0.3188,  1.4025,  0.6559],\n        [-1.1099, -0.3763,  1.0076,  ..., -1.236...8458, -0.0771,  0.3183],\n        [ 1.1135,  1.4422, -1.1206,  ..., -1.5392, -1.5835,  0.5070]],\n       device='cuda:0') = <built-in method t of Tensor object at 0x2b52f0958360>()
+E        +        where <built-in method t of Tensor object at 0x2b52f0958360> = tensor([[-0.9247, -1.1099, -1.0323,  ..., -0.0799, -0.4227,  1.1135],\n        [-0.4253, -0.3763, -0.8894,  ...,  1.302...0714, -0.0771, -1.5835],\n        [ 0.6559, -0.1084, -0.4907,  ..., -0.9329,  0.3183,  0.5070]],\n       device='cuda:0').t
+E        +          where tensor([[-0.9247, -1.1099, -1.0323,  ..., -0.0799, -0.4227,  1.1135],\n        [-0.4253, -0.3763, -0.8894,  ...,  1.302...0714, -0.0771, -1.5835],\n        [ 0.6559, -0.1084, -0.4907,  ..., -0.9329,  0.3183,  0.5070]],\n       device='cuda:0') = <built-in method contiguous of Tensor object at 0x2b52f09585e0>()
+E        +            where <built-in method contiguous of Tensor object at 0x2b52f09585e0> = tensor([[-0.9247, -1.1099, -1.0323,  ..., -0.0799, -0.4227,  1.1135],\n        [-0.4253, -0.3763, -0.8894,  ...,  1.302...0714, -0.0771, -1.5835],\n        [ 0.6559, -0.1084, -0.4907,  ..., -0.9329,  0.3183,  0.5070]],\n       device='cuda:0').contiguous
+E        +              where tensor([[-0.9247, -1.1099, -1.0323,  ..., -0.0799, -0.4227,  1.1135],\n        [-0.4253, -0.3763, -0.8894,  ...,  1.302...0714, -0.0771, -1.5835],\n        [ 0.6559, -0.1084, -0.4907,  ..., -0.9329,  0.3183,  0.5070]],\n       device='cuda:0') = <built-in method t of Tensor object at 0x2b52f09a9d00>()
+E        +                where <built-in method t of Tensor object at 0x2b52f09a9d00> = tensor([[-0.9247, -0.4253, -2.6438,  ..., -0.3188,  1.4025,  0.6559],\n        [-1.1099, -0.3763,  1.0076,  ..., -1.236...8458, -0.0771,  0.3183],\n        [ 1.1135,  1.4422, -1.1206,  ..., -1.5392, -1.5835,  0.5070]],\n       device='cuda:0').t
+
+tests/gpu/test_tf32x3_gemm_cuda.py:35: AssertionError
+_____________ test_error_is_fp32_class_and_repeats_bitwise[shape1] _____________
+
+shape = (1944, 128, 2048)
+
+    @pytest.mark.parametrize("shape", SHAPES)
+    def test_error_is_fp32_class_and_repeats_bitwise(shape):
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+    
+        torch.backends.cuda.matmul.fp32_precision = "ieee"
+        a, b = _operands(*shape)
+        reference = a.double() @ b.double()
+        got = tf32x3_mm(a, b)
+        ieee = a @ b
+        error = float((got.double() - reference).abs().max())
+        assert error <= 4 * float((ieee.double() - reference).abs().max()) + 1e-30
+        assert torch.equal(tf32x3_mm(a, b), got)
+>       assert torch.equal(tf32x3_mm(a.t().contiguous().t(), b), got)  # strided A, same arithmetic
+E       AssertionError: assert False
+E        +  where False = <built-in method equal of type object at 0x2b525a1a6400>(tensor([[-10.2021,  20.4846,   3.7867,  ...,   6.0192,   5.0291, -17.3977],\n        [ 23.0108,  -5.7001,   1.0731,  .....1.7790,  13.4572],\n        [  2.6003,  30.2864,  -4.8133,  ...,  17.2820,   6.3839,   2.7191]],\n       device='cuda:0'), tensor([[-10.2021,  20.4846,   3.7867,  ...,   6.0192,   5.0291, -17.3977],\n        [ 23.0108,  -5.7001,   1.0731,  .....1.7790,  13.4572],\n        [  2.6003,  30.2864,  -4.8133,  ...,  17.2820,   6.3839,   2.7191]],\n       device='cuda:0'))
+E        +    where <built-in method equal of type object at 0x2b525a1a6400> = torch.equal
+E        +    and   tensor([[-10.2021,  20.4846,   3.7867,  ...,   6.0192,   5.0291, -17.3977],\n        [ 23.0108,  -5.7001,   1.0731,  .....1.7790,  13.4572],\n        [  2.6003,  30.2864,  -4.8133,  ...,  17.2820,   6.3839,   2.7191]],\n       device='cuda:0') = <CustomOpDef(fastmace::tf32x3_mm)>(tensor([[-0.9247, -0.4253, -2.6438,  ..., -0.2128, -0.3315, -0.2023],\n        [-1.1451, -0.5715, -0.6510,  ...,  1.341...7044, -0.3900, -0.2458],\n        [-0.2069,  0.4197,  0.3505,  ...,  0.8718, -2.0284,  0.6411]],\n       device='cuda:0'), tensor([[ 0.1808, -0.5523,  0.9238,  ..., -0.3213,  0.6505,  0.5591],\n        [-0.2301,  0.4469, -0.6131,  ..., -0.005...5077,  0.1555,  1.8302],\n        [-0.8396,  0.9184,  1.2251,  ...,  1.0556,  0.8478, -0.6737]],\n       device='cuda:0'))
+E        +      where tensor([[-0.9247, -0.4253, -2.6438,  ..., -0.2128, -0.3315, -0.2023],\n        [-1.1451, -0.5715, -0.6510,  ...,  1.341...7044, -0.3900, -0.2458],\n        [-0.2069,  0.4197,  0.3505,  ...,  0.8718, -2.0284,  0.6411]],\n       device='cuda:0') = <built-in method t of Tensor object at 0x2b52f92869d0>()
+E        +        where <built-in method t of Tensor object at 0x2b52f92869d0> = tensor([[-0.9247, -1.1451,  0.2374,  ..., -1.3826,  0.7023, -0.2069],\n        [-0.4253, -0.5715,  1.0884,  ..., -1.523...2993, -0.3900, -2.0284],\n        [-0.2023, -0.8467, -0.2111,  ...,  0.7478, -0.2458,  0.6411]],\n       device='cuda:0').t
+E        +          where tensor([[-0.9247, -1.1451,  0.2374,  ..., -1.3826,  0.7023, -0.2069],\n        [-0.4253, -0.5715,  1.0884,  ..., -1.523...2993, -0.3900, -2.0284],\n        [-0.2023, -0.8467, -0.2111,  ...,  0.7478, -0.2458,  0.6411]],\n       device='cuda:0') = <built-in method contiguous of Tensor object at 0x2b52f073b8d0>()
+E        +            where <built-in method contiguous of Tensor object at 0x2b52f073b8d0> = tensor([[-0.9247, -1.1451,  0.2374,  ..., -1.3826,  0.7023, -0.2069],\n        [-0.4253, -0.5715,  1.0884,  ..., -1.523...2993, -0.3900, -2.0284],\n        [-0.2023, -0.8467, -0.2111,  ...,  0.7478, -0.2458,  0.6411]],\n       device='cuda:0').contiguous
+E        +              where tensor([[-0.9247, -1.1451,  0.2374,  ..., -1.3826,  0.7023, -0.2069],\n        [-0.4253, -0.5715,  1.0884,  ..., -1.523...2993, -0.3900, -2.0284],\n        [-0.2023, -0.8467, -0.2111,  ...,  0.7478, -0.2458,  0.6411]],\n       device='cuda:0') = <built-in method t of Tensor object at 0x2b52f090b150>()
+E        +                where <built-in method t of Tensor object at 0x2b52f090b150> = tensor([[-0.9247, -0.4253, -2.6438,  ..., -0.2128, -0.3315, -0.2023],\n        [-1.1451, -0.5715, -0.6510,  ...,  1.341...7044, -0.3900, -0.2458],\n        [-0.2069,  0.4197,  0.3505,  ...,  0.8718, -2.0284,  0.6411]],\n       device='cuda:0').t
+
+tests/gpu/test_tf32x3_gemm_cuda.py:35: AssertionError
+_________________ test_gradients_are_the_op_on_the_transposes __________________
+
+    def test_gradients_are_the_op_on_the_transposes():
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_matmul, tf32x3_mm
+    
+        a, b = _operands(300, 64, 96, seed=1)
+        a.requires_grad_()
+        b.requires_grad_()
+        grad = torch.randn((300, 96), device="cuda")
+>       grad_a, grad_b = torch.autograd.grad(tf32x3_matmul(a, b), (a, b), grad)
+
+tests/gpu/test_tf32x3_gemm_cuda.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.10/site-packages/torch/autograd/__init__.py:594: in grad
+    result = _engine_run_backward(
+/usr/local/lib/python3.10/site-packages/torch/autograd/graph.py:1072: in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+/usr/local/lib/python3.10/site-packages/torch/autograd/function.py:366: in apply
+    return user_fn(self, *args)
+fastmace/kernels/triton/tf32x3_gemm.py:166: in backward
+    grad_a = tf32x3_mm(grad, saved if ctx.transposed else saved.t())
+/usr/local/lib/python3.10/site-packages/torch/_library/custom_ops.py:866: in __call__
+    return self._opoverload(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_ops.py:916: in __call__
+    return self._op(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_library/autograd.py:147: in autograd_impl
+    result = redispatch_no_grad(keyset, args, keyword_only_args)
+/usr/local/lib/python3.10/site-packages/torch/_library/autograd.py:43: in redispatch_no_grad
+    result = op.redispatch(keyset & _C._after_autograd_keyset, *args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_ops.py:925: in redispatch
+    return pyobj_dispatcher.redispatch(keyset, *args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_library/custom_ops.py:442: in backend_impl
+    result = self._backend_fns[device_type](*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_compile.py:54: in inner
+    return disable_fn(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:1548: in _fn
+    return fn(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/_library/custom_ops.py:503: in wrapped_fn
+    return fn(*args, **kwargs)
+fastmace/kernels/triton/tf32x3_gemm.py:126: in tf32x3_mm
+    _launch(a, b, out)
+fastmace/kernels/triton/tf32x3_gemm.py:109: in _launch
+    tf32x3.mm_into(a, b, out)
+fastmace/kernels/cutlass/tf32x3.py:119: in mm_into
+    _check(driver.cuLaunchKernel(kernels.functions[layout], grid[0], grid[1], 1, kernels.threads, 1, 1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+result = (<CUresult.CUDA_ERROR_INVALID_CONTEXT: 201>,)
+
+    def _check(result):
+        error = result[0]
+        if int(error) != 0:
+>           raise RuntimeError(f"CUDA/NVRTC call failed: {error}")
+E           RuntimeError: CUDA/NVRTC call failed: <CUresult.CUDA_ERROR_INVALID_CONTEXT: 201>
+
+fastmace/kernels/oeq_streaming/runtime.py:42: RuntimeError
+______________ test_joined_products_in_tf32x3_equal_the_dense_op _______________
+
+    def test_joined_products_in_tf32x3_equal_the_dense_op():
+        from fastmace.kernels.triton.segment_gemm import joined_products
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+    
+        atoms, dims, muls = 50, (1, 3), (64, 32)
+        generator = torch.Generator(device="cuda").manual_seed(2)
+        rows = [torch.randn((atoms * d, 48), generator=generator, device="cuda") for d in dims]
+        weights = [torch.randn((48, m), generator=generator, device="cuda") for m in muls]
+        offsets = (0, muls[0])
+        width = sum(d * m for d, m in zip(dims, muls))
+        out = joined_products(rows, weights, [w.t().contiguous() for w in weights], offsets, dims, width, "tf32x3")
+        for x, w, offset, d, m in zip(rows, weights, offsets, dims, muls):
+>           assert torch.equal(out[:, offset:offset + d * m].reshape(atoms * d, m), tf32x3_mm(x, w))
+E           AssertionError: assert False
+E            +  where False = <built-in method equal of type object at 0x2b525a1a6400>(tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0'), tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0'))
+E            +    where <built-in method equal of type object at 0x2b525a1a6400> = torch.equal
+E            +    and   tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0') = <built-in method reshape of Tensor object at 0x2b533a891d50>((50 * 1), 64)
+E            +      where <built-in method reshape of Tensor object at 0x2b533a891d50> = tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0').reshape
+E            +    and   tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0') = <CustomOpDef(fastmace::tf32x3_mm)>(tensor([[ 0.0223, -0.5777,  0.7053,  ..., -1.2035,  0.0754, -0.0962],\n        [ 0.3381,  0.3703,  0.7920,  ..., -0.014...6114, -0.6558,  0.1303],\n        [ 0.4326,  0.6732, -0.3741,  ..., -1.4741,  0.9413,  0.9145]],\n       device='cuda:0'), tensor([[-0.1825,  1.7087,  0.1843,  ...,  0.9775,  1.1469, -1.4862],\n        [ 1.5623,  1.1490,  0.2106,  ...,  0.783...4269, -0.3695,  1.2287],\n        [-0.1834,  1.3019,  2.0926,  ...,  1.5561,  0.6213, -0.0932]],\n       device='cuda:0'))
+
+tests/gpu/test_tf32x3_gemm_cuda.py:80: AssertionError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_tf32x3_gemm_cuda.py::test_error_is_fp32_class_and_repeats_bitwise[shape0]
+FAILED tests/gpu/test_tf32x3_gemm_cuda.py::test_error_is_fp32_class_and_repeats_bitwise[shape1]
+FAILED tests/gpu/test_tf32x3_gemm_cuda.py::test_gradients_are_the_op_on_the_transposes
+FAILED tests/gpu/test_tf32x3_gemm_cuda.py::test_joined_products_in_tf32x3_equal_the_dense_op
+4 failed, 4 passed in 3.37s

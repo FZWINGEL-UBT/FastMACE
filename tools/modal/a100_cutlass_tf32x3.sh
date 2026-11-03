@@ -45,6 +45,6 @@ nb=(--a-neighbours skin=0.5 --b-neighbours skin=0.5)
 ab omat0 omat0-medium "$omat" --structures "$st" "${nb[@]}" --b tf32x3_gemms=on grouped_launch=off
 ab omat0-control omat0-medium "$omat" --structures "$st" "${nb[@]}" --a grouped_launch=off   --b tf32x3_gemms=on grouped_launch=off
 ab mh1 mh1-r2scan "$mh1" --structures NaCl NbCl5 --a grouped_launch=off --b tf32x3_gemms=on grouped_launch=off
-ab omat0-backend omat0-medium "$omat" --structures "$st" "${nb[@]}" --a tf32x3_gemms=on grouped_launch=off   --a-constant fastmace.kernels.triton.tf32x3_gemm:CUTLASS=False --b tf32x3_gemms=on grouped_launch=off
+ab omat0-backend omat0-medium "$omat" --structures "$st" "${nb[@]}" --a tf32x3_gemms=on grouped_launch=off   --a-constant fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES=() --b tf32x3_gemms=on grouped_launch=off
 note done
 grep -h -E "b/a" "$out"/ab-*.log 2>/dev/null | cut -c1-300
