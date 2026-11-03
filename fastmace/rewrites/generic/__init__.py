@@ -332,20 +332,22 @@ def _run(module, probe, with_cutoff, cotangents, generator):
     with torch.enable_grad():
         feats = probe["node_attrs"] @ probe["table"] if probe["table"] is not None else probe["node_feats"]
         cutoff = probe["cutoff"] if with_cutoff else None
-        if reassociation is not None:  # the probe's species table in place of the structure's (this check only)
+        # The probe's species table in place of the structure's (this check only), until after the backward: a
+        # checkpointed forward (generic_recompute_first_table) runs again there and must see the same table.
+        if reassociation is not None:
             reassociation.bind(module.linear_up(probe["table"][reassociation.columns]))
         try:
             outputs = [out for out in module(probe["node_attrs"], feats, probe["edge_attrs"], probe["edge_feats"],
                                              probe["edge_index"], cutoff=cutoff) if out is not None]
+            if not cotangents:
+                cotangents.extend(torch.randn(out.shape, generator=generator, dtype=torch.float64).to(out)
+                                  for out in outputs)
+            leaves = [probe["table"] if probe["table"] is not None else probe["node_feats"],
+                      probe["edge_attrs"], probe["edge_feats"]] + ([probe["cutoff"]] if with_cutoff else [])
+            grads = torch.autograd.grad(outputs, leaves, cotangents[:len(outputs)], allow_unused=True)
         finally:
             if reassociation is not None:
                 reassociation.bind(own)
-        if not cotangents:
-            cotangents.extend(torch.randn(out.shape, generator=generator, dtype=torch.float64).to(out)
-                              for out in outputs)
-        leaves = [probe["table"] if probe["table"] is not None else probe["node_feats"],
-                  probe["edge_attrs"], probe["edge_feats"]] + ([probe["cutoff"]] if with_cutoff else [])
-        grads = torch.autograd.grad(outputs, leaves, cotangents[:len(outputs)], allow_unused=True)
     grads = [torch.zeros_like(leaf) if grad is None else grad for leaf, grad in zip(leaves, grads)]
     return [out.detach() for out in outputs] + grads
 
