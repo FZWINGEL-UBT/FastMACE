@@ -48,6 +48,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     strided) ab "$spec" --a-constant fastmace.kernels.triton.edge_outer_sum:STRIDED_ROWS=False ;;  # b: in place
     fullrows) ab "$spec" --b-constant fastmace.rewrites.generic.modules:FIRST_FULL_ROWS=True ;;
     colblock64) ab "$spec" --b-constant fastmace.kernels.triton.radial_table:COLUMN_BLOCK=64 ;;
+    deg*) ab "$spec" --b-constant "fastmace.rewrites.radial:DEGREE=${spec#deg}" ;;  # fewer terms, more pieces (same tolerance)
   esac
 done
 note done
