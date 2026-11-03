@@ -225,11 +225,13 @@ def big_structure(seed=8):
     return atoms
 
 
+@pytest.mark.parametrize("split", [1, 2])
 @pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
-def test_tile_neighbours_are_bitwise_the_global_list(names):
+def test_tile_neighbours_are_bitwise_the_global_list(names, split):
     """Each tile's edges from the cell bins (fastmace.neighbors.tile_list) are the global skin list's edges for
     those receivers after compact at the same positions: the same pairs, unit shifts and shifts, in the same order
-    (with MH-1's rewrites the list sorts by sender group too)."""
+    (with MH-1's rewrites the list sorts by sender group too), with cutoff-wide bins and a +-1 stencil and with
+    half-cutoff bins and a +-2 stencil (the default on this cell)."""
     from fastmace.neighbors.tile_list import TileNeighbours
 
     calc, atoms = calculator(), big_structure()
@@ -241,7 +243,8 @@ def test_tile_neighbours_are_bitwise_the_global_list(names):
     count = int(field.neighbours.count)
     expected = (field.neighbours.edge_index[:, :count], field.neighbours.unit_shifts[:count],
                 field.neighbours.shifts[:count])
-    bins = TileNeighbours.like(field.neighbours)
+    bins = TileNeighbours.like(field.neighbours, split=split)
+    assert TileNeighbours.like(field.neighbours).split == 2 and bins.split == split
     bins.bin(positions)
     chunks = [bins.edges(chunk) for chunk in torch.arange(len(atoms)).split(37)]
     sender, receiver, unit, shifts = (torch.cat(part) for part in zip(*chunks))
@@ -269,6 +272,8 @@ def test_tile_neighbours_refuse_small_cells():
 
     with pytest.raises(ValueError, match="bins"):
         TileNeighbours(4.0, torch.eye(3, dtype=torch.float64) * 11.0, torch.float64)
+    # The smallest accepted cell (three cutoff-wide bins) holds six half-cutoff bins: the +-2 stencil.
+    assert TileNeighbours(4.0, torch.eye(3, dtype=torch.float64) * 12.0, torch.float64).split == 2
     with pytest.raises(ValueError, match="neighbours"):
         TileConfig(neighbours="cells")
 
