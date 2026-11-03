@@ -413,6 +413,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [prec-cutlass-ada](#prec-cutlass-ada) | CUTLASS 3×TF32 on sm_89 / sm_120 | none | FM | NOT BUILT | 2026-10-20 | same ceiling as Triton | [opt-T01](validation/opt-T01-tensor-cores.md) §3 |
 | [prec-cutlass-a100](#prec-cutlass-a100) | CUTLASS 3×TF32 on the A100 (stage 2) | would sit behind `tf32x3_gemms` | FM | NOT BUILT | owner 2026-10-24 | GEMM time NaCl 0.75×, NbCl5 0.55× | [opt-T01](validation/opt-T01-tensor-cores.md) §5, §7 |
 | [prec-bf16x6](#prec-bf16x6) | Triton BF16×6 / BF16×3 | none | FM | REJECTED | 2026-10-23 | never beats cuBLAS IEEE at K = 512 | [opt-T01](validation/opt-T01-tensor-cores.md) §6 |
+| [prec-cublasdx-int8](#prec-cublasdx-int8) | cuBLASDx INT8-slice FP32 emulation (`RequiredMantissaBits`, MathDx 26.10) | bench | FM | REJECTED | 2026-11-03 | 3 slices 1.73× (Ada), 1.85× (5060 Ti) SGEMM time at 13696×512×512, kernel only | [bf16x3-facto](validation/bf16x3-facto.md) §5 |
 | [prec-bf16x3-facto](#prec-bf16x3-facto) | BF16×3 atom GEMMs in the MD step (FACTO) | branch env `FASTMACE_SPLIT_PRECISION` | FM | REJECTED | 2026-11-03 | gate passes (A100 NaCl via floors); step 1.08–1.29× slower, A100 NbCl5 0.994 | [bf16x3-facto](validation/bf16x3-facto.md) |
 | [prec-tc-overlap](#prec-tc-overlap) | Tensor-core GEMM beside SIMT on two streams | bench | FM | REJECTED | 2026-10-20 | 0.77–0.98× of cuBLAS alone | [opt-1](validation/opt-1.md) |
 | [prec-tf32x3-gemms](#prec-tf32x3-gemms) | 3×TF32 atom GEMMs as a record (+ tile rule) | `tf32x3_gemms` | FM | NEVER-AUTOMATIC | 2026-10-24; tile rule 2026-10-26 | accuracy pass; A100 slower (NaCl 3.1 → 4.2 ms) | [opt4-T03](validation/opt4-T03.md) |
@@ -2231,6 +2232,17 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Measured: per product 7–19× (median) IEEE's error, worse on 48 of 52; force gate passes (5060 Ti worst ratios 1.55 forces, 1.61 energy, 1.66 stress; default plan ≤ 1.05), on the A100 NaCl only through the absolute floors (energy 4.38, stress 2.20). Whole step b/a (both build orders): 5060 Ti NaCl 1.23–1.25, NbCl5 1.18; Ada 1.09, 1.08; A100 1.29, 0.994. GEMM 13608×512×512 bf16x3 / cuBLAS IEEE: 1.23, 1.11, 0.75. BF16 dense / FP32 at 4096³: 3.0, 5.1, 13.6.
 - Why: BF16 tensor cores are only 3–5× FP32 on the production GPUs; on the A100 the GEMM gain is lost with the grouped launch. cuBLAS has no BF16×3 mode (BF16×9 FP32 emulation only on cc 10.0/10.3); cuBLASDx 0.7.0's `RequiredMantissaBits` (INT8 slices, emulates on sm_89/sm_120) is the remaining library route, see [prec-int8-f32](#prec-int8-f32).
 - Sources: [bf16x3-facto](validation/bf16x3-facto.md); `results/bf16x3-facto-20261103/`.
+
+<a id="prec-cublasdx-int8"></a>
+#### prec-cublasdx-int8: cuBLASDx INT8-slice float32 emulation (MathDx 26.10.0)
+- Switch: none (`tools/bench/cublasdx_int8_emulation.cu` on branch `fastmace/bf16x3-screen`)
+- Engine: FM
+- Date/round: 3 November 2026 (owner request)
+- What: cuBLASDx's pipelined GEMM with `RequiredMantissaBits<X>` (X = 15, 23, 31: 2, 3, 4 INT8 slices with a shared exponent per row of A and column of B), against cublasSgemm.
+- Status: REJECTED (RTX 5060 Ti, RTX 4000 Ada).
+- Measured: 13696×512×512 µs, cuBLAS / 2 / 3 / 4 slices (kernel only): 5060 Ti 630 / 715 / 1,165 / 1,683; Ada 557 / 596 / 964 / 1,396; slicing per call adds about 0.3 ms. Only 4096³ wins (3 slices 0.87–0.88×). Errors: 3 slices 1.5e-6 Gaussian (SGEMM 1.0e-6), 2.0e-3 under cancellation (SGEMM 4.4e-5); 2 slices 3e-4.
+- Why: INT8 throughput on these cards is not 6–10× FP32; the production products are K = N = 512.
+- Sources: [bf16x3-facto](validation/bf16x3-facto.md) §5; `results/cublasdx-int8-20261103/`; [prec-int8-f32](#prec-int8-f32).
 
 <a id="prec-tc-overlap"></a>
 #### prec-tc-overlap: tensor-core GEMM beside cuBLAS SIMT on two streams (OPT-T01b)
