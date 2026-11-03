@@ -1,0 +1,91 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  58,
+  58,
+  58
+ ],
+ "atoms": 975560,
+ "receivers": 32768,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "e7a1a06a",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2107256832,
+   "host_peak": 2107256832
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2108583936,
+   "host_peak": 2108583936
+  },
+  "build": {
+   "seconds": 36.04329586797394,
+   "allocated": 157176832,
+   "reserved": 224395264,
+   "peak_above_before": 195796480,
+   "host_rss": 2978435072,
+   "host_peak": 3058827264
+  },
+  "neighbours": {
+   "allocated": 180590592,
+   "reserved": 224395264,
+   "peak_above_before": 23413760,
+   "host_rss": 2979217408,
+   "host_peak": 3058827264
+  }
+ },
+ "phase": "tiled call 0",
+ "call_rows": 32768,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.157617611934292e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=5.769702648483092e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.524407248280912e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.7445807662076195e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903561267464e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (177 pieces, 9 pairs, certificate 0.31, cached)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, cached)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "backward_chunk_edges": [
+  8192
+ ],
+ "ledgers": {},
+ "edges_within_cutoff": 0,
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 144.00 MiB. GPU 0 has a total capacity of 19.54 GiB of which 75.62 MiB is free. Including non-PyTorch memory, this process has 19.46 GiB memory in use. Of the allocated memory 19.09 GiB is allocated by PyTorch, and 103.66 MiB is reserved by PyTorch but unallocated.",
+ "oom_at": "tiled call 0",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/tools/bench/tiled_capacity.py:418 main: out = tiled(positions)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1329 __call__: out = self._call(positions)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1587 _call: tile(sweep, index, lane=lane, position=position if ahead else None)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1563 tile: self._eager_tile(sweep, piece, g)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1971 _eager_tile: es, g_vec, g_x, g_sc, g_eps = self._second(tile, state, strain)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1115 _second: objective, es = self._forward(2)(leaf, x, eps, attrs, local, recv_mask, r)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1142 _second_forward: out = self._layer(1, x, attrs, edge_attrs, edge_feats, cutoff, local, r)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/model/tiled.py:1043 _layer: feats, sc = model.interactions[index](",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/rewrites/generic/modules.py:146 generic_interaction_forward: message = self.linear(message) / (density + 1)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1783 _wrapped_call_impl: return self._call_impl(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py:1794 _call_impl: return forward_call(*args, **kwargs)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/rewrites/linear/modules.py:123 forward: return self.transpose_out(join_rows(self.segments_out, self.products(rows), n, x))",
+  "/mnt/homes/zwingel/fm-tiled/src-all-e7a1a06a/fastmace/rewrites/linear/modules.py:132 products: lefts.append(rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1))"
+ ]
+}

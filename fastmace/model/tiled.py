@@ -27,10 +27,12 @@ readout. Tiles are planned on the host from a spatial binning of the fractional 
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import functools
 import inspect
 import math
+import time
 from typing import Any
 
 from fastmace.model.forces import ForceOutput
@@ -40,6 +42,21 @@ from fastmace.model.forces import ForceOutput
 # (tiled-compiled-default.md).
 COMPILED_RESIDENCY = int(0.07 * 2**30)
 COMPILED_MARGIN = 2**30
+# TileConfig.wavefront "auto": considered from this many layers of the tile grid along its slowest axis (the band of
+# live rows is about five layers: three around sweep 2, and the first and last layers, alive for the whole call).
+WAVEFRONT_LAYERS = 12
+# ... and from this many when the plain state would not fit the host at all: a pool of about three layers and the
+# boundary skins is still smaller than the plain state and its alias window, and without it the call fails.
+WAVEFRONT_MIN_LAYERS = 4
+# TileConfig.lanes "auto": the GPUs where two sweep-2 tiles on disjoint halves of the SMs ran faster than one after
+# the other (docs/validation/tiled-concurrent-tiles.md: 1.09x per pair on the RTX 4000 Ada, 1.05x on the RTX 5060 Ti,
+# under cudaMallocAsync); by exact device name (decision 66).
+LANE_GPUS = ("NVIDIA RTX 4000 Ada Generation",)
+# TileConfig.backward_chunk_scale "auto" (decision 66, by exact device name): the chunked streaming backward's edges
+# per chunk times this in the tiles, where it measured faster (results/tiled-ideas-20261102, 1.08M SrTiO3,
+# wavefront, R 8,192: x4 -10.5 % on the RTX 5060 Ti, -3.2 % on the RTX 4000 Ada; the RTX PRO 6000's tiles do not
+# chunk). A tile's backward runs eagerly, one launch pair per chunk: the L2 rule's chunks were launch-bound there.
+TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Generation": 4}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -82,8 +99,11 @@ class TileConfig:
     # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
-    # neighbours "tiles": each tile's edges found once per call and kept on the host (int32 senders, receiver counts
-    # and one-byte unit shifts, about 5 bytes per edge), the later sweeps rebuilding them exactly from it.
+    # neighbours "tiles": each tile's edges found once per call and kept on the host (int16 ranks into the tile's
+    # int32 senders, receiver counts and one-byte unit shifts, about 3 bytes per edge), the later sweeps rebuilding
+    # them exactly from it. At the host limit (below ``list_reuse_floor`` available while it fills) it is dropped,
+    # for this call and the later ones: the later sweeps search again (bitwise), the reason in the call's report
+    # (``list_cache``).
     list_cache: bool = True
     # neighbours "tiles": the tiles' edges searched within cutoff + skin (the force field's list's skin) and kept on
     # the host across calls with the tile plan; a call with the same cell while no atom has moved more than skin / 2
@@ -99,6 +119,50 @@ class TileConfig:
     # device runs it while the host indexes (on CUDA through pinned buffers and events); the same order.
     overlap: bool = True
     species: str = "one_hot"
+    # ``"auto"``, ``"on"`` or ``"off"`` (with ``alias_state``): the wavefront schedule (docs/design/tiled-wavefront.md).
+    # Sweep 2 visits the tiles in their order; sweep 1 runs on a tile just before the first sweep-2 tile that reads
+    # its x, and sweep 3 just after the last sweep-2 tile that adds to its receivers' dE/dx. x, sc and their adjoints
+    # then live in a pool of the rows of the atoms between their sweeps 1 and 3 instead of [N, width] tensors: per
+    # atom bitwise today's state and node energies, the forces and stress summed in another order (float32 rounding;
+    # the scatter is atomic on the GPU anyway). The search pass that plans it keeps no tile lists, so the tiles
+    # search once more (about 3 % of a call). "auto": on from ``WAVEFRONT_LAYERS`` layers of the tile grid (from
+    # ``WAVEFRONT_MIN_LAYERS`` when the plain state would not fit the host at all) when the
+    # plain state would leave the host below ``list_reuse_floor``.
+    wavefront: str = "auto"
+    # ``"auto"``, ``"on"`` or ``"off"``: sweep 2's tiles in pairs on two lanes, CUDA streams of two green contexts
+    # holding disjoint halves of the SMs (padded and compiled tiles; sweeps 1 and 3 keep the whole device). The second
+    # lane has its own padded slots and strain gradient; the node energies, forces and dE/dx are the same sums (the
+    # GPU's scatter is atomic, the host writes keep their tile order). Green-context streams need PyTorch's
+    # ``cudaMallocAsync`` allocator backend (``PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync`` before CUDA starts;
+    # with expandable segments their first tile fails to map memory). "auto": on with that backend on the GPUs of
+    # ``LANE_GPUS`` when the first call's memory model fits a second tile workspace; "on" refuses elsewhere (off a
+    # CUDA device the lanes run one after the other: the CPU tests' stand-in).
+    lanes: str = "auto"
+    # The wavefront's sweeps by groups of this many sweep-2 tiles: sweep 1 on every tile the group reads, then the
+    # group's sweep 2, then sweep 3 on every tile it closes. One tile at a time alternates the sweeps at every tile,
+    # and every change of sweep applies the pending host writes, which waits for the device (two drains per tile);
+    # a group pays them once and keeps the rows' prefetch within its runs. The pool grows by about two groups' tiles.
+    wavefront_group: int = 16
+    # The chunked streaming backward's edges per chunk in the tiles, times this (``None``: ``TILE_CHUNK_SCALE`` by
+    # device name, else 1). The chunks only change which edges' weight gradients share an L2-sized buffer.
+    backward_chunk_scale: int | None = None
+    # Padded tiles with the state on the host (CUDA): the next tile's graph is built, and the host rows its sweep
+    # reads gathered and copied, on a side stream while the current tile runs, so the host's syncs and gathers no
+    # longer drain the device's queue at every tile (a profiled 5M call left the GPU idle 17 % of the time).
+    # Bitwise the same call: the same graphs and rows, read where the sweep would read them. Rows are fetched ahead
+    # only within a run of one sweep (2 or 3), where no host write reaches a row the next tile reads.
+    prefetch: bool = True
+    # With the wavefront: the tile grid's first and last layer along its slowest axis each split into a skin of one
+    # reach (cutoff + the kept lists' skin) at the periodic boundary and the rest. Only the skins are read across the
+    # boundary, so only they stay in the row pool for the whole call, not two whole layers (a block model of 149M
+    # SrTiO3 at R 8,192: the pool from 16 % to 9 % of the atoms; results/tiled-ideas-20261102/band_model.py). Another
+    # tile plan: the forces and stress are the same sums in another order (float32 rounding).
+    boundary_skin: bool = True
+    # Compiled tiles (mode "compiled", or "auto" once it compiles): each slot's compiled sweep bodies captured in a
+    # CUDA graph (one per slot and sweep, after two warm-ups) and replayed per tile, as mode "graphs" does with the
+    # eager bodies. Device state only (the captured bodies read it), no lanes. Off by default: the gaps between a
+    # compiled call's kernels are about 2 % of it (tiled-call-memory.md, tiled-1m-speed.md).
+    compiled_graphs: bool = False
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -128,6 +192,26 @@ class TileConfig:
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
             raise ValueError(f"TileConfig.edges must be positive or None, got {self.edges!r}")
+        if self.wavefront not in ("auto", "on", "off"):
+            raise ValueError(f"TileConfig.wavefront must be 'auto', 'on' or 'off', got {self.wavefront!r}")
+        if self.wavefront == "on" and not self.alias_state:
+            raise ValueError("TileConfig.wavefront='on' needs alias_state=True (state='host')")
+        if self.backward_chunk_scale is not None and int(self.backward_chunk_scale) < 1:
+            raise ValueError(f"TileConfig.backward_chunk_scale must be positive, got {self.backward_chunk_scale!r}")
+        if int(self.wavefront_group) < 1:
+            raise ValueError(f"TileConfig.wavefront_group must be positive, got {self.wavefront_group!r}")
+        if self.lanes not in ("auto", "on", "off"):
+            raise ValueError(f"TileConfig.lanes must be 'auto', 'on' or 'off', got {self.lanes!r}")
+        if self.lanes == "on" and self.mode in ("eager", "graphs"):
+            raise ValueError(f"TileConfig.lanes='on' needs padded or compiled tiles, not mode {self.mode!r}")
+        if self.compiled_graphs:
+            if self.mode not in ("compiled", "auto"):
+                raise ValueError(f"TileConfig.compiled_graphs needs mode 'compiled' or 'auto', not {self.mode!r}")
+            if self.state == "host":
+                raise ValueError("TileConfig.compiled_graphs cannot run with state='host': the captured bodies read "
+                                 "the state from device memory")
+            if self.lanes == "on":
+                raise ValueError("TileConfig.compiled_graphs cannot run with lanes='on'")
 
 
 class _State:
@@ -142,6 +226,62 @@ class _State:
         self.tensors = {}
         # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
+        # wavefront (``pool``): x and sc (with their aliased adjoints) in pooled rows, ``_row_of`` each atom's
+        self.pooled, self._row_of = False, None
+        self.prefetched = {}  # TileConfig.prefetch: the running tile's rows, fetched ahead (name -> device rows)
+
+    def pool(self, rows, n):
+        """The wavefront schedule: x, sc and their aliased adjoints in ``rows`` pooled rows instead of ``n``; an atom
+        takes a row before its sweep 1 (``assign``) and returns it after its sweep 3 (``release``). The pool grows,
+        never shrinks, between calls; ``rows`` 0 switches back to [N, width]."""
+        import torch
+
+        pooled = rows > 0
+        size = next(iter(self.tensors.values())).shape[0] if self.tensors else None
+        if size is not None and (pooled != self.pooled or (pooled and size < rows) or (not pooled and size != n)):
+            self.tensors = {}  # allocated again at the right size from sweep 1's first outputs
+        self.pooled = pooled
+        if pooled:
+            self._pool_rows = max(rows, size or 0) if self.tensors else rows
+            self._row_of = torch.full((n,), -1, dtype=torch.int32)
+            self._free_rows = torch.arange(self._pool_rows, dtype=torch.int32)
+            self._rows_top = self._pool_rows
+        else:
+            self._row_of = None
+
+    def assign(self, atoms):
+        """Pooled rows for ``atoms`` (none of which has one)."""
+        atoms = atoms.cpu()
+        top = self._rows_top - atoms.shape[0]
+        if top < 0:
+            raise RuntimeError("the wavefront's row pool is exhausted (its schedule's band was underestimated)")
+        self._row_of[atoms] = self._free_rows[top:self._rows_top]
+        self._rows_top = top
+
+    def release(self, atoms):
+        """Return ``atoms``' pooled rows (after their sweep 3 has read them)."""
+        atoms = atoms.cpu()
+        rows = self._row_of[atoms]
+        self._free_rows[self._rows_top:self._rows_top + rows.shape[0]] = rows
+        self._rows_top += rows.shape[0]
+        self._row_of[atoms] = -1
+
+    def _rows_of(self, name, index, read=False):
+        """The rows of ``index``'s atoms in the storage of ``name``: the atoms themselves, or pooled rows (x and sc's
+        storage). A read maps an atom without a row (a padded slot's padding rows, atom 0) to row 0: padding rows
+        reach no real output (tiled tests: padded equals eager bitwise), and a pooled row holds finite values."""
+        if not self.pooled or self._storage.get(name, name) not in ("x", "sc"):
+            return index
+        rows = self._row_of[index.cpu()].long()
+        return rows.clamp_(min=0) if read else rows
+
+    def touched(self, first, last):
+        """The wavefront's search pass recorded each atom's first and last tile (``touch`` of sweep 1 without it)."""
+        import torch
+
+        self._first, self._last = first, last
+        self._slot_of = torch.full_like(first, -1)
+        self._window = None
 
     def allocate(self, n, widths):
         import torch
@@ -152,9 +292,10 @@ class _State:
         # PyTorch's pinned allocator rounds every block up to a power of two, all of it resident (72 GiB for
         # 42 GiB of state at 9.26M NbCl5 atoms).
         where = "cpu" if self.host else self.device
+        size = self._pool_rows if self.pooled else n
         for name, width in widths.items():
             if name not in self._storage:
-                self.tensors[name] = torch.zeros((n, width), dtype=self.dtype, device=where)
+                self.tensors[name] = torch.zeros((size, width), dtype=self.dtype, device=where)
         if self.alias:
             self._width = widths["gx"]
             self._index(n)
@@ -167,21 +308,25 @@ class _State:
         if getattr(self, "_first", None) is None:
             self._first = torch.full((n,), -1, dtype=torch.int32)
             self._last = torch.full((n,), -1, dtype=torch.int32)
-            self._slot_of = torch.full((n,), -1, dtype=torch.int64)
+            if getattr(self, "_slot_of", None) is None or self._slot_of.shape[0] != n:
+                self._slot_of = torch.full((n,), -1, dtype=torch.int32)  # int32: 4 bytes per atom on the host
 
     def zero(self):
         for tensor in self.tensors.values():
             tensor.zero_()
-        if self.alias and getattr(self, "_first", None) is not None:
-            self._first.fill_(-1)
-            self._last.fill_(-1)
+        if self.alias and getattr(self, "_slot_of", None) is not None:
+            if self._first is not None:
+                self._first.fill_(-1)
+                self._last.fill_(-1)
             self._slot_of.fill_(-1)
             self._window = None
 
     def bytes(self):
         tensors = list(self.tensors.values())
-        if self.alias and getattr(self, "_first", None) is not None:
-            tensors += [self._first, self._last, self._slot_of]
+        if self.pooled:
+            tensors += [self._row_of, self._free_rows]
+        if self.alias and getattr(self, "_slot_of", None) is not None:
+            tensors += [t for t in (self._first, self._last, self._slot_of) if t is not None]
             tensors += [self._window] if getattr(self, "_window", None) is not None else []
         return int(sum(t.numel() * t.element_size() for t in tensors))
 
@@ -191,11 +336,29 @@ class _State:
         x rows), and every sweep ends with the writes applied."""
         import torch
 
+        fetched = self.prefetched.pop(name, None)
+        if fetched is not None and fetched.shape[0] == index.shape[0]:
+            if fetched.is_cuda:  # made on the prefetch stream
+                fetched.record_stream(torch.cuda.current_stream(fetched.device))
+            return fetched
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
             return tensor[index]
-        index = index.cpu()
+        index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
+            return tensor.index_select(0, index).to(self.device)
+        staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
+        torch.index_select(tensor, 0, index, out=staging)
+        return staging.to(self.device, non_blocking=True)
+
+    def fetch(self, name, index):
+        """``rows(name, index)`` for a host ``index``, copied on the current stream without waiting (the prefetch
+        stream's: its event orders the read)."""
+        import torch
+
+        tensor = self.tensors[self._storage.get(name, name)]
+        index = self._rows_of(name, index, read=True)
+        if self.device.type != "cuda":
             return tensor.index_select(0, index).to(self.device)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
         torch.index_select(tensor, 0, index, out=staging)
@@ -206,14 +369,14 @@ class _State:
         if not self.host:
             self.tensors[self._storage.get(name, name)][index] = values
         else:
-            self._defer("put", name, index, values)
+            self._defer("put", name, self._rows_of(name, index), values)
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
         if not self.host:
             self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
         else:
-            self._defer("add", name, index, values)
+            self._defer("add", name, self._rows_of(name, index) if name != "gx" else index, values)
 
     def new_tile(self):
         """The call starts a tile: its first host write applies the earlier tiles' pending ones, by then behind
@@ -291,14 +454,17 @@ class _State:
         import torch
 
         last = self._last.long()
-        order = torch.sort(last, stable=True).indices
+        order = torch.sort(last, stable=True).indices.to(torch.int32)  # kept until the call ends: int32
         self._closing = torch.split(order, torch.bincount(last, minlength=tiles).tolist())
         opened = torch.bincount(self._first.long(), minlength=tiles)
         closed = torch.bincount(last, minlength=tiles)
         # During tile t: the atoms open after it plus those it closes.
         size = int((torch.cumsum(opened - closed, 0) + closed).max().item())
+        del last, order, opened, closed
+        # Read no more this call (8 bytes per atom on the host); the next call's touches start new ones.
+        self._first = self._last = None
         self._window = torch.zeros((size, self._width), dtype=self.dtype)
-        self._free = torch.arange(size, dtype=torch.int64)
+        self._free = torch.arange(size, dtype=torch.int32)
         self._top = size
 
     def close(self, tile):
@@ -313,7 +479,7 @@ class _State:
         atoms = self._closing[tile]
         if atoms.numel():
             slots = self._slot_of[atoms]
-            self.tensors["x"][atoms] = self._window[slots]
+            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots]
             self._free[self._top:self._top + slots.numel()] = slots
             self._top += slots.numel()
             self._slot_of[atoms] = -1
@@ -345,7 +511,23 @@ def _holder_class():
     return Holder
 
 
-def plan_tiles(positions, cell, row_ptr, receivers, edges):
+def _grid_shape(cell, n, receivers, reach=0.0, min_layers=4):
+    """The tile grid of ``plan_tiles``: blocks per axis from the cell's plane spacings (about cubic blocks of about
+    ``receivers`` atoms), and the fractional thickness of the boundary skin along the first axis (0: no split). The
+    first axis splits when ``reach`` > 0, it has at least ``min_layers`` layers and a skin is at most half a layer."""
+    import torch
+
+    cell64 = torch.as_tensor(cell, dtype=torch.float64)
+    volume = abs(float(torch.linalg.det(cell64)))
+    recip = torch.linalg.inv(cell64).T
+    spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
+    side = (volume * min(receivers, n) / n) ** (1 / 3)
+    k = [max(1, round(s / side)) for s in spacings]
+    skin = float(reach) / spacings[0]  # fractional: a plane's distance bounds every distance across it
+    return k, (skin if reach > 0 and k[0] >= min_layers and skin * k[0] <= 0.5 else 0.0)
+
+
+def plan_tiles(positions, cell, row_ptr, receivers, edges, reach=0.0, min_layers=4):
     """Receiver tiles: a list of sorted int64 device index tensors covering every atom once.
 
     Atoms are binned on a k1 x k2 x k3 grid of fractional coordinates, with k_i from the cell's plane spacings so
@@ -353,33 +535,42 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     consecutive pieces (in index order) below both. A rule on the cell geometry and the caps only. ``row_ptr``
     None: no degrees (the tiles build their own lists), so a block splits into consecutive pieces of ``receivers``.
 
-    The fractional coordinates are reduced in place and the block index is computed in chunks, so the plan's
-    whole-system transients stay small (tiled-call-memory.md); the values are the unchunked ones.
+    ``reach`` > 0 (``TileConfig.boundary_skin``): the first and the last layer along the first axis each split into
+    a skin of ``reach`` at the periodic boundary and the rest (``_grid_shape``), so k1 + 2 layers; only the skins'
+    atoms are within ``reach`` of an atom across the boundary.
+
+    The fractional coordinates and the block index are computed in chunks, element-wise, so the plan's whole-system
+    transients stay small (tiled-call-memory.md); the values are the unchunked ones.
     """
     import torch
 
+    from fastmace.neighbors.skin import times_3x3
     from fastmace.neighbors.tile_list import CHUNK
 
     n = positions.shape[0]
     cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
-    frac = positions.to(torch.float64) @ torch.linalg.inv(cell64)
-    torch.remainder(frac, 1.0, out=frac)
-    volume = abs(float(torch.linalg.det(cell64)))
-    recip = torch.linalg.inv(cell64).T
-    spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
-    side = (volume * min(receivers, n) / n) ** (1 / 3)
-    k = [max(1, round(s / side)) for s in spacings]
+    inverse = torch.linalg.inv(cell64)
+    k, skin = _grid_shape(cell64.cpu(), n, receivers, reach, min_layers)
     scale = torch.tensor(k, dtype=torch.float64, device=positions.device)
     top = torch.tensor([x - 1 for x in k], device=positions.device)
-    block = torch.empty(n, dtype=torch.int64, device=positions.device)
+    layers = k[0] + 2 if skin else k[0]
+    # The fractional coordinates per chunk (element-wise, as the tile lists' bins: no float64 GEMM, whose emulated
+    # forms round coarsely), and the block index in int32 below 2**31 blocks: no whole-system float64 transient,
+    # 4 bytes per atom of keys (tiled capacity, lever 5).
+    blocks = layers * k[1] * k[2]
+    block = torch.empty(n, dtype=torch.int32 if blocks < 2**31 else torch.int64, device=positions.device)
     for start in range(0, n, CHUNK):
         stop = min(start + CHUNK, n)
-        bins = torch.minimum(torch.clamp((frac[start:stop] * scale).long(), min=0), top)
+        frac = times_3x3(positions[start:stop].to(torch.float64), inverse)
+        torch.remainder(frac, 1.0, out=frac)
+        bins = torch.minimum(torch.clamp((frac * scale).long(), min=0), top)
+        if skin:  # layer 0 the skin below ``skin``, the last one the skin from 1 - ``skin``, the others one up
+            first = frac[:, 0]
+            bins[:, 0] = torch.where(first < skin, 0, torch.where(first >= 1 - skin, layers - 1, bins[:, 0] + 1))
         block[start:stop] = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
-        del bins
-    del frac
+        del bins, frac
     order = torch.sort(block, stable=True).indices  # within a block: increasing atom index
-    counts = torch.bincount(block, minlength=k[0] * k[1] * k[2]).cpu().tolist()
+    counts = torch.bincount(block, minlength=blocks).cpu().tolist()
     del block
     if row_ptr is None:  # no degrees: consecutive pieces of ``receivers`` in every block
         tiles, start = [], 0
@@ -387,7 +578,7 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
             tiles.extend(order[piece:min(piece + receivers, start + count)]
                          for piece in range(start, start + count, receivers))
             start += count
-        return tiles, tuple(k)
+        return tiles, (layers, k[1], k[2])
     degree = (row_ptr[1:] - row_ptr[:-1])[order].cpu()
     cumulative = torch.cat([torch.zeros(1, dtype=torch.int64), torch.cumsum(degree, 0)]).numpy()
     tiles = []
@@ -395,7 +586,7 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges):
     for count in counts:
         tiles.extend(order[a:b] for a, b in _split_block(cumulative, start, start + count, receivers, edges))
         start += count
-    return tiles, tuple(k)
+    return tiles, (layers, k[1], k[2])
 
 
 def _split_block(cumulative, start, stop, receivers, edges):
@@ -412,6 +603,98 @@ def _split_block(cumulative, start, stop, receivers, edges):
         pieces.append((piece, cut))
         piece = cut
     return pieces
+
+
+def wavefront_schedule(needs, ready, counts, group=1):
+    """The wavefront's order of the tile sweeps: ``(steps, peak)``, ``steps`` a list of ``(sweep, tile)`` and
+    ``peak`` the most receivers between their sweeps 1 and 3 at once (the row pool's size).
+
+    Sweep 2 visits the tiles in order, ``group`` at a time. Before a group, sweep 1 runs on every tile of its tiles'
+    ``needs`` (the tiles that own a receiver or halo atom of ``t``, ascending) it has not run on; after it, sweep 3
+    runs on every tile whose ``ready`` (the last sweep-2 tile that holds one of its receivers) is in or before the
+    group, in the order of ``ready`` then index. A tile's sweep 1 thus precedes every sweep-2 read of its x and sc,
+    and its sweep 3 follows the last addition to its receivers' dE/dx and its own dE/dsc."""
+    tiles = len(counts)
+    order = sorted(range(tiles), key=lambda u: (int(ready[u]), u))
+    done = [False] * tiles
+    steps, live, peak, next3 = [], 0, 0, 0
+    for start in range(0, tiles, max(1, int(group))):
+        stop = min(tiles, start + max(1, int(group)))
+        for t in range(start, stop):
+            for u in needs[t]:
+                u = int(u)
+                if not done[u]:
+                    done[u] = True
+                    steps.append((1, u))
+                    live += int(counts[u])
+                    peak = max(peak, live)
+        steps.extend((2, t) for t in range(start, stop))
+        while next3 < tiles and int(ready[order[next3]]) < stop:
+            u = order[next3]
+            next3 += 1
+            steps.append((3, u))
+            live -= int(counts[u])
+    return steps, peak
+
+
+def lane_steps(steps, counts):
+    """``steps`` (a list of ``(sweep, tile)``) with sweep 2's tiles in pairs for two lanes: ``(items, peak)``, an item
+    ``(sweep, tile)`` or ``(2, tile, other)``, and ``peak`` the most receivers between their sweeps 1 and 3 at once.
+
+    Two consecutive sweep-2 tiles become a pair. A sweep-1 step between them runs before the pair (it reads nothing),
+    a sweep-3 step between them after it (it follows the first tile's sweep 2 and no later sweep-2 tile adds to its
+    receivers). Without the wavefront every sweep runs over all tiles, so its sweep-2 tiles simply pair up."""
+    items, held, pending = [], [], None
+    for sweep, index in steps:
+        if sweep == 2:
+            if pending is None:
+                pending = index
+            else:
+                items.append((2, pending, index))
+                items.extend(held)
+                held, pending = [], None
+        elif sweep == 3 and pending is not None:
+            held.append((sweep, index))
+        else:
+            items.append((sweep, index))
+    if pending is not None:
+        items.append((2, pending))
+    items.extend(held)
+    live = peak = 0
+    for item in items:
+        if item[0] == 1:
+            live += int(counts[item[1]])
+            peak = max(peak, live)
+        elif item[0] == 3:
+            live -= int(counts[item[1]])
+    return items, peak
+
+
+def _split_streams(device):
+    """Two CUDA streams of two green contexts holding disjoint halves of ``device``'s SMs (one split of its SM
+    resource, rounded to the split's granularity: 2 SMs before sm_90, 8 from it), with the contexts that keep them
+    alive: ``(streams, contexts)``. Raises where the driver or the CUDA Python bindings cannot make them."""
+    import torch
+    from torch.cuda import green_contexts as gc
+
+    drv, check = gc._drv, gc._check_cuda_bindings
+    index = device.index if device.index is not None else torch.cuda.current_device()
+    handle = check(drv.cuDeviceGet(index))
+    sm = check(drv.cuDeviceGetDevResource(handle, drv.CUdevResourceType.CU_DEV_RESOURCE_TYPE_SM))
+    step = 8 if torch.cuda.get_device_capability(index)[0] >= 9 else 2
+    half = (sm.sm.smCount // 2) // step * step
+    groups, count, _ = check(drv.cuDevSmResourceSplitByCount(2, sm, 0, half))
+    if count != 2:
+        raise RuntimeError(f"the SM split gave {count} groups of {half} SMs, not 2")
+    streams, contexts = [], []
+    for group in list(groups)[:2]:
+        desc = check(drv.cuDevResourceGenerateDesc([group], 1))
+        green = check(drv.cuGreenCtxCreate(desc, handle, drv.CUgreenCtxCreate_flags.CU_GREEN_CTX_DEFAULT_STREAM))
+        context = gc.GreenContext.__new__(gc.GreenContext)
+        context._init_from_cuda_objects(index, green, check(drv.cuCtxFromGreenCtx(green)))
+        contexts.append(context)
+        streams.append(context.Stream())
+    return tuple(streams), contexts
 
 
 _UNIT_WEIGHTS = (9, 3, 1)  # a unit shift in {-1, 0, 1}^3 as one byte: sum((u + 1) * w), 0..26
@@ -439,6 +722,46 @@ def _unpack_units(packed, dtype, device):
     codes = torch.arange(27, device=device)
     table = torch.stack([codes // 9, codes // 3 % 3, codes % 3], dim=1).to(dtype) - 1
     return table[packed.long()]
+
+
+def _pack_senders(sender):
+    """A tile's senders [E] (int64 atom indices) for the host lists: ``(dictionary, codes)``, the tile's distinct
+    senders (int32, ascending) and each edge's rank among them as int16 (offset by -32768), while they number at
+    most 65,536 (a tile's receivers and halo: every tile up to the 16,384 cap); else an empty dictionary and the
+    int32 senders. 2 bytes per edge instead of 4 (the kept lists: about 40 % of their host memory)."""
+    import torch
+
+    dictionary, codes = torch.unique(sender, sorted=True, return_inverse=True)
+    if dictionary.shape[0] <= 2**16:
+        return dictionary.to(torch.int32), (codes - 2**15).to(torch.int16)
+    return dictionary.new_empty(0, dtype=torch.int32), sender.to(torch.int32)
+
+
+def _unpack_senders(dictionary, codes):
+    """The int64 senders of ``_pack_senders``' result, exactly."""
+    import torch
+
+    if codes.dtype != torch.int16:
+        return codes.long()
+    return dictionary.long()[codes.long() + 2**15]
+
+
+def moved_within(positions, reference, limit, chunk=None):
+    """Whether no atom of ``positions`` (any device) is more than ``limit`` from its row of ``reference`` (host
+    float64): the squared distances in float64 by chunks of ``chunk`` atoms (default the tile lists' ``CHUNK``),
+    stopping at the first chunk past it. The same decision as on the whole arrays, with transients of one chunk
+    instead of three whole-system float64 copies on the host (72 bytes per atom; tiled capacity)."""
+    import torch
+
+    if chunk is None:
+        from fastmace.neighbors.tile_list import CHUNK as chunk
+    bound = float(limit) ** 2
+    for start in range(0, int(positions.shape[0]), int(chunk)):
+        stop = min(start + int(chunk), int(positions.shape[0]))
+        here = positions[start:stop].detach().to("cpu", torch.float64)
+        if float(((here - reference[start:stop]) ** 2).sum(dim=1).max()) > bound:
+            return False
+    return True
 
 
 def _host_available():
@@ -491,6 +814,8 @@ class TiledForceField:
             raise ValueError("TiledForceField does not support joint embeddings or PolarMACE")
         if self.config.mode == "graphs" and field.device.type != "cuda":
             raise ValueError("TileConfig.mode='graphs' needs a CUDA device")
+        if self.config.compiled_graphs and field.device.type != "cuda":
+            raise ValueError("TileConfig.compiled_graphs needs a CUDA device")
         self.model = model
         self.device = field.device
         self.dtype = field.dtype
@@ -509,6 +834,9 @@ class TiledForceField:
         # TileConfig.species="index": each tile's one-hot rows from the field's species index (the one-hot's
         # column of every atom), bitwise the stored rows; the field's device one-hot goes to the host.
         self._species = None
+        if self.config.neighbours == "global" and not getattr(field, "global_list", True):
+            raise ValueError("TileConfig.neighbours='global' reads the force field's own neighbour list, which this "
+                             "one was built without (global_list=False): use neighbours='tiles'")
         if self.config.species == "index":
             from fastmace.model import energy as energy64
 
@@ -518,6 +846,18 @@ class TiledForceField:
             stored = field.data["node_attrs"]
             self._species, self._width, self._attrs_dtype = field._species_index, stored.shape[1], stored.dtype
             field.release_node_attrs()
+            field.release_whole_system()  # the per-atom buffers only the whole-system call reads
+            self._species = field._species_index  # now int32
+        scale = self.config.backward_chunk_scale
+        if scale is None:
+            name = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else None
+            scale = TILE_CHUNK_SCALE.get(name, 1)
+        self.backward_chunk_scale = int(scale)
+        for module in model.modules():  # from each module's own value: a second tiled field scales it once
+            if getattr(module, "chunked_backward_edges", 0) > 0:
+                base = getattr(module, "_tile_chunk_base", module.chunked_backward_edges)
+                module._tile_chunk_base = base
+                module.chunked_backward_edges = base * self.backward_chunk_scale
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
@@ -538,10 +878,20 @@ class TiledForceField:
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
+        self.list_cache_state = "on" if self.config.list_cache else "off"
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
         self._graph_key = None
         self._pool = None
         self._stream = None
+        self._cache_paused = False  # the wavefront's search pass: the tile lists are not kept
+        self._wave_auto = {}  # TileConfig.wavefront "auto": the decision per atom count
+        self._wave_short = {}  # ... and whether the plain state would not fit the host at all
+        # TileConfig.lanes: the second lane's padded slots (by edge bucket), its green-context streams (with their
+        # contexts) once made, whether the first call's memory model fits a second workspace, and the decision.
+        self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
+        self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
+        self._prep_stream = None  # TileConfig.prefetch's side stream
+        self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
 
     @property
@@ -581,6 +931,11 @@ class TiledForceField:
             from fastmace.neighbors.skin import times_3x3
             from fastmace.neighbors.tile_list import TileNeighbours
 
+            # The kept lists hold every tile's (55.8 GiB at 122M SrTiO3 atoms beside a 55 GiB wavefront pool), and
+            # a call that keeps them searches once: dropping them under the wavefront searched every tile twice per
+            # call (the search pass and sweep 1), 9.2 s against 1.8 s each at 5M atoms (+18 % of a call, RTX 4000
+            # Ada). The host floor drops them where the host runs short; ``list_reuse=False`` keeps only the
+            # band's (the call's cache, from a tile's sweep 1 to its sweep 3).
             skin, cutoff = self._reuse_skin(), float(self.field.neighbours.cutoff)
             self._reusing = False
             kept = (self._keep_lists(positions, n, TileNeighbours.like(self.field.neighbours).cell, skin)
@@ -588,9 +943,15 @@ class TiledForceField:
             bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + (skin if kept is not None else 0.0))
             if not self._reusing:
                 bins.bin(positions)
-            positions64 = positions.to(device=self.device, dtype=torch.float64)
-            # With kept lists the later sweeps filter them again: no per-call cache beside them (host memory).
-            cache = self._list_cache = {} if self.config.list_cache and n < 2**31 and kept is None else None
+            # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device).
+            positions64 = positions.to(device=self.device, dtype=torch.float64) if kept is not None else None
+            # With kept lists, the cache holds the tiles' filtered lists from their sweep 1 (under the wavefront until
+            # their sweep 3: the band), so sweeps 2 and 3 skip the superset's copy and float64 filter. At the host
+            # limit (the floor reached while it fills) the cache is dropped for this and later calls: the later sweeps
+            # search or filter again, bitwise the same edges.
+            self._list_hits = 0
+            self._list_cache = ({} if self.config.list_cache and n < 2**31 and self.list_cache_state == "on"
+                                else None)
 
             def within(receivers):
                 """The tile's edges within the cutoff from the kept ones within cutoff + skin (searched there on a
@@ -598,7 +959,9 @@ class TiledForceField:
                 index = self._tile_index[receivers.data_ptr()]
                 superset = kept["superset"].get(index)
                 if superset is None:
-                    sender, receiver, unit, _ = bins.edges(receivers)
+                    # Float64 positions: the search's own vectors are the filter's below, so they give its mask.
+                    exact = bins.positions.dtype == torch.float64
+                    sender, receiver, unit, shifts, *inner = bins.edges(receivers, inner=cutoff if exact else None)
                     packed = _pack_units(unit)
                     if packed is None:  # beyond int16 shifts: not kept, searched again next call
                         kept["complete"] = False
@@ -608,12 +971,16 @@ class TiledForceField:
                     elif kept["complete"]:
                         counts = torch.bincount(torch.searchsorted(receivers, receiver),
                                                 minlength=receivers.shape[0])
-                        kept["superset"][index] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(),
-                                                   packed.cpu())
+                        kept["superset"][index] = tuple(t.cpu() for t in (*_pack_senders(sender),
+                                                                           _narrow_counts(counts), packed))
+                    if exact:
+                        inner = inner[0]
+                        return sender[inner], receiver[inner], unit[inner], shifts[inner]
                 else:
-                    sender, counts, packed = (t.to(self.device) for t in superset)
+                    dictionary, codes, counts, packed = (t.to(self.device) for t in superset)
+                    sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
-                    sender, unit = sender.long(), _unpack_units(packed, bins.float_dtype, self.device)
+                    unit = _unpack_units(packed, bins.float_dtype, self.device)
                 shifts64 = times_3x3(unit.to(torch.float64), bins.cell)
                 vectors = positions64[receiver] - positions64[sender] + shifts64
                 keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
@@ -624,16 +991,22 @@ class TiledForceField:
                 """The tile's (global edge index, shifts): searched once per call, then from the host cache (int32
                 senders, the receivers' edge counts at their narrowest dtype, the unit shifts packed)."""
                 key = receivers.data_ptr()  # the call's tile tensors live through all its sweeps
+                cache = self._list_cache  # (None once a fallback or the host floor dropped it)
                 if cache is not None and key in cache:
-                    sender, counts, packed = (t.to(self.device) for t in cache[key])
+                    self._list_hits += 1
+                    dictionary, codes, counts, packed = (t.to(self.device) for t in cache[key])
+                    sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
-                    return torch.stack([sender.long(), receiver]), bins.shifts(unit)
+                    return torch.stack([sender, receiver]), bins.shifts(unit)
                 sender, receiver, unit, shifts = within(receivers) if kept is not None else bins.edges(receivers)
-                packed = _pack_units(unit) if cache is not None else None
+                packed = (_pack_units(unit) if cache is not None and self.list_cache_state == "on"
+                          and not self._cache_paused else None)  # the wavefront's search pass keeps none
+                if packed is not None and not self._host_keeps_cache(cache):
+                    packed = None
                 if packed is not None:
                     counts = torch.bincount(torch.searchsorted(receivers, receiver), minlength=receivers.shape[0])
-                    cache[key] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(), packed.cpu())
+                    cache[key] = tuple(t.cpu() for t in (*_pack_senders(sender), _narrow_counts(counts), packed))
                 return torch.stack([sender, receiver]), shifts
 
             # No degrees before the tiles' builds: the tiles are planned by receivers only.
@@ -682,21 +1055,33 @@ class TiledForceField:
                                  f"floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
         return False
 
+    def _host_keeps_cache(self, cache):
+        """Whether the host keeps ``list_reuse_floor`` bytes available (MemAvailable; always off Linux) with the
+        list cache filling. If not, the cache is emptied and off from now on (the later sweeps search again),
+        with the reason in ``list_cache_state``."""
+        available = _host_available()
+        if available is None or available >= int(self.config.list_reuse_floor):
+            return True
+        cache.clear()
+        self.list_cache_state = (f"off: {available / 2**30:.1f} GiB available on the host while the list cache "
+                                 f"filled, below the floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
+        return False
+
     def _keep_lists(self, positions, n, cell, skin):
         """The kept lists for this call: reused (``self._reusing``) while the atom count, cell and receiver cap
         (the budget may raise it after the first call) are those of the search and no atom has moved more than
         skin / 2 since it; else a new, empty set (this call searches and plans)."""
         import torch
 
-        here = positions.detach().to("cpu", torch.float64)
         kept = self._kept
         reuse = (kept is not None and kept["complete"] and kept["n"] == n and kept["receivers"] == self.receivers
                  and torch.equal(kept["cell"], cell.cpu())
-                 and float(((here - kept["reference"]) ** 2).sum(dim=1).max()) <= (skin / 2) ** 2)
+                 and moved_within(positions, kept["reference"], skin / 2))
         if not reuse:
-            self._kept = None
+            self._kept = kept = None  # the old reference and lists go before the new reference is copied
             if not self._host_allows("keeping the reference positions"):
                 return None
+            here = positions.detach().to("cpu", torch.float64)
             kept = self._kept = dict(n=n, cell=cell.cpu(), receivers=self.receivers, reference=here, superset={},
                                      tiles=None, grid=None, complete=True)
             self.list_rebuilds += 1
@@ -737,7 +1122,7 @@ class TiledForceField:
 
         if self._species is None:
             return self.node_attrs[nodes]
-        return torch.nn.functional.one_hot(self._species[nodes], self._width).to(self._attrs_dtype)
+        return torch.nn.functional.one_hot(self._species[nodes].long(), self._width).to(self._attrs_dtype)
 
     @staticmethod
     def _masked(value, mask):
@@ -875,14 +1260,15 @@ class TiledForceField:
         slot["node_mask"][receivers:receivers + h] = 1
         slot["recv_mask"].zero_()
         slot["recv_mask"][:r] = 1
-        slot["ei"].zero_()
+        # The edge buffers: the tile's edges, then the padding tail (the edges' rows are written, not cleared first).
         slot["ei"][:, :e] = ei
-        slot["shifts"].zero_()
+        slot["ei"][:, e:].zero_()
         slot["shifts"][:e] = shifts
-        slot["local"].fill_(receivers - 1)
+        slot["shifts"][e:].zero_()
         slot["local"][:, :e] = local
-        slot["edge_mask"].zero_()
+        slot["local"][:, e:].fill_(receivers - 1)
         slot["edge_mask"][:e] = 1
+        slot["edge_mask"][e:].zero_()
         slot["count"].fill_(e)
 
     def _body(self, sweep, slot, g):
@@ -906,13 +1292,16 @@ class TiledForceField:
             _, g_vec, g_eps = self._first(tile, g["state"], adjoint=True, strain=strain)
             values = (self._masked(g_vec, slot["edge_mask"]),) + ((g_eps,) if strain else ())
             names = ("g_vec", "g_eps")[:len(values)]
+        if not self._captured():  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
+            slot["out"] = {sweep: dict(zip(names, values))}  # no copy, and no other sweep's kept beside them
+            return
         out = slot["out"].setdefault(sweep, {})
         for name, value in zip(names, values):
             if name not in out:
                 out[name] = torch.empty_like(value)
             out[name].copy_(value)
 
-    def _scatter(self, sweep, slot, g, piece):
+    def _scatter(self, sweep, slot, g, piece, host_nodes=None):
         """Add the slot's outputs into the global buffers (outside the graphs: warm-ups and captures have no side
         effects). Padding rows read atom 0 and add exact zeros to it; with the state aliased, only the tile's real
         rows are written (dE/dsc overwrites sc, and dE/dx sums in the window of the tile's own atoms)."""
@@ -923,6 +1312,12 @@ class TiledForceField:
         if sweep == 1:
             state = self._state(g, out["x"], out["sc"])
             g["node_es"].index_add_(0, recv, out["es"])
+            if state.pooled:  # only the real receivers have pooled rows (their x and sc, written once)
+                r = piece[4]
+                index = recv[:r] if host_nodes is None else host_nodes[:r]  # host nodes: no sync for the pool rows
+                state.put("x", index, out["x"][:r])
+                state.put("sc", index, out["sc"][:r])
+                return
             state.add("x", recv, out["x"])
             state.add("sc", recv, out["sc"])
             return
@@ -934,7 +1329,7 @@ class TiledForceField:
                               torch.arange(receivers, receivers + h, device=self.device)])
             g["node_es"].index_add_(0, recv, out["es"])
             state.add("gx", nodes, out["g_x"][rows])
-            state.put("gsc", nodes[:r], out["g_sc"][:r])
+            state.put("gsc", nodes[:r] if host_nodes is None else host_nodes[:r], out["g_sc"][:r])
         elif sweep == 2:
             g["node_es"].index_add_(0, recv, out["es"])
             state.add("gx", slot["nodes"], out["g_x"])
@@ -945,11 +1340,16 @@ class TiledForceField:
         if "g_eps" in out:
             g["strain_grad"].add_(out["g_eps"].double())
 
+    def _captured(self):
+        """Whether the slots' sweep bodies run as captured CUDA graphs: mode "graphs" (eager bodies), or compiled
+        bodies with ``TileConfig.compiled_graphs``."""
+        return self.mode == "graphs" or (self.mode == "compiled" and self.config.compiled_graphs)
+
     def _run_slot(self, sweep, slot, g):
         """The sweep's body on the filled slot: eagerly, or by replaying its graph (captured on first use)."""
         import torch
 
-        if self.mode != "graphs":
+        if not self._captured():
             self._body(sweep, slot, g)
             return
         graph = slot["graphs"].get(sweep)
@@ -1002,14 +1402,25 @@ class TiledForceField:
                 oom = isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in str(error)
                 lower = [int(r) for r in (self.config.receivers, *self.config.budget_receivers)
                          if int(r) < self.receivers]
-                if not (oom and self._budget_raised and lower):
+                lanes = self.lanes_state == "on" and self.config.lanes == "auto"
+                if not (oom and (lanes or (self._budget_raised and lower))):
                     raise
-                fallback = (self.receivers, max(lower), str(error).splitlines()[0][:200])
+                fallback = (self.receivers, self.receivers if lanes else max(lower),
+                            str(error).splitlines()[0][:200])
             # Outside the handler, so the failed call's frames (and their tensors) are released.
             old, new, why = fallback
+            if new == old:  # the lanes go first: one tile workspace again at the same cap
+                self._lanes_fit = False
+                self._lane_slots.clear()
+                self._g = None
+                self._list_cache = None
+                self._fallback = f"lanes off after running out of device memory ({why})"
+                torch.cuda.empty_cache()
+                continue
             self.receivers = new
             self._budget_raised = new > int(self.config.receivers)
             self._slots.clear()
+            self._lane_slots.clear()
             self._edge_step = None
             self._graph_key = None
             self._g = None  # the global buffers and the state are allocated again, zeroed
@@ -1030,7 +1441,12 @@ class TiledForceField:
         pos = field.positions.detach()
         n = pos.shape[0]
         self.node_attrs = data["node_attrs"] if self._species is None else None
-        heads = (data["head"][data["batch"]] if "head" in data else torch.zeros_like(data["batch"])).long()
+        batch = data["batch"]
+        if batch.dim() == 1 and batch.stride(0) == 0:  # one structure (release_whole_system): one head for all
+            heads = (data["head"].reshape(-1)[:1] if "head" in data
+                     else torch.zeros(1, dtype=torch.int64, device=batch.device)).long().expand(n)
+        else:
+            heads = (data["head"][batch] if "head" in data else torch.zeros_like(batch)).long()
         source, row_ptr, degree = self._source(positions, n)
         caps = self.config
         edge_cap = caps.edges if caps.edges is not None else (
@@ -1039,12 +1455,18 @@ class TiledForceField:
         if self._reusing:  # the kept plan, back on the device for this call
             tiles, grid = [t.to(self.device) for t in self._kept["tiles"]], self._kept["grid"]
         else:
-            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap)
+            reach, layers = self._boundary_reach(n)
+            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap, reach, layers)
+            split = _grid_shape(cell.detach().cpu(), n, self.receivers, reach, layers)[1] > 0
+            self._plan_skin = reach if split else 0.0
             if self._kept is not None:
                 self._kept["tiles"], self._kept["grid"] = [t.cpu() for t in tiles], grid
         self._tile_index = {t.data_ptr(): i for i, t in enumerate(tiles)}
         local_of = torch.full((n,), -1, dtype=torch.int32, device=self.device)  # int32: 4 bytes per atom
-        measure = (not self._budgeted or self._auto) and self.device.type == "cuda"
+        # The first padded (compiled) call also measures: the lanes' fit is its own tile workspace, not the eager
+        # first call's scaled to the cap (eager tiles hold several times more: R 16,384 was refused with 12 GiB free).
+        lanes_unmeasured = self._lanes_fit is None and padded and not self._captured()
+        measure = (not self._budgeted or self._auto or lanes_unmeasured) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
@@ -1053,7 +1475,21 @@ class TiledForceField:
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
-        keys = self._slot_keys(tiles, source, local_of, n) if padded else None
+        wave = self._wavefront_on(grid, n)
+        started = time.perf_counter()  # the search pass before the sweeps (its syncs make the wall time its cost)
+        if wave:
+            keys, steps, pool_rows, first, last = self._wavefront(tiles, source, local_of, n, padded)
+        else:
+            keys = self._slot_keys(tiles, source, local_of, n) if padded else None
+            steps, pool_rows = [(sweep, index) for sweep in (1, 2, 3) for index in range(len(tiles))], 0
+        stats["search_s"] = time.perf_counter() - started if padded or wave else 0.0
+        lanes = self._lanes_on(padded, n)
+        if lanes:  # sweep 2 in pairs: its sweep-3 steps between a pair's tiles wait for the pair (a larger pool)
+            steps, lane_peak = lane_steps(steps, [int(t.shape[0]) for t in tiles])
+            pool_rows = max(pool_rows, lane_peak) if wave else pool_rows
+        stats["lanes"] = self.lanes_state
+        stats["wavefront"] = dict(on=wave, pool_rows=pool_rows, pool_fraction=pool_rows / max(n, 1),
+                                  boundary_skin=self._plan_skin)  # the split's reach (Angstrom), 0: none
         if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
             stats["slot_needs"] = {key: self.slot_needs[key] for key in sorted(self.slot_needs)}
@@ -1077,33 +1513,158 @@ class TiledForceField:
                     self._graph_key = key
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
             aliased = self.config.alias_state
-            for sweep in (1, 2, 3):
-                for index, receivers in enumerate(tiles):
-                    g["state"].new_tile()
-                    slot = self._slots[keys[index]] if padded else None
+            if aliased:
+                state.pool(pool_rows, n)
+                if wave:
+                    state.touched(first, last)
+                    del first, last
+            planned, previous = False, None
+            if measure:  # the tiles' workspace alone: the per-atom buffers of the call stay out of it (see _memory)
+                stats["loop_base"] = int(torch.cuda.memory_allocated(self.device))
+                stats["peak_before_tiles"] = int(torch.cuda.max_memory_allocated(self.device))
+                torch.cuda.reset_peak_memory_stats(self.device)
+            streams = self._lane_streams[0] if lanes and self.device.type == "cuda" else None
+            lane_strain = [torch.zeros_like(strain_grad) for _ in range(2)] if lanes else None
+
+            # TileConfig.prefetch: the next tile's graph (and, within a run of sweep 2 or 3, its host rows) on a side
+            # stream; the tiles' receivers on the host (the pool's assign and release index with them, no sync).
+            ahead = self.config.prefetch and padded and state.host
+            prep = None
+            if ahead and self.device.type == "cuda":
+                if self._prep_stream is None:
+                    self._prep_stream = torch.cuda.Stream(self.device)
+                prep = self._prep_stream
+                prep.wait_stream(torch.cuda.current_stream())  # the call's positions, bins and plan
+            host_tiles = [t.cpu() for t in tiles] if ahead and wave else None
+            order = [(item[0], index, (k if len(item) == 3 or (lanes and item[0] == 2) else None))
+                     for item in steps for k, index in enumerate(item[1:])]
+            prepared = {}
+
+            def prepare(position):
+                """Build tile ``order[position]``'s graph ahead; fetch its rows when the sweep before it is its own."""
+                sweep, index, lane = order[position]
+                slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]]
+                rows = position > 0 and order[position - 1][0] == sweep and sweep in (2, 3)
+                with torch.cuda.stream(prep) if prep is not None else contextlib.nullcontext():
+                    piece = self._tile_graph(tiles[index], source, local_of, slot["sizes"][0])
+                    nodes = piece[0].cpu()  # waits for the prefetch stream only
+                    fetched = {}
+                    if rows:  # the slot's layout (_fill): receivers, then the halo after the receiver slots
+                        size, halo = slot["sizes"][0], slot["sizes"][1]
+                        r, h = piece[4], piece[5]
+                        layout = torch.zeros(size + halo, dtype=torch.int64)
+                        layout[:r] = nodes[:r]
+                        layout[size:size + h] = nodes[r:]
+                        names = (("x", layout), ("sc", layout[:size])) if sweep == 2 else (
+                            ("gx", layout[:size]), ("gsc", layout[:size]))
+                        fetched = {name: state.fetch(name, rows_) for name, rows_ in names}
+                    event = None
+                    if prep is not None:
+                        event = torch.cuda.Event()
+                        event.record(prep)
+                prepared[position] = (piece, nodes, fetched, event)
+
+            def tile(sweep, index, lane=None, position=None):
+                """One sweep on one tile; ``lane`` 0 or 1: sweep 2 of a pair, on that lane's stream and slots."""
+                nonlocal bound
+                receivers = tiles[index]
+                if sweep == 1 and wave:
+                    state.assign(receivers if host_tiles is None else host_tiles[index])
+                state.new_tile()
+                slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]] if padded else None
+                ready = prepared.pop(position, None)
+                host_nodes, fetched = None, {}
+                if ready is None:
                     piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
-                    self._note(stats, piece)
-                    if sweep == 1:
-                        stats["edges"] += piece[1].shape[1]
-                        if aliased:
-                            g["state"].touch(piece[0], index, n)
-                    if padded:
-                        if bound is not slot:  # the streaming kernels read this slot's edge count and tables
-                            for module in field._streaming:
-                                module.register_buffer("streaming_count", slot["count"], persistent=False)
-                            self._bind_tables(slot["tables"])
-                            bound = slot
-                        self._fill(slot, piece)
+                else:
+                    piece, host_nodes, fetched, event = ready
+                    if event is not None:
+                        torch.cuda.current_stream().wait_event(event)
+                        for tensor in piece[:4]:  # made on the prefetch stream
+                            tensor.record_stream(torch.cuda.current_stream())
+                self._note(stats, piece)
+                if sweep == 1:
+                    stats["edges"] += piece[1].shape[1]
+                    if aliased and not wave:
+                        state.touch(piece[0] if host_nodes is None else host_nodes, index, n)
+                if padded:
+                    if bound is not slot:  # the streaming kernels read this slot's edge count and tables
+                        for module in field._streaming:
+                            module.register_buffer("streaming_count", slot["count"], persistent=False)
+                        self._bind_tables(slot["tables"])
+                        bound = slot
+                    if slot.get("event") is not None:  # a lane still reads this slot's buffers
+                        torch.cuda.current_stream().wait_event(slot["event"])
+                        slot["event"] = None
+                    self._fill(slot, piece)
+                    state.prefetched = fetched  # rows() takes these instead of gathering them now
+                    following = position is not None and position + 1 < len(order)
+                    if lane is None:
                         self._run_slot(sweep, slot, g)
-                        self._scatter(sweep, slot, g, piece)
-                    else:
-                        self._eager_tile(sweep, piece, g)
-                    if sweep == 2 and aliased:
-                        g["state"].close(index)
-                    del piece
-                g["state"].flush()  # the next sweep reads what this one wrote
-                if sweep == 1 and aliased:
-                    g["state"].plan(len(tiles))
+                        if following:
+                            prepare(position + 1)  # while this tile runs (its scatter only queues)
+                        self._scatter(sweep, slot, g, piece, host_nodes)
+                    else:  # the lane's own strain gradient (a plain add_); forces and node energies add atomically
+                        lane_g = dict(g, strain_grad=lane_strain[lane])
+                        if streams is None:  # off a CUDA device: the lanes one after the other
+                            self._run_slot(sweep, slot, lane_g)
+                            if following:
+                                prepare(position + 1)
+                            self._scatter(sweep, slot, lane_g, piece, host_nodes)
+                        else:
+                            stream = streams[lane]
+                            stream.wait_stream(torch.cuda.current_stream())  # the slot's filled buffers
+                            with torch.cuda.stream(stream):
+                                for tensor in fetched.values():
+                                    tensor.record_stream(stream)
+                                self._run_slot(sweep, slot, lane_g)
+                            if following:
+                                prepare(position + 1)
+                            with torch.cuda.stream(stream):
+                                self._scatter(sweep, slot, lane_g, piece, host_nodes)
+                                slot["event"] = torch.cuda.Event()
+                                slot["event"].record(stream)
+                            for tensor in piece[:4]:  # read by the lane's scatter
+                                tensor.record_stream(stream)
+                    state.prefetched = {}
+                else:
+                    self._eager_tile(sweep, piece, g)
+                if sweep == 2 and aliased:
+                    state.close(index)
+                del piece
+                if sweep == 3 and wave:  # its reads are done (rows() copies on the host before it returns)
+                    state.release(receivers if host_tiles is None else host_tiles[index])
+                    if self._list_cache is not None:
+                        self._list_cache.pop(receivers.data_ptr(), None)  # no sweep reads this tile's lists again
+
+            loop_started = time.perf_counter()
+            position = 0
+            for item in steps:
+                sweep = item[0]
+                if sweep != previous and sweep != 1:
+                    state.flush()  # sweep 2 reads what sweep 1 wrote, sweep 3 what sweep 2 wrote (sweep 1 reads none)
+                if sweep == 2 and aliased and not planned:
+                    state.plan(len(tiles))  # after the touches (sweep 1, or the wavefront's search pass)
+                    planned = True
+                if streams is not None and sweep != 2 and previous == 2:  # the whole device again: after the lanes
+                    for stream in streams:
+                        torch.cuda.current_stream().wait_stream(stream)
+                previous = sweep
+                for k, index in enumerate(item[1:]):
+                    lane = k if len(item) == 3 or (lanes and sweep == 2) else None
+                    tile(sweep, index, lane=lane, position=position if ahead else None)
+                    position += 1
+            if streams is not None:
+                for stream in streams:
+                    torch.cuda.current_stream().wait_stream(stream)
+            if lanes:
+                for part in lane_strain:
+                    strain_grad.add_(part)
+            state.flush()
+            stats["tiles_s"] = time.perf_counter() - loop_started  # the host's time in the sweeps (queued work aside)
+            if measure:
+                stats["tiles_peak"] = int(torch.cuda.max_memory_allocated(self.device))
+            source = None  # the tile lists' cell bins (per-atom device arrays) before the energy's transients
             stats["global_bytes"] = state.bytes()
             list_cache = getattr(self, "_list_cache", None)
             stats["list_cache_bytes"] = int(sum(t.numel() * t.element_size() for entry in (list_cache or {}).values()
@@ -1112,7 +1673,9 @@ class TiledForceField:
             stats["list_kept_bytes"] = 0 if kept is None else int(
                 sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
                 + kept["reference"].numel() * kept["reference"].element_size())
+            stats["list_cache_hits"] = getattr(self, "_list_hits", 0)  # tile visits served from the call's cache
             stats["list_reuse"] = self.list_reuse_state
+            stats["list_cache"] = self.list_cache_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
             with torch.no_grad():
@@ -1120,16 +1683,20 @@ class TiledForceField:
                 from fastmace.model import energy as energy64
 
                 if energy64.NODE_E0_KEY in data:
-                    e0 = data[energy64.NODE_E0_KEY]
+                    e0 = field.node_e0()  # the stored column, or looked up from the species index
                 else:  # a float64 model summed natively: its own table
-                    e0 = self.model.atomic_energies_fn(self.node_attrs)[self.arange[:n], self.heads[:n]].double()
+                    rows = torch.arange(n, device=self.device)
+                    e0 = self.model.atomic_energies_fn(self.node_attrs)[rows, self.heads[:n]].double()
                 energy = (e0 + node_inter.double()).sum().reshape(1)
                 out_stress = None
                 if stress:
                     volume = torch.linalg.det(cell.to(torch.float64)).abs()
                     out_stress = (strain_grad / volume).to(self.dtype)  # MACE: dE/d(strain) / V
             self.last = stats
-            out = ForceOutput(energy, forces.clone(), out_stress)
+            out = ForceOutput(energy, forces, out_stress)
+            # Handed out: the caller holds the forces, not the call (else a caller that drops them still has them
+            # on the device through the next call, beside its new buffer: 12 bytes per atom of that call's peak).
+            g["forces"] = None
             if self._auto or not self._budgeted:
                 memory = self._memory()  # None without a CUDA device: the mode and the cap stay
                 self._choose_mode(memory)
@@ -1137,11 +1704,66 @@ class TiledForceField:
                     self._budgeted = True
                     if self.config.mode != "auto" or self.mode == "compiled":  # "auto": eager tiles take no budget
                         self._choose_receivers(memory)
+            elif lanes_unmeasured and measure:  # TileConfig.lanes: a second workspace of this padded call's
+                workspace, available = self._memory()
+                self._lanes_fit = 2 * 1.1 * workspace <= available
             return out
         finally:
             for module, count in saved:
                 if count is not None:
                     module.register_buffer("streaming_count", count, persistent=False)
+
+    def _lanes_on(self, padded, n):
+        """Whether this call runs sweep 2 on two lanes (``TileConfig.lanes``), the reason in ``lanes_state``."""
+        import torch
+
+        config = self.config.lanes
+        if config == "off":
+            self.lanes_state = "off"
+            return False
+        if not padded or self._captured():
+            self.lanes_state = f"off: {self.mode} tiles" + (" in CUDA graphs" if self.mode == "compiled" else "")
+            return False
+        if self.device.type != "cuda":
+            self.lanes_state = "on: one after the other (no CUDA device)" if config == "on" else "off: no CUDA device"
+            return config == "on"
+        if config == "auto":
+            name = torch.cuda.get_device_name(self.device)
+            if name not in LANE_GPUS:
+                self.lanes_state = f"off: not measured faster on {name}"
+                return False
+            if not self._lanes_fit:
+                self.lanes_state = ("off: no memory measurement" if self._lanes_fit is None else
+                                    "off: a second tile workspace does not fit the device")
+                return False
+        backend = torch.cuda.get_allocator_backend()
+        if backend != "cudaMallocAsync":
+            reason = (f"needs PyTorch's cudaMallocAsync allocator backend (PYTORCH_CUDA_ALLOC_CONF="
+                      f"backend:cudaMallocAsync before CUDA starts), not {backend}")
+            if config == "on":
+                raise ValueError(f"TileConfig.lanes='on' {reason}")
+            self.lanes_state = f"off: {reason}"
+            return False
+        if self._lane_streams is None:
+            try:
+                self._lane_streams = _split_streams(self.device)
+            except Exception as error:  # noqa: BLE001  (no green contexts here: off, with the driver's reason)
+                if config == "on":
+                    raise
+                self._lane_streams = False
+                self.lanes_state = f"off: green contexts: {type(error).__name__}: {error}"[:300]
+        if self._lane_streams is False:
+            return False
+        self.lanes_state = "on"
+        return True
+
+    def _lane_slot(self, key):
+        """The second lane's padded slot of edge bucket ``key``: the first lane's sizes, its own buffers."""
+        sizes = self._slots[key]["sizes"]
+        slot = self._lane_slots.get(key)
+        if slot is None or slot["sizes"] != sizes:
+            slot = self._lane_slots[key] = self._new_slot(sizes)
+        return slot
 
     def _memory(self):
         """``(workspace, available)`` bytes after a measured call, or None without a CUDA device: the call's peak
@@ -1151,8 +1773,16 @@ class TiledForceField:
 
         if self.device.type != "cuda":
             return None
-        allocated = torch.cuda.memory_allocated(self.device)
         free, _ = torch.cuda.mem_get_info(self.device)
+        last = self.last
+        if "tiles_peak" in last:
+            # The tiles' peak above what was allocated when they started (the call's per-atom buffers: tile lists,
+            # local indices, forces), and what was left beside those buffers. The call's own transients outside the
+            # tiles (the energy's float64 sums, the wavefront's search pass) scale with the atoms, not the cap: the
+            # first call held them at this atom count, apart from the tiles' workspace (tiled-wavefront.md).
+            base = last["loop_base"]
+            return last["tiles_peak"] - base, free + torch.cuda.memory_reserved(self.device) - base
+        allocated = torch.cuda.memory_allocated(self.device)
         return (torch.cuda.max_memory_allocated(self.device) - allocated,
                 free + torch.cuda.memory_reserved(self.device) - allocated)
 
@@ -1188,6 +1818,7 @@ class TiledForceField:
             self._budget_raised = chosen > int(self.config.receivers)
             self.receivers = chosen
             self._slots.clear()  # their sizes and edge buckets were for the old cap
+            self._lane_slots.clear()
             self._edge_step = None
             self._graph_key = None
 
@@ -1199,20 +1830,31 @@ class TiledForceField:
         import torch
 
         g = getattr(self, "_g", None)
-        if g is None or g["n"] != n:
-            # n + 1 rows: a padded slot has at most n + 1 receiver rows (one padding row past the largest tile).
-            g = dict(n=n, pos=pos, heads=torch.cat([heads, heads[-1:]]),
-                     arange=torch.arange(n + 1, device=self.device),
-                     forces=torch.zeros((n, 3), dtype=self.dtype, device=self.device),
+        shared = heads.dim() == 1 and heads.stride(0) == 0  # one head for every atom: a zero-stride view
+        if g is None or g["n"] != n or (g["head"] is not None) != shared:
+            # n + 1 rows: a padded slot has at most n + 1 receiver rows (one padding row past the largest tile);
+            # the tiles read the first rows of ``arange`` only (at most the largest receiver cap and its padding
+            # row), and one shared head as a view of one element (tiled capacity, lever 5).
+            caps = (int(self.config.receivers), *map(int, self.config.budget_receivers))
+            head = heads[:1].clone() if shared else None
+            g = dict(n=n, pos=pos, head=head,
+                     heads=head.expand(n + 1) if shared else torch.cat([heads, heads[-1:]]),
+                     arange=torch.arange(min(n, max(caps)) + 1, device=self.device),
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
                                   alias=self.config.alias_state, overlap=self.config.overlap))
             self._g = g
+        elif g["head"] is not None and shared:
+            g["head"].copy_(heads[:1])
         else:
             g["heads"].copy_(torch.cat([heads, heads[-1:]]))
         g["stress"] = stress
-        for tensor in [g["forces"], g["node_es"], g["strain_grad"]]:
+        # A new force buffer every call, handed out as the call's forces (no copy; the scatter runs outside the
+        # graphs, so its address may change): 12 bytes per atom less on the device than a kept buffer and its copy.
+        g["forces"] = None  # a call that raised left its buffer here
+        g["forces"] = torch.zeros((n, 3), dtype=self.dtype, device=self.device)
+        for tensor in [g["node_es"], g["strain_grad"]]:
             tensor.zero_()
         g["state"].zero()
         return g
@@ -1230,7 +1872,104 @@ class TiledForceField:
         stats["max_halo"] = max(stats["max_halo"], h)
         stats["max_edges"] = max(stats["max_edges"], ei.shape[1])
 
-    def _slot_keys(self, tiles, source, local_of, n):
+    def _boundary_reach(self, n):
+        """``TileConfig.boundary_skin``: the plan's ``reach`` and ``min_layers`` (``plan_tiles``); no split without
+        the wavefront, and with "auto" only where its grid would have the layers anyway."""
+        if not self.config.boundary_skin or not self._wave_expected(n):
+            return 0.0, 0
+        reach = float(self.field.neighbours.cutoff) + self._reuse_skin()
+        return reach, self._wave_layers(n)
+
+    def _wave_layers(self, n):
+        """The fewest grid layers the wavefront runs on: ``WAVEFRONT_MIN_LAYERS`` with "on" or where the plain state
+        would not fit the host, else ``WAVEFRONT_LAYERS``."""
+        if self.config.wavefront == "on" or self._wave_short.get(n):
+            return WAVEFRONT_MIN_LAYERS
+        return WAVEFRONT_LAYERS
+
+    def _wavefront_on(self, grid, n):
+        """Whether this call runs the wavefront schedule (``TileConfig.wavefront``)."""
+        config = self.config
+        if config.wavefront == "off" or not config.alias_state:
+            return False
+        if config.wavefront == "on":
+            return True
+        return self._wave_expected(n) and int(grid[0]) >= self._wave_layers(n)
+
+    def _wave_expected(self, n):
+        """``TileConfig.wavefront`` without the grid's layer test: whether a call at ``n`` atoms runs the wavefront
+        when its grid has the layers."""
+        config = self.config
+        if config.wavefront == "off" or not config.alias_state:
+            return False
+        if config.wavefront == "on":
+            return True
+        # "auto": only where the plain state (x and sc, and the alias window, about a quarter more) would leave the
+        # host below the floor: the schedule costs about 3 % of a call (its search pass; 5M SrTiO3, both Ada GPUs).
+        # Decided on the first call at an atom count, then kept.
+        decided = self._wave_auto.get(n)
+        if decided is None:
+            width, available = self._state_width(), _host_available()
+            if width is None or available is None:
+                decided, short = n >= 2**20, False
+            else:
+                itemsize = 8 if str(self.dtype) == "torch.float64" else 4
+                plain = 1.25 * n * width * itemsize
+                decided, short = plain + int(config.list_reuse_floor) > available, plain > available
+            self._wave_auto[n], self._wave_short[n] = decided, short
+        return decided
+
+    def _state_width(self):
+        """Floats per atom of the plain host state (x and sc): from the allocated state, else the model's
+        ``linear_up`` and ``skip_tp`` output widths; None when unknown."""
+        g = getattr(self, "_g", None)
+        if g is not None and g["state"].tensors:
+            return sum(int(t.shape[1]) for name, t in g["state"].tensors.items() if name in ("x", "sc"))
+        interaction = self.model.interactions[1]
+        try:
+            return int(interaction.linear_up.irreps_out.dim) + int(interaction.skip_tp.irreps_out.dim)
+        except AttributeError:
+            return None
+
+    def _wavefront(self, tiles, source, local_of, n, padded):
+        """The wavefront's search pass: every tile's graph built once (without keeping its lists), recording each
+        atom's first and last tile and the tiles each tile reads x from. ``(keys, steps, peak, first, last)``: the
+        padded slots' keys (None eager), the schedule and its row pool size, and the host int32 first and last tile
+        of every atom (the alias window's plan)."""
+        import torch
+
+        owner = torch.empty(n, dtype=torch.int32, device=self.device)
+        for index, receivers in enumerate(tiles):
+            owner[receivers] = index
+        first = torch.full((n,), -1, dtype=torch.int32)
+        last = torch.full((n,), -1, dtype=torch.int32)
+        needs = [None] * len(tiles)
+
+        def visit(index, piece):
+            nodes = piece[0]
+            needs[index] = torch.unique(owner[nodes]).cpu().tolist()
+            nodes = nodes.cpu()
+            first[nodes[first[nodes] < 0]] = index
+            last[nodes] = index
+
+        self._cache_paused = True
+        try:
+            if padded:
+                keys = self._slot_keys(tiles, source, local_of, n, visit)
+            else:
+                keys = None
+                for index, receivers in enumerate(tiles):
+                    visit(index, self._tile_graph(receivers, source, local_of))
+        finally:
+            self._cache_paused = False
+        owner = None  # 4 bytes per atom on the device, before the sweeps
+        # Each tile's last reader among its own atoms (its receivers): no whole-system int64 copies on the host.
+        ready = [int(last[t.cpu()].max()) if t.numel() else -1 for t in tiles]
+        steps, peak = wavefront_schedule(needs, ready, [int(t.shape[0]) for t in tiles],
+                                         self.config.wavefront_group)
+        return keys, steps, peak, first, last
+
+    def _slot_keys(self, tiles, source, local_of, n, visit=None):
         """Each tile's slot: the edge bucket ``ceil(edges / step)``, with ``step`` set on the first call from the
         largest tile (``TileConfig.bucket`` of its edges, at least 256, a multiple of 256). A slot holds one
         receiver row more than the largest of its tiles with ``TileConfig.headroom``, at most the receiver cap (the
@@ -1239,16 +1978,31 @@ class TiledForceField:
         own sizes, the headroom is for sizing only (in MD the tiles' sizes move a little every step). An exceeded
         size grows by at least a quarter of the largest slot's in that size: the large slot's sizes drift by a few per
         cent in MD, while a small slot (the remainder pieces of blocks just above the cap) can triple
-        (tiled-slot-growth.md)."""
+        (tiled-slot-growth.md). A tile whose bucket has no slot runs in a neighbouring bucket's slot when it fits: in MD
+        a tile's edges drift across a bucket's edge by a few per cent, which would otherwise compile a new slot. The
+        edges take no headroom: a slot's padded edges cost every call (+4.8 % edges, +2.5 % step at 1M;
+        tiled-1m-speed.md, "Slots in MD")."""
         sizes = []
-        for receivers in tiles:
-            _, ei, _, _, r, h = self._tile_graph(receivers, source, local_of)
+        for index, receivers in enumerate(tiles):
+            piece = self._tile_graph(receivers, source, local_of)
+            _, ei, _, _, r, h = piece
             sizes.append((r, h, int(ei.shape[1])))
+            if visit is not None:  # the wavefront's search pass
+                visit(index, piece)
+            del piece
         if self._edge_step is None:
             largest = max(e for _, _, e in sizes)
             self._edge_step = max(256, 256 * math.ceil(float(self.config.bucket) * largest / 256))
         step = self._edge_step
         keys = [max(1, math.ceil(e / step)) for _, _, e in sizes]
+        for index, (key, size) in enumerate(zip(keys, sizes)):
+            if key in self._slots:
+                continue
+            raw = (size[0] + 1,) + size[1:]
+            near = [k for k in (key - 1, key + 1)
+                    if k in self._slots and all(a <= b for a, b in zip(raw, self._slots[k]["sizes"]))]
+            if near:
+                keys[index] = near[0]
         head = 1.0 + float(self.config.headroom)
         self.slot_needs = {}  # each bucket's largest tile sizes this call, before headroom (the call's report)
         for key in set(keys):

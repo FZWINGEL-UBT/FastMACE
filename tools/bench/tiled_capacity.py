@@ -61,7 +61,47 @@ def parse_args(argv=None):
                         "given: TileConfig's default)")
     p.add_argument("--no-budget", action="store_true",
                    help="budget_receivers=(): R stays --receivers (several compiled tiles at small sizes)")
+    p.add_argument("--wavefront", choices=("auto", "on", "off"), default="auto",
+                   help="TileConfig.wavefront (with --alias-state): the tile sweeps interleaved, x and sc in a row "
+                        "pool")
+    p.add_argument("--lanes", choices=("auto", "on", "off"), default="auto",
+                   help="TileConfig.lanes: sweep 2's tiles in pairs on two green-context SM halves (needs "
+                        "PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync)")
+    p.add_argument("--wavefront-group", type=int, default=None,
+                   help="TileConfig.wavefront_group: sweep-2 tiles per run of the wavefront (none: the default)")
+    p.add_argument("--boundary-skin", choices=("on", "off"), default="on",
+                   help="TileConfig.boundary_skin: the wavefront plan's first and last layer split at the reach")
+    p.add_argument("--compiled-graphs", action="store_true",
+                   help="TileConfig.compiled_graphs: compiled tile bodies captured in CUDA graphs")
+    p.add_argument("--prefetch", choices=("on", "off"), default="on",
+                   help="TileConfig.prefetch: the next tile's graph and host rows prepared on a side stream")
+    p.add_argument("--backward-chunk-scale", type=int, default=None,
+                   help="TileConfig.backward_chunk_scale: the chunked streaming backward's edges per chunk in the "
+                        "tiles times this (none: by device name)")
+    p.add_argument("--list-cache", choices=("on", "off"), default="on",
+                   help="TileConfig.list_cache: a tile's lists kept on the host within the call (with kept lists: "
+                        "its filtered ones in the wavefront's band)")
+    p.add_argument("--backward-single-stream", default=None, metavar="FRACTION|off",
+                   help="this GPU's entry in oeq_streaming SINGLE_STREAM_DEVICES: the chunked backward on one slot "
+                        "and the current stream where a chunk's slot is at least this fraction of the L2; off: two "
+                        "slots (default: the table's entry for the device name)")
+    p.add_argument("--sweep-profile", action="store_true",
+                   help="the last call with torch.profiler around three tiles of each sweep: kernel classes and top "
+                        "kernels per sweep (tiled_corun.sweep_profile)")
+    p.add_argument("--sweep-times", action="store_true",
+                   help="the last call with CUDA events around each tile's sweep body, fill and scatter: device "
+                        "seconds per sweep (tiled_corun.sweep_times)")
+    p.add_argument("--profile-last", action="store_true",
+                   help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
+                        "host operations with the most self time (tiled_corun.profile_call)")
     p.add_argument("--tag", default="")
+    p.add_argument("--ledger", action="store_true",
+                   help="after the build and after every call, record every live tensor and NumPy array by device, "
+                        "dtype and shape, named where reachable from the user's force field, the evaluation field "
+                        "or the tiled call (ledgers in the record)")
+    p.add_argument("--memory-history", action="store_true",
+                   help="record the CUDA allocator's trace during the build and keep the allocations live at the "
+                        "build's device peak, by the source line that made them (build_peak in the record)")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
                         "left empty, so it costs no memory")
@@ -127,6 +167,133 @@ def host_memory():
     return dict(host_rss=values.get("VmRSS"), host_peak=values.get("VmHWM"))
 
 
+def memory_ledger(roots, depth=4):
+    """Every live torch tensor and NumPy array (by storage, counted once), grouped by device, dtype and shape, with
+    the attribute paths from ``roots`` ({name: object}) that reach it, largest first."""
+    import gc
+
+    import numpy as np
+    import torch
+
+    names = {}
+
+    def key(value):
+        if isinstance(value, torch.Tensor):
+            return ("torch", value.untyped_storage().data_ptr()) if value.numel() else None
+        if isinstance(value, np.ndarray):
+            base = value
+            while isinstance(base.base, np.ndarray):
+                base = base.base
+            return ("numpy", base.__array_interface__["data"][0]) if value.size else None
+        return None
+
+    seen = set()
+
+    def walk(value, path, level):
+        k = key(value)
+        if k is not None:
+            names.setdefault(k, []).append(path)
+            return
+        if level > depth or id(value) in seen or isinstance(value, (str, bytes, int, float, bool, type(None))):
+            return
+        seen.add(id(value))
+        if isinstance(value, dict):
+            items = list(value.items())[:64]
+        elif isinstance(value, (list, tuple)):
+            items = list(enumerate(value))[:64]
+        elif hasattr(value, "__dict__") and not isinstance(value, type):
+            items = list(vars(value).items())
+            if isinstance(value, torch.nn.Module):
+                items += list(value.named_buffers(recurse=False)) + list(value.named_parameters(recurse=False))
+        else:
+            return
+        for name, item in items:
+            walk(item, f"{path}.{name}", level + 1)
+
+    for name, root in roots.items():
+        walk(root, name, 0)
+    groups = {}
+    counted = set()
+    for obj in gc.get_objects():
+        try:
+            k = key(obj)
+        except Exception:  # noqa: BLE001  (a tensor subclass or a freed storage)
+            continue
+        if k is None or k in counted:
+            continue
+        counted.add(k)
+        if isinstance(obj, torch.Tensor):
+            nbytes = obj.untyped_storage().nbytes()
+            where, dtype, shape = str(obj.device), str(obj.dtype), list(obj.shape)
+        else:
+            base = obj
+            while isinstance(base.base, np.ndarray):
+                base = base.base
+            nbytes, where, dtype, shape = base.nbytes, "cpu (numpy)", str(obj.dtype), list(obj.shape)
+        group = groups.setdefault((where, dtype, str(shape)), dict(device=where, dtype=dtype, shape=shape, count=0,
+                                                                     bytes=0, names=[]))
+        group["count"] += 1
+        group["bytes"] += nbytes
+        group["names"] = (group["names"] + names.get(k, [])[:3])[:6]
+        if not names.get(k) and nbytes >= 2**20 and "owners" not in group:
+            group["owners"] = owners(obj)
+    return sorted(groups.values(), key=lambda g: -g["bytes"])
+
+
+def peak_live_set(snapshot, top=30):
+    """The device allocations live at the trace's peak, grouped by the first FastMACE or MACE source line of their
+    stack (else the first frame), largest first: ``{peak, groups: [{site, count, bytes}]}``."""
+    live, total, peak, at_peak = {}, 0, 0, {}
+    for trace in snapshot.get("device_traces", []):
+        for entry in trace:
+            action, address, size = entry.get("action"), entry.get("addr"), int(entry.get("size", 0))
+            if action == "alloc":
+                live[address] = (size, entry.get("frames") or [])
+                total += size
+                if total > peak:
+                    peak, at_peak = total, dict(live)
+            elif action in ("free_completed",) and address in live:
+                total -= live.pop(address)[0]
+
+    def site(frames):
+        for frame in frames:
+            name = frame.get("filename", "")
+            if ("fastmace" in name or "/mace/" in name) and "torch" not in name:
+                short = name.split("site-packages/")[-1].split("src-all-")[-1]
+                return f"{short}:{frame.get('line')} {frame.get('name')}"
+        return f"{frames[0].get('filename')}:{frames[0].get('line')}" if frames else "?"
+
+    groups = {}
+    for size, frames in at_peak.values():
+        group = groups.setdefault(site(frames), dict(site=site(frames), count=0, bytes=0))
+        group["count"] += 1
+        group["bytes"] += size
+    return dict(peak=peak, groups=sorted(groups.values(), key=lambda g: -g["bytes"])[:top])
+
+
+def owners(obj, levels=3):
+    """What holds an unnamed array: the types (and dict keys) of its referrers, ``levels`` deep."""
+    import gc
+    import inspect
+
+    chain, frontier = [], [obj]
+    for _ in range(levels):
+        found = []
+        for item in frontier:
+            for ref in gc.get_referrers(item):
+                if ref is frontier or ref is chain or inspect.isframe(ref):
+                    continue
+                label = type(ref).__qualname__
+                if isinstance(ref, dict):
+                    label += "[" + ",".join(str(key) for key, value in ref.items() if value is item)[:80] + "]"
+                elif hasattr(ref, "__name__"):
+                    label += f" {ref.__name__}"
+                found.append((label, ref))
+        chain.append([label for label, _ in found][:6])
+        frontier = [ref for _, ref in found][:6]
+    return chain
+
+
 def main(argv=None):
     args = parse_args(argv)
     from fastmace.model.compile import configure_allocator
@@ -138,12 +305,22 @@ def main(argv=None):
     from fastmace.model.tiled import TileConfig, TiledForceField
     from fastmace.planner import minimal
 
+    if args.backward_single_stream is not None:
+        import torch
+
+        from fastmace.kernels.oeq_streaming import runtime as oeq_runtime
+        name = torch.cuda.get_device_name()
+        oeq_runtime.SINGLE_STREAM_DEVICES = {k: v for k, v in oeq_runtime.SINGLE_STREAM_DEVICES.items() if k != name}
+        if args.backward_single_stream != "off":
+            oeq_runtime.SINGLE_STREAM_DEVICES[name] = float(args.backward_single_stream)
     repeat = tuple(int(x) for x in args.repeat.lower().split("x"))
     atoms = supercell(args.structure, repeat, args.rattle, args.strain)
     n = len(atoms)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, receivers=args.receivers,
                   edges=args.edges, rattle=args.rattle, strain=args.strain, model=args.model,
+                  backward_single_stream=args.backward_single_stream,
                   device=torch.cuda.get_device_name(), torch=torch.__version__,
+                  alloc_conf=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"),
                   source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"), phases={})
     args.output.mkdir(parents=True, exist_ok=True)
     path = args.output / f"tiled-{args.structure}-{n}-R{args.receivers}{args.tag}.json"
@@ -156,10 +333,11 @@ def main(argv=None):
         return dict(allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()),
                     peak_above_before=int(torch.cuda.max_memory_allocated() - before), **host_memory())
 
-    lists = contextlib.ExitStack()
-    lists.enter_context(no_global_list(args.tile_list))
+    lists = contextlib.ExitStack()  # (the force field's own list: global_list=False with --tile-list)
     try:
         record["phase"] = "build"
+        if args.memory_history:
+            torch.cuda.memory._record_memory_history(max_entries=1_000_000, stacks="python")
         started = time.perf_counter()
         user = fm.ForceField(fm.load(args.model), atoms, precision="float32")
         record["phases"]["user"] = mem()
@@ -174,7 +352,9 @@ def main(argv=None):
         # --species-index: the one-hot on the host from the construction on (it never reaches the device).
         built = plan if args.mode in ("compiled", "auto") else eager
         field = planner.build_evaluation(built, user, atoms, call_rows=call_rows,
-                                         release_node_attrs=args.species_index)
+                                         release_node_attrs=args.species_index,
+                                         release_whole_system=args.species_index,
+                                         global_list=not args.tile_list)
         record["call_rows"] = field.call_rows
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
@@ -185,8 +365,28 @@ def main(argv=None):
                                                   tuple(args.budget_receivers) or None,
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
+                                                  wavefront=args.wavefront, lanes=args.lanes,
+                                                  compiled_graphs=args.compiled_graphs,
+                                                  prefetch=args.prefetch == "on",
+                                                  boundary_skin=args.boundary_skin == "on",
+                                                  backward_chunk_scale=args.backward_chunk_scale,
+                                                  list_cache=args.list_cache == "on",
+                                                  **({} if args.wavefront_group is None else
+                                                     dict(wavefront_group=args.wavefront_group)),
                                                   species="index" if args.species_index else "one_hot"))
+        record["backward_chunk_edges"] = [module.chunked_backward_edges for module in tiled.model.modules()
+                                          if getattr(module, "chunked_backward_edges", 0) > 0]
         record["phases"]["build"] = dict(seconds=time.perf_counter() - started, **mem())
+        if args.memory_history:
+            record["build_peak"] = peak_live_set(torch.cuda.memory._snapshot())
+            torch.cuda.memory._record_memory_history(enabled=None)
+        ledgers = record["ledgers"] = {}
+
+        def ledger(name):
+            if args.ledger:
+                ledgers[name] = memory_ledger(dict(user=user, field=field, tiled=tiled, atoms=atoms))[:25]
+
+        ledger("build")
         save()
 
         record["phase"] = "neighbours"
@@ -206,23 +406,51 @@ def main(argv=None):
             torch.cuda.synchronize()
             before = torch.cuda.memory_allocated()
             torch.cuda.reset_peak_memory_stats()
-            started = time.perf_counter()
-            out = tiled(positions)
+            if args.sweep_profile and call == args.calls - 1:
+                import tiled_corun
+
+                started = time.perf_counter()
+                record["sweep_profile"], out = tiled_corun.sweep_profile(tiled, positions)
+            elif args.sweep_times and call == args.calls - 1:
+                import tiled_corun
+
+                started = time.perf_counter()
+                record["sweep_times"], out = tiled_corun.sweep_times(tiled, positions)
+            elif args.profile_last and call == args.calls - 1:
+                import tiled_corun
+
+                started = time.perf_counter()
+                record["profile"], out = tiled_corun.profile_call(tiled, positions, host_ops=25)
+            else:
+                started = time.perf_counter()
+                out = tiled(positions)
             torch.cuda.synchronize()
             entry = dict(seconds=time.perf_counter() - started, **mem(before), **tiled.last)
+            # A call that measures its tiles' workspace resets the peak at its first tile: its peak is the larger of
+            # the one before the tiles and the one since.
+            entry["peak_above_before"] = max(entry["peak_above_before"],
+                                             int(tiled.last.get("peak_before_tiles", 0)) - int(before))
             # ``allocated`` is after the call (the tiled field keeps its global state between calls); the call's
             # true peak is what was allocated before it plus its peak above that.
             entry.update(allocated_before=int(before), total_peak=int(before) + entry["peak_above_before"])
             calls.append(entry)
             record["calls"] = calls
+            ledger(f"after call {call}")
+            save()
+        if args.ledger:
+            record["ledger"] = memory_ledger(dict(user=user, field=field, tiled=tiled, atoms=atoms, out=out,
+                                                  positions=positions))
             save()
         energy = float(out.energy.reshape(-1)[0])
-        forces = out.forces.detach().double()
+        # The largest force from chunks of the output itself: a whole float64 copy (24 bytes per atom) does not
+        # fit next to a 149M-atom call's residency on a 16 GB GPU, and |f| max is exact in the output's dtype.
+        forces = out.forces.detach()
+        max_force = max(float(chunk.abs().max()) for chunk in forces.reshape(-1).split(1 << 24))
         stress = out.stress.detach().double() if out.stress is not None else None
         if args.tile_list:  # the force field's list is empty: the edges the tiles built
             record["edges_within_cutoff"] = int(tiled.last["edges"])
         record["tiled"] = dict(energy_eV=energy, energy_per_atom_eV=energy / n,
-                               max_abs_force=float(forces.abs().max()),
+                               max_abs_force=max_force,
                                stress=None if stress is None else stress.cpu().tolist())
         save()
 

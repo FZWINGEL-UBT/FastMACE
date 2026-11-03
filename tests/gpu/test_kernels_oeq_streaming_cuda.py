@@ -171,6 +171,43 @@ runtime.UNCHUNKED_L2_MULTIPLE = default_multiple
 print(json.dumps({"ok": True}))
 """
 
+REAL_ROWS = r"""
+from fastmace.kernels.oeq_streaming import folded_streaming_convolution
+
+# A tile's convolution (streaming_message rows=): every receiver is below `real`, the senders reach every node.
+# The message of the first `real` rows only (row_ptr [real + 1]) equals the first rows of every node's, and the
+# gradients follow the truncated output gradient; with the edge-owned and the receiver-owned reverse pass, and
+# with the folded weights. 8 channels at 128 threads: rows_fit needs a multiple of 16 rows.
+real = 32
+tile_receiver = torch.sort(torch.randint(0, real, (edges,), device="cuda", generator=g)).values
+a = torch.randn((edges, 9), device="cuda", generator=g)
+weight = torch.randn((problem.weight_numel, 9), device="cuda", generator=g)
+
+
+def outputs(kernels, rows, folded):
+    xr, yr, wr = (t.clone().requires_grad_() for t in (X, Y, a if folded else W))
+    row_ptr = torch.searchsorted(tile_receiver, torch.arange(rows + 1, device="cuda")).to(torch.int32)
+    if folded:
+        out = folded_streaming_convolution(wr, weight, xr, yr, sender.int(), tile_receiver.int(), row_ptr, kernels,
+                                           64)
+    else:
+        out = streaming_convolution(xr, yr, wr, sender.int(), tile_receiver.int(), row_ptr, kernels)
+    assert out.shape[0] == rows
+    out = out[:real]
+    return (out.detach(),) + torch.autograd.grad(out, (xr, yr, wr), G[:real])
+
+
+for receiver_backward, folded in ((False, False), (True, False), (False, True)):
+    kernels = StreamingKernels(problem, np.float32, receiver_backward=receiver_backward)
+    assert kernels.rows_fit(real) and not kernels.rows_fit(real + 1)
+    full, trimmed = outputs(kernels, nodes, folded), outputs(kernels, real, folded)
+    assert torch.equal(trimmed[0], full[0])
+    torch.testing.assert_close(trimmed[1], full[1], rtol=1e-5, atol=1e-5)  # atomic sender sums
+    for n, o in zip(trimmed[2:], full[2:]):
+        torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-5)
+print(json.dumps({"ok": True}))
+"""
+
 AGAINST_BASELINE = r"""
 directory = Path(os.environ["FASTMACE_BASELINE"]).expanduser() / "Experiments" / "Langevin_Thermostat" / "langevin"
 package = types.ModuleType("langevin")
@@ -216,6 +253,10 @@ def test_message_and_gradients_match_oeq():
 
 def test_chunked_folded_backward_matches_the_unchunked_path():
     assert run_child(FOLDED_CHUNKED) == {"ok": True}
+
+
+def test_a_tiles_real_rows_equal_every_nodes_first_rows():
+    assert run_child(REAL_ROWS) == {"ok": True}
 
 
 def test_kernels_equal_baseline():

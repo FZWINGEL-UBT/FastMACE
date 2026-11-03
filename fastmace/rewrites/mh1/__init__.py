@@ -58,7 +58,8 @@ from fastmace.rewrites.registry import Rewrite, RewriteError, Support, check_ten
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
 # sha256 of inspect.getsource(RealAgnosticResidualNonLinearInteractionBlock.forward) in mace-torch 0.3.16
-# (the research engine's _NONLINEAR_FORWARD_SHA256): modules.cutoff_folded_forward copies it with one change.
+# (the research engine's _NONLINEAR_FORWARD_SHA256): modules.cutoff_folded_forward copies it with two changes
+# (the folded cutoff; skip_tp on the real rows only).
 NONLINEAR_FORWARD = "mace.modules.blocks:RealAgnosticResidualNonLinearInteractionBlock.forward"
 NONLINEAR_FORWARD_SHA256 = "727c37b796de7d3b33793ae6317a6d09c1f4c8677b28c04963ffbb34899b0b44"
 RADIAL_MLP_FORWARD = "mace.modules.radial:RadialMLP.forward"

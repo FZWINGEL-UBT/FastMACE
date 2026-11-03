@@ -119,9 +119,15 @@ class StreamingKernels:
         _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.num_threads, 1, 1, self.shared_memory,
                                      stream, (tuple(values), tuple(types)), 0))
 
+    def rows_fit(self, rows):
+        """Whether a launch over the first ``rows`` receivers only covers them exactly (``row_ptr`` and ``out``
+        then hold ``rows`` rows while senders index all of ``x``): the kernels bound their threads by the node
+        count, so a partial last block would read and write past the rows."""
+        return rows * self.channels % self.num_threads == 0
+
     def forward(self, x, sh, weights, senders, row_ptr, out):
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (nodes * self.channels + self.num_threads - 1) // self.num_threads
+        blocks = (out.shape[0] * self.channels + self.num_threads - 1) // self.num_threads
         if blocks:
             p = ctypes.c_void_p
             self._launch(self._forward, blocks,
@@ -132,7 +138,7 @@ class StreamingKernels:
     def backward_receiver(self, x, sh, weights, senders, row_ptr, dout, dx, dsh, dweights):
         """Receiver-owned reverse pass; dx and dsh must be zero."""
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (nodes * self.channels + self.num_threads - 1) // self.num_threads
+        blocks = (dout.shape[0] * self.channels + self.num_threads - 1) // self.num_threads
         if blocks:
             p = ctypes.c_void_p
             self._launch(self._backward_receiver, blocks,
@@ -171,14 +177,14 @@ def streaming_conv_forward(x: torch.Tensor, sh: torch.Tensor, weights: torch.Ten
                            row_ptr: torch.Tensor, kernel_id: int) -> torch.Tensor:
     kernels = _REGISTRY[kernel_id]
     x, sh, weights = x.contiguous(), sh.contiguous(), weights.contiguous()
-    out = x.new_empty((x.shape[0], kernels.output_dim))
+    out = x.new_empty((row_ptr.shape[0] - 1, kernels.output_dim))  # the receiver rows (rows_fit)
     kernels.forward(x, sh, weights, senders.contiguous(), row_ptr.contiguous(), out)
     return out
 
 
 @streaming_conv_forward.register_fake
 def _(x, sh, weights, senders, row_ptr, kernel_id):
-    return x.new_empty((x.shape[0], _REGISTRY[kernel_id].output_dim))
+    return x.new_empty((row_ptr.shape[0] - 1, _REGISTRY[kernel_id].output_dim))
 
 
 @torch.library.custom_op("fastmace::streaming_conv_backward", mutates_args=())
@@ -239,6 +245,24 @@ def chunks_the_backward(edges, weight_dim, itemsize, device):
 
 _SIDE_STREAMS = {}  # device index -> the side stream of the chunked backward's input gradients
 
+# The chunked backward on one slot and the current stream (each chunk's input gradient right after its weight
+# gradient, as the recomputing backward runs) where a chunk's slot is at least this fraction of the L2: the two
+# slots of the side-stream path then no longer fit in it together (the tiles' backward_chunk_scale makes a slot up
+# to a whole L2). By exact device name (decision 66); other devices always use two slots.
+# Where it measured faster (5M SrTiO3, OMAT-0 medium, tiles at backward_chunk_scale 4, 3 Nov 2026): RTX 4000 Ada
+# 80.5 -> 79.65 s per call (-1.0 %, two runs each, leto), RTX 5060 Ti 96.6 -> 93.0 s (-3.7 %, noisy desktop GPU).
+# Whole-system calls never reach it (their slot is a quarter of the L2).
+SINGLE_STREAM_DEVICES = {"NVIDIA GeForce RTX 5060 Ti": 0.5, "NVIDIA RTX 4000 Ada Generation": 0.5}
+_SINGLE_STREAM_BY_INDEX = {}
+
+
+def _single_stream_fraction(device):
+    index = torch.device(device).index
+    index = torch.cuda.current_device() if index is None else index
+    if index not in _SINGLE_STREAM_BY_INDEX:
+        _SINGLE_STREAM_BY_INDEX[index] = SINGLE_STREAM_DEVICES.get(torch.cuda.get_device_name(index))
+    return _SINGLE_STREAM_BY_INDEX[index]
+
 
 def _side_stream(device):
     index = torch.device(device).index
@@ -279,6 +303,14 @@ def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: t
         input_grad_into(dweights, weight, main, last, da, tile_rule)
         return dx, dsh, da
     rows = max(1, min(int(chunk_edges), edges))
+    fraction = _single_stream_fraction(x.device)
+    if fraction is not None and rows * weights.shape[1] * weights.element_size() >= fraction * l2_bytes(x.device):
+        slot = weights.new_empty((rows, weights.shape[1]))
+        for start in range(0, edges, rows):
+            stop = min(edges, start + rows)
+            kernels.backward_edges(x, sh, weights, senders, receivers, dout, dx, dsh, slot, start, stop)
+            input_grad_into(slot[:stop - start], weight, main, last, da[start:stop], tile_rule)
+        return dx, dsh, da
     slots = weights.new_empty((2, rows, weights.shape[1]))
     current, side = torch.cuda.current_stream(x.device), _side_stream(x.device)
     side.wait_stream(current)
@@ -557,5 +589,6 @@ class _StreamingConvolution(torch.autograd.Function):
 
 
 def streaming_convolution(x, sh, weights, senders, receivers, row_ptr, kernels):
-    """OEq-equivalent message [nodes, output_dim] (mul_ir); senders/receivers/row_ptr int32, row_ptr [nodes + 1]."""
+    """OEq-equivalent message [rows, output_dim] (mul_ir); senders/receivers/row_ptr int32, row_ptr [rows + 1]: every
+    node (rows = nodes), or the first rows when every receiver is below them (``StreamingKernels.rows_fit``)."""
     return _StreamingConvolution.apply(x, sh, weights, senders, receivers, row_ptr, kernels.id)

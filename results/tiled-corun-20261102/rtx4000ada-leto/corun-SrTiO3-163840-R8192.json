@@ -1,0 +1,574 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  32,
+  32,
+  32
+ ],
+ "atoms": 163840,
+ "receivers": 8192,
+ "model": "omat0-medium",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "host": "leto",
+ "source_commit": "a6ea39dc",
+ "reps": 3,
+ "blocks": 6,
+ "expandable_segments": true,
+ "rewrites_b": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.0562759614337396e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=5.825363614536529e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.524407248280912e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='tf32x3_gemms', result=CheckResult(passed=True, max_relative_error=4.060339239719343e-07, threshold=0.0001, modules=15, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.0.skip_tp', 'interactions.0.first_reassociation', 'interactions.1.linear_up', 'interactions.1.linear', 'interactions.1.skip_tp', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903558762282e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (177 pieces, 9 pairs, certificate 0.31, cached)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, cached)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "rewrites_a": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.157617611934292e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=5.769702648483092e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.524407248280912e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903558762282e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (177 pieces, 9 pairs, certificate 0.31, cached)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, cached)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "calls": {
+  "A": {
+   "seconds": [
+    83.39209186495282,
+    2.722390070091933
+   ],
+   "tiles": 27,
+   "slots": {
+    "6": [
+     6548,
+     5142,
+     443904
+    ],
+    "7": [
+     7322,
+     5547,
+     517888
+    ]
+   },
+   "max_receivers": 6655,
+   "max_edges": 492470
+  },
+  "B": {
+   "seconds": [
+    70.57031279895455,
+    2.80264474300202
+   ],
+   "tiles": 27,
+   "slots": {
+    "6": [
+     6548,
+     5142,
+     443904
+    ],
+    "7": [
+     7322,
+     5547,
+     517888
+    ]
+   },
+   "max_receivers": 6655,
+   "max_edges": 492470
+  }
+ },
+ "peak_allocated": 5502877696,
+ "profile": {
+  "wall_s": 2.9643106509465724,
+  "kernel_s": 2.872088153999999,
+  "busy_s": 2.639202384999988,
+  "span_s": 2.9262743139999996,
+  "busy_fraction_of_span": 0.9018984899581729,
+  "kernel_sum_over_busy": 1.0882409664084978,
+  "classes": {
+   "conv": {
+    "seconds": 0.7839183760000034,
+    "share": 0.2729437029668566
+   },
+   "cueq_kernel": {
+    "seconds": 0.6691010180000069,
+    "share": 0.23296674131263698
+   },
+   "gemm": {
+    "seconds": 0.4778826370000105,
+    "share": 0.16638856865673024
+   },
+   "pointwise": {
+    "seconds": 0.3728544839999898,
+    "share": 0.12981999994697582
+   },
+   "copy": {
+    "seconds": 0.2595870509999958,
+    "share": 0.09038268920766415
+   },
+   "index": {
+    "seconds": 0.16238435499999437,
+    "share": 0.056538778161749424
+   },
+   "other": {
+    "seconds": 0.14636023299999867,
+    "share": 0.05095951974738681
+   }
+  },
+  "top": [
+   {
+    "name": "kernel",
+    "seconds": 0.6691010180000069,
+    "share": 0.23296674131263698,
+    "cls": "cueq_kernel"
+   },
+   {
+    "name": "oeq_projected_backward",
+    "seconds": 0.47890799799999945,
+    "share": 0.1667455775453888,
+    "cls": "conv"
+   },
+   {
+    "name": "oeq_projected_forward",
+    "seconds": 0.22220989200000021,
+    "share": 0.07736875753292087,
+    "cls": "conv"
+   },
+   {
+    "name": "ampere_sgemm_128x64_tn",
+    "seconds": 0.18303947600000084,
+    "share": 0.0637304519170413,
+    "cls": "gemm"
+   },
+   {
+    "name": "ampere_sgemm_128x64_nn",
+    "seconds": 0.17267337300000488,
+    "share": 0.06012119536077615,
+    "cls": "gemm"
+   },
+   {
+    "name": "backward",
+    "seconds": 0.0772595809999985,
+    "share": 0.026900142633991906,
+    "cls": "other"
+   },
+   {
+    "name": "ampere_sgemm_128x128_tn",
+    "seconds": 0.07618340500000002,
+    "share": 0.02652544104326961,
+    "cls": "gemm"
+   },
+   {
+    "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::opera",
+    "seconds": 0.06768391299999994,
+    "share": 0.023566098730547515,
+    "cls": "copy"
+   },
+   {
+    "name": "forward",
+    "seconds": 0.06259820099999794,
+    "share": 0.021795361995702152,
+    "cls": "other"
+   },
+   {
+    "name": "triton_poi_fused_add_slice_slice_backward_streaming_conv_folded_backward_9",
+    "seconds": 0.03494898199999996,
+    "share": 0.012168492095664264,
+    "cls": "conv"
+   },
+   {
+    "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std::array<char*, 3ul>, false>(int, at::native::CUDAFunctor_add<double>, ",
+    "seconds": 0.029730130000001694,
+    "share": 0.010351398844981867,
+    "cls": "pointwise"
+   },
+   {
+    "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, std::array",
+    "seconds": 0.028851438999995996,
+    "share": 0.010045457330344884,
+    "cls": "copy"
+   },
+   {
+    "name": "triton_poi_fused_add_edge_outer_sum_backward_slice_backward_transpose_view_19",
+    "seconds": 0.025682236999999733,
+    "share": 0.00894200860939164,
+    "cls": "pointwise"
+   },
+   {
+    "name": "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_8",
+    "seconds": 0.024049152,
+    "share": 0.00837340315146887,
+    "cls": "pointwise"
+   },
+   {
+    "name": "ampere_sgemm_64x64_tn",
+    "seconds": 0.023351645000002346,
+    "share": 0.008130546051478319,
+    "cls": "gemm"
+   },
+   {
+    "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&",
+    "seconds": 0.02252280500000002,
+    "share": 0.007841961594609198,
+    "cls": "index"
+   },
+   {
+    "name": "triton_poi_fused_gather_radial_table_backward_slice_backward_20",
+    "seconds": 0.021719646000000647,
+    "share": 0.007562318715653411,
+    "cls": "index"
+   },
+   {
+    "name": "triton_poi_fused_cat_index_mul_slice_sum_unsqueeze_view_30",
+    "seconds": 0.020358507000000216,
+    "share": 0.007088399070079595,
+    "cls": "index"
+   },
+   {
+    "name": "triton_poi_fused_clone_slice_transpose_view_16",
+    "seconds": 0.01914728300000145,
+    "share": 0.006666676638505942,
+    "cls": "pointwise"
+   },
+   {
+    "name": "triton_poi_fused_add_mul_pow_select_stack_sub_5",
+    "seconds": 0.01741647499999765,
+    "share": 0.006064046110750977,
+    "cls": "pointwise"
+   },
+   {
+    "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<double, double, double, at::native::binary_internal::Mu",
+    "seconds": 0.016344647999998733,
+    "share": 0.005690858749316349,
+    "cls": "pointwise"
+   },
+   {
+    "name": "void at::native::vectorized_scatter_add_kernel<16, float, long>(float*, float const*, long const*, int, long, long, long, long, int, int)",
+    "seconds": 0.01553343900000007,
+    "share": 0.005408413031600866,
+    "cls": "index"
+   },
+   {
+    "name": "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_6",
+    "seconds": 0.01480257499999879,
+    "share": 0.005153941733781056,
+    "cls": "pointwise"
+   },
+   {
+    "name": "Memcpy HtoD (Pageable -> Device)",
+    "seconds": 0.014785035999999382,
+    "share": 0.00514783502707187,
+    "cls": "copy"
+   },
+   {
+    "name": "segmented_polynomial_algo1_4",
+    "seconds": 0.013553976000000374,
+    "share": 0.004719206122250653,
+    "cls": "conv"
+   },
+   {
+    "name": "triton_poi_fused_cat_view_18",
+    "seconds": 0.01349592599999992,
+    "share": 0.0046989943470934015,
+    "cls": "copy"
+   },
+   {
+    "name": "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_10",
+    "seconds": 0.013072563999999315,
+    "share": 0.004551588704473769,
+    "cls": "pointwise"
+   },
+   {
+    "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&",
+    "seconds": 0.012709018999997351,
+    "share": 0.004425010068823032,
+    "cls": "index"
+   },
+   {
+    "name": "triton_poi_fused_add_slice_backward_view_15",
+    "seconds": 0.012575949000000022,
+    "share": 0.004378677925496581,
+    "cls": "pointwise"
+   },
+   {
+    "name": "segmented_polynomial_bwd_algo4_2",
+    "seconds": 0.01204272500000056,
+    "share": 0.004193020671468067,
+    "cls": "conv"
+   }
+  ]
+ },
+ "lanes": {
+  "2+2": [
+   "sweep2/R7322/E464156",
+   "sweep2/R7322/E476014"
+  ],
+  "2+1": [
+   "sweep2/R7322/E464156",
+   "sweep1/R7322/E464156"
+  ],
+  "2+3": [
+   "sweep2/R7322/E464156",
+   "sweep3/R7322/E464156"
+  ],
+  "1+3": [
+   "sweep1/R7322/E464156",
+   "sweep3/R7322/E464156"
+  ],
+  "2+2tc": [
+   "sweep2/R7322/E464156",
+   "sweep2/R7322/E476014"
+  ],
+  "2+1tc": [
+   "sweep2/R7322/E464156",
+   "sweep1/R7322/E464156"
+  ],
+  "2+3tc": [
+   "sweep2/R7322/E464156",
+   "sweep3/R7322/E464156"
+  ]
+ },
+ "alone": {
+  "A1.0": {
+   "label": "sweep1/R7322/E464156",
+   "seconds": 0.011247229335519174
+  },
+  "A1.1": {
+   "label": "sweep1/R7322/E476014",
+   "seconds": 0.011005021980963647
+  },
+  "A2.0": {
+   "label": "sweep2/R7322/E464156",
+   "seconds": 0.0638905706582591
+  },
+  "A2.1": {
+   "label": "sweep2/R7322/E476014",
+   "seconds": 0.06207921134773642
+  },
+  "A3.0": {
+   "label": "sweep3/R7322/E464156",
+   "seconds": 0.023861674979949992
+  },
+  "A3.1": {
+   "label": "sweep3/R7322/E476014",
+   "seconds": 0.02364396001212299
+  },
+  "B1.0": {
+   "label": "sweep1/R7322/E464156",
+   "seconds": 0.011797649669460952
+  },
+  "B1.1": {
+   "label": "sweep1/R7322/E476014",
+   "seconds": 0.011666299658827484
+  },
+  "B2.0": {
+   "label": "sweep2/R7322/E464156",
+   "seconds": 0.06338795266735057
+  },
+  "B2.1": {
+   "label": "sweep2/R7322/E476014",
+   "seconds": 0.06376664464672406
+  },
+  "B3.0": {
+   "label": "sweep3/R7322/E464156",
+   "seconds": 0.025619024333233636
+  },
+  "B3.1": {
+   "label": "sweep3/R7322/E476014",
+   "seconds": 0.025449315668083727
+  }
+ },
+ "pairs": {
+  "2+2": {
+   "serial": {
+    "median_s": 0.12662449050306654,
+    "all_s": [
+     0.12626430834643543,
+     0.1261971686811497,
+     0.12677098667093864,
+     0.12658602135100713,
+     0.12762166396714747,
+     0.12666295965512595
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.13397492284032825,
+    "all_s": [
+     0.13345673230166236,
+     0.13413510968287787,
+     0.13385479035787284,
+     0.13335351463562498,
+     0.13434989866800606,
+     0.13409505532278368
+    ],
+    "speedup": 0.9451357598763317
+   }
+  },
+  "2+1": {
+   "serial": {
+    "median_s": 0.07368094115129983,
+    "all_s": [
+     0.073245556675829,
+     0.07328865533539404,
+     0.0735143026492248,
+     0.07525481698879351,
+     0.0752998396443824,
+     0.07384757965337485
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.07363178049369405,
+    "all_s": [
+     0.07393934767848502,
+     0.07332421330890308,
+     0.07217451999895275,
+     0.07513506865749757,
+     0.07470542467975368,
+     0.07329514665373911
+    ],
+    "speedup": 1.0006676554237337
+   }
+  },
+  "2+3": {
+   "serial": {
+    "median_s": 0.08721296599833295,
+    "all_s": [
+     0.08683039135454844,
+     0.08767530931315075,
+     0.08615404999970148,
+     0.08710064832121134,
+     0.08732528367545456,
+     0.08742045933225502
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.08663276152219623,
+    "all_s": [
+     0.08659903701239575,
+     0.08605201433723171,
+     0.08701825235038996,
+     0.08650413896733274,
+     0.08693714633894463,
+     0.08666648603199671
+    ],
+    "speedup": 1.0066972870995006
+   }
+  },
+  "1+3": {
+   "serial": {
+    "median_s": 0.034620343164230384,
+    "all_s": [
+     0.034604256002542876,
+     0.03456321467335025,
+     0.03462579931753377,
+     0.03468781666985402,
+     0.03468450135551393,
+     0.034614887010927
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.03515754100711395,
+    "all_s": [
+     0.03516789199784398,
+     0.03520457764777044,
+     0.035147190016383924,
+     0.035144087354031704,
+     0.03523069398943335,
+     0.035137744659247495
+    ],
+    "speedup": 0.9847202669044782
+   }
+  },
+  "2+2tc": {
+   "serial": {
+    "median_s": 0.1275827611874168,
+    "all_s": [
+     0.12581836568036428,
+     0.12719881297865263,
+     0.12778933334629983,
+     0.12749456835445017,
+     0.12884192902129143,
+     0.12767095402038345
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.13500881332826492,
+    "all_s": [
+     0.13459930332222333,
+     0.1346625809868177,
+     0.13494743732735515,
+     0.13545337901450694,
+     0.13507018932917467,
+     0.13568482299645743
+    ],
+    "speedup": 0.9449957972536787
+   }
+  },
+  "2+1tc": {
+   "serial": {
+    "median_s": 0.07456141182531914,
+    "all_s": [
+     0.07444031998359908,
+     0.0745797206570084,
+     0.0750426339994495,
+     0.07454310299362987,
+     0.07517805167784293,
+     0.07398102098765473
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.07514057566489403,
+    "all_s": [
+     0.0756277236699437,
+     0.07393426766308646,
+     0.07477019133511931,
+     0.07540851866360754,
+     0.07489690366977204,
+     0.07538424766001602
+    ],
+    "speedup": 0.9922922624101551
+   }
+  },
+  "2+3tc": {
+   "serial": {
+    "median_s": 0.08841095697910836,
+    "all_s": [
+     0.0882284949766472,
+     0.0886593156804641,
+     0.08777582563925534,
+     0.08859341898156951,
+     0.0881083143564562,
+     0.0894208390188093
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.08832475118106231,
+    "all_s": [
+     0.08723128901328892,
+     0.08819266234058887,
+     0.08869245136156678,
+     0.08878181866991024,
+     0.08845684002153575,
+     0.08746640970154355
+    ],
+    "speedup": 1.000976009520472
+   }
+  }
+ },
+ "blocks_done": 6
+}

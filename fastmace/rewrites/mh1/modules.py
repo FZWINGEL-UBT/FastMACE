@@ -165,7 +165,10 @@ class FirstInteractionReassociation(torch.nn.Module):
         if self._buffers.get("species_feats") is not species_feats:
             self.register_buffer("species_feats", species_feats, persistent=False)
 
-    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight):
+    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None):
+        """``rows``: the message of the first ``rows`` nodes only, when every edge's receiver is one of them (the
+        tiled call's tiles: the halo's rows are senders only, and the padding edges join a receiver slot); the
+        senders' species still come from every row. None: every node's."""
         onehot = node_attrs[:, self.columns]
         species = onehot.argmax(dim=1)
         x = self.species_feats  # identity basis of the superset (SPEC §8.5), not the first atom of each species
@@ -173,6 +176,8 @@ class FirstInteractionReassociation(torch.nn.Module):
             raise RuntimeError("FirstInteractionReassociation has no species_feats table: bind one "
                                "(identity_species_feats) before calling it")
         nodes, slots = onehot.shape
+        if rows is not None:
+            nodes = int(rows)
         width, dim = augmented.shape[1], edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
         # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
@@ -230,22 +235,22 @@ def identity_species_feats(model, interaction, attrs, count, joint=None):
         return interaction.linear_up(feats)[:count]
 
 
-def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
     """``(message, edge density)`` of a reassociated interaction with a radial table: the table, then the
     reassociation. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward keeps the
     lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again; the reassociation's
     backward needs nothing else of the region, so the compiled backward rebuilds only the table."""
     folded_input, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
     message = self.first_reassociation(node_feats, node_attrs, edge_attrs, folded_input, edge_index,
-                                       self.conv_tp_weights.folded_weight())
+                                       self.conv_tp_weights.folded_weight(), rows)
     return message, edge_density
 
 
-def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
+def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
     """``first_table_region`` under non-reentrant checkpoint (``recompute_first_table``)."""
     from torch.utils.checkpoint import checkpoint
 
-    return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+    return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows,
                       use_reentrant=False, preserve_rng_state=False)
 
 
@@ -259,7 +264,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     from mace.tools.scatter import scatter_sum
     num_nodes = node_feats.shape[0]
     n_real = lammps_natoms[0] if lammps_class is not None else None
-    sc = self.skip_tp(node_feats)
+    sc = self.skip_tp(node_feats if n_real is None else node_feats[:n_real])  # the real rows' (ghosts truncated)
     node_feats = self.linear_up(node_feats)
     residual_linear = getattr(self, "residual_linear", None)  # merged_residual
     node_feats_res = self.linear_res(node_feats) if residual_linear is None else None
@@ -282,7 +287,8 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         wprime_lengths = edge_feats  # the message and the edge density from one op
     elif table is not None and edge_feats.shape[-1] == 1 and reassociation is not None and getattr(
             self, "recompute_first_table", False):  # recompute_first_table: the table's output is not kept
-        message, edge_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index)
+        message, edge_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                                                       n_real)  # the tiles' receivers only (n_real rows)
     elif table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
         if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
@@ -324,16 +330,17 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         pass
     elif reassociation is not None:
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
-                                self.conv_tp_weights.folded_weight())
+                                self.conv_tp_weights.folded_weight(), rows=n_real)  # the tiles' receivers only
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv
         message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented,
-                                    w_lengths, node_attrs)
+                                    w_lengths, node_attrs, rows=n_real)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
         mji = self.conv_tp(node_feats[edge_index[0]], edge_attrs, tp_weights)
         message = scatter_sum(src=mji, index=edge_index[1], dim=0, dim_size=num_nodes)
-    message = self.truncate_ghosts(message, n_real)
+    if message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
+        message = self.truncate_ghosts(message, n_real)
     density = self.truncate_ghosts(density, n_real)
     sc = self.truncate_ghosts(sc, n_real)
     # species_residual: the residual products are per-species rows, read from the one-hot node_attrs.
@@ -368,7 +375,7 @@ setattr(cutoff_folded_forward, READS_SPECIES_RESIDUAL, True)
 
 
 def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,
-                      w_lengths=None, node_attrs=None, wprime_lengths=None, table_lengths=None):
+                      w_lengths=None, node_attrs=None, wprime_lengths=None, table_lengths=None, rows=None):
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
@@ -378,15 +385,24 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     ``(message, edge density)``; its backward forms the lengths' gradient without the weight gradient. With
     ``table_lengths`` (generic_recompute_first_table on generic_recompute_conv_weights' path) the op evaluates the
     radial table itself and keeps the lengths instead of its output; it also returns ``(message, edge density)``.
+
+    ``rows`` (a tile's receiver count, every receiver below it): the message of those rows only, without the
+    halo rows' zeros, on the paths whose kernels allow it (``StreamingKernels.rows_fit``); else all ``num_nodes``.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
+    plain = wprime_lengths is None and w_lengths is None and table_lengths is None and (
+        augmented is None or (getattr(self, "generic_recompute", None) is None
+                              and getattr(self, "fused_folded_forward", None) is None))
+    if rows is not None and not (plain and self.streaming_kernels.rows_fit(rows)):
+        rows = None
+    rows = num_nodes if rows is None else rows
     # The compacted count (the engine registers the neighbour list's GPU counter) ends the
     # receiver-sorted edges within the cutoff; the padding after it goes past every row. (A float32
     # cutoff test is not enough: pairs at the cutoff can disagree with the float64 compaction.)
     position = torch.arange(receiver.shape[0], device=receiver.device)
     key = torch.where(position < self.streaming_count, receiver, torch.full_like(receiver, num_nodes))
-    row_ptr = torch.searchsorted(key, torch.arange(num_nodes + 1, device=key.device)).to(torch.int32)
+    row_ptr = torch.searchsorted(key, torch.arange(rows + 1, device=key.device)).to(torch.int32)
     # The kernels read and write the model's own node layout (ir_mul with cuEquivariance), so
     # OEq's layout transposes around the convolution are not needed.
     conv = self.conv_tp

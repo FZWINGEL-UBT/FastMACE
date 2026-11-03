@@ -95,7 +95,10 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     kind = self.generic_kind
     num_nodes = node_feats.shape[0]
     n_real = lammps_natoms[0] if lammps_class is not None else None
-    sc = self.skip_tp(node_feats, node_attrs) if kind != "density" else None
+    # The skip connection of the real rows only: the ghost (halo) rows' are truncated below (a tile's halo is about
+    # 40 % of its rows).
+    real = slice(None) if n_real is None else slice(0, n_real)
+    sc = self.skip_tp(node_feats[real], node_attrs[real]) if kind != "density" else None
     node_feats = self.linear_up(node_feats)
     node_feats = self.handle_lammps(node_feats, lammps_class=lammps_class, lammps_natoms=lammps_natoms,
                                     first_layer=first_layer)
@@ -117,7 +120,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                    node_attrs=node_attrs, table_lengths=table_lengths)
     elif tabled:
-        augmented, table_density = table(edge_feats, node_attrs, edge_index)  # [h c, c] and the density
+        augmented, table_density = table(edge_feats, node_attrs, edge_index,
+                                         density=kind != "residual")  # [h c, c] and the density
     if tabled and (chunked or message is not None):
         pass
     elif tabled and reassociation is None:
@@ -143,7 +147,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
             if cutoff is not None:
                 edge_density = edge_density * cutoff
-        density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
+        density = scatter_sum(src=edge_density, index=edge_index[1], dim=0,
+                              dim_size=num_nodes if n_real is None else n_real)  # every receiver is real
     if message is not None:
         pass
     elif reassociation is not None:
@@ -154,23 +159,23 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             if cutoff is not None:  # (h W) c = (h c) W
                 hidden = hidden * cutoff
         message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index,
-                                fc_last_weight(self.radial_last))
+                                fc_last_weight(self.radial_last), rows=n_real)  # the tiles' receivers only
     elif getattr(self, "streaming_kernels", None) is not None:
         from fastmace.rewrites.mh1.modules import streaming_message
         message = streaming_message(self, node_feats, edge_attrs, None if chunked else tp_weights, edge_index,
-                                    num_nodes, augmented=augmented if chunked else None)
+                                    num_nodes, augmented=augmented if chunked else None, rows=n_real)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
         mji = self.conv_tp(node_feats[edge_index[0]], edge_attrs, tp_weights)
         message = scatter_sum(src=mji, index=edge_index[1], dim=0, dim_size=num_nodes)
-    message = self.truncate_ghosts(message, n_real)
+    if message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
+        message = self.truncate_ghosts(message, n_real)
     node_attrs = self.truncate_ghosts(node_attrs, n_real)
     if kind == "residual":
         sc = self.truncate_ghosts(sc, n_real)
         message = self.linear(message) / self.avg_num_neighbors
         return self.reshape(message), sc
-    density = self.truncate_ghosts(density, n_real)
     if getattr(self, "density_before_linear", False):  # GENERIC_DENSITY_FIRST (not carried over); bias-free linear
         message = self.linear(message / (density + 1))
     else:

@@ -211,7 +211,7 @@ rewrites; side b adds the rung.
 |---|---|---|---|
 | RTX 4000 Ada (leto, workstation) | s1 | 1.011 / 1.008 | 1.015 / 1.014 |
 | RTX 4000 Ada (leto, workstation) | s2 | 1.051 / 1.050 | 1.063 / 1.061 |
-| RTX 5060 Ti (local PC, WSL2) | s1 | 1.010 / 1.007 | 1.019 / SRTIO3_S1_BA |
+| RTX 5060 Ti (local PC, WSL2) | s1 | 1.010 / 1.007 | 1.019 / 1.017 |
 | RTX 5060 Ti (local PC, WSL2) | s2 | 1.042 / 1.042 | 1.038 / 1.037 |
 
 - With (B), each interaction evaluates its table once more per chunk, which costs 4–6 %.

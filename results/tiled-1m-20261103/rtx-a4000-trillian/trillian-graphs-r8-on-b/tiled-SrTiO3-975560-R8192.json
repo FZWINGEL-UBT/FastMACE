@@ -1,0 +1,139 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  58,
+  58,
+  58
+ ],
+ "atoms": 975560,
+ "receivers": 8192,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA RTX A4000",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "fe7b0a7b",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2106535936,
+   "host_peak": 2106535936
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2107789312,
+   "host_peak": 2107789312
+  },
+  "build": {
+   "seconds": 11.67009832302574,
+   "allocated": 129361920,
+   "reserved": 161480704,
+   "peak_above_before": 135534592,
+   "host_rss": 2961113088,
+   "host_peak": 3043414016
+  },
+  "neighbours": {
+   "allocated": 152775680,
+   "reserved": 182452224,
+   "peak_above_before": 23413760,
+   "host_rss": 2961895424,
+   "host_peak": 3043414016
+  }
+ },
+ "phase": "tiled call 1",
+ "call_rows": 8192,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=3.7443778167082125e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=6.715348917106337e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.043814025395703e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "backward_chunk_edges": [],
+ "ledgers": {},
+ "edges_within_cutoff": 0,
+ "calls": [
+  {
+   "seconds": 29.927377015003003,
+   "allocated": 5163321856,
+   "reserved": 12691963904,
+   "peak_above_before": 12242261504,
+   "host_rss": 4513861632,
+   "host_peak": 4513861632,
+   "tiles": 138,
+   "grid": [
+    5,
+    5,
+    5
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 8192,
+   "max_halo": 5820,
+   "max_edges": 607936,
+   "list_reused": false,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 8192,
+   "edges": 72191440,
+   "mode": "eager",
+   "mode_reason": "compiled force field: the first call measures its memory",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.0,
+   "lanes": "off: eager tiles",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "loop_base": 196114432,
+   "peak_before_tiles": 196114432,
+   "tiles_s": 29.801707377075218,
+   "tiles_peak": 12395037184,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 361932760,
+   "list_kept_bytes": 478999960,
+   "list_cache_hits": 276,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 152775680,
+   "total_peak": 12395037184
+  }
+ ],
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.62 GiB. GPU 0 has a total capacity of 15.59 GiB of which 2.46 GiB is free. Including non-PyTorch memory, this process has 13.12 GiB memory in use. Of the allocated memory 12.78 GiB is allocated by PyTorch, with 7.15 GiB allocated in private pools (e.g., CUDA Graphs), and 97.69 MiB is reserved by PyTorch but unallocated.",
+ "oom_at": "tiled call 1",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/tools/bench/tiled_capacity.py:426 main: out = tiled(positions)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1349 __call__: out = self._call(positions)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1607 _call: tile(sweep, index, lane=lane, position=position if ahead else None)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1555 tile: self._run_slot(sweep, slot, g)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1317 _run_slot: self._body(sweep, slot, g)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1240 _body: es, g_vec, g_x, g_sc, g_eps = self._second(tile, g[\"state\"], strain)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1130 _second: objective, es = self._forward(2)(leaf, x, eps, attrs, local, recv_mask, r)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:1261 compile_wrapper: result = fn(*args, **kwargs)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-fe7b0a7b/fastmace/model/tiled.py:1152 _second_forward: def _second_forward(self, leaf, x, eps, attrs, local, recv_mask, r):",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py:1548 _fn: return fn(*args, **kwargs)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/aot_autograd.py:1289 forward: return compiled_fn(full_args)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py:1189 runtime_wrapper: result = _codegen_runtime_wrapper(",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(runtime_wrapper_orchestration):11 _runtime_wrapper: ",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py:118 g: return f(*args)",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py:3521 forward: return CompiledFunction._fwd_fn(",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_forward):2 _compiled_forward: ",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_inductor/output_code.py:828 __call__: return self.current_callable(inputs)",
+  "/mnt/homes/zwingel/fm-tiled/cache/inductor/q2/cq2j5wt7vkl7njufmxhvsbr2az5of4capknk5h2rytfzgr5c6jxk.py:2291 call: buf39 = empty_strided_cuda((548352, 1280), (1280, 1), torch.float32)"
+ ]
+}

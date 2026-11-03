@@ -36,7 +36,7 @@ RESERVE_USD = Decimal("3")
 LIMIT_USD = CAP_USD - RESERVE_USD
 START_S = 300  # container start, image pull and the volume commit, billed like the job (generous)
 GPU_RATE_KEYS = {"L4": "gpu_hour_cost_l4", "A100": "gpu_hour_cost_a100_40gb", "A100-80GB": "gpu_hour_cost_a100_80gb",
-                 "H100": "gpu_hour_cost_h100", None: None}
+                 "H100": "gpu_hour_cost_h100", "RTX-PRO-6000": "gpu_hour_cost_rtx6000", None: None}
 LEDGER_FIELDS = ("date_utc", "commit", "gpu", "timeout_s", "wall_s", "estimated_cost_usd", "worst_case_usd",
                  "metered_before_usd", "metered_after_usd", "metered_delta_usd", "limit_usd", "override", "exit")
 

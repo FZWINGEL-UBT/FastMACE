@@ -225,7 +225,9 @@ FASTMACE_ONLY_DEFAULTS = {
     # Owner decision 60, 27 October 2026 (OPT6-T02): with streaming_conv and fused_folded_backward (MH-1 class).
     "chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
     # Owner decision 62, 27 October 2026 (OPT6-T05): with fold_cutoff (MH-1 class), float32, not reproducible.
-    "radial_tables": "on_with_fold_cutoff_unless_reproducible",
+    # Decision 66, 2 November 2026: the generic family's tables (generic_radial_tables) on DECISION_66_GENERIC_
+    # RADIAL_TABLES_GPUS (this file's GPU is one), float32, not reproducible.
+    "radial_tables": "on_with_fold_cutoff_unless_reproducible_and_generic_family_on_decision_66_gpus",
     # Owner decision 64, 27 October 2026 (OPT8-T02): with chunked_conv_backward, MH-1 only, float32, not
     # reproducible.
     "fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
@@ -246,7 +248,8 @@ GENERIC_FAMILY_LABELS = tuple(label for label, facts in LABEL_FACTS.items()
 APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
            # chunked_conv_backward: MH-1's class, and every label with a generic interaction on its folded path
            # (generic_chunked_conv_backward; decision 66: this file's GPU is measured)
-           "chunked_conv_backward": LABELS, "radial_tables": FACTORED_LABELS,
+           "chunked_conv_backward": LABELS,
+           "radial_tables": (*FACTORED_LABELS, *GENERIC_FAMILY_LABELS),  # generic: decision 66 (this file's GPU)
            "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)

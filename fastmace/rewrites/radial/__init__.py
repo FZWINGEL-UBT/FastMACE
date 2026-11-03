@@ -158,11 +158,12 @@ def _table_module(tables, columns, device, single=False):
             species = node_attrs[:, self.columns].argmax(dim=1).to(torch.int32)
             return species[edge_index[0]] * self.species + species[edge_index[1]]
 
-        def forward(self, lengths, node_attrs, edge_index):
+        def forward(self, lengths, node_attrs, edge_index, density=True):
+            """``density=False`` (a residual block): the density ``[E, 0]``, not evaluated."""
             from fastmace.kernels.triton.radial_table import radial_table
 
             return radial_table(lengths, self.pair(node_attrs, edge_index), self.coef, self.dcoef, self.starts,
-                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max)
+                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density)
 
         def extra_repr(self):
             return (f"pairs={self.coef.shape[0]}, pieces={self.pieces} (padded to {self.coef.shape[1]}), "
@@ -940,7 +941,8 @@ def _apply_first_table(model, context):
 # The generic family (MACE-MP-0, OMAT-0, the density family; fastmace.rewrites.generic): the same tables for the radial
 # chain of a generic interaction, ``r -> [h c, c]`` (the split radial network's last layer input on the folded path,
 # ``generic_chunked_conv_backward``) and its edge density. Certified (decision 61) by the same certificate; float32
-# plans only; opt-in (the conductor, 2 November 2026: the default goes to the owner with the A/Bs).
+# plans only; "auto" on only on the measured GPUs (decision 66, owner 2 November 2026;
+# planner.fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS).
 
 
 def _generic_interactions(model):
@@ -970,9 +972,11 @@ def _generic_support(model):
             gm.fc_split(interaction.conv_tp_weights)
         except (AttributeError, ValueError) as error:
             return Support(False, f"interactions.{index}: {error}")
+    # Float32 only (decision 61): a float64 model does not take it, so "auto" resolves to off there before any
+    # apply (an explicit "on" in a float64 plan is refused by the planner).
     parameter = next(model.parameters(), None)
-    if parameter is not None and parameter.dtype not in (torch.float32, torch.float64):
-        return Support(False, f"float32 models only (float64 plans are refused), not {parameter.dtype}")
+    if parameter is not None and parameter.dtype != torch.float32:
+        return Support(False, f"float32 models only, not {parameter.dtype}")
     return Support(True, "ok")
 
 
@@ -1195,11 +1199,11 @@ RECORDS = {
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck,
         memory=memory_terms.radial_tables),
     # The generic family's tables (conductor, 2 November 2026; docs/validation/generic-radial-tables.md): certified
-    # (decision 61), float32 plans only, opt-in until the owner decides a default (decision 62 was MH-1's).
+    # (decision 61), float32 plans only; "auto" on only on the measured GPUs (decision 66, owner 2 November 2026).
     "generic_radial_tables": dict(
         name="generic_radial_tables", config_field="radial_tables", applies_to=_generic_support,
         requires=("generic_fused_radial_backward",), conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={},
-        exactness="certified", default="off", deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,),
+        exactness="certified", default="auto", deterministic=True, workload_constraints=(FIXED_SPECIES_SUPERSET,),
         apply=_apply_generic, selfcheck=_generic_selfcheck, memory=memory_terms.generic_radial_tables),
     # The generic tables' outputs evaluated again in the backward (omat0-capacity-2, lever 1; MH-1's rebuild-a):
     # exact (the same table kernel on the same lengths); docs/validation/omat0-capacity-2.md.

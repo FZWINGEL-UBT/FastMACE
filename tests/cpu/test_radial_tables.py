@@ -209,3 +209,29 @@ def test_padded_pieces_change_no_bit(monkeypatch):
     assert plain[3] == padded[3] and plain[4] == plain[3]
     for a, b in zip(plain[:3], padded[:3]):
         assert torch.equal(a, b)
+
+
+def test_without_density_the_table_gives_the_same_input_and_gradient():
+    """``radial_table(..., density=False)`` (residual blocks): the folded input and the lengths' gradient of the
+    full table with a zero density gradient, and an ``[E, 0]`` density."""
+    from fastmace.kernels.triton.radial_table import radial_table
+
+    generator = torch.Generator().manual_seed(3)
+    pairs, terms, width, n_bins = 2, 7, 9, 64
+    starts, ends = torch.tensor([0.3, 2.0]), torch.tensor([2.0, 6.0])
+    coef = torch.randn((pairs, 2, terms, width), generator=generator, dtype=torch.float64)
+    dcoef = torch.randn((pairs, 2, terms - 1, width), generator=generator, dtype=torch.float64)
+    centres = 0.3 + (torch.arange(n_bins) + 0.5) * 5.7 / n_bins
+    bins = (torch.searchsorted(starts, centres.double(), right=True) - 1).to(torch.int32)
+    args = (coef, dcoef, starts.double(), (2.0 / (ends - starts)).double(), bins, 0.3, n_bins / 5.7, 6.0)
+    r = torch.rand(101, generator=generator, dtype=torch.float64)[:, None] * 6.4
+    pair = torch.randint(0, pairs, (101,), generator=generator, dtype=torch.int32)
+    grad_g = torch.randn((101, width - 1), generator=generator, dtype=torch.float64)
+    results = []
+    for density in (True, False):
+        leaf = r.clone().requires_grad_()
+        g, d = radial_table(leaf, pair, *args, density=density)
+        assert d.shape == (101, int(density))
+        (g * grad_g).sum().backward()
+        results.append((g.detach(), leaf.grad))
+    assert torch.equal(results[0][0], results[1][0]) and torch.equal(results[0][1], results[1][1])

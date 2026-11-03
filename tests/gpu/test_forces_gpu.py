@@ -490,12 +490,13 @@ def test_construction_keeps_one_copy_of_the_one_hot_species_on_the_device(dtype,
 
 
 def test_construction_with_the_one_hot_on_the_host_keeps_it_off_the_device():
-    """``release_node_attrs=True``: the one-hot stays on the host from the batch on; E0 is on the device."""
+    """``release_node_attrs=True``: the one-hot stays on the host from the batch on and is dropped after the
+    construction (its shape kept on the meta device); E0 is on the device."""
     from fastmace.model import energy as energy64
 
     calc = tiny_cueq_calculator(torch.float32)
     field = MACEForceField(calc, structure(), neighbours=SORTED, rewrites=only("factor_species"),
                            release_node_attrs=True)
-    assert field.node_attrs_released and field.data["node_attrs"].device.type == "cpu"
+    assert field.node_attrs_released and field.data["node_attrs"].device.type == "meta"
     assert field.data["node_attrs"].dtype == torch.float32
     assert field.data[energy64.NODE_E0_KEY].is_cuda and field.data[energy64.NODE_E0_KEY].dtype == torch.float64

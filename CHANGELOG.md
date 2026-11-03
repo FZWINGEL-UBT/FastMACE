@@ -8,6 +8,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `TileConfig.compiled_graphs` (default off; `tiled_capacity.py --compiled-graphs`): compiled tile bodies captured
+  in CUDA graphs per slot and sweep. Steady tiled call 0.90 at 40k and 0.961 at 214k atoms (RTX 5060 Ti), 1.000 at
+  1M (RTX 4000 Ada); the private pools cost memory, so 1M runs out of memory with it on the 16 GB RTX A4000
+  (docs/validation/tiled-1m-speed.md, "CUDA graphs for compiled tiles").
 - The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
   records:
   - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming
@@ -177,6 +181,18 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- Tile lists (`fastmace.neighbors.tile_list.TileNeighbours`): half-cutoff bins and a +-2 stencil, 42 % fewer
+  candidates, the same edges in the same order; a 1M-atom list rebuild 2.11 -> 1.38 s (RTX 4000 Ada).
+- Tiled kept lists and list cache: senders as int16 ranks into each tile's int32 senders (about 3 instead of 5 bytes
+  per edge, -36 % host memory); the list reuse's skin check by chunks (no whole-system float64 host copies).
+- Tiled padded slots: a tile whose edge bucket has no slot runs in a neighbouring bucket's slot that fits (MD drift
+  across a bucket's edge compiled a new slot). `wavefront="auto"` runs from 4 grid layers where the plain host state
+  does not fit the host at all (before: from 12 layers only). docs/validation/tiled-1m-speed.md, "MD at 1M".
+- Tiled call, sweep 2: the streaming convolution builds the message of a tile's receiver rows only
+  (`streaming_message(rows=)`, when the launch covers them exactly, `StreamingKernels.rows_fit`), so the halo rows'
+  zeros and their slice backward are gone; residual radial tables neither store nor read the edge density
+  (`radial_table(density=False)`, bit for bit the same gradient). 1M-atom SrTiO3 call on the RTX 4000 Ada
+  0.985 (sweep 2 0.978), GPU peak -0.18 GiB (docs/validation/tiled-1m-speed.md, "Trims").
 - `gate_epilogue`'s input-gradient kernel packs each launch's atoms without padding their D = 3, 5, 7 rows to 4, 8, 8
   (`kernels.triton.gated_products`, the unpadded kernel): whole atoms per 64-row tile, the gate read per row, the
   m-sum by a second `tl.dot` with a 0/1 selection matrix (deterministic, rounding class). It runs for launches of at

@@ -1,0 +1,238 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  32,
+  32,
+  32
+ ],
+ "atoms": 163840,
+ "receivers": 8192,
+ "model": "omat0-medium",
+ "device": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "host": "Fabi-PC",
+ "source_commit": "+corun",
+ "reps": 3,
+ "blocks": 10,
+ "expandable_segments": false,
+ "rewrites_a": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.056274316096939e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.686699253930779e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.686699253930779e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=5.350295911491125e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903558762282e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (177 pieces, 9 pairs, certificate 0.31, cached)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, cached)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "calls": {
+  "A": {
+   "seconds": [
+    22.865403243999936,
+    3.0873611100000744
+   ],
+   "tiles": 27,
+   "slots": {
+    "6": [
+     6548,
+     5142,
+     443904
+    ],
+    "7": [
+     7322,
+     5547,
+     517888
+    ]
+   },
+   "max_receivers": 6655,
+   "max_edges": 492470
+  }
+ },
+ "peak_allocated": 4436831744,
+ "lanes": {
+  "2+2": [
+   "sweep2/R7322/E464156",
+   "sweep2/R7322/E476014"
+  ],
+  "2+1": [
+   "sweep2/R7322/E464156",
+   "sweep1/R7322/E464156"
+  ],
+  "2+3": [
+   "sweep2/R7322/E464156",
+   "sweep3/R7322/E464156"
+  ],
+  "1+3": [
+   "sweep1/R7322/E464156",
+   "sweep3/R7322/E464156"
+  ]
+ },
+ "alone": {
+  "A1.0": {
+   "label": "sweep1/R7322/E464156",
+   "seconds": 0.010298606333284019
+  },
+  "A1.1": {
+   "label": "sweep1/R7322/E476014",
+   "seconds": 0.010575601000027746
+  },
+  "A2.0": {
+   "label": "sweep2/R7322/E464156",
+   "seconds": 0.06863035466669014
+  },
+  "A2.1": {
+   "label": "sweep2/R7322/E476014",
+   "seconds": 0.06612040933335568
+  },
+  "A3.0": {
+   "label": "sweep3/R7322/E464156",
+   "seconds": 0.022603725666613173
+  },
+  "A3.1": {
+   "label": "sweep3/R7322/E476014",
+   "seconds": 0.022640857333347714
+  }
+ },
+ "pairs": {
+  "2+2": {
+   "serial": {
+    "median_s": 0.14652079349999286,
+    "all_s": [
+     0.13798986033339133,
+     0.13634061933332,
+     0.14309855966666873,
+     0.13827324900004592,
+     0.16733519833330016,
+     0.1456688953333014,
+     0.14800865733332103,
+     0.14737269166668435,
+     0.15392621799999992,
+     0.17545946166668122
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.14812149499997912,
+    "all_s": [
+     0.14099055466666263,
+     0.14067745066669582,
+     0.14138572366664448,
+     0.1385842306666897,
+     0.15256652600002477,
+     0.14977103933332123,
+     0.15315880533330528,
+     0.1530898173333147,
+     0.14647195066663699,
+     0.15024595166664767
+    ],
+    "speedup": 0.9891933206589193
+   }
+  },
+  "2+1": {
+   "serial": {
+    "median_s": 0.09447026666665201,
+    "all_s": [
+     0.07728494166667588,
+     0.10090392933329895,
+     0.07678104700001616,
+     0.07617059233333141,
+     0.10867318766660598,
+     0.10439388266665144,
+     0.08719215666663634,
+     0.1072398933332958,
+     0.10382172899994657,
+     0.08803660400000506
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.0859254831666855,
+    "all_s": [
+     0.07639514233331586,
+     0.08290441733333864,
+     0.07654308333333877,
+     0.09769662499995017,
+     0.08233989333333132,
+     0.1013487500000186,
+     0.07652676866662962,
+     0.09874519499999224,
+     0.10014071866665593,
+     0.08894654900003236
+    ],
+    "speedup": 1.0994441134929742
+   }
+  },
+  "2+3": {
+   "serial": {
+    "median_s": 0.11358641516668892,
+    "all_s": [
+     0.10330097566672218,
+     0.08856589400003638,
+     0.09037715366662269,
+     0.11010812766668703,
+     0.11718098733338896,
+     0.11723640166663547,
+     0.10806234433334794,
+     0.12508092666666926,
+     0.11706470266669082,
+     0.11998876133331275
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.09579456316665377,
+    "all_s": [
+     0.08542484033334101,
+     0.08669624300000578,
+     0.08627992333337413,
+     0.08871870066665603,
+     0.09906408866663696,
+     0.09745482866666559,
+     0.10041840066666434,
+     0.10954522466666579,
+     0.10040912333329288,
+     0.09413429766664194
+    ],
+    "speedup": 1.1857292461272846
+   }
+  },
+  "1+3": {
+   "serial": {
+    "median_s": 0.03299067433332918,
+    "all_s": [
+     0.03281483866665743,
+     0.03253712500001408,
+     0.03278137333328838,
+     0.032926916333356836,
+     0.03334347266665342,
+     0.03327133166665893,
+     0.03313449833338685,
+     0.03309036700003768,
+     0.032978683333340086,
+     0.03300266533331827
+    ],
+    "speedup": 1.0
+   },
+   "streams": {
+    "median_s": 0.033445388833342804,
+    "all_s": [
+     0.03327009199999035,
+     0.03340941766668948,
+     0.033319757333326074,
+     0.03369369600000027,
+     0.03395846899995073,
+     0.03348135999999613,
+     0.03349392166668016,
+     0.033269200333279514,
+     0.033534042999993595,
+     0.03340762933332068
+    ],
+    "speedup": 0.9864042692916668
+   }
+  }
+ },
+ "blocks_done": 10
+}
