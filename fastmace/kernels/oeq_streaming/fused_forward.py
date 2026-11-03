@@ -46,8 +46,20 @@ MAX_WARPS = 12
 MIN_WARPS = 4
 CHANNEL_BLOCK = 32
 BLOCKS_PER_SM = 2  # blocks per SM over all slices of the grid (the persistent grid's size)
+# A folded weight whose last column is all zero (a last radial layer without bias, such as e3nn's FullyConnectedNet
+# in MACE-OMAT-0): the k-loop skips that column, and a and W keep their row stride (OMAT-0 kernel lab, 3 November
+# 2026: the fused forward 9.1 % faster on the RTX 4000 Ada, 1.0 % slower on the RTX 5060 Ti). The same FP32 sums:
+# the skipped term adds an exact zero. A module constant for the A/B.
+SKIP_ZERO_COLUMN = False
 
 _REGISTRY = {}
+
+
+def used_columns(weight):
+    """The folded inputs the k-loop reads: ``weight.shape[1]``, one fewer with ``SKIP_ZERO_COLUMN`` when the
+    weight's last column is all zero."""
+    k = int(weight.shape[1])
+    return k - 1 if SKIP_ZERO_COLUMN and k > 1 and not bool(weight[:, -1].any()) else k
 
 
 def _lit(value):
@@ -123,11 +135,15 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
-def render(schedule, k, rule, store_w=True):
+def render(schedule, k, rule, store_w=True, used=None):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
-    plans/capacity.md, the w-rebuild falsifier)."""
+    plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
+    default ``k``), a's and W's rows keep the stride ``k``."""
     check_problem(schedule)
+    used = int(k) if used is None else int(used)
+    if not 1 <= used <= k:
+        raise ValueError(f"fused_folded_forward: {used} used columns of {k}")
     C, layout, paths = schedule.channels, schedule.layout, schedule.paths
     costs = [sum(len(o.terms) for o in p.outputs) for p in paths]
     parts = balanced_parts(costs, rule.parts)
@@ -144,7 +160,8 @@ def render(schedule, k, rule, store_w=True):
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
 constexpr bool STORE_W = {"true" if store_w else "false"};
-constexpr int K = {k};
+constexpr int K = {used};  // the folded inputs the k-loop reads
+constexpr int KA = {k};  // a's and W's row stride
 constexpr int CB = {CHANNEL_BLOCK};
 constexpr int WS = {CHANNEL_BLOCK + 1};
 constexpr int ED = {schedule.edge_dim};
@@ -231,7 +248,7 @@ def _part(schedule, part, slots, C, layout):
             const int wst[{npl}] = {{{wst}}};
             for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
                 const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
-                Ws[(p * K + k) * WS + l] = W[(int64_t)(wst[p] + cb * CB + l) * K + k];
+                Ws[(p * K + k) * WS + l] = W[(int64_t)(wst[p] + cb * CB + l) * KA + k];
             }}
         }}
         __syncthreads();
@@ -262,7 +279,7 @@ def _part(schedule, part, slots, C, layout):
                 __syncwarp();
                 for (int i = lane; i < B * K; i += 32) {{
                     const int b = i / K, k = i - b * K;
-                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * K + k] : 0.f;
+                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * KA + k] : 0.f;
                 }}
                 for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;
                 float xv[B][{nx}];
@@ -309,9 +326,9 @@ def _part(schedule, part, slots, C, layout):
 
 class FusedFoldedForward:
     """Compiled ``fused_folded_forward`` for the streaming kernels of one interaction (``StreamingKernels``) and a
-    folded input width ``k``; float32 only."""
+    folded input width ``k``; float32 only. ``used``: the inputs the k-loop reads (``used_columns``; default ``k``)."""
 
-    def __init__(self, kernels, k, device=None, store_w=True):
+    def __init__(self, kernels, k, device=None, store_w=True, used=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -326,7 +343,8 @@ class FusedFoldedForward:
         self.k, self.channels, self.paths = int(k), schedule.channels, len(schedule.paths)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
-        self.source = render(schedule, self.k, self.rule, self.store_w)
+        self.used = self.k if used is None else int(used)
+        self.source = render(schedule, self.k, self.rule, self.store_w, self.used)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))

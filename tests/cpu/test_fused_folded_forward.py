@@ -4,6 +4,7 @@ its NVRTC compilation, the record and the planner's handling."""
 from types import SimpleNamespace
 
 import pytest
+import torch
 
 from fastmace.kernels.oeq_streaming import fused_forward as ff
 
@@ -65,6 +66,24 @@ def test_render_ir_mul_and_mul_ir():
     assert "out[cur * OUT_DIM + 64 + ch]" in source and "out[cur * OUT_DIM + 192 + ch]" in source
     mul_ir = ff.render(_schedule("mul_ir"), 9, rule)
     assert "out[cur * OUT_DIM + 66 + ch * 3]" in mul_ir  # start 64, component 2, dim 3
+    assert "constexpr int K = 9;" in source and "constexpr int KA = 9;" in source
+
+
+def test_skip_zero_column_reads_one_input_fewer(monkeypatch):
+    """``SKIP_ZERO_COLUMN``: the k-loop stops before an all-zero last weight column; a and W keep their stride."""
+    rule = ff.launch_rule(2, 9, 4, 64, **SM120)
+    source = ff.render(_schedule(), 9, rule, used=8)
+    assert "constexpr int K = 8;" in source and "constexpr int KA = 9;" in source
+    assert "a[(e0 + b) * KA + k]" in source and "W[(int64_t)(wst[p] + cb * CB + l) * KA + k]" in source
+    with pytest.raises(ValueError, match="used columns"):
+        ff.render(_schedule(), 9, rule, used=10)
+    weight = torch.ones(128, 9)
+    weight[:, -1] = 0.0
+    assert ff.used_columns(weight) == 9  # off by default
+    monkeypatch.setattr(ff, "SKIP_ZERO_COLUMN", True)
+    assert ff.used_columns(weight) == 8
+    weight[3, -1] = 1e-30
+    assert ff.used_columns(weight) == 9  # one nonzero entry keeps the column
 
 
 def test_render_refuses_unsupported_problems():
@@ -85,6 +104,7 @@ def test_generated_source_compiles_with_nvrtc():
         rule = ff.launch_rule(2, 9, 4, 64, **SM120)
         assert compile_cubin(ff.render(_schedule(layout), 9, rule), (12, 0))
         assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM89)), (8, 9))
+        assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM80), used=64), (8, 0))
 
 
 def test_record_and_requirements():

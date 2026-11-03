@@ -4,7 +4,8 @@ The chain: ``w = a @ W.T`` (cuBLAS), then the streaming forward. The fused kerne
 (FP32 rounding; on the RTX 5060 Ti bitwise) and a message bitwise equal to the streaming forward on the ``w`` it
 stored (the same angular sums in the same edge order), including the padding edges past every row; the gradients
 through ``folded_streaming_convolution`` equal the chain's (the backward is the same). Both layouts, two folded
-widths, a CUDA graph. Runs in a fresh interpreter like test_kernels_oeq_streaming_cuda.py.
+widths, a CUDA graph, and ``SKIP_ZERO_COLUMN``'s kernel bit for bit on a weight with a zero last column. Runs in a
+fresh interpreter like test_kernels_oeq_streaming_cuda.py.
 """
 
 import json
@@ -92,6 +93,15 @@ for layout in ("ir_mul", "mul_ir"):
         assert torch.equal(captured[0], new[0])  # the forward has no atomics: replay-stable
         for n, o in zip(captured[1:], new[1:]):
             torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-6 * float(o.abs().max()))
+        # SKIP_ZERO_COLUMN: with an all-zero last weight column the kernel that reads one input fewer stores the same
+        # w and message bit for bit (the skipped term adds an exact zero).
+        zero = weight.clone()
+        zero[:, -1] = 0.0
+        skip = FusedFoldedForward(kernels, k, used=k - 1)
+        reference = fused_folded_forward(a, zero, X, Y, *args, fused.id)
+        skipped = fused_folded_forward(a, zero, X, Y, *args, skip.id)
+        assert torch.equal(skipped[0], reference[0]) and torch.equal(skipped[1], reference[1]), (layout, k)
+        report[name]["skip zero column bitwise"] = True
 print(json.dumps(report))
 """
 
