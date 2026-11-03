@@ -177,6 +177,11 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- Tiled call, sweep 2: the streaming convolution builds the message of a tile's receiver rows only
+  (`streaming_message(rows=)`, when the launch covers them exactly, `StreamingKernels.rows_fit`), so the halo rows'
+  zeros and their slice backward are gone; residual radial tables neither store nor read the edge density
+  (`radial_table(density=False)`, bit for bit the same gradient). 1M-atom SrTiO3 call on the RTX 4000 Ada
+  0.985 (sweep 2 0.978), GPU peak -0.18 GiB (docs/validation/tiled-1m-speed.md, "Trims").
 - `gate_epilogue`'s input-gradient kernel packs each launch's atoms without padding their D = 3, 5, 7 rows to 4, 8, 8
   (`kernels.triton.gated_products`, the unpadded kernel): whole atoms per 64-row tile, the gate read per row, the
   m-sum by a second `tl.dot` with a 0/1 selection matrix (deterministic, rounding class). It runs for launches of at

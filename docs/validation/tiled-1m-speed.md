@@ -80,7 +80,7 @@ R = 16,384 is the right choice at 1M, and it also has the shortest compile.
 
 ## What this leaves
 
-- **Sweep-2 conv on the real rows only:** worth about the 3 % of slice-backward fusions. Parked as small.
+- **Sweep-2 conv on the real rows only:** worth about the 3 % of slice-backward fusions. Done: see "Trims".
 - **Sweep 3 without interaction 0's forward:** at most the forward part of sweep 3 (about sweep 1's 1.5 s, 10 %).
   Its backward needs the forward's saved activations, though: per-edge tensors, estimated (not measured) at about 30 GB at 1M, which would
   have to round-trip over PCIe each call. Storing only u does not remove the recompute. Not pursued.
@@ -89,3 +89,35 @@ R = 16,384 is the right choice at 1M, and it also has the shortest compile.
   runs at 12.5–14.1 µs per atom on this GPU up to about 69k atoms. They have been screened at length
   (`docs/optimisation-ledger.md`: 3×TF32 and 3×FP16 GEMMs, own convolutions, receiver backward and others). Gains
   there are general FastMACE kernel work, not tiled-path work.
+
+## Trims (`aa5dbbfc`, 3 November 2026)
+
+Two of the small items above, measured as an A/B against main `7e3e8cd5` on murphy (same setup, R = 16,384,
+`--no-budget --sweep-times`, order base, trim, trim, base; records `results/tiled-1m-20261103/rtx4000ada-murphy/
+murphy-trims-*`).
+
+- **Sweep-2 convolution on the real rows.** `streaming_message(rows=n_real)` builds `row_ptr` and the message for
+  the tile's receivers only; the senders still index every node. The vendored kernels are unchanged: the launch must
+  cover the rows exactly (`StreamingKernels.rows_fit`: rows × channels a multiple of the block size; true for
+  128 channels), otherwise every node's rows are built as before. This applies to the plain and the folded streaming
+  convolution, not to the fused forward, w-table or w′ paths. The generic density scatter is also sized to the real
+  rows.
+- **No density in residual radial tables.** `radial_table(density=False)`: the density is `[E, 0]`, not stored, and
+  the backward reads no zero gradient. The load stays in the kernel with a run-time count of 0: a compile-time
+  branch let the compiler reorder the sum (last-bit differences), the masked load keeps it bit for bit.
+- **Not done: a species index instead of the one-hot.** Building and reading the `[R + H, 89]` one-hot costs about
+  20 µs per tile and sweep, about 4 ms of the 14.5 s call, and an index would need a side channel past MACE's
+  forward signature.
+
+| Run | Steady call | Sweep 1 | Sweep 2 | Sweep 3 | GPU peak | Energy (eV) |
+| --- | --- | --- | --- | --- | --- | --- |
+| base a | 14.49 s | 1.463 | 8.716 | 3.234 | 12.41 GiB | -7,794,285.0090 |
+| trim a | 14.33 s | 1.464 | 8.541 | 3.251 | 12.23 GiB | -7,794,285.0094 |
+| trim b | 14.35 s | 1.464 | 8.561 | 3.249 | 12.23 GiB | -7,794,285.0085 |
+| base b | 14.58 s | 1.466 | 8.778 | 3.248 | 12.41 GiB | -7,794,285.0083 |
+
+The call is 0.985 of main's (sweep 2 0.978), the GPU peak 0.18 GiB lower and the eager first call about 15 % shorter
+(26–27 s against 30–31 s). The energies differ by the same 1 meV as two runs of main (atomic sums). The GPU tests
+(`tests/gpu/test_kernels_oeq_streaming_cuda.py` with the new real-rows test, `tests/gpu/test_radial_table_cuda.py`
+with the density test) pass on murphy and the local RTX 5060 Ti; the targeted CPU tests (radial tables, generic and
+MH-1 rewrites, tiled, streaming kernels, layering, w′ backward) pass on leto.
