@@ -107,10 +107,65 @@ All runs valid (no compile or foreign GPU process while timed).
   (shared exponent per row of A and column of B); with the operator present, sm_89 and sm_120 always emulate. X can
   be lowered (X = 16: 3 slices, about BF16×3's accuracy). Our own INT8-slice screen on sm_120
   ([prec-int8-f32](../optimisation-ledger.md#prec-int8-f32)) measured 3 slices at 599 µs against SGEMM's 518 µs on
-  13608×512×512; the local MathDx is 25.6.0 (before 0.7.0), so cuBLASDx's own kernel is not measured.
+  13608×512×512. Measured with MathDx 26.10.0 in §5: rejected.
 - **cuBLASXt:** multi-GPU host-memory BLAS over cuBLAS; nothing new for this.
 
-## 5. Records
+**NVIDIA's BF16×9 paper (arXiv 2605.16617, read 3 November 2026).** It describes the cuBLAS BF16×9 path above, on GB200:
+- BF16 dense is 28× FP32 there, and Blackwell's `tcgen05.mma` scales partial products in hardware (`scale-input-d`).
+  Without that, the paper's model idles the tensor cores about 40 % of the time.
+- It reaches up to 3× SGEMM, but at M = N = 512 it is slower (17.9 against 21.7 TFLOPS at K = 1024), so even on
+  GB200 our N = K = 512 products sit near or below the crossover.
+- Its accuracy points (products summed along anti-diagonal bands, denormal and Inf/NaN handling) matter for an exact
+  float32 emulation, which BF16×3 is not.
+- Nothing to take for sm_80/89/120. It becomes relevant only if a B200/GB200 becomes a production GPU.
 
-`results/bf16x3-facto-20261103/`: `rtx5060ti-local/accuracy-gates/{bf16x3,bf16x6,tf32x3,default}/` and
+## 5. cuBLASDx INT8-slice emulation (MathDx 26.10.0, measured 3 November 2026)
+
+**What ran.** `tools/bench/cublasdx_int8_emulation.cu`, after MathDx example 21 (`sgemm_emulation_pipeline`).
+- **Mantissa bits:** `RequiredMantissaBits<X>` for X = 15, 23 and 31, i.e. 2, 3 and 4 INT8 slices. X = 16, 20 and
+  23 all give 3 slices, so the first local run, with 16/20/23, came out identical.
+- **Shapes:** 4096³, and M × 512 × 512 for M = 1536, 5888 and 13696 (multiples of the 128 tile, close to
+  the probe's 1512, 5832 and 13608).
+- **Timings:**
+  - "full": `suggest_pipeline` (allocation and slicing) plus the kernel, every call;
+  - "kernel": the kernel alone on one sliced pipeline, the lower bound;
+  - against cublasSgemm.
+- **Errors:** against cublasDgemm on the same float32 inputs, on Gaussian and cancellation operands.
+- **Build:** WSL, CUDA 13.3. For leto (Ubuntu 22.04, glibc 2.35) the binary is built with a static libstdc++ and
+  the two shims in `results/cublasdx-int8-20261103/glibc235_shim.c`.
+
+**Time at 13696×512×512, µs (Gaussian operands):**
+
+| GPU | cuBLAS SGEMM | 2 slices: kernel / full | 3 slices: kernel / full | 4 slices: kernel / full |
+| --- | --- | --- | --- | --- |
+| RTX 5060 Ti | 630 | 715 / 1,036 | 1,165 / 1,506 | 1,683 / 2,056 |
+| RTX 4000 Ada | 557 | 596 / 901 | 964 / 1,288 | 1,396 / 1,746 |
+
+At 1536 and 5888 rows the ratios are the same or worse (Ada, 3 slices: 112 against 62 µs; 429 against 248 µs). Only
+at 4096³ does emulation win:
+- 2 slices: 4,524 against 9,867 µs (5060 Ti) and 4,549 against 10,679 µs (Ada);
+- 3 slices: 0.88× (5060 Ti) and 0.87× (Ada) of SGEMM's time, kernel alone.
+
+**Accuracy (max |c − c64| / max |c64|; Gaussian operands / cancellation set):**
+
+| Method | Gaussian | Cancellation |
+| --- | --- | --- |
+| cuBLAS SGEMM | 1.0e-6 | 4.4e-5 |
+| 2 slices | 3.0e-4 | 0.19 |
+| 3 slices | 1.5e-6 | 2.0e-3 |
+| 4 slices | 3.4e-8 | 1.2e-5 |
+
+With 3 slices the result is float32-class on Gaussian data but 46× worse than SGEMM under cancellation. The shared
+exponent per row of A and per column of B costs the small terms. Two slices are worse than BF16×3 (1.6e-5).
+
+**Result: rejected on sm_120 and sm_89.**
+- **Slower:** even the kernel alone, without slicing, is slower than cuBLAS SGEMM at every production shape (1.7–1.9×
+  at 3 slices).
+- **Slicing cost:** activations would have to be sliced every call, which adds 0.3 ms at 13696 rows.
+- **Why:** INT8 tensor cores on these cards do not exceed float32 by the factor that 6 (3 slices) to 10 (4 slices)
+  products need. This agrees with the in-house screen [prec-int8-f32](../optimisation-ledger.md#prec-int8-f32).
+
+## 6. Records
+
+`results/cublasdx-int8-20261103/` (`rtx5060ti.json`, `rtx4000ada.json`, the shim). `results/bf16x3-facto-20261103/`: `rtx5060ti-local/accuracy-gates/{bf16x3,bf16x6,tf32x3,default}/` and
 `rtx5060ti-local/speed/` (probe, A/B both orders), `rtx4000ada-leto/leto-speed/`, `modal-a100/`.
