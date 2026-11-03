@@ -75,7 +75,7 @@ def test_the_rescue_rung():
     assert terms.generic_recompute_conv_weights(dims, 4) == (-1280 * 4, 0)  # the stored [E, 1280] weights
     rescue = memory.MEMORY_RESCUE
     assert rescue.index("generic_recompute_conv_weights") == rescue.index("recompute_conv_weights") + 1
-    assert memory.RESCUE_FLOAT32_ONLY == ("generic_recompute_conv_weights",)
+    assert memory.RESCUE_FLOAT32_ONLY == ("generic_recompute_conv_weights", "generic_recompute_first_table")
     assert memory.rescue_stage(["generic_chunked_conv_backward", "generic_recompute_conv_weights"]) == (
         "generic_recompute_conv_weights")
 

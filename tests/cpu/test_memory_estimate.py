@@ -599,6 +599,7 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
     from fastmace.planner.fixed import AUTO_RULES
 
     assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "generic_recompute_conv_weights", "recompute_first_table",
+                                    "generic_recompute_first_table",
                                     "recompute_node_segments",
                                     "gate_epilogue", "recompute_node_region")
     assert AUTO_RULES["RewriteConfig.recompute_node_segments"] == (
