@@ -1,0 +1,198 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-03T15:16:08.628101+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100 80GB PCIe",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "2d3583fce782f758262b46da4fb3bd767e76554f",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "radial_tables": "on",
+      "chunked_conv_backward": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 27.44222073749995,
+            "mean_ms": 27.39333891874999,
+            "min_ms": 27.070047590000286,
+            "max_ms": 27.6521533250002,
+            "stdev_ms": 0.23087942331581365,
+            "spread": 0.021212049147482547,
+            "block_ms": [
+              27.101755690000005,
+              27.2542311899997,
+              27.36043891999998,
+              27.070047590000286,
+              27.524002554999925,
+              27.583591915000056,
+              27.60049016499977,
+              27.6521533250002
+            ]
+          },
+          "b": {
+            "median_ms": 30.74725221750043,
+            "mean_ms": 30.6963492631251,
+            "min_ms": 30.375258779999967,
+            "max_ms": 30.862849365000216,
+            "stdev_ms": 0.16571282898094677,
+            "spread": 0.01585802144370891,
+            "block_ms": [
+              30.539602289999834,
+              30.660484714999825,
+              30.735968560000515,
+              30.375258779999967,
+              30.758535875000348,
+              30.81990454999982,
+              30.818189970000276,
+              30.862849365000216
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.1204360066779921,
+        "pair_ratios_b_over_a": [
+          1.1268495900901478,
+          1.1249807232225273,
+          1.1233726421520631,
+          1.122098462480008,
+          1.1175168224002672,
+          1.1173274548497016,
+          1.1165812558314951,
+          1.1161101633664543
+        ]
+      },
+      "ratio_b_over_a": 1.1204360066779921,
+      "pair_ratios": [
+        1.1268495900901478,
+        1.1249807232225273,
+        1.1233726421520631,
+        1.122098462480008,
+        1.1175168224002672,
+        1.1173274548497016,
+        1.1165812558314951,
+        1.1161101633664543
+      ],
+      "setup_s": {
+        "a": 45.079037051,
+        "b": 28.960867930000063
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.chunked_conv_backward = off  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: off, generic folded path not measured on this GPU, decision 66 (NVIDIA A100 80GB PCIe))",
+          "RewriteConfig.radial_tables = off  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: off, generic radial tables not measured on this GPU, decision 66 (NVIDIA A100 80GB PCIe))"
+        ],
+        "b": [
+          "RewriteConfig.chunked_conv_backward = on  (requested 'on': stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)))",
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables (explicit))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 298.05111204279206,
+          "potential_eV_atom": -7.9521897307123215,
+          "kinetic_eV_atom": 0.03852607334771518
+        },
+        "b": {
+          "temperature_K": 298.05097010835954,
+          "potential_eV_atom": -7.952189751216323,
+          "kinetic_eV_atom": 0.03852605500127681
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        },
+        "b": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
