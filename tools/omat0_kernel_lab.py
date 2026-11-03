@@ -87,8 +87,46 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
             s = _sub(s, slope, "slope += cheb[k] * fm_ld_hint(g + k * WEIGHT_DIM + weight_index, g_policy);")
         return s
 
+    def qmajor(s, vector):
+        """G' read q-major ([group, Q, terms(, padded)]) with float2 or float4 loads; the same k-ordered sum."""
+        if vector == 2:
+            body = ("{ const float2* gq = reinterpret_cast<const float2*>(g + weight_index * TERMS);\n"
+                    "                    #pragma unroll\n"
+                    "                    for (int k2 = 0; k2 < TERMS / 2; ++k2) { const float2 v = __ldg(gq + k2);\n"
+                    "                        slope += cheb[2 * k2] * v.x; slope += cheb[2 * k2 + 1] * v.y; } }")
+        else:
+            body = ("{ const float4* gq = reinterpret_cast<const float4*>(g + weight_index * TPAD);\n"
+                    "                    #pragma unroll\n"
+                    "                    for (int k4 = 0; k4 < TPAD / 4; ++k4) { const float4 v = __ldg(gq + k4);\n"
+                    "                        if (4 * k4 < TERMS) slope += cheb[4 * k4] * v.x;\n"
+                    "                        if (4 * k4 + 1 < TERMS) slope += cheb[4 * k4 + 1] * v.y;\n"
+                    "                        if (4 * k4 + 2 < TERMS) slope += cheb[4 * k4 + 2] * v.z;\n"
+                    "                        if (4 * k4 + 3 < TERMS) slope += cheb[4 * k4 + 3] * v.w; } }")
+            s = _sub(s, r"(constexpr int TERMS = \d+;)", r"\1\nconstexpr int TPAD = (TERMS + 3) / 4 * 4;", 1,
+                     regex=True)
+            s = _sub(s, group, "const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * TPAD * WEIGHT_DIM;",
+                     1)
+        return _sub(s, r"for \(int k = 0; k < TERMS; \+\+k\)\s*" + re.escape(slope), body.replace("\\", "\\\\"),
+                    regex=True)
+
+    def qmajor_args(vector):
+        def transform(args):
+            import torch
+            args = list(args)
+            g = args[10]  # [groups, terms, Q]
+            g = g.transpose(1, 2)  # [groups, Q, terms]
+            if vector == 4:
+                pad = -g.shape[2] % 4
+                g = torch.nn.functional.pad(g, (0, pad))
+            args[10] = g.contiguous()
+            return args
+        return transform
+
     return {
         "base": ("exact", lambda s: s, ()),
+        "qmajor-f2": ("exact", lambda s: qmajor(s, 2), (), qmajor_args(2)),
+        "qmajor-f4": ("exact", lambda s: qmajor(s, 4), (), qmajor_args(4)),
+        "qmajor-f2+ldcs-w": ("exact", lambda s: qmajor(hints(s, g=False), 2), (), qmajor_args(2)),
         "maxreg64": ("exact", lambda s: s, ("--maxrregcount=64",)),
         "maxreg80": ("exact", lambda s: s, ("--maxrregcount=80",)),
         "ldcs-w": ("exact", lambda s: hints(s, g=False), ()),
@@ -358,15 +396,15 @@ def main(argv=None):
         cargs = None
         built = {}
         for variant in names:
-            kind, transform, extra = table[variant]
+            kind, transform, extra, *arguments = table[variant]  # arguments: a transform of the argument list
             try:
                 launch, info = launcher(kernel, transform(kernel.source), extra)
             except Exception as error:  # a pattern that does not apply here, or NVRTC
                 built[variant] = dict(kind=kind, error=str(error)[-600:])
                 print(f"{name} {variant}: {error}", flush=True)
                 continue
-            built[variant] = dict(kind=kind, launch=launch, args=base_args if variant == "base" else shared_args,
-                                  **info)
+            own = base_args if variant == "base" else (arguments[0](shared_args) if arguments else shared_args)
+            built[variant] = dict(kind=kind, launch=launch, args=own, **info)
         live = [v for v in names if "launch" in built[v]]
         for variant in live:  # base first: the reference of the comparisons
             b = built[variant]

@@ -58,6 +58,11 @@ R_LO_64 = 0.25
 # generated different code; padded, they share it. The extra pieces repeat the last one and no bin maps to them, so
 # every result is bitwise the same. 1: no padding (A/Bs).
 PIECE_BUCKET = 16
+# Mirror pairs share one table row where the fitted rows of (s, t) and (t, s) are bitwise equal (coef and dcoef): a
+# radial chain symmetric in the pair, as the generic family's (its distance transforms use the pair's mean covalent
+# radius). Each edge then reads the (min, max) row, so a step touches fewer distinct rows (OMAT-0 SrTiO3: 6 of 9 pairs;
+# kernel lab, 3 November 2026). Bitwise: the rows read are equal. A module constant for the A/B.
+SYMMETRIC_PAIRS = False
 CERTIFY_POINTS = 6000  # uniform and as many random lengths; the w-level tensors are [12000, 1280] float64
 FIXED_SPECIES_SUPERSET = "fixed_species_superset"
 
@@ -127,6 +132,16 @@ def _padded(tables):
                 starts=repeat_last(tables["starts"], 0), scales=repeat_last(tables["scales"], 0))
 
 
+def symmetric_rows(tables, species):
+    """Whether every pair's rows equal its mirror pair's bit for bit (``coef`` and ``dcoef``)."""
+    import torch
+
+    coef, dcoef = tables["coef"], tables["dcoef"]
+    return all(torch.equal(coef[s * species + t], coef[t * species + s])
+               and torch.equal(dcoef[s * species + t], dcoef[t * species + s])
+               for s in range(species) for t in range(s + 1, species))
+
+
 def _table_module(tables, columns, device, single=False):
     """``single``: one table for every species pair (a radial chain without species input): every edge reads
     pair 0."""
@@ -134,6 +149,8 @@ def _table_module(tables, columns, device, single=False):
 
     pieces = tables["coef"].shape[1]
     tables = _padded(tables)
+    symmetric = (SYMMETRIC_PAIRS and not single and len(columns) > 1
+                 and symmetric_rows(tables, len(columns)))
 
     class RadialTableModule(torch.nn.Module):
         """One interaction's tables: ``forward(lengths, node_attrs, edge_index) -> (folded input, edge density)``."""
@@ -146,6 +163,7 @@ def _table_module(tables, columns, device, single=False):
                                  persistent=False)
             self.species = len(columns)
             self.single = bool(single)
+            self.symmetric = bool(symmetric)  # mirror pairs read one row (SYMMETRIC_PAIRS)
             self.pieces = pieces  # fitted; coef.shape[1] is padded to PIECE_BUCKET
             self.r_lo, self.bin_scale, self.r_max = tables["r_lo"], tables["bin_scale"], tables["r_max"]
             self.fit_error = tables["fit_error"]
@@ -156,7 +174,10 @@ def _table_module(tables, columns, device, single=False):
             if self.single:
                 return torch.zeros(edge_index.shape[1], dtype=torch.int32, device=edge_index.device)
             species = node_attrs[:, self.columns].argmax(dim=1).to(torch.int32)
-            return species[edge_index[0]] * self.species + species[edge_index[1]]
+            s, t = species[edge_index[0]], species[edge_index[1]]
+            if self.symmetric:  # (min, max): the rows of both orders are bitwise equal
+                s, t = torch.minimum(s, t), torch.maximum(s, t)
+            return s * self.species + t
 
         def forward(self, lengths, node_attrs, edge_index, density=True):
             """``density=False`` (a residual block): the density ``[E, 0]``, not evaluated."""
@@ -166,8 +187,8 @@ def _table_module(tables, columns, device, single=False):
                                 self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density)
 
         def extra_repr(self):
-            return (f"pairs={self.coef.shape[0]}, pieces={self.pieces} (padded to {self.coef.shape[1]}), "
-                    f"degree={self.coef.shape[2] - 1}, r=[{self.r_lo}, {self.r_max})")
+            return (f"pairs={self.coef.shape[0]}{' (symmetric)' if self.symmetric else ''}, pieces={self.pieces} "
+                    f"(padded to {self.coef.shape[1]}), degree={self.coef.shape[2] - 1}, r=[{self.r_lo}, {self.r_max})")
 
     return RadialTableModule()
 

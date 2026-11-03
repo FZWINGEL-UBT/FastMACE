@@ -34,6 +34,10 @@ _REGISTRY = {}
 # the shapes timed in docs/validation/capacity-T08-inventory.md section 2).
 REBUILD_PARTS = 1
 REBUILD_BATCH = 4
+# The stored per-edge weights are read once: load them with the streaming cache hint (``__ldcs``, evict-first), so
+# they do not displace the derivative table and the receivers' output gradients in L1/L2 (OMAT-0 kernel lab,
+# 3 November 2026: the wprime kernel 3.4 % faster on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
+STREAM_W = False
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -134,7 +138,8 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 const int weight_index =
                     {{ path.weight_start + edge_channel * schedule.channels }} + channel;
                 const int64_t radial_weight_index = weight_base + weight_index;
-                const scalar_t radial_weight = weights[radial_weight_index];
+                const scalar_t radial_weight = {{ "__ldcs(weights + radial_weight_index)" if stream_w
+                                                  else "weights[radial_weight_index]" }};
                 acc_t weight_gradient = acc_t(0);
 
                 {% for output in path.outputs %} {
@@ -197,9 +202,9 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 """
 
 
-def render(schedule, scalar, terms):
+def render(schedule, scalar, terms, stream_w=None):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
-    derivative table's ``terms``."""
+    derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``."""
     from fastmace.kernels.oeq_streaming.jinja_env import get_jinja_environment
 
     if schedule.layout not in ("ir_mul", "mul_ir"):
@@ -208,7 +213,7 @@ def render(schedule, scalar, terms):
         raise ValueError("the derivative table needs at least one term")
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
-                                            terms=int(terms))
+                                            terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w)
 
 
 def derivative_table(dcoef, weight):
