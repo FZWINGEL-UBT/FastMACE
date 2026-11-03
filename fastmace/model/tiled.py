@@ -723,6 +723,24 @@ def _unpack_units(packed, dtype, device):
     return table[packed.long()]
 
 
+def moved_within(positions, reference, limit, chunk=None):
+    """Whether no atom of ``positions`` (any device) is more than ``limit`` from its row of ``reference`` (host
+    float64): the squared distances in float64 by chunks of ``chunk`` atoms (default the tile lists' ``CHUNK``),
+    stopping at the first chunk past it. The same decision as on the whole arrays, with transients of one chunk
+    instead of three whole-system float64 copies on the host (72 bytes per atom; tiled capacity)."""
+    import torch
+
+    if chunk is None:
+        from fastmace.neighbors.tile_list import CHUNK as chunk
+    bound = float(limit) ** 2
+    for start in range(0, int(positions.shape[0]), int(chunk)):
+        stop = min(start + int(chunk), int(positions.shape[0]))
+        here = positions[start:stop].detach().to("cpu", torch.float64)
+        if float(((here - reference[start:stop]) ** 2).sum(dim=1).max()) > bound:
+            return False
+    return True
+
+
 def _host_available():
     """The host's available memory in bytes (``MemAvailable``), or None where /proc/meminfo is missing."""
     try:
@@ -1030,15 +1048,15 @@ class TiledForceField:
         skin / 2 since it; else a new, empty set (this call searches and plans)."""
         import torch
 
-        here = positions.detach().to("cpu", torch.float64)
         kept = self._kept
         reuse = (kept is not None and kept["complete"] and kept["n"] == n and kept["receivers"] == self.receivers
                  and torch.equal(kept["cell"], cell.cpu())
-                 and float(((here - kept["reference"]) ** 2).sum(dim=1).max()) <= (skin / 2) ** 2)
+                 and moved_within(positions, kept["reference"], skin / 2))
         if not reuse:
-            self._kept = None
+            self._kept = kept = None  # the old reference and lists go before the new reference is copied
             if not self._host_allows("keeping the reference positions"):
                 return None
+            here = positions.detach().to("cpu", torch.float64)
             kept = self._kept = dict(n=n, cell=cell.cpu(), receivers=self.receivers, reference=here, superset={},
                                      tiles=None, grid=None, complete=True)
             self.list_rebuilds += 1

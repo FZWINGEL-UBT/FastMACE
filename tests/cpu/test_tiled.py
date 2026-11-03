@@ -860,6 +860,25 @@ def test_wavefront_auto_below_its_layers_only_where_the_plain_state_does_not_fit
     assert tiled.last["wavefront"]["on"] is short
 
 
+@pytest.mark.parametrize("chunk", [1, 3, 7, 1000])
+def test_the_skin_check_by_chunks_decides_as_on_the_whole_arrays(chunk):
+    """``moved_within``: the list reuse's displacement test by chunks of atoms gives the whole arrays' decision, at
+    the limit itself too (a displacement equal to the limit keeps the lists)."""
+    import torch
+
+    from fastmace.model.tiled import moved_within
+
+    generator = torch.Generator().manual_seed(3)
+    reference = torch.rand(20, 3, generator=generator, dtype=torch.float64) * 10
+    for index in (0, 6, 19):
+        for step in (0.25, 0.5, 0.5000001, 2.0):
+            moved = reference.clone()
+            moved[index, 1] += step
+            for positions in (moved, moved.to(torch.float32)):
+                whole = float(((positions.to(torch.float64) - reference) ** 2).sum(dim=1).max()) <= 0.25
+                assert moved_within(positions, reference, 0.5, chunk) is whole
+    assert moved_within(reference, reference, 0.0, chunk)
+
 def test_wavefront_with_and_without_kept_lists_is_the_same_call():
     """The wavefront with the kept lists (``list_reuse``, filtered again at the cutoff) and without them, each with
     and without the call's cache (a tile's lists from its sweep 1 to its sweep 3 only: none left after the call;
