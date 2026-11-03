@@ -390,6 +390,18 @@ def test_host_state_refuses_graphs_and_unknown_values():
         TileConfig(5, mode="graphs", state="host")
 
 
+def test_compiled_graphs_refuse_other_modes_host_state_lanes_and_the_cpu():
+    for kwargs, match in ((dict(mode="padded"), "mode"), (dict(mode="graphs"), "mode"),
+                          (dict(mode="compiled", state="host"), "host"), (dict(mode="auto", lanes="on"), "lanes")):
+        with pytest.raises(ValueError, match=match):
+            TileConfig(5, compiled_graphs=True, **kwargs)
+    TileConfig(5, mode="auto", compiled_graphs=True)
+    calc, atoms = calculator(), structure()
+    with pytest.raises(ValueError, match="CUDA"):
+        TiledForceField(MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER),
+                        TileConfig(mode="auto", compiled_graphs=True))
+
+
 # ---------------------------------------------------------------- the species index instead of the one-hot
 
 

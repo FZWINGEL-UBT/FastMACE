@@ -153,6 +153,11 @@ class TileConfig:
     # SrTiO3 at R 8,192: the pool from 16 % to 9 % of the atoms; results/tiled-ideas-20261102/band_model.py). Another
     # tile plan: the forces and stress are the same sums in another order (float32 rounding).
     boundary_skin: bool = True
+    # Compiled tiles (mode "compiled", or "auto" once it compiles): each slot's compiled sweep bodies captured in a
+    # CUDA graph (one per slot and sweep, after two warm-ups) and replayed per tile, as mode "graphs" does with the
+    # eager bodies. Device state only (the captured bodies read it), no lanes. Off by default: the gaps between a
+    # compiled call's kernels are about 2 % of it (tiled-call-memory.md, tiled-1m-speed.md).
+    compiled_graphs: bool = False
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -194,6 +199,14 @@ class TileConfig:
             raise ValueError(f"TileConfig.lanes must be 'auto', 'on' or 'off', got {self.lanes!r}")
         if self.lanes == "on" and self.mode in ("eager", "graphs"):
             raise ValueError(f"TileConfig.lanes='on' needs padded or compiled tiles, not mode {self.mode!r}")
+        if self.compiled_graphs:
+            if self.mode not in ("compiled", "auto"):
+                raise ValueError(f"TileConfig.compiled_graphs needs mode 'compiled' or 'auto', not {self.mode!r}")
+            if self.state == "host":
+                raise ValueError("TileConfig.compiled_graphs cannot run with state='host': the captured bodies read "
+                                 "the state from device memory")
+            if self.lanes == "on":
+                raise ValueError("TileConfig.compiled_graphs cannot run with lanes='on'")
 
 
 class _State:
@@ -756,6 +769,8 @@ class TiledForceField:
             raise ValueError("TiledForceField does not support joint embeddings or PolarMACE")
         if self.config.mode == "graphs" and field.device.type != "cuda":
             raise ValueError("TileConfig.mode='graphs' needs a CUDA device")
+        if self.config.compiled_graphs and field.device.type != "cuda":
+            raise ValueError("TileConfig.compiled_graphs needs a CUDA device")
         self.model = model
         self.device = field.device
         self.dtype = field.dtype
@@ -1229,7 +1244,7 @@ class TiledForceField:
             _, g_vec, g_eps = self._first(tile, g["state"], adjoint=True, strain=strain)
             values = (self._masked(g_vec, slot["edge_mask"]),) + ((g_eps,) if strain else ())
             names = ("g_vec", "g_eps")[:len(values)]
-        if self.mode != "graphs":  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
+        if not self._captured():  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
             slot["out"] = {sweep: dict(zip(names, values))}  # no copy, and no other sweep's kept beside them
             return
         out = slot["out"].setdefault(sweep, {})
@@ -1277,11 +1292,16 @@ class TiledForceField:
         if "g_eps" in out:
             g["strain_grad"].add_(out["g_eps"].double())
 
+    def _captured(self):
+        """Whether the slots' sweep bodies run as captured CUDA graphs: mode "graphs" (eager bodies), or compiled
+        bodies with ``TileConfig.compiled_graphs``."""
+        return self.mode == "graphs" or (self.mode == "compiled" and self.config.compiled_graphs)
+
     def _run_slot(self, sweep, slot, g):
         """The sweep's body on the filled slot: eagerly, or by replaying its graph (captured on first use)."""
         import torch
 
-        if self.mode != "graphs":
+        if not self._captured():
             self._body(sweep, slot, g)
             return
         graph = slot["graphs"].get(sweep)
@@ -1397,7 +1417,7 @@ class TiledForceField:
         local_of = torch.full((n,), -1, dtype=torch.int32, device=self.device)  # int32: 4 bytes per atom
         # The first padded (compiled) call also measures: the lanes' fit is its own tile workspace, not the eager
         # first call's scaled to the cap (eager tiles hold several times more: R 16,384 was refused with 12 GiB free).
-        lanes_unmeasured = self._lanes_fit is None and padded and self.mode != "graphs"
+        lanes_unmeasured = self._lanes_fit is None and padded and not self._captured()
         measure = (not self._budgeted or self._auto or lanes_unmeasured) and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
@@ -1653,8 +1673,8 @@ class TiledForceField:
         if config == "off":
             self.lanes_state = "off"
             return False
-        if not padded or self.mode == "graphs":
-            self.lanes_state = f"off: {self.mode} tiles"
+        if not padded or self._captured():
+            self.lanes_state = f"off: {self.mode} tiles" + (" in CUDA graphs" if self.mode == "compiled" else "")
             return False
         if self.device.type != "cuda":
             self.lanes_state = "on: one after the other (no CUDA device)" if config == "on" else "off: no CUDA device"

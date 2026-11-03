@@ -71,6 +71,8 @@ def parse_args(argv=None):
                    help="TileConfig.wavefront_group: sweep-2 tiles per run of the wavefront (none: the default)")
     p.add_argument("--boundary-skin", choices=("on", "off"), default="on",
                    help="TileConfig.boundary_skin: the wavefront plan's first and last layer split at the reach")
+    p.add_argument("--compiled-graphs", action="store_true",
+                   help="TileConfig.compiled_graphs: compiled tile bodies captured in CUDA graphs")
     p.add_argument("--prefetch", choices=("on", "off"), default="on",
                    help="TileConfig.prefetch: the next tile's graph and host rows prepared on a side stream")
     p.add_argument("--backward-chunk-scale", type=int, default=None,
@@ -364,6 +366,7 @@ def main(argv=None):
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
                                                   wavefront=args.wavefront, lanes=args.lanes,
+                                                  compiled_graphs=args.compiled_graphs,
                                                   prefetch=args.prefetch == "on",
                                                   boundary_skin=args.boundary_skin == "on",
                                                   backward_chunk_scale=args.backward_chunk_scale,
