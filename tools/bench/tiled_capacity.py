@@ -79,10 +79,10 @@ def parse_args(argv=None):
     p.add_argument("--list-cache", choices=("on", "off"), default="on",
                    help="TileConfig.list_cache: a tile's lists kept on the host within the call (with kept lists: "
                         "its filtered ones in the wavefront's band)")
-    p.add_argument("--backward-single-stream", type=float, default=None, metavar="FRACTION",
-                   help="oeq_streaming SINGLE_STREAM_SLOT_L2_FRACTION: the chunked backward on one slot and the "
-                        "current stream where a chunk's slot is at least this fraction of the L2 (none: "
-                        "SINGLE_STREAM_DEVICES by device name)")
+    p.add_argument("--backward-single-stream", default=None, metavar="FRACTION|off",
+                   help="this GPU's entry in oeq_streaming SINGLE_STREAM_DEVICES: the chunked backward on one slot "
+                        "and the current stream where a chunk's slot is at least this fraction of the L2; off: two "
+                        "slots (default: the table's entry for the device name)")
     p.add_argument("--sweep-profile", action="store_true",
                    help="the last call with torch.profiler around three tiles of each sweep: kernel classes and top "
                         "kernels per sweep (tiled_corun.sweep_profile)")
@@ -304,8 +304,13 @@ def main(argv=None):
     from fastmace.planner import minimal
 
     if args.backward_single_stream is not None:
+        import torch
+
         from fastmace.kernels.oeq_streaming import runtime as oeq_runtime
-        oeq_runtime.SINGLE_STREAM_SLOT_L2_FRACTION = float(args.backward_single_stream)
+        name = torch.cuda.get_device_name()
+        oeq_runtime.SINGLE_STREAM_DEVICES = {k: v for k, v in oeq_runtime.SINGLE_STREAM_DEVICES.items() if k != name}
+        if args.backward_single_stream != "off":
+            oeq_runtime.SINGLE_STREAM_DEVICES[name] = float(args.backward_single_stream)
     repeat = tuple(int(x) for x in args.repeat.lower().split("x"))
     atoms = supercell(args.structure, repeat, args.rattle, args.strain)
     n = len(atoms)
