@@ -172,7 +172,7 @@ def main(argv=None):
         name, atoms = ab_step_time.read_structure(spec, None)
         rng = np.random.default_rng(args.seed)
         atoms.positions += rng.uniform(-args.rattle_A, args.rattle_A, atoms.positions.shape)
-        ff = fm.ForceField(model, atoms, precision="float32", rewrites=RewriteConfig(tf32x3_gemms="on"))
+        ff = fm.ForceField(model, atoms, precision="float32", rewrites=RewriteConfig(tf32x3_gemms="on", grouped_launch="off"))
         plan = ff.evaluation_plan(atoms)
         decision = plan.decision("RewriteConfig.tf32x3_gemms")
         ff.evaluate(atoms)  # warm-up: compiles

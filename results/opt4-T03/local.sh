@@ -50,8 +50,8 @@ for job in "$@"; do
     gpu-test) run $job "$REF" -m pytest -p no:cacheprovider -q -rf "$FM/tests/gpu/test_tf32x3_gemm_cuda.py" \
                 --basetemp="$ROOT/pytest" ;;
     accuracy) run $job "$PY" "$FM/tools/tf32x3_accuracy.py" --output "$ROOT/accuracy" --structures NaCl NbCl5 ;;
-    gate-NaCl) gate $job NaCl --rewrites tf32x3_gemms=on ;;
-    gate-NbCl5) gate $job NbCl5 --rewrites tf32x3_gemms=on ;;
+    gate-NaCl) gate $job NaCl --rewrites tf32x3_gemms=on grouped_launch=off ;;
+    gate-NbCl5) gate $job NbCl5 --rewrites tf32x3_gemms=on grouped_launch=off ;;
     gate0-NaCl) gate $job NaCl ;;
     gate0-NbCl5) gate $job NbCl5 ;;
     omol-accuracy) run $job "$PY" "$FM/tools/tf32x3_accuracy.py" --output "$ROOT/omol-accuracy" --model omol0-xl \
