@@ -45,6 +45,9 @@ COMPILED_MARGIN = 2**30
 # TileConfig.wavefront "auto": considered from this many layers of the tile grid along its slowest axis (the band of
 # live rows is about five layers: three around sweep 2, and the first and last layers, alive for the whole call).
 WAVEFRONT_LAYERS = 12
+# ... and from this many when the plain state would not fit the host at all: a pool of about three layers and the
+# boundary skins is still smaller than the plain state and its alias window, and without it the call fails.
+WAVEFRONT_MIN_LAYERS = 4
 # TileConfig.lanes "auto": the GPUs where two sweep-2 tiles on disjoint halves of the SMs ran faster than one after
 # the other (docs/validation/tiled-concurrent-tiles.md: 1.09x per pair on the RTX 4000 Ada, 1.05x on the RTX 5060 Ti,
 # under cudaMallocAsync); by exact device name (decision 66).
@@ -121,7 +124,8 @@ class TileConfig:
     # then live in a pool of the rows of the atoms between their sweeps 1 and 3 instead of [N, width] tensors: per
     # atom bitwise today's state and node energies, the forces and stress summed in another order (float32 rounding;
     # the scatter is atomic on the GPU anyway). The search pass that plans it keeps no tile lists, so the tiles
-    # search once more (about 3 % of a call). "auto": on from ``WAVEFRONT_LAYERS`` layers of the tile grid when the
+    # search once more (about 3 % of a call). "auto": on from ``WAVEFRONT_LAYERS`` layers of the tile grid (from
+    # ``WAVEFRONT_MIN_LAYERS`` when the plain state would not fit the host at all) when the
     # plain state would leave the host below ``list_reuse_floor``.
     wavefront: str = "auto"
     # ``"auto"``, ``"on"`` or ``"off"``: sweep 2's tiles in pairs on two lanes, CUDA streams of two green contexts
@@ -840,6 +844,7 @@ class TiledForceField:
         self._stream = None
         self._cache_paused = False  # the wavefront's search pass: the tile lists are not kept
         self._wave_auto = {}  # TileConfig.wavefront "auto": the decision per atom count
+        self._wave_short = {}  # ... and whether the plain state would not fit the host at all
         # TileConfig.lanes: the second lane's padded slots (by edge bucket), its green-context streams (with their
         # contexts) once made, whether the first call's memory model fits a second workspace, and the decision.
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
@@ -1830,7 +1835,14 @@ class TiledForceField:
         if not self.config.boundary_skin or not self._wave_expected(n):
             return 0.0, 0
         reach = float(self.field.neighbours.cutoff) + self._reuse_skin()
-        return reach, (4 if self.config.wavefront == "on" else WAVEFRONT_LAYERS)
+        return reach, self._wave_layers(n)
+
+    def _wave_layers(self, n):
+        """The fewest grid layers the wavefront runs on: ``WAVEFRONT_MIN_LAYERS`` with "on" or where the plain state
+        would not fit the host, else ``WAVEFRONT_LAYERS``."""
+        if self.config.wavefront == "on" or self._wave_short.get(n):
+            return WAVEFRONT_MIN_LAYERS
+        return WAVEFRONT_LAYERS
 
     def _wavefront_on(self, grid, n):
         """Whether this call runs the wavefront schedule (``TileConfig.wavefront``)."""
@@ -1839,9 +1851,7 @@ class TiledForceField:
             return False
         if config.wavefront == "on":
             return True
-        if int(grid[0]) < WAVEFRONT_LAYERS:
-            return False
-        return self._wave_expected(n)
+        return self._wave_expected(n) and int(grid[0]) >= self._wave_layers(n)
 
     def _wave_expected(self, n):
         """``TileConfig.wavefront`` without the grid's layer test: whether a call at ``n`` atoms runs the wavefront
@@ -1858,11 +1868,12 @@ class TiledForceField:
         if decided is None:
             width, available = self._state_width(), _host_available()
             if width is None or available is None:
-                decided = n >= 2**20
+                decided, short = n >= 2**20, False
             else:
                 itemsize = 8 if str(self.dtype) == "torch.float64" else 4
-                decided = 1.25 * n * width * itemsize + int(config.list_reuse_floor) > available
-            self._wave_auto[n] = decided
+                plain = 1.25 * n * width * itemsize
+                decided, short = plain + int(config.list_reuse_floor) > available, plain > available
+            self._wave_auto[n], self._wave_short[n] = decided, short
         return decided
 
     def _state_width(self):

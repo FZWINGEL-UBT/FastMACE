@@ -841,6 +841,25 @@ def test_wavefront_auto_only_where_the_plain_state_would_not_fit(available, on, 
     assert tiled._wave_auto == {len(atoms): on}
 
 
+@pytest.mark.parametrize("short", [False, True])
+def test_wavefront_auto_below_its_layers_only_where_the_plain_state_does_not_fit_at_all(short, monkeypatch):
+    """Below ``WAVEFRONT_LAYERS`` grid layers "auto" stays off while the plain state fits the host (only the floor
+    is short), and runs from ``WAVEFRONT_MIN_LAYERS`` when it does not fit at all."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "WAVEFRONT_LAYERS", 100)
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(12, neighbours="tiles", state="host", alias_state=True,
+                                              list_reuse=False, list_reuse_floor=2**40))
+    plain = 1.25 * len(atoms) * tiled._state_width() * (8 if str(tiled.dtype) == "torch.float64" else 4)
+    available = int(plain / 2) if short else int(plain * 2)  # below the floor either way
+    monkeypatch.setattr(tiled_module, "_host_available", lambda: available)
+    tiled.evaluate(atoms)
+    assert tiled._wave_auto == {len(atoms): True} and tiled._wave_short == {len(atoms): short}
+    assert tiled.last["wavefront"]["on"] is short
+
+
 def test_wavefront_with_and_without_kept_lists_is_the_same_call():
     """The wavefront with the kept lists (``list_reuse``, filtered again at the cutoff) and without them, each with
     and without the call's cache (a tile's lists from its sweep 1 to its sweep 3 only: none left after the call;
