@@ -215,6 +215,8 @@ def _(x, sh, weights, senders, receivers, row_ptr, dout, kernel_id):
 # The size rule (owner decision 60, 27 October 2026): weights of at most this many L2s run unchunked. NaCl 3x3x3
 # (35-42 MB against a 32 MiB L2) was 0.6-1.1 % slower chunked; NbCl5 (268 MB) and NaNbO3 (430 MB) gain.
 UNCHUNKED_L2_MULTIPLE = 4
+# The share of the L2 one chunk's weight gradient fills (l2_chunk_edges, float32 and narrower).
+CHUNK_L2_SHARE = 0.25
 
 
 def l2_bytes(device):
@@ -234,7 +236,7 @@ def l2_chunk_edges(device, weight_dim, itemsize):
     if int(itemsize) >= 8:
         rows = UNCHUNKED_L2_MULTIPLE * l2_bytes(device) // (int(weight_dim) * int(itemsize))
     else:
-        rows = l2_bytes(device) // (4 * int(weight_dim) * int(itemsize))
+        rows = int(CHUNK_L2_SHARE * l2_bytes(device)) // (int(weight_dim) * int(itemsize))
     return max(128, rows // 128 * 128)
 
 
