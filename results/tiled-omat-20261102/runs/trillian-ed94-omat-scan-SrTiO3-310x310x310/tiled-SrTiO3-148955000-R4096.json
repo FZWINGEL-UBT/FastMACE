@@ -1,0 +1,43 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  310,
+  310,
+  310
+ ],
+ "atoms": 148955000,
+ "receivers": 4096,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "device": "NVIDIA RTX A4000",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "ed94b3a8",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 6842019840,
+   "host_peak": 12459278336
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 6843252736,
+   "host_peak": 12459278336
+  }
+ },
+ "phase": "build",
+ "error": "RuntimeError: Tensor.item() cannot be called on meta tensors",
+ "traceback": [
+  "/mnt/homes/zwingel/fm-tiled/src-all-ed94b3a8/tools/bench/tiled_capacity.py:330 main: field = planner.build_evaluation(built, user, atoms, call_rows=call_rows,",
+  "/mnt/homes/zwingel/fm-tiled/src-all-ed94b3a8/fastmace/planner/minimal.py:1340 build_evaluation: field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,",
+  "/mnt/homes/zwingel/fm-tiled/src-all-ed94b3a8/fastmace/model/forces.py:596 __init__: self.data[key] = _released(key, value, self._dtype, self._device)",
+  "/mnt/homes/zwingel/fm-tiled/src-all-ed94b3a8/fastmace/model/forces.py:198 _released: if key == \"batch\" and bool((value == 0).all()):",
+  "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_meta_registrations.py:8375 meta_local_scalar_dense: raise RuntimeError(\"Tensor.item() cannot be called on meta tensors\")"
+ ]
+}

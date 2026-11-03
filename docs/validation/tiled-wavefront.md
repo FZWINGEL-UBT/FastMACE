@@ -83,3 +83,26 @@ earlier one was 78.1M).
 | 98.4M | 2,277 s | 23.1 | 8,192 | 13.9 GiB | 127.3 GiB | 45.0 GiB |
 | 122M | 2,710 s | 22.2 | 8,192 | 16.3 GiB | 144.7 GiB | 55.8 GiB |
 | 149M | 3,457 s | 23.2 | 4,096 | 16.9 GiB | 139.5 GiB | 68.1 GiB |
+
+## 149M atoms again: compiled at R = 8,192 on murphy, and on a 16 GB A4000 (2–3 November 2026)
+
+**murphy (RTX 4000 Ada 20 GB), source `91f646b7`** ("keep the tile lists under the wavefront again"): valid.
+- **Result:** 11,022,670,000 edges; largest force component 1.3 meV/Å; energy −7.98954971 eV per atom.
+- **Calls:** eager 4,896 s at R = 4,096 over 57,062 tiles (GPU peak 15.4 GiB, host peak 141.5 GB). Compiled
+  2,947 s at R = 8,192 over 34,032 tiles: 19.8 µs per atom, 15 % faster than the 3,457 s at R = 4,096 above. GPU peak
+  17.4 GiB, host peak 179.8 GB, of which 73.1 GB were kept lists.
+- **Run:** `results/tiled-omat-20261102/runs/murphy-all2-omat-scan-SrTiO3-310x310x310/`.
+
+**trillian (RTX A4000 16 GB, sm_86), source `e7bc5099`:** both calls finished at R = 2,048. The bench then ran out of
+memory forming a 3.3 GiB float64 copy of the forces for its summary, so neither energy nor force was recorded (fixed
+in `04582871`: the largest force from chunks of the float32 output).
+- **Calls:** eager 6,424 s and 5,666 s (38 µs per atom) over 105,520 tiles, both eager: 0.15 GiB were left at the
+  first call's peak. Edges 11,022,670,000, the same as murphy's. GPU peak 15.2 GiB; host peak 128 GB, of which 73.1 GB
+  were kept lists. The wavefront's row pool held 6.2 % of the atoms.
+- **Earlier attempts:** R = 4,096 ran out of GPU memory in sweep 2 of the first call, with 7.3 GiB resident after the
+  build (`trillian-e7bc-omat-scan-…`). An attempt on `ed94b3a8` stopped at a meta-tensor `.item()` in the build
+  (`trillian-ed94-…`), fixed on the branch before `e7bc5099`.
+- **Smoke check:** 320,000 atoms on trillian, valid (`trillian-e7bc-smoke-40/`).
+- **Runs:** `results/tiled-omat-20261102/runs/trillian-e7bc-*`.
+
+These were the last capacity runs: from 3 November 2026 the work is speed at 1M (`tiled-1m-speed.md`).

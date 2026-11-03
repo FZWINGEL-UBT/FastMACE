@@ -42,3 +42,29 @@ the graphs were prefetched, not the host rows.
 ## Search pass
 
 0.7–0.8 s of a 22 s call (1.08M, 5060 Ti), 1.9 s of a 98 s call (5M, Ada): about 2–3.5 %. Not built further.
+
+## Wavefront group, halo trim and boundary skin (5M SrTiO3, RTX 4000 Ada on leto, 2–3 November 2026)
+
+Wavefront on, R = 8,192, lanes off. Calls: eager, compiled with compilation, steady.
+
+| Variant (source) | Calls | Row pool | Result |
+| --- | --- | --- | --- |
+| `wavefront_group` 1 (`91f646b7`) | 157.8/111.1/88.0 s; 156.6/107.5/87.8 s | 36.6 % | |
+| `wavefront_group` 16 (`91f646b7`), default | 153.2/102.2/82.6 s; 153.5/102.2/82.5 s | 37.5 % | −6.1 % steady |
+| Before the trims (`91f646b7`) | 82.4, 82.4 s steady | 37.5 % | |
+| Halo trim (`c988f5ff`) | 82.5, 82.4 s | 37.5 % | no change; kept |
+| Boundary skin (`c988f5ff`) | 84.4, 84.5 s | 32.4 % | +2.4 % for 3 % less host; not adopted |
+| Default budget, lanes auto, wavefront auto (`c988f5ff`) | 110.8 s at R = 16,384, wavefront off | 0 | see the receiver-cap A/B |
+
+## Band cache of the kept lists and the single-stream backward (5M SrTiO3, 2–3 November 2026)
+
+Three arms, a/b order reversed. Steady compiled call; `list_cache_hits` 2,208 = 2 × 1,104 tiles with the band cache.
+
+| GPU (source) | Base | Band cache | Band cache + single-stream backward |
+| --- | --- | --- | --- |
+| RTX 4000 Ada, leto (`c446d26f`) | 81.8, 81.8 s | 80.5, 80.5 s (−1.6 %) | 79.7, 79.6 s (−2.6 %); GPU peak 4.40 → 4.36 GiB |
+| RTX 5060 Ti, local (`c446d26f`) | 97.8, 92.9 s | 95.6, 97.5 s | 94.0, 91.9 s (noisy, desktop not idle) |
+
+Both are kept. The single-stream backward (one L2-sized slot on the current stream once a slot is at least half the
+L2) is the default on these two GPUs by device name (`SINGLE_STREAM_DEVICES`, decision 66). Records:
+`rtx4000ada-leto/leto-band-ab-*`, `rtx5060ti-local/{base,band,single}-*`.
