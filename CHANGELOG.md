@@ -181,6 +181,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- Tile lists (`fastmace.neighbors.tile_list.TileNeighbours`): half-cutoff bins and a +-2 stencil, 42 % fewer
+  candidates, the same edges in the same order; a 1M-atom list rebuild 2.11 -> 1.38 s (RTX 4000 Ada).
+- Tiled kept lists and list cache: senders as int16 ranks into each tile's int32 senders (about 3 instead of 5 bytes
+  per edge, -36 % host memory); the list reuse's skin check by chunks (no whole-system float64 host copies).
+- Tiled padded slots: a tile whose edge bucket has no slot runs in a neighbouring bucket's slot that fits (MD drift
+  across a bucket's edge compiled a new slot). `wavefront="auto"` runs from 4 grid layers where the plain host state
+  does not fit the host at all (before: from 12 layers only). docs/validation/tiled-1m-speed.md, "MD at 1M".
 - Tiled call, sweep 2: the streaming convolution builds the message of a tile's receiver rows only
   (`streaming_message(rows=)`, when the launch covers them exactly, `StreamingKernels.rows_fit`), so the halo rows'
   zeros and their slice backward are gone; residual radial tables neither store nor read the edge density

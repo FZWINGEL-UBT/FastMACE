@@ -176,3 +176,42 @@ small and launch-bound. Records: `results/tiled-1m-20261103/rtx4000ada-leto/leto
 `rtx-a4000-trillian/trillian-graphs-*` (R = 16,384, all out of memory) and `trillian-graphs-r8-*`,
 `rtx5060ti-local/graphs-214k/` and `graphs-40k/` (scripts inside). The source of all runs is `fe7b0a7b`. murphy was
 busy with another user's job and was not used.
+
+## MD at 1M: list rebuilds, slots and the remaining queue (3 November 2026)
+
+**Setup.** `tools/bench/tiled_md.py`, SrTiO3 58×58×58 (975,560 atoms), OMAT-0 medium, float32, `--mode auto`, tile
+lists, species index, R = 16,384, 60 steps of 1 fs at 600 K, host integrator; skin 0.3 Å; leto (RTX 4000 Ada).
+Records `results/tiled-1m-20261103/rtx4000ada-leto/leto-md1m-*`.
+
+**Main (`7430fb51`).** The slots settle in the first call (3 slot changes, none afterwards in 60 steps; the large
+slot (16,385, 9,812, 1,275,904) holds). Steps that reuse the kept lists take 14.66 s, the 8 steps that search again
+(every 7-8 steps) 16.77 s: a rebuild costs 2.11 s, about 1.9 % of the MD time. Where it goes
+(`search_parts.py`, `leto-search-parts`): the 64 tiles' search within cutoff + skin (6.3 Å) 2.25 s; packing the
+kept lists 0.09 s; host copies 0.03 s; plan and binning 2 ms each. With cutoff-wide bins the 27-bin stencil tests
+about 613 candidates per atom for 93 edges.
+
+**Changes (branch `fastmace/tiled-slot-neighbours`):**
+
+| Change | What it saves | Check |
+| --- | --- | --- |
+| Half-cutoff bins and a ±2 stencil (`TileNeighbours`, `STENCIL_SPLIT = 2`): 125 bins of (2.5 c)³ instead of 27 of (3 c)³ | search 2.25 → 1.47 s per rebuild at 1M (order 1, 2, 2, 1, 1, 2 in one process, `search_stencil.py`, `leto-search-stencil`) | the same edges in both (digest per tile); `test_tile_neighbours_are_bitwise_the_global_list` with both stencils |
+| Senders of the kept lists and the call's list cache as int16 ranks into each tile's int32 senders (`_pack_senders`) | about 3 instead of 5 bytes per edge: kept lists 442 → 281 MiB, cache 347 → 215 MiB at 1M | exact unpacking, CPU test at 1, 65,536 and 65,537 distinct senders |
+| The skin check by chunks (`moved_within`) | three whole-system float64 host arrays per call (72 B per atom, about 10 GiB at 149M) | the same decision, CPU test at four chunk sizes |
+| A tile whose edge bucket has no slot runs in a neighbouring bucket's slot that fits (`_slot_keys`) | a compile when a tile's edges drift across a bucket's edge (none in these 60 steps) | CPU test: no slot change, the same forces |
+| `wavefront="auto"` from `WAVEFRONT_MIN_LAYERS` (4) grid layers where the plain state does not fit the host at all | cells below 12 layers whose plain state exceeds the host (the local PC between about 5M and 17M atoms) | CPU test both ways |
+
+The branch at 1M (`3a83c308`, `leto-md1m-branch2`): reuse steps 14.68 s (main 14.66 s), rebuild steps 16.07 s
+(+1.38 s instead of +2.11 s); over steps 2-60 14.87 s against 14.95 s per step (-0.5 %); the same drift (0.033
+meV/atom over 60 steps), potential energies equal to 2×10⁻³ eV in 7.75×10⁶; GPU peak 12.23 GiB as main.
+
+**Rejected on the way: edge headroom for the slots** (`5a2dd70f`, `leto-md1m-branch`). Sizing a slot's edges with
+`TileConfig.headroom` like its receivers and halo grew the 1M slot to 1,336,832 edges; the padded edges cost every
+call: reuse steps 15.03 s (+2.5 %) and GPU peak +0.32 GiB, against a recompile that 60 steps never needed. Removed in
+`3a83c308`; the neighbouring-slot rule needs no headroom.
+
+**Not pursued, by the measurements:**
+- **32-bit sort keys in the search:** the sort is over the kept edges only (a small part of the 1.47 s, after the
+  distance test); per-tile ranks would need another sort first.
+- **Per-tile topology cache:** a tile's local topology costs the `fill` phase, 0.08 s of a 14.3 s call (0.6 %).
+- **Pencil wavefront with a GPU band:** at 1M the state lives on the device and the wavefront is off; it would
+  only matter for host-state runs at capacity sizes, which are parked (no bigger cells).
