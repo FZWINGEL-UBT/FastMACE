@@ -229,11 +229,12 @@ FASTMACE_ONLY_DEFAULTS = {
     # RADIAL_TABLES_GPUS (this file's GPU is one), float32, not reproducible.
     "radial_tables": "on_with_fold_cutoff_unless_reproducible_and_generic_family_on_decision_66_gpus",
     # Owner decision 64, 27 October 2026 (OPT8-T02): with chunked_conv_backward, MH-1 only, float32, not
-    # reproducible.
-    "fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
+    # reproducible. Decision 66, 3 November 2026: also OMAT-0 medium with wprime_backward on
+    # DECISION_66_GENERIC_WPRIME_GPUS (this file's GPU is one).
+    "fused_folded_forward": "on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus",
     # Decision 66, 29 October 2026 (OPT9-T05): MH-1 on DECISION_66_WPRIME_GPUS (this file's GPU is one), float32, not
-    # reproducible.
-    "wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
+    # reproducible; 3 November 2026: OMAT-0 medium on DECISION_66_GENERIC_WPRIME_GPUS (this file's GPU is one).
+    "wprime_backward": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     # Decision 66, 31 October 2026 (speed-def E2): MH-1 on DECISION_66_GATE_EPILOGUE_GPUS (this file's GPU is one),
     # with segment_gemm (float32, not reproducible).
     "gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
@@ -257,7 +258,9 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
-           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS, "gate_epilogue": MH1_LABELS,
+           # decision 66 (3 November 2026): OMAT-0 medium too, this file's GPU is measured
+           "fused_folded_forward": (*MH1_LABELS, "omat0-medium"), "wprime_backward": (*MH1_LABELS, "omat0-medium"),
+           "gate_epilogue": MH1_LABELS,
            "tf32x3_gemms": ()}  # decision 66: the A100-SXM4-80GB only, not this file's GPU
 
 
@@ -1044,7 +1047,8 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
     for label in ("polar1-s", "omol0-xl"):
         plan = plan_for(label)
         assert plan.rewrites.wprime_backward == "off", label
-        assert dict(plan.auto_options_off)["wprime_backward"].startswith("not MH-1, decision 66"), label
+        assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured model, decision 66"), \
+            label
     float64 = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
     item, choice, reason = decision(float64, "RewriteConfig.wprime_backward")
     assert choice == "off" and "float64 plans keep the chained backward" in reason
@@ -1055,6 +1059,37 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
         traits("mh1-r2scan"), nacl(), IntegratorConfig(), L4, model_label="mh1-r2scan")
     assert plan.rewrites.wprime_backward == "on"
     assert plan_for("mh1-r2scan", rewrites=RewriteConfig(wprime_backward="off")).rewrites.wprime_backward == "off"
+
+
+def test_decision_66_generic_wprime_and_fused_forward_for_omat0():
+    """Decision 66 (owner, 3 November 2026; docs/validation/generic-wprime.md): the generic fused forward and
+    wprime_backward are on together for OMAT-0 medium on the measured GPUs, by exact name. On the A100-SXM4-80GB,
+    where the generic chunked path is off, chunked_conv_backward stays on as their carrier (wprime_backward's
+    backward never chunks) and goes off with them in float64 plans and when wprime_backward is turned off."""
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+    def plan(hardware, label="omat0-medium", **configs):
+        return planner(engine=EngineConfig(), **configs).plan(traits(label), nacl(), IntegratorConfig(), hardware,
+                                                              model_label=label)
+
+    for hardware in (GPU, ADA, a100_80):
+        p = plan(hardware)
+        assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward, p.rewrites.chunked_conv_backward) == \
+            ("on", "on", "on"), hardware.name
+        assert f"omat0-medium (generic) on a measured GPU, decision 66 ({hardware.name})" in \
+            decision(p, "RewriteConfig.wprime_backward")[2]
+    assert "carrier of wprime_backward" in decision(p, "RewriteConfig.chunked_conv_backward")[2]  # the A100
+    for hardware in (A100, L4):  # never measured
+        p = plan(hardware)
+        assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) == ("off", "off"), hardware.name
+        assert dict(p.auto_options_off)["wprime_backward"] == f"not a measured GPU, decision 66 ({hardware.name})"
+    p = plan(GPU, label="mp0-medium")
+    assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) == ("off", "off")
+    assert dict(p.auto_options_off)["wprime_backward"] == "not a measured model, decision 66 (label mp0-medium)"
+    for configs in ({"precision": PrecisionConfig(dtype="float64")}, {"rewrites": RewriteConfig(wprime_backward="off")}):
+        p = plan(a100_80, **configs)
+        assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward, p.rewrites.chunked_conv_backward) == \
+            ("off", "off", "off"), configs
 
 
 def test_decision_66_gate_epilogue_on_the_measured_gpus():

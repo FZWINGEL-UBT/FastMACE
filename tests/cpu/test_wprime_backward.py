@@ -179,7 +179,7 @@ def test_planner_rules_and_resolution():
     from fastmace.planner.fixed import PlanRefused
 
     assert (fixed.AUTO_RULES["RewriteConfig.wprime_backward"]
-            == "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus")
+            == "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus")
     assert "wprime_backward" in fixed.REWRITE_FIELDS
     plan = plan_for("mh1-r2scan")  # the RTX 5060 Ti: decision 66 (test_planner.py has the per-GPU cases)
     assert plan.rewrites.wprime_backward == "on" and plan.rewrites.radial_tables == "on"

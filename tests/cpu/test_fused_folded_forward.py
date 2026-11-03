@@ -101,7 +101,8 @@ def test_record_and_requirements():
 def test_planner_rules():
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.fused_folded_forward"] == "on_for_mh1_float32_unless_reproducible"
+    assert fixed.AUTO_RULES["RewriteConfig.fused_folded_forward"] == (
+        "on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus")
     assert fixed.REWRITE_FIELDS.index("fused_folded_forward") == fixed.REWRITE_FIELDS.index(
         "chunked_conv_backward") + 1
 

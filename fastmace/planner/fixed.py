@@ -95,10 +95,11 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
-    "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
+    "RewriteConfig.fused_folded_forward":
+        "on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
-    "RewriteConfig.wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
+    "RewriteConfig.wprime_backward": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.recompute_conv_weights": "on_by_rule_12_when_the_plan_does_not_fit_without_it",
     "RewriteConfig.recompute_first_table": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.recompute_node_segments": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
@@ -407,6 +408,16 @@ DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti
 # 0.849 / 0.848, SrTiO3 0.821 / 0.821. Tiled compiled calls: Ada 975,560 atoms 0.861 / 0.862, 5060 Ti 320,000 0.912
 # / 0.882. The A100s (owner, 3 November 2026, after Benchmark_loup; docs/validation/loup-a100.md): A100 80GB PCIe
 # SrTiO3 5,000 atoms 0.902 / 0.901, A100-SXM4-80GB NaCl 8,000 0.917 / 0.917. The A100-SXM4-40GB was not measured.
+# generic_fused_folded_forward and generic_wprime_backward together (owner, 3 November 2026;
+# docs/validation/generic-wprime.md): "auto" on for these labels on these GPUs, exact device names. MACE-OMAT-0
+# medium, SrTiO3 5,000 atoms, MD step b/a in both build orders with both on: RTX 5060 Ti 0.839 / 0.831, RTX 4000 Ada
+# 0.832 / 0.833, A100-SXM4-80GB 0.895 / 0.894. On the A100, where decision 66 leaves the generic chunked path off,
+# chunked_conv_backward stays on as their carrier: wprime_backward's backward writes no chunked weight gradient, so
+# the chunking (1.31x slower there) never runs; the fused forward alone was 1.29x slower and stays off without
+# wprime_backward. Force gates pass (rounding only, as IEEE float32).
+DECISION_66_GENERIC_WPRIME_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                   "NVIDIA A100-SXM4-80GB")
+DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
 DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti",
                                                            "NVIDIA RTX 4000 Ada Generation",
                                                            "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB")
@@ -1192,12 +1203,20 @@ class FixedPlanner:
                 v["radial_tables"] = False
                 v["_auto_off"]["radial_tables"] = reason
                 v["_why"]["radial_tables"] += f"; stage 2: off, {reason}"
+        # generic_fused_folded_forward + generic_wprime_backward (decision 66, measured labels and GPUs only).
+        generic_wprime = (not support["fold_cutoff"][0] and v["radial_tables"] and v["wprime_backward"]
+                          and model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                          and getattr(hardware, "name", None) in DECISION_66_GENERIC_WPRIME_GPUS)
         if v["chunked_conv_backward"] and "chunked_conv_backward" not in explicit and not support["fold_cutoff"][0]:
             # The generic folded path (generic_chunked_conv_backward): decision 66, measured GPUs only.
             name = getattr(hardware, "name", None)
             if name in DECISION_66_GENERIC_CHUNKED_GPUS:
                 v["_why"]["chunked_conv_backward"] += (f"; stage 2: on, generic model on a measured GPU, "
                                                        f"decision 66 ({name})")
+            elif generic_wprime:
+                v["_chunked_carrier"] = True  # dropped with wprime_backward (_fastmace_rules)
+                v["_why"]["chunked_conv_backward"] += (f"; stage 2: on as the carrier of wprime_backward, whose "
+                                                       f"backward never chunks, decision 66 ({name})")
             else:
                 reason = f"generic folded path not measured on this GPU, decision 66 ({name})"
                 v["chunked_conv_backward"] = False
@@ -1251,8 +1270,12 @@ class FixedPlanner:
             # Decision 64: measured faster on MH-1 only (POLAR-1-S neutral, OMOL-0 XL 3.5 % slower; OPT8-T02).
             if _mh1(model_label):
                 v["_why"]["fused_folded_forward"] += f"; stage 2: {model_label}, decision 64"
+            elif generic_wprime:
+                v["_why"]["fused_folded_forward"] += (f"; stage 2: on with wprime_backward, {model_label} on a "
+                                                      f"measured GPU, decision 66 ({hardware.name})")
             else:
-                reason = f"not MH-1, decision 64 (label {model_label})"
+                reason = (f"not MH-1, decision 64 (label {model_label}), nor a measured generic model and GPU "
+                          "with wprime_backward, decision 66")
                 v["fused_folded_forward"] = False
                 v["_auto_off"]["fused_folded_forward"] = reason
                 v["_why"]["fused_folded_forward"] += f"; stage 2: off, {reason}"
@@ -1261,8 +1284,12 @@ class FixedPlanner:
             name = getattr(hardware, "name", None)
             if _mh1(model_label) and name in DECISION_66_WPRIME_GPUS:
                 v["_why"]["wprime_backward"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            elif generic_wprime:
+                v["_why"]["wprime_backward"] += (f"; stage 2: on, {model_label} (generic) on a measured GPU, "
+                                                 f"decision 66 ({name})")
             else:
-                reason = (f"not MH-1, decision 66 (label {model_label})" if not _mh1(model_label)
+                measured = _mh1(model_label) or model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
                           else f"not a measured GPU, decision 66 ({name})")
                 v["wprime_backward"] = False
                 v["_auto_off"]["wprime_backward"] = reason
@@ -1388,6 +1415,10 @@ class FixedPlanner:
         if v["streaming_conv"] and not v["sort_receivers"]:  # cannot happen after stage 1; kept as the hard rule
             book.refuse("RewriteConfig.streaming_conv needs sort_receivers (NeighbourConfig.sort_receivers='on')",
                         "streaming-needs-sorted-receivers")
+        if v.get("_chunked_carrier") and v["chunked_conv_backward"] and (dtype != "float32" or reproducible):
+            # Kept on only for wprime_backward (stage 2), which these plans drop: off with it.
+            v["chunked_conv_backward"] = False
+            v["_why"]["chunked_conv_backward"] += "; off: kept only as wprime_backward's carrier, which is off here"
         if v["chunked_conv_backward"] and not (v["streaming_conv"] and v["fused_folded_backward"]):
             if "chunked_conv_backward" in explicit:
                 book.refuse("RewriteConfig.chunked_conv_backward='on' requires streaming_conv and "

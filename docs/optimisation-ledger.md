@@ -156,7 +156,7 @@ RewriteConfig, on in the default MH-1 float32 plan:
 | `fold_readout_tail` | `on_with_block_linear_unless_reproducible_if_model_supports` | as `species_tables` |
 | `chunked_conv_backward` | `on_with_streaming_conv_and_fused_folded_backward` | Decision 60 (27 Oct 2026; §19 "Optimisation round 6") |
 | `radial_tables` | `on_with_fold_cutoff_unless_reproducible` | Decision 62 (27 Oct 2026); class `certified` by decision 61; float64 by decision 63 |
-| `fused_folded_forward` | `on_for_mh1_float32_unless_reproducible` | Decision 64 (27 Oct 2026) |
+| `fused_folded_forward` | `on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus` | Decision 64 (27 Oct 2026); OMAT-0 with wprime, decision 66 (3 Nov 2026) |
 | `single_graph_strain` | `on` (acts only where stress is computed) | RE default (16 Oct 2026); SPEC §6.2 |
 
 RewriteConfig, off or not applicable in the MH-1 float32 plan: `species_skip` (generic family only,
