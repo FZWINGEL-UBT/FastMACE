@@ -418,12 +418,15 @@ def main(argv=None):
                                                   positions=positions))
             save()
         energy = float(out.energy.reshape(-1)[0])
-        forces = out.forces.detach().double()
+        # The largest force from chunks of the output itself: a whole float64 copy (24 bytes per atom) does not
+        # fit next to a 149M-atom call's residency on a 16 GB GPU, and |f| max is exact in the output's dtype.
+        forces = out.forces.detach()
+        max_force = max(float(chunk.abs().max()) for chunk in forces.reshape(-1).split(1 << 24))
         stress = out.stress.detach().double() if out.stress is not None else None
         if args.tile_list:  # the force field's list is empty: the edges the tiles built
             record["edges_within_cutoff"] = int(tiled.last["edges"])
         record["tiled"] = dict(energy_eV=energy, energy_per_atom_eV=energy / n,
-                               max_abs_force=float(forces.abs().max()),
+                               max_abs_force=max_force,
                                stress=None if stress is None else stress.cpu().tolist())
         save()
 
