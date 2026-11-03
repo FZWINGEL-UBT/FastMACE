@@ -82,7 +82,7 @@ def _kernels():
     @triton.jit
     def forward(r_ptr, pair_ptr, coef_ptr, starts_ptr, scales_ptr, bins_ptr, g_ptr, density_ptr, E, K, n_bins,
                 r_lo, bin_scale, r_max, TERMS: tl.constexpr, J: tl.constexpr, BLOCK_E: tl.constexpr,
-                BLOCK_J: tl.constexpr):
+                BLOCK_J: tl.constexpr, DENSITY: tl.constexpr):
         e = tl.program_id(0) * BLOCK_E + tl.arange(0, BLOCK_E)
         rows = e < E
         r, pair, piece, x = _locate(r_ptr, pair_ptr, starts_ptr, scales_ptr, bins_ptr, e, rows, r_lo, bin_scale,
@@ -92,13 +92,14 @@ def _kernels():
         values = tl.where((r < r_max)[:, None], values, 0.0)
         e64 = e.to(tl.int64)
         tl.store(g_ptr + e64[:, None] * (J - 1) + j[None, :], values, mask=rows[:, None] & (j < J - 1)[None, :])
-        density = tl.sum(tl.where((j == J - 1)[None, :], values, 0.0), axis=1)
-        tl.store(density_ptr + e64, density, mask=rows)
+        if DENSITY:
+            density = tl.sum(tl.where((j == J - 1)[None, :], values, 0.0), axis=1)
+            tl.store(density_ptr + e64, density, mask=rows)
 
     @triton.jit
     def backward(r_ptr, pair_ptr, dcoef_ptr, starts_ptr, scales_ptr, bins_ptr, grad_g_ptr, grad_density_ptr,
-                 grad_r_ptr, E, K, n_bins, r_lo, bin_scale, r_max, TERMS: tl.constexpr, J: tl.constexpr,
-                 BLOCK_E: tl.constexpr, BLOCK_J: tl.constexpr):
+                 grad_r_ptr, E, E_DENSITY, K, n_bins, r_lo, bin_scale, r_max, TERMS: tl.constexpr,
+                 J: tl.constexpr, BLOCK_E: tl.constexpr, BLOCK_J: tl.constexpr):
         e = tl.program_id(0) * BLOCK_E + tl.arange(0, BLOCK_E)
         rows = e < E
         r, pair, piece, x = _locate(r_ptr, pair_ptr, starts_ptr, scales_ptr, bins_ptr, e, rows, r_lo, bin_scale,
@@ -108,7 +109,9 @@ def _kernels():
         e64 = e.to(tl.int64)
         grad = tl.load(grad_g_ptr + e64[:, None] * (J - 1) + j[None, :],
                        mask=rows[:, None] & (j < J - 1)[None, :], other=0.0)
-        grad_density = tl.load(grad_density_ptr + e64, mask=rows, other=0.0)
+        # E_DENSITY = 0 without a density gradient: nothing is read, and the same code as a zero gradient runs (a
+        # compile-time branch let the compiler reorder the sum: last-bit differences).
+        grad_density = tl.load(grad_density_ptr + e64, mask=e < E_DENSITY, other=0.0)
         grad = tl.where((j == J - 1)[None, :], grad_density[:, None], grad)
         total = tl.sum(grad * slopes, axis=1)
         total = tl.where((r < r_max) & (r >= r_lo), total, 0.0)
@@ -126,48 +129,54 @@ def _block_j(width):
 @torch.library.custom_op("fastmace::radial_table_forward", mutates_args=())
 def radial_table_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor, starts: torch.Tensor,
                          scales: torch.Tensor, bins: torch.Tensor, r_lo: float, bin_scale: float,
-                         r_max: float) -> tuple[torch.Tensor, torch.Tensor]:
-    """(``[E, J - 1]`` folded input, ``[E, 1]`` edge density) of edge lengths ``r`` and pair indices ``pair``."""
+                         r_max: float, density: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
+    """(``[E, J - 1]`` folded input, ``[E, 1]`` edge density) of edge lengths ``r`` and pair indices ``pair``.
+
+    ``density=False`` (a residual block, which has no density): the density is ``[E, 0]``, neither computed nor
+    stored."""
     r, pair = r.reshape(-1).contiguous(), pair.contiguous()
     edges, width = r.shape[0], coef.shape[-1]
     if not r.is_cuda:
         values = evaluate(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
-        return values[:, :-1].contiguous(), values[:, -1:].contiguous()
+        return values[:, :-1].contiguous(), values[:, width - 1:width - 1 + int(density)].contiguous()
     g = r.new_empty((edges, width - 1))
-    density = r.new_empty((edges, 1))
+    out = r.new_empty((edges, int(density)))
     if edges:
         forward, _ = _kernels()
         forward[(-(-edges // BLOCK_E),)](
-            r, pair, coef, starts, scales, bins, g, density, edges, coef.shape[1], bins.shape[0], r_lo, bin_scale,
-            r_max, TERMS=coef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=_block_j(width))
-    return g, density
+            r, pair, coef, starts, scales, bins, g, out if density else g, edges, coef.shape[1], bins.shape[0], r_lo,
+            bin_scale, r_max, TERMS=coef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=_block_j(width),
+            DENSITY=density)
+    return g, out
 
 
 @radial_table_forward.register_fake
-def _(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max):
+def _(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, density=True):
     edges = r.numel()
-    return r.new_empty((edges, coef.shape[-1] - 1)), r.new_empty((edges, 1))
+    return r.new_empty((edges, coef.shape[-1] - 1)), r.new_empty((edges, int(density)))
 
 
 @torch.library.custom_op("fastmace::radial_table_backward", mutates_args=())
 def radial_table_backward(r: torch.Tensor, pair: torch.Tensor, dcoef: torch.Tensor, starts: torch.Tensor,
                           scales: torch.Tensor, bins: torch.Tensor, grad_g: torch.Tensor, grad_density: torch.Tensor,
                           r_lo: float, bin_scale: float, r_max: float) -> torch.Tensor:
-    """``dL/dr`` ``[E, 1]`` from the gradients of the folded input and the edge density."""
+    """``dL/dr`` ``[E, 1]`` from the gradients of the folded input and the edge density (``[E, 0]``: none)."""
     shape = r.shape
     r, pair = r.reshape(-1).contiguous(), pair.contiguous()
+    density = grad_density.shape[-1] > 0
     grad_g, grad_density = grad_g.contiguous(), grad_density.reshape(-1).contiguous()
     edges, width = r.shape[0], dcoef.shape[-1]
     if not r.is_cuda:
         slopes = evaluate(r, pair, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, derivative=True)
-        grad = torch.cat([grad_g, grad_density[:, None]], dim=1)
+        grad = torch.cat([grad_g, grad_density[:, None] if density else grad_g.new_zeros((edges, 1))], dim=1)
         return (grad * slopes).sum(dim=1).reshape(shape)
     grad_r = r.new_empty((edges,))
     if edges:
         _, backward = _kernels()
         backward[(-(-edges // BLOCK_E),)](
-            r, pair, dcoef, starts, scales, bins, grad_g, grad_density, grad_r, edges, dcoef.shape[1], bins.shape[0],
-            r_lo, bin_scale, r_max, TERMS=dcoef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=_block_j(width))
+            r, pair, dcoef, starts, scales, bins, grad_g, grad_density if density else grad_g, grad_r, edges,
+            edges if density else 0, dcoef.shape[1], bins.shape[0], r_lo, bin_scale, r_max, TERMS=dcoef.shape[2],
+            J=width, BLOCK_E=BLOCK_E, BLOCK_J=_block_j(width))
     return grad_r.reshape(shape)
 
 
@@ -178,10 +187,11 @@ def _(r, pair, dcoef, starts, scales, bins, grad_g, grad_density, r_lo, bin_scal
 
 class _RadialTable(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max):
+    def forward(ctx, r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, density):
         ctx.save_for_backward(r, pair, dcoef, starts, scales, bins)
         ctx.constants = (r_lo, bin_scale, r_max)
-        return radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
+        ctx.density = density
+        return radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, density)
 
     @staticmethod
     def backward(ctx, grad_g, grad_density):
@@ -189,15 +199,16 @@ class _RadialTable(torch.autograd.Function):
         if grad_g is None:
             grad_g = r.new_zeros((r.numel(), dcoef.shape[-1] - 1))
         if grad_density is None:
-            grad_density = r.new_zeros((r.numel(), 1))
+            grad_density = r.new_zeros((r.numel(), int(ctx.density)))
         grad_r = radial_table_backward(r, pair, dcoef, starts, scales, bins, grad_g, grad_density, *ctx.constants)
-        return grad_r, None, None, None, None, None, None, None, None, None
+        return grad_r, None, None, None, None, None, None, None, None, None, None
 
 
-def radial_table(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max):
-    """``(folded input [E, J - 1], edge density [E, 1])``, differentiable in ``r`` (``[E, 1]`` or ``[E]``)."""
+def radial_table(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, density=True):
+    """``(folded input [E, J - 1], edge density [E, 1])``, differentiable in ``r`` (``[E, 1]`` or ``[E]``);
+    ``density=False``: the density ``[E, 0]`` (not computed)."""
     return _RadialTable.apply(r, pair, coef, dcoef, starts, scales, bins, float(r_lo), float(bin_scale),
-                              float(r_max))
+                              float(r_max), bool(density))
 
 
 __all__ = ["evaluate", "radial_table", "radial_table_backward", "radial_table_forward"]

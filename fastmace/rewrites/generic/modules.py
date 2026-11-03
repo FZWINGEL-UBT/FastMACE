@@ -88,7 +88,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     table = getattr(self, "radial_table", None)
     tabled = table is not None and edge_feats.shape[1] == 1  # generic_radial_tables: edge_feats are the lengths
     if tabled:
-        augmented, table_density = table(edge_feats, node_attrs, edge_index)  # [h c, c] and the density
+        augmented, table_density = table(edge_feats, node_attrs, edge_index,
+                                         density=kind != "residual")  # [h c, c] and the density
     if tabled and chunked:
         pass
     elif tabled and reassociation is None:
@@ -114,7 +115,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
             if cutoff is not None:
                 edge_density = edge_density * cutoff
-        density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
+        density = scatter_sum(src=edge_density, index=edge_index[1], dim=0,
+                              dim_size=num_nodes if n_real is None else n_real)  # every receiver is real
     if reassociation is not None:
         if tabled:
             hidden = augmented[:, :-1]  # h c
@@ -127,19 +129,19 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     elif getattr(self, "streaming_kernels", None) is not None:
         from fastmace.rewrites.mh1.modules import streaming_message
         message = streaming_message(self, node_feats, edge_attrs, None if chunked else tp_weights, edge_index,
-                                    num_nodes, augmented=augmented if chunked else None)
+                                    num_nodes, augmented=augmented if chunked else None, rows=n_real)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
         mji = self.conv_tp(node_feats[edge_index[0]], edge_attrs, tp_weights)
         message = scatter_sum(src=mji, index=edge_index[1], dim=0, dim_size=num_nodes)
-    message = self.truncate_ghosts(message, n_real)
+    if message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
+        message = self.truncate_ghosts(message, n_real)
     node_attrs = self.truncate_ghosts(node_attrs, n_real)
     if kind == "residual":
         sc = self.truncate_ghosts(sc, n_real)
         message = self.linear(message) / self.avg_num_neighbors
         return self.reshape(message), sc
-    density = self.truncate_ghosts(density, n_real)
     if getattr(self, "density_before_linear", False):  # GENERIC_DENSITY_FIRST (not carried over); bias-free linear
         message = self.linear(message / (density + 1))
     else:

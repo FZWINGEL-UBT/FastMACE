@@ -56,3 +56,26 @@ def test_kernels_equal_their_pytorch_twin():
     graph.replay()
     torch.cuda.synchronize()
     assert torch.equal(captured[0], g) and torch.equal(captured[1], density)
+
+
+def test_without_density_the_folded_input_and_its_gradient_are_unchanged():
+    """``density=False`` (residual blocks): the same folded input bit for bit, an ``[E, 0]`` density, and the
+    lengths' gradient of a zero density gradient."""
+    from fastmace.kernels.triton.radial_table import radial_table
+
+    generator = torch.Generator().manual_seed(11)
+    table = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in _table(generator).items()}
+    edges = 3001
+    r = (torch.rand(edges, generator=generator) * 6.4).cuda()[:, None]
+    pair = torch.randint(0, 3, (edges,), generator=generator, dtype=torch.int32).cuda()
+    args = (pair, table["coef"], table["dcoef"], table["starts"], table["scales"], table["bins"], table["r_lo"],
+            table["bin_scale"], table["r_max"])
+    grad_g = torch.randn((edges, 65), generator=generator).cuda()
+    results = []
+    for density in (True, False):
+        leaf = r.clone().requires_grad_()
+        g, d = radial_table(leaf, *args, density=density)
+        assert d.shape == (edges, int(density))
+        (g * grad_g).sum().backward()
+        results.append((g.detach(), leaf.grad))
+    assert torch.equal(results[0][0], results[1][0]) and torch.equal(results[0][1], results[1][1])

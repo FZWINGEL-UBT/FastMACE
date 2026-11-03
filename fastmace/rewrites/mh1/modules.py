@@ -333,13 +333,14 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
                                 self.conv_tp_weights.folded_weight(), rows=n_real)  # the tiles' receivers only
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv
         message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented,
-                                    w_lengths, node_attrs)
+                                    w_lengths, node_attrs, rows=n_real)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
         mji = self.conv_tp(node_feats[edge_index[0]], edge_attrs, tp_weights)
         message = scatter_sum(src=mji, index=edge_index[1], dim=0, dim_size=num_nodes)
-    message = self.truncate_ghosts(message, n_real)
+    if message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
+        message = self.truncate_ghosts(message, n_real)
     density = self.truncate_ghosts(density, n_real)
     sc = self.truncate_ghosts(sc, n_real)
     # species_residual: the residual products are per-species rows, read from the one-hot node_attrs.
@@ -374,7 +375,7 @@ setattr(cutoff_folded_forward, READS_SPECIES_RESIDUAL, True)
 
 
 def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,
-                      w_lengths=None, node_attrs=None, wprime_lengths=None):
+                      w_lengths=None, node_attrs=None, wprime_lengths=None, rows=None):
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
@@ -382,15 +383,24 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     ``fused_folded_forward`` attached (opt-8 OPT8-T02) one kernel builds them and the message. With
     ``wprime_lengths`` (wprime_backward, opt-9 OPT9-T03) the radial table runs inside the op too, which returns
     ``(message, edge density)``; its backward forms the lengths' gradient without the weight gradient.
+
+    ``rows`` (a tile's receiver count, every receiver below it): the message of those rows only, without the
+    halo rows' zeros, on the paths whose kernels allow it (``StreamingKernels.rows_fit``); else all ``num_nodes``.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
+    plain = wprime_lengths is None and w_lengths is None and (
+        augmented is None or (getattr(self, "generic_recompute", None) is None
+                              and getattr(self, "fused_folded_forward", None) is None))
+    if rows is not None and not (plain and self.streaming_kernels.rows_fit(rows)):
+        rows = None
+    rows = num_nodes if rows is None else rows
     # The compacted count (the engine registers the neighbour list's GPU counter) ends the
     # receiver-sorted edges within the cutoff; the padding after it goes past every row. (A float32
     # cutoff test is not enough: pairs at the cutoff can disagree with the float64 compaction.)
     position = torch.arange(receiver.shape[0], device=receiver.device)
     key = torch.where(position < self.streaming_count, receiver, torch.full_like(receiver, num_nodes))
-    row_ptr = torch.searchsorted(key, torch.arange(num_nodes + 1, device=key.device)).to(torch.int32)
+    row_ptr = torch.searchsorted(key, torch.arange(rows + 1, device=key.device)).to(torch.int32)
     # The kernels read and write the model's own node layout (ir_mul with cuEquivariance), so
     # OEq's layout transposes around the convolution are not needed.
     conv = self.conv_tp

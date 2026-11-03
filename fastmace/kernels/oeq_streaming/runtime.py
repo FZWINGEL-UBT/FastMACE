@@ -119,9 +119,15 @@ class StreamingKernels:
         _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.num_threads, 1, 1, self.shared_memory,
                                      stream, (tuple(values), tuple(types)), 0))
 
+    def rows_fit(self, rows):
+        """Whether a launch over the first ``rows`` receivers only covers them exactly (``row_ptr`` and ``out``
+        then hold ``rows`` rows while senders index all of ``x``): the kernels bound their threads by the node
+        count, so a partial last block would read and write past the rows."""
+        return rows * self.channels % self.num_threads == 0
+
     def forward(self, x, sh, weights, senders, row_ptr, out):
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (nodes * self.channels + self.num_threads - 1) // self.num_threads
+        blocks = (out.shape[0] * self.channels + self.num_threads - 1) // self.num_threads
         if blocks:
             p = ctypes.c_void_p
             self._launch(self._forward, blocks,
@@ -132,7 +138,7 @@ class StreamingKernels:
     def backward_receiver(self, x, sh, weights, senders, row_ptr, dout, dx, dsh, dweights):
         """Receiver-owned reverse pass; dx and dsh must be zero."""
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (nodes * self.channels + self.num_threads - 1) // self.num_threads
+        blocks = (dout.shape[0] * self.channels + self.num_threads - 1) // self.num_threads
         if blocks:
             p = ctypes.c_void_p
             self._launch(self._backward_receiver, blocks,
@@ -171,14 +177,14 @@ def streaming_conv_forward(x: torch.Tensor, sh: torch.Tensor, weights: torch.Ten
                            row_ptr: torch.Tensor, kernel_id: int) -> torch.Tensor:
     kernels = _REGISTRY[kernel_id]
     x, sh, weights = x.contiguous(), sh.contiguous(), weights.contiguous()
-    out = x.new_empty((x.shape[0], kernels.output_dim))
+    out = x.new_empty((row_ptr.shape[0] - 1, kernels.output_dim))  # the receiver rows (rows_fit)
     kernels.forward(x, sh, weights, senders.contiguous(), row_ptr.contiguous(), out)
     return out
 
 
 @streaming_conv_forward.register_fake
 def _(x, sh, weights, senders, row_ptr, kernel_id):
-    return x.new_empty((x.shape[0], _REGISTRY[kernel_id].output_dim))
+    return x.new_empty((row_ptr.shape[0] - 1, _REGISTRY[kernel_id].output_dim))
 
 
 @torch.library.custom_op("fastmace::streaming_conv_backward", mutates_args=())
@@ -459,5 +465,6 @@ class _StreamingConvolution(torch.autograd.Function):
 
 
 def streaming_convolution(x, sh, weights, senders, receivers, row_ptr, kernels):
-    """OEq-equivalent message [nodes, output_dim] (mul_ir); senders/receivers/row_ptr int32, row_ptr [nodes + 1]."""
+    """OEq-equivalent message [rows, output_dim] (mul_ir); senders/receivers/row_ptr int32, row_ptr [rows + 1]: every
+    node (rows = nodes), or the first rows when every receiver is below them (``StreamingKernels.rows_fit``)."""
     return _StreamingConvolution.apply(x, sh, weights, senders, receivers, row_ptr, kernels.id)

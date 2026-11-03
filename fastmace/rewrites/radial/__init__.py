@@ -158,11 +158,12 @@ def _table_module(tables, columns, device, single=False):
             species = node_attrs[:, self.columns].argmax(dim=1).to(torch.int32)
             return species[edge_index[0]] * self.species + species[edge_index[1]]
 
-        def forward(self, lengths, node_attrs, edge_index):
+        def forward(self, lengths, node_attrs, edge_index, density=True):
+            """``density=False`` (a residual block): the density ``[E, 0]``, not evaluated."""
             from fastmace.kernels.triton.radial_table import radial_table
 
             return radial_table(lengths, self.pair(node_attrs, edge_index), self.coef, self.dcoef, self.starts,
-                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max)
+                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density)
 
         def extra_repr(self):
             return (f"pairs={self.coef.shape[0]}, pieces={self.pieces} (padded to {self.coef.shape[1]}), "
