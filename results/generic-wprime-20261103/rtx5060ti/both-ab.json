@@ -1,0 +1,198 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-03T19:18:19.835089+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "5b07cef3a1ead7c8e00dd48bb6deffd55be3f40a",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "wprime_backward": "on",
+      "fused_folded_forward": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    1.0078125,
+    1.3271484375,
+    1.07373046875
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 45.901888820001204,
+            "mean_ms": 45.76643431875084,
+            "min_ms": 44.79037479500221,
+            "max_ms": 46.02927605500099,
+            "stdev_ms": 0.4128889714157276,
+            "spread": 0.02699020218660255,
+            "block_ms": [
+              44.79037479500221,
+              46.022888710003826,
+              45.690812624998216,
+              45.80660177500249,
+              45.821923600001355,
+              45.98185404000105,
+              45.98774294999657,
+              46.02927605500099
+            ]
+          },
+          "b": {
+            "median_ms": 38.506070920000184,
+            "mean_ms": 38.50610642999925,
+            "min_ms": 38.139829044998805,
+            "max_ms": 39.07544352499826,
+            "stdev_ms": 0.3347544844053521,
+            "spread": 0.024297843369770995,
+            "block_ms": [
+              38.139829044998805,
+              38.18520110999998,
+              38.49523564500032,
+              38.196167269998114,
+              38.85291114499978,
+              38.51690619500005,
+              39.07544352499826,
+              38.587157504998686
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.8388777000222618,
+        "pair_ratios_b_over_a": [
+          0.8515184170607681,
+          0.8297002248296467,
+          0.8425158895935007,
+          0.8338572561573967,
+          0.8479109581728391,
+          0.8376544834728279,
+          0.8496925706374806,
+          0.8383177145538935
+        ]
+      },
+      "ratio_b_over_a": 0.8388777000222618,
+      "pair_ratios": [
+        0.8515184170607681,
+        0.8297002248296467,
+        0.8425158895935007,
+        0.8338572561573967,
+        0.8479109581728391,
+        0.8376544834728279,
+        0.8496925706374806,
+        0.8383177145538935
+      ],
+      "setup_s": {
+        "a": 24.094183763999354,
+        "b": 21.231882195999788
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.fused_folded_forward = off  (auto (on_for_mh1_float32_unless_reproducible): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: off, not MH-1, decision 64 (label omat0-medium))",
+          "RewriteConfig.wprime_backward = off  (auto (on_for_mh1_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: off, not MH-1, decision 66 (label omat0-medium))"
+        ],
+        "b": [
+          "RewriteConfig.fused_folded_forward = on  (requested 'on': stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)))",
+          "RewriteConfig.wprime_backward = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 298.05113942454824,
+          "potential_eV_atom": -7.952189727946664,
+          "kinetic_eV_atom": 0.03852607688707974
+        },
+        "b": {
+          "temperature_K": 298.050951341921,
+          "potential_eV_atom": -7.952189746590998,
+          "kinetic_eV_atom": 0.03852605257552781
+        }
+      },
+      "load_after": [
+        1.0390625,
+        1.17529296875,
+        1.06005859375
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        },
+        "b": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

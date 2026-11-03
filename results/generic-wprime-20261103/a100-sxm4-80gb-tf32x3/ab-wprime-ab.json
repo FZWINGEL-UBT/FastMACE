@@ -1,0 +1,198 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-03T20:36:57.044423+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "14fe2e47aed3487288330b1c63ab9ef50d5fc575",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "chunked_conv_backward": "on",
+      "wprime_backward": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 21.494000742499964,
+            "mean_ms": 21.43968465874991,
+            "min_ms": 21.082701990000032,
+            "max_ms": 21.51106845499953,
+            "stdev_ms": 0.14610121222160782,
+            "spread": 0.019929582683622615,
+            "block_ms": [
+              21.438612990000365,
+              21.485366934999774,
+              21.48596542000007,
+              21.082701990000032,
+              21.50362848499981,
+              21.502036064999857,
+              21.50809692999985,
+              21.51106845499953
+            ]
+          },
+          "b": {
+            "median_ms": 19.488024405000033,
+            "mean_ms": 19.4271343018751,
+            "min_ms": 19.047600040000248,
+            "max_ms": 19.51802538000038,
+            "stdev_ms": 0.15916167978301474,
+            "spread": 0.024139201092104372,
+            "block_ms": [
+              19.38943351999967,
+              19.460674175000463,
+              19.474248100000295,
+              19.047600040000248,
+              19.50180070999977,
+              19.507450149999954,
+              19.51802538000038,
+              19.517842340000016
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9066727334044645,
+        "pair_ratios_b_over_a": [
+          0.90441641579348,
+          0.905764106048332,
+          0.9063706340080404,
+          0.903470534708261,
+          0.9069074423232133,
+          0.9072373467810051,
+          0.9074733782130354,
+          0.907339511323239
+        ]
+      },
+      "ratio_b_over_a": 0.9066727334044645,
+      "pair_ratios": [
+        0.90441641579348,
+        0.905764106048332,
+        0.9063706340080404,
+        0.903470534708261,
+        0.9069074423232133,
+        0.9072373467810051,
+        0.9074733782130354,
+        0.907339511323239
+      ],
+      "setup_s": {
+        "a": 29.873241783000026,
+        "b": 42.16399133200002
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.chunked_conv_backward = off  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: off, generic folded path not measured on this GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+          "RewriteConfig.wprime_backward = off  (auto (on_for_mh1_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: off, not MH-1, decision 66 (label omat0-medium))"
+        ],
+        "b": [
+          "RewriteConfig.chunked_conv_backward = on  (requested 'on': stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)))",
+          "RewriteConfig.wprime_backward = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 298.05086144631275,
+          "potential_eV_atom": -7.952186341020015,
+          "kinetic_eV_atom": 0.03852604095562552
+        },
+        "b": {
+          "temperature_K": 298.05091335961345,
+          "potential_eV_atom": -7.9521863535131505,
+          "kinetic_eV_atom": 0.03852604766593644
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        },
+        "b": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
