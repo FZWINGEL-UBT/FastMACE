@@ -1274,8 +1274,9 @@ class FixedPlanner:
                 v["_why"]["fused_folded_forward"] += (f"; stage 2: on with wprime_backward, {model_label} on a "
                                                       f"measured GPU, decision 66 ({hardware.name})")
             else:
-                reason = (f"not MH-1, decision 64 (label {model_label}), nor a measured generic model and GPU "
-                          "with wprime_backward, decision 66")
+                reason = (f"not a measured GPU, decision 66 ({getattr(hardware, 'name', None)})"
+                          if model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                          else f"not MH-1, decision 64 (label {model_label})")
                 v["fused_folded_forward"] = False
                 v["_auto_off"]["fused_folded_forward"] = reason
                 v["_why"]["fused_folded_forward"] += f"; stage 2: off, {reason}"
