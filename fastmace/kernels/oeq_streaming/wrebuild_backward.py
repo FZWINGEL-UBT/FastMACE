@@ -28,14 +28,23 @@ from fastmace.kernels.oeq_streaming.fused_forward import (
     BATCH,
     CHANNEL_BLOCK,
     MAX_WARPS,
+    TC_HELPERS,
+    TC_RSTRIDE,
+    TC_STRIDE,
     LaunchRule,
+    _kpad,
     _lit,
     _node,
     balanced_parts,
     check_problem,
     launch_rule,
     slice_floats,
+    tc_astage,
+    tc_product,
+    tc_wfill,
+    tensor_cores,
 )
+from fastmace.kernels.oeq_streaming.fused_forward import staging_floats as _tc_staging
 
 EDGE_CHUNK = 64  # edges per work chunk (eight batches)
 
@@ -47,8 +56,13 @@ def staging_floats(k, edge_dim, batch=BATCH):
     return batch * (k + edge_dim)
 
 
-def rule_for(paths, k, edge_dim, channels, shared_optin, sms, parts=None, batch=BATCH):
-    """The fused forward's launch rule, or one with ``parts`` path parts and ``batch`` edges per batch (tuning)."""
+def rule_for(paths, k, edge_dim, channels, shared_optin, sms, parts=None, batch=BATCH, tc=False):
+    """The fused forward's launch rule, or one with ``parts`` path parts and ``batch`` edges per batch (tuning);
+    ``tc``: the fused forward's tensor-core rule (``TENSOR_CORES``; BATCH edges, the forward's parts)."""
+    if tc:
+        if parts is not None or batch != BATCH:
+            raise ValueError("wrebuild_backward: tensor cores take the fused forward's parts and batch")
+        return launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=True)
     if parts is None and batch == BATCH:
         return launch_rule(paths, k, edge_dim, channels, shared_optin, sms)
     parts = parts or 1
@@ -62,22 +76,32 @@ def rule_for(paths, k, edge_dim, channels, shared_optin, sms, parts=None, batch=
     return LaunchRule(parts, warps, max(1, -(-2 * sms // slices)), wbytes + warps * staging)
 
 
-def render(schedule, k, rule, terms, batch=BATCH):
+def render(schedule, k, rule, terms, batch=BATCH, tc=False):
     """CUDA source of ``wrebuild_backward`` for a schedule, the folded input width ``k``, a launch rule (the fused
-    forward's, or ``rule_for``'s), the derivative table's ``terms`` and ``batch`` edges per batch (4 or 8)."""
+    forward's, or ``rule_for``'s), the derivative table's ``terms`` and ``batch`` edges per batch (4 or 8).
+    ``tc``: w rebuilt by the fused forward's 3xTF32 tensor-core product (``TENSOR_CORES``; the forward's w)."""
     check_problem(schedule)
     if batch % 4:
         raise ValueError("wrebuild_backward: the batch is a multiple of 4 (float4 broadcasts of a)")
+    if tc and batch != BATCH:
+        raise ValueError(f"wrebuild_backward: tensor cores need batches of {BATCH} edges")
     paths = schedule.paths
     costs = [sum(len(o.terms) for o in p.outputs) for p in paths]
     parts = balanced_parts(costs, rule.parts)
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, batch)}    }} break;" for q, part in enumerate(parts))
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, batch, tc)}    }} break;"
+                      for q, part in enumerate(parts))
+    if tc:
+        a_offset = f"{slice_floats(npp, k, True)} + warp * {_tc_staging(k, schedule.edge_dim, True, npp)}"
+    else:
+        a_offset = f"{slice_floats(npp, k)} + warp * {staging_floats(k, schedule.edge_dim, batch)}"
     return f"""// wrebuild_backward (FastMACE): wprime_backward building w on chip (the fused forward's w, bitwise).
 using int64_t = long long;
 constexpr int K = {k};
+constexpr int KP = {_kpad(k) if tc else k};  // the k-loop's padded length (tensor cores: steps of 8)
+constexpr int RS = {TC_RSTRIDE};
 constexpr int CB = {CHANNEL_BLOCK};
-constexpr int WS = {CHANNEL_BLOCK + 1};
+constexpr int WS = {TC_STRIDE if tc else CHANNEL_BLOCK + 1};
 constexpr int ED = {schedule.edge_dim};
 constexpr int IN_DIM = {schedule.input_dim};
 constexpr int OUT_DIM = {schedule.output_dim};
@@ -86,7 +110,7 @@ constexpr int B = {batch};
 constexpr int CHUNK = {EDGE_CHUNK};
 constexpr int TERMS = {int(terms)};
 constexpr unsigned FULL = 0xffffffffu;
-
+{TC_HELPERS if tc else ""}
 extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) wrebuild_backward(
     int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
     const float* __restrict__ x, const float* __restrict__ sh, const int* __restrict__ senders,
@@ -98,8 +122,9 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) wrebuild_back
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
-    float* a_s = Ws + {slice_floats(npp, k)} + warp * {staging_floats(k, schedule.edge_dim, batch)};
-    float* sh_s = a_s + K * B;
+    float* a_s = Ws + {a_offset};
+    float* sh_s = a_s + KP * B;
+    float* r_s = sh_s + B * ED;  // tensor cores: the warp's redistribution tile [paths][B][RS]
     const int cb = blockIdx.y;
     const int ch = cb * CB + lane;
     int* ctr = counters + blockIdx.y * gridDim.z + blockIdx.z;
@@ -110,7 +135,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) wrebuild_back
 """
 
 
-def _part(schedule, part, batch):
+def _part(schedule, part, batch, tc=False):
     paths = schedule.paths
     C, layout = schedule.channels, schedule.layout
     npl = len(part)
@@ -129,6 +154,27 @@ def _part(schedule, part, batch):
                 b = 4 * q + c
                 gemm.append(f"                      w[{g}][{b}] = fmaf(av{q}.{comp}, wk, w[{g}][{b}]);")
         gemm.append("                    }")
+    if tc:
+        wfill, astage, product = tc_wfill(npl, "K"), tc_astage("K"), tc_product(npl)
+    else:
+        wfill = f"""            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
+                const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
+                Ws[(p * K + k) * WS + l] = W[(int64_t)(wst[p] + cb * CB + l) * K + k];
+            }}"""
+        astage = """                for (int i = lane; i < B * K; i += 32) {
+                    const int b = i / K, k = i - b * K;
+                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * K + k] : 0.f;
+                }"""
+        nl = "\n"
+        product = f"""                float w[{npl}][B];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) w[g][b] = 0.f;
+                #pragma unroll 5
+                for (int k = 0; k < K; ++k) {{
+{nl.join(gemm)}
+                }}"""
     body = []
     for g, pi in enumerate(part):
         p = paths[pi]
@@ -168,10 +214,7 @@ def _part(schedule, part, batch):
     return f"""
         {{
             const int wst[{npl}] = {{{wst}}};
-            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
-                const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
-                Ws[(p * K + k) * WS + l] = W[(int64_t)(wst[p] + cb * CB + l) * K + k];
-            }}
+{wfill}
         }}
         __syncthreads();
         while (true) {{
@@ -184,21 +227,10 @@ def _part(schedule, part, batch):
             for (int64_t e0 = ebeg; e0 < eend; e0 += B) {{
                 const int nb = (int)((eend - e0) < B ? (eend - e0) : B);
                 __syncwarp();
-                for (int i = lane; i < B * K; i += 32) {{
-                    const int b = i / K, k = i - b * K;
-                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * K + k] : 0.f;
-                }}
+{astage}
                 for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;
                 __syncwarp();
-                float w[{npl}][B];
-                #pragma unroll
-                for (int g = 0; g < {npl}; ++g)
-                    #pragma unroll
-                    for (int b = 0; b < B; ++b) w[g][b] = 0.f;
-                #pragma unroll 5
-                for (int k = 0; k < K; ++k) {{
-{chr(10).join(gemm)}
-                }}
+{product}
                 #pragma unroll
                 for (int b = 0; b < B; ++b) {{
                     if (b >= nb) break;
@@ -257,10 +289,13 @@ class WRebuildBackward:
         check_problem(schedule)
         device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
         props = torch.cuda.get_device_properties(device)
+        # TENSOR_CORES (fused_forward): w rebuilt as the tensor-core forward built it (the forward's parts and batch)
+        self.tc = tensor_cores(torch.cuda.get_device_capability(device)) and parts is None and batch == BATCH
         self.rule = rule_for(len(schedule.paths), int(k), schedule.edge_dim, schedule.channels,
-                             int(props.shared_memory_per_block_optin), int(props.multi_processor_count), parts, batch)
+                             int(props.shared_memory_per_block_optin), int(props.multi_processor_count), parts, batch,
+                             tc=self.tc)
         self.k, self.terms, self.channels, self.batch = int(k), int(terms), schedule.channels, int(batch)
-        self.source = render(schedule, self.k, self.rule, self.terms, self.batch)
+        self.source = render(schedule, self.k, self.rule, self.terms, self.batch, tc=self.tc)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))

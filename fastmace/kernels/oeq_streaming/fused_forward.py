@@ -55,8 +55,108 @@ SKIP_ZERO_COLUMN = False
 # (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
 # forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
 STREAM_STORE_W = False
+# The batch's a.W product on tensor cores in 3xTF32 (owner, 4 November 2026: "try out all of the ideas"; OMAT-0 on
+# the A100, where the FP32-SIMT product is about 62 GFLOP per call): per warp mma.sync m16n8k8 tiles of 16 channels x
+# the BATCH edges, W and a split into TF32 high and low parts on the fly (hi*hi + hi*lo + lo*hi, FP32 accumulation:
+# about FP32 accuracy, not bitwise), the result redistributed to lane = channel through a per-warp shared tile.
+# Compute capability 8.0 and later only (ignored below). A module constant for the A/B; off.
+TENSOR_CORES = False
+TC_STRIDE = 40  # W slice row stride with tensor cores: the fragment loads hit 32 distinct banks
+TC_RSTRIDE = 36  # the redistribution tile's row stride: conflict-free fragment stores
 
 _REGISTRY = {}
+
+
+def tensor_cores(capability):
+    """Whether the a.W product runs on tensor cores (``TENSOR_CORES`` and compute capability 8.0 or later)."""
+    return bool(TENSOR_CORES) and tuple(capability) >= (8, 0)
+
+
+def _kpad(k):
+    return -(-int(k) // 8) * 8
+
+
+TC_HELPERS = """// 3xTF32: x = hi + lo, both TF32 (round to nearest); a product keeps hi*hi + hi*lo + lo*hi.
+__device__ __forceinline__ void split_tf32(float x, unsigned& hi, unsigned& lo) {
+    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(hi) : "f"(x));
+    const float rest = x - __uint_as_float(hi);
+    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(lo) : "f"(rest));
+}
+__device__ __forceinline__ void mma_tf32(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {
+    asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, "
+                 "{%8, %9}, {%0, %1, %2, %3};"
+                 : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
+}
+"""
+
+
+def tc_wfill(npl, stride):
+    """A block's W slice for the tensor-core product: rows padded to KP with zeros, row stride WS; ``stride``: the
+    name of W's row stride in the kernel."""
+    return f"""            for (int i = threadIdx.x; i < {npl} * KP * CB; i += blockDim.x) {{
+                const int p = i / (KP * CB), rem = i - p * (KP * CB), k = rem / CB, l = rem - k * CB;
+                Ws[(p * KP + k) * WS + l] = k < K ? W[(int64_t)(wst[p] + cb * CB + l) * {stride} + k] : 0.f;
+            }}"""
+
+
+def tc_astage(stride):
+    """A warp's a staging [KP][B] for the tensor-core product, zero past K and past the batch."""
+    return f"""                for (int i = lane; i < B * KP; i += 32) {{
+                    const int b = i / KP, k = i - b * KP;
+                    a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * {stride} + k] : 0.f;
+                }}"""
+
+
+def tc_product(npl):
+    """``float w[npl][B]`` (lane = channel) from the staged a and the W slice through 3xTF32 mma.sync m16n8k8 tiles
+    (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``."""
+    return f"""                float wacc[{npl}][2][4];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int m = 0; m < 2; ++m)
+                        #pragma unroll
+                        for (int i = 0; i < 4; ++i) wacc[g][m][i] = 0.f;
+                {{
+                    const int gid = lane >> 2, tq = lane & 3;
+                    #pragma unroll 2
+                    for (int k0 = 0; k0 < KP; k0 += 8) {{
+                        unsigned bh[2], bl[2];  // a^T fragment: k = k0 + tq (+4), edge = gid
+                        split_tf32(a_s[(k0 + tq) * B + gid], bh[0], bl[0]);
+                        split_tf32(a_s[(k0 + tq + 4) * B + gid], bh[1], bl[1]);
+                        #pragma unroll
+                        for (int g = 0; g < {npl}; ++g)
+                            #pragma unroll
+                            for (int m = 0; m < 2; ++m) {{  // W fragment: channel m*16 + gid (+8), k0 + tq (+4)
+                                const float* wp = Ws + (g * KP + k0 + tq) * WS + m * 16 + gid;
+                                unsigned ah[4], al[4];
+                                split_tf32(wp[0], ah[0], al[0]);
+                                split_tf32(wp[8], ah[1], al[1]);
+                                split_tf32(wp[4 * WS], ah[2], al[2]);
+                                split_tf32(wp[4 * WS + 8], ah[3], al[3]);
+                                mma_tf32(wacc[g][m], al, bh);
+                                mma_tf32(wacc[g][m], ah, bl);
+                                mma_tf32(wacc[g][m], ah, bh);
+                            }}
+                    }}
+                    #pragma unroll
+                    for (int g = 0; g < {npl}; ++g)
+                        #pragma unroll
+                        for (int m = 0; m < 2; ++m) {{  // C fragment: channel m*16 + gid (+8), edge 2 tq (+1)
+                            float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;
+                            rp[0] = wacc[g][m][0];
+                            rp[RS] = wacc[g][m][1];
+                            rp[8] = wacc[g][m][2];
+                            rp[RS + 8] = wacc[g][m][3];
+                        }}
+                }}
+                __syncwarp();
+                float w[{npl}][B];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) w[g][b] = r_s[(g * B + b) * RS + lane];"""
 
 
 def used_columns(weight):
@@ -78,24 +178,29 @@ class LaunchRule:
     shared_bytes: int
 
 
-def slice_floats(paths_per_part, k):
-    """Floats of a block's W slice (row stride CHANNEL_BLOCK + 1), rounded up to keep the staging 16-byte aligned."""
-    return -(-paths_per_part * k * (CHANNEL_BLOCK + 1) // 4) * 4
+def slice_floats(paths_per_part, k, tc=False):
+    """Floats of a block's W slice (row stride CHANNEL_BLOCK + 1; with tensor cores ``TC_STRIDE`` and k padded to a
+    multiple of 8), rounded up to keep the staging 16-byte aligned."""
+    rows, stride = (_kpad(k), TC_STRIDE) if tc else (k, CHANNEL_BLOCK + 1)
+    return -(-paths_per_part * rows * stride // 4) * 4
 
 
-def staging_floats(k, edge_dim):
-    """Floats of one warp's staging: a [K][BATCH] and sh [BATCH][edge_dim]."""
+def staging_floats(k, edge_dim, tc=False, paths_per_part=0):
+    """Floats of one warp's staging: a [K][BATCH] and sh [BATCH][edge_dim]; with tensor cores a [K padded][BATCH]
+    and the redistribution tile [paths per part][BATCH][TC_RSTRIDE] after them."""
+    if tc:
+        return BATCH * (_kpad(k) + edge_dim) + paths_per_part * BATCH * TC_RSTRIDE
     return BATCH * (k + edge_dim)
 
 
-def launch_rule(paths, k, edge_dim, channels, shared_optin, sms):
+def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False):
     """The kernel's parts, warps and grid for ``paths`` uvu paths of ``k``-wide folded inputs on a device with
-    ``shared_optin`` bytes of opt-in shared memory per block and ``sms`` SMs (module docstring)."""
-    staging = 4 * staging_floats(k, edge_dim)
+    ``shared_optin`` bytes of opt-in shared memory per block and ``sms`` SMs (module docstring); ``tc``: the
+    tensor-core product's shared layout (``TENSOR_CORES``)."""
     parts = max(1, -(-paths * BATCH // W_TILE_REGISTERS))
     while parts <= paths:
         per = -(-paths // parts)
-        if 4 * slice_floats(per, k) + MIN_WARPS * staging <= shared_optin:
+        if 4 * slice_floats(per, k, tc) + MIN_WARPS * 4 * staging_floats(k, edge_dim, tc, per) <= shared_optin:
             break
         parts += 1
     else:
@@ -103,7 +208,8 @@ def launch_rule(paths, k, edge_dim, channels, shared_optin, sms):
                          "shared memory")
     per = -(-paths // parts)
     parts = -(-paths // per)
-    wbytes = 4 * slice_floats(per, k)
+    staging = 4 * staging_floats(k, edge_dim, tc, per)
+    wbytes = 4 * slice_floats(per, k, tc)
     warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
     slices = (channels // CHANNEL_BLOCK) * parts
     return LaunchRule(parts, warps, max(1, -(-BLOCKS_PER_SM * sms // slices)), wbytes + warps * staging)
@@ -139,12 +245,13 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
-def render(schedule, k, rule, store_w=True, used=None, stream_store=None):
+def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
     default ``k``), a's and W's rows keep the stride ``k``. ``stream_store`` (default ``STREAM_STORE_W``): ``w``
-    stored with ``__stcs``."""
+    stored with ``__stcs``. ``tc``: the a.W product on tensor cores in 3xTF32 (``TENSOR_CORES``, sm_80+; the launch
+    rule must be ``launch_rule(..., tc=True)``'s)."""
     check_problem(schedule)
     used = int(k) if used is None else int(used)
     if not 1 <= used <= k:
@@ -163,15 +270,18 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None):
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store)}    }} break;"
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc)}    }} break;"
                       for q, part in enumerate(parts))
+    helpers = TC_HELPERS if tc else ""
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
 constexpr bool STORE_W = {"true" if store_w else "false"};
 constexpr int K = {used};  // the folded inputs the k-loop reads
 constexpr int KA = {k};  // a's and W's row stride
+constexpr int KP = {_kpad(used) if tc else used};  // the k-loop's padded length (tensor cores: steps of 8)
+constexpr int RS = {TC_RSTRIDE};
 constexpr int CB = {CHANNEL_BLOCK};
-constexpr int WS = {CHANNEL_BLOCK + 1};
+constexpr int WS = {TC_STRIDE if tc else CHANNEL_BLOCK + 1};
 constexpr int ED = {schedule.edge_dim};
 constexpr int IN_DIM = {schedule.input_dim};
 constexpr int OUT_DIM = {schedule.output_dim};
@@ -180,7 +290,7 @@ constexpr int B = {BATCH};
 constexpr int RC = {RECEIVERS_PER_CHUNK};
 constexpr int TAIL = {TAIL_EDGES};
 constexpr unsigned FULL = 0xffffffffu;
-
+{helpers}
 extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_forward(
     int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
     const float* __restrict__ x, const float* __restrict__ sh, const int* __restrict__ senders,
@@ -189,8 +299,9 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
-    float* a_s = Ws + {slice_floats(npp, k)} + warp * {staging_floats(k, schedule.edge_dim)};
-    float* sh_s = a_s + K * B;
+    float* a_s = Ws + {slice_floats(npp, used if tc else k, tc)} + warp * {staging_floats(used if tc else k, schedule.edge_dim, tc, npp)};
+    float* sh_s = a_s + KP * B;
+    float* r_s = sh_s + B * ED;  // tensor cores: the warp's redistribution tile [paths][B][RS]
     const int cb = blockIdx.y;
     const int ch = cb * CB + lane;
     int* ctr = counters + blockIdx.y * gridDim.z + blockIdx.z;
@@ -205,7 +316,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
 """
 
 
-def _part(schedule, part, slots, C, layout, store):
+def _part(schedule, part, slots, C, layout, store, tc=False):
     paths = schedule.paths
     xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
                     for pi in part for o in paths[pi].outputs for t in o.terms})
@@ -233,6 +344,27 @@ def _part(schedule, part, slots, C, layout, store):
                 b = 4 * q + c
                 gemm.append(f"                      w[{g}][{b}] = fmaf(av{q}.{comp}, wk, w[{g}][{b}]);")
         gemm.append("                    }")
+    if tc:
+        wfill, astage, product = tc_wfill(npl, "KA"), tc_astage("KA"), tc_product(npl)
+    else:
+        wfill = f"""            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
+                const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
+                Ws[(p * K + k) * WS + l] = W[(int64_t)(wst[p] + cb * CB + l) * KA + k];
+            }}"""
+        astage = """                for (int i = lane; i < B * K; i += 32) {
+                    const int b = i / K, k = i - b * K;
+                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * KA + k] : 0.f;
+                }"""
+        nl = "\n"
+        product = f"""                float w[{npl}][B];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) w[g][b] = 0.f;
+                #pragma unroll 5
+                for (int k = 0; k < K; ++k) {{
+{nl.join(gemm)}
+                }}"""
     tp = []
     for g, pi in enumerate(part):
         p = paths[pi]
@@ -254,10 +386,7 @@ def _part(schedule, part, slots, C, layout, store):
     return f"""
         {{
             const int wst[{npl}] = {{{wst}}};
-            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
-                const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
-                Ws[(p * K + k) * WS + l] = W[(int64_t)(wst[p] + cb * CB + l) * KA + k];
-            }}
+{wfill}
         }}
         __syncthreads();
         while (true) {{
@@ -285,10 +414,7 @@ def _part(schedule, part, slots, C, layout, store):
             for (int64_t e0 = ebeg; e0 < eend; e0 += B) {{
                 const int nb = (int)((eend - e0) < B ? (eend - e0) : B);
                 __syncwarp();
-                for (int i = lane; i < B * K; i += 32) {{
-                    const int b = i / K, k = i - b * K;
-                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * KA + k] : 0.f;
-                }}
+{astage}
                 for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;
                 float xv[B][{nx}];
                 int rv[B];
@@ -300,15 +426,7 @@ def _part(schedule, part, slots, C, layout, store):
 {xloads}
                 }}
                 __syncwarp();
-                float w[{npl}][B];
-                #pragma unroll
-                for (int g = 0; g < {npl}; ++g)
-                    #pragma unroll
-                    for (int b = 0; b < B; ++b) w[g][b] = 0.f;
-                #pragma unroll 5
-                for (int k = 0; k < K; ++k) {{
-{chr(10).join(gemm)}
-                }}
+{product}
                 if (STORE_W) {{
                     const int wst[{npl}] = {{{wst}}};
                     #pragma unroll
@@ -346,13 +464,15 @@ class FusedFoldedForward:
         check_problem(schedule)
         device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
         props = torch.cuda.get_device_properties(device)
-        self.rule = launch_rule(len(schedule.paths), int(k), schedule.edge_dim, schedule.channels,
-                                int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
         self.k, self.channels, self.paths = int(k), schedule.channels, len(schedule.paths)
+        self.used = self.k if used is None else int(used)
+        self.tc = tensor_cores(torch.cuda.get_device_capability(device))
+        self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
+                                schedule.channels, int(props.shared_memory_per_block_optin),
+                                int(props.multi_processor_count), tc=self.tc)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
-        self.used = self.k if used is None else int(used)
-        self.source = render(schedule, self.k, self.rule, self.store_w, self.used)
+        self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))

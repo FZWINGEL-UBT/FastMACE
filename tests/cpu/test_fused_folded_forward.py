@@ -94,6 +94,28 @@ def test_stream_store_w_only_changes_the_store():
                             "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];") == plain
 
 
+def test_tensor_cores_render_and_launch_rule(monkeypatch):
+    """``TENSOR_CORES``: the a.W product in 3xTF32 mma.sync tiles over a k padded to a multiple of 8, the W slice
+    with row stride ``TC_STRIDE``, a per-warp redistribution tile; sm_80 and later only."""
+    assert not ff.tensor_cores((8, 0))  # off by default
+    monkeypatch.setattr(ff, "TENSOR_CORES", True)
+    assert ff.tensor_cores((8, 0)) and ff.tensor_cores((12, 0)) and not ff.tensor_cores((7, 5))
+    for device in (SM80, SM89, SM120):
+        rule = ff.launch_rule(10, 64, 16, 128, tc=True, **device)
+        assert rule.shared_bytes <= device["shared_optin"] and rule.warps >= ff.MIN_WARPS
+        assert rule.shared_bytes == 4 * ff.slice_floats(-(-10 // rule.parts), 64, True) + rule.warps * 4 * (
+            ff.staging_floats(64, 16, True, -(-10 // rule.parts)))
+    rule = ff.launch_rule(2, 65, 4, 64, tc=True, **SM80)
+    source = ff.render(_schedule(), 65, rule, tc=True)
+    assert "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32" in source and "cvt.rna.tf32.f32" in source
+    assert "constexpr int KP = 72;" in source and f"constexpr int WS = {ff.TC_STRIDE};" in source
+    assert "a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * KA + k] : 0.f;" in source
+    skipped = ff.render(_schedule(), 65, ff.launch_rule(2, 64, 4, 64, tc=True, **SM80), used=64, tc=True)
+    assert "constexpr int K = 64;" in skipped and "constexpr int KP = 64;" in skipped
+    plain = ff.render(_schedule(), 65, ff.launch_rule(2, 65, 4, 64, **SM80))
+    assert "mma.sync" not in plain and "constexpr int KP = 65;" in plain
+
+
 def test_render_refuses_unsupported_problems():
     rule = ff.launch_rule(2, 9, 4, 64, **SM120)
     with pytest.raises(ValueError, match="divisible"):
@@ -114,6 +136,11 @@ def test_generated_source_compiles_with_nvrtc():
         assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM89)), (8, 9))
         assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM80), used=64,
                                        stream_store=True), (8, 0))
+        for capability, device in (((8, 0), SM80), ((8, 9), SM89), ((12, 0), SM120)):  # TENSOR_CORES
+            assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 64, 4, 64, tc=True, **device),
+                                           used=64, tc=True), capability)
+            assert compile_cubin(ff.render(_schedule(layout), 9, ff.launch_rule(2, 9, 4, 64, tc=True, **device),
+                                           tc=True), capability)
 
 
 def test_record_and_requirements():

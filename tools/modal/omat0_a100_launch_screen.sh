@@ -14,7 +14,11 @@
 # - eos-fcN / eos-beN: edge_outer_sum FORWARD_CHUNK / BACKWARD_BLOCK_EDGES (default 32);
 # - skipzero: fused_forward.SKIP_ZERO_COLUMN (the k-loop skips the folded weight's all-zero bias column);
 # - stcs: fused_forward.STREAM_STORE_W (w stored with __stcs); bundle-all: degree 6, slopes2, skipzero and stcs;
-# - dN-slopes2, dN-slopes4, dN-streamw, dN-skipzero, dN-stcs: the switch on top of degree N (a: degree N too);
+# - tc: fused_forward.TENSOR_CORES (the a.W product in 3xTF32 on tensor cores; not bitwise); dztcN: degree N,
+#   skipzero and tc; dzN: degree N and skipzero; tcre / dztcreN: tc / dztcN with recompute_conv_weights=on (w not
+#   stored; the backward rebuilds it on tensor cores too); tolN-X: degree N with the table fit tolerance X (fewer
+#   pieces; the planner drops tables whose certificate exceeds 1, so a failed fit shows as a slower step);
+# - dN-slopes2, dN-slopes4, dN-streamw, dN-skipzero, dN-stcs, dN-tc: the switch on top of degree N (a: degree N too);
 #   bundle: degree 6 and slopes2; bundle-skipzero: and skipzero; allN: degree N, slopes2, skipzero and stcs; allnsN:
 #   the same without slopes2 (streamw is 12.7 % slower in the RTX 4000 Ada lab, 3.4 % faster on the RTX 5060 Ti:
 #   screened alone).
@@ -31,6 +35,7 @@ rt=fastmace.kernels.oeq_streaming.runtime
 wp=fastmace.kernels.oeq_streaming.wprime_backward
 zc=fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN=True
 ffs=fastmace.kernels.oeq_streaming.fused_forward:STREAM_STORE_W=True
+ftc=fastmace.kernels.oeq_streaming.fused_forward:TENSOR_CORES=True
 rd=fastmace.rewrites.radial
 eos=fastmace.kernels.triton.edge_outer_sum
 log=$out/run.log
@@ -73,7 +78,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     d[0-9]*-*) n=${spec%%-*}; n=${n#d}  # dN-switch: the switch on top of degree N (a: degree N too)
       case ${spec#*-} in
         slopes2) sw="$wp:SLOPE_VECTOR=2" ;; slopes4) sw="$wp:SLOPE_VECTOR=4" ;; streamw) sw="$wp:STREAM_W=True" ;;
-        skipzero) sw=$zc ;; stcs) sw=$ffs ;; *) note "unknown case $spec"; continue ;;
+        skipzero) sw=$zc ;; stcs) sw=$ffs ;; tc) sw=$ftc ;; *) note "unknown case $spec"; continue ;;
       esac
       ab "$spec" --a-constant "$rd:DEGREE=$n" --b-constant "$rd:DEGREE=$n" "$sw" ;;
     bundle) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" ;;
@@ -84,6 +89,12 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     all[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#all}" "$wp:SLOPE_VECTOR=2" "$zc" "$ffs" ;;  # all at degree N
     allns[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#allns}" "$zc" "$ffs" ;;  # the same without slopes2
     dz[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#dz}" "$zc" ;;  # degree N and skipzero
+    tc) ab "$spec" --b-constant "$ftc" ;;  # the fused forward's a.W on tensor cores (3xTF32)
+    dztc[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#dztc}" "$zc" "$ftc" ;;  # degree N, skipzero, tensor cores
+    tol[0-9]*-*) n=${spec#tol}; n=${n%%-*}  # tolN-X: degree N, fit tolerance X (default 1e-7; certificate <= 1)
+      ab "$spec" --b-constant "$rd:DEGREE=$n" "$rd:TOLERANCE=${spec#*-}" ;;
+    tcre) ab "$spec" --b recompute_conv_weights=on --b-constant "$ftc" ;;  # tc, w rebuilt in the backward
+    dztcre[0-9]*) ab "$spec" --b recompute_conv_weights=on --b-constant "$rd:DEGREE=${spec#dztcre}" "$zc" "$ftc" ;;
   esac
 done
 note done
