@@ -12,10 +12,11 @@ its directory has a `LICENSE`.
 | `fastmace/kernels/oeq_streaming/factorized_projected.cuh` | OpenEquivariance PR 223 (P. Fuchs), commit `ef051c3f9efa2d1daf74cfbe3beaad152235f47d`, <https://github.com/PASSIONLab/OpenEquivariance/pull/223>; © 2025 The Regents of the University of California, through Lawrence Berkeley National Laboratory | BSD-3-Clause | adapted (`ir_mul` node offsets) |
 | `fastmace/kernels/oeq_streaming/schedule.py` | as above | BSD-3-Clause | adapted (accumulator slots, layout) |
 | `fastmace/kernels/oeq_streaming/jinja_env.py` | as above, the PR's `templates/jinja_utils.py` | BSD-3-Clause | adapted (CUDA only) |
+| `fastmace/kernels/cutlass/tf32x3_sm80.cubin` | compiled from NVIDIA CUTLASS v4.8.1 headers, commit `2c85f497547eb441f0fe80bfb0fb2e6f9add1719`, <https://github.com/NVIDIA/cutlass>; © 2017-2026 NVIDIA CORPORATION & AFFILIATES | BSD-3-Clause | compiled (sm_80 3xTF32 GEMM, `tf32x3_sm80.cu`; build record `tf32x3_sm80.build.txt`) |
 | `fastmace/longrange/data/dftd3_params.npz` | torch-dftd 0.5.1, `torch_dftd/nn/params/dftd3_params.npz`, <https://github.com/pfnet/torch-dftd>; © 2021 Preferred Networks, Inc. Holds S. Grimme's DFT-D3 reference data (see `docs/licences.md`) | MIT | none (SHA-256 `52b7b35a957df55b813035ffde3a6b5a41dec585bdb1e281fb8ba67a729f3d92`) |
 
 Licence texts: `fastmace/kernels/oeq_streaming/LICENSE` (BSD-3-Clause,
-OpenEquivariance) and `fastmace/longrange/data/LICENSE` (MIT, torch-dftd).
+OpenEquivariance), `fastmace/kernels/cutlass/LICENSE` (BSD-3-Clause, CUTLASS) and `fastmace/longrange/data/LICENSE` (MIT, torch-dftd).
 
 ## ASE 3.27 ports (LGPL-2.1-or-later)
 
