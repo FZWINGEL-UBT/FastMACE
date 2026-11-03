@@ -129,6 +129,7 @@ def test_records_have_the_spec_fields():
         requires = {"generic_segmented_first_sum": ("generic_reassociate",),
                     "generic_chunked_conv_backward": ("generic_streaming", "generic_fused_radial_backward"),
                     "generic_recompute_conv_weights": ("generic_chunked_conv_backward",),
+                    "generic_fused_folded_forward": ("generic_chunked_conv_backward",),
                     }.get(name, ())
         default = "off" if name == "generic_recompute_conv_weights" else "auto"  # a memory-rescue rung
         assert rewrite_.default == default and rewrite_.requires == requires and rewrite_.conflicts == ()
