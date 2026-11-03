@@ -3,7 +3,9 @@
 ``fm.Simulation`` on the graph engine from rest (no initial velocities), skin --skin, 1 fs, NVE or Langevin 300 K
 (friction 0.002 per fs), seed 1, no output: --warmup untimed steps, then --blocks timed blocks of --steps steps between
 CUDA synchronisations. ``--rewrites FIELD=VALUE ...`` sets RewriteConfig fields, the others stay "auto" (empty: the
-plan's own "auto"). Prints and writes one JSON record with the plan's enabled rewrites, the GPU and the times.
+plan's own "auto"). ``--constant MODULE:NAME=VALUE ...`` sets module constants (A/B switches such as
+``fastmace.rewrites.radial:DEGREE=5``) for the whole process, before the model loads. Prints and writes one JSON
+record with the plan's enabled rewrites, the constants, the GPU and the times.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ def main(argv=None) -> int:
     p.add_argument("--steps", type=int, default=20)
     p.add_argument("--blocks", type=int, default=1)
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE")
+    p.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE")
     p.add_argument("--sha256", default="d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
                    help="The checkpoint's SHA-256 (default: MACE-OMAT-0 medium's)")
     p.add_argument("--output", type=Path, required=True)
@@ -37,6 +40,12 @@ def main(argv=None) -> int:
     import fastmace as fm
     from fastmace.config import NeighbourConfig, RewriteConfig
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from ab_rewrites import constant_overrides
+
+    constants = constant_overrides(args.constant)
+    for (module, name), value in constants.items():
+        setattr(sys.modules[module], name, value)
     path, repeat = args.structure.split("@")
     atoms = read(path).repeat(tuple(int(n) for n in repeat.split("x")))
     started = time.perf_counter()
@@ -63,6 +72,7 @@ def main(argv=None) -> int:
     enabled = sorted(k for k, v in vars(rewrites).items() if v == "on") if rewrites is not None else None
     record = dict(tool="loup_md", structure=args.structure, atoms=n, ensemble=args.ensemble, skin=args.skin,
                   warmup=args.warmup, steps=args.steps, blocks=args.blocks, requested=fields,
+                  constants={f"{m}:{n}": v for (m, n), v in constants.items()},
                   gpu=torch.cuda.get_device_name(0), fastmace=fm.__version__, setup_s=setup_s, block_s=blocks,
                   us_per_atom_step=[b / (args.steps * n) * 1e6 for b in blocks],
                   median_us_per_atom_step=statistics.median(blocks) / (args.steps * n) * 1e6,
@@ -71,7 +81,7 @@ def main(argv=None) -> int:
     sim.close()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(record, indent=1))
-    print(json.dumps({k: record[k] for k in ("gpu", "atoms", "ensemble", "requested", "median_us_per_atom_step",
+    print(json.dumps({k: record[k] for k in ("gpu", "atoms", "ensemble", "requested", "constants", "median_us_per_atom_step",
                                              "ms_per_step", "rewrites_on")}))
     return 0
 
