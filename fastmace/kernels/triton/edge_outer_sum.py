@@ -24,6 +24,9 @@ from functools import cache
 import torch
 
 FORWARD_CHUNK = 32  # edges per program of the segmented forward (fixed for every crystal and GPU)
+# The kernels read ``a`` at its row stride where its rows are unit-stride (False: a contiguous copy first, as before
+# 3 November 2026; kept for the A/B).
+STRIDED_ROWS = True
 BACKWARD_BLOCK_EDGES = 32  # edges per program of the backward (fixed for every crystal and GPU)
 
 
@@ -33,7 +36,7 @@ def _triton_forward():
     import triton.language as tl
 
     @triton.jit
-    def kernel(a_ptr, y_ptr, key_ptr, out_ptr, num_edges, K: tl.constexpr, D: tl.constexpr,
+    def kernel(a_ptr, y_ptr, key_ptr, out_ptr, num_edges, a_stride, K: tl.constexpr, D: tl.constexpr,
                CHUNK: tl.constexpr, BLOCK_K: tl.constexpr, BLOCK_D: tl.constexpr):
         start = tl.program_id(0) * CHUNK
         d = tl.arange(0, BLOCK_D)
@@ -50,12 +53,18 @@ def _triton_forward():
                 acc = tl.zeros((BLOCK_D, BLOCK_K), dtype=tl.float32)
                 current = key
             row = edge.to(tl.int64)
-            a = tl.load(a_ptr + row * K + k, mask=k < K, other=0.0)
+            a = tl.load(a_ptr + row * a_stride + k, mask=k < K, other=0.0)
             y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
             acc += y[:, None] * a[None, :]
         tl.atomic_add(out_ptr + current * (D * K) + offsets, acc, mask=mask, sem="relaxed")
 
     return kernel
+
+
+def _rows(a):
+    """``a`` itself where its rows are unit-stride (a column slice such as the generic tables' ``augmented[:, :-1]``,
+    read in place at its row stride), else a contiguous copy."""
+    return a if STRIDED_ROWS and a.stride(1) == 1 else a.contiguous()
 
 
 @torch.library.custom_op("fastmace::edge_outer_sum_forward", mutates_args=())
@@ -68,10 +77,10 @@ def edge_outer_sum_forward(a: torch.Tensor, y: torch.Tensor, key: torch.Tensor,
     if not a.is_cuda or a.dtype != torch.float32:
         return out.index_add(0, key, (y[:, :, None] * a[:, None, :]).reshape(num_edges, d * k))
     import triton
-    a, y, key = a.contiguous(), y.contiguous(), key.contiguous()
+    a, y, key = _rows(a), y.contiguous(), key.contiguous()
     if num_edges:
         _triton_forward()[(triton.cdiv(num_edges, FORWARD_CHUNK),)](
-            a, y, key, out, num_edges, K=k, D=d, CHUNK=FORWARD_CHUNK,
+            a, y, key, out, num_edges, a.stride(0), K=k, D=d, CHUNK=FORWARD_CHUNK,
             BLOCK_K=triton.next_power_of_2(k), BLOCK_D=triton.next_power_of_2(d), num_warps=1)
     return out
 
@@ -87,7 +96,7 @@ def _triton_backward():
     import triton.language as tl
 
     @triton.jit
-    def kernel(grad_ptr, a_ptr, y_ptr, key_ptr, grad_a_ptr, grad_y_ptr, num_edges,
+    def kernel(grad_ptr, a_ptr, y_ptr, key_ptr, grad_a_ptr, grad_y_ptr, num_edges, a_stride,
                K: tl.constexpr, D: tl.constexpr, BLOCK_E: tl.constexpr, BLOCK_K: tl.constexpr):
         edges = tl.program_id(0) * BLOCK_E + tl.arange(0, BLOCK_E)
         edge_mask = edges < num_edges
@@ -95,7 +104,7 @@ def _triton_backward():
         k = tl.arange(0, BLOCK_K)
         mask = edge_mask[:, None] & (k < K)[None, :]
         key = tl.load(key_ptr + edges, mask=edge_mask, other=0).to(tl.int64)
-        a = tl.load(a_ptr + edges[:, None] * K + k[None, :], mask=mask, other=0.0)
+        a = tl.load(a_ptr + edges[:, None] * a_stride + k[None, :], mask=mask, other=0.0)
         rows = grad_ptr + key[:, None] * (D * K) + k[None, :]
         grad_a = a * 0
         for d in tl.static_range(D):
@@ -118,19 +127,19 @@ def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor
         rows = grad.reshape(-1, d, k)[key]
         return torch.einsum("edk,ed->ek", rows, y), torch.einsum("edk,ek->ed", rows, a)
     import triton
-    grad, a, y, key = grad.contiguous(), a.contiguous(), y.contiguous(), key.contiguous()
-    grad_a = torch.empty_like(a)
+    grad, a, y, key = grad.contiguous(), _rows(a), y.contiguous(), key.contiguous()
+    grad_a = a.new_empty(a.shape)
     grad_y = torch.empty_like(y)
     if num_edges:
         _triton_backward()[(triton.cdiv(num_edges, BACKWARD_BLOCK_EDGES),)](
-            grad, a, y, key, grad_a, grad_y, num_edges,
+            grad, a, y, key, grad_a, grad_y, num_edges, a.stride(0),
             K=k, D=d, BLOCK_E=BACKWARD_BLOCK_EDGES, BLOCK_K=triton.next_power_of_2(k))
     return grad_a, grad_y
 
 
 @edge_outer_sum_backward.register_fake
 def _(grad, a, y, key):
-    return torch.empty_like(a), torch.empty_like(y)
+    return a.new_empty(a.shape), torch.empty_like(y)
 
 
 class _EdgeOuterSum(torch.autograd.Function):

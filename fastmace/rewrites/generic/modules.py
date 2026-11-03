@@ -57,6 +57,21 @@ def fc_split(network):
     return torch.nn.Sequential(*layers[:-1]), last
 
 
+# The reassociated first interaction with radial tables reads the whole table row [h c, c] against [W, 0] (as MH-1
+# reads [h c, c] against [W, b]) instead of the slice h c against W: no strided copy of [E, 64] and no zero-padding
+# slice backward; the cutoff column only adds zero products. Exact to rounding (the per-path products' K grows by
+# one zero row per species slot). A module constant for the A/B (OMAT-0 A100 profile, 3 November 2026).
+FIRST_FULL_ROWS = False
+
+
+def _first_inputs(augmented, last):
+    """(table rows, last-layer weight) for the reassociation of a tabled generic first interaction."""
+    weight = fc_last_weight(last)
+    if FIRST_FULL_ROWS:
+        return augmented, torch.nn.functional.pad(weight, (0, 1))
+    return augmented[:, :-1], weight
+
+
 def fc_last_weight(last):
     """Effective [out, in] matrix of an e3nn last layer: x @ w / sqrt(h_in var_in / var_out) == x @ result.T."""
     return (last.weight / (last.h_in * last.var_in / last.var_out) ** 0.5).t()
@@ -74,8 +89,8 @@ def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edg
     ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
     backward rebuilds only the table."""
     augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
-    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, augmented[:, :-1], edge_index,
-                                       fc_last_weight(self.radial_last))
+    rows, weight = _first_inputs(augmented, self.radial_last)
+    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, rows, edge_index, weight)
     return message, edge_density
 
 
@@ -161,13 +176,13 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         pass
     elif reassociation is not None:
         if tabled:
-            hidden = augmented[:, :-1]  # h c
+            hidden, weight = _first_inputs(augmented, self.radial_last)  # h c and W, or [h c, c] and [W, 0]
         else:
-            hidden = self.radial_hidden(edge_feats)
+            hidden, weight = self.radial_hidden(edge_feats), fc_last_weight(self.radial_last)
             if cutoff is not None:  # (h W) c = (h c) W
                 hidden = hidden * cutoff
-        message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index,
-                                fc_last_weight(self.radial_last), rows=n_real)  # the tiles' receivers only
+        message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index, weight,
+                                rows=n_real)  # the tiles' receivers only
     elif getattr(self, "streaming_kernels", None) is not None:
         from fastmace.rewrites.mh1.modules import streaming_message
         message = streaming_message(self, node_feats, edge_attrs, None if chunked else tp_weights, edge_index,

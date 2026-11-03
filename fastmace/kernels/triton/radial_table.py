@@ -27,6 +27,11 @@ from functools import cache
 import torch
 
 BLOCK_E = 32
+# Columns per program of the forward (None: all J in one program). The forward's register tile is [BLOCK_E,
+# next_power_of_2(J)]: OMAT-0's J = 66 pads to 128 (212 registers, 13 % occupancy on the A100). With 64, a second
+# column program takes the last two columns. Bitwise: every column is its own Clenshaw sum. A module constant for the
+# A/B (OMAT-0 A100 profile, 3 November 2026); the backward sums over the columns and keeps one program.
+COLUMN_BLOCK = None
 
 
 def evaluate(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, derivative=False):
@@ -87,14 +92,15 @@ def _kernels():
         rows = e < E
         r, pair, piece, x = _locate(r_ptr, pair_ptr, starts_ptr, scales_ptr, bins_ptr, e, rows, r_lo, bin_scale,
                                     n_bins)
-        j = tl.arange(0, BLOCK_J)
+        j = tl.program_id(1) * BLOCK_J + tl.arange(0, BLOCK_J)  # this program's columns
         values = _series(coef_ptr, pair, piece, x, rows, j, j < J, K, TERMS, J, BLOCK_E, BLOCK_J)
         values = tl.where((r < r_max)[:, None], values, 0.0)
         e64 = e.to(tl.int64)
         tl.store(g_ptr + e64[:, None] * (J - 1) + j[None, :], values, mask=rows[:, None] & (j < J - 1)[None, :])
         if DENSITY:
             density = tl.sum(tl.where((j == J - 1)[None, :], values, 0.0), axis=1)
-            tl.store(density_ptr + e64, density, mask=rows)
+            last = (tl.program_id(1) + 1) * BLOCK_J >= J  # the program holding column J - 1
+            tl.store(density_ptr + e64, density, mask=rows & last)
 
     @triton.jit
     def backward(r_ptr, pair_ptr, dcoef_ptr, starts_ptr, scales_ptr, bins_ptr, grad_g_ptr, grad_density_ptr,
@@ -143,9 +149,10 @@ def radial_table_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor
     out = r.new_empty((edges, int(density)))
     if edges:
         forward, _ = _kernels()
-        forward[(-(-edges // BLOCK_E),)](
+        block_j = _block_j(width) if COLUMN_BLOCK is None else min(_block_j(width), int(COLUMN_BLOCK))
+        forward[(-(-edges // BLOCK_E), -(-width // block_j))](
             r, pair, coef, starts, scales, bins, g, out if density else g, edges, coef.shape[1], bins.shape[0], r_lo,
-            bin_scale, r_max, TERMS=coef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=_block_j(width),
+            bin_scale, r_max, TERMS=coef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=block_j,
             DENSITY=density)
     return g, out
 
