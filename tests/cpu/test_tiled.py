@@ -879,6 +879,25 @@ def test_the_skin_check_by_chunks_decides_as_on_the_whole_arrays(chunk):
                 assert moved_within(positions, reference, 0.5, chunk) is whole
     assert moved_within(reference, reference, 0.0, chunk)
 
+def test_senders_packed_as_ranks_into_the_tiles_senders_unpack_exactly():
+    """``_pack_senders``: int16 ranks into the tile's distinct int32 senders while they number at most 65,536 (the
+    full range of the ranks used), else the int32 senders; both unpack to the same int64 senders, in order."""
+    import torch
+
+    from fastmace.model.tiled import _pack_senders, _unpack_senders
+
+    generator = torch.Generator().manual_seed(5)
+    for distinct, packed_dtype in ((1, torch.int16), (2**16, torch.int16), (2**16 + 1, torch.int32)):
+        pool = torch.randperm(10 * distinct, generator=generator)[:distinct] + 2**30
+        sender = torch.cat([pool, pool[torch.randint(distinct, (500,), generator=generator)]])
+        sender = sender[torch.randperm(sender.shape[0], generator=generator)]
+        dictionary, codes = _pack_senders(sender)
+        assert codes.dtype == packed_dtype
+        assert torch.equal(_unpack_senders(dictionary, codes), sender)
+    dictionary, codes = _pack_senders(torch.empty(0, dtype=torch.int64))
+    assert _unpack_senders(dictionary, codes).shape == (0,)
+
+
 def test_wavefront_with_and_without_kept_lists_is_the_same_call():
     """The wavefront with the kept lists (``list_reuse``, filtered again at the cutoff) and without them, each with
     and without the call's cache (a tile's lists from its sweep 1 to its sweep 3 only: none left after the call;

@@ -99,10 +99,11 @@ class TileConfig:
     # "global": the force field's neighbour list; "tiles": each tile's edges from a cell binning of the current
     # positions (``fastmace.neighbors.tile_list``), bitwise the global list's, without it (T3).
     neighbours: str = "global"
-    # neighbours "tiles": each tile's edges found once per call and kept on the host (int32 senders, receiver counts
-    # and one-byte unit shifts, about 5 bytes per edge), the later sweeps rebuilding them exactly from it. At the
-    # host limit (below ``list_reuse_floor`` available while it fills) it is dropped, for this call and the later
-    # ones: the later sweeps search again (bitwise), the reason in the call's report (``list_cache``).
+    # neighbours "tiles": each tile's edges found once per call and kept on the host (int16 ranks into the tile's
+    # int32 senders, receiver counts and one-byte unit shifts, about 3 bytes per edge), the later sweeps rebuilding
+    # them exactly from it. At the host limit (below ``list_reuse_floor`` available while it fills) it is dropped,
+    # for this call and the later ones: the later sweeps search again (bitwise), the reason in the call's report
+    # (``list_cache``).
     list_cache: bool = True
     # neighbours "tiles": the tiles' edges searched within cutoff + skin (the force field's list's skin) and kept on
     # the host across calls with the tile plan; a call with the same cell while no atom has moved more than skin / 2
@@ -723,6 +724,28 @@ def _unpack_units(packed, dtype, device):
     return table[packed.long()]
 
 
+def _pack_senders(sender):
+    """A tile's senders [E] (int64 atom indices) for the host lists: ``(dictionary, codes)``, the tile's distinct
+    senders (int32, ascending) and each edge's rank among them as int16 (offset by -32768), while they number at
+    most 65,536 (a tile's receivers and halo: every tile up to the 16,384 cap); else an empty dictionary and the
+    int32 senders. 2 bytes per edge instead of 4 (the kept lists: about 40 % of their host memory)."""
+    import torch
+
+    dictionary, codes = torch.unique(sender, sorted=True, return_inverse=True)
+    if dictionary.shape[0] <= 2**16:
+        return dictionary.to(torch.int32), (codes - 2**15).to(torch.int16)
+    return dictionary.new_empty(0, dtype=torch.int32), sender.to(torch.int32)
+
+
+def _unpack_senders(dictionary, codes):
+    """The int64 senders of ``_pack_senders``' result, exactly."""
+    import torch
+
+    if codes.dtype != torch.int16:
+        return codes.long()
+    return dictionary.long()[codes.long() + 2**15]
+
+
 def moved_within(positions, reference, limit, chunk=None):
     """Whether no atom of ``positions`` (any device) is more than ``limit`` from its row of ``reference`` (host
     float64): the squared distances in float64 by chunks of ``chunk`` atoms (default the tile lists' ``CHUNK``),
@@ -948,15 +971,16 @@ class TiledForceField:
                     elif kept["complete"]:
                         counts = torch.bincount(torch.searchsorted(receivers, receiver),
                                                 minlength=receivers.shape[0])
-                        kept["superset"][index] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(),
-                                                   packed.cpu())
+                        kept["superset"][index] = tuple(t.cpu() for t in (*_pack_senders(sender),
+                                                                           _narrow_counts(counts), packed))
                     if exact:
                         inner = inner[0]
                         return sender[inner], receiver[inner], unit[inner], shifts[inner]
                 else:
-                    sender, counts, packed = (t.to(self.device) for t in superset)
+                    dictionary, codes, counts, packed = (t.to(self.device) for t in superset)
+                    sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
-                    sender, unit = sender.long(), _unpack_units(packed, bins.float_dtype, self.device)
+                    unit = _unpack_units(packed, bins.float_dtype, self.device)
                 shifts64 = times_3x3(unit.to(torch.float64), bins.cell)
                 vectors = positions64[receiver] - positions64[sender] + shifts64
                 keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
@@ -970,10 +994,11 @@ class TiledForceField:
                 cache = self._list_cache  # (None once a fallback or the host floor dropped it)
                 if cache is not None and key in cache:
                     self._list_hits += 1
-                    sender, counts, packed = (t.to(self.device) for t in cache[key])
+                    dictionary, codes, counts, packed = (t.to(self.device) for t in cache[key])
+                    sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
-                    return torch.stack([sender.long(), receiver]), bins.shifts(unit)
+                    return torch.stack([sender, receiver]), bins.shifts(unit)
                 sender, receiver, unit, shifts = within(receivers) if kept is not None else bins.edges(receivers)
                 packed = (_pack_units(unit) if cache is not None and self.list_cache_state == "on"
                           and not self._cache_paused else None)  # the wavefront's search pass keeps none
@@ -981,7 +1006,7 @@ class TiledForceField:
                     packed = None
                 if packed is not None:
                     counts = torch.bincount(torch.searchsorted(receivers, receiver), minlength=receivers.shape[0])
-                    cache[key] = (sender.to(torch.int32).cpu(), _narrow_counts(counts).cpu(), packed.cpu())
+                    cache[key] = tuple(t.cpu() for t in (*_pack_senders(sender), _narrow_counts(counts), packed))
                 return torch.stack([sender, receiver]), shifts
 
             # No degrees before the tiles' builds: the tiles are planned by receivers only.
