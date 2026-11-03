@@ -1223,10 +1223,6 @@ class FixedPlanner:
             measured = _mh1(model_label) or model_label in DECISION_66_TF32X3_LABELS
             if measured and name in DECISION_66_TF32X3_GPUS and "grouped_launch" not in explicit:
                 v["_why"]["tf32x3_gemms"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
-                if v["grouped_launch"]:  # both reroute the block products; the A100 measured no change from it
-                    v["grouped_launch"] = False
-                    v["_auto_off"]["grouped_launch"] = "tf32x3_gemms reroutes the block products, decision 66"
-                    v["_why"]["grouped_launch"] += "; stage 2: off, tf32x3_gemms reroutes the block products"
             else:
                 reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
                           else f"not a measured GPU, decision 66 ({name})" if name not in DECISION_66_TF32X3_GPUS
@@ -1234,6 +1230,12 @@ class FixedPlanner:
                 v["tf32x3_gemms"] = False
                 v["_auto_off"]["tf32x3_gemms"] = reason
                 v["_why"]["tf32x3_gemms"] += f"; stage 2: off, {reason}"
+        if v["tf32x3_gemms"] and v["grouped_launch"] and "grouped_launch" not in explicit:
+            # Both reroute the block products; tf32x3_gemms (asked for, or decision 66's default) takes them. The
+            # A100 measured no change from grouped_launch.
+            v["grouped_launch"] = False
+            v["_auto_off"]["grouped_launch"] = "tf32x3_gemms reroutes the block products"
+            v["_why"]["grouped_launch"] += "; stage 2: off, tf32x3_gemms reroutes the block products"
         for name in POLAR_GRAPH_RECORDS:
             if v[name] and name not in explicit and not _qualified_polar(traits, model_label):
                 # Gated on the three POLAR-1 checkpoints (OPT4-T02); other models were not screened.

@@ -257,7 +257,8 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
-           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS, "gate_epilogue": MH1_LABELS}
+           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS, "gate_epilogue": MH1_LABELS,
+           "tf32x3_gemms": ()}  # decision 66: the A100-SXM4-80GB only, not this file's GPU
 
 
 def fastmace_only_expected(name, label, backend):
