@@ -180,16 +180,17 @@ class FirstInteractionReassociation(torch.nn.Module):
             nodes = int(rows)
         width, dim = augmented.shape[1], edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
-        # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
-        summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots,
-                                segmented=self.segmented).view(nodes, slots, dim, width)
+        # [nodes, (l, m), slots, k] (edge_outer_sum's inner layout: every path's rows are one contiguous
+        # matrix, no transposing copy); fused backward
+        summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots, segmented=self.segmented,
+                                inner=slots).view(nodes, dim, slots, width)
         blocks = []
         start = 0
         c = self.channels
         for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
             size = 2 * l + 1
             # [nodes * size, slots * width] @ [slots * width, C]
-            left = summed[:, :, start:start + size].transpose(1, 2).reshape(nodes * size, slots * width)
+            left = summed[:, start:start + size].reshape(nodes * size, slots * width)
             right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
             if self.tf32x3:
                 from fastmace.kernels.triton.tf32x3_gemm import tf32x3_matmul

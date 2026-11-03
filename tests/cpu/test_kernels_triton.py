@@ -90,6 +90,24 @@ def test_edge_outer_sum_handles_no_edges():
 
 
 @pytest.mark.parametrize("segmented", [False, True])
+def test_edge_outer_sum_inner_layout_is_the_plain_layout_transposed(segmented):
+    """inner=I: S viewed as [slots / I, D, I, K], the plain sums with each group's I slots inside the D axis; the
+    gradients follow the moved upstream gradient."""
+    inner = 37
+    a, y, key, grad, slots = outer_sum_inputs()
+    d, k = y.shape[1], a.shape[1]
+
+    def moved(t):
+        return t.view(-1, inner, d, k).transpose(1, 2).reshape(t.shape)
+
+    plain = outer_sum_with_gradients(eos.edge_outer_sum, a, y, key, grad, slots, segmented=segmented)
+    new = outer_sum_with_gradients(eos.edge_outer_sum, a, y, key, moved(grad), slots, segmented=segmented,
+                                   inner=inner)
+    assert torch.equal(new[0], moved(plain[0]))
+    assert torch.equal(new[1], plain[1]) and torch.equal(new[2], plain[2])
+
+
+@pytest.mark.parametrize("segmented", [False, True])
 @pytest.mark.parametrize("sort", [False, True])
 def test_edge_outer_sum_equals_baseline(segmented, sort):
     base = baseline_module("edge_outer_sum")
