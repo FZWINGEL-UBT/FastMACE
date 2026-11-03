@@ -101,15 +101,20 @@ def eligible(a, b, out) -> bool:
 
 def takes(m, k, n) -> bool:
     """Whether ``tf32x3_mm`` runs ``[m, k] @ [k, n]`` here: K and N multiples of ``ALIGNMENT`` (the kernels' 128-bit
-    loads; any strides are made to fit by ``fit``), at least ``MIN_WORK`` multiply-adds and below 2**31 elements per
-    operand. A rule on the shape alone, so a product's arithmetic does not depend on its operands' strides."""
-    return (k % ALIGNMENT == 0 and n % ALIGNMENT == 0 and m * k * n >= MIN_WORK
+    loads; any strides are made to fit by ``fit``), at least ``MIN_TILES`` output tiles or K at most ``LONG_K``, and
+    below 2**31 elements per operand. A rule on the shape alone, so a product's arithmetic does not depend on its
+    operands' strides."""
+    tiles = -(-m // 64) * -(-n // 64)
+    return (k % ALIGNMENT == 0 and n % ALIGNMENT == 0 and (tiles >= MIN_TILES or k <= LONG_K)
             and max(m * k, k * n, m * n) < 2**31)
 
 
-# The fewest multiply-adds a product needs to run here (``takes``); smaller ones stay on cuBLAS IEEE, where the
-# A100 measured them faster (docs/validation/cutlass-tf32x3.md).
-MIN_WORK = 0
+# Without split-K a product with few 64x64 output tiles and a long K leaves most SMs idle: on the A100 (108 SMs,
+# CUDA-graph timings) 16 tiles at K 512 and 2048 took 1.2-2.3x cuBLAS IEEE's time, while every product with 16
+# tiles at K <= 256 or with 160 tiles or more took 0.54-1.00x (docs/validation/cutlass-tf32x3.md). Those stay on
+# cuBLAS IEEE (an MD step's products have atom rows, so many tiles; a weight gradient's K is the atom count).
+MIN_TILES = 54  # half the A100's SMs
+LONG_K = 256
 
 
 def fit(a, b):
@@ -147,4 +152,4 @@ def mm_into(a, b, out):
                                  kernels.shared[layout], stream, (values, types), 0))
 
 
-__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "MIN_WORK", "available", "eligible", "fit", "mm_into", "takes"]
+__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "LONG_K", "MIN_TILES", "available", "eligible", "fit", "mm_into", "takes"]
