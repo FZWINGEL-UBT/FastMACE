@@ -98,8 +98,9 @@ class GatedRows(torch.nn.Module):
         not, the joined op would only add launches, so the stock products and join run (NaCl-sized cells)."""
         from fastmace.kernels.triton import tile_rule
 
-        if self.tf32x3:  # every product runs in the Triton GEMM (segment_gemm._choices)
-            return bool(self.sms)
+        if self.tf32x3:  # every product runs in the Triton GEMM (segment_gemm._choices); on the CUTLASS backend
+            # (the A100) none: the block products run there through tf32x3_mm (precision.route)
+            return bool(self.sms) and getattr(self, "tf32x3_backend", "triton") == "triton"
         return any(tile_rule.uses_triton(n * dim, self.sms) for _, _, dim, _ in self.joined)
 
     def _gate_epilogue(self, outputs, scalars, gates):

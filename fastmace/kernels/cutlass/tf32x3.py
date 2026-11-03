@@ -35,7 +35,8 @@ class _Kernels:
 
         from fastmace.kernels.oeq_streaming.runtime import _check
         with torch.cuda.device(index):
-            torch.cuda.current_stream(index)  # the primary context is current
+            torch.zeros(1, device=f"cuda:{index}")  # a runtime call: the device's primary context is current
+            self.context = _check(driver.cuCtxGetCurrent())
             self.module = _check(driver.cuModuleLoadData(CUBIN.read_bytes()))
             self.functions = {layout: _check(driver.cuModuleGetFunction(self.module, f"fm_tf32x3_{layout}_64x64"
                                                                         .encode()))
@@ -98,6 +99,29 @@ def eligible(a, b, out) -> bool:
     return max(a.numel(), b.numel(), out.numel()) < 2**31
 
 
+def takes(m, k, n) -> bool:
+    """Whether ``tf32x3_mm`` runs ``[m, k] @ [k, n]`` here: K and N multiples of ``ALIGNMENT`` (the kernels' 128-bit
+    loads; any strides are made to fit by ``fit``), at least ``MIN_WORK`` multiply-adds and below 2**31 elements per
+    operand. A rule on the shape alone, so a product's arithmetic does not depend on its operands' strides."""
+    return (k % ALIGNMENT == 0 and n % ALIGNMENT == 0 and m * k * n >= MIN_WORK
+            and max(m * k, k * n, m * n) < 2**31)
+
+
+# The fewest multiply-adds a product needs to run here (``takes``); smaller ones stay on cuBLAS IEEE, where the
+# A100 measured them faster (docs/validation/cutlass-tf32x3.md).
+MIN_WORK = 0
+
+
+def fit(a, b):
+    """``(a, b)`` in layouts ``mm_into`` takes: A row-major, B row- or column-major, aligned (copies otherwise)."""
+    (la, lda), (lb, ldb) = _layout(a), _layout(b)
+    if la != "r" or lda % ALIGNMENT or a.data_ptr() % 16:
+        a = a.contiguous() if la != "r" or a.stride(0) != a.shape[1] else a.clone()
+    if lb is None or ldb % ALIGNMENT or b.data_ptr() % 16:
+        b = b.contiguous() if lb != "r" or b.stride(0) != b.shape[1] else b.clone()
+    return a, b
+
+
 def mm_into(a, b, out):
     """``out = a @ b`` (``[M, K] @ [K, N]``) through the CUTLASS kernel for B's layout; ``eligible`` holds."""
     from cuda.bindings import driver
@@ -105,6 +129,9 @@ def mm_into(a, b, out):
     from fastmace.kernels.oeq_streaming.runtime import _check
     index = a.device.index if a.device.index is not None else torch.cuda.current_device()
     kernels = _kernels(index)
+    current = _check(driver.cuCtxGetCurrent())
+    if int(current) != int(kernels.context):  # autograd's device threads may have no context current yet
+        _check(driver.cuCtxSetCurrent(kernels.context))
     m, k = a.shape
     n = b.shape[1]
     _, lda = _layout(a)
@@ -120,4 +147,4 @@ def mm_into(a, b, out):
                                  kernels.shared[layout], stream, (values, types), 0))
 
 
-__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "available", "eligible", "mm_into"]
+__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "MIN_WORK", "available", "eligible", "fit", "mm_into", "takes"]

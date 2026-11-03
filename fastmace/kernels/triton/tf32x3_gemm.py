@@ -103,11 +103,14 @@ def _launch(a, b, out):
     if not uses_tf32x3_tile(k, n):
         torch.mm(a.contiguous(), b.contiguous(), out=out)
         return
-    if _cutlass(a.device):
+    if _cutlass(a.device):  # by the shape alone (cutlass.tf32x3.takes): CUTLASS, else cuBLAS IEEE, never Triton
         from fastmace.kernels.cutlass import tf32x3
-        if tf32x3.eligible(a, b, out):
+        if tf32x3.takes(m, k, n):
+            a, b = tf32x3.fit(a, b)
             tf32x3.mm_into(a, b, out)
-            return
+        else:
+            torch.mm(a.contiguous(), b.contiguous(), out=out)
+        return
     grid = (triton.cdiv(m, tile_rule.BLOCK_M), triton.cdiv(n, tile_rule.BLOCK_N))
     _kernel()[grid](a, b, out, m, n, k, a.stride(0), a.stride(1), b.stride(0), b.stride(1), out.stride(0),
                     out.stride(1), BLOCK_M=tile_rule.BLOCK_M, BLOCK_N=tile_rule.BLOCK_N, BLOCK_K=tile_rule.BLOCK_K,

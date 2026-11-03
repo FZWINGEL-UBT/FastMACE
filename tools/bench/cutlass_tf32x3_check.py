@@ -53,6 +53,28 @@ def main(argv=None) -> int:
             times.append(start.elapsed_time(stop) * 1e3)
         return statistics.median(times)
 
+    def graph_timed(fn, launches=20):
+        """Median µs per call of ``launches`` calls captured in one CUDA graph (no host launch cost)."""
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            fn()
+        torch.cuda.current_stream().wait_stream(stream)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            for _ in range(launches):
+                fn()
+        graph.replay()
+        times = []
+        for _ in range(max(5, args.reps // 5)):
+            start, stop = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+            start.record()
+            graph.replay()
+            stop.record()
+            stop.synchronize()
+            times.append(start.elapsed_time(stop) * 1e3 / launches)
+        return statistics.median(times)
+
     def triton_into(a, b, out):
         saved = triton_gemm.CUTLASS
         triton_gemm.CUTLASS = False
@@ -96,16 +118,19 @@ def main(argv=None) -> int:
             graph.replay()
             torch.cuda.synchronize()
             replay = bool(torch.equal(graph_out, first))
-            times = {"cutlass": timed(lambda: cutlass.mm_into(a, b, out)),
-                     "triton": timed(lambda: triton_into(a, b, out)),
-                     "cublas_ieee": timed(lambda: torch.mm(a, b, out=out))}
+            calls = {"cutlass": lambda: cutlass.mm_into(a, b, out), "triton": lambda: triton_into(a, b, out),
+                     "cublas_ieee": lambda: torch.mm(a, b, out=out)}
+            times = {name: timed(fn) for name, fn in calls.items()}
+            graphed = {name: graph_timed(fn) for name, fn in calls.items()}  # no host launch cost, as in MD
             case = dict(m=m, k=k, n=n, layout=layout, scaled_error=errors, bitwise_repeat=repeat, graph_replay=replay,
-                        us=times, cutlass_over_cublas=times["cutlass"] / times["cublas_ieee"],
-                        cutlass_over_triton=times["cutlass"] / times["triton"])
+                        us=times, graph_us=graphed, cutlass_over_cublas=times["cutlass"] / times["cublas_ieee"],
+                        cutlass_over_triton=times["cutlass"] / times["triton"],
+                        graph_cutlass_over_cublas=graphed["cutlass"] / graphed["cublas_ieee"])
             record["cases"].append(case)
             print(f"{m:6d} {k:5d} {n:5d} {layout}  err c {errors['cutlass']:.1e} t {errors['triton']:.1e} "
                   f"i {errors['cublas_ieee']:.1e}  us c {times['cutlass']:8.1f} t {times['triton']:8.1f} "
-                  f"i {times['cublas_ieee']:8.1f}  rep {repeat} graph {replay}", flush=True)
+                  f"i {times['cublas_ieee']:8.1f}  graph c {graphed['cutlass']:8.1f} t {graphed['triton']:8.1f} "
+                  f"i {graphed['cublas_ieee']:8.1f}  rep {repeat} graph {replay}", flush=True)
     record["worst_scaled_error"] = worst
     record["all_repeat"] = all(c["bitwise_repeat"] for c in record["cases"])
     record["all_graph"] = all(c["graph_replay"] for c in record["cases"])
