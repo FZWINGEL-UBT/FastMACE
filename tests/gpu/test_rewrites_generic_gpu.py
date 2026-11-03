@@ -134,7 +134,10 @@ def tables(label):
     registry = reg.Registry([*generic.RECORDS.values(), *(radial.RECORDS[name] for name in names)])
     asked = {name: "on" for name in ("generic_recompute_conv_weights", *names)}
     resolution = registry.resolve(model, asked, strict=False)
-    applied = registry.apply(model, resolution, reg.Context(inputs=reg.structure_inputs(data)),
+    # The structure's species as the superset, as the planner gives it: without it a per-pair (Agnesi) radial is
+    # tabulated for every element pair of the model (OMAT-0: 89^2 pairs, >128 GB of host memory in the fit).
+    present = torch.nonzero(data["node_attrs"].sum(dim=0)).flatten().tolist()
+    applied = registry.apply(model, resolution, reg.Context(inputs=reg.structure_inputs(data, species_columns=present)),
                              original=original.model)
     edges = int(data["edge_index"].shape[1])
     for interaction in model.interactions:
