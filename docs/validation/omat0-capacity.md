@@ -169,6 +169,66 @@ trillian (RTX A4000), NaNbO3 held out on leeloo (RTX 4000 Ada).
 **Tests:** `tests/cpu/test_memory_fit.py` keeps every matrix case in its stage's band: [1.0, 1.05], [0.99, 1.08],
 [1.0, 1.12].
 
+## Second round: `generic_recompute_first_table` (2–3 November 2026, branch `fastmace/omat0-capacity-2`)
+
+With `generic_radial_tables` on (`generic-radial-tables.md`), the largest kept tensor per edge is the tables'
+output, `[h c, c]`: 65 floats per interaction for OMAT-0 medium. The ledger ranked dropping it as the first remaining
+lever. Its bound was 520 B per edge for both interactions, 31 % (SrTiO3) and 21 % (NaCl) of the live peak.
+
+**What it does:**
+- The table output is no longer kept for the backward, only the lengths, which the tables keep anyway.
+- In the backward the table is evaluated again (same kernel, same input), and the table's gradient is consumed per
+  chunk.
+- First interaction (reassociated): under a checkpoint.
+- The other interactions: inside (A)'s chunked convolution. This needs (B), because without (B) they keep the
+  weights, not the table output.
+
+**Class and rule:**
+- Exact: the same table kernel on the same input.
+- It is a rescue rung after (B), in `MEMORY_RESCUE`, default off.
+- Rule 12's terms (`rewrites.memory`):
+  - `generic_recompute_first_table`: −65 floats per edge (first interaction only);
+  - `generic_recompute_first_table_with_weights`: −130 floats per edge, with (B).
+
+**Two fixes on the way:**
+- Rule 12 counted `generic_radial_tables` against what the estimate never held. It now removes the networks' input
+  and saved hidden units, not the real saved tensors (`f651530c`). A `generic_*` record now counts for generic models
+  wherever it lives (`e99b222f`).
+- The GPU gate's tables child had no `species_columns`.
+  - Without them, a per-pair (Agnesi) radial is fitted for every element pair of the model: 89² pairs for OMAT-0,
+    on the CPU in float64.
+  - The leto gate was killed at 128 GB of host memory.
+  - It now passes the structure's species, as the planner does (`5d83b59a`).
+  - After the fix, `tests/gpu/test_rewrites_generic_gpu.py` passes 4 of 4 in 88 s on leto (`omat2-gate4-leto`).
+  - Against the kept tables: forces 3.3e-7 relative, energy equal (MP-0 medium, float32).
+
+**Cost (`ab_rewrites.py --b ... recompute_first_table=on`, b/a in both build orders, 1 fs).** Side a is the stage's
+rewrites; side b adds the rung.
+- s1 = (A) + tables.
+- s2 = (A) + (B) + tables.
+
+| GPU (provider) | Stage | NaCl 10×10×10 | SrTiO3 11×11×11 |
+|---|---|---|---|
+| RTX 4000 Ada (leto, workstation) | s1 | 1.011 / 1.008 | 1.015 / 1.014 |
+| RTX 4000 Ada (leto, workstation) | s2 | 1.051 / 1.050 | 1.063 / 1.061 |
+| RTX 5060 Ti (local PC, WSL2) | s1 | 1.010 / 1.007 | 1.019 / SRTIO3_S1_BA |
+| RTX 5060 Ti (local PC, WSL2) | s2 | 1.042 / 1.042 | 1.038 / 1.037 |
+
+- With (B), each interaction evaluates its table once more per chunk, which costs 4–6 %.
+- Without (B), only the first interaction's table is evaluated again, which costs 1–2 %.
+- Neither is a default; rule 12 turns the rung on only when the plan would not fit otherwise.
+
+**Tables matrix (`est_matrix_tables.sh`):** the reserved peaks with tables on, at s1 / s2:
+
+| Cell | s1 | s2 |
+|---|---:|---:|
+| SrTiO3 24,565 (leeloo) | 11.79 GiB | 3.91 GiB |
+| SrTiO3 53,240 (leeloo) | – | 8.06 GiB |
+| SrTiO3 87,880 (leeloo) | – | 13.20 GiB (985 ms/step) |
+
+The memory the rung frees is not measured yet. The capacity scan with the rung, and the rung's points in rule 12's
+matrix, are still to do. The merge tier runs before any merge.
+
 ## Records
 
 `results/omat0-capacity-20261102/`:
@@ -177,3 +237,11 @@ trillian (RTX A4000), NaNbO3 held out on leeloo (RTX 4000 Ada).
 - the matrix cases, `cases-*.json`, also in `tests/_support/data/rule12_generic_rescue.json`.
 
 Points, A/B records and ledgers are on the NAS, `/mnt/homes/zwingel/fastmace-capacity/omat-*`.
+
+Second round: the scripts are in `results/omat0-capacity-2-20261102/` (`ab_local.sh`, `ab_ws.sh`, `est_matrix_tables.sh`,
+`saved_probe.py`). The records are on the NAS, `/mnt/homes/zwingel/fastmace-capacity/omat2-*`:
+- the A/Bs, `omat2-ab3-*`;
+- the gates, `omat2-gate*`;
+- the matrix, `omat2-matrix-*`.
+
+The local A/Bs are in WSL, `~/fm-runs/omat2-ab3-*-local*`.
