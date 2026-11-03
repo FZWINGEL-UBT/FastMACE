@@ -38,7 +38,8 @@ GENERIC_FIELDS = {"generic_species_skip": "species_skip", "generic_reassociate":
                   "generic_segmented_first_sum": "segmented_first_sum",
                   "generic_fused_radial_backward": "fused_folded_backward", "generic_streaming": "streaming_conv",
                   "generic_chunked_conv_backward": "chunked_conv_backward",
-                  "generic_recompute_conv_weights": "recompute_conv_weights"}
+                  "generic_recompute_conv_weights": "recompute_conv_weights",
+                  "generic_fused_folded_forward": "fused_folded_forward"}
 FAMILIES = ("residual", "density", "off")
 
 

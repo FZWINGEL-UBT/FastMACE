@@ -38,7 +38,8 @@ NONDETERMINISTIC = {"streaming_conv", "chunked_conv_backward", "fused_folded_for
                     "recompute_conv_weights",  # CAP-T07: wprime_backward's atomic sender additions, per edge chunk
                     "generic_streaming", "generic_chunked_conv_backward", "generic_recompute_conv_weights",
                     "segmented_first_sum", "generic_segmented_first_sum",
-                    "generic_recompute_first_table"}  # on generic_recompute_conv_weights' chunked path
+                    "generic_recompute_first_table",  # on generic_recompute_conv_weights' chunked path
+                    "generic_fused_folded_forward", "generic_wprime_backward"}  # as their MH-1 records
 
 
 @pytest.fixture(autouse=True)
