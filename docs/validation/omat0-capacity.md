@@ -244,4 +244,4 @@ Second round: the scripts are in `results/omat0-capacity-2-20261102/` (`ab_local
 - the gates, `omat2-gate*`;
 - the matrix, `omat2-matrix-*`.
 
-The local A/Bs are in WSL, `~/fm-runs/omat2-ab3-*-local*`.
+The local A/Bs are in `/mnt/homes/zwingel/fastmace-capacity/local-5060ti/omat2-ab3-*-local*`.
