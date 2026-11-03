@@ -13,6 +13,7 @@
 # - degN: radial.DEGREE N (default 10; fewer terms per edge, more pieces, the same fit tolerance and certificate);
 # - eos-fcN / eos-beN: edge_outer_sum FORWARD_CHUNK / BACKWARD_BLOCK_EDGES (default 32);
 # - skipzero: fused_forward.SKIP_ZERO_COLUMN (the k-loop skips the folded weight's all-zero bias column);
+# - stcs: fused_forward.STREAM_STORE_W (w stored with __stcs); bundle-all: degree 6, slopes2, skipzero and stcs;
 # - d6-slopes2, d6-streamw, d6-skipzero: the switch on top of degree 6 (a: degree 6 too); bundle: degree 6 and
 #   slopes2; bundle-skipzero: and skipzero (streamw is 12.7 % slower in the RTX 4000 Ada lab, 3.4 % faster on the
 #   RTX 5060 Ti: screened alone).
@@ -28,6 +29,7 @@ ff=fastmace.kernels.oeq_streaming.fused_forward
 rt=fastmace.kernels.oeq_streaming.runtime
 wp=fastmace.kernels.oeq_streaming.wprime_backward
 zc=fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN=True
+ffs=fastmace.kernels.oeq_streaming.fused_forward:STREAM_STORE_W=True
 rd=fastmace.rewrites.radial
 eos=fastmace.kernels.triton.edge_outer_sum
 log=$out/run.log
@@ -73,6 +75,8 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     skipzero) ab "$spec" --b-constant "$zc" ;;
     d6-skipzero) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$zc" ;;
     bundle-skipzero) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$zc" ;;
+    stcs) ab "$spec" --b-constant "$ffs" ;;
+    bundle-all) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$zc" "$ffs" ;;
   esac
 done
 note done

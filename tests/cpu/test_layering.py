@@ -79,7 +79,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # OMAT-0 kernel lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py): bitwise A/B switches, off by default.
     "fastmace/rewrites/radial/__init__.py": {"SYMMETRIC_PAIRS": "mirror pairs read one table row; screen A/B"},
     "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B"},
-    "fastmace/kernels/oeq_streaming/fused_forward.py": {"SKIP_ZERO_COLUMN": "k-loop skips W's zero bias column; A/B"},
+    "fastmace/kernels/oeq_streaming/fused_forward.py": {"SKIP_ZERO_COLUMN": "k-loop skips W's zero bias column; A/B",
+                                                        "STREAM_STORE_W": "w stored with __stcs; screen A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")

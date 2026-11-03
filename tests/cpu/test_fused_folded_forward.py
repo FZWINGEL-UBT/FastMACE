@@ -86,6 +86,14 @@ def test_skip_zero_column_reads_one_input_fewer(monkeypatch):
     assert ff.used_columns(weight) == 9  # one nonzero entry keeps the column
 
 
+def test_stream_store_w_only_changes_the_store():
+    rule = ff.launch_rule(2, 9, 4, 64, **SM120)
+    plain, streamed = ff.render(_schedule(), 9, rule), ff.render(_schedule(), 9, rule, stream_store=True)
+    assert "__stcs(&wout[(e0 + b) * Q + wst[g] + ch], w[g][b]);" in streamed and "__stcs" not in plain
+    assert streamed.replace("__stcs(&wout[(e0 + b) * Q + wst[g] + ch], w[g][b]);",
+                            "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];") == plain
+
+
 def test_render_refuses_unsupported_problems():
     rule = ff.launch_rule(2, 9, 4, 64, **SM120)
     with pytest.raises(ValueError, match="divisible"):
@@ -104,7 +112,8 @@ def test_generated_source_compiles_with_nvrtc():
         rule = ff.launch_rule(2, 9, 4, 64, **SM120)
         assert compile_cubin(ff.render(_schedule(layout), 9, rule), (12, 0))
         assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM89)), (8, 9))
-        assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM80), used=64), (8, 0))
+        assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule(2, 65, 4, 64, **SM80), used=64,
+                                       stream_store=True), (8, 0))
 
 
 def test_record_and_requirements():

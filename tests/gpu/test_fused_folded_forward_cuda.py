@@ -37,6 +37,7 @@ import openequivariance as oeq
 import torch
 
 from fastmace.kernels.oeq_streaming import StreamingKernels, folded_streaming_convolution
+from fastmace.kernels.oeq_streaming import fused_forward as ff_module
 from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward, fused_folded_forward
 from fastmace.kernels.oeq_streaming.runtime import streaming_conv_forward
 
@@ -102,6 +103,16 @@ for layout in ("ir_mul", "mul_ir"):
         skipped = fused_folded_forward(a, zero, X, Y, *args, skip.id)
         assert torch.equal(skipped[0], reference[0]) and torch.equal(skipped[1], reference[1]), (layout, k)
         report[name]["skip zero column bitwise"] = True
+        # STREAM_STORE_W: the w store with the evict-first hint stores the same values.
+        ff_module.STREAM_STORE_W = True
+        try:
+            streamed = FusedFoldedForward(kernels, k)
+        finally:
+            ff_module.STREAM_STORE_W = False
+        assert "__stcs(&wout" in streamed.source, (layout, k)
+        hinted = fused_folded_forward(a, weight, X, Y, *args, streamed.id)
+        assert torch.equal(hinted[0], message) and torch.equal(hinted[1], w), (layout, k)
+        report[name]["stream store bitwise"] = True
 print(json.dumps(report))
 """
 

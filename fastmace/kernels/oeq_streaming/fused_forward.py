@@ -51,6 +51,10 @@ BLOCKS_PER_SM = 2  # blocks per SM over all slices of the grid (the persistent g
 # 2026: the fused forward 9.1 % faster on the RTX 4000 Ada, 1.0 % slower on the RTX 5060 Ti). The same FP32 sums:
 # the skipped term adds an exact zero. A module constant for the A/B.
 SKIP_ZERO_COLUMN = False
+# The stored per-edge weights are read only by the backward, long after: store them with the streaming cache hint
+# (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
+# forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
+STREAM_STORE_W = False
 
 _REGISTRY = {}
 
@@ -135,15 +139,19 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
-def render(schedule, k, rule, store_w=True, used=None):
+def render(schedule, k, rule, store_w=True, used=None, stream_store=None):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
-    default ``k``), a's and W's rows keep the stride ``k``."""
+    default ``k``), a's and W's rows keep the stride ``k``. ``stream_store`` (default ``STREAM_STORE_W``): ``w``
+    stored with ``__stcs``."""
     check_problem(schedule)
     used = int(k) if used is None else int(used)
     if not 1 <= used <= k:
         raise ValueError(f"fused_folded_forward: {used} used columns of {k}")
+    stream_store = STREAM_STORE_W if stream_store is None else bool(stream_store)
+    store = ("__stcs(&wout[(e0 + b) * Q + wst[g] + ch], w[g][b]);" if stream_store
+             else "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];")
     C, layout, paths = schedule.channels, schedule.layout, schedule.paths
     costs = [sum(len(o.terms) for o in p.outputs) for p in paths]
     parts = balanced_parts(costs, rule.parts)
@@ -155,7 +163,7 @@ def render(schedule, k, rule, store_w=True, used=None):
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout)}    }} break;"
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store)}    }} break;"
                       for q, part in enumerate(parts))
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
@@ -197,7 +205,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
 """
 
 
-def _part(schedule, part, slots, C, layout):
+def _part(schedule, part, slots, C, layout, store):
     paths = schedule.paths
     xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
                     for pi in part for o in paths[pi].outputs for t in o.terms})
@@ -307,7 +315,7 @@ def _part(schedule, part, slots, C, layout):
                     for (int b = 0; b < B; ++b)
                         if (b < nb) {{
                             #pragma unroll
-                            for (int g = 0; g < {npl}; ++g) wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];
+                            for (int g = 0; g < {npl}; ++g) {store}
                         }}
                 }}
                 if (!tail) {{
