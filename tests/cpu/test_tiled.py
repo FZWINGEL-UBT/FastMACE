@@ -131,6 +131,27 @@ def test_padded_slot_kept_while_its_tiles_fit_and_grown_by_a_quarter_of_the_larg
     assert tiled._slots[key]["sizes"][1] >= h - 1 + math.ceil(0.25 * largest)
 
 
+def test_a_tile_whose_bucket_has_no_slot_runs_in_a_neighbouring_slot_that_fits():
+    """In MD a tile's edges drift across its bucket's edge by a few per cent. Its edges have the same headroom as
+    its receivers and halo, and a tile whose bucket has no slot runs in the bucket above's or below's slot when it
+    fits there, instead of compiling a new slot; the same call."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(8, mode="padded", headroom=0.5, bucket=0.3))
+    expected = tiled.evaluate(atoms)
+    for key, (_, _, e) in tiled.slot_needs.items():
+        assert tiled._slots[key]["sizes"][2] >= 1.5 * e
+    top = max(tiled._slots)
+    slot = tiled._slots.pop(top)  # the top bucket's tiles drifted one bucket up
+    tiled._slots[top + 1] = slot
+    changes = tiled.slot_changes
+    got = tiled.evaluate(atoms)
+    assert top not in tiled._slots and tiled._slots[top + 1] is slot
+    assert tiled.slot_changes == changes
+    assert top + 1 in tiled.slot_needs
+    assert relative(got[1], expected[1]) <= 1e-12
+
+
 def test_tiled_call_without_stress():
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))

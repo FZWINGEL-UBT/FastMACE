@@ -1924,7 +1924,9 @@ class TiledForceField:
         own sizes, the headroom is for sizing only (in MD the tiles' sizes move a little every step). An exceeded
         size grows by at least a quarter of the largest slot's in that size: the large slot's sizes drift by a few per
         cent in MD, while a small slot (the remainder pieces of blocks just above the cap) can triple
-        (tiled-slot-growth.md)."""
+        (tiled-slot-growth.md). The edges take the same headroom (at least the bucket's count), and a tile whose bucket
+        has no slot runs in a neighbouring bucket's slot when it fits: in MD a tile's edges drift across a bucket's
+        edge by a few per cent, which would otherwise compile a new slot (tiled-1m-speed.md, "Slots in MD")."""
         sizes = []
         for index, receivers in enumerate(tiles):
             piece = self._tile_graph(receivers, source, local_of)
@@ -1938,6 +1940,14 @@ class TiledForceField:
             self._edge_step = max(256, 256 * math.ceil(float(self.config.bucket) * largest / 256))
         step = self._edge_step
         keys = [max(1, math.ceil(e / step)) for _, _, e in sizes]
+        for index, (key, size) in enumerate(zip(keys, sizes)):
+            if key in self._slots:
+                continue
+            raw = (size[0] + 1,) + size[1:]
+            near = [k for k in (key - 1, key + 1)
+                    if k in self._slots and all(a <= b for a, b in zip(raw, self._slots[k]["sizes"]))]
+            if near:
+                keys[index] = near[0]
         head = 1.0 + float(self.config.headroom)
         self.slot_needs = {}  # each bucket's largest tile sizes this call, before headroom (the call's report)
         for key in set(keys):
@@ -1948,7 +1958,7 @@ class TiledForceField:
             rows = min(self.receivers, n,  # nor the atom count
                        math.ceil(max(r for r, _, _ in members) * head))
             need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
-                    key * step)
+                    max(key * step, 256 * math.ceil(max(e for _, _, e in members) * head / 256)))
             raw = (self.slot_needs[key][0] + 1,) + self.slot_needs[key][1:]  # one padding row
             slot = self._slots.get(key)
             if slot is None or any(a > b for a, b in zip(raw, slot["sizes"])):
