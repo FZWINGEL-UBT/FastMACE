@@ -81,8 +81,8 @@ def parse_args(argv=None):
                         "its filtered ones in the wavefront's band)")
     p.add_argument("--backward-single-stream", type=float, default=None, metavar="FRACTION",
                    help="oeq_streaming SINGLE_STREAM_SLOT_L2_FRACTION: the chunked backward on one slot and the "
-                        "current stream where a chunk's slot is at least this fraction of the L2 (none: two slots, "
-                        "side stream)")
+                        "current stream where a chunk's slot is at least this fraction of the L2 (none: "
+                        "SINGLE_STREAM_DEVICES by device name)")
     p.add_argument("--profile-last", action="store_true",
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")

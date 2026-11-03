@@ -242,8 +242,23 @@ _SIDE_STREAMS = {}  # device index -> the side stream of the chunked backward's 
 # The chunked backward on one slot and the current stream (each chunk's input gradient right after its weight
 # gradient, as the recomputing backward runs) where a chunk's slot is at least this fraction of the L2: the two
 # slots of the side-stream path then no longer fit in it together (the tiles' backward_chunk_scale makes a slot up
-# to a whole L2). None: always two slots and the side stream. Under A/B (tiled band lists, #2); not a default yet.
+# to a whole L2). None: SINGLE_STREAM_DEVICES by exact device name (decision 66), else always two slots.
 SINGLE_STREAM_SLOT_L2_FRACTION = None
+# Where it measured faster (5M SrTiO3, OMAT-0 medium, tiles at backward_chunk_scale 4, 3 Nov 2026): RTX 4000 Ada
+# 80.5 -> 79.65 s per call (-1.0 %, two runs each, leto), RTX 5060 Ti 96.6 -> 93.0 s (-3.7 %, noisy desktop GPU).
+# Whole-system calls never reach it (their slot is a quarter of the L2).
+SINGLE_STREAM_DEVICES = {"NVIDIA GeForce RTX 5060 Ti": 0.5, "NVIDIA RTX 4000 Ada Generation": 0.5}
+_SINGLE_STREAM_BY_INDEX = {}
+
+
+def _single_stream_fraction(device):
+    if SINGLE_STREAM_SLOT_L2_FRACTION is not None:
+        return SINGLE_STREAM_SLOT_L2_FRACTION
+    index = torch.device(device).index
+    index = torch.cuda.current_device() if index is None else index
+    if index not in _SINGLE_STREAM_BY_INDEX:
+        _SINGLE_STREAM_BY_INDEX[index] = SINGLE_STREAM_DEVICES.get(torch.cuda.get_device_name(index))
+    return _SINGLE_STREAM_BY_INDEX[index]
 
 
 def _side_stream(device):
@@ -285,7 +300,7 @@ def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: t
         input_grad_into(dweights, weight, main, last, da, tile_rule)
         return dx, dsh, da
     rows = max(1, min(int(chunk_edges), edges))
-    fraction = SINGLE_STREAM_SLOT_L2_FRACTION
+    fraction = _single_stream_fraction(x.device)
     if fraction is not None and rows * weights.shape[1] * weights.element_size() >= fraction * l2_bytes(x.device):
         slot = weights.new_empty((rows, weights.shape[1]))
         for start in range(0, edges, rows):
