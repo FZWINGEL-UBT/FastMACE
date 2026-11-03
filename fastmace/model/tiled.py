@@ -1978,9 +1978,10 @@ class TiledForceField:
         own sizes, the headroom is for sizing only (in MD the tiles' sizes move a little every step). An exceeded
         size grows by at least a quarter of the largest slot's in that size: the large slot's sizes drift by a few per
         cent in MD, while a small slot (the remainder pieces of blocks just above the cap) can triple
-        (tiled-slot-growth.md). The edges take the same headroom (at least the bucket's count), and a tile whose bucket
-        has no slot runs in a neighbouring bucket's slot when it fits: in MD a tile's edges drift across a bucket's
-        edge by a few per cent, which would otherwise compile a new slot (tiled-1m-speed.md, "Slots in MD")."""
+        (tiled-slot-growth.md). A tile whose bucket has no slot runs in a neighbouring bucket's slot when it fits: in MD
+        a tile's edges drift across a bucket's edge by a few per cent, which would otherwise compile a new slot. The
+        edges take no headroom: a slot's padded edges cost every call (+4.8 % edges, +2.5 % step at 1M;
+        tiled-1m-speed.md, "Slots in MD")."""
         sizes = []
         for index, receivers in enumerate(tiles):
             piece = self._tile_graph(receivers, source, local_of)
@@ -2012,7 +2013,7 @@ class TiledForceField:
             rows = min(self.receivers, n,  # nor the atom count
                        math.ceil(max(r for r, _, _ in members) * head))
             need = (rows + 1, max(1, math.ceil(max(h for _, h, _ in members) * head)),
-                    max(key * step, 256 * math.ceil(max(e for _, _, e in members) * head / 256)))
+                    key * step)
             raw = (self.slot_needs[key][0] + 1,) + self.slot_needs[key][1:]  # one padding row
             slot = self._slots.get(key)
             if slot is None or any(a > b for a, b in zip(raw, slot["sizes"])):
