@@ -146,6 +146,9 @@ class TileConfig:
     # The chunked streaming backward's edges per chunk in the tiles, times this (``None``: ``TILE_CHUNK_SCALE`` by
     # device name, else 1). The chunks only change which edges' weight gradients share an L2-sized buffer.
     backward_chunk_scale: int | None = None
+    # The plan's grid from ``fit_grid`` (the fewest receiver-cap pieces among the rule's grid and finer ones), chosen
+    # once per receiver cap, atom count and cell; False: the rule's grid alone (``_grid_shape``).
+    grid_fit: bool = True
     # Padded tiles with the state on the host (CUDA): the next tile's graph is built, and the host rows its sweep
     # reads gathered and copied, on a side stream while the current tile runs, so the host's syncs and gathers no
     # longer drain the device's queue at every tile (a profiled 5M call left the GPU idle 17 % of the time).
@@ -511,10 +514,11 @@ def _holder_class():
     return Holder
 
 
-def _grid_shape(cell, n, receivers, reach=0.0, min_layers=4):
+def _grid_shape(cell, n, receivers, reach=0.0, min_layers=4, k=None, scale=1.0):
     """The tile grid of ``plan_tiles``: blocks per axis from the cell's plane spacings (about cubic blocks of about
-    ``receivers`` atoms), and the fractional thickness of the boundary skin along the first axis (0: no split). The
-    first axis splits when ``reach`` > 0, it has at least ``min_layers`` layers and a skin is at most half a layer."""
+    ``receivers`` atoms; ``scale`` times as many per axis; ``k`` given: those), and the fractional thickness of the
+    boundary skin along the first axis (0: no split). The first axis splits when ``reach`` > 0, it has at least
+    ``min_layers`` layers and a skin is at most half a layer."""
     import torch
 
     cell64 = torch.as_tensor(cell, dtype=torch.float64)
@@ -522,43 +526,62 @@ def _grid_shape(cell, n, receivers, reach=0.0, min_layers=4):
     recip = torch.linalg.inv(cell64).T
     spacings = [1.0 / float(torch.linalg.norm(recip[i])) for i in range(3)]  # plane spacings, Angstrom
     side = (volume * min(receivers, n) / n) ** (1 / 3)
-    k = [max(1, round(s / side)) for s in spacings]
+    if k is None:
+        k = [max(1, round(scale * s / side)) for s in spacings]
+    k = [int(x) for x in k]
     skin = float(reach) / spacings[0]  # fractional: a plane's distance bounds every distance across it
     return k, (skin if reach > 0 and k[0] >= min_layers and skin * k[0] <= 0.5 else 0.0)
 
 
-def plan_tiles(positions, cell, row_ptr, receivers, edges, reach=0.0, min_layers=4):
-    """Receiver tiles: a list of sorted int64 device index tensors covering every atom once.
+# fit_grid: the finer grids it tries, as factors on the blocks per axis of _grid_shape's rule.
+GRID_FIT_SCALES = (1.0, 1.04, 1.08, 1.12, 1.17, 1.22, 1.28)
 
-    Atoms are binned on a k1 x k2 x k3 grid of fractional coordinates, with k_i from the cell's plane spacings so
-    that a block is about cubic and holds about ``receivers`` atoms; a block above either cap is split into
-    consecutive pieces (in index order) below both. A rule on the cell geometry and the caps only. ``row_ptr``
-    None: no degrees (the tiles build their own lists), so a block splits into consecutive pieces of ``receivers``.
 
-    ``reach`` > 0 (``TileConfig.boundary_skin``): the first and the last layer along the first axis each split into
-    a skin of ``reach`` at the periodic boundary and the rest (``_grid_shape``), so k1 + 2 layers; only the skins'
-    atoms are within ``reach`` of an atom across the boundary.
+def fit_grid(positions, cell, receivers, reach=0.0, min_layers=4):
+    """The blocks per axis for ``plan_tiles(shape=...)``: of ``_grid_shape``'s rule and finer grids
+    (``GRID_FIT_SCALES``), the one whose blocks make the fewest pieces of at most ``receivers`` atoms (the coarser
+    one on a tie). The rule aims at blocks of ``receivers`` atoms on average, so on a crystal whose blocks are a whole
+    number of unit cells, rounding can leave most blocks just above the cap: each then splits into a full tile and a
+    small remainder with a large halo (SrTiO3 at 20M atoms, R 8,192: 2,535 blocks, 4,412 tiles;
+    docs/validation/tiled-scale.md). A finer grid whose blocks all fit has fewer tiles."""
+    import torch
 
-    The fractional coordinates and the block index are computed in chunks, element-wise, so the plan's whole-system
-    transients stay small (tiled-call-memory.md); the values are the unchunked ones.
-    """
+    n = positions.shape[0]
+    cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
+    best, seen = None, set()
+    for scale in GRID_FIT_SCALES:
+        k, skin = _grid_shape(cell64.cpu(), n, receivers, reach, min_layers, scale=scale)
+        if tuple(k) in seen:
+            continue
+        seen.add(tuple(k))
+        counts, _ = _blocks(positions, cell64, k, skin, counts_only=True)
+        pieces = sum(-(-int(c) // int(receivers)) for c in counts)
+        if best is None or pieces < best[0]:
+            best = (pieces, k)
+    return best[1]
+
+
+def _blocks(positions, cell64, k, skin, counts_only=False):
+    """``(counts, block)``: the atoms per block of the ``k`` grid with a boundary skin of ``skin`` along the first
+    axis (``plan_tiles``) and each atom's block (None with ``counts_only``).
+
+    The fractional coordinates and the block index are computed in chunks, element-wise (as the tile lists' bins: no
+    float64 GEMM, whose emulated forms round coarsely), and the block index in int32 below 2**31 blocks: no
+    whole-system float64 transient, 4 bytes per atom of keys (tiled capacity, lever 5; tiled-call-memory.md)."""
     import torch
 
     from fastmace.neighbors.skin import times_3x3
     from fastmace.neighbors.tile_list import CHUNK
 
     n = positions.shape[0]
-    cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
     inverse = torch.linalg.inv(cell64)
-    k, skin = _grid_shape(cell64.cpu(), n, receivers, reach, min_layers)
     scale = torch.tensor(k, dtype=torch.float64, device=positions.device)
     top = torch.tensor([x - 1 for x in k], device=positions.device)
     layers = k[0] + 2 if skin else k[0]
-    # The fractional coordinates per chunk (element-wise, as the tile lists' bins: no float64 GEMM, whose emulated
-    # forms round coarsely), and the block index in int32 below 2**31 blocks: no whole-system float64 transient,
-    # 4 bytes per atom of keys (tiled capacity, lever 5).
     blocks = layers * k[1] * k[2]
-    block = torch.empty(n, dtype=torch.int32 if blocks < 2**31 else torch.int64, device=positions.device)
+    dtype = torch.int32 if blocks < 2**31 else torch.int64
+    block = None if counts_only else torch.empty(n, dtype=dtype, device=positions.device)
+    counts = torch.zeros(blocks, dtype=torch.int64, device=positions.device)
     for start in range(0, n, CHUNK):
         stop = min(start + CHUNK, n)
         frac = times_3x3(positions[start:stop].to(torch.float64), inverse)
@@ -567,10 +590,38 @@ def plan_tiles(positions, cell, row_ptr, receivers, edges, reach=0.0, min_layers
         if skin:  # layer 0 the skin below ``skin``, the last one the skin from 1 - ``skin``, the others one up
             first = frac[:, 0]
             bins[:, 0] = torch.where(first < skin, 0, torch.where(first >= 1 - skin, layers - 1, bins[:, 0] + 1))
-        block[start:stop] = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
-        del bins, frac
+        index = (bins[:, 0] * k[1] + bins[:, 1]) * k[2] + bins[:, 2]
+        counts += torch.bincount(index, minlength=blocks)
+        if block is not None:
+            block[start:stop] = index
+        del bins, frac, index
+    return counts.cpu().tolist(), block
+
+
+def plan_tiles(positions, cell, row_ptr, receivers, edges, reach=0.0, min_layers=4, shape=None):
+    """Receiver tiles: a list of sorted int64 device index tensors covering every atom once.
+
+    Atoms are binned on a k1 x k2 x k3 grid of fractional coordinates, with k_i from the cell's plane spacings so
+    that a block is about cubic and holds about ``receivers`` atoms (``shape``: the k_i, as ``fit_grid`` chooses
+    them); a block above either cap is split into consecutive pieces (in index order) below both. A rule on the cell
+    geometry and the caps only. ``row_ptr`` None: no degrees (the tiles build their own lists), so a block splits
+    into consecutive pieces of ``receivers``.
+
+    ``reach`` > 0 (``TileConfig.boundary_skin``): the first and the last layer along the first axis each split into
+    a skin of ``reach`` at the periodic boundary and the rest (``_grid_shape``), so k1 + 2 layers; only the skins'
+    atoms are within ``reach`` of an atom across the boundary.
+
+    The block index is computed in chunks (``_blocks``), so the plan's whole-system transients stay small
+    (tiled-call-memory.md); the values are the unchunked ones.
+    """
+    import torch
+
+    n = positions.shape[0]
+    cell64 = torch.as_tensor(cell, dtype=torch.float64, device=positions.device)
+    k, skin = _grid_shape(cell64.cpu(), n, receivers, reach, min_layers, k=shape)
+    layers = k[0] + 2 if skin else k[0]
+    counts, block = _blocks(positions, cell64, k, skin)
     order = torch.sort(block, stable=True).indices  # within a block: increasing atom index
-    counts = torch.bincount(block, minlength=blocks).cpu().tolist()
     del block
     if row_ptr is None:  # no degrees: consecutive pieces of ``receivers`` in every block
         tiles, start = [], 0
@@ -876,6 +927,7 @@ class TiledForceField:
         self._budget_raised, self._fallback = False, None  # the budget raised the cap; the last step down
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
+        self._grid_fit = None  # (key, blocks per axis) of fit_grid's last choice
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
         self.list_cache_state = "on" if self.config.list_cache else "off"
@@ -1456,8 +1508,9 @@ class TiledForceField:
             tiles, grid = [t.to(self.device) for t in self._kept["tiles"]], self._kept["grid"]
         else:
             reach, layers = self._boundary_reach(n)
-            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap, reach, layers)
-            split = _grid_shape(cell.detach().cpu(), n, self.receivers, reach, layers)[1] > 0
+            shape = self._fitted_grid(pos, cell, n, reach, layers)
+            tiles, grid = plan_tiles(pos, cell, row_ptr, self.receivers, edge_cap, reach, layers, shape=shape)
+            split = _grid_shape(cell.detach().cpu(), n, self.receivers, reach, layers, k=shape)[1] > 0
             self._plan_skin = reach if split else 0.0
             if self._kept is not None:
                 self._kept["tiles"], self._kept["grid"] = [t.cpu() for t in tiles], grid
@@ -1871,6 +1924,16 @@ class TiledForceField:
         stats["max_receivers"] = max(stats["max_receivers"], r)
         stats["max_halo"] = max(stats["max_halo"], h)
         stats["max_edges"] = max(stats["max_edges"], ei.shape[1])
+
+    def _fitted_grid(self, pos, cell, n, reach, layers):
+        """The plan's blocks per axis (``TileConfig.grid_fit``; None: the rule's). Chosen once per receiver cap, atom
+        count, cell and boundary skin, so the plan of an MD run keeps its grid while the atoms move."""
+        if not self.config.grid_fit:
+            return None
+        key = (self.receivers, n, tuple(float(x) for x in cell.detach().cpu().reshape(-1)), float(reach), int(layers))
+        if self._grid_fit is None or self._grid_fit[0] != key:
+            self._grid_fit = (key, fit_grid(pos, cell, self.receivers, reach, layers))
+        return self._grid_fit[1]
 
     def _boundary_reach(self, n):
         """``TileConfig.boundary_skin``: the plan's ``reach`` and ``min_layers`` (``plan_tiles``); no split without
