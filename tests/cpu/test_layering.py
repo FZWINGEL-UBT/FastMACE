@@ -71,6 +71,11 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.
     "fastmace/kernels/oeq_streaming/runtime.py": {"TABLE_GRADIENT_PER_CHUNK": "per-chunk table gradient; GPU gate A/B"},
+    # OMAT-0 A100 profile follow-ups (3 November 2026): A/B switches of the launch screen
+    # (tools/modal/omat0_a100_launch_screen.sh); config fields only if adopted.
+    "fastmace/kernels/triton/edge_outer_sum.py": {"STRIDED_ROWS": "strided rows in place; copy kept for the A/B"},
+    "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B"},
+    "fastmace/rewrites/generic/modules.py": {"FIRST_FULL_ROWS": "reassociation on the full table row; screen A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")
