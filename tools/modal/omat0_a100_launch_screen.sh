@@ -42,6 +42,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     ff-bps*) ab "$spec" --b-constant "$ff:BLOCKS_PER_SM=${spec#ff-bps}" ;;
     ff-rpc*) ab "$spec" --b-constant "$ff:RECEIVERS_PER_CHUNK=${spec#ff-rpc}" ;;
     ff-wtr*) ab "$spec" --b-constant "$ff:W_TILE_REGISTERS=${spec#ff-wtr}" ;;
+    ff-batch*) ab "$spec" --b-constant "$ff:BATCH=${spec#ff-batch}" ;;  # BATCH 4: all 10 OMAT-0 paths in one part
     rt-thr*) ab "$spec" --b-constant "$rt:NUM_THREADS=${spec#rt-thr}" ;;
     recompute) ab "$spec" --b recompute_conv_weights=on ;;
   esac
