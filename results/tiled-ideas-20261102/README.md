@@ -68,3 +68,18 @@ Three arms, a/b order reversed. Steady compiled call; `list_cache_hits` 2,208 = 
 Both are kept. The single-stream backward (one L2-sized slot on the current stream once a slot is at least half the
 L2) is the default on these two GPUs by device name (`SINGLE_STREAM_DEVICES`, decision 66). Records:
 `rtx4000ada-leto/leto-band-ab-*`, `rtx5060ti-local/{base,band,single}-*`.
+
+## Receiver cap at 5M (SrTiO3, RTX 4000 Ada on leto, source `f5b158a1`, 3 November 2026)
+
+Host state, aliased, lanes off, wavefront auto (off: the host has room). Order r8 r16 budget budget r16 r8.
+
+| Cap | Tiles | GPU peak | Steady call |
+| --- | --- | --- | --- |
+| 8,192 (`--no-budget`) | 1,024 | 4.39 GiB | 78.5, 78.5 s |
+| 16,384 (`--no-budget`) | 343 | 7.89 GiB | 79.4, 79.2 s |
+| Default budget from 4,096 (goes to 16,384) | 343 | 7.89 GiB | 79.4, 79.1 s |
+
+The cap changes the steady call by about 1 %, as at 1M (`docs/validation/tiled-1m-speed.md`). The 110.8 s of the
+"lanes auto" arm above came from that arm's other settings and source (`c988f5ff`), not from R = 16,384. The total
+energy differs by 0.46 eV (1e-8 relative) between the two tilings: float32 summation order. Records:
+`rtx4000ada-leto/leto-cap-ab-*`.
