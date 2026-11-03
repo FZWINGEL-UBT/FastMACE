@@ -12,7 +12,8 @@
 # - streamw: wprime_backward.STREAM_W (the stored w read with __ldcs); sympairs: radial.SYMMETRIC_PAIRS;
 # - degN: radial.DEGREE N (default 10; fewer terms per edge, more pieces, the same fit tolerance and certificate);
 # - eos-fcN / eos-beN: edge_outer_sum FORWARD_CHUNK / BACKWARD_BLOCK_EDGES (default 32);
-# - d6-slopes2, d6-streamw: the switch on top of degree 6 (a: degree 6 too); bundle: degree 6, slopes2 and streamw.
+# - d6-slopes2, d6-streamw: the switch on top of degree 6 (a: degree 6 too); bundle: degree 6 and slopes2 (streamw
+#   is 12.7 % slower in the RTX 4000 Ada lab, 3.4 % faster on the RTX 5060 Ti: screened alone).
 # Screen pass: one order (abab), 6 blocks of 200 steps; SCREEN_BOTH=1 runs both orders, 8 blocks (winners).
 # Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu A100-80GB --timeout-min 75 --commit <sha> \
@@ -65,7 +66,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     eos-be*) ab "$spec" --b-constant "$eos:BACKWARD_BLOCK_EDGES=${spec#eos-be}" ;;
     d6-slopes2) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" ;;
     d6-streamw) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$wp:STREAM_W=True" ;;
-    bundle) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$wp:STREAM_W=True" ;;
+    bundle) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" ;;
   esac
 done
 note done
