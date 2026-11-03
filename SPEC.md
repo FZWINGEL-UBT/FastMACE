@@ -3307,6 +3307,8 @@ never probe. See `docs/validation/estimate-band.md` and `docs/validation/estimat
 
 **Generic radial tables on by default (2 November 2026, owner: "Yes make it default"; conductor):** §6.2 amended. `generic_radial_tables` is default on for the generic family on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, same-process A/Bs in both orders on both GPUs), float32 only and not in reproducible plans; float64 models resolve "auto" to off, an explicit "on" there is refused. Off on every other GPU (the A100 was not measured). See `docs/validation/generic-radial-tables.md`.
 
+**Generic radial tables on the A100 80GB cards (3 November 2026, owner: "Yes go ahead"; conductor):** decision 66's list for `generic_radial_tables` adds "NVIDIA A100 80GB PCIe" (SrTiO3 5,000 atoms, MD step b/a 0.902 / 0.901) and "NVIDIA A100-SXM4-80GB" (NaCl 8,000 atoms, 0.917 / 0.917), one structure each, after MargrafGroup's Benchmark_loup ran FastMACE on the PCIe card without them. `generic_chunked_conv_backward` stays off there (1.12 with the tables). See `docs/validation/loup-a100.md`.
+
 **Rule 12 for generic models (2 November 2026, owner: test the capacity on OMAT-0 medium and carry over the MH-1
 changes; conductor):** §6.2, §9.3 rule 12 and decision 66 amended. Two generic records (§6.2):
 `generic_chunked_conv_backward` (default on by decision 66 on the RTX 5060 Ti and RTX 4000 Ada) and

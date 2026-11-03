@@ -398,9 +398,11 @@ DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti
 # 66 (owner, 2 November 2026): "auto" on only on these GPUs, exact device names. MACE-OMAT-0 medium, MD step b/a in
 # the two build orders: RTX 4000 Ada NaCl 8,000 atoms 0.864 / 0.862, SrTiO3 6,655 0.845 / 0.844; RTX 5060 Ti NaCl
 # 0.849 / 0.848, SrTiO3 0.821 / 0.821. Tiled compiled calls: Ada 975,560 atoms 0.861 / 0.862, 5060 Ti 320,000 0.912
-# / 0.882. The A100 was not measured.
+# / 0.882. The A100s (owner, 3 November 2026, after Benchmark_loup; docs/validation/loup-a100.md): A100 80GB PCIe
+# SrTiO3 5,000 atoms 0.902 / 0.901, A100-SXM4-80GB NaCl 8,000 0.917 / 0.917. The A100-SXM4-40GB was not measured.
 DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti",
-                                                           "NVIDIA RTX 4000 Ada Generation")
+                                                           "NVIDIA RTX 4000 Ada Generation",
+                                                           "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB")
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):

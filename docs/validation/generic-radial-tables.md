@@ -122,9 +122,10 @@ Both drifts are negligible, and the fluctuations are the same.
 ## 6. Status
 
 - **Default on the measured GPUs (owner, 2 November 2026: "Yes make it default"; decision 66).** For the generic
-  family, `radial_tables="auto"` is on only on the "NVIDIA GeForce RTX 5060 Ti" and the
-  "NVIDIA RTX 4000 Ada Generation" (`planner.fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS`, exact device names),
-  and off on every other GPU. `radial_tables="on"` turns them on anywhere.
+  family, `radial_tables="auto"` is on only on the "NVIDIA GeForce RTX 5060 Ti", the
+  "NVIDIA RTX 4000 Ada Generation" and, since 3 November 2026 (owner, after Benchmark_loup, `loup-a100.md`), the
+  "NVIDIA A100 80GB PCIe" and "NVIDIA A100-SXM4-80GB" (`planner.fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS`, exact
+  device names), and off on every other GPU. `radial_tables="on"` turns them on anywhere.
 - Float32 plans only. In float64 plans "auto" keeps the radial chain and an explicit "on" is refused; the same for
   `reproducible=True`.
 - The table cache under `FASTMACE_CACHE` covers the setup cost after the first fit (section 3).

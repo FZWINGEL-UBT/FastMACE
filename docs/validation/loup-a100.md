@@ -94,8 +94,9 @@ Kernel time of one force call, 26.5 ms:
   - "NVIDIA A100-SXM4-80GB": NaCl.
 
   Each card has one structure; the 5060 Ti and RTX 4000 Ada had two each.
-- **The pending change:** adding both names to `DECISION_66_GENERIC_RADIAL_TABLES_GPUS` is a default change, and
-  waits for the owner.
+- **The change (owner, 3 November 2026: "Yes go ahead"):** both names are now in
+  `DECISION_66_GENERIC_RADIAL_TABLES_GPUS`, so `radial_tables="auto"` is on for generic models on these two cards.
+  The A100-SXM4-40GB stays off, since it was not measured.
 - **`generic_chunked_conv_backward`:** stays off on the A100. The data for that is the PCIe SrTiO3 A/B with both
   records, 1.12; the chunked backward was not measured alone.
 

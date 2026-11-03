@@ -109,7 +109,8 @@ def test_the_planner_keeps_generic_tables_to_measured_gpus_and_float32(monkeypat
 
     # Decision 66 (owner, 2 November 2026): "auto" on for the generic family on the measured GPUs only.
     assert fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS == ("NVIDIA GeForce RTX 5060 Ti",
-                                                            "NVIDIA RTX 4000 Ada Generation")
+                                                            "NVIDIA RTX 4000 Ada Generation",
+                                                            "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB")
     measured = plan_for("omat0-medium")
     assert measured.rewrites.radial_tables == "on"
     assert "measured GPU, decision 66" in str(measured.decision("RewriteConfig.radial_tables")[2])
