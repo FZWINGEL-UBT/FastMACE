@@ -91,7 +91,7 @@ AUTO_RULES = {
         "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
-    "RewriteConfig.tf32x3_gemms": "never_automatic",
+    "RewriteConfig.tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",

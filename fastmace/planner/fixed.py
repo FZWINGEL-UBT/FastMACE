@@ -118,7 +118,7 @@ AUTO_RULES = MappingProxyType({
         "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
-    "RewriteConfig.tf32x3_gemms": "never_automatic",
+    "RewriteConfig.tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
@@ -388,6 +388,13 @@ DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"
 # 0.968; NaCl 1.000 / 1.005. RTX 4000 Ada: NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969;
 # NaCl 0.998 / 1.003 (docs/validation/speed-def.md). The A100 was not measured.
 DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+# tf32x3_gemms on the CUTLASS backend (owner, 3 November 2026; docs/validation/cutlass-tf32x3.md): MD step b/a in
+# both build orders against IEEE with grouped_launch off. A100-SXM4-80GB: MH-1 NaCl 0.887 / 0.882, NbCl5 0.772 /
+# 0.770; OMAT-0 medium SrTiO3 5,000 atoms 0.948 / 0.947 (grouped_launch itself: no change there). Force gates pass;
+# OMAT-0's energy error is 4-11x the float32 reference's, under the 10 meV floor. A precision change, owner-approved
+# for these two models on this GPU only (the Ada and the RTX 5060 Ti measured Triton's tf32x3 slower).
+DECISION_66_TF32X3_GPUS = ("NVIDIA A100-SXM4-80GB",)
+DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
@@ -1145,9 +1152,9 @@ class FixedPlanner:
         # ideas-20261027 D3; owner decision 65 as w_tables (the FastMACE rules).
         note("save_transcendentals", r.save_transcendentals != "off",
              "transcendental ops saved for the backward, not recomputed (ideas-20261027 D3)")
-        needs("tf32x3_gemms", r.tf32x3_gemms == "on", v["block_linear"], "block_linear")
-        if r.tf32x3_gemms == "auto":
-            v["_why"]["tf32x3_gemms"] = "off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)"
+        # Decision 66 (owner, 3 November 2026): "auto" on for MH-1 and OMAT-0 on DECISION_66_TF32X3_GPUS (stage 2),
+        # float32 plans that are not reproducible (the FastMACE rules).
+        needs("tf32x3_gemms", r.tf32x3_gemms != "off", v["block_linear"], "block_linear")
         # Owner decision 58, 24 October 2026 (OPT4-T02): on for the qualified POLAR-1 checkpoints on the hybrid;
         # stage 2 drops them for every other model, the FastMACE rules in float64 and reproducible plans.
         for name in POLAR_GRAPH_RECORDS:
@@ -1210,6 +1217,23 @@ class FixedPlanner:
                 v["grouped_launch"] = False
                 v["_auto_off"]["grouped_launch"] = reason
                 v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
+        if v["tf32x3_gemms"] and "tf32x3_gemms" not in explicit:
+            # Decision 66: measured faster for these models on these GPU models only, matched by exact name.
+            name = getattr(hardware, "name", None)
+            measured = _mh1(model_label) or model_label in DECISION_66_TF32X3_LABELS
+            if measured and name in DECISION_66_TF32X3_GPUS and "grouped_launch" not in explicit:
+                v["_why"]["tf32x3_gemms"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
+                if v["grouped_launch"]:  # both reroute the block products; the A100 measured no change from it
+                    v["grouped_launch"] = False
+                    v["_auto_off"]["grouped_launch"] = "tf32x3_gemms reroutes the block products, decision 66"
+                    v["_why"]["grouped_launch"] += "; stage 2: off, tf32x3_gemms reroutes the block products"
+            else:
+                reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
+                          else f"not a measured GPU, decision 66 ({name})" if name not in DECISION_66_TF32X3_GPUS
+                          else "grouped_launch was asked for")
+                v["tf32x3_gemms"] = False
+                v["_auto_off"]["tf32x3_gemms"] = reason
+                v["_why"]["tf32x3_gemms"] += f"; stage 2: off, {reason}"
         for name in POLAR_GRAPH_RECORDS:
             if v[name] and name not in explicit and not _qualified_polar(traits, model_label):
                 # Gated on the three POLAR-1 checkpoints (OPT4-T02); other models were not screened.
@@ -1256,6 +1280,10 @@ class FixedPlanner:
     def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None,
                         decision_65="no hardware given, decision 65", species=None):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
+        if v["tf32x3_gemms"] and "tf32x3_gemms" not in explicit and (dtype != "float32" or reproducible):
+            v["tf32x3_gemms"] = False  # decision 66's default: float32 plans that are not reproducible
+            v["_why"]["tf32x3_gemms"] += ("; off: reproducible=True keeps IEEE products" if reproducible
+                                          else f"; off: {dtype} keeps IEEE products")
         if v["tf32x3_gemms"]:
             from fastmace.kernels.triton.tf32x3_gemm import MIN_CAPABILITY
 
