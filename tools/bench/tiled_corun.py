@@ -123,6 +123,45 @@ def profile_call(tiled, positions, host_ops=0):
     return summary, output
 
 
+def sweep_times(tiled, positions):
+    """One call with CUDA events around each tile's sweep body (``_run_slot``), its fill and its scatter: device
+    seconds per sweep and part (the stream's elapsed time between the events, idle gaps included), and tile counts.
+    Returns ``(summary, output)``."""
+    import torch
+
+    pending = []
+    originals = {name: getattr(tiled, name) for name in ("_run_slot", "_fill", "_scatter")}
+
+    def timed(name, key):
+        def run(*args, **kwargs):
+            start, stop = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+            start.record()
+            result = originals[name](*args, **kwargs)
+            stop.record()
+            pending.append((key(args), start, stop))
+            return result
+        return run
+
+    tiled._run_slot = timed("_run_slot", lambda a: f"sweep{a[0]}")
+    tiled._fill = timed("_fill", lambda a: "fill")
+    tiled._scatter = timed("_scatter", lambda a: f"scatter{a[0]}")
+    try:
+        torch.cuda.synchronize()
+        started = time.perf_counter()
+        output = tiled(positions)
+        torch.cuda.synchronize()
+        wall = time.perf_counter() - started
+    finally:
+        for name in originals:
+            delattr(tiled, name)
+    seconds, counts = {}, {}
+    for key, start, stop in pending:
+        seconds[key] = seconds.get(key, 0.0) + start.elapsed_time(stop) / 1e3
+        counts[key] = counts.get(key, 0) + 1
+    return dict(wall_s=wall, seconds=dict(sorted(seconds.items())), counts=dict(sorted(counts.items())),
+                timed_s=sum(seconds.values())), output
+
+
 def capture_slots(tiled, positions, per_sweep=2, skip=1):
     """Run one call and keep copies of the padded slots of ``per_sweep`` tiles of each sweep (after ``skip``)."""
     import torch
