@@ -7,6 +7,12 @@
 #   16 / 24 / 80 (parts 5 / 4 / 1; default 40: parts 2);
 # - runtime.NUM_THREADS 64 / 256 / 512 (default 128): the streaming kernels' block size, the wprime backward's grid;
 # - recompute_conv_weights=on: w rebuilt in the backward instead of stored (1.9 GB written and read per call).
+# Kernel-lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py), all bitwise or certified:
+# - slopes2 / slopes4: wprime_backward.SLOPE_VECTOR (q-major derivative table, float2/float4 term loads);
+# - streamw: wprime_backward.STREAM_W (the stored w read with __ldcs); sympairs: radial.SYMMETRIC_PAIRS;
+# - degN: radial.DEGREE N (default 10; fewer terms per edge, more pieces, the same fit tolerance and certificate);
+# - eos-fcN / eos-beN: edge_outer_sum FORWARD_CHUNK / BACKWARD_BLOCK_EDGES (default 32);
+# - d6-slopes2, d6-streamw: the switch on top of degree 6 (a: degree 6 too); bundle: degree 6, slopes2 and streamw.
 # Screen pass: one order (abab), 6 blocks of 200 steps; SCREEN_BOTH=1 runs both orders, 8 blocks (winners).
 # Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu A100-80GB --timeout-min 75 --commit <sha> \
@@ -17,6 +23,9 @@ ck=$FASTMACE_MODELS/mace-omat-0-medium.model
 st=results/loup-a100-20261103/SrTiO3.cif@10x10x10
 ff=fastmace.kernels.oeq_streaming.fused_forward
 rt=fastmace.kernels.oeq_streaming.runtime
+wp=fastmace.kernels.oeq_streaming.wprime_backward
+rd=fastmace.rewrites.radial
+eos=fastmace.kernels.triton.edge_outer_sum
 log=$out/run.log
 note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
 job() {
@@ -36,7 +45,7 @@ ab() {  # name b-arguments...
       --warmup 200 --block 200 --blocks "$blocks" --order "$order" --pattern "$pattern" "$@"
   done
 }
-note "Modal $(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader); source $(cat .source_commit)"
+note "$(hostname) $(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader); source $(cat .source_commit)"
 for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80 rt-thr64 rt-thr256 rt-thr512 recompute}; do
   case $spec in
     ff-bps*) ab "$spec" --b-constant "$ff:BLOCKS_PER_SM=${spec#ff-bps}" ;;
@@ -48,7 +57,15 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     strided) ab "$spec" --a-constant fastmace.kernels.triton.edge_outer_sum:STRIDED_ROWS=False ;;  # b: in place
     fullrows) ab "$spec" --b-constant fastmace.rewrites.generic.modules:FIRST_FULL_ROWS=True ;;
     colblock64) ab "$spec" --b-constant fastmace.kernels.triton.radial_table:COLUMN_BLOCK=64 ;;
-    deg*) ab "$spec" --b-constant "fastmace.rewrites.radial:DEGREE=${spec#deg}" ;;  # fewer terms, more pieces (same tolerance)
+    deg*) ab "$spec" --b-constant "$rd:DEGREE=${spec#deg}" ;;  # fewer terms, more pieces (same tolerance)
+    slopes*) ab "$spec" --b-constant "$wp:SLOPE_VECTOR=${spec#slopes}" ;;
+    streamw) ab "$spec" --b-constant "$wp:STREAM_W=True" ;;
+    sympairs) ab "$spec" --b-constant "$rd:SYMMETRIC_PAIRS=True" ;;
+    eos-fc*) ab "$spec" --b-constant "$eos:FORWARD_CHUNK=${spec#eos-fc}" ;;
+    eos-be*) ab "$spec" --b-constant "$eos:BACKWARD_BLOCK_EDGES=${spec#eos-be}" ;;
+    d6-slopes2) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" ;;
+    d6-streamw) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$wp:STREAM_W=True" ;;
+    bundle) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$wp:STREAM_W=True" ;;
   esac
 done
 note done
