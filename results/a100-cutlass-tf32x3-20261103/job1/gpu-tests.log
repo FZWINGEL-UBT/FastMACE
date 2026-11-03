@@ -1,0 +1,30 @@
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+......F.                                                                 [100%]
+=================================== FAILURES ===================================
+______________ test_joined_products_in_tf32x3_equal_the_dense_op _______________
+
+    def test_joined_products_in_tf32x3_equal_the_dense_op():
+        from fastmace.kernels.triton.segment_gemm import joined_products
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+    
+        atoms, dims, muls = 50, (1, 3), (64, 32)
+        generator = torch.Generator(device="cuda").manual_seed(2)
+        rows = [torch.randn((atoms * d, 48), generator=generator, device="cuda") for d in dims]
+        weights = [torch.randn((48, m), generator=generator, device="cuda") for m in muls]
+        offsets = (0, muls[0])
+        width = sum(d * m for d, m in zip(dims, muls))
+        out = joined_products(rows, weights, [w.t().contiguous() for w in weights], offsets, dims, width, "tf32x3")
+        for x, w, offset, d, m in zip(rows, weights, offsets, dims, muls):
+>           assert torch.equal(out[:, offset:offset + d * m].reshape(atoms * d, m), tf32x3_mm(x, w))
+E           AssertionError: assert False
+E            +  where False = <built-in method equal of type object at 0x2ab2ae7a6400>(tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0'), tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0'))
+E            +    where <built-in method equal of type object at 0x2ab2ae7a6400> = torch.equal
+E            +    and   tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0') = <built-in method reshape of Tensor object at 0x2ab3452ef8d0>((50 * 1), 64)
+E            +      where <built-in method reshape of Tensor object at 0x2ab3452ef8d0> = tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0').reshape
+E            +    and   tensor([[ -0.1811,   1.3222,  -0.6319,  ...,  -8.9260,   0.4246,   7.1328],\n        [ -0.3288,  -1.1447,  -9.3533,  .....1.2171,   1.0176],\n        [ 12.1971,   1.0030,   2.2770,  ...,   4.5157,  -1.6986,   7.0668]],\n       device='cuda:0') = <CustomOpDef(fastmace::tf32x3_mm)>(tensor([[ 0.0223, -0.5777,  0.7053,  ..., -1.2035,  0.0754, -0.0962],\n        [ 0.3381,  0.3703,  0.7920,  ..., -0.014...6114, -0.6558,  0.1303],\n        [ 0.4326,  0.6732, -0.3741,  ..., -1.4741,  0.9413,  0.9145]],\n       device='cuda:0'), tensor([[-0.1825,  1.7087,  0.1843,  ...,  0.9775,  1.1469, -1.4862],\n        [ 1.5623,  1.1490,  0.2106,  ...,  0.783...4269, -0.3695,  1.2287],\n        [-0.1834,  1.3019,  2.0926,  ...,  1.5561,  0.6213, -0.0932]],\n       device='cuda:0'))
+
+tests/gpu/test_tf32x3_gemm_cuda.py:80: AssertionError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_tf32x3_gemm_cuda.py::test_joined_products_in_tf32x3_equal_the_dense_op
+1 failed, 7 passed in 1.70s

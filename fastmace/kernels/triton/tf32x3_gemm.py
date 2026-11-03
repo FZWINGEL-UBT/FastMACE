@@ -73,6 +73,28 @@ def uses_tf32x3_tile(k: int, n: int) -> bool:
     return int(k) >= tile_rule.BLOCK_K and int(n) >= tile_rule.BLOCK_K
 
 
+# The compute capabilities whose products run on the CUTLASS backend (fastmace.kernels.cutlass.tf32x3, the A100's
+# 8.0) where its kernels load: there by its shape rule, else on cuBLAS IEEE. () puts Triton everywhere (A/B).
+CUTLASS_CAPABILITIES = ((8, 0),)
+_CUTLASS_ON = {}  # device index -> whether the CUTLASS kernels load there
+
+
+def _cutlass(device):
+    index = device.index if device.index is not None else torch.cuda.current_device()
+    if tuple(torch.cuda.get_device_capability(index)) not in CUTLASS_CAPABILITIES:
+        return False
+    if index not in _CUTLASS_ON:
+        from fastmace.kernels.cutlass import tf32x3
+        _CUTLASS_ON[index] = tf32x3.available(device)
+    return _CUTLASS_ON[index]
+
+
+def backend(device) -> str:
+    """"cutlass" where ``tf32x3_mm`` runs its eligible products in CUTLASS on ``device``, else "triton"."""
+    device = torch.device(device)
+    return "cutlass" if device.type == "cuda" and _cutlass(device) else "triton"
+
+
 def _launch(a, b, out):
     import triton
 
@@ -80,6 +102,14 @@ def _launch(a, b, out):
     n = b.shape[1]
     if not uses_tf32x3_tile(k, n):
         torch.mm(a.contiguous(), b.contiguous(), out=out)
+        return
+    if _cutlass(a.device):  # by the shape alone (cutlass.tf32x3.takes): CUTLASS, else cuBLAS IEEE, never Triton
+        from fastmace.kernels.cutlass import tf32x3
+        if tf32x3.takes(m, k, n):
+            a, b = tf32x3.fit(a, b)
+            tf32x3.mm_into(a, b, out)
+        else:
+            torch.mm(a.contiguous(), b.contiguous(), out=out)
         return
     grid = (triton.cdiv(m, tile_rule.BLOCK_M), triton.cdiv(n, tile_rule.BLOCK_N))
     _kernel()[grid](a, b, out, m, n, k, a.stride(0), a.stride(1), b.stride(0), b.stride(1), out.stride(0),
@@ -147,4 +177,4 @@ def tf32x3_matmul(a, b, b_t=None):
     return Tf32x3Matmul.apply(a, b, b_t)
 
 
-__all__ = ["MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]
+__all__ = ["CUTLASS_CAPABILITIES", "MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "backend", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]

@@ -31,10 +31,21 @@ def _targets(model):
 
 
 def route(model):
-    """Set ``tf32x3`` on every module that has atom GEMMs; returns their names."""
+    """Set ``tf32x3`` on every module that has atom GEMMs, and ``tf32x3_backend``, the backend ``tf32x3_mm`` uses on
+    the module's device ("cutlass" on compute capability 8.0, else "triton"; ``GatedRows`` then takes the block
+    products instead of its joined Triton GEMM); returns their names."""
+    import torch
+
+    from fastmace.kernels.triton.tf32x3_gemm import backend
+
     names = []
     for name, module in _targets(model):
+        tensor = next(iter(module.parameters()), None)
+        if tensor is None:
+            tensor = next(iter(module.buffers()), None)
+        device = tensor.device if tensor is not None else torch.device("cpu")
         module.tf32x3 = True
+        module.tf32x3_backend = backend(device)
         names.append(name)
     return names
 

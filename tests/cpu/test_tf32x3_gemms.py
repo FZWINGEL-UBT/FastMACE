@@ -1,8 +1,9 @@
 """The ``tf32x3_gemms`` record (plans/opt-4.md, OPT4-T03 stage 1): every atom GEMM as 3xTF32, opt-in.
 
 On the CPU the op runs PyTorch's product, so with the record on a tiny cuEquivariance model's energy and forces
-are bitwise those without it; the GPU accuracy is docs/validation/opt4-T03.md's force gate. The planner keeps
-the record opt-in and refuses it in float64, below compute capability 8.0 and beside ``grouped_launch``.
+are bitwise those without it; the GPU accuracy is docs/validation/opt4-T03.md's force gate. The planner turns
+"auto" on only for MH-1 and OMAT-0 on the A100-SXM4-80GB (decision 66, docs/validation/cutlass-tf32x3.md), and
+refuses it in float64, below compute capability 8.0 and beside ``grouped_launch``.
 """
 
 import copy
@@ -39,7 +40,8 @@ def test_record_is_opt_in_rounding_deterministic_and_last_of_the_module_records(
     order = regs.order()
     species = [name for name in order if name in ("species_tables", "fold_readout_tail", "fold_product_linear")]
     assert species and all(order.index(name) < order.index("tf32x3_gemms") for name in species)
-    assert fixed.AUTO_RULES["RewriteConfig.tf32x3_gemms"] == "never_automatic"
+    assert (fixed.AUTO_RULES["RewriteConfig.tf32x3_gemms"]
+            == "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus")
     assert "tf32x3_gemms" in fixed.REWRITE_FIELDS
     assert RewriteConfig().tf32x3_gemms == "auto"
 
@@ -122,11 +124,27 @@ def test_supported_needs_cuda():
 # --------------------------------------------------------------------------- planner
 
 
-def _plan(rewrites, hardware=GPU, dtype=None):
+def _plan(rewrites, hardware=GPU, dtype=None, label="mh1-r2scan"):
     configs = dict(rewrites=rewrites, engine=dataclasses.replace(EngineConfig(), backend="auto"))
     if dtype:
         configs["precision"] = PrecisionConfig(dtype=dtype)
-    return planner(**configs).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), hardware)
+    return planner(**configs).plan(traits(label), nacl(), IntegratorConfig(), hardware, model_label=label)
+
+
+A100 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+
+def test_decision_66_turns_auto_on_for_mh1_and_omat0_on_the_a100_only():
+    for label in ("mh1-r2scan", "omat0-medium"):
+        plan = _plan(RewriteConfig(), A100, label=label)
+        assert plan.rewrites.tf32x3_gemms == "on" and plan.rewrites.grouped_launch == "off", label
+        assert _plan(RewriteConfig(), A100, dtype="float64", label=label).rewrites.tf32x3_gemms == "off", label
+    assert "not a measured GPU, decision 66" in dict(_plan(RewriteConfig()).auto_options_off)["tf32x3_gemms"]
+    plan = _plan(RewriteConfig(), A100, label="mp0-medium")
+    assert plan.rewrites.tf32x3_gemms == "off"
+    assert "not a measured model, decision 66" in dict(plan.auto_options_off)["tf32x3_gemms"]
+    plan = _plan(RewriteConfig(grouped_launch="on"), A100, label="omat0-medium")  # an explicit grouped_launch wins
+    assert plan.rewrites.tf32x3_gemms == "off" and plan.rewrites.grouped_launch == "on"
 
 
 def test_planner_keeps_it_off_unless_asked_and_enables_an_explicit_on():

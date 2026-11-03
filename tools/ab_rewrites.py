@@ -254,7 +254,8 @@ def main(argv=None):
             tf32 = args.a_tf32 if side == "a" else args.b_tf32
             ab_step_time.set_tf32(torch, False)  # built in IEEE (tf32_after_build)
             rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
-            field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
+            with _Constants(args.a_constant if side == "a" else args.b_constant):  # rewrites read them too
+                field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
             integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
                           IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs))
             planner = planners[side]

@@ -237,6 +237,9 @@ FASTMACE_ONLY_DEFAULTS = {
     # Decision 66, 31 October 2026 (speed-def E2): MH-1 on DECISION_66_GATE_EPILOGUE_GPUS (this file's GPU is one),
     # with segment_gemm (float32, not reproducible).
     "gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
+    # Decision 66, 3 November 2026 (docs/validation/cutlass-tf32x3.md): MH-1 and OMAT-0 medium on
+    # DECISION_66_TF32X3_GPUS (not this file's GPU), float32, not reproducible.
+    "tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
@@ -254,7 +257,8 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
-           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS, "gate_epilogue": MH1_LABELS}
+           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS, "gate_epilogue": MH1_LABELS,
+           "tf32x3_gemms": ()}  # decision 66: the A100-SXM4-80GB only, not this file's GPU
 
 
 def fastmace_only_expected(name, label, backend):
@@ -748,6 +752,9 @@ def test_plans_equal_the_research_engine(label, capsys):
             elif name in fixed.POLAR_GRAPH_RECORDS and name in got_off:
                 assert label not in APPLIES[name], (label, argv)
                 assert got_off[name].startswith("not a qualified POLAR-1 checkpoint, decision 58"), (label, argv)
+            elif name == "tf32x3_gemms" and name in got_off:  # this file's GPU is not a decision-66 tf32x3 GPU
+                assert got_off[name].startswith(("not a measured GPU, decision 66", "not a measured model, decision 66",
+                                                 "grouped_launch was asked for")), (label, argv)
             elif name in got_off:
                 supported, reason = capabilities.rewrite_support(model)[stage2[name]]
                 assert label not in APPLIES[name] and not supported and got_off[name] == reason, (label, argv, name)
