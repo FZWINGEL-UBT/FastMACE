@@ -3,8 +3,8 @@
 # fastest time yet on SrTiO3 5000 atoms"), after the kernel-lab switches were screened on the RTX 4000 Ada and the
 # RTX 5060 Ti (results/omat0-kernel-lab-20261103: radial tables at degree 5 0.908 / 0.935 there).
 # 1. Screen (omat0_a100_launch_screen.sh): single switches in one order (SCREEN_ONE), the candidate sets in both
-#    orders (CANDIDATES; deg5: DEGREE 5; all5: and SLOPE_VECTOR 2, SKIP_ZERO_COLUMN, STREAM_STORE_W; allns5: all5
-#    without SLOPE_VECTOR).
+#    orders (CANDIDATES; deg5: DEGREE 5; dz5: and SKIP_ZERO_COLUMN; allns5: and STREAM_STORE_W too; all5, with
+#    SLOPE_VECTOR 2 as well, is not a default candidate: 1.027 and 1.070 on top of degree 5 on the Ada and 5060 Ti).
 # 2. The candidate with the lowest mean b/a over both orders (if below 1) and the default plan under the benchmark's
 #    protocol (tools/bench/loup_md.py: 5 warm-up and 20 timed steps, 3 fresh processes, NVE and Langevin).
 # 3. The step breakdown (tools/step_breakdown.py) with that set, then the kernel lab on this GPU (LAB=0 skips it):
@@ -22,15 +22,16 @@ ff=fastmace.kernels.oeq_streaming.fused_forward
 declare -A sets=(
   [deg5]="$rd:DEGREE=5"
   [all5]="$rd:DEGREE=5 $wp:SLOPE_VECTOR=2 $ff:SKIP_ZERO_COLUMN=True $ff:STREAM_STORE_W=True"
+  [dz5]="$rd:DEGREE=5 $ff:SKIP_ZERO_COLUMN=True"
   [allns5]="$rd:DEGREE=5 $ff:SKIP_ZERO_COLUMN=True $ff:STREAM_STORE_W=True"
 )
 log=$out/run.log
 note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
 SCREEN=${SCREEN_ONE:-"deg4 deg6 skipzero slopes2 sympairs d5-slopes2 d5-skipzero d5-stcs"} \
   bash tools/modal/omat0_a100_launch_screen.sh
-SCREEN_BOTH=1 SCREEN=${CANDIDATES:-"deg5 all5 allns5"} bash tools/modal/omat0_a100_launch_screen.sh
+SCREEN_BOTH=1 SCREEN=${CANDIDATES:-"deg5 dz5 allns5"} bash tools/modal/omat0_a100_launch_screen.sh
 best="" best_ratio=1
-for name in ${CANDIDATES:-deg5 all5 allns5}; do
+for name in ${CANDIDATES:-deg5 dz5 allns5}; do
   ratio=$(grep -h -o "b/a [0-9.]* valid" "$out/ab-$name-ab.log" "$out/ab-$name-ba.log" 2>/dev/null |
           awk '{s += $2; n++} END {if (n == 2) printf "%.4f", s / n}')
   note "candidate $name mean b/a ${ratio:-missing}"

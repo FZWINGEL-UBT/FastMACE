@@ -83,6 +83,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     bundle-all) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$zc" "$ffs" ;;
     all[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#all}" "$wp:SLOPE_VECTOR=2" "$zc" "$ffs" ;;  # all at degree N
     allns[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#allns}" "$zc" "$ffs" ;;  # the same without slopes2
+    dz[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#dz}" "$zc" ;;  # degree N and skipzero
   esac
 done
 note done
