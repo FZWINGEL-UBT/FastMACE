@@ -162,6 +162,50 @@ def sweep_times(tiled, positions):
                 timed_s=sum(seconds.values())), output
 
 
+def sweep_profile(tiled, positions, picks=(4, 5, 6), top=25):
+    """One call with torch.profiler around the bodies of tiles ``picks`` (by order within each sweep) of every
+    sweep: per sweep, the device time of the profiled bodies, its kernel classes and its top kernels. Returns
+    ``(summary, output)``."""
+    import torch
+    from torch.profiler import ProfilerActivity, profile
+
+    seen, found = {1: 0, 2: 0, 3: 0}, {1: [], 2: [], 3: []}
+    run_slot = tiled._run_slot
+
+    def profiled(sweep, slot, g):
+        k = seen[sweep]
+        seen[sweep] += 1
+        if k not in picks:
+            return run_slot(sweep, slot, g)
+        torch.cuda.synchronize()
+        with profile(activities=[ProfilerActivity.CUDA]) as prof:
+            result = run_slot(sweep, slot, g)
+            torch.cuda.synchronize()
+        found[sweep].extend((e.name, e.time_range.end - e.time_range.start) for e in prof.events()
+                            if e.device_type == torch.autograd.DeviceType.CUDA)
+        return result
+
+    tiled._run_slot = profiled
+    try:
+        output = tiled(positions)
+        torch.cuda.synchronize()
+    finally:
+        del tiled._run_slot
+    summary = {}
+    for sweep, kernels in found.items():
+        classes, names = {}, {}
+        for name, us in kernels:
+            classes[classify(name)] = classes.get(classify(name), 0.0) + us
+            names[name] = names.get(name, 0.0) + us
+        total = sum(classes.values()) or 1.0
+        summary[f"sweep{sweep}"] = dict(
+            tiles=sum(1 for k in picks if k < seen[sweep]), kernel_s=total / 1e6,
+            classes={k: round(v / total, 4) for k, v in sorted(classes.items(), key=lambda kv: -kv[1])},
+            top=[dict(name=k[:160], ms=v / 1e3, share=round(v / total, 4), cls=classify(k))
+                 for k, v in sorted(names.items(), key=lambda kv: -kv[1])[:top]])
+    return summary, output
+
+
 def capture_slots(tiled, positions, per_sweep=2, skip=1):
     """Run one call and keep copies of the padded slots of ``per_sweep`` tiles of each sweep (after ``skip``)."""
     import torch

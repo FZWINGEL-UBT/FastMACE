@@ -83,6 +83,9 @@ def parse_args(argv=None):
                    help="oeq_streaming SINGLE_STREAM_SLOT_L2_FRACTION: the chunked backward on one slot and the "
                         "current stream where a chunk's slot is at least this fraction of the L2 (none: "
                         "SINGLE_STREAM_DEVICES by device name)")
+    p.add_argument("--sweep-profile", action="store_true",
+                   help="the last call with torch.profiler around three tiles of each sweep: kernel classes and top "
+                        "kernels per sweep (tiled_corun.sweep_profile)")
     p.add_argument("--sweep-times", action="store_true",
                    help="the last call with CUDA events around each tile's sweep body, fill and scatter: device "
                         "seconds per sweep (tiled_corun.sweep_times)")
@@ -395,7 +398,12 @@ def main(argv=None):
             torch.cuda.synchronize()
             before = torch.cuda.memory_allocated()
             torch.cuda.reset_peak_memory_stats()
-            if args.sweep_times and call == args.calls - 1:
+            if args.sweep_profile and call == args.calls - 1:
+                import tiled_corun
+
+                started = time.perf_counter()
+                record["sweep_profile"], out = tiled_corun.sweep_profile(tiled, positions)
+            elif args.sweep_times and call == args.calls - 1:
                 import tiled_corun
 
                 started = time.perf_counter()
