@@ -1,0 +1,62 @@
+Cannot read termcap database;
+using dumb terminal settings.
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+FF......                                                                 [100%]
+=================================== FAILURES ===================================
+_____________ test_error_is_fp32_class_and_repeats_bitwise[shape0] _____________
+
+shape = (216, 512, 512)
+
+    @pytest.mark.parametrize("shape", SHAPES)
+    def test_error_is_fp32_class_and_repeats_bitwise(shape):
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+    
+        torch.backends.cuda.matmul.fp32_precision = "ieee"
+        a, b = _operands(*shape)
+        reference = a.double() @ b.double()
+        got = tf32x3_mm(a, b)
+        ieee = a @ b
+        error = float((got.double() - reference).abs().max())
+>       assert error <= 4 * float((ieee.double() - reference).abs().max()) + 1e-30
+E       AssertionError: assert 0.00047597074563654473 <= ((4 * 3.818281165024473e-05) + 1e-30)
+E        +  where 3.818281165024473e-05 = float(tensor(3.8183e-05, device='cuda:0', dtype=torch.float64))
+E        +    where tensor(3.8183e-05, device='cuda:0', dtype=torch.float64) = <built-in method max of Tensor object at 0x7215782562a0>()
+E        +      where <built-in method max of Tensor object at 0x7215782562a0> = tensor([[7.7953e-06, 3.7613e-06, 1.7203e-06,  ..., 6.2578e-06, 8.0927e-06,\n         5.0675e-07],\n        [8.7839e-06, ...-06, 2.1712e-06, 1.3993e-06,  ..., 5.1683e-06, 3.1115e-06,\n         1.8526e-06]], device='cuda:0', dtype=torch.float64).max
+E        +        where tensor([[7.7953e-06, 3.7613e-06, 1.7203e-06,  ..., 6.2578e-06, 8.0927e-06,\n         5.0675e-07],\n        [8.7839e-06, ...-06, 2.1712e-06, 1.3993e-06,  ..., 5.1683e-06, 3.1115e-06,\n         1.8526e-06]], device='cuda:0', dtype=torch.float64) = <built-in method abs of Tensor object at 0x721578256250>()
+E        +          where <built-in method abs of Tensor object at 0x721578256250> = (tensor([[  5.0997, -18.4108,  23.1352,  ..., -27.0340,  46.3294, -17.6608],\n        [ 20.3973, -27.3614,   5.0424,  .....      [ 11.9330, -15.7522, -11.0283,  ..., -10.5652,  10.9140,  14.4954]],\n       device='cuda:0', dtype=torch.float64) - tensor([[  5.0998, -18.4108,  23.1352,  ..., -27.0340,  46.3294, -17.6608],\n        [ 20.3972, -27.3614,   5.0424,  .....      [ 11.9330, -15.7522, -11.0283,  ..., -10.5652,  10.9140,  14.4954]],\n       device='cuda:0', dtype=torch.float64)).abs
+E        +            where tensor([[  5.0997, -18.4108,  23.1352,  ..., -27.0340,  46.3294, -17.6608],\n        [ 20.3973, -27.3614,   5.0424,  .....      [ 11.9330, -15.7522, -11.0283,  ..., -10.5652,  10.9140,  14.4954]],\n       device='cuda:0', dtype=torch.float64) = <built-in method double of Tensor object at 0x721780fb0b30>()
+E        +              where <built-in method double of Tensor object at 0x721780fb0b30> = tensor([[  5.0997, -18.4108,  23.1352,  ..., -27.0340,  46.3294, -17.6608],\n        [ 20.3973, -27.3614,   5.0424,  .....4.1516, -20.7168],\n        [ 11.9330, -15.7522, -11.0283,  ..., -10.5652,  10.9140,  14.4954]],\n       device='cuda:0').double
+
+/home/fzwin/fm-src/e00ed09f/tests/gpu/test_tf32x3_gemm_cuda.py:33: AssertionError
+_____________ test_error_is_fp32_class_and_repeats_bitwise[shape1] _____________
+
+shape = (1944, 128, 2048)
+
+    @pytest.mark.parametrize("shape", SHAPES)
+    def test_error_is_fp32_class_and_repeats_bitwise(shape):
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+    
+        torch.backends.cuda.matmul.fp32_precision = "ieee"
+        a, b = _operands(*shape)
+        reference = a.double() @ b.double()
+        got = tf32x3_mm(a, b)
+        ieee = a @ b
+        error = float((got.double() - reference).abs().max())
+>       assert error <= 4 * float((ieee.double() - reference).abs().max()) + 1e-30
+E       AssertionError: assert 0.0003665486164479148 <= ((4 * 3.357305336493255e-05) + 1e-30)
+E        +  where 3.357305336493255e-05 = float(tensor(3.3573e-05, device='cuda:0', dtype=torch.float64))
+E        +    where tensor(3.3573e-05, device='cuda:0', dtype=torch.float64) = <built-in method max of Tensor object at 0x7215780880e0>()
+E        +      where <built-in method max of Tensor object at 0x7215780880e0> = tensor([[6.9097e-07, 2.4361e-06, 4.8515e-07,  ..., 5.8687e-06, 1.8594e-06,\n         2.2539e-07],\n        [2.4600e-06, ...-07, 2.1196e-06, 9.1091e-07,  ..., 2.4929e-06, 6.7079e-07,\n         8.9034e-07]], device='cuda:0', dtype=torch.float64).max
+E        +        where tensor([[6.9097e-07, 2.4361e-06, 4.8515e-07,  ..., 5.8687e-06, 1.8594e-06,\n         2.2539e-07],\n        [2.4600e-06, ...-07, 2.1196e-06, 9.1091e-07,  ..., 2.4929e-06, 6.7079e-07,\n         8.9034e-07]], device='cuda:0', dtype=torch.float64) = <built-in method abs of Tensor object at 0x721578088950>()
+E        +          where <built-in method abs of Tensor object at 0x721578088950> = (tensor([[ 17.3909,   3.8786,   2.1610,  ..., -20.1172,  -6.6001,  -3.7892],\n        [-19.2084,  -8.2710,   6.1922,  .....      [ 14.4846,   5.8477,  -6.6104,  ..., -14.9017,  11.0335,   0.3660]],\n       device='cuda:0', dtype=torch.float64) - tensor([[ 17.3909,   3.8786,   2.1610,  ..., -20.1172,  -6.6001,  -3.7892],\n        [-19.2084,  -8.2710,   6.1922,  .....      [ 14.4846,   5.8477,  -6.6104,  ..., -14.9017,  11.0335,   0.3660]],\n       device='cuda:0', dtype=torch.float64)).abs
+E        +            where tensor([[ 17.3909,   3.8786,   2.1610,  ..., -20.1172,  -6.6001,  -3.7892],\n        [-19.2084,  -8.2710,   6.1922,  .....      [ 14.4846,   5.8477,  -6.6104,  ..., -14.9017,  11.0335,   0.3660]],\n       device='cuda:0', dtype=torch.float64) = <built-in method double of Tensor object at 0x721578088810>()
+E        +              where <built-in method double of Tensor object at 0x721578088810> = tensor([[ 17.3909,   3.8786,   2.1610,  ..., -20.1172,  -6.6001,  -3.7892],\n        [-19.2084,  -8.2710,   6.1922,  .....1.6250,  -0.7426],\n        [ 14.4846,   5.8477,  -6.6104,  ..., -14.9017,  11.0335,   0.3660]],\n       device='cuda:0').double
+
+/home/fzwin/fm-src/e00ed09f/tests/gpu/test_tf32x3_gemm_cuda.py:33: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../home/fzwin/fm-src/e00ed09f/tests/gpu/test_tf32x3_gemm_cuda.py::test_error_is_fp32_class_and_repeats_bitwise[shape0]
+FAILED ../../../../home/fzwin/fm-src/e00ed09f/tests/gpu/test_tf32x3_gemm_cuda.py::test_error_is_fp32_class_and_repeats_bitwise[shape1]
+2 failed, 6 passed in 2.09s
