@@ -147,3 +147,32 @@ rounding (compiled sum order). A layout that would really give views (`[(l, m), 
 by `m` then node) moves the transpose to the per-path outputs, which `torch.cat` copies anyway, but writes the sums
 with an even larger stride; at most about 1.7 % of the 1M call (the copy kernels' share of sweeps 1 and 3), so it
 was not tried.
+
+## CUDA graphs for compiled tiles: opt-in (`fe7b0a7b`, 3 November 2026)
+
+`TileConfig(compiled_graphs=True)` (mode `compiled` or `auto`, device state, no lanes; `tiled_capacity.py
+--compiled-graphs`) captures each slot's compiled sweep bodies in a CUDA graph after two warm-ups and replays it per
+tile, as mode `graphs` does with the eager bodies. The idea: remove the host launch gaps between a compiled tile's
+kernels. At 1M atoms those gaps are about 2 % of the call (GPU 97.8 % busy, "Whole-call profile"), so the gain was
+expected only for small tiles. Steady calls (calls 2-4, or 3-4 at 1M), SrTiO3, OMAT-0 medium, float32:
+
+| Cell, GPU | Cap R | Without | With graphs | With / without |
+| --- | --- | --- | --- | --- |
+| 40,000 atoms, RTX 5060 Ti (one run each) | 4,096 | 0.761, 0.761 s | 0.697, 0.678 s | 0.90 |
+| 214,375 atoms, RTX 5060 Ti (ABBA) | 8,192 | 3.311-3.392 s, mean 3.333 | 3.157-3.276 s, mean 3.204 | 0.961 |
+| 975,560 atoms, RTX 4000 Ada leto (ABBA) | 16,384 | 14.21-14.31 s, mean 14.26 | 14.24-14.27 s, mean 14.26 | 1.000 |
+| 975,560 atoms, RTX A4000 trillian (ABBA) | 8,192 | 16.58-16.95 s | out of GPU memory | — |
+
+The energies agree to rounding (atomic sums: -7794285.0088 to -7794285.0092 eV at 1M with and without), and so does
+the force check. Memory: the graphs keep each slot's and sweep's private pool. At 1M on the Ada the memory held after
+a call rises from 4.97 to 5.21 GiB, and the first compiled call (the captures) peaks at 12.24 GiB as without. On the
+16 GB A4000 the first compiled call with graphs ran out of memory even at R = 8,192 (7.15 GiB in private pools,
+2.62 GiB more requested), where the run without graphs fits; at R = 16,384 all four trillian runs, with and without,
+ran out already in the eager first call. Graphs re-capture when a slot's size or the call's position, species or
+stress tensors change (`_graph_key`), so an MD loop must keep its tensors in place to profit.
+
+So the switch stays opt-in (default off): no gain at 1M, less memory headroom, a gain of 4-10 % only where tiles are
+small and launch-bound. Records: `results/tiled-1m-20261103/rtx4000ada-leto/leto-graphs-*` (`graphs_ab.sh`),
+`rtx-a4000-trillian/trillian-graphs-*` (R = 16,384, all out of memory) and `trillian-graphs-r8-*`,
+`rtx5060ti-local/graphs-214k/` and `graphs-40k/` (scripts inside). The source of all runs is `fe7b0a7b`. murphy was
+busy with another user's job and was not used.

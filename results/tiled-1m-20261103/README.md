@@ -12,6 +12,9 @@ SrTiO3 58×58×58 (975,560 atoms), OMAT-0 medium, float32. Report: `docs/validat
 - `rtx4000ada-murphy/murphy-reassoc-{base,new}-{a,b}`, `murphy-reassoc-sweep-profile`, `murphy-reassoc-gputests`:
   the rejected reassociation layout, main `a7159afd` against `e2903496` (`reassoc_ab.sh`);
   `rtx5060ti-local/reassoc-local/`: its whole-system MH-1 step A/B (`local_ab.sh`).
+- `rtx4000ada-leto/leto-graphs-{off,on}-{a,b}` (`graphs_ab.sh`), `rtx-a4000-trillian/trillian-graphs-*` (R = 16,384, all
+  out of memory; `-r8-`: R = 8,192, the graphs side out of memory), `rtx5060ti-local/graphs-{214k,40k}/`: the opt-in
+  CUDA graphs for compiled tiles, `TileConfig.compiled_graphs` (`fe7b0a7b`), without and with.
 - `rtx5060ti-local/profile-1m-{device,host}`: `--profile-last` on the local RTX 5060 Ti (WSL), R = 8,192
   (`f5b158a1`).
 

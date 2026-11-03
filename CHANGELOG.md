@@ -8,6 +8,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `TileConfig.compiled_graphs` (default off; `tiled_capacity.py --compiled-graphs`): compiled tile bodies captured
+  in CUDA graphs per slot and sweep. Steady tiled call 0.90 at 40k and 0.961 at 214k atoms (RTX 5060 Ti), 1.000 at
+  1M (RTX 4000 Ada); the private pools cost memory, so 1M runs out of memory with it on the 16 GB RTX A4000
+  (docs/validation/tiled-1m-speed.md, "CUDA graphs for compiled tiles").
 - The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
   records:
   - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming
