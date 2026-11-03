@@ -7,7 +7,8 @@
 #    without SLOPE_VECTOR).
 # 2. The candidate with the lowest mean b/a over both orders (if below 1) and the default plan under the benchmark's
 #    protocol (tools/bench/loup_md.py: 5 warm-up and 20 timed steps, 3 fresh processes, NVE and Langevin).
-# 3. The kernel lab on this GPU (LAB=0 skips it): sizes the 3xTF32 tensor-core forward idea.
+# 3. The step breakdown (tools/step_breakdown.py) with that set, then the kernel lab on this GPU (LAB=0 skips it):
+#    the next targets, and the size of the 3xTF32 tensor-core forward idea.
 # Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu A100-80GB --timeout-min 85 --commit <sha> \
 #     --command "bash tools/modal/omat0_a100_fastest.sh" --out ~/fm-runs/omat0-a100-fastest
@@ -48,6 +49,13 @@ for set in default $best; do
     done
   done
 done
+if [ -n "$best" ]; then read -r -a constants <<< "${sets[$best]}"; else constants=(); fi
+note "start breakdown ${best:-default}"  # the step's kernels by category with the fastest set (old copies gone?)
+python tools/step_breakdown.py --output "$out/breakdown" --checkpoint "$ck" --model omat0-medium --structure "$st" \
+  --temperature-K 300 --timestep-fs 1 --equilibrate-steps 100 --steps 200 ${constants[@]:+--constant "${constants[@]}"} \
+  > "$out/breakdown.log" 2>&1 < /dev/null
+note "end breakdown exit=$?"
+rm -f "$out"/breakdown/trace.json
 if [ "${LAB:-1}" = 1 ]; then
   note "start lab"
   python tools/omat0_kernel_lab.py --checkpoint "$ck" --output "$out/lab" > "$out/lab.log" 2>&1 < /dev/null
