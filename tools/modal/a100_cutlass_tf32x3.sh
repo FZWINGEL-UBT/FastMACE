@@ -28,9 +28,9 @@ job check python tools/bench/cutlass_tf32x3_check.py --output "$out/check.json" 
 job gpu-tests python -m pytest -q -p no:cacheprovider tests/gpu/test_tf32x3_gemm_cuda.py
 job accuracy-mh1 python tools/tf32x3_accuracy.py --output "$out/accuracy-mh1" --model mh1-r2scan
 job gate-mh1 python tools/force_stress_gate.py --output "$out/gate-mh1" --engine fastmace --checkpoint "$mh1" \
-  --model mh1-r2scan --structures NaCl NbCl5 --rewrites tf32x3_gemms=on
+  --model mh1-r2scan --structures-root "$FASTMACE_STRUCTURES" --structures NaCl NbCl5 --rewrites tf32x3_gemms=on grouped_launch=off
 job gate-omat0 python tools/force_stress_gate.py --output "$out/gate-omat0" --engine fastmace --checkpoint "$omat" \
-  --model omat0-medium --structures NaCl NbCl5 --rewrites tf32x3_gemms=on
+  --model omat0-medium --structures-root "$FASTMACE_STRUCTURES" --structures NaCl NbCl5 \n  --rewrites tf32x3_gemms=on grouped_launch=off
 ab() {  # name model checkpoint structures... -- extra
   local name=$1 model=$2 ck=$3; shift 3
   for order in ab ba; do
@@ -39,10 +39,12 @@ ab() {  # name model checkpoint structures... -- extra
       --model "$model" --timestep-fs 1 --warmup 200 --block 200 --blocks 8 --order "$order" --pattern "$pattern" "$@"
   done
 }
-ab omat0 omat0-medium "$omat" --structures "$st" --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
-  --b tf32x3_gemms=on
-ab mh1 mh1-r2scan "$mh1" --structures NaCl NbCl5 --b tf32x3_gemms=on
-ab omat0-backend omat0-medium "$omat" --structures "$st" --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
-  --a tf32x3_gemms=on --a-constant fastmace.kernels.triton.tf32x3_gemm:CUTLASS=False --b tf32x3_gemms=on
+# tf32x3_gemms conflicts with grouped_launch (both reroute the block products): b turns grouped_launch off, and a
+# control pair (a = grouped_launch=off) separates the two.
+nb=(--a-neighbours skin=0.5 --b-neighbours skin=0.5)
+ab omat0 omat0-medium "$omat" --structures "$st" "${nb[@]}" --b tf32x3_gemms=on grouped_launch=off
+ab omat0-control omat0-medium "$omat" --structures "$st" "${nb[@]}" --a grouped_launch=off   --b tf32x3_gemms=on grouped_launch=off
+ab mh1 mh1-r2scan "$mh1" --structures NaCl NbCl5 --a grouped_launch=off --b tf32x3_gemms=on grouped_launch=off
+ab omat0-backend omat0-medium "$omat" --structures "$st" "${nb[@]}" --a tf32x3_gemms=on grouped_launch=off   --a-constant fastmace.kernels.triton.tf32x3_gemm:CUTLASS=False --b tf32x3_gemms=on grouped_launch=off
 note done
 grep -h -E "b/a" "$out"/ab-*.log 2>/dev/null | cut -c1-300
