@@ -14,9 +14,10 @@
 # - eos-fcN / eos-beN: edge_outer_sum FORWARD_CHUNK / BACKWARD_BLOCK_EDGES (default 32);
 # - skipzero: fused_forward.SKIP_ZERO_COLUMN (the k-loop skips the folded weight's all-zero bias column);
 # - stcs: fused_forward.STREAM_STORE_W (w stored with __stcs); bundle-all: degree 6, slopes2, skipzero and stcs;
-# - d6-slopes2, d6-streamw, d6-skipzero: the switch on top of degree 6 (a: degree 6 too); bundle: degree 6 and
-#   slopes2; bundle-skipzero: and skipzero (streamw is 12.7 % slower in the RTX 4000 Ada lab, 3.4 % faster on the
-#   RTX 5060 Ti: screened alone).
+# - dN-slopes2, dN-slopes4, dN-streamw, dN-skipzero, dN-stcs: the switch on top of degree N (a: degree N too);
+#   bundle: degree 6 and slopes2; bundle-skipzero: and skipzero; allN: degree N, slopes2, skipzero and stcs; allnsN:
+#   the same without slopes2 (streamw is 12.7 % slower in the RTX 4000 Ada lab, 3.4 % faster on the RTX 5060 Ti:
+#   screened alone).
 # Screen pass: one order (abab), 6 blocks of 200 steps; SCREEN_BOTH=1 runs both orders, 8 blocks (winners).
 # Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu A100-80GB --timeout-min 75 --commit <sha> \
@@ -69,14 +70,19 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     sympairs) ab "$spec" --b-constant "$rd:SYMMETRIC_PAIRS=True" ;;
     eos-fc*) ab "$spec" --b-constant "$eos:FORWARD_CHUNK=${spec#eos-fc}" ;;
     eos-be*) ab "$spec" --b-constant "$eos:BACKWARD_BLOCK_EDGES=${spec#eos-be}" ;;
-    d6-slopes2) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" ;;
-    d6-streamw) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$wp:STREAM_W=True" ;;
+    d[0-9]*-*) n=${spec%%-*}; n=${n#d}  # dN-switch: the switch on top of degree N (a: degree N too)
+      case ${spec#*-} in
+        slopes2) sw="$wp:SLOPE_VECTOR=2" ;; slopes4) sw="$wp:SLOPE_VECTOR=4" ;; streamw) sw="$wp:STREAM_W=True" ;;
+        skipzero) sw=$zc ;; stcs) sw=$ffs ;; *) note "unknown case $spec"; continue ;;
+      esac
+      ab "$spec" --a-constant "$rd:DEGREE=$n" --b-constant "$rd:DEGREE=$n" "$sw" ;;
     bundle) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" ;;
     skipzero) ab "$spec" --b-constant "$zc" ;;
-    d6-skipzero) ab "$spec" --a-constant "$rd:DEGREE=6" --b-constant "$rd:DEGREE=6" "$zc" ;;
     bundle-skipzero) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$zc" ;;
     stcs) ab "$spec" --b-constant "$ffs" ;;
     bundle-all) ab "$spec" --b-constant "$rd:DEGREE=6" "$wp:SLOPE_VECTOR=2" "$zc" "$ffs" ;;
+    all[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#all}" "$wp:SLOPE_VECTOR=2" "$zc" "$ffs" ;;  # all at degree N
+    allns[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#allns}" "$zc" "$ffs" ;;  # the same without slopes2
   esac
 done
 note done
