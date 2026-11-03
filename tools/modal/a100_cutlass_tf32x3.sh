@@ -30,7 +30,7 @@ job accuracy-mh1 python tools/tf32x3_accuracy.py --output "$out/accuracy-mh1" --
 job gate-mh1 python tools/force_stress_gate.py --output "$out/gate-mh1" --engine fastmace --checkpoint "$mh1" \
   --model mh1-r2scan --structures-root "$FASTMACE_STRUCTURES" --structures NaCl NbCl5 --rewrites tf32x3_gemms=on grouped_launch=off
 job gate-omat0 python tools/force_stress_gate.py --output "$out/gate-omat0" --engine fastmace --checkpoint "$omat" \
-  --model omat0-medium --structures-root "$FASTMACE_STRUCTURES" --structures NaCl NbCl5 \n  --rewrites tf32x3_gemms=on grouped_launch=off
+  --model omat0-medium --structures-root "$FASTMACE_STRUCTURES" --structures NaCl NbCl5 --rewrites tf32x3_gemms=on grouped_launch=off
 ab() {  # name model checkpoint structures... -- extra
   local name=$1 model=$2 ck=$3; shift 3
   for order in ab ba; do
