@@ -410,7 +410,7 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     feats = conv.layout_transpose_in(node_feats) if transpose else node_feats
     density = None
     if wprime_lengths is not None:
-        radial = self.conv_tp_weights
+        radial = getattr(self, "generic_folded", None) or self.conv_tp_weights  # generic_wprime_backward
         message, density = self.wprime_backward.convolution(
             wprime_lengths, self.radial_table.pair(node_attrs, edge_index), self.radial_table, radial.folded_weight(),
             feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,

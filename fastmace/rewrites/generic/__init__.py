@@ -221,6 +221,31 @@ def apply_recompute_conv_weights(model, context):
     return changed
 
 
+def apply_fused_folded_forward(model, context):
+    """The fused folded forward (opt-8 OPT8-T02) in every generic interaction on the chunked folded path that keeps
+    its per-edge weights (no generic_recompute): one kernel builds them and the message; returns their names."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+
+    changed = []
+    for index, interaction, _ in _generic_interactions(model):
+        folded = getattr(interaction, "generic_folded", None)
+        if (folded is None or not getattr(interaction, "chunked_backward_edges", 0)
+                or getattr(interaction, "generic_recompute", None) is not None):
+            continue
+        weight = folded.folded_constant
+        if weight.dtype != torch.float32:
+            raise ValueError(f"generic_fused_folded_forward is float32 only, interactions.{index} is {weight.dtype}")
+        try:
+            interaction.fused_folded_forward = FusedFoldedForward(interaction.streaming_kernels, weight.shape[1],
+                                                                  weight.device)
+        except ValueError as error:
+            raise ValueError(f"generic_fused_folded_forward: interactions.{index}: {error}") from error
+        changed.append(f"interactions.{index}")
+    return changed
+
+
 def apply_streaming(model, context):
     """Attach the receiver-streaming kernels to every non-reassociated generic OEq-fused convolution."""
     changed = []
@@ -416,6 +441,11 @@ def _selfcheck_recompute_conv_weights(original, rewritten, context):
                                lambda i: getattr(i, "generic_recompute", None) is not None)
 
 
+def _selfcheck_fused_folded_forward(original, rewritten, context):
+    return _check_interactions(original, rewritten, context,
+                               lambda i: getattr(i, "fused_folded_forward", None) is not None)
+
+
 def _selfcheck_streaming(original, rewritten, context):
     return _check_interactions(original, rewritten, context,
                                lambda i: getattr(i, "streaming_kernels", None) is not None)
@@ -465,8 +495,15 @@ RECORDS = {
         ("sort_receivers", "per_engine_edge_counter"), apply_recompute_conv_weights,
         _selfcheck_recompute_conv_weights, requires=("generic_chunked_conv_backward",), deterministic=False,
         memory=memory_terms.generic_recompute_conv_weights, default="off"),
+    # MH-1's fused_folded_forward on the generic folded path; the planner keeps "auto" off for non-MH-1 models
+    # (decision 64), so it runs only when asked for.
+    "generic_fused_folded_forward": _record(
+        "generic_fused_folded_forward", "fused_folded_forward", _support_chunked_conv_backward, "exact",
+        ("sort_receivers", "per_engine_edge_counter"), apply_fused_folded_forward,
+        _selfcheck_fused_folded_forward, requires=("generic_chunked_conv_backward",), deterministic=False),
 }
 
-__all__ = ["NODE_ATTRS", "RECORDS", "apply_chunked_conv_backward", "apply_fused_radial_backward", "apply_reassociate",
+__all__ = ["NODE_ATTRS", "RECORDS", "apply_chunked_conv_backward", "apply_fused_folded_forward",
+           "apply_fused_radial_backward", "apply_reassociate",
            "apply_recompute_conv_weights", "apply_species_skip",
            "apply_streaming"]

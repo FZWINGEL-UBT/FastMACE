@@ -111,6 +111,10 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     recompute_table = tabled and getattr(self, "recompute_table", False)
     table_lengths = (edge_feats if recompute_table and chunked and getattr(self, "generic_recompute", None) is not None
                      else None)
+    # generic_wprime_backward: the table, the folded layer and the convolution in one op, its backward without the
+    # per-edge weight gradient.
+    wprime_lengths = (edge_feats if tabled and chunked and getattr(self, "generic_recompute", None) is None
+                      and getattr(self, "wprime_backward", None) is not None else None)
     message = None
     if recompute_table and reassociation is not None:
         message, table_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
@@ -119,6 +123,10 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         from fastmace.rewrites.mh1.modules import streaming_message
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                    node_attrs=node_attrs, table_lengths=table_lengths)
+    elif wprime_lengths is not None:
+        from fastmace.rewrites.mh1.modules import streaming_message
+        message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
+                                                   node_attrs=node_attrs, wprime_lengths=wprime_lengths)
     elif tabled:
         augmented, table_density = table(edge_feats, node_attrs, edge_index,
                                          density=kind != "residual")  # [h c, c] and the density

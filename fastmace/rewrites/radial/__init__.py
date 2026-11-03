@@ -741,7 +741,7 @@ def _wprime_case(interaction, generator, wprime, recompute_rows=0):
     from fastmace.kernels.triton.radial_table import radial_table
 
     table, kernels = interaction.radial_table, interaction.streaming_kernels
-    radial = interaction.conv_tp_weights
+    radial = getattr(interaction, "generic_folded", None) or interaction.conv_tp_weights  # generic: its folded layer
     weight = radial.folded_weight().detach()
     device, dtype = table.coef.device, table.coef.dtype
     nodes, edges = 37, 720
@@ -799,6 +799,62 @@ def _wprime_selfcheck(original, rewritten, context):
 
 def _apply_wprime(model, context):
     return attach_wprime(model)
+
+
+def attach_generic_wprime(model):
+    """``generic_wprime_backward``: ``wprime_backward`` in every generic interaction whose tables feed the chunked
+    folded streaming convolution with stored weights (``generic_chunked_conv_backward``; not on the recompute
+    paths, ``generic_recompute_conv_weights`` and ``generic_recompute_first_table``); returns their names. The
+    reassociated first interaction keeps its own path."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.wprime_backward import WPrime
+
+    names = []
+    for index, interaction in _generic_interactions(model):
+        table = getattr(interaction, "radial_table", None)
+        folded = getattr(interaction, "generic_folded", None)
+        if table is None or folded is None or getattr(interaction, "first_reassociation", None) is not None:
+            continue
+        if (not getattr(interaction, "chunked_backward_edges", 0)
+                or getattr(interaction, "generic_recompute", None) is not None):
+            continue
+        if table.coef.dtype != torch.float32:
+            raise RewriteError(f"generic_wprime_backward is float32 only, interactions.{index} has {table.coef.dtype} "
+                               f"tables")
+        weight = folded.folded_weight().detach()
+        pairs, pieces, terms, _ = table.dcoef.shape
+        size = pairs * pieces * terms * weight.shape[0] * table.dcoef.element_size()
+        if size > W_TABLE_MAX_BYTES:
+            raise RewriteError(f"generic_wprime_backward: interactions.{index} would hold {size / 2**30:.1f} GiB of "
+                               f"tables (more than W_TABLE_MAX_BYTES)")
+        interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels)
+        names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB)")
+    if not names:
+        raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the "
+                           "chunked streaming convolution")
+    return names
+
+
+def _generic_wprime_selfcheck(original, rewritten, context):
+    """``_wprime_selfcheck`` for the generic interactions."""
+    import torch
+
+    cases, dtype = CaseErrors(), None
+    for index, interaction in _generic_interactions(rewritten):
+        if getattr(interaction, "wprime_backward", None) is None:
+            continue
+        dtype = interaction.radial_table.coef.dtype
+        seed = context.seed + 17 + index
+        chain = _wprime_case(interaction, torch.Generator().manual_seed(seed), wprime=False)
+        got = _wprime_case(interaction, torch.Generator().manual_seed(seed), wprime=True)
+        for name, a, b in zip(("message", "density", "dr", "dx", "dsh"), chain, got):
+            cases.add(f"interactions.{index}.{name}", a, b)
+    return cases.result(dtype)
+
+
+def _apply_generic_wprime(model, context):
+    return attach_generic_wprime(model)
 
 
 # --------------------------------------------------------------------------- recompute_conv_weights (CAP-T07)
@@ -1225,6 +1281,14 @@ RECORDS = {
         conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
         deterministic=False, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_wprime,
         selfcheck=_wprime_selfcheck),
+    # The generic family's wprime_backward (3 November 2026): rounding, float32; the planner keeps "auto" off for
+    # every model but MH-1 (decision 66), so it runs only when asked for.
+    "generic_wprime_backward": dict(
+        name="generic_wprime_backward", config_field="wprime_backward", applies_to=_generic_support,
+        requires=("generic_radial_tables", "generic_chunked_conv_backward"), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto", deterministic=False,
+        workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_generic_wprime,
+        selfcheck=_generic_wprime_selfcheck),
     # plans/capacity.md CAP-T07: rounding (the rebuilt weights equal the stored ones bitwise; dsh and dL/dr are summed
     # over channel slices in another order, the sender additions are atomic); off unless memory requires it
     # (planner.memory.MEMORY_RESCUE, fallback.memory_rescue).
@@ -1244,5 +1308,6 @@ RECORDS = {
 }
 
 __all__ = ["DEGREE", "PIECE_BUCKET", "R_LO", "RECOMPUTE_CHECK_ROWS", "RECOMPUTE_KERNEL", "RECORDS", "W_TABLE_MAX_BYTES",
-           "attach_first_table", "attach_recompute", "attach_w_tables", "attach_wprime", "certify", "fit",
+           "attach_first_table", "attach_generic_wprime", "attach_recompute", "attach_w_tables", "attach_wprime",
+           "certify", "fit",
            "tabulate_generic", "tabulate_radials"]
