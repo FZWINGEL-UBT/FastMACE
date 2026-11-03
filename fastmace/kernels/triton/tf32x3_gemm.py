@@ -73,6 +73,28 @@ def uses_tf32x3_tile(k: int, n: int) -> bool:
     return int(k) >= tile_rule.BLOCK_K and int(n) >= tile_rule.BLOCK_K
 
 
+# The CUTLASS backend (fastmace.kernels.cutlass.tf32x3): on compute capability 8.0 (the A100) every product whose
+# layouts and alignment it takes runs there, the rest in Triton. False: Triton everywhere (A/B and fallback).
+CUTLASS = True
+_CUTLASS_ON = {}  # device index -> whether the CUTLASS kernels run there
+
+
+def _cutlass(device):
+    if not CUTLASS:
+        return False
+    index = device.index if device.index is not None else torch.cuda.current_device()
+    if index not in _CUTLASS_ON:
+        from fastmace.kernels.cutlass import tf32x3
+        _CUTLASS_ON[index] = tf32x3.available(device)
+    return _CUTLASS_ON[index]
+
+
+def backend(device) -> str:
+    """"cutlass" where ``tf32x3_mm`` runs its eligible products in CUTLASS on ``device``, else "triton"."""
+    device = torch.device(device)
+    return "cutlass" if device.type == "cuda" and _cutlass(device) else "triton"
+
+
 def _launch(a, b, out):
     import triton
 
@@ -81,6 +103,11 @@ def _launch(a, b, out):
     if not uses_tf32x3_tile(k, n):
         torch.mm(a.contiguous(), b.contiguous(), out=out)
         return
+    if _cutlass(a.device):
+        from fastmace.kernels.cutlass import tf32x3
+        if tf32x3.eligible(a, b, out):
+            tf32x3.mm_into(a, b, out)
+            return
     grid = (triton.cdiv(m, tile_rule.BLOCK_M), triton.cdiv(n, tile_rule.BLOCK_N))
     _kernel()[grid](a, b, out, m, n, k, a.stride(0), a.stride(1), b.stride(0), b.stride(1), out.stride(0),
                     out.stride(1), BLOCK_M=tile_rule.BLOCK_M, BLOCK_N=tile_rule.BLOCK_N, BLOCK_K=tile_rule.BLOCK_K,
@@ -147,4 +174,4 @@ def tf32x3_matmul(a, b, b_t=None):
     return Tf32x3Matmul.apply(a, b, b_t)
 
 
-__all__ = ["MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]
+__all__ = ["CUTLASS", "MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "backend", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]
