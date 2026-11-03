@@ -9,6 +9,9 @@ SrTiO3 58×58×58 (975,560 atoms), OMAT-0 medium, float32. Report: `docs/validat
   (`e7a1a06a`). `dev-r32` ran out of GPU memory.
 - `rtx4000ada-murphy/murphy-trims-{base,trim}-{a,b}`: the trims A/B, main `7e3e8cd5` against `aa5dbbfc`
   (`trims_ab.sh`), and `murphy-trims-gputests/log.txt`, the GPU tests of `aa5dbbfc`.
+- `rtx4000ada-murphy/murphy-reassoc-{base,new}-{a,b}`, `murphy-reassoc-sweep-profile`, `murphy-reassoc-gputests`:
+  the rejected reassociation layout, main `a7159afd` against `e2903496` (`reassoc_ab.sh`);
+  `rtx5060ti-local/reassoc-local/`: its whole-system MH-1 step A/B (`local_ab.sh`).
 - `rtx5060ti-local/profile-1m-{device,host}`: `--profile-last` on the local RTX 5060 Ti (WSL), R = 8,192
   (`f5b158a1`).
 

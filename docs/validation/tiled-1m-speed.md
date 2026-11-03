@@ -121,3 +121,29 @@ The call is 0.985 of main's (sweep 2 0.978), the GPU peak 0.18 GiB lower and the
 (`tests/gpu/test_kernels_oeq_streaming_cuda.py` with the new real-rows test, `tests/gpu/test_radial_table_cuda.py`
 with the density test) pass on murphy and the local RTX 5060 Ti; the targeted CPU tests (radial tables, generic and
 MH-1 rewrites, tiled, streaming kernels, layering, w′ backward) pass on leto.
+
+## Contiguous reassociation layout: rejected (`e2903496`, 3 November 2026)
+
+The idea: the reassociated first interaction slices its per-slot sums `[nodes, species, (l, m), k]` per path and
+transposes them, so each path's GEMM input needs a copy (sweeps 1 and 3). `e2903496` (branch
+`fastmace/reassoc-layout`, not merged) let `edge_outer_sum` write `[nodes, (l, m), species, k]` instead
+(`inner=` argument) so that each path's slice would be a view.
+
+It is not: a slice of the middle axis is not one matrix across nodes (row stride `dim × species × k`, not
+`size × species × k`), so Inductor still copies it. The sweep profiles (`murphy-1m-sweep-profile` against
+`murphy-reassoc-sweep-profile`, both R = 16,384) show the same copy kernels at the same times
+(`clone_slice_transpose_view` became `clone_slice_view`). Measured:
+
+| Run | Steady 1M call (Ada) | MH-1 NaNbO3 step (5060 Ti) | MH-1 NbCl5 step (5060 Ti) |
+| --- | --- | --- | --- |
+| main `a7159afd` | 14.28 / 14.35 s | 13.31 / 13.35 ms | 17.35 / 17.51 ms |
+| `e2903496` | 14.34 / 14.35 s | 14.02 / 14.09 ms | 17.76 / 17.98 ms |
+
+(1M: murphy, order base, new, new, base, records `rtx4000ada-murphy/murphy-reassoc-*`. Whole system:
+`tools/ab_step_time.py --sides fastmace`, one process per side, order base, new, new, base, local RTX 5060 Ti,
+`rtx5060ti-local/reassoc-local/`.) No gain at 1M, and the whole-system MH-1 step is 2-5 % slower: the segmented sum
+and its backward write and read the sums with the larger stride. The CUDA backward's `grad_y` also changed by
+rounding (compiled sum order). A layout that would really give views (`[(l, m), nodes, species, k]`, rows ordered
+by `m` then node) moves the transpose to the per-path outputs, which `torch.cat` copies anyway, but writes the sums
+with an even larger stride; at most about 1.7 % of the 1M call (the copy kernels' share of sweeps 1 and 3), so it
+was not tried.

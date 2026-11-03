@@ -1,0 +1,813 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  58,
+  58,
+  58
+ ],
+ "atoms": 975560,
+ "receivers": 8192,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "e2903496",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2106417152,
+   "host_peak": 2106417152
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2107723776,
+   "host_peak": 2107723776
+  },
+  "build": {
+   "seconds": 12.265653350041248,
+   "allocated": 147630080,
+   "reserved": 182452224,
+   "peak_above_before": 148606464,
+   "host_rss": 2985783296,
+   "host_peak": 3066363904
+  },
+  "neighbours": {
+   "allocated": 171043840,
+   "reserved": 203423744,
+   "peak_above_before": 23413760,
+   "host_rss": 2986569728,
+   "host_peak": 3066363904
+  }
+ },
+ "phase": "done",
+ "call_rows": 8192,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.0562751387651726e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=5.769702648483092e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=6.524407248280912e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.393903561267464e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (162 pieces, 9 pairs, certificate 0.31, cached)', 'interactions.1 (175 pieces, 9 pairs, certificate 0.34, cached)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "backward_chunk_edges": [
+  8192
+ ],
+ "ledgers": {},
+ "edges_within_cutoff": 72191440,
+ "calls": [
+  {
+   "seconds": 25.752948453067802,
+   "allocated": 5181655552,
+   "reserved": 9250537472,
+   "peak_above_before": 9040243200,
+   "host_rss": 4593037312,
+   "host_peak": 4593037312,
+   "tiles": 138,
+   "grid": [
+    5,
+    5,
+    5
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 8192,
+   "max_halo": 5820,
+   "max_edges": 607936,
+   "list_reused": false,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 8192,
+   "edges": 72191440,
+   "mode": "eager",
+   "mode_reason": "compiled force field: the first call measures its memory",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.0,
+   "lanes": "off: eager tiles",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "loop_base": 214448128,
+   "peak_before_tiles": 214448128,
+   "tiles_s": 25.64422050002031,
+   "tiles_peak": 9211287040,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 361932760,
+   "list_kept_bytes": 478999960,
+   "list_cache_hits": 276,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 171043840,
+   "total_peak": 9211287040
+  },
+  {
+   "seconds": 45.6826245469274,
+   "allocated": 5335540224,
+   "reserved": 13570670592,
+   "peak_above_before": 7969706496,
+   "host_rss": 5225267200,
+   "host_peak": 5240864768,
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": false,
+   "list_rebuilds": 2,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "10.74 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 2.7185821440070868,
+   "lanes": "off: no memory measurement",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "loop_base": 5332593152,
+   "peak_before_tiles": 6591299584,
+   "tiles_s": 42.9060586480191,
+   "tiles_peak": 13139654144,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 361932760,
+   "list_kept_bytes": 478999960,
+   "list_cache_hits": 204,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 5169947648,
+   "total_peak": 13139654144
+  },
+  {
+   "seconds": 14.542629685020074,
+   "allocated": 5335540224,
+   "reserved": 13579059200,
+   "peak_above_before": 7799884800,
+   "host_rss": 5297590272,
+   "host_peak": 5297590272,
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": true,
+   "list_rebuilds": 2,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "10.74 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.35570412897504866,
+   "lanes": "off: a second tile workspace does not fit the device",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "tiles_s": 14.067876668064855,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 361932760,
+   "list_kept_bytes": 478999960,
+   "list_cache_hits": 204,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 5323832320,
+   "total_peak": 13123717120
+  }
+ ],
+ "sweep_profile": {
+  "sweep1": {
+   "tiles": 3,
+   "kernel_s": 0.069038291,
+   "classes": {
+    "copy": 0.2366,
+    "gemm": 0.2038,
+    "pointwise": 0.1692,
+    "index": 0.1661,
+    "cueq_kernel": 0.1097,
+    "other": 0.0884,
+    "conv": 0.0261
+   },
+   "top": [
+    {
+     "name": "ampere_sgemm_128x64_nn",
+     "ms": 12.802164000000001,
+     "share": 0.1854,
+     "cls": "gemm"
+    },
+    {
+     "name": "kernel",
+     "ms": 7.573523000000001,
+     "share": 0.1097,
+     "cls": "cueq_kernel"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::opera",
+     "ms": 6.482316,
+     "share": 0.0939,
+     "cls": "copy"
+    },
+    {
+     "name": "forward",
+     "ms": 6.1040410000000005,
+     "share": 0.0884,
+     "cls": "other"
+    },
+    {
+     "name": "triton_poi_fused_add_cat_div_view_22",
+     "ms": 2.6374259999999996,
+     "share": 0.0382,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_cat_slice_view_27",
+     "ms": 2.5211699999999984,
+     "share": 0.0365,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_21",
+     "ms": 2.2750900000000036,
+     "share": 0.033,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused__to_copy_add_clamp_min_div_expand_index_linalg_vector_norm_mul_pow_radial_table_forward_select_stack_sub_10",
+     "ms": 2.2625110000000004,
+     "share": 0.0328,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_index_mul_slice_sum_unsqueeze_view_26",
+     "ms": 2.233582000000006,
+     "share": 0.0324,
+     "cls": "index"
+    },
+    {
+     "name": "segmented_polynomial_algo1_2",
+     "ms": 1.7464759999999988,
+     "share": 0.0253,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_view_16",
+     "ms": 1.7051629999999987,
+     "share": 0.0247,
+     "cls": "pointwise"
+    },
+    {
+     "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, std::array",
+     "ms": 1.6050020000000014,
+     "share": 0.0232,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_index_mul_slice_sum_unsqueeze_view_25",
+     "ms": 1.6022820000000029,
+     "share": 0.0232,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_20",
+     "ms": 1.5272749999999997,
+     "share": 0.0221,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_add_cat_edge_outer_sum_forward_index_mul_select_slice_11",
+     "ms": 1.5198519999999998,
+     "share": 0.022,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_add_div_exp_index_linalg_vector_norm_lt_mul_pow_rsub_scatter_add_select_sub_unsqueeze_zeros_12",
+     "ms": 1.4882340000000003,
+     "share": 0.0216,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_view_15",
+     "ms": 1.1683600000000005,
+     "share": 0.0169,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_18",
+     "ms": 1.129575999999999,
+     "share": 0.0164,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_stack_8",
+     "ms": 1.117832,
+     "share": 0.0162,
+     "cls": "pointwise"
+    },
+    {
+     "name": "ampere_sgemm_128x128_nn",
+     "ms": 1.1118459999999977,
+     "share": 0.0161,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_index_mul_slice_sum_unsqueeze_view_24",
+     "ms": 0.9628209999999963,
+     "share": 0.0139,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_19",
+     "ms": 0.8436540000000005,
+     "share": 0.0122,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_17",
+     "ms": 0.7893179999999993,
+     "share": 0.0114,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_28",
+     "ms": 0.7644850000000042,
+     "share": 0.0111,
+     "cls": "pointwise"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFu",
+     "ms": 0.733796999999995,
+     "share": 0.0106,
+     "cls": "pointwise"
+    }
+   ]
+  },
+  "sweep2": {
+   "tiles": 3,
+   "kernel_s": 0.40951032399999965,
+   "classes": {
+    "conv": 0.4926,
+    "gemm": 0.2246,
+    "cueq_kernel": 0.1561,
+    "other": 0.0464,
+    "pointwise": 0.0425,
+    "copy": 0.0305,
+    "index": 0.0073
+   },
+   "top": [
+    {
+     "name": "oeq_projected_backward",
+     "ms": 131.5533469999999,
+     "share": 0.3212,
+     "cls": "conv"
+    },
+    {
+     "name": "kernel",
+     "ms": 63.93285899999991,
+     "share": 0.1561,
+     "cls": "cueq_kernel"
+    },
+    {
+     "name": "ampere_sgemm_64x64_tn",
+     "ms": 60.008743,
+     "share": 0.1465,
+     "cls": "gemm"
+    },
+    {
+     "name": "oeq_projected_forward",
+     "ms": 59.47833999999999,
+     "share": 0.1452,
+     "cls": "conv"
+    },
+    {
+     "name": "backward",
+     "ms": 12.48409599999999,
+     "share": 0.0305,
+     "cls": "other"
+    },
+    {
+     "name": "ampere_sgemm_128x128_tn",
+     "ms": 11.930810999999995,
+     "share": 0.0291,
+     "cls": "gemm"
+    },
+    {
+     "name": "ampere_sgemm_128x64_nn",
+     "ms": 11.890841999999997,
+     "share": 0.029,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_mm_13",
+     "ms": 6.6319859999999995,
+     "share": 0.0162,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_streaming_conv_folded_backward_8",
+     "ms": 6.519537999999994,
+     "share": 0.0159,
+     "cls": "conv"
+    },
+    {
+     "name": "forward",
+     "ms": 6.496786,
+     "share": 0.0159,
+     "cls": "other"
+    },
+    {
+     "name": "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_6",
+     "ms": 3.8484130000000003,
+     "share": 0.0094,
+     "cls": "pointwise"
+    },
+    {
+     "name": "segmented_polynomial_bwd_algo1_1",
+     "ms": 2.6813640000000087,
+     "share": 0.0065,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_add_cat_div_slice_view_22",
+     "ms": 2.648181000000004,
+     "share": 0.0065,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_mul_pow_select_stack_sub_5",
+     "ms": 2.538227,
+     "share": 0.0062,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_slice_17",
+     "ms": 2.2876660000000046,
+     "share": 0.0056,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_slice_18",
+     "ms": 2.129680999999997,
+     "share": 0.0052,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_mul_7",
+     "ms": 1.4805229999999996,
+     "share": 0.0036,
+     "cls": "pointwise"
+    },
+    {
+     "name": "segmented_polynomial_algo1_1",
+     "ms": 1.4777070000000094,
+     "share": 0.0036,
+     "cls": "conv"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFu",
+     "ms": 1.4518189999999886,
+     "share": 0.0035,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_slice_16",
+     "ms": 1.309418000000005,
+     "share": 0.0032,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_clamp_min_div_expand_linalg_vector_norm_mul_neg_pow_select_sub_9",
+     "ms": 1.3088089999999792,
+     "share": 0.0032,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_21",
+     "ms": 1.136968000000008,
+     "share": 0.0028,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_clone_div_slice_slice_backward_view_5",
+     "ms": 1.0876889999999986,
+     "share": 0.0027,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_stack_4",
+     "ms": 1.084201,
+     "share": 0.0026,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_add_clamp_min_div_expand_mul_pow_select_select_backward_10",
+     "ms": 1.0722000000000116,
+     "share": 0.0026,
+     "cls": "pointwise"
+    }
+   ]
+  },
+  "sweep3": {
+   "tiles": 3,
+   "kernel_s": 0.152957942,
+   "classes": {
+    "pointwise": 0.2897,
+    "gemm": 0.1956,
+    "copy": 0.1536,
+    "other": 0.1127,
+    "cueq_kernel": 0.1112,
+    "index": 0.1032,
+    "conv": 0.034
+   },
+   "top": [
+    {
+     "name": "kernel",
+     "ms": 17.010172000000004,
+     "share": 0.1112,
+     "cls": "cueq_kernel"
+    },
+    {
+     "name": "ampere_sgemm_128x64_nn",
+     "ms": 15.393361999999994,
+     "share": 0.1006,
+     "cls": "gemm"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::opera",
+     "ms": 12.896638,
+     "share": 0.0843,
+     "cls": "copy"
+    },
+    {
+     "name": "backward",
+     "ms": 10.990831999999996,
+     "share": 0.0719,
+     "cls": "other"
+    },
+    {
+     "name": "ampere_sgemm_128x64_tn",
+     "ms": 6.691278999999995,
+     "share": 0.0437,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_gather_radial_table_backward_slice_backward_20",
+     "ms": 6.470959999999999,
+     "share": 0.0423,
+     "cls": "index"
+    },
+    {
+     "name": "forward",
+     "ms": 6.240942,
+     "share": 0.0408,
+     "cls": "other"
+    },
+    {
+     "name": "triton_poi_fused_cat_index_mul_slice_sum_unsqueeze_view_25",
+     "ms": 5.04586,
+     "share": 0.033,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_add_edge_outer_sum_backward_slice_backward_view_19",
+     "ms": 3.8133720000000104,
+     "share": 0.0249,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_10",
+     "ms": 3.7516440000000038,
+     "share": 0.0245,
+     "cls": "pointwise"
+    },
+    {
+     "name": "ampere_sgemm_64x64_tn",
+     "ms": 3.6193870000000024,
+     "share": 0.0237,
+     "cls": "gemm"
+    },
+    {
+     "name": "segmented_polynomial_bwd_algo1_1",
+     "ms": 3.0405979999999984,
+     "share": 0.0199,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_add_div_23",
+     "ms": 2.636693000000003,
+     "share": 0.0172,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_add_slice_backward_view_18",
+     "ms": 2.4852660000000033,
+     "share": 0.0162,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_slice_view_27",
+     "ms": 2.4672500000000035,
+     "share": 0.0161,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_mul_pow_select_stack_sub_7",
+     "ms": 2.416818,
+     "share": 0.0158,
+     "cls": "pointwise"
+    },
+    {
+     "name": "ampere_sgemm_128x128_nn",
+     "ms": 2.301519999999997,
+     "share": 0.015,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_19",
+     "ms": 2.282544999999998,
+     "share": 0.0149,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_expand_mul_slice_slice_backward_unsqueeze_view_6",
+     "ms": 2.2560480000000025,
+     "share": 0.0147,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_22",
+     "ms": 2.2241119999999954,
+     "share": 0.0145,
+     "cls": "pointwise"
+    },
+    {
+     "name": "segmented_polynomial_algo1_2",
+     "ms": 1.7146039999999994,
+     "share": 0.0112,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_view_16",
+     "ms": 1.675339,
+     "share": 0.011,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_18",
+     "ms": 1.6423150000000042,
+     "share": 0.0107,
+     "cls": "copy"
+    },
+    {
+     "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, std::array",
+     "ms": 1.6255150000000003,
+     "share": 0.0106,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_21",
+     "ms": 1.4867299999999997,
+     "share": 0.0097,
+     "cls": "pointwise"
+    }
+   ]
+  }
+ },
+ "tiled": {
+  "energy_eV": -7794285.008766951,
+  "energy_per_atom_eV": -7.989549601015777,
+  "max_abs_force": 0.00016272719949483871,
+  "stress": [
+   [
+    -0.028883015736937523,
+    1.6752707554523738e-10,
+    -4.563047509287266e-11
+   ],
+   [
+    1.6752707554523738e-10,
+    -0.028883008286356926,
+    -1.219513240391379e-10
+   ],
+   [
+    -4.563047509287266e-11,
+    -1.219513240391379e-10,
+    -0.028883008286356926
+   ]
+  ]
+ },
+ "valid": true,
+ "check": {
+  "initial_edges": 72191440,
+  "expected_initial_edges": 72191440,
+  "reference_edges_per_atom": 74.0,
+  "initial_ok": true,
+  "live_edges": null,
+  "fresh_edges": null,
+  "live_ok": true,
+  "max_abs_force": 0.00016272719949483871,
+  "forces_ok": true
+ }
+}
