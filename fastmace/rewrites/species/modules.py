@@ -136,6 +136,30 @@ def compose(first, second):
     return composed
 
 
+def compose_species_skip(first, skip):
+    """The SpeciesSkip of ``skip(first(x), node_attrs)`` for a BlockLinear ``first`` whose outputs are the skip's
+    first input (generic_fold_product_linear). An equivariant linear layer acts on the channels of each irrep the same
+    way in every component and layout, so each species' matrix of a skip path becomes ``A @ W_s`` with ``A`` the
+    layer's ``[mul_in, mul_mid]`` block of that irrep (products in float64, stored in the skip's dtype)."""
+    from fastmace.rewrites.generic.modules import SpeciesSkip
+
+    if [(o, m, d * m) for o, m, d in first.segments_out] != [tuple(s) for s in skip.segments_in]:
+        raise ValueError("compose_species_skip: the layer's outputs are not the skip's first input")
+    dtype = skip.w0.dtype
+    products = {}
+    for index, (mid, j) in enumerate(skip.pairs):
+        weight = getattr(skip, f"ws{index}").double()  # [species, mul_mid, mul_out]
+        for i, mid2, left in raw_blocks(first):
+            if mid2 == mid:
+                term = torch.matmul(left.double(), weight)  # [species, mul_in, mul_out]
+                products[(i, j)] = term if (i, j) not in products else products[(i, j)] + term
+    blocks = [(i, j, weight.to(dtype)) for (i, j), weight in products.items()]
+    composed = SpeciesSkip(skip.columns, [(o, m, d * m) for o, m, d in first.segments_in], skip.segments_out,
+                           blocks, skip.layout)
+    composed._reference = (first, skip)
+    return composed
+
+
 class HeadActivation(torch.nn.Module):
     """The readout's scalar activation on the active head's hidden columns only (TAIL_HEAD prototype)."""
 

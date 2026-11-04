@@ -1,0 +1,195 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-04T22:52:27.996713+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "df0d088f",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "fold_product_linear": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    1.7529296875,
+    2.36865234375,
+    2.546875
+  ],
+  "structures": {
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 6.0214768699370325,
+            "mean_ms": 6.062749942357186,
+            "min_ms": 5.922486209892668,
+            "max_ms": 6.491835779743269,
+            "stdev_ms": 0.17749362985422124,
+            "spread": 0.09455314404563261,
+            "block_ms": [
+              6.491835779743269,
+              5.981924049556255,
+              5.990950865088962,
+              5.922486209892668,
+              6.012798970332369,
+              6.030154769541696,
+              6.0306967195356265,
+              6.041152175166644
+            ]
+          },
+          "a": {
+            "median_ms": 6.113796584832016,
+            "mean_ms": 6.153986291246838,
+            "min_ms": 6.0165221052011475,
+            "max_ms": 6.593528825324029,
+            "stdev_ms": 0.1814721907410997,
+            "spread": 0.09437780798177066,
+            "block_ms": [
+              6.593528825324029,
+              6.061687489855103,
+              6.08377869008109,
+              6.0165221052011475,
+              6.113399879541248,
+              6.114193290122785,
+              6.124031789950095,
+              6.1247482598992065
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.015331739519901,
+        "pair_ratios_b_over_a": [
+          1.0156647594041237,
+          1.0133340777378752,
+          1.0154946730631798,
+          1.0158777736200393,
+          1.016731127999664,
+          1.0139363787154465,
+          1.015476664596998,
+          1.0138377717211298
+        ]
+      },
+      "ratio_b_over_a": 0.9848997732237242,
+      "pair_ratios": [
+        0.9845768406759392,
+        0.986841380319863,
+        0.9847417485544843,
+        0.9843703897926033,
+        0.9835441961607085,
+        0.9862551743797747,
+        0.9847592119675739,
+        0.9863510986598594
+      ],
+      "setup_s": {
+        "b": 19.35739830392413,
+        "a": 9.987049869028851
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables (generic: species_skip)); stage 2: supported (ok (generic: no skip term in the first product)))"
+        ],
+        "a": [
+          "RewriteConfig.fold_product_linear = off  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables (generic: species_skip)); stage 2: supported (ok (generic: no skip term in the first product)); stage 2: off, generic fold not measured on this GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 288.70168366506914,
+          "potential_eV_atom": -4.387338563132546,
+          "kinetic_eV_atom": 0.03731756665579031
+        },
+        "a": {
+          "temperature_K": 288.7016864712615,
+          "potential_eV_atom": -4.387338496291943,
+          "kinetic_eV_atom": 0.037317567018518606
+        }
+      },
+      "load_after": [
+        1.36328125,
+        2.16943359375,
+        2.46875
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 75,
+          "pipelined_redos": 1,
+          "pipelined_early_rebuilds": 75
+        },
+        "a": {
+          "rebuilds": 75,
+          "pipelined_redos": 1,
+          "pipelined_early_rebuilds": 75
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

@@ -140,7 +140,7 @@ STAGE2_SUPPORT = (
     ("radial_tables", "radial_tables"), ("w_tables", "fold_cutoff"), ("wprime_backward", "radial_tables"),
     ("recompute_node_segments", "fold_cutoff"), ("recompute_node_region", "fold_cutoff"),
     ("species_tables", "species_tables"),
-    ("fold_product_linear", "species_tables"),
+    ("fold_product_linear", "fold_product_linear"),
     ("species_residual", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -433,6 +433,12 @@ DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
 DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce RTX 5060 Ti",
                                                                      "NVIDIA RTX 4000 Ada Generation",
                                                                      "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB"))
+# generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
+# whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
+# medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;
+# A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828 (docs/validation/generic-fold-product.md). The RTX 5060 Ti was
+# not measured and keeps it off unless asked for.
+DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -1165,8 +1171,11 @@ class FixedPlanner:
               "species_tables and merged_residual")
         if r.species_residual == "auto":
             v["_why"]["species_residual"] = "off: only an explicit 'on' enables it (fp32 profile, opt-in)"
-        needs("fold_product_linear", r.fold_product_linear != "off", v["block_linear"] and v["species_tables"],
-              "block_linear and species_tables")
+        # MH-1's class through species_tables; a generic model through generic_species_skip (stage 2 keeps the one
+        # the model takes, decision 66 the generic default).
+        needs("fold_product_linear", r.fold_product_linear != "off",
+              v["block_linear"] and (v["species_tables"] or v["species_skip"]),
+              "block_linear and species_tables (generic: species_skip)")
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
         note("combo_kernels", r.combo_kernels == "on",
@@ -1215,6 +1224,19 @@ class FixedPlanner:
                 v["radial_tables"] = False
                 v["_auto_off"]["radial_tables"] = reason
                 v["_why"]["radial_tables"] += f"; stage 2: off, {reason}"
+        # generic_fold_product_linear: the generic model's fold (decision 66, measured GPUs only).
+        generic_fold = v["fold_product_linear"] and not support["species_tables"][0]
+        v["_generic_fold_product"] = generic_fold
+        if generic_fold and "fold_product_linear" not in explicit:
+            name = getattr(hardware, "name", None)
+            if name in DECISION_66_GENERIC_FOLD_PRODUCT_GPUS:
+                v["_why"]["fold_product_linear"] += (f"; stage 2: on, generic fold on a measured GPU, decision 66 "
+                                                     f"({name})")
+            else:
+                reason = f"generic fold not measured on this GPU, decision 66 ({name})"
+                v["fold_product_linear"] = False
+                v["_auto_off"]["fold_product_linear"] = reason
+                v["_why"]["fold_product_linear"] += f"; stage 2: off, {reason}"
         # generic_fused_folded_forward + generic_wprime_backward (decision 66, measured labels and GPUs only).
         generic_wprime = (not support["fold_cutoff"][0] and v["radial_tables"] and v["wprime_backward"]
                           and model_label in DECISION_66_GENERIC_WPRIME_LABELS
@@ -1373,12 +1395,14 @@ class FixedPlanner:
                 v[name] = False
                 v["_why"][name] += ("; off: reproducible=True keeps the stock products" if reproducible
                                     else f"; off: {dtype} keeps the stock products (rounding class)")
-        if v["fold_product_linear"] and not v["species_tables"]:
+        generic_fold = v.get("_generic_fold_product", False)
+        if v["fold_product_linear"] and not (v["species_skip"] if generic_fold else v["species_tables"]):
+            needed = "species_skip" if generic_fold else "species_tables"
             if "fold_product_linear" in explicit:
-                book.refuse("RewriteConfig.fold_product_linear='on' requires species_tables, which is off",
+                book.refuse(f"RewriteConfig.fold_product_linear='on' requires {needed}, which is off",
                             "rewrite-requirement-missing")
             v["fold_product_linear"] = False
-            v["_why"]["fold_product_linear"] += "; off: requires species_tables, which is off"
+            v["_why"]["fold_product_linear"] += f"; off: requires {needed}, which is off"
         if v["species_residual"] and not v["species_tables"]:
             if "species_residual" in explicit:
                 book.refuse("RewriteConfig.species_residual='on' requires species_tables, which is off",
