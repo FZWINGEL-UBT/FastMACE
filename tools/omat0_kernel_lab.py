@@ -68,7 +68,7 @@ def wprime_variants(species):
     """name -> (kind, source transform, extra NVRTC options); kind "exact" or "falsifier"."""
     load_w = "const scalar_t radial_weight = weights[radial_weight_index];"
     slope = "slope += cheb[k] * __ldg(g + k * WEIGHT_DIM + weight_index);"
-    group = "const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * TERMS * WEIGHT_DIM;"
+    group = "const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;"
 
     def unordered(s):
         s = _after_constants(s, f"""

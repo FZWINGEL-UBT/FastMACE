@@ -15,7 +15,8 @@
 # - skipzero: fused_forward.SKIP_ZERO_COLUMN (the k-loop skips the folded weight's all-zero bias column);
 # - stcs: fused_forward.STREAM_STORE_W (w stored with __stcs); bundle-all: degree 6, slopes2, skipzero and stcs;
 # - tc: fused_forward.TENSOR_CORES (the a.W product in 3xTF32 on tensor cores; not bitwise); tcmask: tc with
-#   fused_forward.TC_SPLIT='mask' (the high part truncated, the low part passed raw); dztcN: degree N,
+#   fused_forward.TC_SPLIT='mask' (the high part truncated, the low part passed raw); tile32x64 / tile64x32: the
+#   CUTLASS 3xTF32 GEMMs' tile (cutlass.tf32x3.TILE; bitwise); dztcN: degree N,
 #   skipzero and tc; dzN: degree N and skipzero; tcre / dztcreN: tc / dztcN with recompute_conv_weights=on (w not
 #   stored; the backward rebuilds it on tensor cores too); tolN-X: degree N with the table fit tolerance X (fewer
 #   pieces; the planner drops tables whose certificate exceeds 1, so a failed fit shows as a slower step);
@@ -93,6 +94,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     dz[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#dz}" "$zc" ;;  # degree N and skipzero
     tc) ab "$spec" --b-constant "$ftc" ;;  # the fused forward's a.W on tensor cores (3xTF32)
     tcmask) ab "$spec" --b-constant "$ftc" "$ff:TC_SPLIT='mask'" ;;  # tc with the truncating split
+    tile*) ab "$spec" --b-constant "fastmace.kernels.cutlass.tf32x3:TILE='${spec#tile}'" ;;  # CUTLASS tile 32x64 / 64x32
     dztc[0-9]*) ab "$spec" --b-constant "$rd:DEGREE=${spec#dztc}" "$zc" "$ftc" ;;  # degree N, skipzero, tensor cores
     tol[0-9]*-*) n=${spec#tol}; n=${n%%-*}  # tolN-X: degree N, fit tolerance X (default 1e-7; certificate <= 1)
       ab "$spec" --b-constant "$rd:DEGREE=$n" "$rd:TOLERANCE=${spec#*-}" ;;
