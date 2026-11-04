@@ -589,6 +589,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-tc-presplit](#omat0-tc-presplit) | W slice split into TF32 parts once per block (tensor-core forward, A100) | `fused_forward.TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | fused forward A100-SXM4 1.362 (12 -> 8 warps), RTX 5060 Ti 1.707 (2 -> 4 parts); bitwise; bound F-tc-no-wsplit 0.862 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-species-gemm](#omat0-species-gemm) | Species skip as one grouped GEMM: each atom's rows through its own species' matrix only (Triton, fixed grid) | `generic.modules.SPECIES_GEMM`, `SPECIES_GEMM_GPUS` | FM | DEFAULT | owner 2026-11-04 (RTX 5060 Ti, RTX 4000 Ada; decision 66) | step RTX 4000 Ada 0.955 / 0.952, RTX 5060 Ti 0.950 / 0.953, A100-SXM4 0.992 / 0.991 (off there); gate passes (5060 Ti); Ada default vs forced off 1.051 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-species-gemm-tc](#omat0-species-gemm-tc) | The species GEMM in our own mma.sync 3xTF32 kernel (for the A100) | `species_gemm.TENSOR_CORES`, `TC_CHUNK`, `TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | kernel lab vs Triton: A100 0.94 (16p), Ada 0.91, 5060 Ti 0.86; step A100-SXM4 1.003 / 1.002 vs default (Triton species GEMM 0.992), Ada 1.001 / 0.999 vs Triton species GEMM | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-species-gemm-cutlass](#omat0-species-gemm-cutlass) | The species GEMM as one gathered CUTLASS 3xTF32 launch (A100) | `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 0.9928 / 0.9922 vs default (Triton species GEMM 0.992); lab size 16 CUTLASS 678 us vs Triton 597, bound 207 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-first-table-columns](#omat0-first-table-columns) | First interaction's radial table stores only the columns it uses | `generic.modules.FIRST_TABLE_COLUMNS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.002 / 0.999, RTX 5060 Ti 1.002; bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 
 <a id="omat0-tc-presplit"></a>
@@ -622,6 +623,17 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 - Measured: species skip lab (forward + input backward, size 16 = interaction 0), against the Triton species GEMM: A100-SXM4-80GB (Modal, 97250a3f) Triton 591.5 us, tc16 594.7, tc32 585.3, tc64 693.2, tc16p 553.3 (0.94), tc32p 659.6, tc64p 930.0; bound (one CUTLASS product, no gather) 204.8 us. RTX 4000 Ada Triton 946.3, tc16 863.3 (0.91), bound 831.5. RTX 5060 Ti Triton 1189.2, tc16 1027.1 (0.86); the first, unchunked version (whole W half per block, 71 KB shared memory) 3125 us. MD step: A100-SXM4 default vs SPECIES_GEMM + tensor cores (16p) 1.0031 / 1.0017 (the Triton species GEMM gave 0.992 there); Ada SPECIES_GEMM vs SPECIES_GEMM + tensor cores (16) 1.0006 / 0.9986.
 - Why: a simple mma.sync kernel only reaches Triton's rate; the A100's CUTLASS 3xTF32 is about 2.7x faster per product (bound 205 vs 553 us). Closing that gap needs a multi-stage cp.async pipeline with larger warp tiles, i.e. a CUTLASS-class grouped GEMM, for at most about 5 % of the A100 step.
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/modal/species_gemm_tc_a100.sh`.
+
+<a id="omat0-species-gemm-cutlass"></a>
+#### omat0-species-gemm-cutlass: the species GEMM as one gathered CUTLASS launch
+- Switch: `fastmace.kernels.triton.species_gemm.CUTLASS` (False), `CUTLASS_FAMILY` (tests on any 8.x); cubin entry `fm_tf32x3_species_rr_64x64`
+- Engine: FM
+- Date/round: 4 November 2026 (owner: "why doesnt it work on a100")
+- What: CUTLASS's 64x64 3xTF32 kernel with GatherA / ScatterD on species_gemm's fixed tile grid; each block finds its species' tile from the device counts and shifts the int32 row-index arrays (built per call from the species order) so that CUTLASS's tile offset lands on the tile's rows. CUDA-graph safe.
+- Status: REJECTED (A/B switch kept).
+- Measured: A100-SXM4-80GB (Modal, 80609d27): GPU tests 17 passed; species skip lab (eager, forward + input backward) size 16: current 944 us, Triton 597, CUTLASS 678, bound 207; size 1: 249, 368, 671, 189 (the index arrays are a few small kernels per call). MD step default vs SPECIES_GEMM + CUTLASS 0.9928 / 0.9922, the same as the Triton species GEMM (0.992). RTX 4000 Ada (sm_89 runs the sm_80 cubin): tests pass, lab size 16 932 vs Triton 936 us.
+- Why: in the captured, compiled MD step the A100's concatenated CUTLASS product is cheap (3xTF32 at about 40 TFLOPS: roughly 0.4 ms per step for forward and backward of both interactions, so a third of it saves about 0.27 ms, 1.8 % of 15.3 ms); the grouped versions recover most of that and lose the rest to the per-call row ordering and indices. The A100 skip has no more than about 1-2 % left.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/modal/species_gemm_cutlass_a100.sh`.
 
 <a id="omat0-first-table-columns"></a>
 #### omat0-first-table-columns: only the used columns of the first radial table

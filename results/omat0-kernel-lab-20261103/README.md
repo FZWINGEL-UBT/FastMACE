@@ -411,3 +411,12 @@ machines; compare only within one job).
 module is built on its device; True / False force it for A/Bs. Not on the A100 (0.992 there; see above). Check on
 leto after the switch, default against `SPECIES_GEMM=False`: 1.0507 (`rtx4000ada-species-gemm-default/`; CPU tests,
 GPU tests and ruff pass).
+
+**Gathered CUTLASS on the A100** (`species_gemm.CUTLASS`, owner: "why doesnt it work on a100"): CUTLASS's 64x64
+3xTF32 kernel with GatherA / ScatterD (`fm_tf32x3_species_rr_64x64`, cubin rebuilt), one launch over all species on
+the same fixed tiles. A100-SXM4-80GB (`a100-sxm4-species-gemm-cutlass/`, Modal 80609d27): tests pass; lab size 16
+current 944 us, Triton 597, CUTLASS 678, bound 207; MD step 0.9928 / 0.9922, the same as the Triton species GEMM.
+In the compiled step the concatenated CUTLASS product costs only about 0.4 ms per step, so a third of it is worth
+about 1.8 % at best; the grouped kernels keep most of that and lose the rest to the per-call row order and indices.
+Rejected; the A100 keeps the concatenated product. RTX 4000 Ada (`rtx4000ada-species-gemm-cutlass/`, sm_80 cubin on
+sm_89): tests pass, lab 932 vs 936 us.

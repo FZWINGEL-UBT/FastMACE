@@ -1,0 +1,68 @@
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+...F...F.........                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_product_and_gradient[counts0-7-128-128-cutlass-2e-05] __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75b1325f9240>
+precision = 'tf32x3', limit = 2e-05, counts = (1000, 1000, 3000), size = 7
+k = 128, n = 128
+
+    @pytest.mark.parametrize("precision, limit", [("ieee", 2e-6), ("tf32x3", 2e-5), ("tc", 2e-5), ("cutlass", 2e-5)])
+    @pytest.mark.parametrize("counts, size, k, n", [((1000, 1000, 3000), 7, 128, 128), ((37, 0, 101), 3, 128, 64),
+                                                     ((5,), 1, 96, 130)])
+    def test_product_and_gradient(monkeypatch, precision, limit, counts, size, k, n):
+        if precision != "ieee" and torch.cuda.get_device_capability()[0] < 8:
+            pytest.skip("tf32x3 needs compute capability 8.0")
+        if precision == "tc":  # the tensor-core kernel (n = 130 falls back to Triton)
+            assert sg.tc_supported("cuda", k, n) == (n % 16 == 0)
+            monkeypatch.setattr(sg, "TENSOR_CORES", True)
+            precision = "tf32x3"
+        if precision == "cutlass":  # gathered CUTLASS (strided x: lda = gcd of the row strides; n = 130 falls back)
+            _cutlass(monkeypatch)
+            precision = "tf32x3"
+        index, x, w = _case(counts, size, k, n)
+        if sg.CUTLASS:
+>           assert bool(sg._cutlass_rows(x, w, x.new_empty(x.shape[0], size, n))) == (n % 4 == 0)
+E           AssertionError: assert False == ((128 % 4) == 0)
+E            +  where False = bool(0)
+E            +    where 0 = <function _cutlass_rows at 0x75b132625900>(tensor([[[-0.5243, -3.5541, -0.6298,  ...,  0.9100,  1.0729,  0.2385],\n         [ 1.7301,  0.8101, -1.3187,  ...,  2.2...90,  1.5031,  0.7401],\n         [ 0.5674, -0.9184, -1.0869,  ..., -0.2719, -1.0737, -0.2521]]],\n       device='cuda:0'), tensor([[[-0.0403,  0.1034, -0.0621,  ..., -0.1490, -0.1587, -0.0372],\n         [ 0.0462, -0.0140,  0.0190,  ..., -0.0...96, -0.0085,  0.0265],\n         [-0.0172,  0.1290, -0.0513,  ...,  0.0020, -0.0702,  0.0367]]],\n       device='cuda:0'), tensor([[[-2.3923e-01,  3.8339e-01, -1.2968e+00,  ..., -5.3627e-01,\n          -7.8914e-01,  1.4082e+00],\n         [-1....     [-1.0832e+00,  7.3596e-01,  2.1199e-01,  ...,  4.0204e-01,\n          -6.1168e-01, -6.0023e-02]]], device='cuda:0'))
+E            +      where <function _cutlass_rows at 0x75b132625900> = sg._cutlass_rows
+E            +      and   tensor([[[-2.3923e-01,  3.8339e-01, -1.2968e+00,  ..., -5.3627e-01,\n          -7.8914e-01,  1.4082e+00],\n         [-1....     [-1.0832e+00,  7.3596e-01,  2.1199e-01,  ...,  4.0204e-01,\n          -6.1168e-01, -6.0023e-02]]], device='cuda:0') = <built-in method new_empty of Tensor object at 0x75b12844c770>(5000, 7, 128)
+E            +        where <built-in method new_empty of Tensor object at 0x75b12844c770> = tensor([[[-0.5243, -3.5541, -0.6298,  ...,  0.9100,  1.0729,  0.2385],\n         [ 1.7301,  0.8101, -1.3187,  ...,  2.2...90,  1.5031,  0.7401],\n         [ 0.5674, -0.9184, -1.0869,  ..., -0.2719, -1.0737, -0.2521]]],\n       device='cuda:0').new_empty
+
+tests/gpu/test_species_gemm_cuda.py:47: AssertionError
+__________ test_product_and_gradient[counts1-3-128-64-cutlass-2e-05] ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75b128444370>
+precision = 'tf32x3', limit = 2e-05, counts = (37, 0, 101), size = 3, k = 128
+n = 64
+
+    @pytest.mark.parametrize("precision, limit", [("ieee", 2e-6), ("tf32x3", 2e-5), ("tc", 2e-5), ("cutlass", 2e-5)])
+    @pytest.mark.parametrize("counts, size, k, n", [((1000, 1000, 3000), 7, 128, 128), ((37, 0, 101), 3, 128, 64),
+                                                     ((5,), 1, 96, 130)])
+    def test_product_and_gradient(monkeypatch, precision, limit, counts, size, k, n):
+        if precision != "ieee" and torch.cuda.get_device_capability()[0] < 8:
+            pytest.skip("tf32x3 needs compute capability 8.0")
+        if precision == "tc":  # the tensor-core kernel (n = 130 falls back to Triton)
+            assert sg.tc_supported("cuda", k, n) == (n % 16 == 0)
+            monkeypatch.setattr(sg, "TENSOR_CORES", True)
+            precision = "tf32x3"
+        if precision == "cutlass":  # gathered CUTLASS (strided x: lda = gcd of the row strides; n = 130 falls back)
+            _cutlass(monkeypatch)
+            precision = "tf32x3"
+        index, x, w = _case(counts, size, k, n)
+        if sg.CUTLASS:
+>           assert bool(sg._cutlass_rows(x, w, x.new_empty(x.shape[0], size, n))) == (n % 4 == 0)
+E           AssertionError: assert False == ((64 % 4) == 0)
+E            +  where False = bool(0)
+E            +    where 0 = <function _cutlass_rows at 0x75b132625900>(tensor([[[-0.2785, -0.2640,  0.1756,  ..., -0.6850, -0.4056,  0.7894],\n         [-1.0618, -0.4442, -0.5682,  ..., -0.6...61,  0.4293, -0.2426],\n         [-1.8343,  0.2091,  1.4180,  ...,  0.2502,  1.8843,  0.4462]]],\n       device='cuda:0'), tensor([[[-5.5990e-04, -1.2729e-01,  7.2443e-02,  ..., -1.3154e-01,\n          -1.2628e-02,  7.2401e-02],\n         [ 1....     [-5.2088e-02, -7.1625e-02, -1.0289e-02,  ..., -1.3685e-03,\n          -2.9657e-01, -8.2150e-02]]], device='cuda:0'), tensor([[[ 1.9243, -1.1902,  0.0808,  ..., -0.2971,  0.8632,  0.3972],\n         [-0.5774, -1.6722,  0.3825,  ..., -1.0...95, -0.9357,  0.1452],\n         [ 0.1464,  0.2937,  1.1908,  ..., -0.0625,  1.3847, -0.6059]]],\n       device='cuda:0'))
+E            +      where <function _cutlass_rows at 0x75b132625900> = sg._cutlass_rows
+E            +      and   tensor([[[ 1.9243, -1.1902,  0.0808,  ..., -0.2971,  0.8632,  0.3972],\n         [-0.5774, -1.6722,  0.3825,  ..., -1.0...95, -0.9357,  0.1452],\n         [ 0.1464,  0.2937,  1.1908,  ..., -0.0625,  1.3847, -0.6059]]],\n       device='cuda:0') = <built-in method new_empty of Tensor object at 0x75b128591c60>(138, 3, 64)
+E            +        where <built-in method new_empty of Tensor object at 0x75b128591c60> = tensor([[[-0.2785, -0.2640,  0.1756,  ..., -0.6850, -0.4056,  0.7894],\n         [-1.0618, -0.4442, -0.5682,  ..., -0.6...61,  0.4293, -0.2426],\n         [-1.8343,  0.2091,  1.4180,  ...,  0.2502,  1.8843,  0.4462]]],\n       device='cuda:0').new_empty
+
+tests/gpu/test_species_gemm_cuda.py:47: AssertionError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_species_gemm_cuda.py::test_product_and_gradient[counts0-7-128-128-cutlass-2e-05]
+FAILED tests/gpu/test_species_gemm_cuda.py::test_product_and_gradient[counts1-3-128-64-cutlass-2e-05]
+2 failed, 15 passed in 5.30s
