@@ -6,8 +6,9 @@ backward specialised to MACE-OMAT-0 medium's paths and irreps make the wprime ba
 call) faster than the vendored OpenEquivariance PR 223 schedule? Owner, the same day: keep improving the kernel until
 nothing more is possible, on leto and then on the A100 through Modal.
 
-**Verdict: adopt `wprime_backward.FACTORED` (built, off by default; a per-GPU default is the owner's decision under
-decision 66).** It regroups the backward's three trilinear sums per path. The result is rounding-only. The force gates pass on the
+**Verdict: adopt `wprime_backward.FACTORED`. Default on the RTX 4000 Ada and every A100 (`FACTORED_GPUS`, owner,
+4 November 2026: "Turn them on", decision 66), together with `radial.SYMMETRIC_PAIRS` (`SYMMETRIC_PAIRS_GPUS`); the
+RTX 5060 Ti was not measured and keeps both off.** It regroups the backward's three trilinear sums per path. The result is rounding-only. The force gates pass on the
 Ada; on the A100 FACTORED's errors equal the default's, which already fails one stress check there (§3.1). On Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms) the MD step drops by:
 
 | GPU | wprime kernel | MD step b/a (abab / abba) | step a → b |
@@ -89,8 +90,31 @@ float32), here 1.16e-7 and 1.34e-7 (ASE's float32 error itself differs between t
 energy ratios (13–17) are tf32x3's (§4 of `generic-wprime.md`: NbCl5 11.7) and stay far under the 10 meV floor; the
 stress ratio was 1.69 with tf32x3 alone (3 November). The A100 default as it stands today (tf32x3, tensor-core forward,
 degree 5, `TABLE_W`, `BLOCK_MESSAGE`) was gated on the RTX 5060 Ti (dztc5, stress 1.06), never on the A100 itself.
-FACTORED changes the production error by 1 %. Which default pushes the A100's stress over the limit is open: a
-follow-up for the conductor, outside this task.
+FACTORED changes the production error by 1 %.
+
+**Bisection (A100-SXM4-80GB, Modal, source `3812b56e`, 5 November 2026; `a100-sxm4-stress-bisect-3812b56e/`):**
+the OMAT-0 NbCl5 gate with one A100 default off at a time. Production stress error and its ratio to the ASE float32
+error (limit 2):
+
+| Plan | energy | stress | gate |
+|---|---|---|---|
+| default (FACTORED + SYMMETRIC_PAIRS on), two runs | 1.52e-3 r14.5 | 1.82e-7 r2.97, 1.81e-7 r2.55 | **fail** |
+| main (FACTORED, SYMMETRIC_PAIRS off) | 1.52e-3 r15.0 | 1.79e-7 r2.53 | **fail** |
+| `TABLE_W` off | 1.52e-3 r12.9 | 1.94e-7 r3.10 | **fail** |
+| `BLOCK_MESSAGE` off | 1.52e-3 r15.2 | 1.79e-7 r2.40 | **fail** |
+| `radial.DEGREE = 10` | 1.51e-3 r14.6 | 1.66e-7 r2.55 | **fail** |
+| `radial_tables` off | 1.20e-3 r10.9 | 1.64e-7 r2.67 | **fail** |
+| tensor-core forward off (`TENSOR_CORES=False`) | 1.24e-3 r11.2 | 1.21e-7 r1.63 | pass |
+| `tf32x3_gemms` off | 2.18e-4 r2.07 | 8.02e-8 r1.30 | pass |
+| both off | 1.04e-4 r0.92 | 2.89e-8 r0.42 | pass |
+
+Forces stay at r0.97–1.14 in every plan. No single default causes the excess: it is the **sum of the two 3×TF32
+precision changes**, the `tf32x3_gemms` GEMMs (about 1.2e-7 alone) and the tensor-core a·W product of the fused
+forward (about 8e-8 alone). Each passes alone; together they exceed 2 × ASE float32 (1.2–1.5e-7) on NbCl5 only.
+FACTORED and SYMMETRIC_PAIRS change nothing here (default vs main: 1.8e-7 both). The other structures pass with the
+new defaults on the A100: OMAT-0 SrTiO3 stress r1.50, NaCl r1.47; MH-1 NaCl r1.48, NaNbO3 r0.93, NbCl5 r0.46 (forces
+r0.85–1.07). Which of the two to give up on the A100 for OMAT-0, or whether to accept the excess (4e-8 eV/Å³ over the
+limit, energy within the 10 meV floor), is the owner's decision.
 
 The A100 gains three times as much as the Ada: on the A100 the kernel is bound by FP32 arithmetic (19.5 TFLOPS against
 2 TB/s), on the Ada by the value-table loads (§5).
@@ -105,7 +129,8 @@ table). This had no effect on the old kernel (0.984). With the factored kernel i
 | RTX 4000 Ada | 0.877 (0.903) | 0.9792 / 0.9747 (FACTORED alone 0.9832 / 0.9801) |
 | A100-SXM4-80GB | 0.721 (0.727) | 0.9365 / 0.9307 (FACTORED alone 0.9381 / 0.9397) |
 
-About 0.5 % of the step on both GPUs. Bitwise, so a default needs no gate; it is the owner's call together with FACTORED.
+About 0.5 % of the step on both GPUs. Bitwise, so a default needs no gate. Default on the same GPUs as FACTORED
+(owner, 4 November 2026).
 
 ## 5. What else was tried (the kernel's limit)
 
@@ -130,11 +155,14 @@ and extra structure (common magnitudes, vector channels) costs more in registers
 All in `results/omat0-tp-backward-20261104/` (README there). leto: idle check in every run folder (only sovic's idle
 leftover `python3`; one lab launch was refused while another session's A/B held the GPU, and rerun on the A100
 instead). Modal: profile `second`, image builder pinned to 2025.06 for the Python 3.10 image
-(`MODAL_IMAGE_BUILDER_VERSION`), driver 610.57.04, costs in each `modal.json` and the ledger (0.52 + 0.29 + 1.50 USD). CPU suite on leto (`mace_cueq_latest`, 16 workers): 5,128 passed, 202 skipped at `78b27fd2` and at `8aec363b`. Ruff (`fastmace tests`): only the 3 long lines that already exist on main.
+(`MODAL_IMAGE_BUILDER_VERSION`), driver 610.57.04, costs in each `modal.json` and the ledger (0.52 + 0.29 + 1.50 + 2.03 USD, the last the stress bisection). CPU suite on leto (`mace_cueq_latest`, 16 workers): 5,128 passed, 202 skipped at `78b27fd2` and at `8aec363b`. Ruff (`fastmace tests`): only the 3 long lines that already exist on main.
 
 ## 7. Not done
 
-- The A100 default's NbCl5 stress gate failure (§3.1) is not investigated here.
-- No default changed. FACTORED (and SYMMETRIC_PAIRS) per GPU go in decision-66 lists on the owner's word. The RTX 5060
-  Ti and the A100 80GB PCIe are not measured.
+- The A100 default's NbCl5 stress gate failure (§3.1) is located (tf32x3 GEMMs + tensor-core forward together) but
+  not resolved: the owner decides which to drop for OMAT-0 on the A100, or whether to accept it.
+- The RTX 5060 Ti and the A100 80GB PCIe were not measured; the PCIe card gets FACTORED and SYMMETRIC_PAIRS through
+  the "every A100" list without its own A/B or gate.
+- Branch `fastmace/factored-default` (`3812b56e`): CPU suite on leto 5,122 passed, 200 skipped
+  (`/mnt/homes/zwingel/fastmace-suite/fdef-20261104-2305`).
 - The vendored non-wprime backward and `wrebuild_backward` keep the per-term body.
