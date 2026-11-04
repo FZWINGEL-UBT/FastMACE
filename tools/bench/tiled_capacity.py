@@ -107,6 +107,9 @@ def parse_args(argv=None):
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
                         "left empty, so it costs no memory")
+    p.add_argument("--neighbours", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="NeighbourConfig overrides of the plan, e.g. gpu_neighbour_list=off (the host build: O(N) "
+                        "against the GPU screen's O(N^2) at millions of atoms)")
     p.add_argument("--output", required=True, type=Path)
     args = p.parse_args(argv)
     if args.species_index and args.compare == "eager":
@@ -348,6 +351,12 @@ def main(argv=None):
         record["phases"]["plan"] = mem()
         eager = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                        dynamic_edges=False))
+        if args.neighbours:
+            overrides = {key: capacity_scan._value(value) for key, value in
+                         (item.split("=", 1) for item in args.neighbours)}
+            record["neighbours"] = overrides
+            plan = dataclasses.replace(plan, neighbours=dataclasses.replace(plan.neighbours, **overrides))
+            eager = dataclasses.replace(eager, neighbours=dataclasses.replace(eager.neighbours, **overrides))
         # The species tables at the tiles' row count (the tiled call binds its own per tile): the construction
         # never evaluates N rows. An eager comparison keeps N, since it calls this field on the whole system.
         call_rows = None if args.compare == "eager" else args.receivers
