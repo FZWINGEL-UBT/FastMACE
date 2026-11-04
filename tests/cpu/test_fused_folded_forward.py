@@ -99,7 +99,12 @@ def test_stream_store_w_only_changes_the_store():
 def test_tensor_cores_render_and_launch_rule(monkeypatch):
     """``TENSOR_CORES``: the a.W product in 3xTF32 mma.sync tiles over a k padded to a multiple of 8, the W slice
     with row stride ``TC_STRIDE``, a per-warp redistribution tile; sm_80 and later only."""
-    assert not ff.tensor_cores((8, 0))  # off by default
+    assert ff.TENSOR_CORES is None  # per GPU (decision 66): the two A100 80GB cards
+    assert ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-80GB") and ff.tensor_cores((8, 0), "NVIDIA A100 80GB PCIe")
+    assert not ff.tensor_cores((8, 0)) and not ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-40GB")
+    assert not ff.tensor_cores((12, 0), "NVIDIA GeForce RTX 5060 Ti")
+    monkeypatch.setattr(ff, "TENSOR_CORES", False)
+    assert not ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-80GB")
     monkeypatch.setattr(ff, "TENSOR_CORES", True)
     assert ff.tensor_cores((8, 0)) and ff.tensor_cores((12, 0)) and not ff.tensor_cores((7, 5))
     for device in (SM80, SM89, SM120):
@@ -110,12 +115,12 @@ def test_tensor_cores_render_and_launch_rule(monkeypatch):
     rule = ff.launch_rule(2, 65, 4, 64, tc=True, **SM80)
     source = ff.render(_schedule(), 65, rule, tc=True)
     assert "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32" in source
-    assert ff.TC_SPLIT == "round"
-    assert "lo = (__float_as_uint(x - __uint_as_float(hi)) + 0x1000u) & 0xffffe000u;" in source
-    for split, line in (("rna", "cvt.rna.tf32.f32"), ("mask", "hi = __float_as_uint(x) & 0xffffe000u;")):
+    assert ff.TC_SPLIT == "mask" and "hi = __float_as_uint(x) & 0xffffe000u;" in source
+    for split, line in (("rna", "cvt.rna.tf32.f32"),
+                        ("round", "lo = (__float_as_uint(x - __uint_as_float(hi)) + 0x1000u) & 0xffffe000u;")):
         monkeypatch.setattr(ff, "TC_SPLIT", split)
         assert line in ff.render(_schedule(), 65, rule, tc=True)
-    monkeypatch.setattr(ff, "TC_SPLIT", "round")
+    monkeypatch.setattr(ff, "TC_SPLIT", "mask")
     assert "constexpr int KP = 72;" in source and f"constexpr int WS = {ff.TC_STRIDE};" in source
     assert "a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * KA + k] : 0.f;" in source
     skipped = ff.render(_schedule(), 65, ff.launch_rule(2, 64, 4, 64, tc=True, **SM80), used=64, tc=True)

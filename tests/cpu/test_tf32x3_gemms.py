@@ -147,6 +147,16 @@ def test_decision_66_turns_auto_on_for_mh1_and_omat0_on_the_a100_only():
     assert plan.rewrites.tf32x3_gemms == "off" and plan.rewrites.grouped_launch == "on"
 
 
+def test_decision_66_on_the_a100_pcie_for_omat0_only():
+    """The A100 80GB PCIe (owner, 4 November 2026): OMAT-0 medium only, where Benchmark_loup measured it."""
+    pcie = Hardware("NVIDIA A100 80GB PCIe", (8, 0), 80 * 2**30)
+    plan = _plan(RewriteConfig(), pcie, label="omat0-medium")
+    assert plan.rewrites.tf32x3_gemms == "on" and plan.rewrites.grouped_launch == "off"
+    plan = _plan(RewriteConfig(), pcie, label="mh1-r2scan")
+    assert plan.rewrites.tf32x3_gemms == "off"
+    assert dict(plan.auto_options_off)["tf32x3_gemms"] == "not a measured GPU, decision 66 (NVIDIA A100 80GB PCIe)"
+
+
 def test_planner_keeps_it_off_unless_asked_and_enables_an_explicit_on():
     assert _plan(RewriteConfig()).rewrites.tf32x3_gemms == "off"
     assert _plan(RewriteConfig(tf32x3_gemms="on")).rewrites.tf32x3_gemms == "on"

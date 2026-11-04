@@ -3309,6 +3309,22 @@ never probe. See `docs/validation/estimate-band.md` and `docs/validation/estimat
 
 **Generic radial tables on the A100 80GB cards (3 November 2026, owner: "Yes go ahead"; conductor):** decision 66's list for `generic_radial_tables` adds "NVIDIA A100 80GB PCIe" (SrTiO3 5,000 atoms, MD step b/a 0.902 / 0.901) and "NVIDIA A100-SXM4-80GB" (NaCl 8,000 atoms, 0.917 / 0.917), one structure each, after MargrafGroup's Benchmark_loup ran FastMACE on the PCIe card without them. `generic_chunked_conv_backward` stays off there (1.12 with the tables). See `docs/validation/loup-a100.md`.
 
+**The tensor-core fused forward on the A100s, and the A100 80GB PCIe in decision 66 (4 November 2026, owner: "Yes
+to both"; conductor):** the fused folded forward's a.W product runs in 3xTF32 on tensor cores
+(`fused_forward.TENSOR_CORES`, now None = per GPU) on "NVIDIA A100-SXM4-80GB" and "NVIDIA A100 80GB PCIe"
+(`TENSOR_CORES_GPUS`), for every model, with the split `TC_SPLIT = "mask"` (the high part truncated to TF32, the low
+part the exact remainder passed raw). A precision change of the w product: about 2.5x the rounded split's error,
+within 2 chain errors + (3 ceil(k/8) + 52) units of 2^-24 of the row scale |a| |W| (the GPU test). MD step b/a on the
+A100-SXM4-80GB, both orders: OMAT-0 medium on Benchmark_loup 0.933 / 0.933; MH-1 NaCl 0.978 / 0.970, NaNbO3 0.966 /
+0.967, NbCl5 0.983 / 0.982. Benchmark_loup 3.17 -> 2.92 (NVE) and 3.12 -> 2.90 µs/atom/step (Langevin). Force gates
+pass (OMAT-0: SrTiO3, NaCl, NbCl5; MH-1: NaCl, NaNbO3, NbCl5; RTX 5060 Ti); OMAT-0's SrTiO3 energy error 1.39 meV
+against 0.73 (floor 10 meV), MH-1's energy errors below the float32 calculator's. Slower on the RTX 5060 Ti and the
+RTX 4000 Ada, which keep the FP32-SIMT product. The A100 80GB PCIe joins the SXM4's OMAT-0 switches:
+`tf32x3_gemms` for OMAT-0 medium only (`DECISION_66_TF32X3_OMAT0_GPUS`; MH-1 not measured there), the generic
+wprime set (`DECISION_66_GENERIC_WPRIME_GPUS`, with chunked_conv_backward as its carrier) and
+`SKIP_ZERO_COLUMN_GPUS`: Benchmark_loup there 4.61 -> 3.31 µs/atom/step. See
+`results/omat0-kernel-lab-20261103/README.md` sections 9, 11 and 13.
+
 **Radial tables of degree 5 and the skipped zero column (4 November 2026, owner: "Yes"; conductor):** the float32
 radial tables (MH-1's and the generic family's) are fitted with Chebyshev degree 5 instead of 10
 (`rewrites.radial.DEGREE`), at the same tolerance and certificate (at most 1; more pieces). MD step against degree

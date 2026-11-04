@@ -54,8 +54,9 @@ BLOCKS_PER_SM = 2  # blocks per SM over all slices of the grid (the persistent g
 SKIP_ZERO_COLUMN = None
 # MD step on Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms) on top of degree-5 radial tables: RTX 4000 Ada 0.981,
 # A100-SXM4-80GB 0.986 (degree 5 and the skip against degree 5 alone; both orders 0.896 / 0.895 against degree 10).
-# The RTX 5060 Ti gained nothing (1.000) and keeps the full k-loop; other GPUs are not measured.
-SKIP_ZERO_COLUMN_GPUS = ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB")
+# The RTX 5060 Ti gained nothing (1.000) and keeps the full k-loop; other GPUs are not measured. The A100 80GB PCIe
+# (owner, 4 November 2026: "Yes"): Benchmark_loup 4.61 -> 3.31 us/atom/step with the SXM4's decision-66 switches.
+SKIP_ZERO_COLUMN_GPUS = ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
 # The stored per-edge weights are read only by the backward, long after: store them with the streaming cache hint
 # (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
 # forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
@@ -64,17 +65,26 @@ STREAM_STORE_W = False
 # the A100, where the FP32-SIMT product is about 62 GFLOP per call): per warp mma.sync m16n8k8 tiles of 16 channels x
 # the BATCH edges, W and a split into TF32 high and low parts on the fly (hi*hi + hi*lo + lo*hi, FP32 accumulation:
 # about FP32 accuracy, not bitwise), the result redistributed to lane = channel through a per-warp shared tile.
-# Compute capability 8.0 and later only (ignored below). A module constant for the A/B; off.
-TENSOR_CORES = False
+# Compute capability 8.0 and later only (ignored below). None: on for TENSOR_CORES_GPUS (decision 66; owner,
+# 4 November 2026: "Yes", with TC_SPLIT "mask"); True / False: an A/B side's choice on every GPU.
+TENSOR_CORES = None
+# A100-SXM4-80GB, Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms): MD step b/a 0.933 / 0.933 in both orders;
+# loup 3.17 -> 2.92 (NVE), 3.12 -> 2.90 us/atom/step (Langevin). Force gate passes (SrTiO3 energy error 1.39 meV
+# against 0.73, floor 10 meV). Slower on the RTX 5060 Ti and the RTX 4000 Ada (TF32 there is 2x FP32).
+TENSOR_CORES_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
 TC_STRIDE = 40  # W slice row stride with tensor cores: the fragment loads hit 32 distinct banks
 TC_RSTRIDE = 36  # the redistribution tile's row stride: conflict-free fragment stores
 
 _REGISTRY = {}
 
 
-def tensor_cores(capability):
-    """Whether the a.W product runs on tensor cores (``TENSOR_CORES`` and compute capability 8.0 or later)."""
-    return bool(TENSOR_CORES) and tuple(capability) >= (8, 0)
+def tensor_cores(capability, name=None):
+    """Whether the a.W product runs on tensor cores: ``TENSOR_CORES`` (None: the device ``name`` in
+    ``TENSOR_CORES_GPUS``) and compute capability 8.0 or later."""
+    on = TENSOR_CORES
+    if on is None:
+        on = name in TENSOR_CORES_GPUS
+    return bool(on) and tuple(capability) >= (8, 0)
 
 
 def _kpad(k):
@@ -87,7 +97,7 @@ def _kpad(k):
 # passed as it is (the tensor core truncates it): 19 instead of 7.6 units of 2^-24 of the row scale at k = 9 on the
 # RTX 5060 Ti. A100-SXM4-80GB kernel lab (4 November 2026): the fused forward 3.67 ms with "mask", 4.20 with the
 # high part masked and the low part rounded by cvt.rna, 5.13 with "rna", 4.89 for the FP32-SIMT product.
-TC_SPLIT = "round"
+TC_SPLIT = "mask"  # owner, 4 November 2026 ("Yes" to the A100 default with the mask split)
 _TC_SPLITS = {
     "mask": """    hi = __float_as_uint(x) & 0xffffe000u;
     lo = __float_as_uint(x - __uint_as_float(hi));""",
@@ -497,7 +507,7 @@ class FusedFoldedForward:
         props = torch.cuda.get_device_properties(device)
         self.k, self.channels, self.paths = int(k), schedule.channels, len(schedule.paths)
         self.used = self.k if used is None else int(used)
-        self.tc = tensor_cores(torch.cuda.get_device_capability(device))
+        self.tc = tensor_cores(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
         self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
                                 schedule.channels, int(props.shared_memory_per_block_optin),
                                 int(props.multi_processor_count), tc=self.tc)

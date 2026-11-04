@@ -396,6 +396,10 @@ DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000
 # for these two models on this GPU only (the Ada and the RTX 5060 Ti measured Triton's tf32x3 slower).
 DECISION_66_TF32X3_GPUS = ("NVIDIA A100-SXM4-80GB",)
 DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
+# The A100 80GB PCIe (owner, 4 November 2026: "Yes"): for OMAT-0 medium only, where it was measured (Benchmark_loup
+# with the SXM4's switches: 4.61 -> 3.31 us/atom/step; results/omat0-kernel-lab-20261103 section 9). MH-1 was not
+# measured there.
+DECISION_66_TF32X3_OMAT0_GPUS = ("NVIDIA A100 80GB PCIe",)
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
@@ -415,8 +419,10 @@ DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti
 # chunked_conv_backward stays on as their carrier: wprime_backward's backward writes no chunked weight gradient, so
 # the chunking (1.31x slower there) never runs; the fused forward alone was 1.29x slower and stays off without
 # wprime_backward. Force gates pass (rounding only, as IEEE float32).
+# The A100 80GB PCIe (owner, 4 November 2026: "Yes"; the generic set there on Benchmark_loup with tf32x3_gemms and
+# the skipped zero column: 4.61 -> 3.31 us/atom/step).
 DECISION_66_GENERIC_WPRIME_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                   "NVIDIA A100-SXM4-80GB")
+                                   "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
 DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
 DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti",
                                                            "NVIDIA RTX 4000 Ada Generation",
@@ -1240,11 +1246,15 @@ class FixedPlanner:
             # Decision 66: measured faster for these models on these GPU models only, matched by exact name.
             name = getattr(hardware, "name", None)
             measured = _mh1(model_label) or model_label in DECISION_66_TF32X3_LABELS
-            if measured and name in DECISION_66_TF32X3_GPUS and "grouped_launch" not in explicit:
+            if name in DECISION_66_TF32X3_OMAT0_GPUS and model_label in DECISION_66_TF32X3_LABELS:
+                gpus = DECISION_66_TF32X3_GPUS + DECISION_66_TF32X3_OMAT0_GPUS
+            else:
+                gpus = DECISION_66_TF32X3_GPUS
+            if measured and name in gpus and "grouped_launch" not in explicit:
                 v["_why"]["tf32x3_gemms"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
             else:
                 reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
-                          else f"not a measured GPU, decision 66 ({name})" if name not in DECISION_66_TF32X3_GPUS
+                          else f"not a measured GPU, decision 66 ({name})" if name not in gpus
                           else "grouped_launch was asked for")
                 v["tf32x3_gemms"] = False
                 v["_auto_off"]["tf32x3_gemms"] = reason

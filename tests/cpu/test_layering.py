@@ -81,7 +81,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B"},
     "fastmace/kernels/oeq_streaming/fused_forward.py": {"SKIP_ZERO_COLUMN": "skips W's zero bias column; per GPU, A/B",
                                                         "STREAM_STORE_W": "w stored with __stcs; screen A/B",
-                                                        "TENSOR_CORES": "a.W in 3xTF32 on tensor cores; A/B"},
+                                                        "TENSOR_CORES": "a.W in 3xTF32 on tensor cores; per GPU, A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")

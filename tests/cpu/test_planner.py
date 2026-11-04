@@ -1067,12 +1067,13 @@ def test_decision_66_generic_wprime_and_fused_forward_for_omat0():
     where the generic chunked path is off, chunked_conv_backward stays on as their carrier (wprime_backward's
     backward never chunks) and goes off with them in float64 plans and when wprime_backward is turned off."""
     a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+    pcie = Hardware("NVIDIA A100 80GB PCIe", (8, 0), 80 * 2**30)  # owner, 4 November 2026
 
     def plan(hardware, label="omat0-medium", **configs):
         return planner(engine=EngineConfig(), **configs).plan(traits(label), nacl(), IntegratorConfig(), hardware,
                                                               model_label=label)
 
-    for hardware in (GPU, ADA, a100_80):
+    for hardware in (GPU, ADA, pcie, a100_80):
         p = plan(hardware)
         assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward, p.rewrites.chunked_conv_backward) == \
             ("on", "on", "on"), hardware.name

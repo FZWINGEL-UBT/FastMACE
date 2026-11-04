@@ -316,3 +316,26 @@ tile's (`tests/gpu/test_cutlass_tf32x3_tiles_cuda.py` on the RTX 4000 Ada: 4 sha
 2.5e-7 of the row scale). MD step A/B on the A100-SXM4-80GB, both orders, 8 blocks (`screens/tile-sxm4/`, $0.40):
 `tile32x64` b/a 1.0144 / 1.0116, `tile64x32` 1.0167 / 1.0173. Slower: the two-warp tiles lose more in mainloop
 efficiency than the even load gains. Rejected; `TILE` stays 64x64.
+
+## 13. The A100 defaults (owner, 4 November 2026: "Yes to both")
+
+`fused_forward.TENSOR_CORES` is None (per GPU): on for "NVIDIA A100-SXM4-80GB" and "NVIDIA A100 80GB PCIe", with
+`TC_SPLIT = "mask"`; the A100 80GB PCIe joins the SXM4's OMAT-0 switches (`tf32x3_gemms` for OMAT-0 medium only,
+the generic wprime set, `SKIP_ZERO_COLUMN_GPUS`). Before the default, MH-1 (which uses the same fused forward):
+
+- MD step A/B on the A100-SXM4-80GB, default against `TENSOR_CORES=True`, `TC_SPLIT='mask'`, both orders, 8 blocks
+  (`tools/modal/mh1_a100_tc.sh`, 3ac4f16b, `screens/mh1-tc-sxm4/`, $0.52): NaCl 0.9776 / 0.9697, NaNbO3 0.9660 /
+  0.9665, NbCl5 0.9825 / 0.9820.
+- Force gate (MH-1 r2SCAN, RTX 5060 Ti, `gate-rtx5060ti-mh1-tc/`), max |error| and ratio to the ASE float32
+  calculator, default / tcmask: energy NaCl 1.3e-4 (0.18) / 6.2e-4 (0.81) eV, NaNbO3 6.0e-4 (0.49) / 5.6e-4 (0.46),
+  NbCl5 5.0e-5 (0.07) / 5.1e-4 (0.71); forces 0.98 / 0.94, 1.04 / 1.08, 0.99 / 1.00; stress 0.31 / 0.42,
+  0.57 / 0.95, 0.29 / 0.48. All pass.
+
+Tests (leto, RTX 4000 Ada, working tree bfae89c2): merge-tier CPU suite 5,103 passed, 202 skipped; the fused forward
+GPU test body with both splits (mask 1.09e-6 / 1.45e-6 of the row scale at k = 9 / 65, round 5.0e-7 / 9.5e-7,
+chains 2.6e-7 / 2.8e-7); the CUTLASS tile test; ruff only pre-existing long lines.
+
+**Edge order for the wprime slope (idea, bounded):** sorting a receiver's edges by species pair and piece would let
+neighbouring edges share G' slabs. `F-one-slab` (every edge reads group 0; perfect locality) on the RTX 4000 Ada
+(leto, `rtx4000ada-oneslab/`): wprime 7.73 ms base, 9.03 ms one slab (1.169), no slope 0.960, w not loaded 0.872.
+Perfect locality is slower (every warp hits the same lines), so the gathers' locality is not the limit; not built.

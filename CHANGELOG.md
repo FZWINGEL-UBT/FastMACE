@@ -8,6 +8,8 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `fused_forward.TC_SPLIT` ("mask", "round", "rna"): the tensor-core product's TF32 split; and two-warp
+  CUTLASS 3xTF32 tiles (`cutlass.tf32x3.TILE` "32x64" / "64x32", bitwise; slower on the A100, A/B only).
 - `TileConfig.compiled_graphs` (default off; `tiled_capacity.py --compiled-graphs`): compiled tile bodies captured
   in CUDA graphs per slot and sweep. Steady tiled call 0.90 at 40k and 0.961 at 214k atoms (RTX 5060 Ti), 1.000 at
   1M (RTX 4000 Ada); the private pools cost memory, so 1M runs out of memory with it on the 16 GB RTX A4000
@@ -181,6 +183,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- On the A100 80GB (SXM4 and PCIe) the fused folded forward's a.W product runs in 3xTF32 on tensor cores
+  (`fused_forward.TENSOR_CORES` per GPU, decision 66; split `TC_SPLIT = "mask"`), for every model. A precision
+  change of the w product (force gates pass). MD step 0.93 (OMAT-0 medium, Benchmark_loup) and 0.97-0.98 (MH-1) on
+  the A100-SXM4-80GB; Benchmark_loup 2.92 µs/atom/step (NVE) against 3.17. The A100 80GB PCIe also gets the SXM4's
+  OMAT-0 defaults (`tf32x3_gemms` for OMAT-0 medium, the generic wprime set, the skipped zero column): 4.61 -> 3.31
+  µs/atom/step there.
 - Float32 radial tables (MH-1's and the generic family's) are fitted at Chebyshev degree 5 instead of 10
   (`rewrites.radial.DEGREE`), with the same tolerance and certificate. OMAT-0 medium MD step 0.90–0.94 against
   degree 10 (A100-SXM4-80GB, RTX 4000 Ada, RTX 5060 Ti); MH-1 neutral. On the RTX 4000 Ada and the

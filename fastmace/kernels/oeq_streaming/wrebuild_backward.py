@@ -290,7 +290,8 @@ class WRebuildBackward:
         device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
         props = torch.cuda.get_device_properties(device)
         # TENSOR_CORES (fused_forward): w rebuilt as the tensor-core forward built it (the forward's parts and batch)
-        self.tc = tensor_cores(torch.cuda.get_device_capability(device)) and parts is None and batch == BATCH
+        self.tc = (tensor_cores(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
+                   and parts is None and batch == BATCH)
         self.rule = rule_for(len(schedule.paths), int(k), schedule.edge_dim, schedule.channels,
                              int(props.shared_memory_per_block_optin), int(props.multi_processor_count), parts, batch,
                              tc=self.tc)
