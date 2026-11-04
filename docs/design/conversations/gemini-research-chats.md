@@ -1,4 +1,4 @@
-# Gemini research chats (owner's account, October 2026)
+# Gemini research chats (owner's account, October and November 2026)
 
 The owner's chats with Google Gemini about speeding up the research engine and FastMACE, added to the repository on
 4 November 2026 as a record. They are kept unchanged below. Gemini's numbers are its own estimates and literature
@@ -13,6 +13,8 @@ figures, not our measurements; the chats are separated by `//` lines. Contents, 
 - "Try to come up with more optimizations for FP32 in … FastMACE", with Gemini's answer.
 - The research prompt of 28 October 2026 (`results/fp32-profile-20261028/research-prompt.md`) and Gemini's answer.
 - The research prompt of 30 October 2026 (main `d35658be`) and Gemini's answer.
+- The research prompt of 4 November 2026 (`docs/design/2026-11-04-gemini-research-prompt.md`) and Gemini's answer
+  (nine ranked proposals), appended on 4 November 2026.
 
 ---
 
@@ -3122,3 +3124,388 @@ Inductor max-autotune, combo_kernels, aggressive_fusion, and Programmatic Depend
 optimisation-ledger.md
 + 1
 
+
+
+//
+
+# Research prompt of 4 November 2026 (`docs/design/2026-11-04-gemini-research-prompt.md`, with `docs/validation/omat0-a100-optimisations.md` attached): Gemini's answer
+
+### Answers to Research Questions
+
+**1. Equivariant-Convolution Backward Schedules (32 % of step)**
+
+* **Sobek ([arXiv:2607.18074](https://arxiv.org/abs/2607.18074)):** Observes that for an edge weight expansion $W_{e,\pi,a} = \sum_q \phi_{e,q} A_{q,\pi,a}$ (fully connected UVW mixing), summing over edges before applying $A$ reduces the tensor product to a receiver-factorized GEMM. **Applicability to MACE-OMAT-0:** Does *not* apply directly to MACE's `conv_tp` because MACE uses a depthwise `uvu` tensor product (128 channels $\times$ 10 paths = 1,280 weights) followed by an equivariant node linear (`linear_1`), rather than a `uvw` edge mixing. However, when the radial basis is replaced by piecewise Chebyshev polynomials of degree $D=5$, a *piecewise* Sobek factorization becomes possible within each radial slab (see Proposal 3).
+* **Symmetrix-XL ([arXiv:2610.01036](https://arxiv.org/abs/2610.01036)):** Generates model-specialized C++/CUDA code where the forward pass folds the radial projection into the receiver sum, and the reverse pass applies the transpose of the node projection first, then recomputes radial/angular factors in generated source- and edge-owned kernels. **Applicability:** FastMACE already tried pure source-owned and receiver-owned streaming backwards (slower due to either redoing work or atomic traffic), and model-specialized CG unrolling is already in progress. What FastMACE has *not* exploited from the receiver-streaming backward is **register-level directional $d\vec{r}_{ij}$ reduction** (see Proposal 1) and **Newton's 3rd Law ($r_{ij} = -r_{ji}$) half-graph pair pooling** (see Proposal 2).
+* **OpenEquivariance ([arXiv:2501.13986](https://arxiv.org/abs/2501.13986) & PR 223):** Uses warp-level shared-memory staging where $x_j, Y_{ij}, w_{ij}$ and adjoints are loaded into smem segments and contracted via generated warp loops, accumulating sender gradients $\nabla x_j$ via `atomicAdd` into HBM/L2 (`wprime_backward`). **Applicability:** This is FastMACE's current baseline (4.37 ms). Its primary bottlenecks on A100 are: (a) computing three separate scalar products per path ($\nabla x_j$, $\nabla Y_{ij}$, $\nabla w_{ij}$) in FP32 CUDA cores, (b) evaluating Chebyshev polynomials in FP32 ALU for both $w$ and $w'$ while tensor cores sit idle, and (c) global memory reads/writes of $\nabla Y_{ij}$ and Inductor's separate $\nabla Y_{ij} \to \nabla \vec{r}_{ij}$ chain.
+
+
+* **FlashTP ([ICML 2025](https://proceedings.mlr.press/v267/lee25l.html), [SNU-ARC/flashTP](https://github.com/SNU-ARC/flashTP)):** Uses path-aggregated execution—grouping all tensor-product paths $(\ell_1, \ell_2) \to \ell_3$ that share the same input/output irrep into a single shared-memory pass to maximize register reuse of $x_j$ and $g_i$ across paths. **Applicability:** Relevant to register scheduling inside `wprime_backward` (already partially present in OEq PR 223's `ir_mul` layout, and being finalized by your in-progress model-specialized kernel).
+
+
+* **cuEquivariance, e3nn-jax / E3J ([arXiv:2609.35099](https://arxiv.org/abs/2609.35099)), and NequIP/Allegro ([arXiv:2607.28461](https://arxiv.org/abs/2607.28461)):** Target materialized edge weights $w_e \in \mathbb{R}^{E \times 1280}$ in HBM. None support on-the-fly register reconstruction of $w$ and $w'$ from polynomial slabs.
+
+**2. The Fused Forward (27 % of step, 3.70 ms on A100)**
+
+* **A100 Roofline & Resource Audit:** For $E = 373,760$ edges, the 3×TF32 radial projection ($K=64 \to N=1280$) executes $3.74 \times 10^5 \times 2 \times 64 \times 1280 = 61.2\text{ GFLOPs}$ per TF32 pass ($183.7\text{ GFLOPs}$ across 3 passes, or $\sim 1.18\text{ ms}$ theoretical peak at 156 TFLOPS, realistically $\sim 1.6\text{ ms}$ with mask splits and small-$M$ tile efficiency). The UVU tensor product executes $\sim 32\text{ FLOPs/channel} \times 128 \times 373,760 = 1.53\text{ GFLOPs}$ on FP32 CUDA cores ($\sim 0.08\text{ ms}$ theoretical at 19.5 TFLOPS, realistically $\sim 0.6\text{ ms}$ due to smem bank conflicts and loop overhead). Memory traffic is $373,760 \times 16 \times 4\text{ B} = 24\text{ MB}$ for $Y_{ij}$, $373,760 \times 64 \times 4\text{ B} = 95.7\text{ MB}$ for radial inputs, and $373,760 \times 512 \times 4\text{ B} = 765\text{ MB}$ of gathered sender features $x_j$ (hitting the 40 MB L2 cache with $>85\%$ hit rate on a 5,000-atom crystal).
+
+
+* **Where the remaining ~1.5 ms goes:** Synchronous global-to-shared memory stalls (`ld.global` $\to$ register $\to$ `st.shared` + `__syncthreads()`) between the 3×TF32 `mma.sync` phase and the CUDA-core UVU contraction phase, plus redundant reading of the $64$-wide radial vector $[h \cdot c, c]$ from HBM (see Proposals 4 and 6).
+
+**3. Fewer Edge Passes**
+
+* **Why full Interaction 2 reassociation fails:** Unlike Interaction 1 (where sender features are 89-species one-hot vectors), Interaction 2's sender features $x_j = \text{linear\_up}(h_j^{(1)}) \in \mathbb{R}^{512}$ are continuous and unique per atom.
+
+
+* **How to share/eliminate passes:**
+1. **Undirected Half-Graph Pairing ($e_{ij}, e_{ji}$):** Every undirected pair $\{i, j\}$ appears twice in the directed graph with $r_{ij} = r_{ji}$ and $\vec{r}_{ij} = -\vec{r}_{ji}$. Evaluating radial polynomials, $w$, and $w'$ on directed edges does $2\times$ redundant radial work (Proposal 2).
+2. **Chebyshev Slab Factorization (Certified/Exact):** Within each of the $S$ radial polynomial pieces (degree 5, so 6 coefficients per piece), $w_{ij} = \sum_{p=0}^5 T_p(x_{ij}) G_{s(e), p}$. While $5,000 \times S \times 6$ is too dense for a node reduction, evaluating $w(r)$ directly from the degree-5 Chebyshev slab inside `fused_forward` using **tensor cores** ($K=6$ padded to 8 or 16 across 2–3 pieces) avoids reading the 96 MB $[h\cdot c, c]$ intermediate tensor entirely (Proposal 4).
+
+
+
+
+
+**4. The Atom Side (~25 % of step: 1.85 ms GEMMs + 1.07 ms Elementwise + 0.40 ms Contraction)**
+
+* **Linear Folding across Boundaries:** Between Interaction 1 and Interaction 2, and inside each interaction after the message sum, linear operations sit separated only by scalar division $(\text{density} + 1)$ or linear additions:
+* In Interaction 1 & 2: $m_i' = \text{linear\_1}\left(\frac{m_i}{\text{density}_i + 1}\right) = \frac{1}{\text{density}_i + 1} \text{linear\_1}(m_i)$ because `linear_1` has no bias on equivariant irreps (and even on $0e$, MACE equivariant linears are strictly homogeneous linear maps).
+* Between Interaction 1 and Interaction 2: $h_i^{(1)} = \text{linear\_2}(\text{sym\_contract}_1(\dots)) + \text{skip\_tp}_1(s_i)$. Then Interaction 2 immediately computes $x_i = \text{linear\_up}_2(h_i^{(1)})$, $sc_i^{(2)} = \text{skip\_tp}_2(h_i^{(1)}, s_i)$, and `readout_1`$(h_i^{(1)})$. By folding $\text{linear\_2}$ into $\text{linear\_up}_2$, $\text{skip\_tp}_2$, and $\text{readout\_1}$ at setup time, `linear_2` disappears completely from both forward and backward passes (Proposal 5).
+
+
+
+
+
+**5. Unused A100 Architectural Features**
+
+* **`cp.async.cg.shared.global` (16-byte async copy bypassing registers):** Currently unused in `fused_forward` and `wprime_backward`. Moving $x_j$, $Y_{ij}$, and $g_i$ tiles asynchronously while tensor cores or CUDA cores compute the previous edge batch hides global memory and L2 latency (Proposal 6).
+* **3×TF32 Tensor Cores in `wprime_backward`:** Currently, `wprime_backward` runs entirely on FP32 CUDA cores (4.37 ms). Evaluating $w$ and $w'$ and contracting across edge batches via 3×TF32 `mma.sync` shifts half of its arithmetic onto the 156 TFLOPS tensor pipe (Proposal 4).
+
+
+* **L2 Persistence (`cudaAccessPolicyWindow`):** Setting a 30 MB persisting L2 window on the 40 MB A100 L2 cache for node tensors ($x_j \in \mathbb{R}^{5000 \times 512}$ is 10.2 MB; $\nabla x_j$ is 10.2 MB) guarantees zero HBM evictions caused by streaming edge reads (included in Proposal 6).
+
+**6. Capacity Paths (1M to 150M atoms)**
+
+* At 1M atoms on RTX 4000 Ada (15.3 µs/atom/step tiled vs. 13 µs/atom/step whole-system), the 2.3 µs/atom overhead comes from **Sweep 3 recomputing Interaction 0 from scratch** (edges, spherical harmonics $Y$, radial tables, and segmented sums) and host-staged `state="host"` PCIe transfers (Proposals 8 and 9).
+
+
+
+---
+
+### Ranked Proposals (Top 9)
+
+#### Proposal 1: Fuse Spherical Harmonics ($Y_{ij}$) Forward & Analytical Jacobian ($\nabla Y_{ij} \to \nabla \vec{r}_{ij}$) Directly into `fused_forward` and `wprime_backward`
+
+* **Mechanism:**
+* **Current state:** Inductor runs separate kernels to compute $Y_{ij}(\hat{r}_{ij}) \in \mathbb{R}^{E \times 16}$ ($\ell \le 3$) and writes it to HBM (24 MB). In the backward pass, `wprime_backward` computes $\nabla Y_{ij}$ in registers, writes $\nabla Y_{ij} \in \mathbb{R}^{E \times 16}$ to HBM (or accumulates across paths), and Inductor launches multiple elementwise backward kernels to backpropagate $\nabla Y_{ij} \to \nabla \hat{r}_{ij}$ and combine with $\frac{\partial E}{\partial r_{ij}} \hat{r}_{ij}$ into edge force vectors $\vec{f}_{ij} \in \mathbb{R}^{E \times 3}$ before scattering to atom forces $\vec{F}_i$.
+
+
+* **Change:**
+1. For $\ell_{\max} = 3$, real spherical harmonics $Y_0^0 \dots Y_3^3$ and their Cartesian gradients $\frac{\partial Y_{\ell m}}{\partial \hat{r}_\alpha}$ ($\alpha \in \{x,y,z\}$) are fixed degree-3 polynomials in $(x, y, z) = \hat{r}_{ij}$ requiring only 38 FP32 FMAs per edge (e.g., SpheriCart hardcoding).
+2. In `wprime_backward` (`fastmace/kernels/oeq_streaming/wprime_backward.py`): Instead of writing $\nabla Y_{ij}$ to memory, once a thread/warp finishes accumulating the 15 non-constant components of $\nabla Y_{ij}$ across paths for edge $e$ and scalar radial derivative $dr_e = \sum_c dw_c w'_c(r_e) + d(\text{density})_e$, immediately contract $\nabla Y_{ij}$ with the analytical Jacobian $\frac{\partial Y_{ij}}{\partial \vec{r}_{ij}}$ in registers and add $dr_e \hat{r}_{ij}$ to form the complete directed edge force $\vec{f}_e \in \mathbb{R}^3$.
+
+
+3. Accumulate $\vec{f}_e$ across the receiver's edges directly into the receiver atom's force register $\vec{F}_i \mathrel{+}= \vec{f}_e$ (written once per receiver at kernel exit, zero atomics) and perform a single `atomicAdd` of $-\vec{f}_e$ to the sender force $\vec{F}_j$.
+4. Also fuse the scalar `table_backward` (0.30 ms, which only computes the density derivative and Interaction 1's radial derivative) into `wprime_backward` and Interaction 1's sum backward.
+
+
+
+
+
+
+* **Exactness class:** **Rounding** (identical polynomials and chain-rule derivatives in FP32, reassociated in registers without intermediate HBM stores).
+* **Estimated ceiling (A100-SXM4):** **0.75 – 1.15 ms** per call (eliminates ~0.35 ms of Inductor $Y_{ij}$ backward/edge-force elementwise kernels from the 1.07 ms pool, ~0.20 ms of `table_backward` from the 0.30 ms pool, and ~0.30 ms of HBM read/write traffic inside `wprime_backward`).
+
+
+* **Cheap falsifier (1 day):** Stub out the $\nabla Y_{ij}$ global store in `wprime_backward`, replace it with a register dot-product against $\vec{r}_{ij}$ (38 FMAs) plus one `atomicAdd` of a `float3` to a dummy force buffer, and measure `wprime_backward` + removed Inductor force-chain kernels in `tools/step_breakdown.py`. Stop rule: if combined time drops by $< 0.35\text{ ms}$ (~2.5 % of step), abort.
+
+
+* **Sources & differentiation:** Inspired by [SpheriCart](https://github.com/lab-cosmo/sphericart) ([J. Chem. Phys. 159, 064113 (2023)](https://arxiv.org/abs/2306.03813)) and Symmetrix-XL's fused directional force reverse stage ([arXiv:2610.01036](https://arxiv.org/abs/2610.01036)). Unlike rejected "Gate VJP and prologue/epilogue fusions" (which were node-level), this acts on the $E = 373,760$ edge bottleneck and removes the $\nabla Y_{ij}$ HBM round-trip.
+
+---
+
+#### Proposal 2: Undirected Half-Graph Pairing ($e_{ij}, e_{ji}$) in Radial Tables and `wprime_backward`
+
+* **Mechanism:**
+* **Current state:** In a periodic crystal of 5,000 atoms with 373,760 directed edges, there are exactly 186,880 undirected pairs $\{i, j\}$. Currently, every directed edge $e_{ij}$ and its twin $e_{ji}$ independently evaluate the degree-5 Chebyshev radial tables (0.42 ms forward, 0.30 ms backward) and independently rebuild $w(r)$ and $w'(r)$ from the slab inside `wprime_backward` (where rebuilding $w$ and $w'$ is half the register/ALU pressure of the 4.37 ms kernel).
+
+
+* **Change:**
+1. During the early neighbour-list rebuild (`SkinNeighbourList` on the side stream, which is already overlapped and free), alongside the receiver-sorted edge list, emit an `int32` index array `twin_idx[E]` (or sort undirected pairs for the radial table pass) mapping each directed edge $e_{ij}$ to its canonical undirected index $u \in [0, E/2)$.
+
+
+2. **Radial tables (forward & backward):** Evaluate the Triton radial table kernel (`generic_radial_tables`) only on the $E/2 = 186,880$ canonical undirected distances $r_u$. Both edge count and output memory ($[h\cdot c, c, \text{density}]$) drop by $2\times$ (from 96 MB to 48 MB).
+
+
+3. **In `wprime_backward`:** Because `wprime_backward` must stay receiver-sorted (sorting edges by slab was 1.51× slower), keep the receiver-sorted schedule, OR better yet: in Proposal 4 below, precompute or cache the undirected radial weights/slabs so L2 footprint is halved. Even simpler: in `generic_radial_tables`, running on $E/2$ halves the 0.72 ms radial table forward+backward time immediately and halves the L2 cache footprint of $[h\cdot c, c]$ read by `fused_forward`.
+
+
+
+
+
+
+* **Exactness class:** **Exact** (bitwise identical distance $r_{ij} = \|\vec{r}_j - \vec{r}_i\| = r_{ji}$ and symmetric species pair $(Z_i, Z_j)$ in MACE's radial basis; if Agnesi radii are symmetric in $(Z_i, Z_j)$, it is $100\%$ symmetric; if any model has asymmetric pair tables, group by unordered pair and emit both only when $Z_i \ne Z_j$).
+* **Estimated ceiling (A100-SXM4):** **0.45 – 0.65 ms** per call (cuts radial table forward+backward from 0.72 ms to ~0.36 ms, and reduces `fused_forward` L2 misses on $[h\cdot c, c]$ by 48 MB $\approx 0.15\text{ ms}$).
+
+
+* **Cheap falsifier (1 day):** Modify the Triton radial table forward and backward kernels to run on $E/2$ edges and index $[h\cdot c, c]$ in `fused_forward` via `e >> 1` (mocking `twin_idx`). Measure the whole step on A100. Stop rule: if whole-step gain is $< 0.25\text{ ms}$, abort.
+* **Sources & differentiation:** Standard MD Newton's third law symmetry, applied here specifically to the radial embedding and Chebyshev table evaluation while *preserving* the receiver-sorted edge order required by `fused_forward` and `wprime_backward` (thus avoiding the rejected 1.51× slower edge-order sort).
+
+---
+
+#### Proposal 3: Linear Folding Across Interaction Boundaries and Density Normalization (Atom Side)
+
+* **Mechanism:**
+* **Current state:** Atom GEMMs take 1.85 ms (44 CUTLASS launches) and Inductor elementwise takes 1.07 ms (~74 kernels). Look at the exact computational graph in §1–§2:
+
+
+1. **Commuting density division across `linear_1`:** In both Interaction 1 and Interaction 2, the receiver message $m_i$ is divided by scalar $d_i = (\text{density}_i + 1)$ *before* `linear_1`: $u_i = \text{linear\_1}(m_i / d_i)$. Because equivariant `linear_1` is strictly homogeneous (zero bias), $\text{linear\_1}(m_i / d_i) = \text{linear\_1}(m_i) / d_i$. Pushing the $1/d_i$ scaling *after* `linear_1` fuses it directly into the `symmetric_contraction` prologue or `skip_tp` addition, eliminating two full-node elementwise kernels (forward + backward) per interaction and allowing `fused_forward` (`BLOCK_MESSAGE`) to feed directly into `linear_1` without an intervening Inductor division kernel!
+
+
+2. **Folding Interaction 1's `linear_2` into Interaction 2's linear layers:** At the end of Interaction 1, MACE computes $h_i^{(1)} = \text{linear\_2}(p_i^{(1)}) + \text{skip\_tp}_1(s_i)$, where $p_i^{(1)}$ is the output of `symmetric_contraction_1` and $s_i$ is the 89-species one-hot. Then $h_i^{(1)}$ is consumed *exclusively* by three linear maps:
+
+
+* Interaction 2's $\text{linear\_up}_2(h_i^{(1)})$
+* Interaction 2's $\text{skip\_tp}_2(h_i^{(1)}, s_i)$
+* $\text{readout\_1}(h_i^{(1)})$ (a linear layer on the $0e$ irrep)
+By linearity, for any linear operator $L \in \{\text{linear\_up}_2, \text{skip\_tp}_2(\cdot, s_i), \text{readout\_1}\}$:
+
+$$L\left(\text{linear\_2}(p_i^{(1)}) + \text{skip\_tp}_1(s_i)\right) = (L \circ \text{linear\_2})(p_i^{(1)}) + L(\text{skip\_tp}_1(s_i))$$
+
+
+
+At setup time (in float64), multiply the weight matrices $W_{L \circ \text{linear\_2}} = W_L W_{\text{linear\_2}}$ per irrep block and precompute the 89-species constant lookup table $T_L[Z_i] = L(\text{skip\_tp}_1(e_{Z_i}))$.
+This **completely eliminates `linear_2` of Interaction 1** (both forward and backward GEMMs) and replaces `skip_tp_1` with a simple species-indexed bias addition!
+
+
+3. **Same folding for Interaction 2's `linear_2` + `skip_tp_2` on $\ell > 0$:** `readout_2` (an MLP) only reads the scalar $0e$ channel of $h_i^{(2)}$. If `linear_2` of Interaction 2 computes $\ell > 0$ irreps, those irreps are dead outputs (verify whether MACE-OMAT-0's second interaction `linear_2` and `symmetric_contraction_2` already prune $\ell > 0$; if not, prune all $\ell > 0$ paths in Interaction 2's `linear_1`, `symmetric_contraction`, `skip_tp_2`, and `linear_2`).
+
+
+
+
+
+
+* **Exactness class:** **Rounding** (algebraically identical linear algebra; weights composed in float64 at setup time; passes the 2× ratio gate easily because matrix multiplication is associative up to FP32 rounding).
+* **Estimated ceiling (A100-SXM4):** **0.50 – 0.85 ms** per call (removes 8–12 CUTLASS GEMM launches from the 44 launches in the 1.85 ms pool, plus ~10 Inductor elementwise kernels from the 1.07 ms pool).
+
+
+* **Cheap falsifier (1 day):** Check the shapes of `interaction_1.linear` (`linear_2`) and `interaction_2.linear_1 / symmetric_contraction` in `breakdown/ops.csv`. Write a 40-line rewrite pass that fuses `W_linear_up2 @ W_linear2` in float64 at setup and bypasses `interaction_1.linear`. Run the accuracy gate and `loup_md.py`. Stop rule: if error ratio $> 2.0$ or step gain $< 0.25\text{ ms}$, abort.
+
+
+* **Sources & differentiation:** Own derivation from the MACE architecture graph (§1–§2). Distinct from `grouped_linear` and `merged_residual` (which is off for OMAT-0): this composes sequential linear layers *across* the Interaction 1 $\to$ Interaction 2 boundary and commutes the scalar density division.
+
+
+
+---
+
+#### Proposal 4: 3×TF32 Tensor-Core Chebyshev Evaluation & Contraction Inside `wprime_backward` (and Direct Chebyshev `fused_forward`)
+
+* **Mechanism:**
+* **Current state:** `wprime_backward` (4.37 ms, 32 % of step) rebuilds $w_{e,c} = \sum_{p=0}^5 T_p(x_e) C_{s(e), p, c}$ and $w'_{e,c} = \sum_{p=0}^5 T'_p(x_e) C_{s(e), p, c}$ for $c \in [0, 1280)$ using scalar FP32 FMA loops on CUDA cores. Earlier, "computing `w` from the slab in the forward (spills; slower)" failed because it was done in scalar FP32 registers alongside the UVU registers.
+
+
+* **Change:** Use A100's **3×TF32 tensor cores (`mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32`)** inside `wprime_backward`!
+1. In `wprime_backward`, each thread block processes a batch of edges for a receiver. For a batch of 8 or 16 edges, form the degree-5 Chebyshev basis values $T_0(x_e)\dots T_5(x_e)$ and derivatives $T'_0(x_e)\dots T'_5(x_e)$ in shared memory (only 12 floats per edge).
+2. Note that within a single receiver atom $i$ in a crystal (3 species in SrTiO3), the incoming edges fall into at most 3 species pairs, and typically 2–3 radial pieces per species pair. Even simpler: without any sorting, `wprime_backward` can still use 3×TF32 `mma.sync` if we rebuild $w$ and $w'$ from the **shared folded weight matrix $W \in \mathbb{R}^{1280 \times 64}$** and a 64-wide radial table $[h\cdot c, c]$ and its derivative $[h\cdot c, c]'$, **OR** if we keep `TABLE_W`, we pack the 16-edge tile's $dw_{e, c}$ computation:
+
+
+3. Specifically, in `wprime_backward`, the UVU backward first computes $dw_{e, c}$ and $\nabla x_{j, c}$ from $g_{i}$ and $x_j, Y_{ij}$. Notice that $dw_{e, (u, \pi)} = \sum_{m_i, m_y, m_o} C^\pi_{m_i m_y m_o} g_{i, u, m_o} x_{j, u, m_i} Y_{\pi, m_y}$. Once $dw_{e, c}$ is formed in registers/smem for a tile of 16 edges, instead of rebuilding both $w_{e,c}$ and $w'_{e,c}$ in scalar FP32 registers concurrently (which causes high register pressure and occupies FP32 pipes), compute $w_{e,c}$ in Phase 1 (to get $\nabla x_j$ and $\nabla Y_{ij}$), overwrite its registers/smem with $dw_{e,c}$, and compute $dr_e = \sum_c dw_{e,c} w'_{e,c}$ in Phase 2!
+4. **Crucial two-phase register lifetime split in `wprime_backward`:** Right now, `TABLE_W` computes $w_c$ and $w'_c$ simultaneously from the slab in the inner loop so it only loads the slab once. However, holding both $w_c$ and $w'_c$ (plus $T_0..T_5$ and $T'_0..T'_5$) doubles register demand and halves warp occupancy or causes local-memory/smem traffic. Instead, use the algebraic identity for Chebyshev polynomials: the derivative basis $T'_p(x)$ is a fixed linear combination of $T_q(x)$ ($T'_1 = T_0$, $T'_2 = 4 T_1$, $T'_3 = 6 T_2 + 3 T_0$, $T'_4 = 8 T_3 + 8 T_1$, $T'_5 = 10 T_4 + 10 T_2 + 5 T_0$). Therefore:
+
+
+
+$$\sum_{c=1}^{1280} dw_{e,c} w'_{e,c}(x_e) = \sum_{p=0}^{5} T'_p(x_e) \left( \sum_{c=1}^{1280} dw_{e,c} C_{s(e), p, c} \right)$$
+
+
+
+**Look at that equation!** By reassociating the sum over $c \in [0, 1280)$ *inside* the polynomial degree $p \in [0, 5]$:
+* You do **NOT** compute $w'_{e,c} = \sum_{p=0}^5 T'_p(x_e) C_{s(e), p, c}$ for all 1,280 channels (which costs $6 \times 1280$ FMAs to build $w'_c$ + $1280$ FMAs to dot with $dw_c$ = $7 \times 1280$ FMAs, plus holding both $w_c$ and $w'_c$)!
+* Instead, as each channel $c$'s slab coefficients $C_{s(e), 0..5, c}$ are loaded to form $w_{e,c} = \sum_{p=0}^5 T_p(x_e) C_{s(e), p, c}$, you immediately compute $dw_{e,c}$ for that channel and accumulate $dw_{e,c} \cdot C_{s(e), p, c}$ into **just 5 scalar register accumulators** $S_1 \dots S_5$ per edge!
+* At the very end of the edge (after all 1,280 channels are done), you perform **one single 5-element dot product** $dr_e = \sum_{p=1}^5 T'_p(x_e) S_p$!
+
+
+
+
+
+
+* **Exactness class:** **Rounding** (exact distributive law $\sum_c dw_c \left(\sum_{p=1}^5 T'_p(x) C_{p,c}\right) = \sum_{p=1}^5 T'_p(x) \left(\sum_c dw_c C_{p,c}\right)$; replaces 1,280 evaluations of $T'_p$ per edge with a single 5-term dot product at the end of the edge, and frees the registers previously holding $T'_1 \dots T'_5$ in the inner loop).
+* **Estimated ceiling (A100-SXM4):** **0.40 – 0.80 ms** per call (~10–18 % of the 4.37 ms `wprime_backward` kernel by cutting slab FMA count and register live-range in the inner 1,280-channel loop).
+
+
+* **Cheap falsifier (1 day):** In `fastmace/kernels/oeq_streaming/wprime_backward.py`, replace the inner-loop evaluation of `w_prime = c1*Tp1 + ... + c5*Tp5` and `dr += dw * w_prime` with 5 register accumulators `s1 += dw * c1; ... s5 += dw * c5;` and evaluate `dr = s1*Tp1 + ... + s5*Tp5` once after the channel loop. Compile with NVRTC and check `ptxas` register count and `loup_md.py` timing. Stop rule: if `wprime_backward` shrinks by $< 0.20\text{ ms}$, abort.
+
+
+* **Sources & differentiation:** Own algebraic derivation from FastMACE's `wprime_backward.TABLE_W` design (§3.5). Nothing like this is in the rejected list (which tested vectorised slope loads and degree changes, but still evaluated $w'_c(r)$ per channel before multiplying by $dw_c$).
+
+
+
+---
+
+#### Proposal 5: Sender-Deduplicated Shared-Memory Gather & Local Atomic Reduction per Receiver Tile in `wprime_backward` and `fused_forward`
+
+* **Mechanism:**
+* **Current state:** In `fused_forward` (3.70 ms) and `wprime_backward` (4.37 ms), each receiver atom $i$ has ~75 incoming edges $(j \to i)$ within the 6.0 Å (+ 0.5 Å skin) cutoff. However, because SrTiO3 (and most condensed-matter systems with $6.5\text{ Å}$ cutoff) has periodic images or multiple edges/chunks, and more importantly, when a thread block processes 2–4 spatially adjacent receiver atoms (or 32 edges per warp), **many edges in the same thread block share the same sender atom $j$**! Furthermore, in `wprime_backward`, for every single path $\pi \in [0, 10)$ of the same edge $e = (j \to i)$, or across edges sharing sender $j$ within the block, threads issue global `atomicAdd`s to $\nabla x_j \in \mathbb{R}^{N \times 512}$ in L2/HBM.
+
+
+* **Change:**
+1. **Per-Edge Sender Gradient Accumulation in Registers/Smem before Global Atomic:** Ensure that within `wprime_backward`, for a given edge $e = (j \to i)$, all paths $\pi$ that contribute to the *same* sender irrep $(\ell_i, m_i)$ of $\nabla x_{j, u, (\ell_i, m_i)}$ are accumulated in registers/shared memory *first*, so that each edge issues at most **one** `atomicAdd` per sender irrep component (16 components total per channel), rather than one `atomicAdd` per path $\pi$ (up to 34 path-component updates). (Note: if your in-progress model-specialized backward already fuses updates across paths to the same sender irrep, verify this; if not, this alone eliminates >50% of global `atomicAdd` instructions!)
+2. **Multi-Receiver Spatial Block Coalescing:** Since atoms are spatially ordered (or can be ordered by 3D cell bin without affecting exactness, note: Morton order alone gave no gain on the un-coalesced kernel, so only do this if paired with shared-memory caching), two adjacent receivers share ~65% of their neighbor list. Even for a *single* receiver $i$ in `wprime_backward`, $x_j$ (512 floats) is loaded once per edge, and $\nabla x_j$ (512 floats) is written once per edge. By staging $\nabla x_j$ in shared memory and flushing via vectorized `atomicAdd` (or warp-coalesced `atomicAdd` across the 128 channels $u$, which is contiguous in `ir_mul` or `mul_ir` layout), L2 atomic contention drops sharply.
+
+
+
+
+* **Exactness class:** **Rounding** (changes only the order of floating-point addition into $\nabla x_j$).
+* **Estimated ceiling (A100-SXM4):** **0.35 – 0.70 ms** per call (8–15 % of `wprime_backward`).
+
+
+* **Cheap falsifier (1 day):** Profile `wprime_backward` with Nsight Compute (`ncu --metrics l1tex__t_sectors_pipe_lsu_mem_global_op_red.sum,smsp__sass_thread_inst_executed_op_atom_pred_on.sum`) or replace the global `atomicAdd` on $\nabla x_j$ with a shared-memory dummy write to measure the exact hardware cost of the global atomic scatter on A100. Stop rule: if removing/coalescing the $\nabla x_j$ `atomicAdd` saves $< 0.30\text{ ms}$ in the kernel stub, abort.
+* **Sources & differentiation:** Inspired by FlashTP's path-aggregated execution ([ICML 2025](https://proceedings.mlr.press/v267/lee25l.html)) and TrimSO(2)'s on-chip accumulation before reduction ([arXiv:2610.20029](https://arxiv.org/abs/2610.20029)). Differs from the rejected Morton atom order (which was tested without changing the kernel's atomic emission count).
+
+---
+
+#### Proposal 6: `cp.async` Double-Buffered Edge Pipeline + 30 MB Persisting L2 Window for Node Features on A100
+
+* **Mechanism:**
+* **Current state:** `fused_forward` (3.70 ms) and `wprime_backward` (4.37 ms) process a receiver's edges in batches of 8 edges. In each iteration of the receiver loop, threads issue synchronous global loads of sender features $x_{s(e)} \in \mathbb{R}^{512}$, spherical harmonics $Y_e \in \mathbb{R}^{16}$, and radial features/slabs, wait for them to arrive in registers, store them to shared memory, call `__syncthreads()`, and then run tensor cores / CUDA cores. On A100 (`sm_80`), synchronous `ld.global` $\to$ `st.shared` wastes both registers (staging buffers) and instruction slots, and stalls warps during the L2 fetch (~200 cycles).
+
+
+* **Change:**
+1. **Hardware `cp.async.cg.shared.global` (16-byte async copy, `sm_80+`):** Allocate a 2-stage ring buffer in shared memory for the 8-edge batch inputs ($8 \times 512 \times 4\text{ B} = 16\text{ KB}$ per stage, easily fitting inside A100's 164 KB shared memory per SM without reducing occupancy). Issue `cp.async.cg.shared.global` (`__pipeline_memcpy_async` in CUDA C++) for batch $b+1$ *before* starting the 3×TF32 `mma.sync` and UVU contraction of batch $b$, followed by `cp.async.commit_group()` and `cp.async.wait_group<1>()`. The `.cg` (cache global) modifier bypasses L1 (avoiding L1 thrashing from streaming edges) and fetches directly from L2 into shared memory without touching the register file.
+2. **A100 L2 Persistence (`cudaStreamAttrValue::accessPolicyWindow`):** The A100 has a 40 MB L2 cache. Across the entire 5,000-atom system, the node tensors that are randomly gathered/scattered by `s(e)` are:
+* $x = \text{linear\_up}(h^{(1)}) \in \mathbb{R}^{5000 \times 512}$ (10.24 MB)
+* $\nabla x \in \mathbb{R}^{5000 \times 512}$ (10.24 MB)
+* $g = \nabla m \in \mathbb{R}^{5000 \times 512}$ (10.24 MB)
+Total = **30.72 MB**. Meanwhile, streaming edge arrays ($Y_{ij}$, radial tables, slab weights) stream >200 MB through L2 and evict cache lines of $x$ and $\nabla x$. Allocate $x$, $\nabla x$, and $g$ in a single contiguous 31 MB workspace arena and attach a `cudaAccessPolicyWindow` with `hitRatio = 1.0`, `hitProp = cudaAccessPropertyPersisting`, `missProp = cudaAccessPropertyStreaming` on the CUDA stream before capturing Graph B.
+
+
+
+
+
+
+
+
+* **Exactness class:** **Exact** (bitwise identical arithmetic; hardware data-movement and cache-replacement policy only).
+* **Estimated ceiling (A100-SXM4):** **0.40 – 0.75 ms** per call (~5–9 % across `fused_forward` and `wprime_backward` combined, 8.07 ms base).
+
+
+* **Cheap falsifier (1 day):**
+* *Part A (1 hour):* Call `cudaCtxSetLimit(cudaLimitPersistingL2CacheSize, 32 << 20)` and set `cudaStreamSetAttribute` with `accessPolicyWindow` pointing to $x$ and $\nabla x$ on the capture stream of Graph B. Run same-process A/B in both build orders.
+
+
+* *Part B (half day):* Replace the global-to-shared load of $x_{s(e)}$ in `fused_forward.py` with `__pipeline_memcpy_async` (16-byte `float4` chunks) and a 2-stage smem buffer. Stop rule: if neither gives $\ge 0.20\text{ ms}$, abort.
+
+
+* **Sources & differentiation:** NVIDIA Ampere Architecture Tuning Guide (`sm_80` `cp.async` and L2 persistence). Note that the rejected list mentions "OEq launch-shape, L2-hint and register or block tuning (ceiling 0.3 %)" on the *old* materialized OEq kernel in October; `cp.async` double-buffering across the 8-edge streaming loop in `fused_forward` / `wprime_backward` has never been tested.
+
+---
+
+#### Proposal 7: Fuse Interaction 1's Segmented Edge Sum Directly into the Radial Table Kernel (Eliminating 1 Edge Pass)
+
+* **Mechanism:**
+* **Current state:** For Interaction 1, `generic_radial_tables` runs a Triton kernel over all $E = 373,760$ edges to evaluate the degree-5 Chebyshev polynomials and writes $[h_1 \cdot c, c, \text{density}_1] \in \mathbb{R}^{E \times 65}$ to HBM (~97 MB write). Immediately after, `segmented_first_sum` (0.22 ms forward, 0.50 ms backward) launches another Triton kernel that reads $[h_1 \cdot c, c] \in \mathbb{R}^{E \times 64}$ (96 MB read) and $Y_{ij} \in \mathbb{R}^{E \times 16}$ (24 MB read) from HBM, forms their outer product per edge, and run-segment-sums them per `(receiver, sender_species)`. In the backward pass, `segmented_first_sum` backward (0.50 ms) writes $\nabla [h_1 \cdot c, c] \in \mathbb{R}^{E \times 64}$ (96 MB write) to HBM, which `table_backward` (0.30 ms) then reads back (96 MB read) to multiply by the Chebyshev slope!
+
+
+* **Change:**
+* Interaction 1's radial table output $[h_1 \cdot c, c] \in \mathbb{R}^{E \times 64}$ has **no other consumer** than `segmented_first_sum`!
+
+
+* Fuse Interaction 1's Chebyshev table evaluation directly inside `segmented_first_sum` (forward) and fuse Interaction 1's Chebyshev derivative $w'_1(r)$ directly inside `segmented_first_sum_backward` (backward)!
+* Consequently, the entire $E \times 64$ edge tensor for Interaction 1 (96 MB forward write + 96 MB forward read + 96 MB backward write + 96 MB backward read = **384 MB of HBM traffic per step**) **disappears completely**.
+* Even better: in `segmented_first_sum` (and its backward), apply **Sobek's Chebyshev factorization**! Within a `(receiver, sender_species)` run, group the sum by radial slab piece $s \in [0, S)$ and polynomial degree $p \in [0, 5]$: instead of multiplying $64$ radial channels by $16$ spherical harmonics ($64 \times 16 = 1,024$ FMAs per edge), multiply only the $6$ scalar Chebyshev powers $T_0(x_e)\dots T_5(x_e)$ by $Y_{ij}$ ($6 \times 16 = 96$ FMAs per edge—an **11× reduction in per-edge ALU work**!) and multiply by the $6 \times 64$ slab matrix *after* summing over the run!
+
+
+
+
+* **Exactness class:** **Rounding** (fusing the table into `segmented_first_sum` is bitwise identical; factoring the 6 Chebyshev powers across the segmented sum is exact distributive arithmetic up to FP32 summation order).
+* **Estimated ceiling (A100-SXM4):** **0.45 – 0.65 ms** per call (eliminates half of the 0.72 ms radial table forward+backward and more than half of the 0.72 ms `segmented_first_sum` forward+backward by removing 384 MB of HBM traffic and cutting edge FMAs by $11\times$).
+
+
+* **Cheap falsifier (1 day):** Fuse Interaction 1's degree-5 Chebyshev evaluation inline into the Triton `segmented_first_sum` forward and backward kernels so Interaction 1 never allocates or touches the `[E, 64]` radial tensor. Measure on A100 in `tools/step_breakdown.py`. Stop rule: if combined time of `radial_tables` + `segmented_first_sum` (currently $0.72 + 0.72 = 1.44\text{ ms}$) drops by $< 0.30\text{ ms}$, abort.
+
+
+* **Sources & differentiation:** Own synthesis combining FastMACE's `generic_radial_tables` (§3.3) and `segmented_first_sum` (§3.4) with Sobek's polynomial/basis reassociation ([arXiv:2607.18074](https://arxiv.org/abs/2607.18074)). Never tried before because `generic_radial_tables` was built as a drop-in replacement for the radial MLP module rather than fused with Interaction 1's segmented reducer.
+
+
+
+---
+
+#### Proposal 8 (Secondary Target – Capacity Path 1M–150M): Cache Compact Interaction-0 Segmented Sums instead of Recomputing Interaction 0 in Sweep 3
+
+* **Mechanism:**
+* **Current state:** In the tiled and wavefront paths (§4–§5), Sweep 1 runs Interaction 0 without autograd and stores per atom $x = \text{linear\_up}(h_1)$ and $sc = \text{skip\_tp}(h_1)$ (4.75 kB/atom). Then Sweep 3 **recomputes all of Interaction 0 from scratch with autograd** (re-evaluating tile edge vectors, spherical harmonics $Y$, radial tables, `segmented_first_sum`, `linear_1`, `symmetric_contraction_1`, and `linear_2`) just to backpropagate $dE/dx$ and $dE/dsc$ to Interaction 0's edge forces!
+
+
+* **Change:**
+* Look at what actually connects the node side of Interaction 0 (`symmetric_contraction_1`) to the edges of Interaction 0:
+* Because Interaction 0 is reassociated (§3.4), its node side (`linear_1`, `skip_tp`, `symmetric_contraction_1`, `linear_2`, `readout_0`) takes as input **only** the node-level projected message $m_i^{(0)} \in \mathbb{R}^{R \times 512}$ and scalar $\text{density}_i^{(0)} \in \mathbb{R}^R$!
+
+
+* Furthermore, in Sweep 2, the tile already loads $x$ and $sc$ for all receivers + halo. In Sweep 3, for a tile of $R = 8,192$ or $16,384$ receivers, recomputing the *edge* part of Interaction 0 (`Y`, `radial_tables`, `segmented_first_sum` forward) is only needed to obtain $m_i^{(0)}$ so `symmetric_contraction_1` has its forward input for backward!
+
+
+* If instead we either:
+1. Run the *node-only* backward of Interaction 0 (`linear_up`, `skip_tp`, `linear_2`, `symmetric_contraction_1`, `linear_1`) for receiver tile $T$ **at the end of Sweep 1**? No, $dE/dx_i$ isn't ready until Sweep 2 finishes all tiles that use atom $i$ as a halo sender.
+2. **In Sweep 3, do NOT recompute Interaction 0's edges (`Y`, `radial_tables`, `segmented_first_sum` forward) to get $m_i^{(0)}$!** Instead, store the pre-contraction node feature $u_i^{(0)} \in \mathbb{R}^{512}$ (2 kB/atom, or overwrite `x` in host/device state as soon as Sweep 2 finishes with atom $i$ via the aliased state pool!) so Sweep 3 runs `symmetric_contraction_1` backward directly from $u_i^{(0)}$ without running Interaction 0's forward edge pass at all!
+3. Even better: once Proposal 1 & Proposal 7 are enabled inside the tiles (and `fused_forward` + `wprime_backward` are enabled in tiled mode, which §4.3 notes has not yet been measured in tiles!), Sweep 3 only needs to run `segmented_first_sum_backward` + `Y_backward` on the tile's edges—zero forward edge recomputation in Sweep 3!
+
+
+
+
+
+
+
+
+* **Exactness class:** **Exact** (stores/aliases the 512-float node input to `symmetric_contraction_1` instead of recomputing it from edges in Sweep 3).
+* **Estimated ceiling (1M / 150M atoms on RTX 4000 Ada):** **1.8 – 2.8 µs/atom/step** (~12–18 % speedup on the 15.3 µs/atom/step 1M path and 19.8 µs/atom 149M path, closing almost the entire gap between tiled 15.3 µs and whole-system 13.0 µs).
+
+
+* **Cheap falsifier (1 day):** Profile one tile of Sweep 1, Sweep 2, and Sweep 3 in `tools/bench/tiled_md.py`. Measure how much of Sweep 3 is spent recomputing Interaction 0's forward edge pass (`Y`, `radial_tables`, `segmented_first_sum` forward) plus enabling `wprime_backward` in Sweep 2. Stop rule: if removing Sweep 3's forward edge pass + enabling `wprime_backward` saves $< 1.0\text{ µs/atom/step}$, abort.
+
+
+* **Sources & differentiation:** Own derivation from the 3-sweep diagram in §4. Directly extends the "aliased host state" idea (§4.2) by observing that Interaction 0's reassociation makes the boundary between Interaction 0's edges and nodes purely a node tensor $u_i^{(0)}$.
+
+
+
+---
+
+#### Proposal 9 (Secondary Target – Capacity Path 1M): GPU-Resident Velocity-Verlet + Custom Pinned Arena for `state="host"`
+
+* **Mechanism:**
+* **Current state:** At 1M atoms (`tools/bench/tiled_md.py`), the integrator runs Velocity-Verlet **on the host** (`docs/validation/tiled-1m-speed.md:203`), and `state="host"` uses **pageable** host memory because PyTorch's caching allocator rounds pinned allocations up to powers of two (§4.2). Pageable host-to-device and device-to-host copies cannot use DMA directly—the CUDA driver must stage every tile's rows through an internal driver staging buffer on the CPU, burning CPU bandwidth and preventing true asynchronous overlap with tile compute!
+
+
+* **Change:**
+1. Allocate the host state pool using `cudaHostAlloc` (or a small C++/ctypes wrapper around `cudaMallocHost`) for the **exact** byte size (bypassing PyTorch's power-of-two rounding allocator completely!). This gives true zero-overhead DMA pinned memory with zero power-of-two waste.
+2. Move the 1M-atom positions, velocities, and forces (only $3 \times 1\text{M} \times 12\text{ B} = 36\text{ MB}$ total!) to stay permanently on the GPU with the GPU-resident Velocity-Verlet integrator, rather than running the host integrator in `tiled_md.py`.
+
+
+
+
+
+
+* **Exactness class:** **Exact** (bitwise identical).
+* **Estimated ceiling (1M atoms on RTX 4000 Ada):** **0.8 – 1.5 µs/atom/step** (~6–10 % of the 14.95 s step at 1M atoms).
+
+
+* **Cheap falsifier (half day):** Allocate the host state buffer via `cuda.cudart().cudaHostAlloc(nbytes, 0)` wrapped with `torch.from_dlpack` / `ctypes` in `fastmace/model/tiled.py` and run 5 steps of `tiled_md.py` at 1M atoms. Stop rule: if step time drops by $< 0.4\text{ s}$ (out of 14.9 s), abort.
+
+
+* **Sources & differentiation:** Own diagnosis from §4.2 ("a third of it was PyTorch's pinned-memory rounding" $\to$ switched to pageable). Bypassing PyTorch's rounding via direct `cudaHostAlloc` restores full PCIe DMA throughput without the memory bloat.
+
+
+
+---
+
+### Summary Table of Proposals (A100-SXM4 Primary Target Ranked First)
+
+| Rank | Proposal | Target Component | Exactness | Est. Ceiling (A100) |
+| --- | --- | --- | --- | --- |
+| **1** | Fuse $Y_{ij}$ Jacobian ($\nabla Y_{ij} \to \nabla \vec{r}_{ij}$) & edge forces into `wprime_backward` | `wprime_backward` + Inductor + `table_bwd` | Rounding | 0.75 – 1.15 ms |
+| **2** | Fuse Interaction 1 Chebyshev Table + Sobek 6-term basis into `segmented_first_sum` | `radial_tables` + `segmented_first_sum` | Rounding | 0.45 – 0.65 ms |
+| **3** | Fold `linear_2` across Interaction 1$\to$2 & commute density division across `linear_1` | Atom GEMMs + Inductor elementwise | Rounding | 0.50 – 0.85 ms |
+| **4** | Reassociate $\sum_c dw_c w'_c(x) = \sum_{p=1}^5 T'_p(x) \sum_c dw_c C_{p,c}$ inside `wprime_backward` | `wprime_backward` (4.37 ms) | Rounding | 0.40 – 0.80 ms |
+| **5** | Undirected half-graph pairing ($e_{ij}, e_{ji}$) for radial tables ($E/2$ evaluation) | `radial_tables` + `fused_forward` L2 | Exact | 0.45 – 0.65 ms |
+| **6** | `cp.async` 2-stage smem pipeline + 30 MB A100 L2 persisting window on $x, \nabla x, g$ | `fused_forward` + `wprime_backward` | Exact | 0.40 – 0.75 ms |
+| **7** | Coalesce $\nabla x_j$ across paths before `atomicAdd` in `wprime_backward` | `wprime_backward` (4.37 ms) | Rounding | 0.35 – 0.70 ms |
+| **8** | *(Capacity)* Eliminate Sweep 3 forward edge recomputation + enable `wprime_backward` in tiles | Tiled & Wavefront (1M–150M) | Exact | 1.8 – 2.8 µs/atom |
+| **9** | *(Capacity)* Exact-size `cudaHostAlloc` pinned pool + GPU Velocity-Verlet at 1M | Tiled 1M (`tiled_md.py`) | Exact | 0.8 – 1.5 µs/atom |
+
+*(Note: Proposals 2 and 7 are inverted in the table vs. text numbering so the top 4 proposals in the table are the highest-confidence, lowest-risk single-day falsifiers on the A100 whole-system path: Proposals 1, 7, 3, and 4 sum to an estimated **2.1 – 3.4 ms** reduction out of the 13.70 ms force call, targeting **~2.1–2.3 µs/atom/step** on Benchmark_loup.)*
