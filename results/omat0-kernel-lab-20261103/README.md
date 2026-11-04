@@ -434,3 +434,26 @@ Langevin 6.255 / 6.267 (6.604 / 6.592): 5.0 % and 5.2 % faster.
 the per-edge product `da = dw W` of Benchmark_loup's shape (373,760 x 1,280 x 64) as one GEMM on the A100-SXM4-80GB,
 six Modal jobs: CUTLASS 3xTF32 2.27 ms (2.26-2.30), cuBLAS FP32 4.14 ms, cuBLAS TF32 1.27 ms (one pass, too
 inexact). The slope it would replace costs 1.81 ms, so even the ideal standalone product loses. Not built.
+
+## 16. w and its slope from one table slab (`wprime_backward.TABLE_W`, 4 November 2026)
+
+The A100 profile (section 12) left no lever in its 44 CUTLASS GEMMs (smaller tiles already rejected), so the w
+store came back: the fused forward writes w (1.9 GB per call) only for the wprime backward, and the kernel lab's
+falsifiers put 13-22 % of the forward (F-no-store) and 9-17 % of the backward (F-no-wload) on it. With `TABLE_W` the
+backward evaluates w and its slope from one slab of the value table G = C [W, b]^T (q-major, float2 loads,
+`value_table`), and the forward runs its message-only kernel.
+
+| | RTX 5060 Ti | RTX 4000 Ada | A100-SXM4-80GB |
+|---|---|---|---|
+| lab: wprime B-gslab-f2 (bound) | 0.744 | - | 0.884 |
+| lab: wprime B-gslab (term-major scalar loads) | 1.047-1.055 | - | - |
+| lab: wprime F-no-wload | 0.830-0.840 | - | 0.883 |
+| lab: forward F-no-store | 0.781 | (0.821 at dz5, section 6) | 0.971 |
+| MD step b/a, ab / ba, 8 blocks | 0.8881 / 0.8917 | 0.9277 / 0.9314 | 0.9433 / 0.9426 |
+| step a -> b | 32.9 -> 29.2 ms | 33.7 -> 31.3 ms | 15.36 -> 14.49 ms |
+
+Checks: the GPU test (both RTX GPUs): message and density bitwise, dr 3.2e-7 of the float64 reference, dx and dsh
+2-4e-7 of the stored-w path, CUDA graph. Force gate on the RTX 5060 Ti (`gate-rtx5060ti-tablew/table.txt`): OMAT-0
+medium and MH-1 pass with the default's errors. Merge-tier CPU suite on leto: 5,110 passed, 202 skipped. Switch off
+by default; a per-GPU default awaits the owner. Files: `rtx5060ti-tablew-lab/`, `rtx5060ti-tablew-ab/`,
+`rtx4000ada-tablew/`, `a100-sxm4-tablew/` (Modal, 442684b6), `gate-rtx5060ti-tablew/`.
