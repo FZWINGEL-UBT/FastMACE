@@ -221,9 +221,10 @@ def forward_variants():
                                                     "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
                                                     "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
-        # Cheaper splits (accuracy checked by the GPU test once adopted): the high part by masking the low 13 mantissa
-        # bits (truncation), the low part the exact remainder, rounded to TF32 (mask-rna) or passed raw (mask: the
-        # tensor core reads its top 19 bits).
+        # Cheaper splits than rounding both parts; they need the rounded split in the capture
+        # (--constant ...fused_forward:TC_SPLIT="'rna'"; "mask" is fused_forward.TC_SPLIT's default):
+        # the high part by masking the low 13 mantissa bits (truncation), the low part the exact remainder, rounded to
+        # TF32 (mask-rna) or passed raw (mask: the tensor core reads its top 19 bits).
         "tc-mask-rna": ("falsifier", lambda s: _sub(s, TC_SPLIT_RNA_HI, TC_SPLIT_MASK_HI), ()),
         "tc-mask": ("falsifier", lambda s: _sub(_sub(s, TC_SPLIT_RNA_HI, TC_SPLIT_MASK_HI), TC_SPLIT_RNA_LO,
                                                 TC_SPLIT_RAW_LO), ()),

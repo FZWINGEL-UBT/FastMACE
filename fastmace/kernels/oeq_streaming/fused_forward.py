@@ -81,11 +81,32 @@ def _kpad(k):
     return -(-int(k) // 8) * 8
 
 
-TC_HELPERS = """// 3xTF32: x = hi + lo, both TF32 (round to nearest); a product keeps hi*hi + hi*lo + lo*hi.
-__device__ __forceinline__ void split_tf32(float x, unsigned& hi, unsigned& lo) {
-    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(hi) : "f"(x));
+# How the tensor-core product splits x into TF32 high and low parts. "round": both parts rounded to nearest by an
+# integer add and mask (ties away from zero), as accurate as "rna" (cvt.rna.tf32, ties away too; the same errors in
+# the GPU test). "mask": the high part truncated (low 13 mantissa bits masked off), the low part the exact remainder
+# passed as it is (the tensor core truncates it): 19 instead of 7.6 units of 2^-24 of the row scale at k = 9 on the
+# RTX 5060 Ti. A100-SXM4-80GB kernel lab (4 November 2026): the fused forward 3.67 ms with "mask", 4.20 with the
+# high part masked and the low part rounded by cvt.rna, 5.13 with "rna", 4.89 for the FP32-SIMT product.
+TC_SPLIT = "round"
+_TC_SPLITS = {
+    "mask": """    hi = __float_as_uint(x) & 0xffffe000u;
+    lo = __float_as_uint(x - __uint_as_float(hi));""",
+    "round": """    hi = (__float_as_uint(x) + 0x1000u) & 0xffffe000u;
+    lo = (__float_as_uint(x - __uint_as_float(hi)) + 0x1000u) & 0xffffe000u;""",
+    "rna": """    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(hi) : "f"(x));
     const float rest = x - __uint_as_float(hi);
-    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(lo) : "f"(rest));
+    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(lo) : "f"(rest));""",
+}
+
+
+def tc_helpers():
+    """The tensor-core kernels' device helpers: ``split_tf32`` (``TC_SPLIT``) and ``mma_tf32``."""
+    return TC_HELPERS.replace("    // split\n", _TC_SPLITS[TC_SPLIT] + "\n")
+
+
+TC_HELPERS = """// 3xTF32: x = hi + lo, both TF32 (TC_SPLIT); a product keeps hi*hi + hi*lo + lo*hi.
+__device__ __forceinline__ void split_tf32(float x, unsigned& hi, unsigned& lo) {
+    // split
 }
 __device__ __forceinline__ void mma_tf32(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {
     asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, "
@@ -280,7 +301,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     npp = max(len(p) for p in parts)
     cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc)}    }} break;"
                       for q, part in enumerate(parts))
-    helpers = TC_HELPERS if tc else ""
+    helpers = tc_helpers() if tc else ""
     ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
     a_offset = f"{slice_floats(npp, ka, tc)} + warp * {staging_floats(ka, schedule.edge_dim, tc, npp)}"
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.

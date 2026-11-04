@@ -28,7 +28,7 @@ from fastmace.kernels.oeq_streaming.fused_forward import (
     BATCH,
     CHANNEL_BLOCK,
     MAX_WARPS,
-    TC_HELPERS,
+    tc_helpers,
     TC_RSTRIDE,
     TC_STRIDE,
     LaunchRule,
@@ -110,7 +110,7 @@ constexpr int B = {batch};
 constexpr int CHUNK = {EDGE_CHUNK};
 constexpr int TERMS = {int(terms)};
 constexpr unsigned FULL = 0xffffffffu;
-{TC_HELPERS if tc else ""}
+{tc_helpers() if tc else ""}
 extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) wrebuild_backward(
     int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
     const float* __restrict__ x, const float* __restrict__ sh, const int* __restrict__ senders,

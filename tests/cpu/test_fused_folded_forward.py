@@ -109,7 +109,13 @@ def test_tensor_cores_render_and_launch_rule(monkeypatch):
             ff.staging_floats(64, 16, True, -(-10 // rule.parts)))
     rule = ff.launch_rule(2, 65, 4, 64, tc=True, **SM80)
     source = ff.render(_schedule(), 65, rule, tc=True)
-    assert "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32" in source and "cvt.rna.tf32.f32" in source
+    assert "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32" in source
+    assert ff.TC_SPLIT == "round"
+    assert "lo = (__float_as_uint(x - __uint_as_float(hi)) + 0x1000u) & 0xffffe000u;" in source
+    for split, line in (("rna", "cvt.rna.tf32.f32"), ("mask", "hi = __float_as_uint(x) & 0xffffe000u;")):
+        monkeypatch.setattr(ff, "TC_SPLIT", split)
+        assert line in ff.render(_schedule(), 65, rule, tc=True)
+    monkeypatch.setattr(ff, "TC_SPLIT", "round")
     assert "constexpr int KP = 72;" in source and f"constexpr int WS = {ff.TC_STRIDE};" in source
     assert "a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * KA + k] : 0.f;" in source
     skipped = ff.render(_schedule(), 65, ff.launch_rule(2, 64, 4, 64, tc=True, **SM80), used=64, tc=True)
