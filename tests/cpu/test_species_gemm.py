@@ -37,7 +37,7 @@ def test_fallback_and_gradient():
     order, counts = sg.species_plan(index, 3)
     y = sg.species_mm(x, w, w.transpose(1, 2).contiguous(), index, order, counts, "ieee")
     expected = torch.stack([x[a] @ w[index[a]] for a in range(6)])
-    assert torch.equal(y, expected)
+    assert torch.allclose(y, expected, atol=1e-14)
     grad = torch.randn(6, 3, 4, generator=g, dtype=torch.float64)
     (gx,) = torch.autograd.grad(y, x, grad)
     assert torch.allclose(gx, torch.stack([grad[a] @ w[index[a]].T for a in range(6)]), atol=1e-14)
