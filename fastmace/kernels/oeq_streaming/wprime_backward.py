@@ -69,6 +69,12 @@ BLOCK_MESSAGE = None
 # Benchmark_loup MD step b/a (a = the default with TABLE_W) in both orders: RTX 4000 Ada 0.974 / 0.971,
 # A100-SXM4-80GB 0.983 / 0.977 (every A100 model, GPUModels); the RTX 5060 Ti measured 1.060 and keeps it off.
 BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# The tensor product's backward factored per path (OMAT-0 TP backward screen, 4 November 2026). False: per
+# Clebsch-Gordan term the vendored three updates (weight, input and edge gradient; about 7 floating-point operations).
+# True: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i (3 operations per term), then the weight gradient
+# sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j. Rounding (the same sums regrouped); every wprime kernel built while
+# it is set. A module constant for the A/B (kernel lab on the RTX 4000 Ada: 0.903 of the TABLE_W wprime kernel).
+FACTORED = False
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -246,9 +252,11 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     {%- if factored %}
                     {%- for term in output.terms %} {
                         const scalar_t input_value =
-                            x[input_base + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }}];
+                            x[input_base
+                              + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }}];
                         const scalar_t edge_value =
-                            sh[edge_base + {{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];
+                            sh[edge_base
+                               + {{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];
                         {%- if term.coefficient == 1.0 %}
                         const scalar_t scaled = output_gradient;
                         {%- else %}
@@ -281,11 +289,13 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 } {%- endfor %}
                 {%- if factored %}
                 {%- for i, slot in factored[path_index].inputs.items() %}
-                weight_gradient += x[input_base + {{ node_offset(path.input_start, i, path.input_irrep_dim) }}] * u_{{ i }};
+                weight_gradient +=
+                    x[input_base + {{ node_offset(path.input_start, i, path.input_irrep_dim) }}] * u_{{ i }};
                 {{ slot }} += radial_weight * u_{{ i }};
                 {%- endfor %}
                 {%- for j in factored[path_index].edges %}
-                edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] += radial_weight * v_{{ j }};
+                edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] +=
+                    radial_weight * v_{{ j }};
                 {%- endfor %}
                 {%- endif %}
                 if (sloped) {
@@ -462,7 +472,7 @@ class WPrimeBackward:
     (``StreamingKernels``) and a derivative table of ``terms`` terms (``vector``: its q-major layout's load width,
     ``SLOPE_VECTOR``)."""
 
-    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None):
+    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -475,8 +485,9 @@ class WPrimeBackward:
         self.table_w = bool(table_w)
         self.blocks = blocks
         self.schedule = kernels.schedule
+        self.factored = FACTORED if factored is None else bool(factored)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
-                             blocks=blocks)
+                             blocks=blocks, factored=self.factored)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -853,9 +864,10 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
+__all__ = ["BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
            "block_message_default", "block_spec", "dense_message",
-           "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
+           "density_backward", "density_column", "derivative_table", "factored_paths", "padded_terms",
+           "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
            "wprime_reference"]
