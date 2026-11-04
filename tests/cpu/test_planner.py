@@ -1092,7 +1092,8 @@ def test_decision_66_generic_wprime_and_fused_forward_for_omat0():
     p = plan(GPU, label="mp0-medium")
     assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) == ("off", "off")
     assert dict(p.auto_options_off)["wprime_backward"] == "not a measured model, decision 66 (label mp0-medium)"
-    for configs in ({"precision": PrecisionConfig(dtype="float64")}, {"rewrites": RewriteConfig(wprime_backward="off")}):
+    for configs in ({"precision": PrecisionConfig(dtype="float64")},
+                    {"rewrites": RewriteConfig(wprime_backward="off")}):
         p = plan(a100_80, **configs)
         assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward, p.rewrites.chunked_conv_backward) == \
             ("off", "off", "off"), configs

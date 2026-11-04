@@ -70,7 +70,8 @@ AUTO_RULES = {
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
-    "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus",
+    "RewriteConfig.fused_folded_forward": ("on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_"
+                                           "decision_66_gpus"),
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.wprime_backward": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
