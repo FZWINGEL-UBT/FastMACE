@@ -496,6 +496,7 @@ backward reassembled the gradient. With `BLOCK_MESSAGE` the message-only forward
 
 Force gate (RTX 5060 Ti, `gate-rtx5060ti-block/`): passes, errors as the default's. Breakdown (RTX 5060 Ti,
 `rtx5060ti-block-breakdown/`): the copies are gone, but the block wprime kernel takes 10.3 ms against 7.6 ms (80
-registers both); without `__restrict__` on the gradient pointers the step is the same (1.059). Not adopted; a default
-on the Ada and the A100s alone awaits the owner. The owner stopped OMAT-0 work after this round.
+registers both); without `__restrict__` on the gradient pointers the step is the same (1.059). Default on the RTX
+4000 Ada and every A100 (owner, 4 November 2026: "Yes, Ada and A100"; `BLOCK_MESSAGE_GPUS`), off on the RTX 5060 Ti.
+The owner stopped OMAT-0 work after this round.
 

@@ -7,9 +7,9 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 ## [Unreleased]
 
 ### Added
-- `wprime_backward.BLOCK_MESSAGE` (off; A/B switch): the conv message in linear_1's block layout, no relayout
-  copies. Benchmark_loup step 1.060 (RTX 5060 Ti, slower), 0.974 / 0.971 (RTX 4000 Ada), 0.983 / 0.977
-  (A100-SXM4).
+- `wprime_backward.BLOCK_MESSAGE`: the conv message in linear_1's block layout, no relayout copies. Default on the
+  RTX 4000 Ada and every A100 (owner, 4 November 2026). Benchmark_loup step 0.974 / 0.971 (RTX 4000 Ada), 0.983 /
+  0.977 (A100-SXM4); the RTX 5060 Ti (1.060, slower) keeps it off.
 - `wprime_backward.TABLE_W`: the wprime backward evaluates w and its slope from one q-major
   value-table slab, so the fused forward stores no w (1.9 GB on Benchmark_loup). Benchmark_loup step 0.888 /
   0.892 (RTX 5060 Ti), 0.928 / 0.931 (RTX 4000 Ada), 0.943 / 0.943 (A100-SXM4); force gates pass. Default on for
