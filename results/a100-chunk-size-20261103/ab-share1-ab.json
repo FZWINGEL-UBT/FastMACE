@@ -1,0 +1,203 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-03T16:44:31.963132+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "5c6cf6a1daa2d8aa82a3dffcea86e7e5b23dee28",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {
+      "radial_tables": "on",
+      "chunked_conv_backward": "off"
+    },
+    "b": {
+      "radial_tables": "on",
+      "chunked_conv_backward": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.kernels.oeq_streaming.runtime:CHUNK_L2_SHARE": 1.0
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 22.76169206750012,
+            "mean_ms": 22.709471178125042,
+            "min_ms": 22.32994245499981,
+            "max_ms": 22.7941400200001,
+            "stdev_ms": 0.15420023542008607,
+            "spread": 0.020393807438555362,
+            "block_ms": [
+              22.75854996000021,
+              22.742733795000163,
+              22.745434445000114,
+              22.32994245499981,
+              22.764834175000033,
+              22.7941400200001,
+              22.77287801,
+              22.76725656499991
+            ]
+          },
+          "b": {
+            "median_ms": 23.134855490000064,
+            "mean_ms": 23.089789733750052,
+            "min_ms": 22.714864929999976,
+            "max_ms": 23.201769504999845,
+            "stdev_ms": 0.15414030661623676,
+            "spread": 0.021046363363295326,
+            "block_ms": [
+              23.104471605000185,
+              23.124653675000104,
+              23.127451215000008,
+              22.714864929999976,
+              23.14225976500012,
+              23.201769504999845,
+              23.153233875000012,
+              23.14961330000017
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0163943621323634,
+        "pair_ratios_b_over_a": [
+          1.015199634669518,
+          1.0167930506263017,
+          1.0167953164809242,
+          1.0172379519461763,
+          1.0165793252478232,
+          1.0178830824344363,
+          1.0167021429980432,
+          1.0167941505779865
+        ]
+      },
+      "ratio_b_over_a": 1.0163943621323634,
+      "pair_ratios": [
+        1.015199634669518,
+        1.0167930506263017,
+        1.0167953164809242,
+        1.0172379519461763,
+        1.0165793252478232,
+        1.0178830824344363,
+        1.0167021429980432,
+        1.0167941505779865
+      ],
+      "setup_s": {
+        "a": 28.991591441000025,
+        "b": 23.311813109000013
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.chunked_conv_backward = off  (requested 'off': stage 1: off)",
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables (explicit))"
+        ],
+        "b": [
+          "RewriteConfig.chunked_conv_backward = on  (requested 'on': stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)))",
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables (explicit))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 298.05096947439955,
+          "potential_eV_atom": -7.952189730664638,
+          "kinetic_eV_atom": 0.03852605491933117
+        },
+        "b": {
+          "temperature_K": 298.0510913846253,
+          "potential_eV_atom": -7.952189748355301,
+          "kinetic_eV_atom": 0.03852607067744147
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        },
+        "b": {
+          "rebuilds": 113,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 113
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
