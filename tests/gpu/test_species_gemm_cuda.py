@@ -1,7 +1,7 @@
 """fastmace.kernels.triton.species_gemm on CUDA: ``species_mm`` against float64 within float32 rounding of the row
 scale |x| |w| (ieee) and the 3xTF32 bound (tf32x3: Triton and ``TENSOR_CORES``), its input gradient, strided inputs,
-a species without atoms, atoms changing species under one captured CUDA graph, and ``SpeciesSkip`` with ``SPECIES_GEMM`` bitwise or within
-rounding of the concatenated product."""
+a species without atoms, atoms changing species under one captured CUDA graph, and ``SpeciesSkip`` with
+``SPECIES_GEMM`` bitwise or within rounding of the concatenated product."""
 
 import pytest
 import torch
