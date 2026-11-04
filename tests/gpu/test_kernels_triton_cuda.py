@@ -134,6 +134,30 @@ def test_strided_rows_are_read_in_place_and_give_the_contiguous_results():
                                eos.edge_outer_sum(copy, y, keys, slots, segmented=True), rtol=1e-6, atol=1e-5)
 
 
+@pytest.mark.parametrize("segmented", [False, True])
+def test_inner_layout_is_the_plain_layout_transposed(segmented):
+    """inner=I (the reassociation's layout): the plain sums and gradients, the I slots of each group moved
+    inside the D axis. The sums are atomic on both sides and grad_y's sum over K is compiled in another order
+    (both to rounding); grad_a is bit for bit."""
+    inner = 4
+    a, y, key, grad, slots = outer_sum_inputs("cuda", torch.float32, edges=5000, slots=800)
+    key = torch.sort(key).values
+    d, k = y.shape[1], a.shape[1]
+
+    def moved(t):  # [slots, D * K] plain -> inner layout
+        return t.view(-1, inner, d, k).transpose(1, 2).reshape(t.shape)
+
+    results = []
+    for layout, upstream in ((1, grad), (inner, moved(grad))):
+        a_, y_ = a.clone().requires_grad_(), y.clone().requires_grad_()
+        out = eos.edge_outer_sum(a_, y_, key, slots, segmented=segmented, inner=layout)
+        out.backward(upstream)
+        results.append((out.detach() if layout == inner else moved(out.detach()), a_.grad, y_.grad))
+    torch.testing.assert_close(results[0][0], results[1][0], rtol=1e-6, atol=1e-5)
+    assert_equal(results[0][1], results[1][1])
+    torch.testing.assert_close(results[0][2], results[1][2], rtol=1e-6, atol=1e-5)
+
+
 # --------------------------------------------------------------------------- folded_linear
 
 
