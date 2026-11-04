@@ -191,3 +191,18 @@ At degree 5 the slope is no longer the limit of wprime (4 % of it); the w load (
 backward are. The fused forward on the Ada is bound by its 1.9 GB w store (18 %); its product and tensor product
 overlap. Neither kernel has a cheap lever left on the Ada; the A100 forward is bound by its FP32 product instead
 (section 4), which only tensor cores with larger edge batches could move.
+
+## 7. MH-1 with degree-5 tables (RTX 4000 Ada)
+
+The check a global `radial.DEGREE` change needs: MH-1 (`mh1-r2scan`, default plan) with degree 5 against degree 10,
+same-process MD step A/B, 1 fs, 8 blocks of 300 steps, both build orders (0130eca2, leto with the idle check;
+`screens/rtx4000ada-mh1-deg5/`):
+
+| Crystal | ab | ba |
+|---|---|---|
+| NaCl | 0.978 | 0.978 |
+| NaNbO3 | 1.006 | 0.998 |
+| NbCl5 | 1.001 | 0.999 |
+
+Degree 5 is neutral on MH-1 (NaCl −2 %); the planner certifies every table at any degree (certificate at most 1),
+so the accuracy rule is unchanged.
