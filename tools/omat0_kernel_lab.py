@@ -122,7 +122,28 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
             return args
         return transform
 
+    def edge_order(key):
+        """An argument transform: every per-edge input permuted by ``key(r, pair)`` (stable sort). The outputs come
+        out in that order too, so this is a timing bound, not an exact variant."""
+        def transform(args):
+            import torch
+            args = list(args)
+            sh, r, pair = args[1], args[8], args[9]
+            edges = sh.shape[0]
+            order = torch.sort(key(r, pair), stable=True).indices
+            for i in (1, 2, 3, 4, 7, 8, 9, 17):  # sh, weights, senders, receivers, dsh, r, pair, dr
+                t = args[i]
+                if t.dim() >= 1 and t.shape[0] == edges:
+                    args[i] = t.index_select(0, order).contiguous()
+                elif t.dim() == 1 and t.numel() % edges == 0:
+                    args[i] = t.view(edges, -1).index_select(0, order).flatten().contiguous()
+            return args
+        return transform
+
+    by_piece = edge_order(lambda r, pair: pair.double() * 1e3 + r.double())  # within a pair, r orders the pieces
+
     return {
+        "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
         "base": ("exact", lambda s: s, ()),
         "qmajor-f2": ("exact", lambda s: qmajor(s, 2), (), qmajor_args(2)),
         "qmajor-f4": ("exact", lambda s: qmajor(s, 4), (), qmajor_args(4)),

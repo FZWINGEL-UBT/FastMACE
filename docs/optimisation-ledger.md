@@ -590,6 +590,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-species-gemm](#omat0-species-gemm) | Species skip as one grouped GEMM: each atom's rows through its own species' matrix only (Triton, fixed grid) | `generic.modules.SPECIES_GEMM`, `SPECIES_GEMM_GPUS` | FM | DEFAULT | owner 2026-11-04 (RTX 5060 Ti, RTX 4000 Ada; decision 66) | step RTX 4000 Ada 0.955 / 0.952, RTX 5060 Ti 0.950 / 0.953, A100-SXM4 0.992 / 0.991 (off there); gate passes (5060 Ti); Ada default vs forced off 1.051 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-species-gemm-tc](#omat0-species-gemm-tc) | The species GEMM in our own mma.sync 3xTF32 kernel (for the A100) | `species_gemm.TENSOR_CORES`, `TC_CHUNK`, `TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | kernel lab vs Triton: A100 0.94 (16p), Ada 0.91, 5060 Ti 0.86; step A100-SXM4 1.003 / 1.002 vs default (Triton species GEMM 0.992), Ada 1.001 / 0.999 vs Triton species GEMM | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-species-gemm-cutlass](#omat0-species-gemm-cutlass) | The species GEMM as one gathered CUTLASS 3xTF32 launch (A100) | `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 0.9928 / 0.9922 vs default (Triton species GEMM 0.992); lab size 16 CUTLASS 678 us vs Triton 597, bound 207 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-wprime-piece-order](#omat0-wprime-piece-order) | wprime backward over edges sorted by (pair, r), so edges of one derivative-table slab run together | none (lab bound `B-piece-sorted`) | FM | REJECTED | 2026-11-04 | lab wprime 1.513 (RTX 5060 Ti; slope alone 0.757) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-first-table-columns](#omat0-first-table-columns) | First interaction's radial table stores only the columns it uses | `generic.modules.FIRST_TABLE_COLUMNS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.002 / 0.999, RTX 5060 Ti 1.002; bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 
 <a id="omat0-tc-presplit"></a>
@@ -634,6 +635,17 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 - Measured: A100-SXM4-80GB (Modal, 80609d27): GPU tests 17 passed; species skip lab (eager, forward + input backward) size 16: current 944 us, Triton 597, CUTLASS 678, bound 207; size 1: 249, 368, 671, 189 (the index arrays are a few small kernels per call). MD step default vs SPECIES_GEMM + CUTLASS 0.9928 / 0.9922, the same as the Triton species GEMM (0.992). RTX 4000 Ada (sm_89 runs the sm_80 cubin): tests pass, lab size 16 932 vs Triton 936 us.
 - Why: in the captured, compiled MD step the A100's concatenated CUTLASS product is cheap (3xTF32 at about 40 TFLOPS: roughly 0.4 ms per step for forward and backward of both interactions, so a third of it saves about 0.27 ms, 1.8 % of 15.3 ms); the grouped versions recover most of that and lose the rest to the per-call row ordering and indices. The A100 skip has no more than about 1-2 % left.
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/modal/species_gemm_cutlass_a100.sh`.
+
+<a id="omat0-wprime-piece-order"></a>
+#### omat0-wprime-piece-order: the wprime backward over edges grouped by table slab
+- Switch: none; `tools/omat0_kernel_lab.py` bound variant `B-piece-sorted` (every per-edge input permuted by pair, then r)
+- Engine: FM
+- Date/round: 4 November 2026 (A100 edge kernels: wprime is 5.2 of 14.9 ms; its slope gathers a 25.6 KB G' slab per edge from a 206 MB table)
+- What: if edges sharing a (pair, piece) slab ran together, each slab would be read about once per step instead of about 40 times. The bound times the unchanged kernel on permuted inputs, the sort not counted.
+- Status: REJECTED.
+- Measured: RTX 5060 Ti (local), the captured Benchmark_loup call: base 8.30 ms, piece-sorted 12.55 ms (1.513), no slope 6.28 ms (0.757).
+- Why: the kernel streams edges in receiver order; sorted by slab, the receivers' output gradients and the sender atomics lose their locality, which costs far more than the whole slope.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `rtx5060ti-wprime-piece/`.
 
 <a id="omat0-first-table-columns"></a>
 #### omat0-first-table-columns: only the used columns of the first radial table

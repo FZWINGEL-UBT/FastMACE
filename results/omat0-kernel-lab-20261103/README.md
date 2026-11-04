@@ -420,3 +420,12 @@ In the compiled step the concatenated CUTLASS product costs only about 0.4 ms pe
 about 1.8 % at best; the grouped kernels keep most of that and lose the rest to the per-call row order and indices.
 Rejected; the A100 keeps the concatenated product. RTX 4000 Ada (`rtx4000ada-species-gemm-cutlass/`, sm_80 cubin on
 sm_89): tests pass, lab 932 vs 936 us.
+
+**wprime over edges grouped by table slab** (bound `B-piece-sorted` in `tools/omat0_kernel_lab.py`: every per-edge
+input permuted by pair, then r, so that edges of one G' slab run together; sort not timed). RTX 5060 Ti
+(`rtx5060ti-wprime-piece/`): base 8.30 ms, piece-sorted 12.55 ms (1.513), no slope 6.28 ms (0.757). Losing the
+receiver order costs more than the whole slope. Rejected.
+
+**Benchmark_loup on the RTX 4000 Ada with the species GEMM default** (leto, `tools/bench/loup_md.py`, two rounds,
+alternating, `rtx4000ada-loup-20261104/`): NVE 6.334 / 6.351 us/atom/step (with `SPECIES_GEMM=False` 6.668 / 6.675),
+Langevin 6.255 / 6.267 (6.604 / 6.592): 5.0 % and 5.2 % faster.

@@ -1,0 +1,40 @@
+{
+ "tool": "loup_md",
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "atoms": 5000,
+ "ensemble": "langevin",
+ "skin": 0.5,
+ "warmup": 5,
+ "steps": 20,
+ "blocks": 1,
+ "requested": {},
+ "constants": {},
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "fastmace": "1.0.0",
+ "setup_s": 24.21219975303393,
+ "block_s": [
+  0.6254681430291384
+ ],
+ "us_per_atom_step": [
+  6.2546814302913845
+ ],
+ "median_us_per_atom_step": 6.2546814302913845,
+ "ms_per_step": 31.27340715145692,
+ "rewrites_on": [
+  "block_linear",
+  "chunked_conv_backward",
+  "fused_folded_backward",
+  "fused_folded_forward",
+  "grouped_launch",
+  "grouped_linear",
+  "merged_residual",
+  "radial_tables",
+  "reassociate_first",
+  "segmented_first_sum",
+  "single_graph_strain",
+  "species_skip",
+  "streaming_conv",
+  "wprime_backward"
+ ],
+ "max_memory_allocated_mib": 2650.6611328125
+}
