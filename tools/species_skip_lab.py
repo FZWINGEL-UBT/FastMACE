@@ -25,6 +25,8 @@ import json
 from pathlib import Path
 
 import fastmace  # noqa: F401  (before torch: soft file locks)
+
+# isort: split
 import torch
 
 COUNTS = (1000, 1000, 3000)
