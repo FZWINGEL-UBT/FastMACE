@@ -183,12 +183,13 @@ def _table_module(tables, columns, device, single=False):
                 s, t = torch.minimum(s, t), torch.maximum(s, t)
             return s * self.species + t
 
-        def forward(self, lengths, node_attrs, edge_index, density=True):
-            """``density=False`` (a residual block): the density ``[E, 0]``, not evaluated."""
+        def forward(self, lengths, node_attrs, edge_index, density=True, columns=-1):
+            """``density=False`` (a residual block): the density ``[E, 0]``, not evaluated; ``columns`` >= 0: the
+            folded input's leading ``columns`` only."""
             from fastmace.kernels.triton.radial_table import radial_table
 
             return radial_table(lengths, self.pair(node_attrs, edge_index), self.coef, self.dcoef, self.starts,
-                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density)
+                                self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density, columns)
 
         def extra_repr(self):
             return (f"pairs={self.coef.shape[0]}{' (symmetric)' if self.symmetric else ''}, pieces={self.pieces} "

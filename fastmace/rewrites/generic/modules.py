@@ -62,6 +62,11 @@ def fc_split(network):
 # slice backward; the cutoff column only adds zero products. Exact to rounding (the per-path products' K grows by
 # one zero row per species slot). A module constant for the A/B (OMAT-0 A100 profile, 3 November 2026).
 FIRST_FULL_ROWS = False
+# The tabled first interaction's table evaluated for the reassociation's columns only (the folded input without its
+# cutoff column, which the reassociation drops): no [E, h c + 1] output sliced, and its backward reads the [E, h c]
+# gradient as it is, without the zero-padded copy (OMAT-0 A100 profile, 4 November 2026: 0.11 ms per force call).
+# Bitwise: the dropped column's gradient is zero. A module constant for the A/B.
+FIRST_TABLE_COLUMNS = False
 
 
 def _first_inputs(augmented, last):
@@ -69,6 +74,8 @@ def _first_inputs(augmented, last):
     weight = fc_last_weight(last)
     if FIRST_FULL_ROWS:
         return augmented, torch.nn.functional.pad(weight, (0, 1))
+    if augmented.shape[1] == weight.shape[-1]:  # FIRST_TABLE_COLUMNS: the table returned these columns only
+        return augmented, weight
     return augmented[:, :-1], weight
 
 
@@ -88,7 +95,8 @@ def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edg
     keeps the lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again (MH-1's
     ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
     backward rebuilds only the table."""
-    augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
+    columns = fc_last_weight(self.radial_last).shape[-1] if FIRST_TABLE_COLUMNS and not FIRST_FULL_ROWS else -1
+    augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index, columns=columns)
     rows, weight = _first_inputs(augmented, self.radial_last)
     message = self.first_reassociation(node_feats, node_attrs, edge_attrs, rows, edge_index, weight)
     return message, edge_density
