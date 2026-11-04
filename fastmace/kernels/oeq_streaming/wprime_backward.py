@@ -67,12 +67,15 @@ TABLE_W_VECTOR = 2
 # choice on every GPU.
 BLOCK_MESSAGE = None
 # Benchmark_loup MD step b/a (a = the default with TABLE_W) in both orders: RTX 4000 Ada 0.974 / 0.971,
-# A100-SXM4-80GB 0.983 / 0.977 (every A100 model, GPUModels); the RTX 5060 Ti measured 1.060 and keeps it off.
-BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
-# The block kernel's gradient reads through __ldg (read-only data, written before the launch). Plain loads through the
-# group pointers took 9.9 ms against 6.6 ms on the RTX 5060 Ti, whatever the tensors' placement (same layout and
-# registers; the kernel alone, Benchmark_loup, 4 November 2026). False: an A/B side.
-BLOCK_LDG = True
+# A100-SXM4-80GB 0.983 / 0.977 (every A100 model, GPUModels), RTX 5060 Ti 0.976 / 0.975 with BLOCK_LDG (1.060 without).
+BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                "NVIDIA A100-SXM4-80GB"))
+# The block kernel's gradient reads through __ldg (read-only data, written before the launch). The RTX 5060 Ti took
+# 9.9 ms with plain loads through the group pointers and 6.6 ms with __ldg, whatever the tensors' placement (the
+# kernel alone, Benchmark_loup, 4 November 2026); the RTX 4000 Ada gains nothing (MD step 1.004 / 1.001). None: on for
+# BLOCK_LDG_GPUS (decision 66); True / False: an A/B side's choice on every GPU.
+BLOCK_LDG = None
+BLOCK_LDG_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -315,7 +318,7 @@ def padded_terms(terms, vector):
     return -(-int(terms) // vector) * vector if vector else int(terms)
 
 
-def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None):
+def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -342,7 +345,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             slope_vector=vector, vector_type=f"float{vector}",
                                             padded_terms=padded_terms(terms, vector), table_w=bool(table_w),
                                             blocks=None if blocks is None else block_map(blocks, schedule.channels),
-                                            n_blocks=0 if blocks is None else len(blocks), block_ldg=BLOCK_LDG)
+                                            n_blocks=0 if blocks is None else len(blocks), block_ldg=block_ldg)
 
 
 def derivative_table(dcoef, weight, vector=0):
@@ -432,7 +435,7 @@ class WPrimeBackward:
         self.table_w = bool(table_w)
         self.blocks = blocks
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
-                             blocks=blocks)
+                             blocks=blocks, block_ldg=block_ldg_default(device))
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -697,6 +700,14 @@ def block_message_default(device):
     return device.type == "cuda" and torch.cuda.get_device_name(device) in BLOCK_MESSAGE_GPUS
 
 
+def block_ldg_default(device):
+    """``BLOCK_LDG`` on ``device``: the constant when set, else on for ``BLOCK_LDG_GPUS``."""
+    if BLOCK_LDG is not None:
+        return bool(BLOCK_LDG)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in BLOCK_LDG_GPUS
+
+
 def prepare_block_messages(model):
     """``WPrime.prepare_blocks`` in every interaction of ``model`` with ``wprime_backward`` (after the rewrites;
     a no-op where ``BLOCK_MESSAGE`` is off). Returns how many interactions write the block layout."""
@@ -809,7 +820,7 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_LDG", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
+__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
            "block_message_default", "block_spec", "dense_message",
            "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",

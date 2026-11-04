@@ -50,22 +50,28 @@ def test_table_w_default(monkeypatch):
 
 
 def test_block_message_default(monkeypatch):
-    """BLOCK_MESSAGE (owner, 4 November 2026: "Yes, Ada and A100"): on for the RTX 4000 Ada and every A100, off on the
-    RTX 5060 Ti (measured slower) and elsewhere; the constant overrides."""
+    """BLOCK_MESSAGE: on for the RTX 5060 Ti, the RTX 4000 Ada and every A100, off elsewhere; the constant overrides."""
     assert wprime_backward.BLOCK_MESSAGE is None
     assert "NVIDIA RTX 4000 Ada Generation" in wprime_backward.BLOCK_MESSAGE_GPUS
-    assert "NVIDIA GeForce RTX 5060 Ti" not in wprime_backward.BLOCK_MESSAGE_GPUS
+    assert "NVIDIA GeForce RTX 5060 Ti" in wprime_backward.BLOCK_MESSAGE_GPUS
     assert not wprime_backward.block_message_default(torch.device("cpu"))
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA A100 80GB PCIe")
     assert wprime_backward.block_message_default(torch.device("cuda", 0))
-    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA GeForce RTX 5060 Ti")
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX A4000")
     assert not wprime_backward.block_message_default(torch.device("cuda", 0))
     monkeypatch.setattr(wprime_backward, "BLOCK_MESSAGE", True)
     assert wprime_backward.block_message_default(torch.device("cuda", 0))
 
 
-def test_block_gradient_reads_use_ldg():
-    """Plain loads through the group pointers cost 47 % of the kernel on the RTX 5060 Ti (``BLOCK_LDG``)."""
-    assert wprime_backward.BLOCK_LDG is True
+def test_block_ldg_default(monkeypatch):
+    """BLOCK_LDG: only the RTX 5060 Ti, where plain loads through the group pointers cost 47 % of the kernel."""
+    assert wprime_backward.BLOCK_LDG is None
     assert "__ldg(dout{{ bk[0] }} + int64_t(receiver)" in wprime_backward.TEMPLATE
+    assert not wprime_backward.block_ldg_default(torch.device("cpu"))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA GeForce RTX 5060 Ti")
+    assert wprime_backward.block_ldg_default(torch.device("cuda", 0))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
+    assert not wprime_backward.block_ldg_default(torch.device("cuda", 0))
+    monkeypatch.setattr(wprime_backward, "BLOCK_LDG", True)
+    assert wprime_backward.block_ldg_default(torch.device("cuda", 0))
 
