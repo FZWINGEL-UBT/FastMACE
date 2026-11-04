@@ -169,3 +169,25 @@ chains of 2.2–3.4e-7, the message bitwise) but the MD step on top of degree 5 
 (`presplit-5060`, one order): the doubled slice halves the warps per block. Each W fragment serves one mma triple
 of 8 edges, so the tensor-core product needs twice the shared loads of the FP32 path either way; a version that
 pays would need larger edge batches per warp. Reverted; `TENSOR_CORES` stays off and rejected.
+
+## 6. Kernel lab at dz5 (RTX 4000 Ada)
+
+`tools/omat0_kernel_lab.py --constant fastmace.rewrites.radial:DEGREE=5 fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN=True`
+(0130eca2, leto with the idle check; `rtx4000ada-dz5/`), without the q-major variants (they assume an even term count).
+Base wprime 7.94 ms, fused forward 7.80 ms (167 registers, 40 bytes of local memory). Ratios to the base:
+
+| Kernel | Variant | Ratio | Check |
+|---|---|---|---|
+| wprime | ldcs-w | 0.982 | dsh, dr bitwise |
+| wprime | unordered | 0.993 | dsh, dr bitwise |
+| wprime | maxreg80 | 1.034 | dsh, dr bitwise |
+| wprime | F-no-slope / F-half-terms | 0.956 / 1.065 | falsifiers |
+| wprime | F-no-atomics / F-no-wload | 0.967 / 0.901 | falsifiers |
+| forward | stcs | 0.999 | out, w bitwise |
+| forward | F-no-store / F-no-gemm / F-no-tp | 0.821 / 0.988 / 0.994 | falsifiers |
+| forward | F-gemm-only | 0.183 | falsifier |
+
+At degree 5 the slope is no longer the limit of wprime (4 % of it); the w load (10 %) and the tensor-product
+backward are. The fused forward on the Ada is bound by its 1.9 GB w store (18 %); its product and tensor product
+overlap. Neither kernel has a cheap lever left on the Ada; the A100 forward is bound by its FP32 product instead
+(section 4), which only tensor cores with larger edge batches could move.
