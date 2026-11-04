@@ -29,7 +29,7 @@ def test_a100_defaults_cover_every_model():
     for models in (fixed.DECISION_66_WPRIME_GPUS, fixed.DECISION_66_TF32X3_GPUS,
                    fixed.DECISION_66_GENERIC_WPRIME_GPUS, fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS,
                    fused_forward.SKIP_ZERO_COLUMN_GPUS, fused_forward.TENSOR_CORES_GPUS,
-                   wprime_backward.TABLE_W_GPUS):
+                   wprime_backward.TABLE_W_GPUS, wprime_backward.BLOCK_MESSAGE_GPUS):
         assert all(name in models for name in A100S)
     assert not any(name in fixed.DECISION_66_GATE_EPILOGUE_GPUS for name in A100S)  # no A100 measured there
 
@@ -47,3 +47,19 @@ def test_table_w_default(monkeypatch):
     assert not wprime_backward.table_w_default(torch.device("cuda", 0), generic=True)
     monkeypatch.setattr(wprime_backward, "TABLE_W", True)
     assert wprime_backward.table_w_default(torch.device("cpu"), generic=False)
+
+
+def test_block_message_default(monkeypatch):
+    """BLOCK_MESSAGE (owner, 4 November 2026: "Yes, Ada and A100"): on for the RTX 4000 Ada and every A100, off on the
+    RTX 5060 Ti (measured slower) and elsewhere; the constant overrides."""
+    assert wprime_backward.BLOCK_MESSAGE is None
+    assert "NVIDIA RTX 4000 Ada Generation" in wprime_backward.BLOCK_MESSAGE_GPUS
+    assert "NVIDIA GeForce RTX 5060 Ti" not in wprime_backward.BLOCK_MESSAGE_GPUS
+    assert not wprime_backward.block_message_default(torch.device("cpu"))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA A100 80GB PCIe")
+    assert wprime_backward.block_message_default(torch.device("cuda", 0))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA GeForce RTX 5060 Ti")
+    assert not wprime_backward.block_message_default(torch.device("cuda", 0))
+    monkeypatch.setattr(wprime_backward, "BLOCK_MESSAGE", True)
+    assert wprime_backward.block_message_default(torch.device("cuda", 0))
+

@@ -62,8 +62,13 @@ TABLE_W_VECTOR = 2
 # The message in linear_1's block layout (OMAT-0 work, 4 November 2026): with TABLE_W and the fused forward, the
 # message-only kernel writes each same-irrep group of the grouped BlockLinear's input as its own [N * dim, P * C]
 # tensor, the backward reads the groups' gradients through one pointer each, and linear_1 multiplies the groups
-# without the relayout copies (RTX 5060 Ti: about 1.15 ms per step). Bitwise the same message. A/B switch.
-BLOCK_MESSAGE = False
+# without the relayout copies (RTX 5060 Ti: about 1.15 ms per step). Bitwise the same message. None: on for
+# BLOCK_MESSAGE_GPUS (decision 66; owner, 4 November 2026: "Yes, Ada and A100"); True / False: an A/B side's
+# choice on every GPU.
+BLOCK_MESSAGE = None
+# Benchmark_loup MD step b/a (a = the default with TABLE_W) in both orders: RTX 4000 Ada 0.974 / 0.971,
+# A100-SXM4-80GB 0.983 / 0.977 (every A100 model, GPUModels); the RTX 5060 Ti measured 1.060 and keeps it off.
+BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -675,11 +680,19 @@ def table_w_default(device, generic):
     return bool(generic) and device.type == "cuda" and torch.cuda.get_device_name(device) in TABLE_W_GPUS
 
 
+def block_message_default(device):
+    """``BLOCK_MESSAGE`` on ``device``: the constant when set, else on for ``BLOCK_MESSAGE_GPUS``."""
+    if BLOCK_MESSAGE is not None:
+        return bool(BLOCK_MESSAGE)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in BLOCK_MESSAGE_GPUS
+
+
 def prepare_block_messages(model):
     """``WPrime.prepare_blocks`` in every interaction of ``model`` with ``wprime_backward`` (after the rewrites;
-    a no-op unless ``BLOCK_MESSAGE``). Returns how many interactions write the block layout."""
+    a no-op where ``BLOCK_MESSAGE`` is off). Returns how many interactions write the block layout."""
     count = 0
-    if not BLOCK_MESSAGE:
+    if BLOCK_MESSAGE is False:
         return count
     for module in model.modules():
         wprime = module._modules.get("wprime_backward") if hasattr(module, "_modules") else None
@@ -722,7 +735,8 @@ class WPrime(torch.nn.Module):
 
         self.block = None
         fused, linear = getattr(interaction, "fused_folded_forward", None), getattr(interaction, "linear", None)
-        if not (BLOCK_MESSAGE and self.table_w and fused is not None and linear is not None):
+        if not (block_message_default(self.gprime.device) and self.table_w and fused is not None
+                and linear is not None):
             return
         blocks = block_spec(linear, self.kernels.schedule)
         if blocks is None:
@@ -755,7 +769,7 @@ class WPrime(torch.nn.Module):
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
-                and BLOCK_MESSAGE):  # the message as a tuple of linear_1's input groups (prepare_blocks)
+                and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
             *groups, density = _WPrimeBlockConvolution.apply(
                 lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), weight, self.gprime, x, sh,
@@ -786,7 +800,8 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_MESSAGE", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_spec", "dense_message",
+__all__ = ["BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
+           "block_message_default", "block_spec", "dense_message",
            "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
