@@ -339,3 +339,17 @@ chains 2.6e-7 / 2.8e-7); the CUTLASS tile test; ruff only pre-existing long line
 neighbouring edges share G' slabs. `F-one-slab` (every edge reads group 0; perfect locality) on the RTX 4000 Ada
 (leto, `rtx4000ada-oneslab/`): wprime 7.73 ms base, 9.03 ms one slab (1.169), no slope 0.960, w not loaded 0.872.
 Perfect locality is slower (every warp hits the same lines), so the gathers' locality is not the limit; not built.
+
+**The A100 80GB PCIe** (`tools/modal/omat0_a100_pcie_tc.sh`, 1d20b01c, second Modal account, `a100-pcie-tc/`, $0.58),
+on top of the SXM4's switches (tf32x3_gemms, the generic wprime set, the skipped zero column): MD step A/B with
+`TENSOR_CORES=True`, `TC_SPLIT='mask'`, both orders, b/a 0.9314 / 0.9301 (18.40 -> 17.13 ms). Benchmark_loup,
+µs/atom/step (2 processes each, sets alternating):
+
+| set | NVE | Langevin |
+| --- | --- | --- |
+| switches | 3.400, 3.342 | 3.315, 3.315 |
+| tc (`round`) | 3.237, 3.221 | 3.185, 3.207 |
+| tcmask (now the default) | 3.125, 3.123 | 3.078, 3.108 |
+
+On MargrafGroup's benchmark card, FastMACE's default plan now runs Benchmark_loup at 3.12 / 3.09 µs/atom/step, against
+4.61 / 4.56 with the defaults before 4 November.
