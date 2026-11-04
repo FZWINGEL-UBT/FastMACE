@@ -148,7 +148,7 @@ class TileConfig:
     backward_chunk_scale: int | None = None
     # The plan's grid from ``fit_grid`` (the fewest receiver-cap pieces among the rule's grid and finer ones), chosen
     # once per receiver cap, atom count and cell; False: the rule's grid alone (``_grid_shape``).
-    grid_fit: bool = True
+    grid_fit: bool = False
     # Padded tiles with the state on the host (CUDA): the next tile's graph is built, and the host rows its sweep
     # reads gathered and copied, on a side stream while the current tile runs, so the host's syncs and gathers no
     # longer drain the device's queue at every tile (a profiled 5M call left the GPU idle 17 % of the time).

@@ -126,7 +126,8 @@ MH-1 rewrites, tiled, streaming kernels, layering, w′ backward) pass on leto.
 
 The idea: the reassociated first interaction slices its per-slot sums `[nodes, species, (l, m), k]` per path and
 transposes them, so each path's GEMM input needs a copy (sweeps 1 and 3). `e2903496` (branch
-`fastmace/reassoc-layout`, not merged) let `edge_outer_sum` write `[nodes, (l, m), species, k]` instead
+`fastmace/reassoc-layout`; merged on 4 November 2026 at the owner's request with the MH-1 caller left on the plain
+layout, so `inner=` is unused) let `edge_outer_sum` write `[nodes, (l, m), species, k]` instead
 (`inner=` argument) so that each path's slice would be a view.
 
 It is not: a slice of the middle axis is not one matrix across nodes (row stride `dim × species × k`, not

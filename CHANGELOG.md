@@ -7,6 +7,9 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 ## [Unreleased]
 
 ### Added
+- Merged on 4 November 2026 (owner): `TileConfig.grid_fit` (off), `tiled_capacity.py --neighbours`, `edge_outer_sum`'s
+  `inner=` layout (unused: 5 % slower on MH-1), `FASTMACE_SPLIT_PRECISION` (rejected BF16x3 experiment; default
+  `tf32x3`), and the records of those branches. Production behaviour is unchanged.
 - `wprime_backward.BLOCK_MESSAGE`: the conv message in linear_1's block layout, no relayout copies. Default on the
   RTX 5060 Ti, the RTX 4000 Ada and every A100 (owner, 4 November 2026). Benchmark_loup step 0.976 / 0.975 (RTX
   5060 Ti, with `BLOCK_LDG`: the block kernel's gradient reads through `__ldg`, 9.93 -> 6.64 ms), 0.974 / 0.971

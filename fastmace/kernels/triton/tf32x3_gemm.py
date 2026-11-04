@@ -23,7 +23,7 @@ import torch
 
 from fastmace.kernels.triton import tile_rule
 
-# Experiment branch only (FACTO's BF16x3, arXiv 2611.03276): FASTMACE_SPLIT_PRECISION picks Triton's split
+# Rejected experiment, kept (FACTO's BF16x3, arXiv 2611.03276): FASTMACE_SPLIT_PRECISION picks Triton's split
 # ("tf32x3", "bf16x3" or "bf16x6") for every product of the tf32x3_gemms record.
 PRECISION = __import__("os").environ.get("FASTMACE_SPLIT_PRECISION", "tf32x3")
 MIN_CAPABILITY = (8, 0)  # Triton's rule for tf32 dots (capability // 10 >= 8)

@@ -69,7 +69,7 @@ def _gemm(a, a_offset, a_n, a_m, b, c, c_offset, c_n, c_m, rows, dim, choice, pr
 
     from fastmace.kernels.triton.tf32x3_gemm import PRECISION as split
 
-    precision = split if precision == "tf32x3" else precision  # experiment branch: FASTMACE_SPLIT_PRECISION
+    precision = split if precision == "tf32x3" else precision  # rejected experiment: FASTMACE_SPLIT_PRECISION
     k, n = b.shape
     tiles_m, tiles_n = triton.cdiv(rows, choice.block_m), triton.cdiv(n, choice.block_n)
     grid = (tiles_m * tiles_n,) if choice.column_fastest else (tiles_m, tiles_n)

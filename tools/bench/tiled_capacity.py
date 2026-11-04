@@ -78,7 +78,7 @@ def parse_args(argv=None):
     p.add_argument("--backward-chunk-scale", type=int, default=None,
                    help="TileConfig.backward_chunk_scale: the chunked streaming backward's edges per chunk in the "
                         "tiles times this (none: by device name)")
-    p.add_argument("--grid-fit", choices=("on", "off"), default="on",
+    p.add_argument("--grid-fit", choices=("on", "off"), default="off",
                    help="TileConfig.grid_fit: the plan's grid with the fewest receiver-cap pieces (off: the rule's)")
     p.add_argument("--list-cache", choices=("on", "off"), default="on",
                    help="TileConfig.list_cache: a tile's lists kept on the host within the call (with kept lists: "

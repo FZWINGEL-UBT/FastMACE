@@ -28,4 +28,5 @@ Reading:
 - Second calls are not steady: the same 20M configuration took 395.9 s and 340.1 s, so the second-call differences
   above are not evidence.
 - `fit_grid` cuts the tiles by 29 % and the steady call by 2.1 %, in a single unrepeated pair, and the first call by
-  7 %. It stays on the unmerged local branch `fastmace/tile-grid-fit` (commit 5a162b6c); no decision was recorded.
+  7 %. Merged on 4 November 2026 at the owner's request as `TileConfig.grid_fit`, default off until an A/B in both
+  orders decides it (`tiled_capacity.py --grid-fit on`).

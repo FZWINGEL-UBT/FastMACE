@@ -2353,7 +2353,7 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 
 <a id="prec-bf16x3-facto"></a>
 #### prec-bf16x3-facto: BF16×3 atom GEMMs in the MD step (FACTO, arXiv 2611.03276)
-- Switch: none on main (branch `fastmace/bf16x3-screen`: `FASTMACE_SPLIT_PRECISION=bf16x3` with `tf32x3_gemms=on grouped_launch=off`)
+- Switch: `FASTMACE_SPLIT_PRECISION=bf16x3` with `tf32x3_gemms=on grouped_launch=off` (merged 4 November 2026, owner; default `tf32x3`)
 - Engine: FM
 - Date/round: 3 November 2026 (owner request)
 - What: the `tf32x3_gemms` record's GEMMs with `tl.dot(input_precision="bf16x3")`, as FACTO's dense projections.
@@ -2364,7 +2364,7 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 
 <a id="prec-cublasdx-int8"></a>
 #### prec-cublasdx-int8: cuBLASDx INT8-slice float32 emulation (MathDx 26.10.0)
-- Switch: none (`tools/bench/cublasdx_int8_emulation.cu` on branch `fastmace/bf16x3-screen`)
+- Switch: none (`tools/bench/cublasdx_int8_emulation.cu`)
 - Engine: FM
 - Date/round: 3 November 2026 (owner request)
 - What: cuBLASDx's pipelined GEMM with `RequiredMantissaBits<X>` (X = 15, 23, 31: 2, 3, 4 INT8 slices with a shared exponent per row of A and column of B), against cublasSgemm.
