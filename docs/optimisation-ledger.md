@@ -585,6 +585,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-stream-store-w](#omat0-stream-store-w) | The fused forward stores w with `__stcs` | `fused_forward.STREAM_STORE_W` | FM | REJECTED | 2026-11-04 | lab forward 0.965 (Ada), 0.995 (5060 Ti); step 1.001 (Ada), 0.991 (5060 Ti), 1.001 on top of degree 5 (Ada) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-eos-chunks](#omat0-eos-chunks) | `edge_outer_sum` chunk sizes 64 | `edge_outer_sum.FORWARD_CHUNK`, `BACKWARD_BLOCK_EDGES` | FM | REJECTED | 2026-11-04 | Ada step 1.002 (forward chunk 64), 1.004 (backward block 64) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-tc-forward](#omat0-tc-forward) | 3×TF32 tensor-core a·W product in the fused forward (A100 only) | `fused_forward.TENSOR_CORES`, `TC_SPLIT` | FM | PENDING | 2026-11-04 | rna split: step 1.040 (A100), 1.124 (Ada), 1.272 (5060 Ti); round split A100-SXM4 0.963, mask split 0.933; loup 3.17 -> 2.92 µs/atom/step (mask) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-cutlass-tile](#omat0-cutlass-tile) | Two-warp 32x64 / 64x32 tiles for the CUTLASS 3×TF32 GEMMs (A100) | `cutlass.tf32x3.TILE` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.014 / 1.012 (32x64), 1.017 / 1.017 (64x32); bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 
 ### Alternative backends and external comparisons
 
@@ -3773,6 +3774,17 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Split (4 November 2026, `TC_SPLIT`): the A100 lab showed the time going to the `cvt.rna.tf32` splits, not the mma triples. `round` (integer add and mask, as accurate as `rna`): fused forward 4.18 against 4.90 ms SIMT, MD step b/a 0.963 / 0.965 (both orders), loup NVE 3.03 against 3.17. `mask` (high part truncated, low part passed raw; about 2.5× the `round` error, outside the GPU test's bound at k = 9): 3.65 ms, b/a 0.933 / 0.933, loup NVE 2.92 and Langevin 2.90. Force gate passes for both (SrTiO3 energy error 1.15 / 1.39 meV against 0.73 meV, floor 10 meV). Slower on the RTX 5060 Ti with every split.
 - Why: the A100 is the one target GPU where the reopen condition of [conv-tc-wtile](#conv-tc-wtile) holds.
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md); the A100 profile `results/omat0-a100-profile-20261103`.
+
+<a id="omat0-cutlass-tile"></a>
+#### omat0-cutlass-tile: two-warp tiles for the CUTLASS 3×TF32 GEMMs (A100)
+- Switch: `fastmace.kernels.cutlass.tf32x3.TILE` ("64x64"; "32x64", "64x32")
+- Engine: FM
+- Date/round: 4 November 2026 (owner's goal: Benchmark_loup as fast as possible)
+- What: the CUTLASS 3×TF32 products of Benchmark_loup (5,000 atom rows × 128 columns) launch 158 blocks of 64×64 on the A100's 108 SMs, so 50 SMs hold two tiles and 58 one. The cubin gained 32×64 and 64×32 tiles (two warps of 32×32×16, 4 stages), twice the blocks; bitwise the 64×64 tile's (the same K loop per element; the 64×64 entries' SASS unchanged).
+- Status: REJECTED.
+- Measured: MD step b/a on the A100-SXM4-80GB, both orders, 8 blocks: 32×64 1.0144 / 1.0116, 64×32 1.0167 / 1.0173. The GEMMs are 1.85 ms of the 14.85 ms force call (with the tensor-core forward); the smaller tiles' mainloops lose more than the even load gains.
+- Why: wave quantisation on 108 SMs.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §12; `tests/gpu/test_cutlass_tf32x3_tiles_cuda.py`.
 
 ### Alternative backends and external comparisons
 

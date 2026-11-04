@@ -292,3 +292,27 @@ one job, 2 fresh processes each), µs/atom/step:
 
 `tcmask` is the fastest Benchmark_loup yet on the A100 (2.92 / 2.90 µs/atom/step, -8 % / -7 %). `TENSOR_CORES` stays
 off by default; a per-GPU default on the A100-SXM4-80GB (decision 66), and which split, is the owner's decision.
+
+## 12. After the tensor-core forward: profile, wprime at degree 5, GEMM tiles (A100-SXM4-80GB)
+
+**Step breakdown with tcmask** (`omat0_a100_profile.sh`, `LOUP=0`, `CONSTANTS` = `TENSOR_CORES=True`,
+`TC_SPLIT='mask'`; 71db0f06, `a100-sxm4-tc-profile/`, $0.06): 14.85 ms of kernels per force call. wprime backward
+5.16 ms (35 %), fused forward 3.63 ms, CUTLASS 3xTF32 GEMMs 1.85 ms (44 launches, grid 79 x 2 of 64x64 tiles),
+`edge_outer_sum` backward 0.49 ms, radial tables 0.71 ms (forward and backward).
+
+**wprime lab at degree 5** (`omat0_a100_wprime_lab.sh`, 211d3d3f, `a100-sxm4-wprime-deg5/`, $0.05): base 4.70 ms (96
+registers, no local memory). `ldcs-w` 1.023 and `unordered` 0.997 (bitwise, no gain); falsifiers: no slope 0.615,
+half the terms 0.952, w not loaded 0.884, no atomics 0.931. The slope costs 1.8 ms although its 6 terms halve to
+3 for only 5 %: the per-weight cost is the gather of each edge's `G'` slab (term-major, 25.6 KB per edge from a
+table of 9 pairs x 896 pieces x 5 terms x 1280 weights, about 206 MB, far beyond the 40 MB L2), not the
+arithmetic. (`F-one-slab` did not match the kernel since `PADDED_TERMS`; fixed in 607135c5, not rerun.) An `a'
+W^T` reformulation (dr = a' . (dw W), the shared W instead of the per-group `G'`) would need the forward's product
+again on tensor cores (about 1.4 ms with `mask`), so at most about 0.4 ms; not built.
+
+**CUTLASS tiles** (`cutlass.tf32x3.TILE`, 607135c5): Benchmark_loup's products of 5,000 rows x 128 columns launch
+158 blocks of 64x64 on 108 SMs. The cubin now also holds 32x64 and 64x32 tiles (two warps of 32x32x16, 4 stages;
+nvcc 13.3, CUTLASS 4.8.1; the 64x64 entries' SASS identical to the shipped cubin's). They are bitwise the 64x64
+tile's (`tests/gpu/test_cutlass_tf32x3_tiles_cuda.py` on the RTX 4000 Ada: 4 shapes x 2 B layouts, largest error
+2.5e-7 of the row scale). MD step A/B on the A100-SXM4-80GB, both orders, 8 blocks (`screens/tile-sxm4/`, $0.40):
+`tile32x64` b/a 1.0144 / 1.0116, `tile64x32` 1.0167 / 1.0173. Slower: the two-warp tiles lose more in mainloop
+efficiency than the even load gains. Rejected; `TILE` stays 64x64.
