@@ -377,7 +377,7 @@ species), rows gathered and results scattered. Benchmark_loup MD step (`ab_rewri
 | GPU | SPECIES_GEMM (count tiles) | first version | folder |
 | --- | --- | --- | --- |
 | NVIDIA RTX 4000 Ada Generation (leto) | 0.9548 / 0.9522 | 0.9695 / 0.9682 | `rtx4000ada-species-gemm-2/`, `rtx4000ada-species-gemm/` |
-| NVIDIA GeForce RTX 5060 Ti | 0.9504 (one order) | 0.9621 | `rtx5060ti-species-gemm/`, `rtx5060ti-species-gemm-first/` |
+| NVIDIA GeForce RTX 5060 Ti | 0.9504 / 0.9525 | 0.9621 | `rtx5060ti-species-gemm/`, `rtx5060ti-species-gemm-ba/`, `rtx5060ti-species-gemm-first/` |
 | A100-SXM4-80GB (Modal) | 0.9919 / 0.9914 | 1.0402 / 1.0363 | `a100-sxm4-species-gemm-b/`, `a100-sxm4-species-gemm/` |
 
 The 5060 Ti gate (`gate-rtx5060ti-species-gemm/`) passes. On the A100 the skip runs through tf32x3, and Triton's
@@ -405,3 +405,9 @@ uses; bitwise): A100-SXM4 1.0018 / 0.9993, RTX 5060 Ti 1.002. Rejected.
 
 Lab folders of the first round: `rtx5060ti-skiplab/`, `a100-sxm4-skiplab/` (A100 lab times differ between Modal
 machines; compare only within one job).
+
+**Default (owner, 4 November 2026: "Yes both"):** `SPECIES_GEMM = None` turns the grouped GEMM on for
+`SPECIES_GEMM_GPUS` ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"; decision 66), fixed when the
+module is built on its device; True / False force it for A/Bs. Not on the A100 (0.992 there; see above). Check on
+leto after the switch, default against `SPECIES_GEMM=False`: 1.0507 (`rtx4000ada-species-gemm-default/`; CPU tests,
+GPU tests and ruff pass).

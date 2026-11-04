@@ -86,6 +86,8 @@ def test_species_skip_grouped_bitwise(monkeypatch, layout):
     x2 = torch.zeros(500, 89, device="cuda")
     x2[torch.arange(500), torch.tensor([3, 7, 11], device="cuda")[torch.randint(3, (500,), device="cuda",
                                                                                   generator=g)]] = 1
+    assert skip.species_gemm_gpu == (torch.cuda.get_device_name() in gm.SPECIES_GEMM_GPUS)  # the None default
+    monkeypatch.setattr(gm, "SPECIES_GEMM", False)
     reference = skip(x1, x2)
     monkeypatch.setattr(gm, "SPECIES_GEMM", True)
     grouped = skip(x1, x2)

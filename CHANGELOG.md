@@ -8,9 +8,9 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
-- `generic.modules.SPECIES_GEMM` (default off; owner decision per GPU pending): the species skip as one grouped
-  GEMM (`kernels/triton/species_gemm.py`, fixed grid, CUDA-graph safe). Benchmark_loup step 0.955 / 0.952 (RTX
-  4000 Ada), 0.950 (RTX 5060 Ti), 0.992 (A100-SXM4). `species_gemm.TENSOR_CORES` (own 3xTF32 mma.sync kernel)
+- `generic.modules.SPECIES_GEMM` (default on for the RTX 5060 Ti and RTX 4000 Ada, `SPECIES_GEMM_GPUS`, decision
+  66): the species skip as one grouped GEMM (`kernels/triton/species_gemm.py`, fixed grid, CUDA-graph safe).
+  Benchmark_loup step 0.955 / 0.952 (RTX 4000 Ada), 0.950 / 0.953 (RTX 5060 Ti); 0.992 on the A100-SXM4 (off). `species_gemm.TENSOR_CORES` (own 3xTF32 mma.sync kernel)
   and `FIRST_TABLE_COLUMNS` were measured and rejected (A/B switches only).
 - `fused_forward.TC_SPLIT` ("mask", "round", "rna"): the tensor-core product's TF32 split; and two-warp
   CUTLASS 3xTF32 tiles (`cutlass.tf32x3.TILE` "32x64" / "64x32", bitwise; slower on the A100, A/B only).

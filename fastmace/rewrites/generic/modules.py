@@ -243,8 +243,13 @@ class GenericFoldedRadial(torch.nn.Module):
 # Every atom's rows through its own species' matrix only (``fastmace.kernels.triton.species_gemm``), instead of
 # through all present species' matrices followed by the selection of its block: a third of the products and no
 # species-expanded intermediates for three species. Exact (the same dot products; bitwise in the species skip lab).
-# CUDA float32 only. A module constant for the A/B (4 November 2026, Benchmark_loup speed goal).
-SPECIES_GEMM = False
+# CUDA float32 only (4 November 2026, Benchmark_loup speed goal). None: on for SPECIES_GEMM_GPUS (decision 66;
+# owner, 4 November 2026: "Yes both"); True / False: an A/B side's choice on every GPU. Benchmark_loup (OMAT-0
+# medium, SrTiO3 5,000 atoms) MD step b/a in both orders: RTX 4000 Ada 0.955 / 0.952, RTX 5060 Ti 0.950 / 0.953;
+# A100-SXM4-80GB 0.992 / 0.991 (not adopted there: its skip runs as 3xTF32, where the Triton dot is about 3x slower
+# per product than the concatenated CUTLASS GEMM; our own mma.sync kernel, species_gemm.TENSOR_CORES, did no better).
+SPECIES_GEMM = None
+SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
 class SpeciesSkip(torch.nn.Module):
@@ -274,6 +279,8 @@ class SpeciesSkip(torch.nn.Module):
             self.register_buffer(f"wt{index}", weight.transpose(1, 2).contiguous(), persistent=False)
             self.pairs.append((i, j))
         self.tf32x3 = False  # tf32x3_gemms: the products as 3xTF32 (OPT4-T03)
+        # SPECIES_GEMM None: the device's default, fixed when the module is built on it
+        self.species_gemm_gpu = (columns.is_cuda and torch.cuda.get_device_name(columns.device) in SPECIES_GEMM_GPUS)
 
     def _view(self, x, segment):
         offset, mul, dim = segment
@@ -286,7 +293,8 @@ class SpeciesSkip(torch.nn.Module):
         onehot = x2[:, self.columns]  # [atoms, species]
         atoms, species = onehot.shape
         outputs = [None] * len(self.segments_out)
-        grouped = SPECIES_GEMM and x1.is_cuda and x1.dtype == torch.float32
+        on = self.species_gemm_gpu if SPECIES_GEMM is None else SPECIES_GEMM
+        grouped = on and x1.is_cuda and x1.dtype == torch.float32
         if grouped:
             from fastmace.kernels.triton.species_gemm import species_mm, species_plan
             kind = onehot.argmax(dim=1)
