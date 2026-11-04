@@ -90,7 +90,8 @@ def tile_rows(t, counts, size):
         rows = count * size
         n_tiles = -(-rows // BLOCK_M)
         if tiles_before <= t < tiles_before + n_tiles:
-            return s, rows_before + (t - tiles_before) * BLOCK_M, rows_before + rows
+            first = rows_before + (t - tiles_before) * BLOCK_M
+            return s, first, min(first + BLOCK_M, rows_before + rows)
         tiles_before += n_tiles
         rows_before += rows
     return 0, 0, 0
@@ -103,8 +104,9 @@ def _launch(x, w, order, counts, out, precision):
     n = w.shape[2]
     grid = (tiles(atoms, size, counts.shape[0]), triton.cdiv(n, BLOCK_N))
     _kernel()[grid](x, w, out, order, counts, counts.shape[0], size, n, k, x.stride(0), x.stride(1), x.stride(2),
-                    w.stride(1), w.stride(2), out.stride(0), out.stride(1), out.stride(2), BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N,
-                    BLOCK_K=BLOCK_K, PRECISION=precision, num_warps=NUM_WARPS, num_stages=NUM_STAGES)
+                    w.stride(1), w.stride(2), out.stride(0), out.stride(1), out.stride(2), BLOCK_M=BLOCK_M,
+                    BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K, PRECISION=precision, num_warps=NUM_WARPS,
+                    num_stages=NUM_STAGES)
 
 
 def _reference(x, w, index):
