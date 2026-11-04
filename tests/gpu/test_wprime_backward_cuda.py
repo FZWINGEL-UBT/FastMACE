@@ -231,16 +231,16 @@ for layout in ("ir_mul", "mul_ir"):
            + wp.density_backward(r.double().cpu(), pair.cpu(), wp.density_column(table.dcoef.double().cpu()),
                                  table.starts.double().cpu(), table.scales.double().cpu(), table.bins.cpu(),
                                  D.double().cpu(), r_lo, table.bin_scale, r_max).cuda())
-    for table_w in (False, True):
-        name = f"factored-{layout}-{'table-w' if table_w else 'stored-w'}"
+    for table_w, scale in ((False, False), (True, False), (True, True)):
+        name = f"factored-{layout}-{'table-w' if table_w else 'stored-w'}{'-scaled' if scale else ''}"
         wp.TABLE_W = table_w
         try:
             plain = wp.WPrime(table, weight, kernels)
-            wp.FACTORED = True
+            wp.FACTORED, wp.FACTORED_SCALE = True, scale
             try:
                 factored = wp.WPrime(table, weight, kernels)
             finally:
-                wp.FACTORED = False
+                wp.FACTORED, wp.FACTORED_SCALE = False, False
         finally:
             wp.TABLE_W = None
         assert factored.kernel.factored and not plain.kernel.factored, name
@@ -278,4 +278,5 @@ def test_wprime_backward_matches_the_chain():
     print(json.dumps(report, indent=1))
     assert set(report) == {"ir_mul-cublas", "ir_mul-fused", "mul_ir-cublas", "mul_ir-fused", "slope-vector-2",
                            "slope-vector-4", "table-w-cublas", "table-w-fused", "factored-ir_mul-stored-w",
-                           "factored-ir_mul-table-w", "factored-mul_ir-stored-w", "factored-mul_ir-table-w"}
+                           "factored-ir_mul-table-w", "factored-mul_ir-stored-w", "factored-mul_ir-table-w",
+                           "factored-ir_mul-table-w-scaled", "factored-mul_ir-table-w-scaled"}
