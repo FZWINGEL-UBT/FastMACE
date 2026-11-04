@@ -101,6 +101,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
       ab "$spec" --b-constant "$rd:DEGREE=$n" "$rd:TOLERANCE=${spec#*-}" ;;
     tcre) ab "$spec" --b recompute_conv_weights=on --b-constant "$ftc" ;;  # tc, w rebuilt in the backward
     tablew) ab "$spec" --b-constant "$wp:TABLE_W=True" ;;  # w and its slope from the value table, no stored w
+    block) ab "$spec" --b-constant "$wp:BLOCK_MESSAGE=True" ;;  # the message in linear_1's block layout
     dztcre[0-9]*) ab "$spec" --b recompute_conv_weights=on --b-constant "$rd:DEGREE=${spec#dztcre}" "$zc" "$ftc" ;;
   esac
 done
