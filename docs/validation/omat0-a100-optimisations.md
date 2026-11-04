@@ -9,18 +9,13 @@
 §6 compares FastMACE's architecture with Symmetrix-XL's. §7 lists the parts whose origin is not recorded.
 
 **The whole-system run described.** §1–§3 describe the fastest OMAT-0 run recorded on `main`:
-- **Record:** `results/omat0-a100-profile-20261103/` (source `3501a499`, result commit `57b4f31e`).
+- **Record:** `results/omat0-a100-profile-20261104-4b70e3f2/` (source `4b70e3f2`, merged into `main` as `9ed7f559`).
 - **Model and system:** MACE-OMAT-0 medium on a Modal A100-SXM4-80GB, Benchmark_loup's SrTiO3 10×10×10 (5,000 atoms),
   float32.
 - **Protocol:** skin 0.5 Å, 1 fs (`tools/bench/loup_md.py`).
-- **Speed:** 3.64 µs/atom/step in NVE and 3.59 µs/atom/step in Langevin (`loup/*.json`). On the A100 PCIe card,
-  Symmetrix-XL ran the same benchmark at 5.00 µs/atom/step ([loup-a100.md](loup-a100.md):7). That number is from
-  another card and is context, not an A/B.
-
-**Newer kernels.** §1–§3 describe main as of 3 November. The OMAT-0 kernel round merged on 4 November (`9ed7f559`):
-the tensor-core fused forward, `TABLE_W`, `BLOCK_MESSAGE`, degree-5 tables and the species GEMM. It brings the same
-benchmark to NVE 2.73–2.97 and Langevin 2.79–2.95 µs/atom/step on the A100-SXM4-80GB
-(`results/omat0-a100-profile-20261104-4b70e3f2/`). §2 and §3 do not describe those kernels yet.
+- **Speed:** NVE 2.73–2.97 µs/atom/step and Langevin 2.79–2.95 µs/atom/step, from three fresh processes each
+  (`loup/*.json`). On 3 November, before the OMAT-0 kernel round, the same protocol gave 3.64 / 3.59
+  (`results/omat0-a100-profile-20261103/`).
 
 **Where each part came from.** Every part in §3–§5 carries one of four verdicts:
 
@@ -95,7 +90,7 @@ flowchart TB
 - **B:** forces and the second half kick.
 
 The host only launches and reads flags. A neighbour-list rebuild, when the skin check asks for one, runs on a side
-stream beside B. Everything outside the force graph costs about 0.07 ms of the 18.50 ms step
+stream beside B. Everything outside the force graph costs about 0.08 ms of the 13.77 ms step
 (`breakdown/summary.json`).
 
 ```mermaid
@@ -109,19 +104,19 @@ flowchart LR
   HOST["host: launches graphs,<br/>reads flags one step late"] -.-> ACP
 ```
 
-**One force call inside graph B** for OMAT-0 on the A100: 178 kernels and 18.4 ms. The numbers are milliseconds per
+**One force call inside graph B** for OMAT-0 on the A100: 171 kernels and 13.7 ms. The numbers are milliseconds per
 call from `breakdown/ops.csv`:
 
 ```mermaid
 flowchart TB
-  E["edge vectors and lengths r<br/>(receiver-sorted, padded)"] --> TAB["radial tables (§3.3): one Triton kernel per interaction,<br/>r → [h·c, c, density], 0.67 ms for both"]
+  E["edge vectors and lengths r<br/>(receiver-sorted, padded)"] --> TAB["radial tables (§3.3): one Triton kernel per interaction,<br/>r → [h·c, c, density], degree 5, 0.42 ms for both"]
   E --> Y["spherical harmonics (MACE's code, compiled by Inductor)"]
   subgraph INT1["Interaction 1, reassociated (§3.4)"]
-    OS["edge sums per (receiver, sender species),<br/>run-segmented Triton kernel, 0.24 ms"] --> NG1["projection as node GEMMs<br/>(no per-edge tensor product)"]
+    OS["edge sums per (receiver, sender species),<br/>run-segmented Triton kernel, 0.22 ms"] --> NG1["projection as node GEMMs<br/>(no per-edge tensor product)"]
     NG1 --> L1["linears, species skip, symmetric contraction"]
   end
   subgraph INT2["Interaction 2 (§3.5)"]
-    FF["fused forward: w = [h·c, c]·Wᵀ per edge tile inside<br/>the receiver-streaming convolution, 5.06 ms"] --> L2["linears, species skip, symmetric contraction"]
+    FF["fused forward: w = [h·c, c]·Wᵀ per edge tile on tensor cores (3×TF32)<br/>inside the receiver-streaming convolution; writes only the message,<br/>in the linears' block layout, 3.70 ms"] --> L2["linears, species skip, symmetric contraction"]
   end
   TAB --> OS
   Y --> OS
@@ -130,9 +125,9 @@ flowchart TB
   L1 --> FF
   L2 --> EN["readouts → energy"]
   L1 --> EN
-  EN -. "backward" .-> WB["w′ backward of interaction 2: dr from derivative tables,<br/>no weight gradient stored (§3.5), 6.92 ms"]
-  EN -. "backward" .-> OB["interaction-1 sum backward (Triton) 0.44 ms,<br/>table backward 0.30 ms, the rest by Inductor"]
-  NOTE["all atom GEMMs in L1, L2 and the backward: CUTLASS 3×TF32 (§3.6), 1.85 ms;<br/>symmetric contractions: cuEquivariance (§3.7), 0.41 ms"]
+  EN -. "backward" .-> WB["w′ backward of interaction 2: w and its slope rebuilt<br/>from the radial table, dr from them; nothing per edge stored (§3.5), 4.37 ms"]
+  EN -. "backward" .-> OB["interaction-1 sum backward (Triton) 0.50 ms,<br/>table backward 0.30 ms, the rest by Inductor"]
+  NOTE["all atom GEMMs in L1, L2 and the backward: CUTLASS 3×TF32 (§3.6), 1.85 ms;<br/>symmetric contractions: cuEquivariance (§3.7), 0.40 ms"]
 ```
 
 **What changed against standard MACE:**
@@ -143,8 +138,8 @@ flowchart TB
 | matscipy neighbour list on the CPU every step | skin list on the GPU, rebuilt only when an atom has moved skin/2, beside the force call |
 | Bessel basis + radial MLP per edge, twice | one table lookup per edge and interaction |
 | Interaction 1: per-edge tensor product | sums per receiver and species, then node GEMMs |
-| Interaction 2: `w₂ [E × 1280]` written, then read by the convolution | `w₂` computed inside the convolution's edge tiles |
-| Backward of interaction 2 through `w₂` and the MLP | one kernel using derivative tables |
+| Interaction 2: `w₂ [E × 1280]` written, then read by the convolution | `w₂` computed on tensor cores inside the convolution's edge tiles, never stored |
+| Backward of interaction 2 through `w₂` and the MLP | one kernel that rebuilds `w₂` and its slope from the radial table |
 | cuEq linears and the 89-species `skip_tp` in FP32 | per-irrep GEMMs for the present species only, on 3×TF32 tensor cores |
 | eager kernels | `torch.compile` (Inductor) inside our own graphs |
 
@@ -177,6 +172,7 @@ flowchart TB
 | Part | What it does | Verdict | Evidence |
 | --- | --- | --- | --- |
 | Radial tables (`generic_radial_tables`) | Per interaction and species pair, piecewise Chebyshev series fitted in float64 at setup replace the whole chain r → `[h·c, c, density]` (Bessel, Agnesi, MLP, cutoff). A setup certificate requires the table's float32 error to be at most the float32 network's. | **OWN** | The "external proposal" of 27 October (`docs/validation/opt6-T04.md:21`) was a Claude research session that the owner ran on another account; the chat is kept in [2026-10-27-radial-tables-proposal.md](../design/2026-10-27-radial-tables-proposal.md). **That session found the design itself:** it calls it "The most radical lever I found" and cites no outside source. The design is per species pair, piecewise Chebyshev, on the folded layer's 65-wide input, with the certificate "refuse if the ratio exceeds 1". Its NumPy scripts are in `results/opt6-T04-radial-stub-20261027/table-check/`. **Not copied from the outside spline idea:** Symmetrix-XL uses "cubic Hermite splines (256 knots)" (`RM:LT/studies/symmetrix_xl/README.md:20`), and an outside report proposed a 512-knot Hermite spline. The session tested that spline and rejected it: its r-derivatives were 1.4–34× worse than the float32 network. The OMAT-0 version is a FastMACE finding ("The one worth building", `docs/validation/tiled-omat.md:164`). Measured on the A100: 0.902 / 0.901 ([loup-a100.md](loup-a100.md):46). |
+| Degree-5 table pieces | Chebyshev degree 5 instead of 10, with more pieces at the same tolerance and certificate: fewer terms per edge in the table, its backward and the w′ slope. | **OWN** | From our OMAT-0 screen: "Degree 5 tables are the largest gain on every GPU (−7 to −10 %)" (`results/omat0-kernel-lab-20261103/README.md:114`). Default since 4 November (`fastmace/rewrites/radial/__init__.py:41-45`): MD step 0.903 / 0.905 on the A100-SXM4-80GB. |
 
 ### 3.4 Interaction 1, reassociated
 
@@ -191,7 +187,11 @@ flowchart TB
 | --- | --- | --- | --- |
 | Receiver-streaming convolution kernels | One writer per receiver, with no atomics in the forward; compiled with NVRTC. | **COPIED** (OpenEquivariance PR 223, after the Sobek paper) | Vendored from "OpenEquivariance pull request 223 … by Paul Fuchs", which "adapts the streaming schedule of Chorošajev and Bény, Sobek" (arXiv 2607.18074) (`fastmace/kernels/oeq_streaming/NOTICE.md:3-8`). The owner pointed at the PR (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES_RESULTS.md:121`). Our change is the `ir_mul` layout (`NOTICE.md:12-15`). |
 | Fused forward (`generic_fused_folded_forward`) | `w = [h·c, c]·[W, b]ᵀ` is computed per edge tile inside the streaming convolution, instead of an `[E × 1280]` tensor written and read back. | **EXTERNAL IDEA** (Symmetrix-XL), **OWN CODE** | "Origin: the one idea from Symmetrix-XL" (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES.md:7`). The idea "computes `w[e]` from `a[e]` inside the kernel" (`:27-28`). Our kernel is generated from the streaming schedule (round 8, "Owner request", `plans/opt-8.md:3`). On the A100 it is used only together with the w′ backward, because alone it is slower (1.289; pair 0.885, `docs/validation/generic-wprime.md:58`, `:71`). |
-| w′ backward (`generic_wprime_backward`) | Within a table piece, `w(r) = Σ_t T_t(x) G_t`. The backward forms `dr = Σ_c dw_c · w′_c(r)` from derivative tables: 10 instead of 65 multiply-adds per weight, with no stored weight gradient and no radial backward. | **OWN** | Derived in our own ideas session: "`dr = Σ_c dw_c · w'_c(r)`" (`plans/ideas-20261027.md:57`; "Side session \"fm-ideas\"", `:3`). The float32 form was an "Owner request, 28 October 2026" (`plans/opt-9.md:3`). It depends on the radial tables (§3.3). |
+| Tensor-core fused forward (`fused_forward.TENSOR_CORES`, mask split) | The `[h·c, c]·Wᵀ` product of the fused forward in 3×TF32 `mma.sync` tiles. The TF32 high and low parts are split by masking instead of rounding, which our kernel lab found to be where the time went. | **EXTERNAL IDEA** (3×TF32, §3.6), **OWN** kernel and split | Our first version lost on every GPU, because the split costs "about as much ALU work as the FP32 product it replaced" (`results/omat0-kernel-lab-20261103/README.md:119-120`). The lab then traced the time to the split (`:250-253`). The mask split followed. Default on the A100s (owner "Yes to both", `:320-322`): MH-1 step 0.97–0.98 (`:326-327`); Benchmark_loup on the A100 80GB PCIe 3.12 / 3.09 µs/atom/step (`:354`). |
+| Skip the zero bias column | The fused forward's k-loop skips the folded weight's all-zero last column. | **OWN** | Built from the kernel lab (`results/omat0-kernel-lab-20261103/README.md:71`); adds 1–2 % on top of degree 5 on the Ada and the A100 (`:117`). |
+| w′ backward (`generic_wprime_backward`) | Within a table piece, `w(r) = Σ_t T_t(x) G_t`. The backward forms `dr = Σ_c dw_c · w′_c(r)` from derivative tables: 6 instead of 65 multiply-adds per weight at degree 5, with no stored weight gradient and no radial backward. | **OWN** | Derived in our own ideas session: "`dr = Σ_c dw_c · w'_c(r)`" (`plans/ideas-20261027.md:57`; "Side session \"fm-ideas\"", `:3`). The float32 form was an "Owner request, 28 October 2026" (`plans/opt-9.md:3`). It depends on the radial tables (§3.3). |
+| w from the table (`wprime_backward.TABLE_W`) | The w′ backward rebuilds w and its slope from one slab of the value table, so the forward no longer stores `w [E × 1280]` (1.9 GB per call). | **OWN** | From our A100 profile and kernel-lab falsifiers, which put 13–22 % of the forward and 9–17 % of the backward on the w store (`results/omat0-kernel-lab-20261103/README.md:440-443`). MD step 0.943 / 0.943 on the A100-SXM4-80GB; default owner, 4 November (`:480`). Not storing w was the goal of Symmetrix-XL's streamed edges (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES.md:27-28`); rebuilding it from our tables is our own route. |
+| Message in the linears' block layout (`wprime_backward.BLOCK_MESSAGE`) | The forward writes interaction 2's message straight into `linear_1`'s per-irrep blocks, and the backward reads the gradient the same way; the relayout copies around `linear_1` go. | **OWN** | From our `TABLE_W` step breakdown: "about 1.15 ms per step … in relayout copies around linear_1" (`results/omat0-kernel-lab-20261103/README.md:486`). A100-SXM4 0.983 / 0.977; default on the RTX 4000 Ada and the A100s (owner, `:499-500`). |
 
 ### 3.6 Atom-level linear layers and GEMM precision
 
@@ -207,8 +207,12 @@ flowchart TB
 | Part | What it does | Verdict | Evidence |
 | --- | --- | --- | --- |
 | Hybrid cuEq + OEq backend | OpenEquivariance for the convolution; cuEquivariance for the symmetric contraction and the rest. | **COPIED** (MACE 0.3.16, OEq, cuEq) | "MACE 0.3.16 can run a model with two accelerated backends at once" (`RM:LT/studies/remaining_optimizations/proposal.md:96`). Adopting it was the user's decision of 9 October (`RM:LT/docs/status.md:7`). |
-| Symmetric contraction | cuEquivariance's kernel, unchanged (0.41 ms). | **COPIED** (cuEquivariance) | No rewrite. |
+| Symmetric contraction | cuEquivariance's kernel, unchanged (0.40 ms). | **COPIED** (cuEquivariance) | No rewrite. |
 | Float32 with TF32 off, energy summed in float64 | The precision policy; 3×TF32 (§3.6) is the only tensor-core use. | **OWN** (decision) | User production decision, 9 October (`RM:LT/docs/status.md:7`). |
+
+**Not on the A100:** the species GEMM (`SPECIES_GEMM`, every atom's skip-product rows through its own species'
+matrix) is a default only on the RTX 5060 Ti and RTX 4000 Ada (owner, `results/omat0-kernel-lab-20261103/README.md:409`). On the A100-SXM4-80GB
+it measured 0.992 / 0.991, and 0.993 / 0.992 as a gathered CUTLASS kernel (`:381`, `:418`).
 
 **On in the plan but doing nothing in this run** (no kernels):
 - `fused_folded_backward` and `chunked_conv_backward` are on only as prerequisites of §3.3 and §3.5
@@ -374,7 +378,7 @@ flowchart LR
 | --- | --- | --- |
 | Model representation | The checkpoint is converted to a compact JSON format; learned weights and the graph are runtime inputs. | MACE's own modules from the checkpoint, rewritten in place by exact rewrite records (§3). |
 | Kernels | Generated per model, precision and target. "Host artifacts are model-, precision-, ABI-, generation-, and target-specific." NVRTC on CUDA, hipRTC on AMD; LAMMPS only loads prepared artifacts. | General kernels: Inductor-fused PyTorch, plus our Triton, NVRTC (OEq streaming) and CUTLASS kernels. Optimisations must be general, not per crystal (AGENTS.md); per-GPU defaults since decision 66. |
-| Edge work | "Direct" execution for every edge stage, receiver-major. It aims to "consume, aggregate, or recompute edge intermediates without retaining every materialized edge tensor". | Streamed only in interaction 2 (OEq PR 223 kernels, fused forward, §3.5). Interaction 1 is removed by reassociation (§3.4). Some per-edge state stays for autograd, for example the stored weights `w` on `main`. |
+| Edge work | "Direct" execution for every edge stage, receiver-major. It aims to "consume, aggregate, or recompute edge intermediates without retaining every materialized edge tensor". | Streamed only in interaction 2 (OEq PR 223 kernels, fused forward, §3.5); `w` is rebuilt from the radial table in the backward instead of stored. Interaction 1 is removed by reassociation (§3.4). Other per-edge state stays for autograd. |
 | Forces | "Coordinate or field reverse stages", planned like the forward; the planner chooses what to keep and what to recompute. | PyTorch autograd through the rewritten graph, with hand-written backward kernels where they pay: w′ backward, table backward, the reassociated sum backward. |
 | Radial network | Default: "the shared radial model once", evaluated inside the radial stages. An optional export stores per-pair splines (`--radial-format pair-splines`). The October study recorded cubic Hermite splines with 256 knots (`RM:LT/studies/symmetrix_xl/README.md:20`). | Certified piecewise Chebyshev tables per species pair and interaction, fitted in float64 at setup, with a certificate against the float32 network (§3.3). |
 | Planner | Plans ranked by an estimated memory footprint: `capacity` picks the fastest plan that fits, `speed` a fixed throughput plan. | A planner that turns rewrite records on per model, precision and GPU (`auto` rules), with a memory estimate that turns memory-saving records on when needed (rule 12). |
