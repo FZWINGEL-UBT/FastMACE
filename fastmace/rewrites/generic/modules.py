@@ -232,6 +232,13 @@ class GenericFoldedRadial(torch.nn.Module):
         return self.folded_main, self.folded_last
 
 
+# Every atom's rows through its own species' matrix only (``fastmace.kernels.triton.species_gemm``), instead of
+# through all present species' matrices followed by the selection of its block: a third of the products and no
+# species-expanded intermediates for three species. Exact (the same dot products; bitwise in the species skip lab).
+# CUDA float32 only. A module constant for the A/B (4 November 2026, Benchmark_loup speed goal).
+SPECIES_GEMM = False
+
+
 class SpeciesSkip(torch.nn.Module):
     """Element-dependent skip connection restricted to the structure's species (``generic_species_skip``).
 
@@ -255,6 +262,8 @@ class SpeciesSkip(torch.nn.Module):
         for index, (i, j, weight) in enumerate(blocks):  # weight [species, mul_in, mul_out]
             species, mul_in, mul_out = weight.shape
             self.register_buffer(f"w{index}", weight.permute(1, 0, 2).reshape(mul_in, species * mul_out).contiguous())
+            self.register_buffer(f"ws{index}", weight.contiguous(), persistent=False)  # [species, mul_in, mul_out]
+            self.register_buffer(f"wt{index}", weight.transpose(1, 2).contiguous(), persistent=False)
             self.pairs.append((i, j))
         self.tf32x3 = False  # tf32x3_gemms: the products as 3xTF32 (OPT4-T03)
 
@@ -269,9 +278,23 @@ class SpeciesSkip(torch.nn.Module):
         onehot = x2[:, self.columns]  # [atoms, species]
         atoms, species = onehot.shape
         outputs = [None] * len(self.segments_out)
+        grouped = SPECIES_GEMM and x1.is_cuda and x1.dtype == torch.float32
+        if grouped:
+            from fastmace.kernels.triton.species_gemm import species_mm, species_plan
+            kind = onehot.argmax(dim=1)
+            precision = "tf32x3" if self.tf32x3 else "ieee"
+            plans = {}
         for index, (i, j) in enumerate(self.pairs):
             weight = getattr(self, f"w{index}")
             xi = self._view(x1, self.segments_in[i])  # [atoms, size, mul_in]
+            if grouped:
+                size = xi.shape[1]
+                if size not in plans:
+                    plans[size] = species_plan(kind, species, size)
+                y = species_mm(xi, getattr(self, f"ws{index}"), getattr(self, f"wt{index}"), kind, *plans[size],
+                               precision)
+                outputs[j] = y if outputs[j] is None else outputs[j] + y
+                continue
             size, mul_out = xi.shape[1], weight.shape[1] // species
             left = xi.reshape(atoms * size, -1)
             if self.tf32x3:
