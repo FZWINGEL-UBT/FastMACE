@@ -113,9 +113,10 @@ for layout in ("ir_mul", "mul_ir"):
         hinted = fused_folded_forward(a, weight, X, Y, *args, streamed.id)
         assert torch.equal(hinted[0], message) and torch.equal(hinted[1], w), (layout, k)
         report[name]["stream store bitwise"] = True
-        # TENSOR_CORES (sm_80+): w in 3xTF32 within twice the FP32 chain's error against float64 (plus a few units
-        # of FP32 rounding of the row's scale), the message bitwise the streaming forward's on that w; with the
-        # zero-column skip too.
+        # TENSOR_CORES (sm_80+): w in 3xTF32 within twice the FP32 chain's error against float64 plus one unit of
+        # the row's scale per mma accumulation (3 per 8 columns; the tensor cores' FP32 accumulation does not round
+        # to nearest: 9.5e-7 against a chain of 2.8e-7 at k = 65 on the RTX 4000 Ada) and a few for the split, the
+        # message bitwise the streaming forward's on that w; with the zero-column skip too.
         if torch.cuda.get_device_capability() >= (8, 0):
             exact = (a.double() @ weight.double().t())
             scale = (a.double().abs() @ weight.double().abs().t())
@@ -129,11 +130,12 @@ for layout in ("ir_mul", "mul_ir"):
             tc_message, tc_w = fused_folded_forward(a, weight, X, Y, *args, tc.id)
             chain_error = float(((chain_w.double() - exact).abs() / scale).max())
             tc_error = float(((tc_w.double() - exact).abs() / scale).max())
-            assert tc_error <= 2 * chain_error + 4 * 2.0 ** -24, (layout, k, tc_error, chain_error)
+            tc_limit = 2 * chain_error + (3 * -(-k // 8) + 4) * 2.0 ** -24
+            assert tc_error <= tc_limit, (layout, k, tc_error, chain_error)
             assert torch.equal(tc_message, streaming_conv_forward(X, Y, tc_w, sender.int(), rows, kernels.id))
             skip_message, skip_w = fused_folded_forward(a, zero, X, Y, *args, tc_skip.id)
             zero_exact = a.double() @ zero.double().t()
-            assert float(((skip_w.double() - zero_exact).abs() / scale).max()) <= 2 * chain_error + 4 * 2.0 ** -24
+            assert float(((skip_w.double() - zero_exact).abs() / scale).max()) <= tc_limit
             report[name]["tensor cores"] = {"max error / scale": tc_error, "chain": chain_error}
 print(json.dumps(report))
 """

@@ -273,6 +273,8 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc)}    }} break;"
                       for q, part in enumerate(parts))
     helpers = TC_HELPERS if tc else ""
+    ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
+    a_offset = f"{slice_floats(npp, ka, tc)} + warp * {staging_floats(ka, schedule.edge_dim, tc, npp)}"
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
 constexpr bool STORE_W = {"true" if store_w else "false"};
@@ -299,7 +301,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
-    float* a_s = Ws + {slice_floats(npp, used if tc else k, tc)} + warp * {staging_floats(used if tc else k, schedule.edge_dim, tc, npp)};
+    float* a_s = Ws + {a_offset};
     float* sh_s = a_s + KP * B;
     float* r_s = sh_s + B * ED;  // tensor cores: the warp's redistribution tile [paths][B][RS]
     const int cb = blockIdx.y;
