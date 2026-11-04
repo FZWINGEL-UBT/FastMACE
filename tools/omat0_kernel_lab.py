@@ -293,6 +293,35 @@ def _tc_presplit(kernel):
     return transform
 
 
+def _ns_slab(s):
+    """No store, and w from a 6-term slab with float2 loads instead of the a.W product (wprime_backward.TABLE_W in the
+    forward): w[g][b] = sum_k a_k G_k, the a row's first 6 values standing in for the Chebyshev basis and W's own
+    buffer for the table (three groups by edge index: an L2-resident timing bound, not the real values)."""
+    s = _sub(s, "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;", 1)
+
+    def slab(m):
+        npl = int(m.group(1))
+        return m.group(0) + f"""
+                {{
+                    const float2* slab = reinterpret_cast<const float2*>(W);
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) {{
+                        const int grp = (int)((e0 + b) % 3);
+                        const float t0 = a_s[0 * B + b], t1 = a_s[1 * B + b], t2 = a_s[2 * B + b];
+                        const float t3 = a_s[3 * B + b], t4 = a_s[4 * B + b], t5 = a_s[5 * B + b];
+                        #pragma unroll
+                        for (int g = 0; g < {npl}; ++g) {{
+                            const float2* q = slab + (grp * 1280 + g * 128 + lane) * 3;
+                            const float2 v0 = __ldg(q), v1 = __ldg(q + 1), v2 = __ldg(q + 2);
+                            w[g][b] = t0 * v0.x + t1 * v0.y + t2 * v1.x + t3 * v1.y + t4 * v2.x + t5 * v2.y;
+                        }}
+                    }}
+                }}"""
+    s = _sub(s, r"float w\[(\d+)\]\[B\];\s*#pragma unroll\s*for \(int g = 0; g < \d+; \+\+g\)\s*#pragma unroll\s*"
+                r"for \(int b = 0; b < B; \+\+b\) w\[g\]\[b\] = 0\.f;", slab, regex=True)
+    return _sub(s, "for (int k = 0; k < K; ++k) {", "for (int k = 0; k < 0; ++k) {")
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -315,6 +344,12 @@ def forward_variants(kernel=None):
         "F-no-gemm": ("falsifier", lambda s: _sub(s, "for (int k = 0; k < K; ++k) {", "for (int k = 0; k < 0; ++k) {"),
                       ()),
         "F-no-tp": ("falsifier", lambda s: _sub(s, tp, r"if (false) {\1", regex=True), ()),
+        # Without the store (the message-only kernel of wprime_backward.TABLE_W): the product's share.
+        "NS-no-gemm": ("falsifier", lambda s: _sub(_sub(s, "for (int k = 0; k < K; ++k) {",
+                                                        "for (int k = 0; k < 0; ++k) {"),
+                                                   "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;",
+                                                   1), ()),
+        "NS-slab": ("falsifier", _ns_slab, ()),
         "F-gemm-only": ("falsifier", lambda s: _sub(_sub(s, tp, r"if (false) {\1", regex=True),
                                                     "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;",
                                                     1), ()),

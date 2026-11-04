@@ -457,3 +457,22 @@ Checks: the GPU test (both RTX GPUs): message and density bitwise, dr 3.2e-7 of 
 medium and MH-1 pass with the default's errors. Merge-tier CPU suite on leto: 5,110 passed, 202 skipped. Switch off
 by default; a per-GPU default awaits the owner. Files: `rtx5060ti-tablew-lab/`, `rtx5060ti-tablew-ab/`,
 `rtx4000ada-tablew/`, `a100-sxm4-tablew/` (Modal, 442684b6), `gate-rtx5060ti-tablew/`.
+
+**Follow-ups on top of `TABLE_W`** (MD step, one order, 6 blocks of 200 steps, a = b = `TABLE_W`; b also changes the
+slab; `rtx5060ti-tablew-screen/`, `rtx4000ada-tablew-screen/`):
+
+| b | RTX 5060 Ti | RTX 4000 Ada |
+|---|---|---|
+| `TABLE_W_VECTOR=4` (6 terms padded to 8, two float4 loads) | 1.0447 | 1.0593 |
+| degree 7, float4 (8 terms) | 1.0184 | 1.0252 |
+| degree 4 (float2, 5 terms padded to 6) | 1.0797 | 1.0406 |
+| degree 3, float4 (4 terms, one load) | refused: table certificate 4.8 > 1 | the same |
+
+Float2 at degree 5 stays. Kernel lab with `TABLE_W` (RTX 5060 Ti): the forward without its store 6.78 ms, without the
+store and the a.W product 3.99 ms (the product is now about 2.8 ms of it); `NS-slab` (w from a 6-term float2 slab
+in the forward instead of the product; an L2-resident bound) 8.81 ms with 96 bytes of spills: slower, not built.
+The `TABLE_W` wprime kernel (6.67 ms): no slope 0.924, no atomics 0.986, `unordered` 0.992 (bitwise), maxreg80
+1.004, maxreg64 1.138 (spills): it is bound by the vendored tensor-product backward itself. Step breakdown with
+`TABLE_W` (RTX 5060 Ti, `rtx5060ti-tablew-breakdown/`): edge kernels 17.3 ms per force call (forward 7.6, wprime 7.0),
+atom elementwise 4.3 ms in 85 kernels, atom GEMMs 3.1 ms, interaction-1 edge sums 2.0 ms, symmetric contraction
+0.85 ms.
