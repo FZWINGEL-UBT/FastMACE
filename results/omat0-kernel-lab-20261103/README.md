@@ -353,3 +353,16 @@ on top of the SXM4's switches (tf32x3_gemms, the generic wprime set, the skipped
 
 On MargrafGroup's benchmark card, FastMACE's default plan now runs Benchmark_loup at 3.12 / 3.09 µs/atom/step, against
 4.61 / 4.56 with the defaults before 4 November.
+
+## 14. The W slice pre-split (rejected)
+
+`fused_forward.TC_PRESPLIT` stores the tensor-core forward's W slice as float2 {hi, lo} once per block instead of
+splitting the fragments in every batch (bitwise). Kernel lab, forward kernel of the default plan, round-robin:
+
+| GPU | base | pre-split | F-tc-no-wsplit | launch |
+| --- | --- | --- | --- | --- |
+| A100-SXM4-80GB (`a100-sxm4-presplit/`, Modal 3de2e597, $0.06) | 3.688 ms | 5.023 (1.362) | 3.178 (0.862) | 12 -> 8 warps, 168 -> 194 registers |
+| RTX 5060 Ti, tensor cores forced (`rtx5060ti-presplit/`) | 18.17 ms | 31.02 (1.707) | 17.99 (0.990) | 2 -> 4 parts |
+
+The split instructions cost at most 14 % of the kernel on the A100, but holding the split slice costs a third of the
+block's warps. Rejected; the switch stays for A/Bs.

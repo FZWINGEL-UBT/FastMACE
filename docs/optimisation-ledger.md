@@ -586,6 +586,18 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-eos-chunks](#omat0-eos-chunks) | `edge_outer_sum` chunk sizes 64 | `edge_outer_sum.FORWARD_CHUNK`, `BACKWARD_BLOCK_EDGES` | FM | REJECTED | 2026-11-04 | Ada step 1.002 (forward chunk 64), 1.004 (backward block 64) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-tc-forward](#omat0-tc-forward) | 3×TF32 tensor-core a·W product in the fused forward (A100 only) | `fused_forward.TENSOR_CORES`, `TC_SPLIT` | FM | DEFAULT | 2026-11-04 | A100 80GB only (decision 66), mask split: OMAT-0 step 0.933, MH-1 0.97-0.98 (A100-SXM4); loup 3.17 -> 2.92 µs/atom/step; rna split 1.040; Ada 1.124, 5060 Ti 1.272 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-cutlass-tile](#omat0-cutlass-tile) | Two-warp 32x64 / 64x32 tiles for the CUTLASS 3×TF32 GEMMs (A100) | `cutlass.tf32x3.TILE` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.014 / 1.012 (32x64), 1.017 / 1.017 (64x32); bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-tc-presplit](#omat0-tc-presplit) | W slice split into TF32 parts once per block (tensor-core forward, A100) | `fused_forward.TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | fused forward A100-SXM4 1.362 (12 -> 8 warps), RTX 5060 Ti 1.707 (2 -> 4 parts); bitwise; bound F-tc-no-wsplit 0.862 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+
+<a id="omat0-tc-presplit"></a>
+#### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.TC_PRESPLIT` (False)
+- Engine: FM
+- Date/round: 4 November 2026 (owner's goal: Benchmark_loup as fast as possible; owner: "Yes, try it")
+- What: the tensor-core product splits each W fragment element into its TF32 parts in every batch (4 splits per fragment). The variant stores the block's W slice as float2 {hi, lo} (row stride 36 float2, conflict-free 64-bit fragment loads) and loads the parts; bitwise the same product.
+- Status: REJECTED.
+- Measured: kernel lab, OMAT-0 medium on Benchmark_loup (SrTiO3 5,000 atoms), the plan's forward kernel, round-robin in one process: A100-SXM4-80GB (Modal, 3de2e597, $0.06) base 3.688 ms, pre-split 5.023 (1.362; 8 warps per block instead of 12, 194 registers instead of 168), F-tc-no-wsplit (no W split at all) 3.178 (0.862); RTX 5060 Ti (tensor cores forced on) 1.707, 4 parts instead of 2.
+- Why: the doubled slice costs a third of the block's warps; the latency hiding lost outweighs the split instructions saved.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §14; `tools/modal/omat0_a100_presplit_lab.sh`.
 
 ### Alternative backends and external comparisons
 
