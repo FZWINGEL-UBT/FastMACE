@@ -1,0 +1,299 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-04T00:45:14.953239+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "e804b246cc34d4ace9d07a6f6f600ae54f12e907",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 45.82864672100004,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          1584,
+          10,
+          1280
+        ],
+        "gprime_MB": 77.34375,
+        "species": 3,
+        "pieces": 176,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 6477.215766906738,
+          "min_us": 6427.487850189209,
+          "max_us": 6570.015907287598,
+          "ratio": 1.0
+        },
+        "qmajor-f2": {
+          "kind": "exact",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 5818.816184997559,
+          "min_us": 5767.0722007751465,
+          "max_us": 5899.199962615967,
+          "ratio": 0.898351451363862
+        },
+        "qmajor-f4": {
+          "kind": "exact",
+          "error": "variant pattern found 0 times: 'const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * TERMS * WEIG'"
+        },
+        "qmajor-f2+ldcs-w": {
+          "kind": "exact",
+          "registers": 108,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 5216.864109039307,
+          "min_us": 5167.456150054932,
+          "max_us": 5285.215854644775,
+          "ratio": 0.8054176820375823
+        },
+        "maxreg64": {
+          "kind": "exact",
+          "registers": 64,
+          "local_bytes": 120,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 6584.512233734131,
+          "min_us": 6544.928073883057,
+          "max_us": 6623.487949371338,
+          "ratio": 1.0165652142353494
+        },
+        "maxreg80": {
+          "kind": "exact",
+          "registers": 80,
+          "local_bytes": 48,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 7202.591896057129,
+          "min_us": 7194.591999053955,
+          "max_us": 7278.207778930664,
+          "ratio": 1.1119888784400958
+        },
+        "ldcs-w": {
+          "kind": "exact",
+          "registers": 95,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 7668.767929077148,
+          "min_us": 7662.911891937256,
+          "max_us": 7773.439884185791,
+          "ratio": 1.183960548027173
+        },
+        "evict-last-g": {
+          "kind": "exact",
+          "registers": 95,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 7937.727928161621,
+          "min_us": 7930.1438331604,
+          "max_us": 8055.04035949707,
+          "ratio": 1.2254845621658772
+        },
+        "hints": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 8532.735824584961,
+          "min_us": 8527.680397033691,
+          "max_us": 8653.216361999512,
+          "ratio": 1.3173462382062744
+        },
+        "unordered": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 6392.543792724609,
+          "min_us": 6388.448238372803,
+          "max_us": 6484.73596572876,
+          "ratio": 0.9869277206087941
+        },
+        "unordered+hints": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 8395.584106445312,
+          "min_us": 8386.112213134766,
+          "max_us": 8507.424354553223,
+          "ratio": 1.2961717516559914
+        },
+        "F-no-slope": {
+          "kind": "falsifier",
+          "registers": 72,
+          "local_bytes": 0,
+          "median_us": 2886.240005493164,
+          "min_us": 2884.351968765259,
+          "max_us": 2919.7440147399902,
+          "ratio": 0.44559886675992544
+        },
+        "F-half-terms": {
+          "kind": "falsifier",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 4680.319786071777,
+          "min_us": 4675.327777862549,
+          "max_us": 4745.888233184814,
+          "ratio": 0.722582040571255
+        },
+        "F-one-slab": {
+          "kind": "falsifier",
+          "error": "variant pattern found 0 times: 'const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * TERMS * WEIG'"
+        },
+        "F-no-atomics": {
+          "kind": "falsifier",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 6417.056083679199,
+          "min_us": 6413.4721755981445,
+          "max_us": 6513.919830322266,
+          "ratio": 0.9907121075794779
+        },
+        "F-no-wload": {
+          "kind": "falsifier",
+          "registers": 95,
+          "local_bytes": 0,
+          "median_us": 4865.151882171631,
+          "min_us": 4836.927890777588,
+          "max_us": 4948.800086975098,
+          "ratio": 0.7511177730142274
+        }
+      }
+    },
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=74016)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 48,
+          "median_us": 5094.624042510986,
+          "min_us": 5018.55993270874,
+          "max_us": 6206.431865692139,
+          "ratio": 1.0
+        },
+        "stcs": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 48,
+          "compare": {
+            "out": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 5052.864074707031,
+          "min_us": 5041.600227355957,
+          "max_us": 6164.31999206543,
+          "ratio": 0.9918031306224958
+        },
+        "ldcs-a": {
+          "kind": "exact",
+          "error": "variant pattern found 0 times: 'a[(e0 + b) * K + k]'"
+        },
+        "k64": {
+          "kind": "exact",
+          "error": "variant pattern found 0 times: 'a[(e0 + b) * K + k]'"
+        },
+        "k64+stcs": {
+          "kind": "exact",
+          "error": "variant pattern found 0 times: 'a[(e0 + b) * K + k]'"
+        },
+        "F-no-store": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 40,
+          "median_us": 4911.136150360107,
+          "min_us": 4897.85623550415,
+          "max_us": 5987.904071807861,
+          "ratio": 0.9639840171483108
+        },
+        "F-no-gemm": {
+          "kind": "falsifier",
+          "registers": 139,
+          "local_bytes": 40,
+          "median_us": 2252.4800300598145,
+          "min_us": 2244.7359561920166,
+          "max_us": 2586.6239070892334,
+          "ratio": 0.44212880308036134
+        },
+        "F-no-tp": {
+          "kind": "falsifier",
+          "registers": 114,
+          "local_bytes": 40,
+          "median_us": 3966.3360118865967,
+          "min_us": 3944.6399211883545,
+          "max_us": 4856.319904327393,
+          "ratio": 0.7785336030274983
+        },
+        "F-gemm-only": {
+          "kind": "falsifier",
+          "registers": 64,
+          "local_bytes": 40,
+          "median_us": 609.279990196228,
+          "min_us": 604.3840050697327,
+          "max_us": 706.2720060348511,
+          "ratio": 0.1195927285531225
+        }
+      }
+    }
+  }
+}
