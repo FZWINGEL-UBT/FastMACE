@@ -235,3 +235,11 @@ Benchmark protocol on the PCIe card with pcie-all: NVE 3.324, 3.311, 3.305 and L
 µs/atom/step (medians 3.311 and 3.260), against 4.612 and 4.562 for the default plan there (section 8): 28 % less.
 The switches are the arithmetic the SXM4 card already runs by default (same sm_80 kernels, force gates passed there).
 Adding "NVIDIA A100 80GB PCIe" to their decision-66 lists needs the owner.
+
+## 10. The defaults re-timed on the A100-SXM4-80GB
+
+`omat0_a100_recheck.sh` with `SCREEN=streamw`, guarded to the SXM4 card (2913d44c, first attempt; about $0.40;
+`a100-sxm4-retime/`). The default plan with no constants (degree 5 and the skipped zero column now default there):
+NVE 3.187, 3.182, 3.183 and Langevin 3.242, 3.146, 3.199 µs/atom/step (medians 3.183 and 3.199), the same as dz5 set
+by constants in section 4 (3.172 / 3.175) within run noise. `streamw` (wprime reads w with `__ldcs`) on top: 1.0048,
+rejected on the A100 too.
