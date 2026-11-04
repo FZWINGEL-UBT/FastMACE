@@ -354,7 +354,8 @@ def main(argv=None):
                    help="RewriteConfig overrides (e.g. radial_tables=on fused_folded_forward=on wprime_backward=on "
                         "on a GPU outside decision 66)")
     p.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
-                   help="Module constants (A/B switches such as fastmace.rewrites.radial:DEGREE=5) of the captured plan")
+                   help="Module constants of the captured plan (A/B switches such as "
+                        "fastmace.rewrites.radial:DEGREE=5)")
     p.add_argument("--kernels", nargs="*", default=["wprime", "forward"])
     p.add_argument("--variants", nargs="*", default=None, help="variant names (default: all)")
     p.add_argument("--min-edges", type=int, default=100000, help="the smallest edge count of a captured call")
