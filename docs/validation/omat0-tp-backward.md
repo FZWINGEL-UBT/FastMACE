@@ -114,7 +114,9 @@ forward (about 8e-8 alone). Each passes alone; together they exceed 2 × ASE flo
 FACTORED and SYMMETRIC_PAIRS change nothing here (default vs main: 1.8e-7 both). The other structures pass with the
 new defaults on the A100: OMAT-0 SrTiO3 stress r1.50, NaCl r1.47; MH-1 NaCl r1.48, NaNbO3 r0.93, NbCl5 r0.46 (forces
 r0.85–1.07). Which of the two to give up on the A100 for OMAT-0, or whether to accept the excess (4e-8 eV/Å³ over the
-limit, energy within the 10 meV floor), is the owner's decision.
+limit, energy within the 10 meV floor), was the owner's decision. **Accepted (owner, 5 November 2026: "keep it its
+fine"):** both stay default on the A100s; the OMAT-0 NbCl5 stress error of about 1.8e-7 eV/Å³ against a limit of
+1.2–1.5e-7 is a recorded, accepted exception of the A100 plan.
 
 The A100 gains three times as much as the Ada: on the A100 the kernel is bound by FP32 arithmetic (19.5 TFLOPS against
 2 TB/s), on the Ada by the value-table loads (§5).
@@ -159,8 +161,8 @@ instead). Modal: profile `second`, image builder pinned to 2025.06 for the Pytho
 
 ## 7. Not done
 
-- The A100 default's NbCl5 stress gate failure (§3.1) is located (tf32x3 GEMMs + tensor-core forward together) but
-  not resolved: the owner decides which to drop for OMAT-0 on the A100, or whether to accept it.
+- The A100 default's NbCl5 stress gate failure (§3.1) is located (tf32x3 GEMMs + tensor-core forward together) and
+  accepted by the owner (5 November 2026); nothing was turned off.
 - The RTX 5060 Ti and the A100 80GB PCIe were not measured; the PCIe card gets FACTORED and SYMMETRIC_PAIRS through
   the "every A100" list without its own A/B or gate.
 - Branch `fastmace/factored-default` (`3812b56e`): CPU suite on leto 5,122 passed, 200 skipped
