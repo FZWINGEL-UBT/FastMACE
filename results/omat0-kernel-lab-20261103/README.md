@@ -497,6 +497,37 @@ backward reassembled the gradient. With `BLOCK_MESSAGE` the message-only forward
 Force gate (RTX 5060 Ti, `gate-rtx5060ti-block/`): passes, errors as the default's. Breakdown (RTX 5060 Ti,
 `rtx5060ti-block-breakdown/`): the copies are gone, but the block wprime kernel takes 10.3 ms against 7.6 ms (80
 registers both); without `__restrict__` on the gradient pointers the step is the same (1.059). Default on the RTX
-4000 Ada and every A100 (owner, 4 November 2026: "Yes, Ada and A100"; `BLOCK_MESSAGE_GPUS`), off on the RTX 5060 Ti.
+4000 Ada and every A100 (owner, 4 November 2026: "Yes, Ada and A100"; `BLOCK_MESSAGE_GPUS`).
 The owner stopped OMAT-0 work after this round.
+
+### The RTX 5060 Ti slowdown (`wprime_backward.BLOCK_LDG`, 4 November 2026)
+
+The owner asked for this one fix. `rtx5060ti-block-probe/` times the kernel alone on tensors captured from a real
+step, alternating variants in one process (median of 40 launches, RTX 5060 Ti, WSL2, `mace_cueq_oeq`):
+
+| Kernel, reads | ms | / dense |
+|---|---:|---:|
+| dense | 6.83 | 1.000 |
+| block, four pointers, plain loads | 9.93 | 1.455 |
+| block, one allocation, compile-time offsets | 7.18 | 1.051 |
+| block, one pointer, 64-bit distances per edge | 7.60 | 1.113 |
+| dense layout through four pointers | 7.55 | 1.116 |
+| block, row start kept once per edge | 9.93 | 1.470 |
+| block, 32-bit row index | 10.49 | 1.552 |
+| block, assumed 512-byte alignment | 9.95 | 1.457 |
+| **block, four pointers, `__ldg`** | **6.64** | **0.973** |
+
+Placement does not matter: one allocation, 2 MiB alignment and offset groups all give 9.87-9.90 ms. Writing the
+gradient just before the launch, as the GEMM does, changes nothing either. Results agree with the dense kernel to
+2e-7 relative. Why plain loads cost this much on sm_120 was not traced to the machine code.
+
+| GPU | MD step b/a (ab / ba) | folder |
+|---|---|---|
+| RTX 5060 Ti, b = block with `__ldg`, a = default with `TABLE_W` | 0.9764 / 0.9749 (29.3 -> 28.6 ms) | `rtx5060ti-ldg-ab/` |
+| RTX 4000 Ada (leto), b = `__ldg`, a = plain, both block | 1.0035 / 1.0010 | `rtx4000ada-ldg-ab/` |
+
+`BLOCK_LDG_GPUS` is the RTX 5060 Ti alone, which joins `BLOCK_MESSAGE_GPUS`. No A100 was measured, so the A100s and
+the Ada run exactly what they ran before. Force gate on the new default
+(`gate-rtx5060ti-block-ldg/`) passes on SrTiO3, NaCl and NbCl5: worst ratios forces 0.97, stress 0.66, energy 1.85
+(under the 0.01 floor). With no constants set, OMAT-0 medium runs the block layout with `__ldg` here (20 MD steps).
 
