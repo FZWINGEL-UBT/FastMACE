@@ -353,6 +353,8 @@ def main(argv=None):
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="RewriteConfig overrides (e.g. radial_tables=on fused_folded_forward=on wprime_backward=on "
                         "on a GPU outside decision 66)")
+    p.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
+                   help="Module constants (A/B switches such as fastmace.rewrites.radial:DEGREE=5) of the captured plan")
     p.add_argument("--kernels", nargs="*", default=["wprime", "forward"])
     p.add_argument("--variants", nargs="*", default=None, help="variant names (default: all)")
     p.add_argument("--min-edges", type=int, default=100000, help="the smallest edge count of a captured call")
@@ -362,7 +364,11 @@ def main(argv=None):
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
+    from ab_rewrites import constant_overrides
 
+    constants = constant_overrides(args.constant)
+    for (module, name), value in constants.items():
+        setattr(sys.modules[module], name, value)
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=True)
@@ -371,7 +377,8 @@ def main(argv=None):
     meta.update(tool="omat0_kernel_lab", created_utc=datetime.now(timezone.utc).isoformat(),
                 host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, rounds=args.rounds,
-                capture_s=time.perf_counter() - started, kernels={})
+                capture_s=time.perf_counter() - started, kernels={},
+                constants={f"{m}:{n}": v for (m, n), v in constants.items()})
     for name in args.kernels:
         kernel, cargs = captured[name]
         if name == "wprime":
