@@ -206,3 +206,32 @@ same-process MD step A/B, 1 fs, 8 blocks of 300 steps, both build orders (0130ec
 
 Degree 5 is neutral on MH-1 (NaCl −2 %); the planner certifies every table at any degree (certificate at most 1),
 so the accuracy rule is unchanged.
+
+## 8. The A100 80GB PCIe with the new defaults
+
+The recheck job (`tools/modal/omat0_a100_recheck.sh`, 4bc2ffeb, `a100-pcie-recheck/`) was meant to re-time the
+defaults of 4 November on the A100-SXM4-80GB, but Modal assigned an **A100 80GB PCIe**. There the plan has only
+the generic radial tables of decision 66; `tf32x3_gemms`, `wprime_backward`, `fused_folded_forward`,
+`chunked_conv_backward` and the skipped zero column are listed for the SXM4 card alone. Benchmark protocol on the
+PCIe card: NVE 4.606, 4.619, 4.612 and Langevin 4.556, 4.562, 4.569 µs/atom/step (23.0 ms per step), against 3.17
+on the SXM4 card with them. MargrafGroup's Benchmark_loup ran on the PCIe card, so section 9 measures those
+switches there. The screen `ffoff` (fused folded forward off) was 1.0006 on the PCIe card, where it was not on
+anyway, and 1.108 on the RTX 5060 Ti (`screens/rtx5060ti-ffoff/`).
+
+## 9. The decision-66 switches on the A100 80GB PCIe
+
+`tools/modal/omat0_a100_pcie.sh` (d671614e; Modal, rerun until it was assigned the PCIe card: five SXM4 attempts
+exited at once, about $0.06 each; the run itself about $1.07; `a100-pcie/`). Same-process MD step A/Bs, default plan
+on side a (degree-5 tables, no tf32x3, no wprime set, no skip on this card):
+
+| Case | b | b/a |
+|---|---|---|
+| pcie-all (both orders) | `tf32x3_gemms`, `wprime_backward`, `fused_folded_forward`, `chunked_conv_backward` on, `SKIP_ZERO_COLUMN` | **0.7490 / 0.7484** |
+| pcie-tf32x3 | `tf32x3_gemms` on | 0.9503 |
+| pcie-wprime | the wprime set (wprime backward, fused forward, chunked carrier) | 0.8086 |
+| pcie-skip | the skip on top of the wprime set (both sides with the set) | 0.9938 |
+
+Benchmark protocol on the PCIe card with pcie-all: NVE 3.324, 3.311, 3.305 and Langevin 3.277, 3.257, 3.260
+µs/atom/step (medians 3.311 and 3.260), against 4.612 and 4.562 for the default plan there (section 8): 28 % less.
+The switches are the arithmetic the SXM4 card already runs by default (same sm_80 kernels, force gates passed there).
+Adding "NVIDIA A100 80GB PCIe" to their decision-66 lists needs the owner.
