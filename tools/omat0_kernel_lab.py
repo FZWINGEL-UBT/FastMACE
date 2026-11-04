@@ -244,6 +244,9 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
     return {
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
         "factored": ("rounding", rerender(factored=True), ()),
+        "factored-maxreg80": ("rounding", rerender(factored=True), ("--maxrregcount=80",)),
+        "factored-maxreg72": ("rounding", rerender(factored=True), ("--maxrregcount=72",)),
+        "factored-maxreg64": ("rounding", rerender(factored=True), ("--maxrregcount=64",)),
         "sh-hoist": ("exact", sh_hoist, ()),
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, coefficient, "", 258, regex=True), ()),
         "F-tp-wg-only": ("falsifier", wg_only, ()),
