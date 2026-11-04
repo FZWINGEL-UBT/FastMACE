@@ -179,4 +179,5 @@ def tf32x3_matmul(a, b, b_t=None):
     return Tf32x3Matmul.apply(a, b, b_t)
 
 
-__all__ = ["CUTLASS_CAPABILITIES", "MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "backend", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]
+__all__ = ["CUTLASS_CAPABILITIES", "MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "backend", "supported",
+           "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]
