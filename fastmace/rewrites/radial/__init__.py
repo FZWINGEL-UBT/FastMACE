@@ -38,7 +38,11 @@ from fastmace.rewrites.registry import CaseErrors, CheckResult, Rewrite, Rewrite
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
 R_LO = 0.3  # Å: the domain's lower end, below any distance MD reaches; shorter edges are evaluated here
 R_PHYSICAL = 1.0  # Å: the certificate's second region, where every MD edge lies
-DEGREE = 10  # tiny MH-1-type model: 36 pieces, certificate 0.13 (degree 12: 24 pieces, the same ratios)
+# Degree 5 (owner, 4 November 2026; degree 10 before): fewer terms per edge in the table forward, its backward and
+# wprime's slope, more pieces at the same tolerance and certificate. MD step against degree 10: OMAT-0 medium on
+# Benchmark_loup 0.903 / 0.905 (A100-SXM4-80GB), 0.908 (RTX 4000 Ada), 0.935 (RTX 5060 Ti); MH-1 on the Ada neutral
+# (NaCl 0.978, NaNbO3 and NbCl5 within 0.6 %); results/omat0-kernel-lab-20261103.
+DEGREE = 5
 INITIAL_PIECES = 8
 MAX_DEPTH = 9  # bins: INITIAL_PIECES * 2**MAX_DEPTH, so that every piece boundary is a bin boundary
 TOLERANCE = 1e-7

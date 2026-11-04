@@ -181,6 +181,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- Float32 radial tables (MH-1's and the generic family's) are fitted at Chebyshev degree 5 instead of 10
+  (`rewrites.radial.DEGREE`), with the same tolerance and certificate. OMAT-0 medium MD step 0.90–0.94 against
+  degree 10 (A100-SXM4-80GB, RTX 4000 Ada, RTX 5060 Ti); MH-1 neutral. On the RTX 4000 Ada and the
+  A100-SXM4-80GB the fused folded forward also skips an all-zero last folded-weight column
+  (`fused_forward.SKIP_ZERO_COLUMN`, decision 66, exact). Benchmark_loup on the A100-SXM4-80GB: 3.17 µs/atom/step
+  (was 3.54–3.61). Owner decision, 4 November 2026; results/omat0-kernel-lab-20261103.
 - Tile lists (`fastmace.neighbors.tile_list.TileNeighbours`): half-cutoff bins and a +-2 stencil, 42 % fewer
   candidates, the same edges in the same order; a 1M-atom list rebuild 2.11 -> 1.38 s (RTX 4000 Ada).
 - Tiled kept lists and list cache: senders as int16 ranks into each tile's int32 senders (about 3 instead of 5 bytes

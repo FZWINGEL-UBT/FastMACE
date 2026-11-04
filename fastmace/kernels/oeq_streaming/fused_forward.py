@@ -49,8 +49,13 @@ BLOCKS_PER_SM = 2  # blocks per SM over all slices of the grid (the persistent g
 # A folded weight whose last column is all zero (a last radial layer without bias, such as e3nn's FullyConnectedNet
 # in MACE-OMAT-0): the k-loop skips that column, and a and W keep their row stride (OMAT-0 kernel lab, 3 November
 # 2026: the fused forward 9.1 % faster on the RTX 4000 Ada, 1.0 % slower on the RTX 5060 Ti). The same FP32 sums:
-# the skipped term adds an exact zero. A module constant for the A/B.
-SKIP_ZERO_COLUMN = False
+# the skipped term adds an exact zero. None: on for SKIP_ZERO_COLUMN_GPUS (decision 66; owner, 4 November 2026);
+# True / False: an A/B side's choice on every GPU.
+SKIP_ZERO_COLUMN = None
+# MD step on Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms) on top of degree-5 radial tables: RTX 4000 Ada 0.981,
+# A100-SXM4-80GB 0.986 (degree 5 and the skip against degree 5 alone; both orders 0.896 / 0.895 against degree 10).
+# The RTX 5060 Ti gained nothing (1.000) and keeps the full k-loop; other GPUs are not measured.
+SKIP_ZERO_COLUMN_GPUS = ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB")
 # The stored per-edge weights are read only by the backward, long after: store them with the streaming cache hint
 # (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
 # forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
@@ -160,10 +165,13 @@ def tc_product(npl):
 
 
 def used_columns(weight):
-    """The folded inputs the k-loop reads: ``weight.shape[1]``, one fewer with ``SKIP_ZERO_COLUMN`` when the
-    weight's last column is all zero."""
+    """The folded inputs the k-loop reads: ``weight.shape[1]``, one fewer with ``SKIP_ZERO_COLUMN`` (by default on
+    ``SKIP_ZERO_COLUMN_GPUS``) when the weight's last column is all zero."""
     k = int(weight.shape[1])
-    return k - 1 if SKIP_ZERO_COLUMN and k > 1 and not bool(weight[:, -1].any()) else k
+    skip = SKIP_ZERO_COLUMN
+    if skip is None:
+        skip = weight.device.type == "cuda" and torch.cuda.get_device_name(weight.device) in SKIP_ZERO_COLUMN_GPUS
+    return k - 1 if skip and k > 1 and not bool(weight[:, -1].any()) else k
 
 
 def _lit(value):

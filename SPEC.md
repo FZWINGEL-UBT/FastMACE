@@ -3309,6 +3309,17 @@ never probe. See `docs/validation/estimate-band.md` and `docs/validation/estimat
 
 **Generic radial tables on the A100 80GB cards (3 November 2026, owner: "Yes go ahead"; conductor):** decision 66's list for `generic_radial_tables` adds "NVIDIA A100 80GB PCIe" (SrTiO3 5,000 atoms, MD step b/a 0.902 / 0.901) and "NVIDIA A100-SXM4-80GB" (NaCl 8,000 atoms, 0.917 / 0.917), one structure each, after MargrafGroup's Benchmark_loup ran FastMACE on the PCIe card without them. `generic_chunked_conv_backward` stays off there (1.12 with the tables). See `docs/validation/loup-a100.md`.
 
+**Radial tables of degree 5 and the skipped zero column (4 November 2026, owner: "Yes"; conductor):** the float32
+radial tables (MH-1's and the generic family's) are fitted with Chebyshev degree 5 instead of 10
+(`rewrites.radial.DEGREE`), at the same tolerance and certificate (at most 1; more pieces). MD step against degree
+10: OMAT-0 medium on Benchmark_loup 0.903 / 0.905 (A100-SXM4-80GB), 0.908 (RTX 4000 Ada), 0.935 (RTX 5060 Ti);
+MH-1 on the Ada neutral (NaCl 0.978, NaNbO3 and NbCl5 within 0.6 %); the force gate passes on SrTiO3, NaCl and
+NbCl5. Float64 tables keep `DEGREE_64`. The fused folded forward's k-loop skips the folded weight's all-zero last
+column (`fused_forward.SKIP_ZERO_COLUMN`, exact) on "NVIDIA RTX 4000 Ada Generation" and "NVIDIA A100-SXM4-80GB"
+(decision 66; 0.981 and 0.986 on top of degree 5; the RTX 5060 Ti 1.000 keeps it off). Benchmark_loup on the
+A100-SXM4-80GB: 3.17 µs/atom/step against 3.61 (NVE) and 3.54 (Langevin). See
+`results/omat0-kernel-lab-20261103/README.md`.
+
 **Rule 12 for generic models (2 November 2026, owner: test the capacity on OMAT-0 medium and carry over the MH-1
 changes; conductor):** §6.2, §9.3 rule 12 and decision 66 amended. Two generic records (§6.2):
 `generic_chunked_conv_backward` (default on by decision 66 on the RTX 5060 Ti and RTX 4000 Ada) and

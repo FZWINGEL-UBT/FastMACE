@@ -79,7 +79,9 @@ def test_skip_zero_column_reads_one_input_fewer(monkeypatch):
         ff.render(_schedule(), 9, rule, used=10)
     weight = torch.ones(128, 9)
     weight[:, -1] = 0.0
-    assert ff.used_columns(weight) == 9  # off by default
+    assert ff.used_columns(weight) == 9  # by default only on SKIP_ZERO_COLUMN_GPUS (a CPU weight: none)
+    monkeypatch.setattr(ff, "SKIP_ZERO_COLUMN", False)
+    assert ff.used_columns(weight) == 9
     monkeypatch.setattr(ff, "SKIP_ZERO_COLUMN", True)
     assert ff.used_columns(weight) == 8
     weight[3, -1] = 1e-30
