@@ -22,7 +22,7 @@ leto: NVIDIA RTX 4000 Ada Generation, driver 595.99.02, NAS `mace_cueq_oeq` (tor
 | `rtx4000ada-ab-factored-sym` | bcb1bf28 | MD step b = FACTORED + SYMMETRIC_PAIRS 0.9792 / 0.9747 |
 | `a100-sxm4-bcb1bf28` | bcb1bf28 | lab: factored 0.727, +unordered 0.721, pair 0.713, one slab 0.683, wg-only 0.588; MD step FACTORED 0.9381 / 0.9397, FACTORED + SYMMETRIC_PAIRS 0.9365 / 0.9307 ($0.52) |
 | `a100-sxm4-scale-dcde706e` | dcde706e | GPU test pass; lab factored 0.722, factored-scaled 0.830, pair 0.708; MD step a = FACTORED, b = + FACTORED_SCALE 1.0247 / 1.0238 ($0.29) |
-| `a100-sxm4-gate-8aec363b` | 8aec363b | force gates on the A100 default plan, default vs FACTORED |
+| `a100-sxm4-gate-8aec363b` | 8aec363b | force gates on the A100 default plan, default vs FACTORED: FACTORED's errors are the default's; OMAT-0 NbCl5 stress fails for both (1.79e-7 / 1.81e-7 against 1.16e-7 / 1.34e-7) ($1.50) |
 | `rtx4000ada-cpu-suite-final` | 8aec363b | CPU suite 5,128 passed, 202 skipped; ruff: 3 long lines (in main) + 1 in `wprime_backward.__all__`, fixed after |
 
 Lab ratios are medians of 21 round-robin rounds against the default kernel captured in the same process. MD step A/Bs:
