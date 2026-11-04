@@ -43,8 +43,12 @@ def _check(result):
     return result[1:] if len(result) > 2 else (result[1] if len(result) == 2 else None)
 
 
-def render_kernels(problem, dtype=np.float32, num_threads=128, layout="mul_ir"):
+NUM_THREADS = 128  # threads per block of the streaming kernels (32 lanes per edge); a module constant for screens
+
+
+def render_kernels(problem, dtype=np.float32, num_threads=None, layout="mul_ir"):
     """(schedule, kernel) for one uvu problem (OEq TPProblem): kernel.jit_kernel is the CUDA source."""
+    num_threads = NUM_THREADS if num_threads is None else num_threads
     from fastmace.kernels.oeq_streaming.schedule import FactorizedLaunchConfig, factorized_schedule_from_problem
 
     if layout not in LAYOUTS:
@@ -82,10 +86,11 @@ def compile_cubin(source, capability, extra_options=()):
 class StreamingKernels:
     """Compiled forward/backward kernels for one uvu problem (OEq TPProblem) and dtype."""
 
-    def __init__(self, problem, dtype=np.float32, num_threads=128, layout="mul_ir", receiver_backward=False,
+    def __init__(self, problem, dtype=np.float32, num_threads=None, layout="mul_ir", receiver_backward=False,
                  extra_options=()):
         from cuda.bindings import driver
 
+        num_threads = NUM_THREADS if num_threads is None else num_threads
         schedule, kernel = render_kernels(problem, dtype, num_threads, layout)
         self.layout = layout
         self.schedule = schedule

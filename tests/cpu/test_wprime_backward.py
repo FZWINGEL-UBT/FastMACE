@@ -56,6 +56,21 @@ def test_derivative_table_is_fold_tables_g_prime_without_padding():
     assert bool((dg[:-1, terms:] == 0).all())
 
 
+@pytest.mark.parametrize("degree, vector", [(10, 2), (10, 4), (7, 2), (7, 4)])
+def test_q_major_derivative_table_holds_the_same_values(degree, vector):
+    """``SLOPE_VECTOR``'s layout: each (group, weight)'s terms contiguous, zero terms up to a multiple of the load
+    width, the term-major table's values bit for bit."""
+    table, weight, _ = _tables(torch.float32, degree=degree)
+    term_major = wp.derivative_table(table.dcoef, weight)
+    q_major = wp.derivative_table(table.dcoef, weight, vector)
+    terms = degree
+    padded = wp.padded_terms(terms, vector)
+    assert padded % vector == 0 and terms <= padded < terms + vector
+    assert q_major.shape == (term_major.shape[0], weight.shape[0], padded) and q_major.is_contiguous()
+    assert torch.equal(q_major[..., :terms], term_major.transpose(1, 2))
+    assert bool((q_major[..., terms:] == 0).all())
+
+
 @pytest.mark.parametrize("dtype, tolerance", [(torch.float64, 1e-12), (torch.float32, 2e-5)])
 def test_the_w_prime_dot_equals_the_chain(dtype, tolerance):
     """``<dw, w'(r)>`` against ``radial_table_backward(dw W)`` with a zero density gradient; edges outside the
@@ -147,6 +162,12 @@ def test_render_both_layouts():
     assert "input_base + 0 + channel" in source  # ir_mul: channel-minor
     assert "output_base + 66 + channel * 3" in wp.render(_schedule("mul_ir"), "float", 10)
     assert "using scalar_t = double;" in wp.render(_schedule(), "double", 17)
+    assert "__ldg(g + k * WEIGHT_DIM + weight_index)" in source and "float2" not in source  # term-major
+    vector = wp.render(_schedule(), "float", 7, vector=4)  # SLOPE_VECTOR: q-major, one zero term
+    assert "constexpr int TERMS = 7;" in vector and "constexpr int PADDED_TERMS = 8;" in vector
+    assert "const float4 v = __ldg(gq + k);" in vector and "* v.w;" in vector
+    with pytest.raises(ValueError, match="slope vector"):
+        wp.render(_schedule(), "double", 17, vector=2)
 
 
 def test_generated_source_compiles_with_nvrtc():
@@ -158,6 +179,7 @@ def test_generated_source_compiles_with_nvrtc():
     for layout in ("ir_mul", "mul_ir"):
         for capability in ((12, 0), (8, 9), (8, 0)):
             assert compile_cubin(wp.render(_schedule(layout), "float", 10), capability)
+            assert compile_cubin(wp.render(_schedule(layout), "float", 7, vector=2), capability)
 
 
 def test_record_and_requirements():

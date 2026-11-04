@@ -57,6 +57,28 @@ def fc_split(network):
     return torch.nn.Sequential(*layers[:-1]), last
 
 
+# The reassociated first interaction with radial tables reads the whole table row [h c, c] against [W, 0] (as MH-1
+# reads [h c, c] against [W, b]) instead of the slice h c against W: no strided copy of [E, 64] and no zero-padding
+# slice backward; the cutoff column only adds zero products. Exact to rounding (the per-path products' K grows by
+# one zero row per species slot). A module constant for the A/B (OMAT-0 A100 profile, 3 November 2026).
+FIRST_FULL_ROWS = False
+# The tabled first interaction's table evaluated for the reassociation's columns only (the folded input without its
+# cutoff column, which the reassociation drops): no [E, h c + 1] output sliced, and its backward reads the [E, h c]
+# gradient as it is, without the zero-padded copy (OMAT-0 A100 profile, 4 November 2026: 0.11 ms per force call).
+# Bitwise: the dropped column's gradient is zero. A module constant for the A/B.
+FIRST_TABLE_COLUMNS = False
+
+
+def _first_inputs(augmented, last):
+    """(table rows, last-layer weight) for the reassociation of a tabled generic first interaction."""
+    weight = fc_last_weight(last)
+    if FIRST_FULL_ROWS:
+        return augmented, torch.nn.functional.pad(weight, (0, 1))
+    if augmented.shape[1] == weight.shape[-1]:  # FIRST_TABLE_COLUMNS: the table returned these columns only
+        return augmented, weight
+    return augmented[:, :-1], weight
+
+
 def fc_last_weight(last):
     """Effective [out, in] matrix of an e3nn last layer: x @ w / sqrt(h_in var_in / var_out) == x @ result.T."""
     return (last.weight / (last.h_in * last.var_in / last.var_out) ** 0.5).t()
@@ -73,9 +95,10 @@ def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edg
     keeps the lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again (MH-1's
     ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
     backward rebuilds only the table."""
-    augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index)
-    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, augmented[:, :-1], edge_index,
-                                       fc_last_weight(self.radial_last))
+    columns = fc_last_weight(self.radial_last).shape[-1] if FIRST_TABLE_COLUMNS and not FIRST_FULL_ROWS else -1
+    augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index, columns=columns)
+    rows, weight = _first_inputs(augmented, self.radial_last)
+    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, rows, edge_index, weight)
     return message, edge_density
 
 
@@ -161,13 +184,13 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         pass
     elif reassociation is not None:
         if tabled:
-            hidden = augmented[:, :-1]  # h c
+            hidden, weight = _first_inputs(augmented, self.radial_last)  # h c and W, or [h c, c] and [W, 0]
         else:
-            hidden = self.radial_hidden(edge_feats)
+            hidden, weight = self.radial_hidden(edge_feats), fc_last_weight(self.radial_last)
             if cutoff is not None:  # (h W) c = (h c) W
                 hidden = hidden * cutoff
-        message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index,
-                                fc_last_weight(self.radial_last), rows=n_real)  # the tiles' receivers only
+        message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index, weight,
+                                rows=n_real)  # the tiles' receivers only
     elif getattr(self, "streaming_kernels", None) is not None:
         from fastmace.rewrites.mh1.modules import streaming_message
         message = streaming_message(self, node_feats, edge_attrs, None if chunked else tp_weights, edge_index,
@@ -177,7 +200,15 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     else:
         mji = self.conv_tp(node_feats[edge_index[0]], edge_attrs, tp_weights)
         message = scatter_sum(src=mji, index=edge_index[1], dim=0, dim_size=num_nodes)
-    if message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
+    if isinstance(message, tuple) and (n_real is not None or kind == "residual"
+                                       or getattr(self, "density_before_linear", False)):
+        from fastmace.kernels.oeq_streaming.wprime_backward import dense_message
+        wprime = self.wprime_backward  # BLOCK_MESSAGE on a path that needs the whole message
+        message = dense_message(message, wprime.block[1], wprime.kernels.schedule.channels,
+                                wprime.kernels.schedule.output_dim)
+    if isinstance(message, tuple):  # BLOCK_MESSAGE: linear_1's input groups, every row real
+        pass
+    elif message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
         message = self.truncate_ghosts(message, n_real)
     node_attrs = self.truncate_ghosts(node_attrs, n_real)
     if kind == "residual":
@@ -217,6 +248,18 @@ class GenericFoldedRadial(torch.nn.Module):
         return self.folded_main, self.folded_last
 
 
+# Every atom's rows through its own species' matrix only (``fastmace.kernels.triton.species_gemm``), instead of
+# through all present species' matrices followed by the selection of its block: a third of the products and no
+# species-expanded intermediates for three species. Exact (the same dot products; bitwise in the species skip lab).
+# CUDA float32 only (4 November 2026, Benchmark_loup speed goal). None: on for SPECIES_GEMM_GPUS (decision 66;
+# owner, 4 November 2026: "Yes both"); True / False: an A/B side's choice on every GPU. Benchmark_loup (OMAT-0
+# medium, SrTiO3 5,000 atoms) MD step b/a in both orders: RTX 4000 Ada 0.955 / 0.952, RTX 5060 Ti 0.950 / 0.953;
+# A100-SXM4-80GB 0.992 / 0.991 (not adopted there: its skip runs as 3xTF32, where the Triton dot is about 3x slower
+# per product than the concatenated CUTLASS GEMM; our own mma.sync kernel, species_gemm.TENSOR_CORES, did no better).
+SPECIES_GEMM = None
+SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+
+
 class SpeciesSkip(torch.nn.Module):
     """Element-dependent skip connection restricted to the structure's species (``generic_species_skip``).
 
@@ -240,8 +283,12 @@ class SpeciesSkip(torch.nn.Module):
         for index, (i, j, weight) in enumerate(blocks):  # weight [species, mul_in, mul_out]
             species, mul_in, mul_out = weight.shape
             self.register_buffer(f"w{index}", weight.permute(1, 0, 2).reshape(mul_in, species * mul_out).contiguous())
+            self.register_buffer(f"ws{index}", weight.contiguous(), persistent=False)  # [species, mul_in, mul_out]
+            self.register_buffer(f"wt{index}", weight.transpose(1, 2).contiguous(), persistent=False)
             self.pairs.append((i, j))
         self.tf32x3 = False  # tf32x3_gemms: the products as 3xTF32 (OPT4-T03)
+        # SPECIES_GEMM None: the device's default, fixed when the module is built on it
+        self.species_gemm_gpu = (columns.is_cuda and torch.cuda.get_device_name(columns.device) in SPECIES_GEMM_GPUS)
 
     def _view(self, x, segment):
         offset, mul, dim = segment
@@ -254,9 +301,21 @@ class SpeciesSkip(torch.nn.Module):
         onehot = x2[:, self.columns]  # [atoms, species]
         atoms, species = onehot.shape
         outputs = [None] * len(self.segments_out)
+        on = self.species_gemm_gpu if SPECIES_GEMM is None else SPECIES_GEMM
+        grouped = on and x1.is_cuda and x1.dtype == torch.float32
+        if grouped:
+            from fastmace.kernels.triton.species_gemm import species_mm, species_plan
+            kind = onehot.argmax(dim=1)
+            precision = "tf32x3" if self.tf32x3 else "ieee"
+            order, counts = species_plan(kind, species)
         for index, (i, j) in enumerate(self.pairs):
             weight = getattr(self, f"w{index}")
             xi = self._view(x1, self.segments_in[i])  # [atoms, size, mul_in]
+            if grouped:
+                y = species_mm(xi, getattr(self, f"ws{index}"), getattr(self, f"wt{index}"), kind, order, counts,
+                               precision)
+                outputs[j] = y if outputs[j] is None else outputs[j] + y
+                continue
             size, mul_out = xi.shape[1], weight.shape[1] // species
             left = xi.reshape(atoms * size, -1)
             if self.tf32x3:

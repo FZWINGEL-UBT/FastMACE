@@ -5,6 +5,8 @@
 # - the benchmark's protocol (tools/bench/loup_md.py, NVE and Langevin, 3 fresh processes each);
 # - the step breakdown (tools/step_breakdown.py, kernels by category, 300 K, 1 fs);
 # - the kernel sources (tools/module_profile.py: compiled graph, eager frame or autograd node per kernel).
+# CONSTANTS (MODULE:NAME=VALUE ..., 4 November 2026): module constants for the breakdown; LOUP=0 skips the benchmark
+# runs and the kernel sources (a breakdown of a candidate only).
 # Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu A100-80GB --timeout-min 60 --commit <sha> \
 #     --command "bash tools/modal/omat0_a100_profile.sh" --out ~/fm-runs/omat0-a100-profile
@@ -21,15 +23,17 @@ job() {
   note "end $name exit=$? $(tail -n 1 "$out/$name.log" | cut -c1-300)"
 }
 note "Modal $(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader); source $(cat .source_commit)"
-for ens in nve langevin; do
+read -r -a constants <<< "${CONSTANTS:-}"
+[ "${LOUP:-1}" = 0 ] || for ens in nve langevin; do
   for t in 1 2 3; do
     job "loup-$ens-$t" python tools/bench/loup_md.py --structure "$st" --checkpoint "$ck" --ensemble "$ens" \
       --output "$out/loup/$ens-$t.json"
   done
 done
 job breakdown python tools/step_breakdown.py --output "$out/breakdown" --checkpoint "$ck" --model omat0-medium \
-  --structure "$st" --temperature-K 300 --timestep-fs 1 --equilibrate-steps 100 --steps 200
-job sources python tools/module_profile.py --output "$out/sources" --checkpoint "$ck" --model omat0-medium \
-  --structure "$st" --temperature-K 300 --equilibrate-steps 50 --calls 5
+  --structure "$st" --temperature-K 300 --timestep-fs 1 --equilibrate-steps 100 --steps 200 \
+  ${constants[@]+--constant "${constants[@]}"}
+[ "${LOUP:-1}" = 0 ] || job sources python tools/module_profile.py --output "$out/sources" --checkpoint "$ck" \
+  --model omat0-medium --structure "$st" --temperature-K 300 --equilibrate-steps 50 --calls 5
 rm -f "$out"/breakdown/trace.json "$out"/sources/trace.json
 note done

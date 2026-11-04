@@ -1,0 +1,100 @@
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+bringing up nodes...
+bringing up nodes...
+
+.................................F.F.................................... [ 59%]
+..................................................                       [100%]
+=================================== FAILURES ===================================
+__________________ test_plan_covers_every_row_once[counts0-3] __________________
+[gw7] linux -- Python 3.10.12 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python
+
+counts = (1000, 1000, 3000), size = 3
+
+    @pytest.mark.parametrize("counts, size", [((1000, 1000, 3000), 3), ((5, 0, 7), 1), ((64,), 7), ((1, 2, 3, 4), 16)])
+    def test_plan_covers_every_row_once(counts, size):
+        index = torch.cat([torch.full((n,), s) for s, n in enumerate(counts)])
+        index = index[torch.randperm(index.numel(), generator=torch.Generator().manual_seed(0))]
+        order, found = sg.species_plan(index, len(counts))
+        atoms = index.numel()
+        assert found.tolist() == list(counts)
+        assert sorted(order.tolist()) == list(range(atoms))
+        assert index[order.long()].tolist() == sorted(index.tolist())
+        seen = []
+        for t in range(sg.tiles(atoms, size, len(counts))):
+            species, first, end = sg.tile_rows(t, list(counts), size)
+>           assert 0 <= end - first <= sg.BLOCK_M
+E           assert (3000 - 0) <= 64
+E            +  where 64 = sg.BLOCK_M
+
+tests/cpu/test_species_gemm.py:23: AssertionError
+__________________ test_plan_covers_every_row_once[counts2-7] __________________
+[gw7] linux -- Python 3.10.12 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python
+
+counts = (64,), size = 7
+
+    @pytest.mark.parametrize("counts, size", [((1000, 1000, 3000), 3), ((5, 0, 7), 1), ((64,), 7), ((1, 2, 3, 4), 16)])
+    def test_plan_covers_every_row_once(counts, size):
+        index = torch.cat([torch.full((n,), s) for s, n in enumerate(counts)])
+        index = index[torch.randperm(index.numel(), generator=torch.Generator().manual_seed(0))]
+        order, found = sg.species_plan(index, len(counts))
+        atoms = index.numel()
+        assert found.tolist() == list(counts)
+        assert sorted(order.tolist()) == list(range(atoms))
+        assert index[order.long()].tolist() == sorted(index.tolist())
+        seen = []
+        for t in range(sg.tiles(atoms, size, len(counts))):
+            species, first, end = sg.tile_rows(t, list(counts), size)
+>           assert 0 <= end - first <= sg.BLOCK_M
+E           assert (448 - 0) <= 64
+E            +  where 64 = sg.BLOCK_M
+
+tests/cpu/test_species_gemm.py:23: AssertionError
+=============================== warnings summary ===============================
+tests/cpu/test_rewrites_species.py::test_compose_block_linears_equals_applying_both
+tests/cpu/test_rewrites_species.py::test_species_tables_keep_energy_and_forces_to_round_off
+tests/cpu/test_rewrites_species.py::test_fold_readout_tail_is_exact_to_round_off_on_other_families[omol]
+tests/cpu/test_rewrites_species.py::test_fold_product_linear_keeps_energy_and_forces_to_round_off[off]
+tests/cpu/test_rewrites_species.py::test_simulation_with_both_records_follows_the_default_to_round_off
+tests/cpu/test_rewrites_species.py::test_tables_follow_a_species_change_between_evaluations
+tests/cpu/test_radial_tables.py::test_the_table_gradient_is_the_derivative_of_its_values
+tests/cpu/test_radial_tables.py::test_float64_tables_follow_the_float64_network
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/cpu/test_rewrites_species.py: 74 warnings
+tests/cpu/test_rewrites_species_residual.py: 10 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:183: UserWarning: cuequivariance_ops_torch is not available. Falling back to naive implementation.
+    warnings.warn(
+
+tests/cpu/test_rewrites_species.py::test_simulation_with_both_records_follows_the_default_to_round_off
+tests/cpu/test_rewrites_species.py::test_simulation_with_both_records_follows_the_default_to_round_off
+tests/cpu/test_rewrites_species.py::test_simulation_with_both_records_follows_the_default_to_round_off
+  /mnt/homes/zwingel/FastMACE/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/cpu/test_rewrites_species.py::test_simulation_with_both_records_follows_the_default_to_round_off
+  /mnt/homes/zwingel/FastMACE/fastmace/model/loading.py:766: ModelLicenceWarning: tiny-mh1.model (SHA-256 2023eeb0f96f…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/cpu/test_species_gemm.py::test_plan_covers_every_row_once[counts0-3]
+FAILED tests/cpu/test_species_gemm.py::test_plan_covers_every_row_once[counts2-7]
+2 failed, 120 passed, 96 warnings in 23.00s

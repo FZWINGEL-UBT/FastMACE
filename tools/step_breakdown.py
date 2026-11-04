@@ -705,6 +705,8 @@ def parse_args(argv=None):
     p.add_argument("--calls", type=int, default=10)
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="RewriteConfig fields (e.g. gated_rows=on); the others stay auto")
+    p.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
+                   help="Module constants (A/B switches such as fastmace.rewrites.radial:DEGREE=5) for the pass")
     p.add_argument("--tf32", action="store_true",
                    help="PyTorch's TF32 matmul mode for the whole pass (TF32 screen, 29 October 2026; never default)")
     p.add_argument("--allow-busy-gpu", action="store_true", help="CPU checks of the tool only (no timing)")
@@ -732,6 +734,12 @@ def main(argv=None):
         oeq_runtime = ab_step_time.prepare_fastmace_hybrid()  # before anything imports MACE
     else:
         oeq_runtime = None
+    from ab_rewrites import constant_overrides
+
+    constants = constant_overrides(args.constant)
+    for (module, name), value in constants.items():
+        setattr(sys.modules[module], name, value)
+    args.constant = {f"{module}:{name}": value for (module, name), value in constants.items()}
     import numpy as np
     import torch
     from ase.md.velocitydistribution import MaxwellBoltzmannDistribution, Stationary
@@ -930,7 +938,7 @@ def main(argv=None):
     summary = dict(
         tool="step_breakdown", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
         python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), packages=package_versions(),
-        tf32=args.tf32,
+        tf32=args.tf32, constants=args.constant,
         gpu=torch.cuda.get_device_name(), cuda=torch.version.cuda, oeq_runtime=oeq_runtime,
         other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()],
         compute_capability=f"{properties.major}.{properties.minor}", sms=properties.multi_processor_count,

@@ -6,7 +6,10 @@ turns into ``dL/dr`` together with the density's gradient. The record must give 
 (the same forward), ``dsh`` as the vendored backward's (the same sums), ``dx`` to the atomics' order, and
 ``dL/dr`` to float32 rounding; both are compared with a float64 reference built from the same weight gradient.
 Edges at and beyond the cutoff and padding edges past every row get a zero radial slope. Both layouts, the
-cuBLAS and the fused forward, a CUDA graph. Runs in a fresh interpreter like test_fused_folded_forward_cuda.py.
+cuBLAS and the fused forward, a CUDA graph, and the q-major derivative table (``SLOPE_VECTOR`` 2 and 4) bit for bit
+against the term-major one. ``TABLE_W`` (w and its slope from the value table, no stored w): the same message and
+density, ``dx`` and ``dsh`` to rounding, ``dL/dr`` against the float64 reference, also in a CUDA graph. Runs in a fresh
+interpreter like test_fused_folded_forward_cuda.py.
 """
 
 import json
@@ -144,6 +147,69 @@ for layout in ("ir_mul", "mul_ir"):
         assert torch.equal(captured[0], new[0]) and torch.equal(captured[4], new[4]), name
         torch.testing.assert_close(captured[2], new[2], rtol=0, atol=0)  # no atomics in dr
         torch.testing.assert_close(captured[3], new[3], rtol=1e-5, atol=1e-6 * float(new[3].abs().max()))
+
+# SLOPE_VECTOR: the q-major derivative table loaded as float2/float4 (float4: two zero padding terms) gives the
+# same dr and dsh bit for bit (the same sums in the same order) and dx to the atomics' order.
+kernels = StreamingKernels(problem, np.float32, layout="ir_mul")
+weight = torch.randn((problem.weight_numel, k), device="cuda", generator=g) / k ** 0.5
+X = torch.randn((nodes, irreps_in1.dim), device="cuda", generator=g)
+Y = torch.randn((edges, irreps_in2.dim), device="cuda", generator=g)
+G = torch.randn((nodes, irreps_out.dim), device="cuda", generator=g)
+D = torch.randn((edges, 1), device="cuda", generator=g)
+fused = FusedFoldedForward(kernels, k)
+base = run(X, Y, G, D, kernels, weight, fused, wp.WPrime(table, weight, kernels))
+for vector in (2, 4):
+    wp.SLOPE_VECTOR = vector
+    try:
+        w_prime = wp.WPrime(table, weight, kernels)
+    finally:
+        wp.SLOPE_VECTOR = 0
+    name = f"slope-vector-{vector}"
+    assert w_prime.gprime.shape == (pairs * pieces, problem.weight_numel, wp.padded_terms(degree, vector)), name
+    new = run(X, Y, G, D, kernels, weight, fused, w_prime)
+    assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name
+    assert torch.equal(new[2], base[2]) and torch.equal(new[4], base[4]), name  # dr, dsh
+    torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=1e-6 * float(base[3].abs().max()))  # dx
+    report[name] = {"dr and dsh bitwise": True,
+                    "dx max rel": float((new[3] - base[3]).abs().max() / base[3].abs().max())}
+
+# TABLE_W: the backward evaluates w and w' from the q-major value table (degree 10: 11 terms, padded to 12); the
+# forward (cuBLAS, or the fused forward's message-only kernel) stores no w. The message and density are the stored-w
+# path's bit for bit; dx and dsh differ by the w rounding; dr is checked against the float64 reference.
+a, _ = radial_table(r, pair, table.coef, table.dcoef, table.starts, table.scales, table.bins, r_lo, table.bin_scale,
+                    r_max)
+_, _, dw = streaming_conv_backward(X, Y, a @ weight.t(), sender.int(), receiver.int(), rows, G, kernels.id)
+ref = (wp.wprime_reference(dw.double(), r.double(), pair, wp.derivative_table(table.dcoef.double().cpu(),
+                                                                              weight.double().cpu()).cuda(),
+                           table.starts.double(), table.scales.double(), table.bins, r_lo, table.bin_scale, r_max)
+       + wp.density_backward(r.double().cpu(), pair.cpu(), wp.density_column(table.dcoef.double().cpu()),
+                             table.starts.double().cpu(), table.scales.double().cpu(), table.bins.cpu(),
+                             D.double().cpu(), r_lo, table.bin_scale, r_max).cuda())
+wp.TABLE_W = True
+try:
+    w_prime = wp.WPrime(table, weight, kernels)
+finally:
+    wp.TABLE_W = None
+assert w_prime.gprime.shape == (pairs * pieces, problem.weight_numel, wp.padded_terms(degree + 1, 2))
+for forward in (None, fused):
+    name = f"table-w-{'fused' if forward is not None else 'cublas'}"
+    stored = run(X, Y, G, D, kernels, weight, forward, wp.WPrime(table, weight, kernels))
+    new = run(X, Y, G, D, kernels, weight, forward, w_prime)
+    assert torch.equal(new[0], stored[0]) and torch.equal(new[1], stored[1]), name  # the same forward
+    torch.testing.assert_close(new[3], stored[3], rtol=1e-5, atol=2e-6 * float(stored[3].abs().max()))  # dx
+    torch.testing.assert_close(new[4], stored[4], rtol=1e-5, atol=2e-6 * float(stored[4].abs().max()))  # dsh
+    dr_new = new[2].reshape(-1)
+    assert bool((dr_new[outside] == 0).all()), name
+    err = float((dr_new.double() - ref).abs().max()) / float(ref.abs().max())
+    assert err <= 1e-5, (name, err)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        captured = run(X, Y, G, D, kernels, weight, forward, w_prime)
+    graph.replay()
+    torch.cuda.synchronize()
+    assert torch.equal(captured[0], new[0]) and torch.equal(captured[2], new[2]), name
+    report[name] = {"dr error": err, "dsh max rel": float((new[4] - stored[4]).abs().max() / stored[4].abs().max()),
+                    "dx max rel": float((new[3] - stored[3]).abs().max() / stored[3].abs().max())}
 print(json.dumps(report))
 """
 
@@ -156,4 +222,5 @@ def test_wprime_backward_matches_the_chain():
     assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-8000:]
     report = json.loads(result.stdout.strip().splitlines()[-1])
     print(json.dumps(report, indent=1))
-    assert set(report) == {"ir_mul-cublas", "ir_mul-fused", "mul_ir-cublas", "mul_ir-fused"}
+    assert set(report) == {"ir_mul-cublas", "ir_mul-fused", "mul_ir-cublas", "mul_ir-fused", "slope-vector-2",
+                           "slope-vector-4", "table-w-cublas", "table-w-fused"}

@@ -1,0 +1,72 @@
+2026-11-03T23:58:54Z start tc-test
+2026-11-03T23:59:16Z end tc-test exit=1 AssertionError: ('ir_mul', 65, 1.017889881578828e-06, 2.8153329200878165e-07)
+2026-11-03T23:59:16Z modal NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB; source e804b246cc34d4ace9d07a6f6f600ae54f12e907
+2026-11-03T23:59:16Z start ab-tc-ab
+2026-11-04T00:02:27Z end ab-tc-ab exit=0 SrTiO3 a 18.8368 ms b 19.5824 ms b/a 1.0396 valid 
+2026-11-04T00:02:27Z start ab-tcre-ab
+2026-11-04T00:03:21Z end ab-tcre-ab exit=1     raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the " fastmace.errors.RewriteError: generic_wprime_backward: no generic interaction with float32 radial tables and the chunked streaming convolution 
+2026-11-04T00:03:21Z start ab-deg4-ab
+2026-11-04T00:06:02Z end ab-deg4-ab exit=0 SrTiO3 a 18.7326 ms b 19.2240 ms b/a 1.0262 valid 
+2026-11-04T00:06:02Z start ab-deg6-ab
+2026-11-04T00:08:40Z end ab-deg6-ab exit=0 SrTiO3 a 18.7702 ms b 17.2616 ms b/a 0.9196 valid 
+2026-11-04T00:08:40Z start ab-skipzero-ab
+2026-11-04T00:10:52Z end ab-skipzero-ab exit=0 SrTiO3 a 18.7574 ms b 18.5966 ms b/a 0.9914 valid 
+2026-11-04T00:10:52Z start ab-d5-tc-ab
+2026-11-04T00:13:34Z end ab-d5-tc-ab exit=0 SrTiO3 a 17.0136 ms b 17.7279 ms b/a 1.0420 valid 
+2026-11-04T00:13:34Z start ab-d5-skipzero-ab
+2026-11-04T00:15:40Z end ab-d5-skipzero-ab exit=0 SrTiO3 a 17.0208 ms b 16.7789 ms b/a 0.9858 valid 
+2026-11-04T00:15:40Z start ab-d5-slopes2-ab
+2026-11-04T00:17:56Z end ab-d5-slopes2-ab exit=0 SrTiO3 a 16.9455 ms b 17.6221 ms b/a 1.0399 valid 
+2026-11-04T00:17:56Z done
+2026-11-04T00:17:56Z modal NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB; source e804b246cc34d4ace9d07a6f6f600ae54f12e907
+2026-11-04T00:17:56Z start ab-deg5-ab
+2026-11-04T00:20:12Z end ab-deg5-ab exit=0 SrTiO3 a 18.8237 ms b 16.9964 ms b/a 0.9029 valid 
+2026-11-04T00:20:12Z start ab-deg5-ba
+2026-11-04T00:22:26Z end ab-deg5-ba exit=0 SrTiO3 b 17.0209 ms a 18.8020 ms b/a 0.9053 valid 
+2026-11-04T00:22:26Z start ab-dz5-ab
+2026-11-04T00:24:40Z end ab-dz5-ab exit=0 SrTiO3 a 18.8223 ms b 16.8672 ms b/a 0.8961 valid 
+2026-11-04T00:24:40Z start ab-dz5-ba
+2026-11-04T00:26:55Z end ab-dz5-ba exit=0 SrTiO3 b 16.8136 ms a 18.7845 ms b/a 0.8951 valid 
+2026-11-04T00:26:55Z start ab-dztc5-ab
+2026-11-04T00:29:21Z end ab-dztc5-ab exit=0 SrTiO3 a 18.8110 ms b 17.1194 ms b/a 0.9101 valid 
+2026-11-04T00:29:21Z start ab-dztc5-ba
+2026-11-04T00:31:36Z end ab-dztc5-ba exit=0 SrTiO3 b 17.1445 ms a 18.8157 ms b/a 0.9112 valid 
+2026-11-04T00:31:36Z start ab-dztcre5-ab
+2026-11-04T00:32:28Z end ab-dztcre5-ab exit=1     raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the " fastmace.errors.RewriteError: generic_wprime_backward: no generic interaction with float32 radial tables and the chunked streaming convolution 
+2026-11-04T00:32:28Z start ab-dztcre5-ba
+2026-11-04T00:32:53Z end ab-dztcre5-ba exit=1     raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the " fastmace.errors.RewriteError: generic_wprime_backward: no generic interaction with float32 radial tables and the chunked streaming convolution 
+2026-11-04T00:32:53Z done
+2026-11-04T00:32:53Z candidate deg5 mean b/a 0.9041
+2026-11-04T00:32:53Z candidate dz5 mean b/a 0.8956
+2026-11-04T00:32:53Z candidate dztc5 mean b/a 0.9106
+2026-11-04T00:32:53Z candidate dztcre5 mean b/a missing
+2026-11-04T00:32:53Z protocol sets: default dz5 0.8956
+2026-11-04T00:32:53Z start loup-default-nve-1
+2026-11-04T00:33:58Z end loup-default-nve-1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "nve", "requested": {}, "constants": {}, "median_us_per_atom_step": 3.613590939999085, "ms_per_step": 18.067954699995425, "rewrites_on": ["block_linear", "chunked_conv_backward", "fused_folded_backward", "fused_folded_forward", "grouped_lin
+2026-11-04T00:33:58Z start loup-default-nve-2
+2026-11-04T00:34:48Z end loup-default-nve-2 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "nve", "requested": {}, "constants": {}, "median_us_per_atom_step": 3.605725809998148, "ms_per_step": 18.02862904999074, "rewrites_on": ["block_linear", "chunked_conv_backward", "fused_folded_backward", "fused_folded_forward", "grouped_line
+2026-11-04T00:34:48Z start loup-default-nve-3
+2026-11-04T00:35:38Z end loup-default-nve-3 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "nve", "requested": {}, "constants": {}, "median_us_per_atom_step": 3.613666149999517, "ms_per_step": 18.068330749997585, "rewrites_on": ["block_linear", "chunked_conv_backward", "fused_folded_backward", "fused_folded_forward", "grouped_lin
+2026-11-04T00:35:38Z start loup-default-langevin-1
+2026-11-04T00:36:27Z end loup-default-langevin-1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 3.6961947000008877, "ms_per_step": 18.48097350000444, "rewrites_on": ["block_linear", "chunked_conv_backward", "fused_folded_backward", "fused_folded_forward", "groupe
+2026-11-04T00:36:27Z start loup-default-langevin-2
+2026-11-04T00:37:17Z end loup-default-langevin-2 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 3.542617620000783, "ms_per_step": 17.713088100003915, "rewrites_on": ["block_linear", "chunked_conv_backward", "fused_folded_backward", "fused_folded_forward", "groupe
+2026-11-04T00:37:17Z start loup-default-langevin-3
+2026-11-04T00:38:07Z end loup-default-langevin-3 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 3.5414833400000134, "ms_per_step": 17.707416700000067, "rewrites_on": ["block_linear", "chunked_conv_backward", "fused_folded_backward", "fused_folded_forward", "group
+2026-11-04T00:38:07Z start loup-dz5-nve-1
+2026-11-04T00:39:13Z end loup-dz5-nve-1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "nve", "requested": {}, "constants": {"fastmace.rewrites.radial:DEGREE": 5, "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true}, "median_us_per_atom_step": 3.1718661099966994, "ms_per_step": 15.859330549983497, "rewrites_
+2026-11-04T00:39:13Z start loup-dz5-nve-2
+2026-11-04T00:40:04Z end loup-dz5-nve-2 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "nve", "requested": {}, "constants": {"fastmace.rewrites.radial:DEGREE": 5, "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true}, "median_us_per_atom_step": 3.171416320001299, "ms_per_step": 15.857081600006495, "rewrites_o
+2026-11-04T00:40:04Z start loup-dz5-nve-3
+2026-11-04T00:40:53Z end loup-dz5-nve-3 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "nve", "requested": {}, "constants": {"fastmace.rewrites.radial:DEGREE": 5, "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true}, "median_us_per_atom_step": 3.1717348599977413, "ms_per_step": 15.858674299988706, "rewrites_
+2026-11-04T00:40:53Z start loup-dz5-langevin-1
+2026-11-04T00:41:42Z end loup-dz5-langevin-1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {"fastmace.rewrites.radial:DEGREE": 5, "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true}, "median_us_per_atom_step": 3.175003819997073, "ms_per_step": 15.875019099985364, "rewri
+2026-11-04T00:41:42Z start loup-dz5-langevin-2
+2026-11-04T00:42:32Z end loup-dz5-langevin-2 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {"fastmace.rewrites.radial:DEGREE": 5, "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true}, "median_us_per_atom_step": 3.365224229996784, "ms_per_step": 16.82612114998392, "rewrit
+2026-11-04T00:42:32Z start loup-dz5-langevin-3
+2026-11-04T00:43:24Z end loup-dz5-langevin-3 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {"fastmace.rewrites.radial:DEGREE": 5, "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true}, "median_us_per_atom_step": 3.1269778000023507, "ms_per_step": 15.634889000011754, "rewr
+2026-11-04T00:43:24Z start breakdown dz5
+2026-11-04T00:44:27Z end breakdown exit=0
+2026-11-04T00:44:27Z start lab
+2026-11-04T00:45:29Z end lab exit=0
+2026-11-04T00:45:29Z done

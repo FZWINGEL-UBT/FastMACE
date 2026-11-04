@@ -1,0 +1,5 @@
+ruff exit=1
+gpu-fused exit=0 {"ir_mul-9": {"w bitwise cuBLAS": false, "message bitwise chain": false, "skip zero column bitwise": true, "stream store bitwise": true, "tensor cores": {"chain": 2.572500757169415e-07, "mask": 1.0920202828418993e-06, "round": 4.991063349869434e-07}}, "ir_mul-65": {"w bitwise cuBLAS": true, "message bitwise chain": true, "skip zero column bitwise": true, "stream store bitwise": true, "tensor cores": {"chain": 2.8466042217699585e-07, "mask": 1.4455832071427392e-06, "round": 9.507046671518896e-07}}, "mul_ir-9": {"w bitwise cuBLAS": false, "message bitwise chain": false, "skip zero column bitwise
+gpu-pytest exit=0 4 passed in 0.45s
+cpu exit=0 5103 passed, 202 skipped, 1016 warnings in 624.68s (0:10:24)
+done

@@ -1,0 +1,60 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/FastMACE/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/FastMACE/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/FastMACE/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/d/Margraf/FastMACE/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Traceback (most recent call last):
+  File "/mnt/d/Margraf/FastMACE/tools/ab_rewrites.py", line 311, in <module>
+    main()
+  File "/mnt/d/Margraf/FastMACE/tools/ab_rewrites.py", line 264, in main
+    engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
+  File "/mnt/d/Margraf/FastMACE/fastmace/planner/minimal.py", line 1222, in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+  File "/mnt/d/Margraf/FastMACE/fastmace/planner/fixed.py", line 1616, in build
+    field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
+  File "/mnt/d/Margraf/FastMACE/fastmace/model/forces.py", line 555, in __init__
+    compiled = compiling.compile_model(source, self.compile_mode, accelerated=accelerated, oeq=self.oeq,
+  File "/mnt/d/Margraf/FastMACE/fastmace/model/compile.py", line 295, in compile_model
+    prepare(private)
+  File "/mnt/d/Margraf/FastMACE/fastmace/model/forces.py", line 527, in prepare
+    self.applied = registry.apply(private, resolution, context, original=source, check=check)
+  File "/mnt/d/Margraf/FastMACE/fastmace/rewrites/registry.py", line 691, in apply
+    raise self._selfcheck_failure(name, result, detail, resolution, applied)
+fastmace.errors.SelfCheckError: rewrite generic_radial_tables failed its self-check: interactions.0: certificate 4.812718193402367 > 1 (pairs {'0-0': 4.812718193402367, '0-1': 0.32214036743682767, '0-2': 0.2527982347363751, '1-0': 0.32214036743682767, '1-1': 0.29081263633506954, '1-2': 0.25399204607723463, '2-0': 0.2527982347363751, '2-1': 0.25399204607723463, '2-2': 0.28369986848861445})
+Why: every rewrite is checked against the original module at setup (SPEC §6.4)
+Next: re-plan without generic_radial_tables, generic_wprime_backward (SPEC §9.3 rule 13: fastmace.planner.reactions.selfcheck_revision)

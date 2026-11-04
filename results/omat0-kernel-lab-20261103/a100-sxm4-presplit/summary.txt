@@ -1,0 +1,5 @@
+lab exit=0
+tc-presplit rule LaunchRule(parts=2, warps=8, blocks_per_slice=27, shared_bytes=158720) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward  base                3688.4 us  ratio 1.000  regs 168 local 40  
+forward  tc-presplit         5023.3 us  ratio 1.362  regs 194 local 40  {'out': 'bitwise', 'w': 'bitwise'}
+forward  F-tc-no-wsplit      3177.8 us  ratio 0.862  regs 168 local 64  

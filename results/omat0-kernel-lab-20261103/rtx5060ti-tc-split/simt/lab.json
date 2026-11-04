@@ -1,0 +1,43 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-04T07:48:06.265137+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "3fd6757fa4d60f684a4d3225fc44dc46bd261d15",
+  "model": "omat0-medium",
+  "rounds": 5,
+  "capture_s": 36.982131565000145,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=9, shared_bytes=74016)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 0,
+          "median_us": 16090.17562866211,
+          "min_us": 15877.568244934082,
+          "max_us": 17079.744338989258,
+          "ratio": 1.0
+        }
+      }
+    }
+  },
+  "constants": {}
+}

@@ -118,6 +118,22 @@ def test_triton_unsegmented_path_equals_baseline():
         assert_equal(n, o)
 
 
+def test_strided_rows_are_read_in_place_and_give_the_contiguous_results():
+    """A column slice (the generic tables' ``augmented[:, :-1]``) goes in at its row stride: the backward's results
+    are those of a contiguous copy bit for bit, the segmented forward's to its atomic order."""
+    a, y, key, grad, slots = outer_sum_inputs("cuda", torch.float32, edges=5000, k=65, slots=800)
+    sliced = a[:, :-1]
+    assert not sliced.is_contiguous() and eos._rows(sliced) is sliced
+    copy = sliced.contiguous()
+    grad = grad.reshape(slots, 16, 65)[:, :, :64].reshape(slots, 16 * 64).contiguous()
+    for n, o in zip(eos.edge_outer_sum_backward(grad, sliced, y, key),
+                    eos.edge_outer_sum_backward(grad, copy, y, key)):
+        assert_equal(n, o)
+    keys = torch.sort(key).values
+    torch.testing.assert_close(eos.edge_outer_sum(sliced, y, keys, slots, segmented=True),
+                               eos.edge_outer_sum(copy, y, keys, slots, segmented=True), rtol=1e-6, atol=1e-5)
+
+
 # --------------------------------------------------------------------------- folded_linear
 
 

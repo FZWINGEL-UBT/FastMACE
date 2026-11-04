@@ -226,7 +226,7 @@ def apply_fused_folded_forward(model, context):
     its per-edge weights (no generic_recompute): one kernel builds them and the message; returns their names."""
     import torch
 
-    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward, used_columns
 
     changed = []
     for index, interaction, _ in _generic_interactions(model):
@@ -239,7 +239,7 @@ def apply_fused_folded_forward(model, context):
             raise ValueError(f"generic_fused_folded_forward is float32 only, interactions.{index} is {weight.dtype}")
         try:
             interaction.fused_folded_forward = FusedFoldedForward(interaction.streaming_kernels, weight.shape[1],
-                                                                  weight.device)
+                                                                  weight.device, used=used_columns(weight))
         except ValueError as error:
             raise ValueError(f"generic_fused_folded_forward: interactions.{index}: {error}") from error
         changed.append(f"interactions.{index}")

@@ -79,3 +79,47 @@ def test_without_density_the_folded_input_and_its_gradient_are_unchanged():
         (g * grad_g).sum().backward()
         results.append((g.detach(), leaf.grad))
     assert torch.equal(results[0][0], results[1][0]) and torch.equal(results[0][1], results[1][1])
+
+
+@pytest.mark.parametrize("density", [True, False])
+def test_column_blocks_give_the_same_values_bit_for_bit(monkeypatch, density):
+    """COLUMN_BLOCK = 64 (J = 66 in two column programs): every column, and the density, bit for bit."""
+    from fastmace.kernels.triton import radial_table as rt
+
+    generator = torch.Generator().manual_seed(13)
+    table = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in _table(generator).items()}
+    edges = 4099
+    r = (torch.rand(edges, generator=generator) * 6.4).cuda()[:, None]
+    pair = torch.randint(0, 3, (edges,), generator=generator, dtype=torch.int32).cuda()
+    args = (r, pair, table["coef"], table["starts"], table["scales"], table["bins"], table["r_lo"],
+            table["bin_scale"], table["r_max"], density)
+    whole = rt.radial_table_forward(*args)
+    monkeypatch.setattr(rt, "COLUMN_BLOCK", 64)
+    blocked = rt.radial_table_forward(*args)
+    assert torch.equal(whole[0], blocked[0]) and torch.equal(whole[1], blocked[1])
+
+
+@pytest.mark.parametrize("density", [True, False])
+def test_leading_columns_bit_for_bit(density):
+    """``columns=64`` (the reassociated first interaction, ``FIRST_TABLE_COLUMNS``): the full folded input's leading
+    64 columns, the same density, and bit for bit the lengths' gradient of the full input with a zero last column."""
+    from fastmace.kernels.triton.radial_table import radial_table
+
+    generator = torch.Generator().manual_seed(17)
+    table = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in _table(generator).items()}
+    edges = 4099
+    r = (torch.rand(edges, generator=generator) * 6.4).cuda()[:, None]
+    pair = torch.randint(0, 3, (edges,), generator=generator, dtype=torch.int32).cuda()
+    args = (pair, table["coef"], table["dcoef"], table["starts"], table["scales"], table["bins"], table["r_lo"],
+            table["bin_scale"], table["r_max"], density)
+    grad_g = torch.randn((edges, 64), generator=generator).cuda()
+    grad_d = torch.randn((edges, int(density)), generator=generator).cuda()
+    results = []
+    for columns in (-1, 64):
+        leaf = r.clone().requires_grad_()
+        g, d = radial_table(leaf, *args, columns=columns)
+        assert g.shape == (edges, 65 if columns < 0 else 64)
+        ((g[:, :64] * grad_g).sum() + (d * grad_d).sum()).backward()
+        results.append((g[:, :64].detach(), d.detach(), leaf.grad))
+    for a, b in zip(*results):
+        assert torch.equal(a, b)

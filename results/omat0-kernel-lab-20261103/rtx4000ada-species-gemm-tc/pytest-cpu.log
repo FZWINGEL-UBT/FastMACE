@@ -1,0 +1,32 @@
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+bringing up nodes...
+bringing up nodes...
+
+.....................................F.                                  [100%]
+=================================== FAILURES ===================================
+___________________ test_fastmace_obeys[no_module_switches] ____________________
+[gw1] linux -- Python 3.10.12 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python
+
+check = 'no_module_switches'
+package_modules = [Module(path='fastmace/__init__.py', name='fastmace', package='fastmace', tree=<ast.Module object at 0x75db1af744f0>, ...lanner refuses it with the reason\n        return False\n\n\n__all__ = ("NOTE", "FastMACECalculator", "calc")\n'), ...]
+
+    @pytest.mark.parametrize("check", CHECKS)
+    def test_fastmace_obeys(check, package_modules):
+        violations = CHECKS[check](package_modules)
+>       assert not violations, "\n".join(violations)
+E       AssertionError: fastmace/kernels/triton/species_gemm.py:35: module-level switch TC_PRESPLIT bound to bool/None (put it in a fastmace.config dataclass)
+E       assert not ['fastmace/kernels/triton/species_gemm.py:35: module-level switch TC_PRESPLIT bound to bool/None (put it in a fastmace.config dataclass)']
+
+tests/cpu/test_layering.py:296: AssertionError
+=========================== short test summary info ============================
+FAILED tests/cpu/test_layering.py::test_fastmace_obeys[no_module_switches] - ...
+1 failed, 38 passed in 7.19s

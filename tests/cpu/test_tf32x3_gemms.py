@@ -147,6 +147,15 @@ def test_decision_66_turns_auto_on_for_mh1_and_omat0_on_the_a100_only():
     assert plan.rewrites.tf32x3_gemms == "off" and plan.rewrites.grouped_launch == "on"
 
 
+def test_decision_66_on_every_a100():
+    """Every A100 model (owner, 4 November 2026: "turn on a100 speedups no matter which version"): the A100 80GB
+    PCIe and the 40 GB cards take the SXM4's tf32x3_gemms for MH-1 and OMAT-0 medium."""
+    for name, memory in (("NVIDIA A100 80GB PCIe", 80), ("NVIDIA A100-PCIE-40GB", 40), ("NVIDIA A100-SXM4-40GB", 40)):
+        for label in ("omat0-medium", "mh1-r2scan"):
+            plan = _plan(RewriteConfig(), Hardware(name, (8, 0), memory * 2**30), label=label)
+            assert plan.rewrites.tf32x3_gemms == "on" and plan.rewrites.grouped_launch == "off", (name, label)
+
+
 def test_planner_keeps_it_off_unless_asked_and_enables_an_explicit_on():
     assert _plan(RewriteConfig()).rewrites.tf32x3_gemms == "off"
     assert _plan(RewriteConfig(tf32x3_gemms="on")).rewrites.tf32x3_gemms == "on"

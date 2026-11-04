@@ -568,6 +568,133 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-gate-t03d](#model-gate-t03d) | Gate tool applies rule 13 (OMOL-0 on A100) | tooling | FM | DEFAULT | 2026-10-24 (`3e06d243`) | tooling | [opt4-T03](validation/opt4-T03.md) §9 |
 | [model-other-models](#model-other-models) | Benchmark models, MACE-OFF, POLAR, OMOL on the GPU engine | `--model` | RE | MEASUREMENT | 2026-10-15/16 | 2.9–12.2× vs stock ASE (ten models) | `ResearchModule:LT/studies/other_models/README.md` |
 
+### OMAT-0 on the A100 (Benchmark_loup, November 2026)
+
+| ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [omat0-launch-screen](#omat0-launch-screen) | Launch settings of the fused forward and the streaming kernels | `fused_forward.BLOCKS_PER_SM`, `RECEIVERS_PER_CHUNK`, `W_TILE_REGISTERS`, `BATCH`; `runtime.NUM_THREADS` | FM | REJECTED | 2026-11-03 | A100 at best 1.000–1.003; Ada at best 0.992 (BATCH 4) | [launch screen](../results/omat0-a100-launch-screen-20261103), [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-strided-rows](#omat0-strided-rows) | `edge_outer_sum` reads the table's strided rows in place | `edge_outer_sum.STRIDED_ROWS` | FM | DEFAULT on branch `fastmace/omat0-strided-tables` (exact) | 2026-11-03 (`27609a1e`) | Ada step 0.975 against the copy | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-first-full-rows](#omat0-first-full-rows) | Generic reassociation on the full table row `[h c, c]` | `generic.modules.FIRST_FULL_ROWS` | FM | REJECTED | 2026-11-03 | Ada step 1.017 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-column-block](#omat0-column-block) | 64-column radial-table forward programs | `radial_table.COLUMN_BLOCK` | FM | REJECTED | 2026-11-03 | Ada step 1.002 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-table-degree](#omat0-table-degree) | Lower Chebyshev degree of the radial tables: more pieces, the same tolerance and certificate | `radial.DEGREE` (default 10) | FM | DEFAULT (owner, 4 November 2026) | 2026-11-04 | MH-1 Ada neutral (NaCl 0.978, NaNbO3 1.006 / 0.998, NbCl5 1.001 / 0.999); step degree 5: Ada 0.908, 5060 Ti 0.935, A100 0.903 / 0.905; with skip-zero (dz5) A100 0.896 / 0.895 and Benchmark_loup 3.17 against 3.61 µs/atom/step; gate passes; certificate 0.30–0.36 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-kernel-lab](#omat0-kernel-lab) | One force call's wprime and fused forward: variants and falsifiers | `tools/omat0_kernel_lab.py` | FM | MEASUREMENT | 2026-11-03 | wprime load-bound, slope 27–40 %; a·W alone 0.19–0.36 of the forward | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-slope-vector](#omat0-slope-vector) | q-major derivative table, float2/float4 term loads in wprime | `wprime_backward.SLOPE_VECTOR` | FM | REJECTED | 2026-11-04 | lab wprime 0.913 (5060 Ti), A100 0.898 at degree 10; step on top of degree 5: Ada 1.027, 5060 Ti 1.070, A100 1.040 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-stream-w](#omat0-stream-w) | wprime reads the stored w with `__ldcs` | `wprime_backward.STREAM_W` | FM | REJECTED | 2026-11-04 | lab wprime 0.964 (5060 Ti), 1.127 (Ada), 0.982 (Ada, degree 5); step 0.987 (5060 Ti), 1.005 (A100-SXM4, degree 5) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-symmetric-pairs](#omat0-symmetric-pairs) | Mirror species pairs read one table row | `radial.SYMMETRIC_PAIRS` | FM | REJECTED on Ada (A100 open) | 2026-11-03 | Ada step 0.997 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-skip-zero-column](#omat0-skip-zero-column) | The fused forward skips the folded weight's all-zero bias column | `fused_forward.SKIP_ZERO_COLUMN` | FM | DEFAULT on RTX 4000 Ada and A100-SXM4-80GB (owner, 4 November 2026; decision 66) | 2026-11-04 | lab forward 0.909 (Ada), 1.010 (5060 Ti); step 0.989 (Ada), 1.000 (5060 Ti), 0.991 (A100); on top of degree 5 0.981 (Ada), 0.986 (A100) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-stream-store-w](#omat0-stream-store-w) | The fused forward stores w with `__stcs` | `fused_forward.STREAM_STORE_W` | FM | REJECTED | 2026-11-04 | lab forward 0.965 (Ada), 0.995 (5060 Ti); step 1.001 (Ada), 0.991 (5060 Ti), 1.001 on top of degree 5 (Ada) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-eos-chunks](#omat0-eos-chunks) | `edge_outer_sum` chunk sizes 64 | `edge_outer_sum.FORWARD_CHUNK`, `BACKWARD_BLOCK_EDGES` | FM | REJECTED | 2026-11-04 | Ada step 1.002 (forward chunk 64), 1.004 (backward block 64) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-tc-forward](#omat0-tc-forward) | 3×TF32 tensor-core a·W product in the fused forward (A100 only) | `fused_forward.TENSOR_CORES`, `TC_SPLIT` | FM | DEFAULT | 2026-11-04 | A100 80GB only (decision 66), mask split: OMAT-0 step 0.933, MH-1 0.97-0.98 (A100-SXM4); loup 3.17 -> 2.92 µs/atom/step; rna split 1.040; Ada 1.124, 5060 Ti 1.272 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-cutlass-tile](#omat0-cutlass-tile) | Two-warp 32x64 / 64x32 tiles for the CUTLASS 3×TF32 GEMMs (A100) | `cutlass.tf32x3.TILE` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.014 / 1.012 (32x64), 1.017 / 1.017 (64x32); bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-tc-presplit](#omat0-tc-presplit) | W slice split into TF32 parts once per block (tensor-core forward, A100) | `fused_forward.TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | fused forward A100-SXM4 1.362 (12 -> 8 warps), RTX 5060 Ti 1.707 (2 -> 4 parts); bitwise; bound F-tc-no-wsplit 0.862 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-species-gemm](#omat0-species-gemm) | Species skip as one grouped GEMM: each atom's rows through its own species' matrix only (Triton, fixed grid) | `generic.modules.SPECIES_GEMM`, `SPECIES_GEMM_GPUS` | FM | DEFAULT | owner 2026-11-04 (RTX 5060 Ti, RTX 4000 Ada; decision 66) | step RTX 4000 Ada 0.955 / 0.952, RTX 5060 Ti 0.950 / 0.953, A100-SXM4 0.992 / 0.991 (off there); gate passes (5060 Ti); Ada default vs forced off 1.051 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-species-gemm-tc](#omat0-species-gemm-tc) | The species GEMM in our own mma.sync 3xTF32 kernel (for the A100) | `species_gemm.TENSOR_CORES`, `TC_CHUNK`, `TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | kernel lab vs Triton: A100 0.94 (16p), Ada 0.91, 5060 Ti 0.86; step A100-SXM4 1.003 / 1.002 vs default (Triton species GEMM 0.992), Ada 1.001 / 0.999 vs Triton species GEMM | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-species-gemm-cutlass](#omat0-species-gemm-cutlass) | The species GEMM as one gathered CUTLASS 3xTF32 launch (A100) | `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 0.9928 / 0.9922 vs default (Triton species GEMM 0.992); lab size 16 CUTLASS 678 us vs Triton 597, bound 207 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-wprime-piece-order](#omat0-wprime-piece-order) | wprime backward over edges sorted by (pair, r), so edges of one derivative-table slab run together | none (lab bound `B-piece-sorted`) | FM | REJECTED | 2026-11-04 | lab wprime 1.513 (RTX 5060 Ti; slope alone 0.757) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-table-w](#omat0-table-w) | w and its slope from one value-table slab in the wprime backward; the forward stores no w | `wprime_backward.TABLE_W`, `TABLE_W_GPUS` | FM | DEFAULT for the generic family (OMAT-0) on the RTX 5060 Ti, RTX 4000 Ada and every A100 (owner, 4 November 2026: "Enable it"; decision 66) | 2026-11-04 | Benchmark_loup step RTX 5060 Ti 0.888 / 0.892, RTX 4000 Ada 0.928 / 0.931, A100-SXM4 0.943 / 0.943; gates pass | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-block-message](#omat0-block-message) | The conv message written in linear_1's block layout (one tensor per same-irrep group); no relayout copies | `wprime_backward.BLOCK_MESSAGE`, `BLOCK_MESSAGE_GPUS` | FM | DEFAULT on the RTX 4000 Ada and every A100 (owner, 4 November 2026: "Yes, Ada and A100"; decision 66); off on the RTX 5060 Ti (slower) | 2026-11-04 | Benchmark_loup MD step b/a (a = the default with `TABLE_W` on): RTX 5060 Ti 1.060 / 1.060 (slower), RTX 4000 Ada 0.974 / 0.971, A100-SXM4-80GB 0.983 / 0.977; gate passes (5060 Ti) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-wprime-aprime](#omat0-wprime-aprime) | wprime slope as dr = a'(r) . (dw W) instead of the per-edge G' slab | none (bound `tools/wprime_da_bound.py`) | FM | REJECTED | 2026-11-04 | A100-SXM4: the da = dw W product alone 2.27 ms (CUTLASS 3xTF32), 4.14 ms (FP32) against the slope's 1.81 ms | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-first-table-columns](#omat0-first-table-columns) | First interaction's radial table stores only the columns it uses | `generic.modules.FIRST_TABLE_COLUMNS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.002 / 0.999, RTX 5060 Ti 1.002; bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+
+<a id="omat0-tc-presplit"></a>
+#### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.TC_PRESPLIT` (False)
+- Engine: FM
+- Date/round: 4 November 2026 (owner's goal: Benchmark_loup as fast as possible; owner: "Yes, try it")
+- What: the tensor-core product splits each W fragment element into its TF32 parts in every batch (4 splits per fragment). The variant stores the block's W slice as float2 {hi, lo} (row stride 36 float2, conflict-free 64-bit fragment loads) and loads the parts; bitwise the same product.
+- Status: REJECTED.
+- Measured: kernel lab, OMAT-0 medium on Benchmark_loup (SrTiO3 5,000 atoms), the plan's forward kernel, round-robin in one process: A100-SXM4-80GB (Modal, 3de2e597, $0.06) base 3.688 ms, pre-split 5.023 (1.362; 8 warps per block instead of 12, 194 registers instead of 168), F-tc-no-wsplit (no W split at all) 3.178 (0.862); RTX 5060 Ti (tensor cores forced on) 1.707, 4 parts instead of 2.
+- Why: the doubled slice costs a third of the block's warps; the latency hiding lost outweighs the split instructions saved.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §14; `tools/modal/omat0_a100_presplit_lab.sh`.
+
+<a id="omat0-species-gemm"></a>
+#### omat0-species-gemm: the species skip as one grouped GEMM
+- Switch: `fastmace.rewrites.generic.modules.SPECIES_GEMM` (None: on for `SPECIES_GEMM_GPUS`); kernel `fastmace/kernels/triton/species_gemm.py`
+- Engine: FM
+- Date/round: 4 November 2026 (owner's goal: Benchmark_loup as fast as possible; owner's four ideas, idea 1)
+- What: `SpeciesSkip` multiplies every atom's rows by all present species' concatenated matrices and keeps its own block. The grouped kernel sorts the atoms by species on the device (stable argsort, counts by `index_add`, no host sync), cuts each species' rows into 64-row tiles on a fixed grid of `ceil(atoms*size/64) + species` programs, gathers the rows and scatters the results: a third of the products for three species, CUDA-graph safe when atoms change species. Same dot products (ieee bitwise on the 5060 Ti; tf32x3 within the 3xTF32 bound).
+- Status: DEFAULT on "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation" (owner, 4 November 2026: "Yes both"; decision 66); off on the A100 and every other GPU. Check after the switch (leto, default vs `SPECIES_GEMM=False`): 1.0507.
+- Measured (Benchmark_loup, OMAT-0 medium, SrTiO3 5,000 atoms, 1 fs, skin 0.5, `ab_rewrites.py`, 8 blocks): NVIDIA RTX 4000 Ada Generation (leto) 0.9548 / 0.9522 (both orders); NVIDIA GeForce RTX 5060 Ti 0.9504 / 0.9525; A100-SXM4-80GB 0.9919 / 0.9914 (Modal, 31799fb6; the A100 runs the skip through tf32x3, where Triton's dot is about 3x slower per FLOP than CUTLASS). The first version (data-dependent tiles) measured Ada 0.970 / 0.968, 5060 Ti 0.962, A100 1.040 / 1.036.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/species_skip_lab.py`; `tools/modal/species_gemm_a100.sh`, `species_gemm_a100b.sh`.
+
+<a id="omat0-species-gemm-tc"></a>
+#### omat0-species-gemm-tc: the species GEMM in our own 3xTF32 tensor-core kernel
+- Switch: `fastmace.kernels.triton.species_gemm.TENSOR_CORES` (False); `TC_CHUNK` (16), `TC_PRESPLIT` (False)
+- Engine: FM
+- Date/round: 4 November 2026 (owner: "could we then not try to make our own TF32x3 version ... so that it runs faster on a100?")
+- What: an NVRTC kernel on the same fixed tiles: K reduced in chunks in shared memory, 8 warps of 3xTF32 mma.sync m16n8k8 with the fused forward's split; `TC_PRESPLIT` splits each chunk once into TF32 parts in shared memory.
+- Status: REJECTED.
+- Measured: species skip lab (forward + input backward, size 16 = interaction 0), against the Triton species GEMM: A100-SXM4-80GB (Modal, 97250a3f) Triton 591.5 us, tc16 594.7, tc32 585.3, tc64 693.2, tc16p 553.3 (0.94), tc32p 659.6, tc64p 930.0; bound (one CUTLASS product, no gather) 204.8 us. RTX 4000 Ada Triton 946.3, tc16 863.3 (0.91), bound 831.5. RTX 5060 Ti Triton 1189.2, tc16 1027.1 (0.86); the first, unchunked version (whole W half per block, 71 KB shared memory) 3125 us. MD step: A100-SXM4 default vs SPECIES_GEMM + tensor cores (16p) 1.0031 / 1.0017 (the Triton species GEMM gave 0.992 there); Ada SPECIES_GEMM vs SPECIES_GEMM + tensor cores (16) 1.0006 / 0.9986.
+- Why: a simple mma.sync kernel only reaches Triton's rate; the A100's CUTLASS 3xTF32 is about 2.7x faster per product (bound 205 vs 553 us). Closing that gap needs a multi-stage cp.async pipeline with larger warp tiles, i.e. a CUTLASS-class grouped GEMM, for at most about 5 % of the A100 step.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/modal/species_gemm_tc_a100.sh`.
+
+<a id="omat0-species-gemm-cutlass"></a>
+#### omat0-species-gemm-cutlass: the species GEMM as one gathered CUTLASS launch
+- Switch: `fastmace.kernels.triton.species_gemm.CUTLASS` (False), `CUTLASS_FAMILY` (tests on any 8.x); cubin entry `fm_tf32x3_species_rr_64x64`
+- Engine: FM
+- Date/round: 4 November 2026 (owner: "why doesnt it work on a100")
+- What: CUTLASS's 64x64 3xTF32 kernel with GatherA / ScatterD on species_gemm's fixed tile grid; each block finds its species' tile from the device counts and shifts the int32 row-index arrays (built per call from the species order) so that CUTLASS's tile offset lands on the tile's rows. CUDA-graph safe.
+- Status: REJECTED (A/B switch kept).
+- Measured: A100-SXM4-80GB (Modal, 80609d27): GPU tests 17 passed; species skip lab (eager, forward + input backward) size 16: current 944 us, Triton 597, CUTLASS 678, bound 207; size 1: 249, 368, 671, 189 (the index arrays are a few small kernels per call). MD step default vs SPECIES_GEMM + CUTLASS 0.9928 / 0.9922, the same as the Triton species GEMM (0.992). RTX 4000 Ada (sm_89 runs the sm_80 cubin): tests pass, lab size 16 932 vs Triton 936 us.
+- Why: in the captured, compiled MD step the A100's concatenated CUTLASS product is cheap (3xTF32 at about 40 TFLOPS: roughly 0.4 ms per step for forward and backward of both interactions, so a third of it saves about 0.27 ms, 1.8 % of 15.3 ms); the grouped versions recover most of that and lose the rest to the per-call row ordering and indices. The A100 skip has no more than about 1-2 % left.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/modal/species_gemm_cutlass_a100.sh`.
+
+<a id="omat0-wprime-piece-order"></a>
+#### omat0-wprime-piece-order: the wprime backward over edges grouped by table slab
+- Switch: none; `tools/omat0_kernel_lab.py` bound variant `B-piece-sorted` (every per-edge input permuted by pair, then r)
+- Engine: FM
+- Date/round: 4 November 2026 (A100 edge kernels: wprime is 5.2 of 14.9 ms; its slope gathers a 25.6 KB G' slab per edge from a 206 MB table)
+- What: if edges sharing a (pair, piece) slab ran together, each slab would be read about once per step instead of about 40 times. The bound times the unchanged kernel on permuted inputs, the sort not counted.
+- Status: REJECTED.
+- Measured: RTX 5060 Ti (local), the captured Benchmark_loup call: base 8.30 ms, piece-sorted 12.55 ms (1.513), no slope 6.28 ms (0.757).
+- Why: the kernel streams edges in receiver order; sorted by slab, the receivers' output gradients and the sender atomics lose their locality, which costs far more than the whole slope.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `rtx5060ti-wprime-piece/`.
+
+<a id="omat0-table-w"></a>
+#### omat0-table-w: w and its slope from one value-table slab (no stored w)
+- Switch: `fastmace.kernels.oeq_streaming.wprime_backward.TABLE_W` (None: on for the generic family's wprime_backward on `TABLE_W_GPUS`, off for MH-1, which was not measured; True / False: an A/B side), `TABLE_W_VECTOR` (2); lab bounds `B-gslab`, `B-gslab-f2` in `tools/omat0_kernel_lab.py`; A100 job `tools/modal/tablew_a100.sh` (screen case `tablew`)
+- Engine: FM
+- Date/round: 4 November 2026 (A100 non-edge analysis, then the kernel lab's w-store falsifiers)
+- What: the fused forward stored w = a [W, b]^T ([E, Q], 1.9 GB on Benchmark_loup) only for the wprime backward, which read it with the derivative table G'. With `TABLE_W` the backward reads the value table G = C [W, b]^T (`value_table`, q-major [groups, Q, D + 1 rounded up to even], float2 loads) and evaluates w = sum_k T_k(x) G_k and w' = sum_k k U_(k-1)(x) scale G_k from the one slab (w zero at or beyond the cutoff); the forward runs its message-only kernel (`FusedFoldedForward(store_w=False)`). The tables grow by one term (164 vs 137 MB per interaction on Benchmark_loup); the 1.9 GB w buffer goes.
+- Status: MEASURED, off by default; faster on every GPU measured; a default (per GPU, decision 66) awaits the owner.
+- Measured: kernel lab (Benchmark_loup call) RTX 5060 Ti: wprime B-gslab (term-major, scalar loads) 1.047-1.055, B-gslab-f2 0.744, F-no-wload 0.830-0.840; forward F-no-store 0.781. A100-SXM4-80GB (Modal, 442684b6): wprime B-gslab-f2 0.884 (4.16 vs 4.70 ms), forward F-no-store 0.971. MD step b/a, both orders, 8 blocks of 200 steps (`ab_rewrites.py`): RTX 5060 Ti 0.8881 / 0.8917 (32.9 -> 29.2 ms); RTX 4000 Ada (leto, idle check) 0.9277 / 0.9314 (33.7 -> 31.3 ms); A100-SXM4-80GB 0.9433 / 0.9426 (15.36 -> 14.49 ms).
+- Checks: GPU test (`tests/gpu/test_wprime_backward_cuda.py`, RTX 5060 Ti and RTX 4000 Ada): message and density bitwise, dr 3.2e-7 of the float64 reference (stored-w path 2.5-4.5e-7), dx and dsh 2-4e-7 of the stored-w path, CUDA graph. Force gate (RTX 5060 Ti, `gate-rtx5060ti-tablew/`): OMAT-0 medium (SrTiO3 3x3x3, NaCl, NbCl5) and MH-1 r2SCAN (NaCl, NaNbO3, NbCl5) pass with the default's errors (force ratios 0.76-0.98 and 0.95-1.05). Merge-tier CPU suite on leto 5,110 passed, 202 skipped; ruff clean.
+- Why: on the RTX GPUs the forward is bound by the w store and the backward by load instructions; the q-major slab gives w and w' with three float2 loads per weight in place of one w load and five G' loads. On the A100 the forward is bound by its product instead, so the store saves only 3 %.
+- Default (owner, 4 November 2026: "Turn on the table_w for all a100s and the other gpus"): on for the generic family on the RTX 5060 Ti, the RTX 4000 Ada and every A100 model (`kernels/gpu_models.py`: an A100 entry in a decision-66 list now stands for every A100 model, so the A100-SXM4-40GB and A100-PCIE-40GB take all the A100 defaults, tf32x3_gemms for MH-1 and OMAT-0 included). Follow-up: the block-layout message ([omat0-block-message](#omat0-block-message)).
+- Follow-ups (rejected): float4 slab loads 1.045 / 1.059 (RTX 5060 Ti / Ada), degree 7 + float4 1.018 / 1.025, degree 4 1.080 / 1.041, degree 3 refused by the table certificate; w from the slab in the forward too (`NS-slab` bound) 1.30x the message-only forward on the RTX 5060 Ti.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §16; `rtx5060ti-tablew-lab/`, `rtx5060ti-tablew-ab/`, `rtx4000ada-tablew/`, `a100-sxm4-tablew/`, `gate-rtx5060ti-tablew/`.
+
+<a id="omat0-block-message"></a>
+#### omat0-block-message: the conv message in linear_1's block layout
+- Switch: `fastmace.kernels.oeq_streaming.wprime_backward.BLOCK_MESSAGE` (None: on for `BLOCK_MESSAGE_GPUS`; True / False: an A/B side); A100 job `tools/modal/block_a100.sh` (screen case `block`)
+- Engine: FM
+- Date/round: 4 November 2026 (after `TABLE_W`; owner: "resume the block layout message work on omat-0 but stop after that")
+- What: with `TABLE_W` and the fused forward, the message-only kernel writes each same-irrep group of the grouped BlockLinear's input (OMAT-0 interaction 1: l0 2 paths, l1 3, l2 3, l3 2) as its own `[N * dim, P * 128]` tensor (`fused_forward.block_map`, one output pointer per group); the `TABLE_W` wprime kernel reads the groups' gradients through one pointer each; linear_1 multiplies the groups directly. `block_spec` checks the layout fits; the kernels are built after the rewrites (`prepare_block_messages`, from `Registry.apply`); LAMMPS ghosts, residual and density-first paths rebuild the whole message (`dense_message`). Bitwise the same message and products.
+- Results: Benchmark_loup MD step b/a (a = the default with `TABLE_W` on): RTX 5060 Ti 1.060 / 1.060 (slower), RTX 4000 Ada 0.974 / 0.971, A100-SXM4-80GB 0.983 / 0.977. Force gate (RTX 5060 Ti, SrTiO3 3x3x3, NaCl, NbCl5) passes. Step breakdown (RTX 5060 Ti): the relayout copies go (about 0.8 ms), but the wprime kernel with four gradient pointers takes 10.3 ms instead of 7.6 ms (same 80 registers; dropping `__restrict__` on the pointers changed nothing, 1.059); the cause is not found (a guess: the gradient groups now come from the cuBLAS backward products well before the kernel instead of from the copy just before it, so they are no longer L2-resident).
+- Decision (owner, 4 November 2026: "Yes, Ada and A100"): default on the RTX 4000 Ada and every A100 model (`BLOCK_MESSAGE_GPUS`, decision 66), off elsewhere. Checked on leto: with no constants set, OMAT-0 medium runs with `TABLE_W` and the block layout (20 MD steps). OMAT-0 work stops here (owner, 4 November 2026).
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §17; `rtx5060ti-block-ab/`, `rtx5060ti-block-breakdown/`, `gate-rtx5060ti-block/`, `rtx4000ada-block-ab/`, `a100-sxm4-block/`
+
+<a id="omat0-wprime-aprime"></a>
+#### omat0-wprime-aprime: the wprime slope through a'(r) and dw W
+- Switch: none; bound `tools/wprime_da_bound.py`, `tools/modal/wprime_da_bound_a100.sh`
+- Engine: FM
+- Date/round: 4 November 2026 (owner: "Try it")
+- What: the slope `dr = sum_c dw_c w'_c(r)` reads a [terms, Q] slab of G' per edge (25.6 KB). Written as `dr = a'(r) . (dw [W, b])`, the table slab shrinks to [terms, J] (a 7 MB table), but every edge needs the product `da = dw W` ([Q] x [Q, J]). The bound times that product alone as one large GEMM of Benchmark_loup's shape (373,760 edges x 1,280 x 64), its most efficient form.
+- Status: REJECTED (not built).
+- Measured: A100-SXM4-80GB (Modal, six jobs, ee1b44fd): CUTLASS 3xTF32 2.27 ms (J 64; 3.8-4.5 ms at J 72), cuBLAS FP32 4.14 ms, cuBLAS TF32 1.27 ms (one pass, too inexact: about 1e-3); the slope it would replace costs 1.81 ms (wprime 4.70 ms, without slope 2.89 ms).
+- Why: the reformulation moves 61 GFLOP of per-edge products into the backward; at the A100's 3xTF32 rate that alone costs more than the table reads it saves.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `a100-sxm4-wprime-da-bound/`.
+
+<a id="omat0-first-table-columns"></a>
+#### omat0-first-table-columns: only the used columns of the first radial table
+- Switch: `fastmace.rewrites.generic.modules.FIRST_TABLE_COLUMNS` (False); `radial_table(..., columns=)`
+- Engine: FM
+- Date/round: 4 November 2026 (owner's four ideas, idea 2: interaction-0 radial/edge backward)
+- What: the first interaction's radial table forward stores, and its backward reads, only the leading columns the first product uses, instead of computing the full width and slicing.
+- Status: REJECTED.
+- Measured: MD step A100-SXM4-80GB 1.0018 / 0.9993 (Modal, 31799fb6), RTX 5060 Ti 1.002; bitwise (`test_leading_columns_bit_for_bit`).
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15.
+
 ### Alternative backends and external comparisons
 
 | ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
@@ -3604,6 +3731,168 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Measured: all ten benchmark models pass the accuracy gate, 2.9–12.2× faster than stock ASE; MACE-OFF default 3.9–16.8× faster than stock ASE and 2.1–3.2× faster than the plain GPU engine; 15 October default NVT at 300 K (all-models run, MH-1) NaCl 3.53, NaNbO3 23.79, NbCl5 28.58 ms. OMOL-0 collapses in NaCl MD (as in stock ASE).
 - Why: –
 - Sources: `ResearchModule:LT/studies/other_models/README.md`; ResearchModule AGENTS.md.
+
+### OMAT-0 on the A100 (Benchmark_loup, November 2026)
+
+Common setup unless stated: MACE-OMAT-0 medium, SrTiO3 10×10×10 (5,000 atoms, 373,760 edges), float32 default
+plan, `tools/ab_rewrites.py` same-process MD step A/Bs (warm-up 200, 6 blocks of 200 steps, order abab; winners
+both orders, 8 blocks), b/a of the step time. RTX 4000 Ada = leto (`mace_cueq_oeq`, idle check); RTX 5060 Ti =
+the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
+
+<a id="omat0-launch-screen"></a>
+#### omat0-launch-screen: launch settings of the fused forward and the streaming kernels
+- Switch: module constants `fused_forward.BLOCKS_PER_SM`, `RECEIVERS_PER_CHUNK`, `W_TILE_REGISTERS`, `BATCH`; `runtime.NUM_THREADS`
+- Engine: FM
+- Date/round: 3 November 2026 (A100 on Modal, `033b86c4`; RTX 4000 Ada on leto)
+- What: the launch rules of the two kernels that hold 65 % of the A100 force call were tuned on MH-1; screen them on OMAT-0.
+- Status: REJECTED.
+- Measured: A100 BLOCKS_PER_SM 4 1.003, 1 1.079; RECEIVERS_PER_CHUNK 1 / 4 1.001 / 1.000; W_TILE_REGISTERS 80 1.001, 24 1.128, 16 1.143; NUM_THREADS 64 / 256 / 512 1.000 / 1.001 / 1.000. Ada BATCH 4 0.992, BLOCKS_PER_SM 1 / 4 1.000 / 1.010, RECEIVERS_PER_CHUNK 1 / 4 1.005 / 1.002, NUM_THREADS 64 / 256 / 512 1.006 / 1.001 / 1.001. `recompute_conv_weights` is refused with `wprime_backward`.
+- Why: the defaults already sit at the optimum; the time is inside the kernels ([omat0-kernel-lab](#omat0-kernel-lab)).
+- Sources: [launch screen](../results/omat0-a100-launch-screen-20261103); [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-strided-rows"></a>
+#### omat0-strided-rows: `edge_outer_sum` reads the strided table rows in place
+- Switch: `fastmace.kernels.triton.edge_outer_sum.STRIDED_ROWS` (module constant, on)
+- Engine: FM
+- Date/round: 3 November 2026 (`27609a1e`)
+- What: the segmented first sum reads the radial table's `[E, 64]` slice in place instead of a contiguous copy (254 µs per force call on the A100).
+- Status: DEFAULT on branch `fastmace/omat0-strided-tables` (exact).
+- Measured: Ada step 0.9746 (copy 41.14 ms, in place 40.10 ms). The A100 has not been measured.
+- Why: removes a copy.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-first-full-rows"></a>
+#### omat0-first-full-rows: generic reassociation on the full table row
+- Switch: `fastmace.rewrites.generic.modules.FIRST_FULL_ROWS` (off)
+- Engine: FM
+- Date/round: 3 November 2026
+- What: the reassociated first interaction reads the table row `[h c, c]` against `[W, 0]` and drops the zero-pad slice and its backward (109 µs on the A100).
+- Status: REJECTED.
+- Measured: Ada step 1.0166.
+- Why: the wider product costs more than the slice saves.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-column-block"></a>
+#### omat0-column-block: 64-column radial-table forward programs
+- Switch: `fastmace.kernels.triton.radial_table.COLUMN_BLOCK=64`
+- Engine: FM
+- Date/round: 3 November 2026
+- What: smaller column blocks for the 212-register table forward.
+- Status: REJECTED.
+- Measured: Ada step 1.0023.
+- Why: no gain.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-table-degree"></a>
+#### omat0-table-degree: lower Chebyshev degree of the radial tables
+- Switch: `fastmace.rewrites.radial.DEGREE` (default 10)
+- Engine: FM
+- Date/round: 3–4 November 2026
+- What: fewer Chebyshev terms per piece and more pieces at the same fit tolerance (1e-7 of the local largest value and derivative). Each edge evaluates fewer terms in the table forward and backward and in wprime's slope.
+- Status: DEFAULT since 4 November 2026 (owner: "Yes"; SPEC decision log). MH-1 on the Ada is neutral (NaCl 0.978 in both orders, NaNbO3 1.006 / 0.998, NbCl5 1.001 / 0.999); memory grows with the piece count.
+- Measured: Ada step: degree 8 0.9759, 7 0.9381, 6 0.9336, 5 0.9078 (both orders 0.9095 / 0.9069), 4 0.9804. RTX 5060 Ti degree 5 0.9348. A100-SXM4-80GB (Modal, 4 November): degree 5 0.9029 / 0.9053, 6 0.9196, 4 1.0262; dz5 (degree 5 and [omat0-skip-zero-column](#omat0-skip-zero-column)) 0.8961 / 0.8951. Benchmark_loup protocol on the A100: dz5 3.172 µs/atom/step NVE and 3.175 Langevin (medians of 3 processes) against 3.614 and 3.543 for the default plan, the fastest so far. Fit tolerance 3e-7 instead of 1e-7: Ada degree 5 0.9049 (no gain over 1e-7), degree 4 0.9581. Force gate (RTX 5060 Ti, SrTiO3 3×3×3, NaCl, NbCl5): dz5 passes all 12 checks, error ratios within 0.06 of the default plan except NaCl energy (1.34 against 1.21). Pieces for interactions 0 / 1 (9 pairs): degree 10 177 / 175, 8 251 / 246, 7 306 / 150, 6 484 / 264, 5 894 / 622, 4 2,122 / 1,687. Certificate (table error over the float32 network's) 0.30–0.36 at every degree, limit 1. wprime's derivative table: 82 MB at degree 10, 134 MB at 6, 206 MB at 5, 391 MB at 4.
+- Why: wprime is load-bound and each term is 2–5 % of it; at degree 4 the tables' size wins.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md); leto `fm-tiled/cache/radial-tables`.
+
+<a id="omat0-kernel-lab"></a>
+#### omat0-kernel-lab: one force call's wprime and fused forward in variants
+- Switch: none (`tools/omat0_kernel_lab.py`)
+- Engine: FM
+- Date/round: 3 November 2026
+- What: capture the default plan's largest eager call of both kernels and time rendered-source variants (exact ones compared bit for bit) and falsifiers.
+- Status: MEASUREMENT.
+- Measured: wprime base 10.47 ms (5060 Ti) / 10.33 ms (Ada); no slope 0.597 / 0.734, half the terms 0.805 / 0.770, one slab 1.073 / 1.029, no atomics 1.101 / 0.999, no w load 0.858 / 0.912. Fused forward base 8.70 / 8.67 ms; no store 0.787 / 0.871, no a·W 0.997 / 0.893, no tensor product 0.978 / 0.900, a·W alone 0.356 / 0.193. Register caps spill (1.11–1.51).
+- Why: wprime is load-instruction bound in L1, not DRAM- or atomic-bound. The forward is store-bound on the 5060 Ti and overlapped on Ada; on the A100 the a·W product should dominate ([omat0-tc-forward](#omat0-tc-forward)).
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-slope-vector"></a>
+#### omat0-slope-vector: q-major derivative table with vector term loads
+- Switch: `fastmace.kernels.oeq_streaming.wprime_backward.SLOPE_VECTOR` (0; 2 or 4)
+- Engine: FM
+- Date/round: 3 November 2026 (`c706a3b8`)
+- What: store G' as `[groups, Q, TERMS padded]` and load each weight's terms as float2/float4. The same sums in the same order (dr and dsh bitwise, GPU test on leto). The rebuild backward refuses it.
+- Status: REJECTED on Ada; the A100 is open.
+- Measured: lab wprime 0.913 (float2), 0.974 (float4) on the 5060 Ti. Ada step 0.9909 (float2), 1.0276 (float4), 0.9993 (float2 at degree 6).
+- Why: fewer load instructions; the gain disappears with fewer terms.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-stream-w"></a>
+#### omat0-stream-w: wprime reads the stored w with `__ldcs`
+- Switch: `fastmace.kernels.oeq_streaming.wprime_backward.STREAM_W` (off)
+- Engine: FM
+- Date/round: 3 November 2026 (`a8171e19`)
+- What: evict-first loads of the 1.9 GB of stored per-edge weights. Bitwise.
+- Status: PENDING (a per-GPU choice at best).
+- Measured: lab wprime 0.964–0.966 (5060 Ti), 1.127 (Ada).
+- Why: helps where L2 is small relative to the slabs (sm_120), hurts on sm_89.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-symmetric-pairs"></a>
+#### omat0-symmetric-pairs: mirror species pairs share one table row
+- Switch: `fastmace.rewrites.radial.SYMMETRIC_PAIRS` (off)
+- Engine: FM
+- Date/round: 3 November 2026 (`a8171e19`)
+- What: when the (s, t) and (t, s) coefficient rows are bitwise equal (OMAT-0's are), edges of both read the lower pair's row. Bitwise.
+- Status: REJECTED on Ada; the A100 is open.
+- Measured: lab wprime 0.980–0.991 ("unordered"); Ada step 0.9973.
+- Why: fewer distinct slabs, but the slab locality is not the limit ([omat0-kernel-lab](#omat0-kernel-lab), one slab 1.03–1.07).
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-skip-zero-column"></a>
+#### omat0-skip-zero-column: the fused forward skips the all-zero bias column
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.SKIP_ZERO_COLUMN` (off; `used_columns`)
+- Engine: FM
+- Date/round: 4 November 2026 (`6c825cab`)
+- What: OMAT-0's last radial layer has no bias (e3nn `FullyConnectedNet`), so the folded weight's last column is zero. The k-loop reads 64 of 65 inputs at the full row stride. Bitwise (GPU test).
+- Status: PENDING.
+- Measured: lab forward 0.909 (Ada), 1.010 (5060 Ti). Step: pending.
+- Why: the loop and staging arithmetic simplify (64 = 2^6); the saved product is 1.5 %.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-stream-store-w"></a>
+#### omat0-stream-store-w: the fused forward stores w with `__stcs`
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.STREAM_STORE_W` (off)
+- Engine: FM
+- Date/round: 4 November 2026 (`40ba974f`)
+- What: evict-first stores of the per-edge weights, read only by the backward. Bitwise (GPU test).
+- Status: PENDING.
+- Measured: lab forward 0.965 (Ada), 0.995 (5060 Ti); with skip-zero-column 0.896 (Ada). Step: pending.
+- Why: keeps W, a and x in L2.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-eos-chunks"></a>
+#### omat0-eos-chunks: `edge_outer_sum` chunk sizes
+- Switch: `fastmace.kernels.triton.edge_outer_sum.FORWARD_CHUNK`, `BACKWARD_BLOCK_EDGES` (32)
+- Engine: FM
+- Date/round: 3 November 2026
+- What: 64 edges per program in the segmented first sum's forward or backward (436 + 244 µs per A100 force call).
+- Status: PENDING.
+- Measured: pending.
+- Why: –
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+
+<a id="omat0-tc-forward"></a>
+#### omat0-tc-forward: 3×TF32 tensor-core a·W product in the fused forward (A100)
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.TENSOR_CORES` (None: per GPU, `TENSOR_CORES_GPUS`; also the w rebuild in `wrebuild_backward`), `TC_SPLIT`
+- Engine: FM
+- Date/round: 4 November 2026 (idea, then built in e804b246 on the owner's "try out all of the ideas")
+- What: the fused forward's per-batch product `w = a W^T` (K = 64 with skip-zero-column, 1,280 outputs per edge) on mma.sync TF32 with three passes (FP32-equivalent, as the accepted `tf32x3_gemms`), only on GPUs whose TF32 rate is many times their FP32 rate (A100).
+- Status: DEFAULT on the A100-SXM4-80GB and the A100 80GB PCIe (owner, 4 November 2026: "Yes to both"; `TENSOR_CORES = None`, `TENSOR_CORES_GPUS`, `TC_SPLIT = "mask"`), every model; the `rna` split was REJECTED. MH-1 on the A100-SXM4 (both orders): NaCl 0.978 / 0.970, NaNbO3 0.966 / 0.967, NbCl5 0.983 / 0.982; MH-1 force gate passes. Correct (w within 2–3.6× the FP32 chain's error of the row scale against float64, the message bitwise the streaming forward's on that w; force gate passes on the RTX 5060 Ti), but slower on every GPU.
+- Measured: MD step b/a 1.040 on the A100 (1.042 on top of degree 5; dztc5 0.910 / 0.911 against dz5 0.896 / 0.895), 1.124 on the Ada, 1.272 on the RTX 5060 Ti. Per warp the kernel multiplies 16 channels × 8 edges per mma.sync m16n8k8, so every W fragment serves one 3-mma triple per batch: twice the shared loads of the FP32 path, plus the TF32 split of W per batch. Splitting W once per block into a high and a low plane in shared memory (not committed) was worse, 1.730 on the RTX 5060 Ti: the doubled slice halves the warps per block. A version that pays would need larger edge batches per warp (W fragments reused across n tiles) and so a new staging layout. The original estimate: The product is 62 GFLOP per force call; at the A100's 19.5 TFLOPS FP32 it takes at least 3.2 ms of the forward's 5.06 ms. With 3×TF32 (about 52 TFLOPS) it would take about 1.2 ms, so the forward could drop to about 2.5 ms (−13 % of the force call). On Ada and sm_120 (TF32 2× FP32) it would lose ([prec-tf32x3-triton](#prec-tf32x3-triton)).
+- Split (4 November 2026, `TC_SPLIT`): the A100 lab showed the time going to the `cvt.rna.tf32` splits, not the mma triples. `round` (integer add and mask, as accurate as `rna`): fused forward 4.18 against 4.90 ms SIMT, MD step b/a 0.963 / 0.965 (both orders), loup NVE 3.03 against 3.17. `mask` (high part truncated, low part passed raw; about 2.5× the `round` error, outside the GPU test's bound at k = 9): 3.65 ms, b/a 0.933 / 0.933, loup NVE 2.92 and Langevin 2.90. Force gate passes for both (SrTiO3 energy error 1.15 / 1.39 meV against 0.73 meV, floor 10 meV). Slower on the RTX 5060 Ti with every split.
+- Why: the A100 is the one target GPU where the reopen condition of [conv-tc-wtile](#conv-tc-wtile) holds.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md); the A100 profile `results/omat0-a100-profile-20261103`.
+
+<a id="omat0-cutlass-tile"></a>
+#### omat0-cutlass-tile: two-warp tiles for the CUTLASS 3×TF32 GEMMs (A100)
+- Switch: `fastmace.kernels.cutlass.tf32x3.TILE` ("64x64"; "32x64", "64x32")
+- Engine: FM
+- Date/round: 4 November 2026 (owner's goal: Benchmark_loup as fast as possible)
+- What: the CUTLASS 3×TF32 products of Benchmark_loup (5,000 atom rows × 128 columns) launch 158 blocks of 64×64 on the A100's 108 SMs, so 50 SMs hold two tiles and 58 one. The cubin gained 32×64 and 64×32 tiles (two warps of 32×32×16, 4 stages), twice the blocks; bitwise the 64×64 tile's (the same K loop per element; the 64×64 entries' SASS unchanged).
+- Status: REJECTED.
+- Measured: MD step b/a on the A100-SXM4-80GB, both orders, 8 blocks: 32×64 1.0144 / 1.0116, 64×32 1.0167 / 1.0173. The GEMMs are 1.85 ms of the 14.85 ms force call (with the tensor-core forward); the smaller tiles' mainloops lose more than the even load gains.
+- Why: wave quantisation on 108 SMs.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §12; `tests/gpu/test_cutlass_tf32x3_tiles_cuda.py`.
 
 ### Alternative backends and external comparisons
 

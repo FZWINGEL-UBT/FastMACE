@@ -1,0 +1,11 @@
+checkpoint /mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model
+ab-ab exit=0 SrTiO3 a 35.4557 ms b 34.3730 ms b/a 0.9695 valid
+ab-ba exit=0 SrTiO3 b 34.5046 ms a 35.6395 ms b/a 0.9682 valid
+gpu-pytest exit=0 9 passed in 4.96s
+cpu exit=1 4 failed, 5106 passed, 202 skipped, 1002 warnings in 784.00s (0:13:03)
+FAILED tests/cpu/test_layering.py::test_fastmace_obeys[no_module_switches] - ...
+FAILED tests/cpu/test_species_gemm.py::test_plan_covers_every_row_once[counts0-3]
+FAILED tests/cpu/test_species_gemm.py::test_plan_covers_every_row_once[counts2-7]
+FAILED tests/cpu/test_species_gemm.py::test_fallback_and_gradient - assert False
+ruff exit=1
+done

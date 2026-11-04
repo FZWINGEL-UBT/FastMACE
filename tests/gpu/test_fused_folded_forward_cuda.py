@@ -4,7 +4,8 @@ The chain: ``w = a @ W.T`` (cuBLAS), then the streaming forward. The fused kerne
 (FP32 rounding; on the RTX 5060 Ti bitwise) and a message bitwise equal to the streaming forward on the ``w`` it
 stored (the same angular sums in the same edge order), including the padding edges past every row; the gradients
 through ``folded_streaming_convolution`` equal the chain's (the backward is the same). Both layouts, two folded
-widths, a CUDA graph. Runs in a fresh interpreter like test_kernels_oeq_streaming_cuda.py.
+widths, a CUDA graph, and ``SKIP_ZERO_COLUMN``'s kernel bit for bit on a weight with a zero last column. Runs in a
+fresh interpreter like test_kernels_oeq_streaming_cuda.py.
 """
 
 import json
@@ -36,10 +37,12 @@ import openequivariance as oeq
 import torch
 
 from fastmace.kernels.oeq_streaming import StreamingKernels, folded_streaming_convolution
+from fastmace.kernels.oeq_streaming import fused_forward as ff_module
 from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward, fused_folded_forward
 from fastmace.kernels.oeq_streaming.runtime import streaming_conv_forward
 
 torch.backends.cuda.matmul.allow_tf32 = False
+ff_module.TENSOR_CORES = False  # the FP32-SIMT product unless a check asks for tensor cores (on by default on A100s)
 C = 64
 irreps_in1, irreps_in2 = oeq.Irreps(f"{C}x0e+{C}x1o"), oeq.Irreps("1x0e+1x1o+1x2e+1x3o")
 irreps_out = oeq.Irreps(f"{C}x0e+{C}x0e+{C}x1o+{C}x1o+{C}x2e+{C}x2e+{C}x3o")
@@ -92,6 +95,53 @@ for layout in ("ir_mul", "mul_ir"):
         assert torch.equal(captured[0], new[0])  # the forward has no atomics: replay-stable
         for n, o in zip(captured[1:], new[1:]):
             torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-6 * float(o.abs().max()))
+        # SKIP_ZERO_COLUMN: with an all-zero last weight column the kernel that reads one input fewer stores the same
+        # w and message bit for bit (the skipped term adds an exact zero).
+        zero = weight.clone()
+        zero[:, -1] = 0.0
+        skip = FusedFoldedForward(kernels, k, used=k - 1)
+        reference = fused_folded_forward(a, zero, X, Y, *args, fused.id)
+        skipped = fused_folded_forward(a, zero, X, Y, *args, skip.id)
+        assert torch.equal(skipped[0], reference[0]) and torch.equal(skipped[1], reference[1]), (layout, k)
+        report[name]["skip zero column bitwise"] = True
+        # STREAM_STORE_W: the w store with the evict-first hint stores the same values.
+        ff_module.STREAM_STORE_W = True
+        try:
+            streamed = FusedFoldedForward(kernels, k)
+        finally:
+            ff_module.STREAM_STORE_W = False
+        assert "__stcs(&wout" in streamed.source, (layout, k)
+        hinted = fused_folded_forward(a, weight, X, Y, *args, streamed.id)
+        assert torch.equal(hinted[0], message) and torch.equal(hinted[1], w), (layout, k)
+        report[name]["stream store bitwise"] = True
+        # TENSOR_CORES (sm_80+): w in 3xTF32 within twice the FP32 chain's error against float64 plus one unit of
+        # the row's scale per mma accumulation (3 per 8 columns; the tensor cores' FP32 accumulation does not round
+        # to nearest: 9.5e-7 against a chain of 2.8e-7 at k = 65 on the RTX 4000 Ada) and a few for the split, the
+        # message bitwise the streaming forward's on that w; with the zero-column skip too. Each TC_SPLIT: "mask"
+        # (the default) truncates the high part and passes the low part raw, so each product may lose up to about
+        # 3 * 2^-20 of |a| |W| more (RTX 5060 Ti: 19.3 units of 2^-24 at k = 9 against 7.6 for "round").
+        if torch.cuda.get_device_capability() >= (8, 0):
+            exact = (a.double() @ weight.double().t())
+            scale = (a.double().abs() @ weight.double().abs().t())
+            chain_error = float(((chain_w.double() - exact).abs() / scale).max())
+            report[name]["tensor cores"] = {"chain": chain_error}
+            for split in ("mask", "round"):
+                ff_module.TENSOR_CORES, ff_module.TC_SPLIT = True, split
+                try:
+                    tc = FusedFoldedForward(kernels, k)
+                    tc_skip = FusedFoldedForward(kernels, k, used=k - 1)
+                finally:
+                    ff_module.TENSOR_CORES, ff_module.TC_SPLIT = False, "mask"
+                assert tc.tc and "mma.sync" in tc.source, (layout, k)
+                tc_message, tc_w = fused_folded_forward(a, weight, X, Y, *args, tc.id)
+                tc_error = float(((tc_w.double() - exact).abs() / scale).max())
+                tc_limit = 2 * chain_error + (3 * -(-k // 8) + 4 + (48 if split == "mask" else 0)) * 2.0 ** -24
+                assert tc_error <= tc_limit, (layout, k, split, tc_error, chain_error)
+                assert torch.equal(tc_message, streaming_conv_forward(X, Y, tc_w, sender.int(), rows, kernels.id))
+                skip_message, skip_w = fused_folded_forward(a, zero, X, Y, *args, tc_skip.id)
+                zero_exact = a.double() @ zero.double().t()
+                assert float(((skip_w.double() - zero_exact).abs() / scale).max()) <= tc_limit
+                report[name]["tensor cores"][split] = tc_error
 print(json.dumps(report))
 """
 

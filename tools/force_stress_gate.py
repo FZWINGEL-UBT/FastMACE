@@ -440,6 +440,9 @@ def parse_args(argv=None):
                    help="RewriteConfig fields for FastMACE's minimal planner (e.g. gated_rows=on); others stay auto")
     p.add_argument("--engine-config", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="Boolean EngineConfig fields for FastMACE's minimal planner (e.g. model_template_cache=false)")
+    p.add_argument("--production-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
+                   help="Module constants of the FastMACE production process (A/B switches such as "
+                        "fastmace.rewrites.radial:DEGREE=5); the references are unchanged")
     p.add_argument("--production-tf32", action="store_true",
                    help="The FastMACE production process runs with PyTorch's TF32 matmul mode (TF32 screen, 29 "
                         "October 2026; never default, SPEC §1.2); the references stay IEEE")
@@ -568,6 +571,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         common = dict(model=args.model, label=args.model, checkpoint=str(checkpoint),
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
                       backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
+                      production_constants=list(args.production_constant),
                       engine_config=args.engine_config, production_tf32=args.production_tf32,
                       tiled_receivers=args.tiled_receivers, tiled_mode=args.tiled_mode)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
@@ -972,6 +976,13 @@ def fastmace_production_child(job, result):
     """
     import torch
 
+    if job.get("production_constants"):  # --production-constant: set before anything is built
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from ab_rewrites import constant_overrides
+
+        for (module, name), value in constant_overrides(job["production_constants"]).items():
+            setattr(sys.modules[module], name, value)
+        result["production_constants"] = job["production_constants"]
     if job.get("tiled_receivers"):
         return tiled_production_child(job, result)
     build = _fastmace_build(job, result)

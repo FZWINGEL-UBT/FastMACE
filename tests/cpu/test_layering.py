@@ -71,6 +71,26 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.
     "fastmace/kernels/oeq_streaming/runtime.py": {"TABLE_GRADIENT_PER_CHUNK": "per-chunk table gradient; GPU gate A/B"},
+    # OMAT-0 A100 profile follow-ups (3 November 2026): A/B switches of the launch screen
+    # (tools/modal/omat0_a100_launch_screen.sh); config fields only if adopted.
+    "fastmace/kernels/triton/edge_outer_sum.py": {"STRIDED_ROWS": "strided rows in place; copy kept for the A/B"},
+    "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B"},
+    "fastmace/kernels/triton/species_gemm.py": {"TENSOR_CORES": "species products in our mma.sync kernel; A/B",
+                                                "TC_PRESPLIT": "tensor-core kernel lab switch",
+                                                "CUTLASS": "gathered CUTLASS species products; A/B",
+                                                "CUTLASS_FAMILY": "CUTLASS cubin on any 8.x; tests"},
+    "fastmace/rewrites/generic/modules.py": {"FIRST_FULL_ROWS": "reassociation on the full table row; screen A/B",
+                                             "FIRST_TABLE_COLUMNS": "first table without its cutoff column; A/B",
+                                             "SPECIES_GEMM": "own-species skip rows; None = SPECIES_GEMM_GPUS"},
+    # OMAT-0 kernel lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py): bitwise A/B switches, off by default.
+    "fastmace/rewrites/radial/__init__.py": {"SYMMETRIC_PAIRS": "mirror pairs read one table row; screen A/B"},
+    "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B",
+                                                          "TABLE_W": "w and slope from the value table; per GPU, A/B",
+                                                          "BLOCK_MESSAGE": "block-layout message; per GPU, A/B"},
+    "fastmace/kernels/oeq_streaming/fused_forward.py": {"SKIP_ZERO_COLUMN": "skips W's zero bias column; per GPU, A/B",
+                                                        "STREAM_STORE_W": "w stored with __stcs; screen A/B",
+                                                        "TENSOR_CORES": "a.W in 3xTF32 on tensor cores; per GPU, A/B",
+                                                        "TC_PRESPLIT": "W slice split once per block; A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")

@@ -7,7 +7,24 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 ## [Unreleased]
 
 ### Added
+- `wprime_backward.BLOCK_MESSAGE`: the conv message in linear_1's block layout, no relayout copies. Default on the
+  RTX 4000 Ada and every A100 (owner, 4 November 2026). Benchmark_loup step 0.974 / 0.971 (RTX 4000 Ada), 0.983 /
+  0.977 (A100-SXM4); the RTX 5060 Ti (1.060, slower) keeps it off.
+- `wprime_backward.TABLE_W`: the wprime backward evaluates w and its slope from one q-major
+  value-table slab, so the fused forward stores no w (1.9 GB on Benchmark_loup). Benchmark_loup step 0.888 /
+  0.892 (RTX 5060 Ti), 0.928 / 0.931 (RTX 4000 Ada), 0.943 / 0.943 (A100-SXM4); force gates pass. Default on for
+  the generic family (OMAT-0) on these GPUs and every A100 (owner, 4 November 2026).
 
+### Changed
+- Decision-66 GPU lists (`kernels/gpu_models.GPUModels`): an A100 entry stands for every A100 model, so the
+  A100-SXM4-40GB and A100-PCIE-40GB take the A100 defaults (owner, 4 November 2026).
+
+- `generic.modules.SPECIES_GEMM` (default on for the RTX 5060 Ti and RTX 4000 Ada, `SPECIES_GEMM_GPUS`, decision
+  66): the species skip as one grouped GEMM (`kernels/triton/species_gemm.py`, fixed grid, CUDA-graph safe).
+  Benchmark_loup step 0.955 / 0.952 (RTX 4000 Ada), 0.950 / 0.953 (RTX 5060 Ti); 0.992 on the A100-SXM4 (off). `species_gemm.TENSOR_CORES` (own 3xTF32 mma.sync kernel)
+  and `FIRST_TABLE_COLUMNS` were measured and rejected (A/B switches only).
+- `fused_forward.TC_SPLIT` ("mask", "round", "rna"): the tensor-core product's TF32 split; and two-warp
+  CUTLASS 3xTF32 tiles (`cutlass.tf32x3.TILE` "32x64" / "64x32", bitwise; slower on the A100, A/B only).
 - `TileConfig.compiled_graphs` (default off; `tiled_capacity.py --compiled-graphs`): compiled tile bodies captured
   in CUDA graphs per slot and sweep. Steady tiled call 0.90 at 40k and 0.961 at 214k atoms (RTX 5060 Ti), 1.000 at
   1M (RTX 4000 Ada); the private pools cost memory, so 1M runs out of memory with it on the 16 GB RTX A4000
@@ -181,6 +198,18 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Changed
 
+- On the A100 80GB (SXM4 and PCIe) the fused folded forward's a.W product runs in 3xTF32 on tensor cores
+  (`fused_forward.TENSOR_CORES` per GPU, decision 66; split `TC_SPLIT = "mask"`), for every model. A precision
+  change of the w product (force gates pass). MD step 0.93 (OMAT-0 medium, Benchmark_loup) and 0.97-0.98 (MH-1) on
+  the A100-SXM4-80GB; Benchmark_loup 2.92 µs/atom/step (NVE) against 3.17. The A100 80GB PCIe also gets the SXM4's
+  OMAT-0 defaults (`tf32x3_gemms` for OMAT-0 medium, the generic wprime set, the skipped zero column): with the
+  tensor-core forward 4.61 -> 3.12 µs/atom/step there (NVE; MD step 0.931 / 0.930 for the tensor cores alone).
+- Float32 radial tables (MH-1's and the generic family's) are fitted at Chebyshev degree 5 instead of 10
+  (`rewrites.radial.DEGREE`), with the same tolerance and certificate. OMAT-0 medium MD step 0.90–0.94 against
+  degree 10 (A100-SXM4-80GB, RTX 4000 Ada, RTX 5060 Ti); MH-1 neutral. On the RTX 4000 Ada and the
+  A100-SXM4-80GB the fused folded forward also skips an all-zero last folded-weight column
+  (`fused_forward.SKIP_ZERO_COLUMN`, decision 66, exact). Benchmark_loup on the A100-SXM4-80GB: 3.17 µs/atom/step
+  (was 3.54–3.61). Owner decision, 4 November 2026; results/omat0-kernel-lab-20261103.
 - Tile lists (`fastmace.neighbors.tile_list.TileNeighbours`): half-cutoff bins and a +-2 stencil, 42 % fewer
   candidates, the same edges in the same order; a 1M-atom list rebuild 2.11 -> 1.38 s (RTX 4000 Ada).
 - Tiled kept lists and list cache: senders as int16 ranks into each tile's int32 senders (about 3 instead of 5 bytes

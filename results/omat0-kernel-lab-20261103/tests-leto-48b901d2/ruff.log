@@ -1,0 +1,35 @@
+E501 Line too long (121 > 120)
+   --> fastmace/kernels/cutlass/tf32x3.py:155:121
+    |
+155 | __all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "LONG_K", "MIN_TILES", "available", "eligible", "fit", "mm_into", "takes"]
+    |                                                                                                                         ^
+
+E501 Line too long (155 > 120)
+   --> fastmace/kernels/triton/tf32x3_gemm.py:180:121
+    |
+180 | …3Matmul", "backend", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+E501 Line too long (129 > 120)
+  --> tests/cpu/test_config.py:73:121
+   |
+71 |     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
+72 |     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
+73 |     "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus",
+   |                                                                                                                         ^^^^^^^^^
+74 |     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
+75 |     "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
+   |
+
+E501 Line too long (121 > 120)
+    --> tests/cpu/test_planner.py:1089:121
+     |
+1087 |     assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) == ("off", "off")
+1088 |     assert dict(p.auto_options_off)["wprime_backward"] == "not a measured model, decision 66 (label mp0-medium)"
+1089 |     for configs in ({"precision": PrecisionConfig(dtype="float64")}, {"rewrites": RewriteConfig(wprime_backward="off")}):
+     |                                                                                                                         ^
+1090 |         p = plan(a100_80, **configs)
+1091 |         assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward, p.rewrites.chunked_conv_backward) == \
+     |
+
+Found 4 errors.

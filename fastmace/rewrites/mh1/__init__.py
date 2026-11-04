@@ -322,7 +322,7 @@ def fused_folded_forwards(model):
     """
     import torch
 
-    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward, used_columns
 
     names = []
     for index, interaction in _folded_interactions(model, "fused_folded_forward"):
@@ -335,7 +335,8 @@ def fused_folded_forwards(model):
         if weight.dtype != torch.float32:
             raise RewriteError(f"fused_folded_forward is float32 only, interactions.{index} is {weight.dtype}")
         try:
-            interaction.fused_folded_forward = FusedFoldedForward(kernels, weight.shape[1], weight.device)
+            interaction.fused_folded_forward = FusedFoldedForward(kernels, weight.shape[1], weight.device,
+                                                                  used=used_columns(weight))
         except ValueError as error:
             raise RewriteError(f"fused_folded_forward: interactions.{index}: {error}") from error
         names.append(f"interactions.{index}")

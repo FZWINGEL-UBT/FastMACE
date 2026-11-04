@@ -1,0 +1,30 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> tools/species_skip_lab.py:21:1
+   |
+19 |   """
+20 |
+21 | / from __future__ import annotations
+22 | |
+23 | | import argparse
+24 | | import json
+25 | | from pathlib import Path
+26 | |
+27 | | import fastmace  # noqa: F401  (before torch: soft file locks)
+28 | | import torch
+   | |____________^
+29 |
+30 |   COUNTS = (1000, 1000, 3000)
+   |
+help: Organize imports
+   |
+26 |
+   - import fastmace  # noqa: F401  (before torch: soft file locks)
+27 | import torch
+28 |
+29 + import fastmace  # noqa: F401  (before torch: soft file locks)
+30 +
+31 | COUNTS = (1000, 1000, 3000)
+   |
+
+Found 1 error.
+[*] 1 fixable with `--fix`.
