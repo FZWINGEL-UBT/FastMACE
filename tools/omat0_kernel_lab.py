@@ -241,8 +241,20 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                              table_w=kernel.table_w, blocks=kernel.blocks, **options)
         return transform
 
+    def pair():
+        """The channel-pair TABLE_W kernel (wprime_pair): float2 / float4 loads, the factored product."""
+        def transform(s):
+            from fastmace.kernels.oeq_streaming import wprime_pair
+            if not kernel.table_w:
+                raise ValueError("pair needs the TABLE_W kernel")
+            return wprime_pair.render(kernel.schedule, kernel.terms, blocks=kernel.blocks)
+        return transform
+
     return {
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
+        "pair": ("rounding", pair(), ()),
+        "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
+        "pair-maxreg96": ("rounding", pair(), ("--maxrregcount=96",)),
         "factored": ("rounding", rerender(factored=True), ()),
         "factored-maxreg80": ("rounding", rerender(factored=True), ("--maxrregcount=80",)),
         "factored-maxreg72": ("rounding", rerender(factored=True), ("--maxrregcount=72",)),
