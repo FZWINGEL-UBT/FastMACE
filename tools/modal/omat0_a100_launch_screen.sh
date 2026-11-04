@@ -66,6 +66,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     ff-batch*) ab "$spec" --b-constant "$ff:BATCH=${spec#ff-batch}" ;;  # BATCH 4: all 10 OMAT-0 paths in one part
     rt-thr*) ab "$spec" --b-constant "$rt:NUM_THREADS=${spec#rt-thr}" ;;
     recompute) ab "$spec" --b recompute_conv_weights=on ;;
+    ffoff) ab "$spec" --b fused_folded_forward=off ;;  # a.W as a separate (CUTLASS 3xTF32 on sm_80) GEMM
     strided) ab "$spec" --a-constant fastmace.kernels.triton.edge_outer_sum:STRIDED_ROWS=False ;;  # b: in place
     fullrows) ab "$spec" --b-constant fastmace.rewrites.generic.modules:FIRST_FULL_ROWS=True ;;
     colblock64) ab "$spec" --b-constant fastmace.kernels.triton.radial_table:COLUMN_BLOCK=64 ;;
