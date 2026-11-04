@@ -64,6 +64,11 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
 - Stage only your own files (never `git add -A` over a broad directory), LF
   line endings, commit messages ending with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Commit author for every commit (owner, 4 November 2026): `Fabian Zwingel
+  <fabian.zwingel@uni-bayreuth.de>`. Where the machine has no git identity,
+  pass it per command (`git -c user.name="Fabian Zwingel"
+  -c user.email="fabian.zwingel@uni-bayreuth.de" commit ...`); do not set it
+  globally.
 - Pushing: this repository's `.git/config` has a credential helper that uses
   the `FZWINGEL-UBT` account's `gh` token, so a plain `git push` works from
   any worktree. Do not change `gh` or global git settings, and never print
