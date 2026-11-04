@@ -6,7 +6,8 @@
 # - fused_forward: BLOCKS_PER_SM 1 and 4 (default 2), RECEIVERS_PER_CHUNK 1 and 4 (default 2), W_TILE_REGISTERS
 #   16 / 24 / 80 (parts 5 / 4 / 1; default 40: parts 2);
 # - runtime.NUM_THREADS 64 / 256 / 512 (default 128): the streaming kernels' block size, the wprime backward's grid;
-# - recompute_conv_weights=on: w rebuilt in the backward instead of stored (1.9 GB written and read per call).
+# - recompute_conv_weights=on: w rebuilt in the backward instead of stored (1.9 GB written and read per call);
+# - tablew: wprime_backward.TABLE_W (w and its slope from the value table in the backward; the forward stores no w).
 # Kernel-lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py), all bitwise or certified:
 # - slopes2 / slopes4: wprime_backward.SLOPE_VECTOR (q-major derivative table, float2/float4 term loads);
 # - streamw: wprime_backward.STREAM_W (the stored w read with __ldcs); sympairs: radial.SYMMETRIC_PAIRS;
@@ -99,6 +100,7 @@ for spec in ${SCREEN:-ff-bps1 ff-bps4 ff-rpc1 ff-rpc4 ff-wtr16 ff-wtr24 ff-wtr80
     tol[0-9]*-*) n=${spec#tol}; n=${n%%-*}  # tolN-X: degree N, fit tolerance X (default 1e-7; certificate <= 1)
       ab "$spec" --b-constant "$rd:DEGREE=$n" "$rd:TOLERANCE=${spec#*-}" ;;
     tcre) ab "$spec" --b recompute_conv_weights=on --b-constant "$ftc" ;;  # tc, w rebuilt in the backward
+    tablew) ab "$spec" --b-constant "$wp:TABLE_W=True" ;;  # w and its slope from the value table, no stored w
     dztcre[0-9]*) ab "$spec" --b recompute_conv_weights=on --b-constant "$rd:DEGREE=${spec#dztcre}" "$zc" "$ftc" ;;
   esac
 done
