@@ -304,6 +304,24 @@ def check_problem(schedule):
         raise ValueError(f"unknown layout {schedule.layout!r}")
 
 
+def block_map(blocks, channels):
+    """``{segment start: (group, row width, rank offset, component stride)}`` of a block-layout message
+    (``wprime_backward.BLOCK_MESSAGE``): ``blocks`` lists per group its irrep dimension and the starts of its
+    segments in rank order; group ``g`` is ``[N * dim, P * channels]``, row ``n * dim + component``, column
+    ``rank * channels + channel``."""
+    out = {}
+    for g, (dim, starts) in enumerate(blocks):
+        width = int(dim) * len(starts) * channels
+        for rank, start in enumerate(starts):
+            out[int(start)] = (g, width, rank * channels, len(starts) * channels)
+    return out
+
+
+def block_shapes(blocks, channels, n):
+    """The groups' shapes ``[n * dim, P * channels]`` of a block-layout message."""
+    return [(n * int(dim), len(starts) * channels) for dim, starts in blocks]
+
+
 def _node(layout, channels, start, component, dim):
     """The node-feature offset expression of the vendored template (``node_offset``) for channel ``ch``."""
     if layout == "ir_mul":
@@ -311,14 +329,21 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
-def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False):
+def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
     default ``k``), a's and W's rows keep the stride ``k``. ``stream_store`` (default ``STREAM_STORE_W``): ``w``
     stored with ``__stcs``. ``tc``: the a.W product on tensor cores in 3xTF32 (``TENSOR_CORES``, sm_80+; the launch
-    rule must be ``launch_rule(..., tc=tc)``'s); ``"presplit"``: with the W slice split once (``TC_PRESPLIT``)."""
+    rule must be ``launch_rule(..., tc=tc)``'s); ``"presplit"``: with the W slice split once (``TC_PRESPLIT``).
+    ``blocks`` (``block_map``'s input; ir_mul, message only): the message written per group, one output
+    pointer each (``out0``, ``out1``, ...)."""
     check_problem(schedule)
+    if blocks is not None and (store_w or schedule.layout != "ir_mul"):
+        raise ValueError("fused_folded_forward: a block-layout message needs store_w=False and ir_mul")
+    bmap = None if blocks is None else block_map(blocks, schedule.channels)
+    outs_decl = ("float* __restrict__ out" if blocks is None
+                 else ", ".join(f"float* __restrict__ out{g}" for g in range(len(blocks))))
     used = int(k) if used is None else int(used)
     if not 1 <= used <= k:
         raise ValueError(f"fused_folded_forward: {used} used columns of {k}")
@@ -336,7 +361,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc)}    }} break;"
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap)}    }} break;"
                       for q, part in enumerate(parts))
     helpers = tc_helpers() if tc else ""
     ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
@@ -363,7 +388,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
     int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
     const float* __restrict__ x, const float* __restrict__ sh, const int* __restrict__ senders,
     const int* __restrict__ receivers, const int* __restrict__ row_ptr, int* __restrict__ counters,
-    float* __restrict__ out, float* __restrict__ wout) {{
+    {outs_decl}, float* __restrict__ wout) {{
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
@@ -384,7 +409,14 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
 """
 
 
-def _part(schedule, part, slots, C, layout, store, tc=False):
+def _out(slot, C, layout, bmap):
+    if bmap is None:
+        return f"out[cur * OUT_DIM + {_node(layout, C, slot.start, slot.component, slot.irrep_dim)}]"
+    g, width, base, stride = bmap[slot.start]
+    return f"out{g}[cur * {width} + {base + slot.component * stride} + ch]"
+
+
+def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None):
     paths = schedule.paths
     xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
                     for pi in part for o in paths[pi].outputs for t in o.terms})
@@ -397,10 +429,7 @@ def _part(schedule, part, slots, C, layout, store, tc=False):
     wst = ", ".join(str(paths[pi].weight_start) for pi in part)
     xloads = "\n".join(f"                    xv[b][{i}] = (snd >= 0) ? x[(int64_t)snd * IN_DIM + "
                        f"{_node(layout, C, s, c, d)}] : 0.f;" for (s, c, d), i in xi.items())
-    outs = "\n".join(
-        f"                out[cur * OUT_DIM + "
-        f"{_node(layout, C, slots[name].start, slots[name].component, slots[name].irrep_dim)}] = acc[{i}];"
-        for name, i in si.items())
+    outs = "\n".join(f"                {_out(slots[name], C, layout, bmap)} = acc[{i}];" for name, i in si.items())
     gemm = []
     for q in range(BATCH // 4):
         gemm.append(f"                    const float4 av{q} ="
@@ -523,7 +552,7 @@ class FusedFoldedForward:
     """Compiled ``fused_folded_forward`` for the streaming kernels of one interaction (``StreamingKernels``) and a
     folded input width ``k``; float32 only. ``used``: the inputs the k-loop reads (``used_columns``; default ``k``)."""
 
-    def __init__(self, kernels, k, device=None, store_w=True, used=None):
+    def __init__(self, kernels, k, device=None, store_w=True, used=None, blocks=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -543,7 +572,8 @@ class FusedFoldedForward:
                                 int(props.multi_processor_count), tc=self.tc)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
-        self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc)
+        self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
+        self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -555,7 +585,8 @@ class FusedFoldedForward:
         _REGISTRY[self.id] = self
 
     def __call__(self, a, weight, x, sh, senders, receivers, row_ptr, out, w):
-        """Writes the message into ``out [N, output_dim]`` and ``a @ weight.T`` into ``w [E, Q]``."""
+        """Writes the message into ``out [N, output_dim]`` (a list of the groups with ``blocks``) and
+        ``a @ weight.T`` into ``w [E, Q]``."""
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check
@@ -563,8 +594,9 @@ class FusedFoldedForward:
         counters = torch.zeros(self.slices, dtype=torch.int32, device=x.device)
         p = ctypes.c_void_p
         values = (nodes, edges, a.data_ptr(), weight.data_ptr(), x.data_ptr(), sh.data_ptr(), senders.data_ptr(),
-                  receivers.data_ptr(), row_ptr.data_ptr(), counters.data_ptr(), out.data_ptr(), w.data_ptr())
-        types = (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p, p)
+                  receivers.data_ptr(), row_ptr.data_ptr(), counters.data_ptr(),
+                  *([o.data_ptr() for o in out] if self.blocks else [out.data_ptr()]), w.data_ptr())
+        types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         _check(driver.cuLaunchKernel(self._function, self.rule.blocks_per_slice, self.channels // CHANNEL_BLOCK,
                                      self.rule.parts, self.rule.warps * 32, 1, 1, self.rule.shared_bytes, stream,
@@ -610,4 +642,27 @@ def fused_folded_message(a: torch.Tensor, weight: torch.Tensor, x: torch.Tensor,
 @fused_folded_message.register_fake
 def _(a, weight, x, sh, senders, receivers, row_ptr, fused_id):
     return x.new_empty((x.shape[0], _REGISTRY[fused_id].output_dim))
+
+
+@torch.library.custom_op("fastmace::fused_folded_message_blocks", mutates_args=())
+def fused_folded_message_blocks(a: torch.Tensor, weight: torch.Tensor, x: torch.Tensor, sh: torch.Tensor,
+                                senders: torch.Tensor, receivers: torch.Tensor, row_ptr: torch.Tensor,
+                                fused_id: int) -> list[torch.Tensor]:
+    """``fused_folded_message`` in the block layout (``wprime_backward.BLOCK_MESSAGE``): one ``[N * dim, P * C]``
+    tensor per group of the kernel's ``blocks``, what the grouped linear_1 multiplies without a copy."""
+    fused = _REGISTRY[fused_id]
+    if fused.store_w or not fused.blocks:
+        raise ValueError("fused_folded_message_blocks needs a FusedFoldedForward built with store_w=False and blocks")
+    a, weight, x, sh = a.contiguous(), weight.contiguous(), x.contiguous(), sh.contiguous()
+    out = [x.new_empty(shape) for shape in block_shapes(fused.blocks, fused.channels, x.shape[0])]
+    if sh.shape[0] or x.shape[0]:
+        fused(a, weight, x, sh, senders.contiguous(), receivers.contiguous(), row_ptr.contiguous(), out,
+              x.new_empty((1,)))
+    return out
+
+
+@fused_folded_message_blocks.register_fake
+def _(a, weight, x, sh, senders, receivers, row_ptr, fused_id):
+    fused = _REGISTRY[fused_id]
+    return [x.new_empty(shape) for shape in block_shapes(fused.blocks, fused.channels, x.shape[0])]
 

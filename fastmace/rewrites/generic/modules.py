@@ -200,7 +200,15 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     else:
         mji = self.conv_tp(node_feats[edge_index[0]], edge_attrs, tp_weights)
         message = scatter_sum(src=mji, index=edge_index[1], dim=0, dim_size=num_nodes)
-    if message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
+    if isinstance(message, tuple) and (n_real is not None or kind == "residual"
+                                       or getattr(self, "density_before_linear", False)):
+        from fastmace.kernels.oeq_streaming.wprime_backward import dense_message
+        wprime = self.wprime_backward  # BLOCK_MESSAGE on a path that needs the whole message
+        message = dense_message(message, wprime.block[1], wprime.kernels.schedule.channels,
+                                wprime.kernels.schedule.output_dim)
+    if isinstance(message, tuple):  # BLOCK_MESSAGE: linear_1's input groups, every row real
+        pass
+    elif message.shape[0] != n_real:  # (the streaming convolution may have built the real rows only)
         message = self.truncate_ghosts(message, n_real)
     node_attrs = self.truncate_ghosts(node_attrs, n_real)
     if kind == "residual":

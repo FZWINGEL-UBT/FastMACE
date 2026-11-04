@@ -59,6 +59,11 @@ TABLE_W = None
 # Ada 0.928 / 0.931, A100-SXM4-80GB 0.943 / 0.943; force gate passes (results/omat0-kernel-lab-20261103 section 16).
 TABLE_W_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 TABLE_W_VECTOR = 2
+# The message in linear_1's block layout (OMAT-0 work, 4 November 2026): with TABLE_W and the fused forward, the
+# message-only kernel writes each same-irrep group of the grouped BlockLinear's input as its own [N * dim, P * C]
+# tensor, the backward reads the groups' gradients through one pointer each, and linear_1 multiplies the groups
+# without the relayout copies (RTX 5060 Ti: about 1.15 ms per step). Bitwise the same message. A/B switch.
+BLOCK_MESSAGE = False
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -98,7 +103,13 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const scalar_t* weights,
     const int32_t* senders,
     const int32_t* receivers,
+{%- if blocks %}
+{%- for g in range(n_blocks) %}
+    const scalar_t* __restrict__ dout{{ g }},
+{%- endfor %}
+{%- else %}
     const scalar_t* dout,
+{%- endif %}
     scalar_t* dx,
     scalar_t* dsh,
     const scalar_t* lengths,
@@ -206,9 +217,15 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 
                 {% for output in path.outputs %} {
                     {%- set slot = output.accumulator %}
+                    {%- if blocks %}
+                    {%- set bk = blocks[slot.start] %}
+                    const scalar_t output_gradient = dout{{ bk[0] }}[int64_t(receiver) * {{ bk[1] }}
+                        + {{ bk[2] + slot.component * bk[3] }} + channel];
+                    {%- else %}
                     const int64_t output_index =
                         output_base + {{ node_offset(slot.start, slot.component, slot.irrep_dim) }};
                     const scalar_t output_gradient = dout[output_index];
+                    {%- endif %}
 
                     {% for term in output.terms %} {
                         const int64_t input_index = input_base
@@ -284,12 +301,17 @@ def padded_terms(terms, vector):
     return -(-int(terms) // vector) * vector if vector else int(terms)
 
 
-def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False):
+def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
     ``table_w`` (``TABLE_W``): the table is the q-major value table (``value_table``, ``terms`` = D + 1), from which
-    the kernel evaluates w and its slope; the stored weights are not read (needs ``vector``)."""
+    the kernel evaluates w and its slope; the stored weights are not read (needs ``vector``). ``blocks``
+    (``fused_forward.block_map``'s input; ir_mul): the message gradient read per group, one pointer each."""
+    from fastmace.kernels.oeq_streaming.fused_forward import block_map
+
+    if blocks is not None and schedule.layout != "ir_mul":
+        raise ValueError("a block-layout message needs the ir_mul layout")
     from fastmace.kernels.oeq_streaming.jinja_env import get_jinja_environment
 
     if schedule.layout not in ("ir_mul", "mul_ir"):
@@ -304,7 +326,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False):
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
                                             slope_vector=vector, vector_type=f"float{vector}",
-                                            padded_terms=padded_terms(terms, vector), table_w=bool(table_w))
+                                            padded_terms=padded_terms(terms, vector), table_w=bool(table_w),
+                                            blocks=None if blocks is None else block_map(blocks, schedule.channels),
+                                            n_blocks=0 if blocks is None else len(blocks))
 
 
 def derivative_table(dcoef, weight, vector=0):
@@ -381,7 +405,7 @@ class WPrimeBackward:
     (``StreamingKernels``) and a derivative table of ``terms`` terms (``vector``: its q-major layout's load width,
     ``SLOPE_VECTOR``)."""
 
-    def __init__(self, kernels, terms, device=None, vector=0, table_w=False):
+    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -390,9 +414,11 @@ class WPrimeBackward:
         self.terms, self.vector = int(terms), int(vector)
         self.scalar = scalar
         self.num_threads, self.cohort, self.shared_memory = kernels.num_threads, kernels.cohort, kernels.shared_memory
-        self.output_dim = kernels.output_dim
+        self.output_dim, self.channels = kernels.output_dim, kernels.schedule.channels
         self.table_w = bool(table_w)
-        self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w)
+        self.blocks = blocks
+        self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
+                             blocks=blocks)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -412,11 +438,13 @@ class WPrimeBackward:
         p = ctypes.c_void_p
         real = ctypes.c_float if self.scalar == "float" else ctypes.c_double
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), weights.data_ptr(), senders.data_ptr(),
-                  receivers.data_ptr(), dout.data_ptr(), dx.data_ptr(), dsh.data_ptr(), r.data_ptr(),
+                  receivers.data_ptr(), *([d.data_ptr() for d in dout] if self.blocks else [dout.data_ptr()]),
+                  dx.data_ptr(), dsh.data_ptr(), r.data_ptr(),
                   pair.data_ptr(), gprime.data_ptr(), starts.data_ptr(), scales.data_ptr(), bins.data_ptr(),
                   r_lo, bin_scale, r_max, bins.shape[0], starts.shape[0], dr.data_ptr())
-        types = (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p, p, p, p, p, p, real, real, real,
-                 ctypes.c_int, ctypes.c_int, p)
+        douts = len(self.blocks) if self.blocks else 1
+        types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + douts) + (real, real, real)
+                 + (ctypes.c_int, ctypes.c_int, p))
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         _check(driver.cuLaunchKernel(self._function, blocks, 1, 1, self.num_threads, 1, 1, self.shared_memory,
                                      stream, (values, types), 0))
@@ -487,6 +515,104 @@ def _(x, sh, senders, receivers, dout, r, pair, gprime, coef, weight, starts, sc
     return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
 
 
+@torch.library.custom_op("fastmace::streaming_conv_wprime_backward_blocks", mutates_args=())
+def streaming_conv_wprime_backward_blocks(x: torch.Tensor, sh: torch.Tensor, senders: torch.Tensor,
+                                          receivers: torch.Tensor, douts: list[torch.Tensor], r: torch.Tensor,
+                                          pair: torch.Tensor, gprime: torch.Tensor, starts: torch.Tensor,
+                                          scales: torch.Tensor, bins: torch.Tensor, r_lo: float, bin_scale: float,
+                                          r_max: float, wprime_id: int) -> tuple[torch.Tensor, torch.Tensor,
+                                                                                 torch.Tensor]:
+    """``streaming_conv_wprime_backward`` of a ``TABLE_W`` kernel built with ``blocks``: the message gradient as
+    one tensor per group (``BLOCK_MESSAGE``)."""
+    kernel = _REGISTRY[wprime_id]
+    x, sh = x.contiguous(), sh.contiguous()
+    douts = [d.contiguous() for d in douts]
+    dx = torch.zeros_like(x)  # sender gradients are added atomically
+    dsh = torch.empty_like(sh)
+    dr = sh.new_empty((sh.shape[0],))
+    kernel(x, sh, sh.new_empty((0,)), senders.contiguous(), receivers.contiguous(), douts, dx, dsh,
+           r.reshape(-1).contiguous(), pair.contiguous(), gprime, starts, scales, bins, r_lo, bin_scale, r_max, dr)
+    return dx, dsh, dr
+
+
+@streaming_conv_wprime_backward_blocks.register_fake
+def _(x, sh, senders, receivers, douts, r, pair, gprime, starts, scales, bins, r_lo, bin_scale, r_max, wprime_id):
+    return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
+
+
+class _WPrimeBlockConvolution(torch.autograd.Function):
+    """``_WPrimeConvolution``'s TABLE_W path with the fused message-only forward, the message in the block layout:
+    returns the groups, then the edge density."""
+
+    @staticmethod
+    def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
+                sh, senders, receivers, row_ptr, message_id, wprime_id):
+        from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message_blocks
+        from fastmace.kernels.triton.radial_table import radial_table_forward
+
+        a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
+        groups = fused_folded_message_blocks(a, weight, x, sh, senders, receivers, row_ptr, message_id)
+        ctx.save_for_backward(x, sh, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins)
+        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
+        return (*groups, density)
+
+    @staticmethod
+    def backward(ctx, *grads):
+        x, sh, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins = ctx.saved_tensors
+        kernel = _REGISTRY[ctx.wprime_id]
+        from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
+        shapes = block_shapes(kernel.blocks, kernel.channels, x.shape[0])
+        douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
+        dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, gprime,
+                                                            starts, scales, bins, *ctx.constants, ctx.wprime_id)
+        if grads[-1] is not None:
+            dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
+        return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
+                None, None, None, None, None)
+
+
+def block_spec(linear, schedule):
+    """The block layout of linear_1's grouped input (``BLOCK_MESSAGE``), ``((dim, segment starts), ...)`` in the
+    order of its products, or None where the message cannot feed ``linear`` directly: a grouped ``BlockLinear``
+    whose input transpose is the identity and whose input segments are exactly the convolution's output segments
+    (ir_mul, ``schedule.channels`` channels each)."""
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    if not isinstance(linear, BlockLinear) or not linear.grouped or schedule.layout != "ir_mul":
+        return None
+    transpose = linear.transpose_in
+    if not isinstance(getattr(transpose, "f", transpose), torch.nn.Identity):
+        return None
+    segments = {(int(s.start), int(s.irrep_dim)) for s in schedule.output_slots}
+    blocks, seen = [], set()
+    for inputs, _ in linear.block_ends:
+        dims = {linear.segments_in[i][2] for i in inputs}
+        if len(dims) != 1 or any(linear.segments_in[i][1] != schedule.channels for i in inputs):
+            return None
+        starts = tuple(int(linear.segments_in[i][0]) for i in inputs)
+        if seen & set(starts):
+            return None
+        seen |= set(starts)
+        blocks.append((dims.pop(), starts))
+    if {(s, d) for d, st in blocks for s in st} != segments:
+        return None
+    return tuple(blocks)
+
+
+def dense_message(groups, blocks, channels, output_dim):
+    """The ``[N, output_dim]`` ir_mul message of a block-layout one (the paths that need the whole message)."""
+    n = groups[0].shape[0] // blocks[0][0]
+    pieces = {}
+    for group, (dim, starts) in zip(groups, blocks):
+        view = group.reshape(n, dim, len(starts), channels)
+        for rank, start in enumerate(starts):
+            pieces[start] = view[:, :, rank].reshape(n, dim * channels)
+    out = torch.cat([pieces[s] for s in sorted(pieces)], dim=1)
+    if out.shape[1] != output_dim:
+        raise ValueError(f"dense_message: {out.shape[1]} columns, expected {output_dim}")
+    return out
+
+
 class _WPrimeConvolution(torch.autograd.Function):
     """Edge lengths -> (message, edge density) through the radial table, the folded layer and the streaming
     convolution; the backward is ``streaming_conv_wprime_backward`` plus the density column's."""
@@ -549,6 +675,20 @@ def table_w_default(device, generic):
     return bool(generic) and device.type == "cuda" and torch.cuda.get_device_name(device) in TABLE_W_GPUS
 
 
+def prepare_block_messages(model):
+    """``WPrime.prepare_blocks`` in every interaction of ``model`` with ``wprime_backward`` (after the rewrites;
+    a no-op unless ``BLOCK_MESSAGE``). Returns how many interactions write the block layout."""
+    count = 0
+    if not BLOCK_MESSAGE:
+        return count
+    for module in model.modules():
+        wprime = module._modules.get("wprime_backward") if hasattr(module, "_modules") else None
+        if isinstance(wprime, WPrime):
+            wprime.prepare_blocks(module)
+            count += wprime.block is not None
+    return count
+
+
 class WPrime(torch.nn.Module):
     """One interaction's ``wprime_backward``: the derivative table ``G'``, the density's derivative series and
     the compiled kernel, built from its radial table, folded weight and streaming kernels."""
@@ -569,9 +709,28 @@ class WPrime(torch.nn.Module):
         self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
                                      table_w=self.table_w)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
+        self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
+        self.kernels = kernels
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
         self.rebuild = None
+
+    def prepare_blocks(self, interaction):
+        """Compile the block-layout kernels (``BLOCK_MESSAGE``) for ``interaction``'s fused forward and linear_1,
+        after every rewrite is applied (``prepare_block_messages``); nothing where the layout does not fit."""
+        from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+
+        self.block = None
+        fused, linear = getattr(interaction, "fused_folded_forward", None), getattr(interaction, "linear", None)
+        if not (BLOCK_MESSAGE and self.table_w and fused is not None and linear is not None):
+            return
+        blocks = block_spec(linear, self.kernels.schedule)
+        if blocks is None:
+            return
+        device = self.gprime.device
+        self.block = (fused.id, blocks,
+                      FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
+                      WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -588,13 +747,20 @@ class WPrime(torch.nn.Module):
                                          batch=REBUILD_BATCH))
 
     def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None,
-                    recompute_rows=0):
+                    recompute_rows=0, linear=None):
         """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh).
         ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward. With the rebuild
         kernels attached (``attach_rebuild``) and ``fused``, the forward stores no ``w`` and the backward builds it on
         chip; otherwise the backward builds it again in chunks of that many edges."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
+        if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
+                and BLOCK_MESSAGE):  # the message as a tuple of linear_1's input groups (prepare_blocks)
+            *groups, density = _WPrimeBlockConvolution.apply(
+                lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales, table.bins,
+                float(table.r_lo), float(table.bin_scale), float(table.r_max), weight, self.gprime, x, sh,
+                senders, receivers, row_ptr, self.block[2].id, self.block[3].id)
+            return tuple(groups), density
         if self.table_w:  # no w is kept anyway; the fused forward's message-only kernel stores none
             if fused is not None and (self.message is None or self.message[0] != fused.id):
                 from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
@@ -620,7 +786,8 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "density_backward", "density_column",
-           "derivative_table", "padded_terms", "render", "table_w_default", "value_table",
-           "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_recompute", "wprime_arguments",
+__all__ = ["BLOCK_MESSAGE", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_spec", "dense_message",
+           "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
+           "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
+           "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
            "wprime_reference"]

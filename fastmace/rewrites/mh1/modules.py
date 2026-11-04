@@ -414,7 +414,8 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
         message, density = self.wprime_backward.convolution(
             wprime_lengths, self.radial_table.pair(node_attrs, edge_index), self.radial_table, radial.folded_weight(),
             feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,
-            getattr(self, "fused_folded_forward", None), getattr(self, "recompute_weight_rows", 0))
+            getattr(self, "fused_folded_forward", None), getattr(self, "recompute_weight_rows", 0),
+            linear=getattr(self, "linear", None))  # BLOCK_MESSAGE: a tuple of linear_1's input groups
     elif w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
         message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,

@@ -691,6 +691,9 @@ class Registry:
                     raise self._selfcheck_failure(name, result, detail, resolution, applied)
             applied.append(AppliedRewrite(name, result, detail))
             context = dataclasses.replace(context, applied=context.applied + (name,))
+        if "generic_wprime_backward" in resolution.enabled:  # BLOCK_MESSAGE needs linear_1's final form
+            from fastmace.kernels.oeq_streaming.wprime_backward import prepare_block_messages
+            prepare_block_messages(model)
         return tuple(applied)
 
     # ---- rule 13: the self-check reaction (SPEC §9.3)

@@ -116,6 +116,12 @@ class BlockLinear(torch.nn.Module):
             self.register_buffer(f"weight_t_{index}", weight.t().contiguous())
 
     def forward(self, x):
+        if isinstance(x, tuple):  # wprime_backward.BLOCK_MESSAGE: the grouped products' left factors
+            n = x[0].shape[0] // self.segments_in[self.block_ends[0][0][0]][2]
+            outputs = [None] * len(self.segments_out)
+            for (_, j), part in zip(self.block_ends, block_products(self, list(x))):
+                outputs[j] = part if outputs[j] is None else outputs[j] + part
+            return self.transpose_out(join_rows(self.segments_out, outputs, n, x[0]))
         x = self.transpose_in(x)
         n = x.shape[0]
         rows = [x[:, offset:offset + dim * mul].reshape(n * dim, mul)
