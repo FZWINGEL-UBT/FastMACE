@@ -429,3 +429,8 @@ receiver order costs more than the whole slope. Rejected.
 **Benchmark_loup on the RTX 4000 Ada with the species GEMM default** (leto, `tools/bench/loup_md.py`, two rounds,
 alternating, `rtx4000ada-loup-20261104/`): NVE 6.334 / 6.351 us/atom/step (with `SPECIES_GEMM=False` 6.668 / 6.675),
 Langevin 6.255 / 6.267 (6.604 / 6.592): 5.0 % and 5.2 % faster.
+
+**wprime slope as a'(r) . (dw W)** (owner: "Try it"; bound `tools/wprime_da_bound.py`, `a100-sxm4-wprime-da-bound/`):
+the per-edge product `da = dw W` of Benchmark_loup's shape (373,760 x 1,280 x 64) as one GEMM on the A100-SXM4-80GB,
+six Modal jobs: CUTLASS 3xTF32 2.27 ms (2.26-2.30), cuBLAS FP32 4.14 ms, cuBLAS TF32 1.27 ms (one pass, too
+inexact). The slope it would replace costs 1.81 ms, so even the ideal standalone product loses. Not built.

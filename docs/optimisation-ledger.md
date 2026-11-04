@@ -591,6 +591,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-species-gemm-tc](#omat0-species-gemm-tc) | The species GEMM in our own mma.sync 3xTF32 kernel (for the A100) | `species_gemm.TENSOR_CORES`, `TC_CHUNK`, `TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | kernel lab vs Triton: A100 0.94 (16p), Ada 0.91, 5060 Ti 0.86; step A100-SXM4 1.003 / 1.002 vs default (Triton species GEMM 0.992), Ada 1.001 / 0.999 vs Triton species GEMM | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-species-gemm-cutlass](#omat0-species-gemm-cutlass) | The species GEMM as one gathered CUTLASS 3xTF32 launch (A100) | `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 0.9928 / 0.9922 vs default (Triton species GEMM 0.992); lab size 16 CUTLASS 678 us vs Triton 597, bound 207 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-wprime-piece-order](#omat0-wprime-piece-order) | wprime backward over edges sorted by (pair, r), so edges of one derivative-table slab run together | none (lab bound `B-piece-sorted`) | FM | REJECTED | 2026-11-04 | lab wprime 1.513 (RTX 5060 Ti; slope alone 0.757) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-wprime-aprime](#omat0-wprime-aprime) | wprime slope as dr = a'(r) . (dw W) instead of the per-edge G' slab | none (bound `tools/wprime_da_bound.py`) | FM | REJECTED | 2026-11-04 | A100-SXM4: the da = dw W product alone 2.27 ms (CUTLASS 3xTF32), 4.14 ms (FP32) against the slope's 1.81 ms | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-first-table-columns](#omat0-first-table-columns) | First interaction's radial table stores only the columns it uses | `generic.modules.FIRST_TABLE_COLUMNS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.002 / 0.999, RTX 5060 Ti 1.002; bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 
 <a id="omat0-tc-presplit"></a>
@@ -646,6 +647,17 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 - Measured: RTX 5060 Ti (local), the captured Benchmark_loup call: base 8.30 ms, piece-sorted 12.55 ms (1.513), no slope 6.28 ms (0.757).
 - Why: the kernel streams edges in receiver order; sorted by slab, the receivers' output gradients and the sender atomics lose their locality, which costs far more than the whole slope.
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `rtx5060ti-wprime-piece/`.
+
+<a id="omat0-wprime-aprime"></a>
+#### omat0-wprime-aprime: the wprime slope through a'(r) and dw W
+- Switch: none; bound `tools/wprime_da_bound.py`, `tools/modal/wprime_da_bound_a100.sh`
+- Engine: FM
+- Date/round: 4 November 2026 (owner: "Try it")
+- What: the slope `dr = sum_c dw_c w'_c(r)` reads a [terms, Q] slab of G' per edge (25.6 KB). Written as `dr = a'(r) . (dw [W, b])`, the table slab shrinks to [terms, J] (a 7 MB table), but every edge needs the product `da = dw W` ([Q] x [Q, J]). The bound times that product alone as one large GEMM of Benchmark_loup's shape (373,760 edges x 1,280 x 64), its most efficient form.
+- Status: REJECTED (not built).
+- Measured: A100-SXM4-80GB (Modal, six jobs, ee1b44fd): CUTLASS 3xTF32 2.27 ms (J 64; 3.8-4.5 ms at J 72), cuBLAS FP32 4.14 ms, cuBLAS TF32 1.27 ms (one pass, too inexact: about 1e-3); the slope it would replace costs 1.81 ms (wprime 4.70 ms, without slope 2.89 ms).
+- Why: the reformulation moves 61 GFLOP of per-edge products into the backward; at the A100's 3xTF32 rate that alone costs more than the table reads it saves.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `a100-sxm4-wprime-da-bound/`.
 
 <a id="omat0-first-table-columns"></a>
 #### omat0-first-table-columns: only the used columns of the first radial table
