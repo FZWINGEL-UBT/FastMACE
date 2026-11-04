@@ -243,3 +243,52 @@ Adding "NVIDIA A100 80GB PCIe" to their decision-66 lists needs the owner.
 NVE 3.187, 3.182, 3.183 and Langevin 3.242, 3.146, 3.199 µs/atom/step (medians 3.183 and 3.199), the same as dz5 set
 by constants in section 4 (3.172 / 3.175) within run noise. `streamw` (wprime reads w with `__ldcs`) on top: 1.0048,
 rejected on the A100 too.
+
+## 11. Tensor cores with a cheaper split (A100-SXM4-80GB)
+
+Where the tensor-core forward loses on the A100: the kernel lab captured its forward kernel with falsifiers
+(e366b8e5, `a100-sxm4-tc-lab/`; 3fd6757f, `a100-sxm4-tc-lab2/`; `tools/modal/omat0_a100_tc_lab.sh`). FP32-SIMT
+base 4.92 / 4.89 ms; tensor-core base 5.14 / 5.13 ms; one mma instead of three 3.08; no mma 3.25; W unsplit 3.15 /
+3.18; no product at all 2.21 / 2.23. The mma triples cost little: the time goes to splitting each value into its
+TF32 high and low parts with two `cvt.rna.tf32` per value. Masked splits: the high part masked (truncated) and the
+low part rounded 4.20 ms; both by masking, the low part passed raw (the tensor core truncates it) 3.67 ms. On the
+RTX 5060 Ti (`rtx5060ti-tc-lab/`) the tensor-core forward is slower whatever the split (TF32 there is 2x FP32).
+
+`fused_forward.TC_SPLIT` (b62a42d7, 91d81ee6) selects the split: `round` (both parts rounded to nearest by an
+integer add and mask, the default split), `rna` (the former `cvt.rna`) or `mask`. Accuracy (GPU test body, max
+error of w over the row scale |a| |W| against float64, units of 2^-24; RTX 5060 Ti): `rna` and `round` identical,
+7.6 / 10.7 at k = 9 / 65 (FP32 chain 3.7 / 5.5); `mask` 19.3 / 16.3. The test bound
+`2 chain + (3 ceil(k/8) + 4) units` (17.5 / 41.9) holds for `round`, not for `mask` at k = 9, so `mask` is not
+covered by the GPU test. The RTX 4000 Ada passes the test body with `round` (`tests on leto`, run
+tests-split-b62a42d7: ruff clean on the changed files, 44 CPU tests).
+
+Lab, A100-SXM4-80GB, b62a42d7 (`a100-sxm4-tc-split/`, $0.13): FP32-SIMT 4.90 ms, `rna` 5.11, `round` 4.18 (0.854),
+`mask` 3.65 ms (0.744). RTX 5060 Ti (`rtx5060ti-tc-split/`): SIMT 16.09 ms, `rna` 18.51, `round` 17.83,
+`mask` 17.49.
+
+MD step A/B on the A100-SXM4-80GB, both orders, 8 blocks of 200 steps (9a9575fb, `screens/tc-split-sxm4/`, $0.38):
+`tc` (`round`) b/a 0.9632 / 0.9647 (17.03 -> 16.42 ms), `tcmask` 0.9327 / 0.9330 (17.06 -> 15.92 ms).
+
+Force gate (`tools/force_stress_gate.py`, production against float64 MACE, RTX 5060 Ti, 91d81ee6,
+`gate-rtx5060ti-tc/`), max |error| and ratio to the ASE float32 calculator; all pass:
+
+| set | SrTiO3 3x3x3 energy (eV) | forces (eV/Å) | NaCl energy | NbCl5 energy | NbCl5 forces |
+| --- | --- | --- | --- | --- | --- |
+| default | 7.3e-4 (1.73) | 2.45e-5 (0.82) | 2.6e-4 (1.20) | 2.1e-4 (0.99) | 7.85e-5 (0.98) |
+| tc (`round`) | 1.15e-3 (2.95) | 2.54e-5 (0.90) | 2.1e-4 (1.34) | 1.6e-4 (0.74) | 7.90e-5 (0.96) |
+| tcmask | 1.39e-3 (3.80) | 2.78e-5 (0.91) | 1.9e-4 (0.99) | 1.0e-4 (0.45) | 7.97e-5 (0.96) |
+
+The SrTiO3 energy errors exceed twice the float32 calculator's but stay far below the gate's 0.01 eV floor; forces
+and stress are within the ratio rule everywhere (stress ratios 0.41-1.35, all below their floors).
+
+Benchmark_loup under its protocol on the A100-SXM4-80GB (7bd74981, `a100-sxm4-tc-loup/`, $0.49; the sets alternate in
+one job, 2 fresh processes each), µs/atom/step:
+
+| set | NVE | Langevin |
+| --- | --- | --- |
+| default | 3.174, 3.173 | 3.123, 3.125 |
+| tc (`round`) | 3.028, 3.028 | 3.129, 2.981 |
+| tcmask | 2.926, 2.919 | 2.928, 2.875 |
+
+`tcmask` is the fastest Benchmark_loup yet on the A100 (2.92 / 2.90 µs/atom/step, -8 % / -7 %). `TENSOR_CORES` stays
+off by default; a per-GPU default on the A100-SXM4-80GB (decision 66), and which split, is the owner's decision.
