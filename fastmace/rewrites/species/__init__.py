@@ -26,6 +26,13 @@
   NbCl5's. MACE's ``node_feats`` descriptor output changes meaning; FastMACE never reads it.
   Needs ``block_linear``; MH-1 class only (the other classes' skip is element-dependent).
 
+- ``generic_fold_product_linear`` (C3 for the generic family, switched by ``fold_product_linear``). Where layer 0's
+  output is ``products.0.linear`` of the contraction with no skip term (MACE-OMAT-0 and the rest of the density
+  family: a density first interaction), that layer is folded into its consumers and replaced by the identity: the
+  second interaction's ``linear_up`` and the first readout's linear become compositions, and the second
+  interaction's species skip a species skip of the contraction (``modules.compose_species_skip``). No species
+  tables are needed. MACE's ``node_feats`` output changes meaning, as above.
+
 Each self-check compares the rewritten modules with what they replaced, values and input gradients,
 in the model's dtype (SPEC §6.4).
 """
@@ -60,6 +67,13 @@ def _modules():
     from fastmace.rewrites.species import modules
 
     return modules
+
+
+def _generic_source_hashes():
+    """The pinned generic interaction forwards (generic_fold_product_linear reads their skip_tp and linear_up)."""
+    from fastmace.rewrites.generic.modules import source_hashes
+
+    return source_hashes()
 
 
 def _one_hot_rows(model):
@@ -355,6 +369,104 @@ def _product_selfcheck(original, rewritten, context):
     return check_tensors(cases, dtype)
 
 
+# --------------------------------------------------------------------------- generic_fold_product_linear
+
+
+def _generic_product_support(model):
+    from fastmace.model.capabilities import generic_fold_product_support
+
+    return Support(*generic_fold_product_support(model))
+
+
+def _generic_consumers(model):
+    """(owner, attribute) of every consumer of layer 0's output in a generic model: the second interaction's
+    ``linear_up``, its ``skip_tp`` unless it is a density block (which applies its skip to the message) and, with one
+    readout per layer, the first readout's first linear."""
+    from fastmace.model.capabilities import GENERIC_INTERACTIONS
+
+    second = model.interactions[1]
+    out = [(second, "linear_up")]
+    if GENERIC_INTERACTIONS[type(second).__name__] != "density":
+        out.append((second, "skip_tp"))
+    if len(model.readouts) == len(model.interactions):
+        attribute, _ = _readout_first(model.readouts[0])
+        if attribute is not None:
+            out.append((model.readouts[0], attribute))
+    return out
+
+
+def fold_generic_product(model):
+    """Fold ``products.0.linear`` of a generic model into the consumers of layer 0's output (``Identity`` left in its
+    place). The block linears become their compositions (``modules.compose``); the second interaction's species skip
+    becomes a species skip of the contraction's output (``modules.compose_species_skip``). Needs block_linear and
+    generic_species_skip."""
+    import torch
+
+    from fastmace.rewrites.generic.modules import SpeciesSkip
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    m = _modules()
+    product = model.products[0].linear
+    if not isinstance(product, BlockLinear):
+        raise ValueError("generic_fold_product_linear needs products.0.linear as a block linear (block_linear)")
+    names = []
+    with torch.no_grad():
+        for owner, attribute in _generic_consumers(model):
+            consumer = getattr(owner, attribute)
+            if isinstance(consumer, BlockLinear):
+                folded = m.compose(product, consumer)
+                folded.grouped_launch, folded.sms = consumer.grouped_launch, consumer.sms
+            elif isinstance(consumer, SpeciesSkip):
+                folded = m.compose_species_skip(product, consumer)
+            else:
+                raise ValueError(f"generic_fold_product_linear: {attribute} is a {type(consumer).__name__}, not a "
+                                 "block linear or species skip (block_linear, generic_species_skip)")
+            setattr(owner, attribute, folded)
+            names.append(next(n for n, mod in model.named_modules() if mod is folded))
+        model.products[0].linear = torch.nn.Identity()
+    return ["products.0.linear", *names]
+
+
+def _generic_product_selfcheck(original, rewritten, context):
+    """Every folded consumer against ``consumer(products.0.linear(x))``, values and the input gradient."""
+    import torch
+
+    from fastmace.rewrites.generic.modules import SpeciesSkip
+    from fastmace.rewrites.linear import _compare, _values_and_gradients, _width
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    m = _modules()
+    generator = torch.Generator().manual_seed(context.seed)
+    cases, dtype = [], None
+    for name, module in rewritten.named_modules():
+        pair = getattr(module, "_reference", None)
+        if not isinstance(module, (BlockLinear, SpeciesSkip)) or not isinstance(pair, tuple) or len(pair) != 2:
+            continue
+        product, consumer = pair
+        weight = product.weight_0
+        dtype = dtype or weight.dtype
+        x = torch.randn((_PROBE_ROWS, _width(product.segments_in)), generator=generator, dtype=torch.float64)
+        x = x.to(device=weight.device, dtype=weight.dtype).requires_grad_()
+        if isinstance(module, SpeciesSkip):
+            attrs = _probe_attrs(rewritten, context, generator)
+            attrs = attrs[torch.arange(_PROBE_ROWS, device=attrs.device) % attrs.shape[0]]
+            out_width = sum(dim for _, _, dim in module.segments_out)
+            grad = torch.randn((_PROBE_ROWS, out_width), generator=generator, dtype=torch.float64).to(x)
+            expected = _values_and_gradients(lambda a, c=consumer, p=product: c(p(a), attrs), (x,), grad)
+            got = _values_and_gradients(lambda a, f=module: f(a, attrs), (x,), grad)
+        else:
+            grad = torch.randn((_PROBE_ROWS, _width(module.segments_out)), generator=generator,
+                               dtype=torch.float64).to(x)
+            expected = _values_and_gradients(m.Chain(product, consumer), (x,), grad)
+            got = _values_and_gradients(module, (x,), grad)
+        cases += _compare(name, expected, got)
+    return check_tensors(cases, dtype)
+
+
+def _apply_generic_product(model, context):
+    return fold_generic_product(model)
+
+
 # --------------------------------------------------------------------------- records
 
 
@@ -457,6 +569,15 @@ RECORDS = {
         source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, INTERACTION_FORWARD: INTERACTION_FORWARD_SHA256},
         exactness="rounding", default="off", workload_constraints=("fixed_species_superset",),
         apply=_apply_product, selfcheck=_product_selfcheck, deterministic=True),
+    # The generic family's fold (OMAT-0 A100 profile, idea 2; 4 November 2026): rounding (the composed products in
+    # float64, stored in the model's dtype). The planner keeps "auto" to the GPUs where same-process A/Bs measured it
+    # faster (decision 66, planner.fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS).
+    "generic_fold_product_linear": dict(
+        name="generic_fold_product_linear", config_field="fold_product_linear", applies_to=_generic_product_support,
+        requires=("block_linear", "generic_species_skip"), conflicts=(), mace_versions=MACE_VERSIONS,
+        source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, **_generic_source_hashes()},
+        exactness="rounding", default="off", workload_constraints=("fixed_species_superset",),
+        apply=_apply_generic_product, selfcheck=_generic_product_selfcheck, deterministic=True),
     "species_residual": Rewrite(
         name="species_residual", applies_to=_residual_support,
         requires=("species_tables", "merged_residual"), conflicts=("tf32x3_gemms",),
@@ -466,4 +587,5 @@ RECORDS = {
         apply=_apply_residual, selfcheck=_residual_selfcheck, deterministic=True),
 }
 
-__all__ = ["READS_SPECIES_RESIDUAL", "RECORDS", "fold_product", "fold_tail", "residual_rows", "tabulate"]
+__all__ = ["READS_SPECIES_RESIDUAL", "RECORDS", "fold_generic_product", "fold_product", "fold_tail", "residual_rows",
+           "tabulate"]

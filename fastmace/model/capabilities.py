@@ -311,7 +311,44 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
         scale_shift and last,
         "ok" if scale_shift and last else class_reason if not scale_shift else
         f"the last interaction is not {FACTORED_INTERACTIONS} (its skip_tp is element-dependent)")
+    # fold_product_linear: MH-1's class through the species tables (species_tables), or a generic model whose first
+    # product has no skip term (generic_fold_product_linear: its consumers' block linears and species skip).
+    generic_fold, generic_reason = generic_fold_product_support(model)
+    if tables:
+        support["fold_product_linear"] = RewriteSupport(True, "ok")
+    elif generic_fold:
+        support["fold_product_linear"] = RewriteSupport(True, "ok (generic: no skip term in the first product)")
+    else:
+        support["fold_product_linear"] = RewriteSupport(
+            False, generic_reason if generic else support["species_tables"].reason)
     return support
+
+
+def generic_fold_product_support(model: Any) -> tuple[bool, str]:
+    """Can ``products.0.linear`` of a generic model be folded into its consumers (generic_fold_product_linear)?
+
+    Layer 0's output is then ``products.0.linear(contraction)`` with no skip term: the first product has no skip
+    connection, or the first interaction is a density block (it returns no skip term). Its consumers are the second
+    interaction's ``linear_up`` and ``skip_tp`` (a residual or density-residual block; a density block applies its
+    skip to the message) and, with one readout per layer, the first readout's first linear layer.
+    """
+    if type(model).__name__ != "ScaleShiftMACE":
+        return False, f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned"
+    interactions = _interaction_classes(model)
+    if len(interactions) < 2:
+        return False, "one interaction: nothing reads layer 0's output but the readout"
+    first, second = (GENERIC_INTERACTIONS.get(name) for name in interactions[:2])
+    if first is None or second is None:
+        return False, f"the first two interactions are not both generic ({', '.join(interactions[:2])})"
+    products = getattr(model, "products", ())
+    if first != "density" and (not products or getattr(products[0], "use_sc", True)):
+        return False, "the first product adds the first interaction's skip term"
+    readouts = getattr(model, "readouts", ())
+    if len(readouts) == len(interactions):
+        kind = type(readouts[0]).__name__
+        if kind not in ("NonLinearReadoutBlock", "LinearReadoutBlock"):
+            return False, f"first readout {kind} is not MACE's linear or nonlinear readout"
+    return True, "ok"
 
 
 def padding_is_exact(model: Any) -> bool:

@@ -1,0 +1,195 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-04T22:51:07.104829+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "df0d088f",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "fold_product_linear": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    1.54931640625,
+    2.38818359375,
+    2.5634765625
+  ],
+  "structures": {
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 6.069246287806891,
+            "mean_ms": 6.1136024843290215,
+            "min_ms": 5.969958399655297,
+            "max_ms": 6.5508974401745945,
+            "stdev_ms": 0.1805317711943715,
+            "spread": 0.09571848182968007,
+            "block_ms": [
+              6.5508974401745945,
+              6.037472504540347,
+              6.047408799640834,
+              5.969958399655297,
+              6.059053725330159,
+              6.081541670137085,
+              6.079438850283623,
+              6.083048484870233
+            ]
+          },
+          "b": {
+            "median_ms": 6.015212382772006,
+            "mean_ms": 6.053725622405182,
+            "min_ms": 5.904415705008432,
+            "max_ms": 6.475828104885295,
+            "stdev_ms": 0.1752373947291709,
+            "spread": 0.09499455106746162,
+            "block_ms": [
+              6.475828104885295,
+              5.977112999535166,
+              5.989317779894918,
+              5.904415705008432,
+              6.015514595201239,
+              6.014910170342773,
+              6.02412493492011,
+              6.02858068945352
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9910970979801168,
+        "pair_ratios_b_over_a": [
+          0.9885406028754286,
+          0.9900025209291158,
+          0.9903940643554036,
+          0.989021247677262,
+          0.9928142029923084,
+          0.9890436498821507,
+          0.9909014768096677,
+          0.9910459705274115
+        ]
+      },
+      "ratio_b_over_a": 0.9910970979801168,
+      "pair_ratios": [
+        0.9885406028754286,
+        0.9900025209291158,
+        0.9903940643554036,
+        0.989021247677262,
+        0.9928142029923084,
+        0.9890436498821507,
+        0.9909014768096677,
+        0.9910459705274115
+      ],
+      "setup_s": {
+        "a": 35.270068201003596,
+        "b": 15.119043339043856
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.fold_product_linear = off  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables (generic: species_skip)); stage 2: supported (ok (generic: no skip term in the first product)); stage 2: off, generic fold not measured on this GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+        ],
+        "b": [
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables (generic: species_skip)); stage 2: supported (ok (generic: no skip term in the first product)))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 288.70179562986914,
+          "potential_eV_atom": -4.387338524254618,
+          "kinetic_eV_atom": 0.03731758112835533
+        },
+        "b": {
+          "temperature_K": 288.70169894894275,
+          "potential_eV_atom": -4.3873385596985335,
+          "kinetic_eV_atom": 0.03731756863138313
+        }
+      },
+      "load_after": [
+        1.89013671875,
+        2.416015625,
+        2.564453125
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 75,
+          "pipelined_redos": 1,
+          "pipelined_early_rebuilds": 75
+        },
+        "b": {
+          "rebuilds": 75,
+          "pipelined_redos": 1,
+          "pipelined_early_rebuilds": 75
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

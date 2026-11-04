@@ -36,7 +36,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 Z_VALUES = [11, 17]
 OPTIONS = ("factor_species", "fold_cutoff", "reassociate_first", "streaming_conv", "species_skip",
            "fused_folded_backward", "chunked_conv_backward", "radial_tables", "species_tables",
-           "fold_readout_tail")
+           "fold_readout_tail", "fold_product_linear")
+SKIP_TERM = "the first product adds the first interaction's skip term"
+GENERIC_FOLD = "ok (generic: no skip term in the first product)"
+NOT_BOTH_GENERIC = ("the first two interactions are not both generic (RealAgnosticInteractionBlock, "
+                    "RealAgnosticResidualInteractionBlock)")
 JOINT = "a joint embedding (charge/spin) is added to the first input, which is then not species-only"
 NOT_SCALE = "PolarMACE: only ScaleShiftMACE\'s forward is pinned"
 FIRST_NOT_FACTORED = "the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)"
@@ -160,7 +164,8 @@ EXPECTED = {
                  "streaming_conv": (True, "ok"), "species_skip": (False, NOT_GENERIC),
                  "fused_folded_backward": (True, "ok"), "chunked_conv_backward": (True, "ok"),
                  "radial_tables": (True, "ok"),
-                 "species_tables": (True, "ok"), "fold_readout_tail": (True, "ok")}),
+                 "species_tables": (True, "ok"), "fold_readout_tail": (True, "ok"),
+                 "fold_product_linear": (True, "ok")}),
     # Per-graph total charge and spin: species-only first inputs, so reassociation stays (16 October 2026).
     "omol": dict(
         interactions=(MH1, MH1), apply_cutoff=False, joint=(("total_charge", "graph"), ("total_spin", "graph")),
@@ -169,7 +174,8 @@ EXPECTED = {
                  "streaming_conv": (True, "ok"), "species_skip": (False, NOT_GENERIC),
                  "fused_folded_backward": (True, "ok"), "chunked_conv_backward": (True, "ok"),
                  "radial_tables": (True, "ok"),
-                 "species_tables": (False, JOINT), "fold_readout_tail": (True, "ok")}),
+                 "species_tables": (False, JOINT), "fold_readout_tail": (True, "ok"),
+                 "fold_product_linear": (False, JOINT)}),
     # The tiny polar family passes the cutoff to the interactions (apply_cutoff=False), as the
     # released POLAR-1 models do, so it takes the MH-1 rewrites (SPEC §4.3) and its padding is exact.
     "polar": dict(
@@ -178,7 +184,8 @@ EXPECTED = {
                  "streaming_conv": (True, "ok"), "species_skip": (False, NOT_GENERIC),
                  "fused_folded_backward": (True, "ok"), "chunked_conv_backward": (True, "ok"),
                  "radial_tables": (True, "ok"),
-                 "species_tables": (False, NOT_SCALE), "fold_readout_tail": (False, NOT_SCALE)}),
+                 "species_tables": (False, NOT_SCALE), "fold_readout_tail": (False, NOT_SCALE),
+                 "fold_product_linear": (False, NOT_SCALE)}),
     "residual": dict(
         interactions=("RealAgnosticResidualInteractionBlock",) * 2, apply_cutoff=True, joint=(), polar=False,
         exact=True, species_only=True,
@@ -188,7 +195,8 @@ EXPECTED = {
                  "species_skip": (True, "ok"), "fused_folded_backward": (True, "ok"),
                  "chunked_conv_backward": (True, GENERIC_FOLDED),
                  "radial_tables": (True, "ok (generic radial tables)"),
-                 "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED)}),
+                 "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED),
+                 "fold_product_linear": (False, SKIP_TERM)}),
     "density": dict(
         interactions=("RealAgnosticDensityInteractionBlock", "RealAgnosticDensityResidualInteractionBlock"),
         apply_cutoff=True, joint=(), polar=False, exact=True, species_only=True,
@@ -200,7 +208,8 @@ EXPECTED = {
                  "species_skip": (True, "ok"), "fused_folded_backward": (True, "ok"),
                  "chunked_conv_backward": (True, GENERIC_FOLDED),
                  "radial_tables": (True, "ok (generic radial tables)"),
-                 "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED)}),
+                 "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED),
+                 "fold_product_linear": (True, GENERIC_FOLD)}),
     # MACE-OFF: rewrite_support asks for *any* GENERIC_INTERACTIONS class, and the residual blocks
     # after the first one are, so the generic verdicts hold although the first block
     # (RealAgnosticInteractionBlock) is not in GENERIC_INTERACTIONS.
@@ -215,7 +224,8 @@ EXPECTED = {
                  "species_skip": (True, "ok"), "fused_folded_backward": (True, "ok"),
                  "chunked_conv_backward": (True, GENERIC_FOLDED),
                  "radial_tables": (False, "not every interaction is generic"),
-                 "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED)}),
+                 "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED),
+                 "fold_product_linear": (False, NOT_BOTH_GENERIC)}),
 }
 
 

@@ -259,6 +259,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [lin-unused-heads](#lin-unused-heads) | Single-head model / skip unused readout heads | `select_head.py` (RE probe) | both | REJECTED | 2026-10-08; 2026-10-21; 2026-10-24 | 9.89 vs 9.93 ms; ≈ 0.05 ms NbCl5 | [opt-T04](validation/opt-T04-checkpoint-scan.md) |
 | [lin-species-tables](#lin-species-tables) | Species-only atom products as gathered tables | `species_tables` | FM | DEFAULT (scoped: MH-1 labels, not reproducible) | owner 2026-10-21 (OPT-DEF-2); decision 63 | local NaCl 0.956, NbCl5 0.979 | [opt-T08](validation/opt-T08-linear.md) |
 | [lin-fold-product-linear](#lin-fold-product-linear) | Fold `products.0.linear` into its consumers | `fold_product_linear` | FM | DEFAULT (scoped: MH-1 labels, not reproducible) | OPT-DEF-2; decision 63 | on top of C1: NaCl −3.4 %, NbCl5 −4.4 % | [opt-T08](validation/opt-T08-linear.md) |
+| [lin-generic-fold-product](#lin-generic-fold-product) | C3 for the generic family: `products.0.linear` folded into interaction 1's `linear_up`, `SpeciesSkip` and readout 0 | `fold_product_linear` (record `generic_fold_product_linear`) | FM | DEFAULT on the RTX 4000 Ada and every A100 (decision 66) | 2026-11-04 | OMAT-0 step: Ada 0.9986 / 0.9960 (SrTiO3), 0.9911 / 0.9849 (NbCl5); A100-SXM4 0.9928 / 0.9931, 0.9805 / 0.9828 | [generic fold](validation/generic-fold-product.md) |
 | [lin-fold-readout-tail](#lin-fold-readout-tail) | Fold the last linear tail into the readout | `fold_readout_tail` | FM | DEFAULT (scoped: MH-1 labels and OMOL-0, not reproducible) | OPT-DEF-2; decision 63 | NaCl 0.977, NbCl5 0.991 | [opt-T08](validation/opt-T08-linear.md) |
 | [lin-opt-t08-package](#lin-opt-t08-package) | C1 + C2 + C3 together (OPT-DEF-2) | the three fields | FM | DEFAULT | owner 2026-10-21, §19 13th | local NaCl 0.908 / 0.904, NbCl5 0.924 / 0.928; L4, A100 similar | [opt-def-2](validation/opt-def-2.md) |
 | [lin-t08-c6](#lin-t08-c6) | No gradient w.r.t. `node_attrs` | none | FM | NOT BUILT | 2026-10-21 | absorbed by C1 | [OPT-T08 audit](design/opt-T08-linear-audit.md) |
@@ -1053,6 +1054,18 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Measured: audit estimate 3.0 % NaCl / 2.4 % NbCl5 (local), 2.9 % / 2.5 % (murphy). Local C1 + C3 (off first): NaCl 0.921, NbCl5 0.935 (C3 on top of C1: −3.4 % / −4.4 %). CPU float64 within 1e-12 energy, 1e-10 forces (relative).
 - Why: removes two 512×512 products per direction.
 - Sources: [OPT-T08 audit](design/opt-T08-linear-audit.md) §2; [opt-T08](validation/opt-T08-linear.md); [opt-def-2](validation/opt-def-2.md).
+
+<a id="lin-generic-fold-product"></a>
+#### lin-generic-fold-product: `fold_product_linear` on the generic family (C3 port)
+- Switch: `RewriteConfig.fold_product_linear` (record `generic_fold_product_linear`; `planner.fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`)
+- Engine: FM
+- Date/round: 4–5 November 2026 (owner: "Yes, port it", idea 2 of the owner's seven OMAT-0 A100 proposals)
+- What: on a generic model whose first product has no skip term (the density family, MACE-OMAT-0), `products.0.linear` (W_p) is folded into its consumers and replaced by `Identity`: interaction 1's `linear_up` and readout 0's linear become `compose(W_p, consumer)`, interaction 1's `SpeciesSkip` becomes per species `A @ W_s` (float64 at apply time). Rounding class; needs `block_linear` and `generic_species_skip` (not `species_tables`: OMAT-0's first skip acts on the message, not a constant species table).
+- Status: DEFAULT on the RTX 4000 Ada and every A100 model (decision 66, 5 November 2026); off on the RTX 5060 Ti (not measured) unless asked for; off in reproducible plans.
+- Measured: MD step b/a (b = fold), OMAT-0 medium, abab / abba, 8 blocks of 200 steps: RTX 4000 Ada SrTiO3 10×10×10 0.9986 / 0.9960, NbCl5 (1,944 atoms) 0.9911 / 0.9849; A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828.
+- Checks: tiny density model vs stock within 1e-10 relative in float64 (energy, forces, stress); self-check catches a wrong skip matrix. Force gate with the fold (NaCl, NbCl5, SrTiO3 3×3×3): passes on the Ada (force r0.73–0.98, stress r0.66–0.69); on the A100 only NbCl5 stress misses (r2.09), the accepted A100 exception (default r2.5–3.0, [omat0-tp-backward](validation/omat0-tp-backward.md) §3.1).
+- Why: removes one 128-channel GEMM pair per step and its backward; the folded consumers keep their shapes.
+- Sources: [generic fold](validation/generic-fold-product.md), [results](../results/generic-fold-product-20261104/README.md).
 
 <a id="lin-fold-readout-tail"></a>
 #### lin-fold-readout-tail: `fold_readout_tail` (OPT-T08 C2)

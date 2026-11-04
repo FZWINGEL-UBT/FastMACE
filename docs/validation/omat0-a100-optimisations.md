@@ -8,7 +8,9 @@
   eV/Å³ against a limit of 1.2–1.5e-7. A bisection traced it to the 3×TF32 GEMMs (§3.6) and the tensor-core forward
   (§3.5) together; each passes alone. The owner kept both (5 November). See §3.7 and
   [omat0-tp-backward.md](omat0-tp-backward.md) §3.1.
-- **The generic fold of `products.0.linear`** (`fold_product_linear` on OMAT-0, §3.6) is measured but not on main yet.
+- **The generic fold of `products.0.linear`** (`fold_product_linear` on OMAT-0): default on the RTX 4000 Ada and every
+  A100 (decision 66, 5 November). MD step b/a on the A100-SXM4-80GB 0.993 / 0.993 (SrTiO3), 0.981 / 0.983 (NbCl5).
+  Row in §3.6.
 
 No new profile of the whole step has been taken since; the per-kernel times below are those of `4b70e3f2`.
 
@@ -224,6 +226,7 @@ flowchart TB
 | Per-irrep block GEMMs (`block_linear`) | cuEq `Linear` becomes per-irrep GEMMs with extracted weights. | **OWN** | From the RE's op map, where cuEq's linears were "using slower kernels" (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:100`). Measured: NaCl −11.8 % (`:117`). |
 | Grouped products (`grouped_linear`) | Same-irrep input segments share one product. | **OWN** | The RE's answer to the owner's "optimize OMOL-0 further" (`RM:LT/studies/other_models/README.md:652`, adopted `:721`). |
 | Species-restricted skip (`species_skip`) | The `skip_tp` over 89 one-hot elements becomes one GEMM per irrep block for the species present. | **OWN** | From the RE's step breakdown: "about 97% of this multiplies by zero" (`RM:LT/studies/other_models/README.md:282`). Measured on OMAT-0: −20 to −39 % (`:318`). |
+| Generic fold of `products.0.linear` (`fold_product_linear`, after this run) | `products.0.linear` folded into interaction 1's `linear_up`, its species skip (per species `A @ W_s`) and readout 0; one 128-channel GEMM pair and its backward fewer. Rounding. | **OWN** | MH-1's C3 fold from our own linear audit (`docs/optimisation-ledger.md`, `lin-fold-product-linear`), ported to the generic family on the owner's "Yes, port it" ([generic-fold-product.md](generic-fold-product.md)). A100-SXM4-80GB 0.993 / 0.993 (SrTiO3), 0.981 / 0.983 (NbCl5). |
 | 3×TF32 GEMMs on CUTLASS (`tf32x3_gemms`) | All of the above GEMMs run as error-compensated 3×TF32 on tensor cores, through a prebuilt CUTLASS cubin. Shapes outside the rule stay on cuBLAS IEEE. | **COPIED** (CUTLASS kernel); **EXTERNAL IDEA**; **OWN** integration and shape rule | The kernel is "the 3xTF32 split of CUTLASS example 27" (`fastmace/kernels/cutlass/NOTICE.md:6`). The idea reached us through an external research report, "3×TF32 is worth testing" (`docs/design/2026-10-20-megakernel-research.md:152`), and an external review that started the 29 October screen (`docs/validation/tc-gemm-screen.md:4`). Then: "build it for a100" (`docs/validation/cutlass-tf32x3.md:3`). Measured on OMAT-0: 0.949 / 0.947 (`:86`). |
 
 ### 3.7 Backend, symmetric contraction, precision
