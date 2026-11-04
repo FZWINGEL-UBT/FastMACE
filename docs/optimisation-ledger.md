@@ -580,7 +580,8 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-kernel-lab](#omat0-kernel-lab) | One force call's wprime and fused forward: variants and falsifiers | `tools/omat0_kernel_lab.py` | FM | MEASUREMENT | 2026-11-03 | wprime load-bound, slope 27–40 %; a·W alone 0.19–0.36 of the forward | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-slope-vector](#omat0-slope-vector) | q-major derivative table, float2/float4 term loads in wprime | `wprime_backward.SLOPE_VECTOR` | FM | REJECTED | 2026-11-04 | lab wprime 0.913 (5060 Ti), A100 0.898 at degree 10; step on top of degree 5: Ada 1.027, 5060 Ti 1.070, A100 1.040 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-stream-w](#omat0-stream-w) | wprime reads the stored w with `__ldcs` | `wprime_backward.STREAM_W` | FM | REJECTED | 2026-11-04 | lab wprime 0.964 (5060 Ti), 1.127 (Ada), 0.982 (Ada, degree 5); step 0.987 (5060 Ti), 1.005 (A100-SXM4, degree 5) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
-| [omat0-symmetric-pairs](#omat0-symmetric-pairs) | Mirror species pairs read one table row | `radial.SYMMETRIC_PAIRS` | FM | REJECTED on Ada (A100 open) | 2026-11-03 | Ada step 0.997 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-symmetric-pairs](#omat0-symmetric-pairs) | Mirror species pairs read one table row | `radial.SYMMETRIC_PAIRS`, `SYMMETRIC_PAIRS_GPUS` | FM | DEFAULT on the RTX 4000 Ada and every A100 with FACTORED (owner, 4 November 2026; decision 66) | 2026-11-03 | alone Ada step 0.997; on top of FACTORED Ada 0.996 / 0.995, A100-SXM4 0.998 / 0.990; bitwise | [tp backward](validation/omat0-tp-backward.md) |
+| [omat0-tp-backward](#omat0-tp-backward) | Factored tensor-product backward in wprime (the three trilinear sums regrouped per path) | `wprime_backward.FACTORED`, `FACTORED_GPUS` | FM | DEFAULT on the RTX 4000 Ada and every A100 (owner, 4 November 2026; decision 66) | 2026-11-04 | wprime 0.90 (Ada), 0.72-0.73 (A100); Benchmark_loup step Ada 0.983 / 0.980, A100-SXM4 0.938 / 0.940; gates pass apart from the A100's pre-existing OMAT-0 NbCl5 stress excess (tf32x3 + tensor-core forward) | [tp backward](validation/omat0-tp-backward.md) |
 | [omat0-skip-zero-column](#omat0-skip-zero-column) | The fused forward skips the folded weight's all-zero bias column | `fused_forward.SKIP_ZERO_COLUMN` | FM | DEFAULT on RTX 4000 Ada and A100-SXM4-80GB (owner, 4 November 2026; decision 66) | 2026-11-04 | lab forward 0.909 (Ada), 1.010 (5060 Ti); step 0.989 (Ada), 1.000 (5060 Ti), 0.991 (A100); on top of degree 5 0.981 (Ada), 0.986 (A100) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-stream-store-w](#omat0-stream-store-w) | The fused forward stores w with `__stcs` | `fused_forward.STREAM_STORE_W` | FM | REJECTED | 2026-11-04 | lab forward 0.965 (Ada), 0.995 (5060 Ti); step 1.001 (Ada), 0.991 (5060 Ti), 1.001 on top of degree 5 (Ada) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-eos-chunks](#omat0-eos-chunks) | `edge_outer_sum` chunk sizes 64 | `edge_outer_sum.FORWARD_CHUNK`, `BACKWARD_BLOCK_EDGES` | FM | REJECTED | 2026-11-04 | Ada step 1.002 (forward chunk 64), 1.004 (backward block 64) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
@@ -3830,14 +3831,26 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 
 <a id="omat0-symmetric-pairs"></a>
 #### omat0-symmetric-pairs: mirror species pairs share one table row
-- Switch: `fastmace.rewrites.radial.SYMMETRIC_PAIRS` (off)
+- Switch: `fastmace.rewrites.radial.SYMMETRIC_PAIRS` (None: on for `SYMMETRIC_PAIRS_GPUS`, the RTX 4000 Ada and every A100; True / False: an A/B side)
 - Engine: FM
-- Date/round: 3 November 2026 (`a8171e19`)
+- Date/round: 3 November 2026 (`a8171e19`); default 4 November 2026 (`3812b56e`)
 - What: when the (s, t) and (t, s) coefficient rows are bitwise equal (OMAT-0's are), edges of both read the lower pair's row. Bitwise.
-- Status: REJECTED on Ada; the A100 is open.
-- Measured: lab wprime 0.980–0.991 ("unordered"); Ada step 0.9973.
-- Why: fewer distinct slabs, but the slab locality is not the limit ([omat0-kernel-lab](#omat0-kernel-lab), one slab 1.03–1.07).
-- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md).
+- Status: DEFAULT on the RTX 4000 Ada and every A100 (owner, 4 November 2026: "Turn them on"; decision 66), together with [omat0-tp-backward](#omat0-tp-backward). Off on the RTX 5060 Ti (not measured).
+- Measured: lab wprime 0.980–0.991 ("unordered"); Ada step 0.9973 alone. With FACTORED: lab 0.877 (Ada), 0.721 (A100); MD step b/a (a = FACTORED) Ada 0.996 / 0.995, A100-SXM4-80GB 0.998 / 0.990.
+- Why: fewer distinct slabs; it matters only once the factored kernel is no longer arithmetic-bound.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md), [tp backward](validation/omat0-tp-backward.md).
+
+<a id="omat0-tp-backward"></a>
+#### omat0-tp-backward: factored tensor-product backward in wprime
+- Switch: `fastmace.kernels.oeq_streaming.wprime_backward.FACTORED` (None: on for `FACTORED_GPUS`, the RTX 4000 Ada and every A100; True / False: an A/B side); `FACTORED_SCALE` (rejected, off)
+- Engine: FM
+- Date/round: 4 November 2026 (`78b27fd2`, `8aec363b`; default `3812b56e`)
+- What: per path and edge channel `u_i = Σ c g_o y_j`, `v_j = Σ c g_o x_i`, then `wg = Σ_i x_i u_i`, `dx_i += w u_i`, `dsh_j += w v_j`. The same sums regrouped (rounding). Every wprime kernel built while it is set.
+- Status: DEFAULT on the RTX 4000 Ada and every A100 (owner, 4 November 2026; decision 66). Off on the RTX 5060 Ti (not measured).
+- Measured: lab wprime 0.90 (Ada), 0.72–0.73 (A100-SXM4); Benchmark_loup MD step b/a Ada 0.9832 / 0.9801, A100-SXM4-80GB 0.9381 / 0.9397.
+- Checks: GPU test on Ada and A100; force gates pass on Ada (OMAT-0 and MH-1). On the A100 FACTORED's errors equal the default's; the A100 default fails OMAT-0 NbCl5 stress (1.8e-7 against 1.2–1.5e-7) with or without it. The bisection (`a100-sxm4-stress-bisect-3812b56e`) traces that to tf32x3 GEMMs + tensor-core forward together (each alone passes). CPU suite on leto 5,122 passed, 200 skipped at `3812b56e`.
+- Why: on the A100 the kernel is bound by FP32 arithmetic, which the regrouping cuts; on the Ada the value-table loads limit it.
+- Sources: [tp backward](validation/omat0-tp-backward.md), [results](../results/omat0-tp-backward-20261104/README.md).
 
 <a id="omat0-skip-zero-column"></a>
 #### omat0-skip-zero-column: the fused forward skips the all-zero bias column

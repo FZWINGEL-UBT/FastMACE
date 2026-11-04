@@ -6,6 +6,7 @@ import torch
 from fastmace.kernels.gpu_models import GPUModels, is_a100
 from fastmace.kernels.oeq_streaming import fused_forward, wprime_backward
 from fastmace.planner import fixed
+from fastmace.rewrites import radial
 
 A100S = ("NVIDIA A100-SXM4-80GB", "NVIDIA A100-SXM4-40GB", "NVIDIA A100 80GB PCIe", "NVIDIA A100-PCIE-40GB")
 
@@ -75,3 +76,21 @@ def test_block_ldg_default(monkeypatch):
     monkeypatch.setattr(wprime_backward, "BLOCK_LDG", True)
     assert wprime_backward.block_ldg_default(torch.device("cuda", 0))
 
+
+def test_factored_and_symmetric_pairs_defaults(monkeypatch):
+    """FACTORED and SYMMETRIC_PAIRS: on for the RTX 4000 Ada and every A100 (decision 66), off elsewhere (the RTX 5060
+    Ti was not measured); the constants override."""
+    for module, constant, default in ((wprime_backward, "FACTORED", wprime_backward.factored_default),
+                                      (radial, "SYMMETRIC_PAIRS", radial.symmetric_pairs_default)):
+        assert getattr(module, constant) is None
+        assert not default(torch.device("cpu"))
+        for name, on in (("NVIDIA RTX 4000 Ada Generation", True), ("NVIDIA A100 80GB PCIe", True),
+                         ("NVIDIA A100-SXM4-40GB", True), ("NVIDIA GeForce RTX 5060 Ti", False),
+                         ("NVIDIA RTX A4000", False)):
+            monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
+            assert default(torch.device("cuda", 0)) is on, (constant, name)
+        monkeypatch.setattr(module, constant, True)
+        assert default(torch.device("cuda", 0))
+        monkeypatch.setattr(module, constant, False)
+        monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
+        assert not default(torch.device("cuda", 0))

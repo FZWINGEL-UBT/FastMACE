@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import copy
 
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.registry import CaseErrors, CheckResult, Rewrite, RewriteError, Support
 
@@ -65,8 +66,12 @@ PIECE_BUCKET = 16
 # Mirror pairs share one table row where the fitted rows of (s, t) and (t, s) are bitwise equal (coef and dcoef): a
 # radial chain symmetric in the pair, as the generic family's (its distance transforms use the pair's mean covalent
 # radius). Each edge then reads the (min, max) row, so a step touches fewer distinct rows (OMAT-0 SrTiO3: 6 of 9 pairs;
-# kernel lab, 3 November 2026). Bitwise: the rows read are equal. A module constant for the A/B.
-SYMMETRIC_PAIRS = False
+# kernel lab, 3 November 2026). Bitwise: the rows read are equal. With wprime_backward.FACTORED, Benchmark_loup MD
+# step b/a (b = FACTORED + SYMMETRIC_PAIRS, a = FACTORED): RTX 4000 Ada 0.996 / 0.995, A100-SXM4-80GB 0.998 / 0.990
+# (docs/validation/omat0-tp-backward.md section 4). None: on for SYMMETRIC_PAIRS_GPUS (owner, 4 November 2026,
+# decision 66; every A100 model); True / False: an A/B side's choice on every GPU.
+SYMMETRIC_PAIRS = None
+SYMMETRIC_PAIRS_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 CERTIFY_POINTS = 6000  # uniform and as many random lengths; the w-level tensors are [12000, 1280] float64
 FIXED_SPECIES_SUPERSET = "fixed_species_superset"
 
@@ -146,6 +151,16 @@ def symmetric_rows(tables, species):
                for s in range(species) for t in range(s + 1, species))
 
 
+def symmetric_pairs_default(device):
+    """``SYMMETRIC_PAIRS`` on ``device``: the constant when set, else on for ``SYMMETRIC_PAIRS_GPUS``."""
+    import torch
+
+    if SYMMETRIC_PAIRS is not None:
+        return bool(SYMMETRIC_PAIRS)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in SYMMETRIC_PAIRS_GPUS
+
+
 def _table_module(tables, columns, device, single=False):
     """``single``: one table for every species pair (a radial chain without species input): every edge reads
     pair 0."""
@@ -153,7 +168,7 @@ def _table_module(tables, columns, device, single=False):
 
     pieces = tables["coef"].shape[1]
     tables = _padded(tables)
-    symmetric = (SYMMETRIC_PAIRS and not single and len(columns) > 1
+    symmetric = (symmetric_pairs_default(device) and not single and len(columns) > 1
                  and symmetric_rows(tables, len(columns)))
 
     class RadialTableModule(torch.nn.Module):

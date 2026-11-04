@@ -82,7 +82,10 @@ BLOCK_LDG_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 # sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j. Rounding (the same sums regrouped); every wprime kernel built while
 # it is set. A module constant for the A/B: OMAT-0 medium, Benchmark_loup MD step b/a in both orders, RTX 4000 Ada
 # 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940 (wprime kernel 0.90 / 0.73; docs/validation/omat0-tp-backward.md).
-FACTORED = False
+# None: on for FACTORED_GPUS (owner, 4 November 2026, decision 66; every A100 model, GPUModels); True / False: an A/B
+# side's choice on every GPU. The RTX 5060 Ti was not measured and keeps the per-term body.
+FACTORED = None
+FACTORED_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 # With FACTORED: each path's most common coefficient magnitude applied once per path (to w and the weight gradient);
 # its terms carry only the sign, the others the ratio |c| / alpha (OMAT-0 medium: 50 of 86 terms without a multiply).
 # Rounding. Rejected (A100-SXM4-80GB: kernel 0.830 against FACTORED's 0.722, MD step 1.025 / 1.024 against FACTORED);
@@ -527,7 +530,7 @@ class WPrimeBackward:
         self.table_w = bool(table_w)
         self.blocks = blocks
         self.schedule = kernels.schedule
-        self.factored = FACTORED if factored is None else bool(factored)
+        self.factored = factored_default(device) if factored is None else bool(factored)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and FACTORED_SCALE)
@@ -803,6 +806,14 @@ def block_ldg_default(device):
     return device.type == "cuda" and torch.cuda.get_device_name(device) in BLOCK_LDG_GPUS
 
 
+def factored_default(device):
+    """``FACTORED`` on ``device``: the constant when set, else on for ``FACTORED_GPUS``."""
+    if FACTORED is not None:
+        return bool(FACTORED)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in FACTORED_GPUS
+
+
 def prepare_block_messages(model):
     """``WPrime.prepare_blocks`` in every interaction of ``model`` with ``wprime_backward`` (after the rewrites;
     a no-op where ``BLOCK_MESSAGE`` is off). Returns how many interactions write the block layout."""
@@ -915,9 +926,10 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_SCALE",
-           "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default", "block_message_default",
-           "block_spec", "dense_message", "density_backward", "density_column", "derivative_table", "factored_paths",
+__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
+           "FACTORED_SCALE", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
+           "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
+           "derivative_table", "factored_default", "factored_paths",
            "padded_terms", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
