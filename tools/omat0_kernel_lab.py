@@ -142,8 +142,69 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
 
     by_piece = edge_order(lambda r, pair: pair.double() * 1e3 + r.double())  # within a pair, r orders the pieces
 
+    def gslab(s):
+        """w and its slope from one slab of the value table G [groups, TERMS + 1, Q]: w = sum_k T_k(x) G_k and
+        w' = sum_k T_k'(x) G_k (T_k' = k U_(k-1)(x) scale), so neither the stored w nor G' is read. A timing bound:
+        the argument transform passes G' with one extra term, so w and dr are not the real ones."""
+        s = _sub(s, r"(constexpr int TERMS = \d+;)", r"\1\nconstexpr int GT = TERMS + 1;", 1, regex=True)
+        s = _sub(s, group, "const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * GT * WEIGHT_DIM;", 1)
+        basis = """scalar_t wcheb[GT], dcheb[GT];
+    {
+        const scalar_t sc = scales[piece];
+        scalar_t um1 = scalar_t(0), u = scalar_t(1);  // U_(k-2), U_(k-1)
+        wcheb[0] = scalar_t(1);
+        dcheb[0] = scalar_t(0);
+        #pragma unroll
+        for (int k = 1; k < GT; ++k) {
+            wcheb[k] = k == 1 ? t : scalar_t(2) * t * wcheb[k == 1 ? 0 : k - 1] - wcheb[k < 2 ? 0 : k - 2];
+            dcheb[k] = scalar_t(k) * u * sc;
+            const scalar_t un = scalar_t(2) * t * u - um1;
+            um1 = u;
+            u = un;
+        }
+    }
+    acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};"""
+        s = _sub(s, "acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};", basis, 1)
+        s = _sub(s, load_w, """scalar_t gv[GT];
+                scalar_t radial_weight = scalar_t(0);
+                #pragma unroll
+                for (int k = 0; k < GT; ++k) {
+                    gv[k] = __ldg(g + k * WEIGHT_DIM + weight_index);
+                    radial_weight += wcheb[k] * gv[k];
+                }""")
+        return _sub(s, r"for \(int k = 0; k < TERMS; \+\+k\)\s*" + re.escape(slope),
+                    "for (int k = 1; k < GT; ++k) slope += dcheb[k] * gv[k];", regex=True)
+
+    def gslab_args(args, qmajor=False):
+        import torch
+        args = list(args)
+        g = args[10]  # [groups, terms, Q] -> [groups, terms + 1, Q] (q-major: [groups, Q, terms + 1])
+        g = torch.cat([g, g[:, :1]], dim=1)
+        args[10] = (g.transpose(1, 2) if qmajor else g).contiguous()
+        return args
+
+    def gslab_q(s, vector):
+        """``gslab`` with the slab q-major, each weight's GT terms loaded as float2/float4 (GT a multiple of it)."""
+        s = gslab(s)
+        loads = "\n".join(
+            f"                    {{ const float{vector} v = __ldg(gq + {i});"
+            + "".join(f" gv[{vector * i + c}] = v.{comp};" for c, comp in enumerate("xyzw"[:vector])) + " }"
+            for i in range(6 // vector))
+        return _sub(s, """                #pragma unroll
+                for (int k = 0; k < GT; ++k) {
+                    gv[k] = __ldg(g + k * WEIGHT_DIM + weight_index);
+                    radial_weight += wcheb[k] * gv[k];
+                }""", f"""                static_assert(GT == 6, "the q-major slab bound assumes 6 terms");
+                const float{vector}* gq = reinterpret_cast<const float{vector}*>(g + weight_index * GT);
+{loads}
+                #pragma unroll
+                for (int k = 0; k < GT; ++k) radial_weight += wcheb[k] * gv[k];""")
+
+
     return {
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
+        "B-gslab": ("falsifier", gslab, (), gslab_args),
+        "B-gslab-f2": ("falsifier", lambda s: gslab_q(s, 2), (), lambda a: gslab_args(a, True)),
         "base": ("exact", lambda s: s, ()),
         "qmajor-f2": ("exact", lambda s: qmajor(s, 2), (), qmajor_args(2)),
         "qmajor-f4": ("exact", lambda s: qmajor(s, 4), (), qmajor_args(4)),

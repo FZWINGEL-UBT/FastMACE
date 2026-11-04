@@ -44,6 +44,14 @@ STREAM_W = False
 # the RTX 5060 Ti, 2.6 % with float4). The same sums in the same order; the padding terms are zero. The rebuild
 # backward (recompute_conv_weights) reads the term-major table. A module constant for the A/B.
 SLOPE_VECTOR = 0
+# w and its slope from one table (OMAT-0 kernel lab, 4 November 2026). False: the fused forward stores w [E, Q] and the
+# backward reads it with the derivative table G'. True (float32 tables): the backward reads the value table
+# G = C [W, b]^T instead, q-major with float2 loads ([groups, Q, D + 1 rounded up to even]), and evaluates both
+# w = sum_k T_k(x) G_k and w' = sum_k T_k'(x) scale G_k from the one slab, so the forward stores no w (its
+# message-only kernel) and the backward reads neither w nor G'. Rounding: the backward's w is the table's series, not
+# the forward's a . W product. A module constant for the A/B.
+TABLE_W = False
+TABLE_W_VECTOR = 2
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -132,6 +140,24 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     if (PADDED_TERMS > 1) cheb[1] = t;
     #pragma unroll
     for (int k = 2; k < PADDED_TERMS; ++k) cheb[k] = scalar_t(2) * t * cheb[k - 1] - cheb[k - 2];
+    {%- if table_w %}
+    // TABLE_W: w from the value series (zero at or beyond the cutoff) and its r-derivative T_k'(x) * scale,
+    // T_k' = k U_(k-1).
+    const bool inside = r < r_max;
+    scalar_t dcheb[TERMS];
+    {
+        const scalar_t sc = scales[piece];
+        scalar_t um1 = scalar_t(0), u = scalar_t(1);  // U_(k-2), U_(k-1)
+        dcheb[0] = scalar_t(0);
+        #pragma unroll
+        for (int k = 1; k < TERMS; ++k) {
+            dcheb[k] = scalar_t(k) * u * sc;
+            const scalar_t un = scalar_t(2) * t * u - um1;
+            um1 = u;
+            u = un;
+        }
+    }
+    {%- endif %}
 
     acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};
     acc_t radial_gradient = acc_t(0);
@@ -146,8 +172,29 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 const int weight_index =
                     {{ path.weight_start + edge_channel * schedule.channels }} + channel;
                 const int64_t radial_weight_index = weight_base + weight_index;
+                {%- if table_w %}
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const {{ vector_type }}* gq =
+                        reinterpret_cast<const {{ vector_type }}*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / {{ slope_vector }}; ++k) {
+                        const {{ vector_type }} v = __ldg(gq + k);
+                        {%- for component in "xyzw"[:slope_vector] %}
+                        gv[{{ slope_vector }} * k + {{ loop.index0 }}] = v.{{ component }};
+                        {%- endfor %}
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = scalar_t(0);
+                #pragma unroll
+                for (int k = 0; k < TERMS; ++k) radial_weight += cheb[k] * gv[k];
+                {%- else %}
                 const scalar_t radial_weight = {{ "__ldcs(weights + radial_weight_index)" if stream_w
                                                   else "weights[radial_weight_index]" }};
+                {%- endif %}
                 acc_t weight_gradient = acc_t(0);
 
                 {% for output in path.outputs %} {
@@ -178,7 +225,10 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 } {%- endfor %}
                 if (sloped) {
                     acc_t slope = acc_t(0);
-                    {%- if slope_vector %}
+                    {%- if table_w %}
+                    #pragma unroll
+                    for (int k = 1; k < TERMS; ++k) slope += dcheb[k] * gv[k];
+                    {%- elif slope_vector %}
                     const {{ vector_type }}* gq =
                         reinterpret_cast<const {{ vector_type }}*>(g + weight_index * PADDED_TERMS);
                     #pragma unroll
@@ -227,10 +277,12 @@ def padded_terms(terms, vector):
     return -(-int(terms) // vector) * vector if vector else int(terms)
 
 
-def render(schedule, scalar, terms, stream_w=None, vector=0):
+def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
-    ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only)."""
+    ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
+    ``table_w`` (``TABLE_W``): the table is the q-major value table (``value_table``, ``terms`` = D + 1), from which
+    the kernel evaluates w and its slope; the stored weights are not read (needs ``vector``)."""
     from fastmace.kernels.oeq_streaming.jinja_env import get_jinja_environment
 
     if schedule.layout not in ("ir_mul", "mul_ir"):
@@ -239,11 +291,13 @@ def render(schedule, scalar, terms, stream_w=None, vector=0):
         raise ValueError("the derivative table needs at least one term")
     if vector not in (0, 2, 4) or (vector and scalar != "float"):
         raise ValueError(f"slope vector {vector!r}: 0, or 2 or 4 for float kernels")
+    if table_w and not vector:
+        raise ValueError("table_w reads the q-major value table: it needs a slope vector of 2 or 4")
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
                                             slope_vector=vector, vector_type=f"float{vector}",
-                                            padded_terms=padded_terms(terms, vector))
+                                            padded_terms=padded_terms(terms, vector), table_w=bool(table_w))
 
 
 def derivative_table(dcoef, weight, vector=0):
@@ -259,6 +313,18 @@ def derivative_table(dcoef, weight, vector=0):
     if vector:
         d = torch.nn.functional.pad(d.transpose(1, 2), (0, padded_terms(terms, vector) - terms))
     return d.to(dcoef.dtype).contiguous()
+
+
+def value_table(coef, weight, vector=TABLE_W_VECTOR):
+    """``G [pairs * pieces, Q, D + 1 rounded up to a multiple of vector]`` (``TABLE_W``) from a table's ``coef [P, K,
+    D + 1, J]`` and the folded weight ``[Q, J - 1]``: ``w_table.fold_tables``' value half without its zero group,
+    q-major with zero padding terms. Computed in float64, stored in ``coef``'s dtype."""
+    pairs, pieces, terms, _ = coef.shape
+    width = weight.shape[1]
+    g = torch.einsum("pktj,qj->pkqt", coef[..., :width].to(torch.float64),
+                     weight.detach().to(device=coef.device, dtype=torch.float64))
+    g = torch.nn.functional.pad(g.reshape(pairs * pieces, -1, terms), (0, padded_terms(terms, vector) - terms))
+    return g.to(coef.dtype).contiguous()
 
 
 def density_column(dcoef):
@@ -308,7 +374,7 @@ class WPrimeBackward:
     (``StreamingKernels``) and a derivative table of ``terms`` terms (``vector``: its q-major layout's load width,
     ``SLOPE_VECTOR``)."""
 
-    def __init__(self, kernels, terms, device=None, vector=0):
+    def __init__(self, kernels, terms, device=None, vector=0, table_w=False):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -318,7 +384,8 @@ class WPrimeBackward:
         self.scalar = scalar
         self.num_threads, self.cohort, self.shared_memory = kernels.num_threads, kernels.cohort, kernels.shared_memory
         self.output_dim = kernels.output_dim
-        self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector)
+        self.table_w = bool(table_w)
+        self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -420,12 +487,12 @@ class _WPrimeConvolution(torch.autograd.Function):
     @staticmethod
     def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
                 sh, senders, receivers, row_ptr, kernel_id, fused_id, wprime_id, recompute_rows=0, message_id=-1,
-                rebuild_id=-1):
+                rebuild_id=-1, table_w=False):
         from fastmace.kernels.oeq_streaming.runtime import streaming_conv_forward
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
-        if rebuild_id >= 0:  # recompute_conv_weights on the fused kernels: w built on chip, never stored
+        if rebuild_id >= 0 or (table_w and message_id >= 0):  # w built on chip, never stored
             from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message
             message = fused_folded_message(a, weight, x, sh, senders, receivers, row_ptr, message_id)
             weights = None
@@ -435,7 +502,7 @@ class _WPrimeConvolution(torch.autograd.Function):
         else:
             weights = a @ weight.t()
             message = streaming_conv_forward(x, sh, weights, senders, row_ptr, kernel_id)
-        if recompute_rows or weights is None:  # recompute_conv_weights (CAP-T07): no stored weights
+        if recompute_rows or weights is None or table_w:  # recompute_conv_weights (CAP-T07), TABLE_W: none
             weights = coef.new_empty((0,))
         ctx.save_for_backward(x, sh, weights, senders, receivers, r, pair, gprime, density_dcoef, starts, scales,
                               bins, coef, weight)
@@ -463,7 +530,7 @@ class _WPrimeConvolution(torch.autograd.Function):
         if ddensity is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, ddensity, *ctx.constants)
         return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
-                None, None, None, None, None, None, None, None, None)
+                None, None, None, None, None, None, None, None, None, None)
 
 
 class WPrime(torch.nn.Module):
@@ -472,11 +539,20 @@ class WPrime(torch.nn.Module):
 
     def __init__(self, table, weight, kernels):
         super().__init__()
-        self.terms = int(table.dcoef.shape[2])
-        self.vector = SLOPE_VECTOR if table.dcoef.dtype == torch.float32 else 0
-        self.register_buffer("gprime", derivative_table(table.dcoef, weight, self.vector), persistent=False)
+        # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
+        self.table_w = bool(TABLE_W) and table.coef.dtype == torch.float32
+        if self.table_w:
+            self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
+            gprime = value_table(table.coef, weight, self.vector)
+        else:
+            self.terms = int(table.dcoef.shape[2])
+            self.vector = SLOPE_VECTOR if table.dcoef.dtype == torch.float32 else 0
+            gprime = derivative_table(table.dcoef, weight, self.vector)
+        self.register_buffer("gprime", gprime, persistent=False)
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
-        self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector)
+        self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
+                                     table_w=self.table_w)
+        self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
         self.rebuild = None
@@ -487,9 +563,9 @@ class WPrime(torch.nn.Module):
         from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
         from fastmace.kernels.oeq_streaming.wrebuild_backward import WRebuildBackward
 
-        if self.vector:
+        if self.vector or self.table_w:
             raise ValueError("wprime_backward: the rebuild backward (recompute_conv_weights) reads the term-major "
-                             "derivative table; it needs SLOPE_VECTOR = 0")
+                             "derivative table; it needs SLOPE_VECTOR = 0 and TABLE_W off")
         device = self.gprime.device
         self.rebuild = (FusedFoldedForward(kernels, fused.k, device, store_w=False),
                         WRebuildBackward(kernels, fused.k, self.terms, device, parts=REBUILD_PARTS,
@@ -503,6 +579,16 @@ class WPrime(torch.nn.Module):
         chip; otherwise the backward builds it again in chunks of that many edges."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
+        if self.table_w:  # no w is kept anyway; the fused forward's message-only kernel stores none
+            if fused is not None and (self.message is None or self.message[0] != fused.id):
+                from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+                self.message = (fused.id, FusedFoldedForward(kernels, fused.k, self.gprime.device, store_w=False,
+                                                             used=fused.used))
+            message_id = self.message[1].id if fused is not None else -1
+            return _WPrimeConvolution.apply(lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales,
+                                            table.bins, float(table.r_lo), float(table.bin_scale), float(table.r_max),
+                                            weight, self.gprime, x, sh, senders, receivers, row_ptr, kernels.id,
+                                            -1 if fused is None else fused.id, self.kernel.id, 0, message_id, -1, True)
         rebuild = (self.rebuild[0].id, self.rebuild[1].id) if recompute_rows and fused is not None and self.rebuild \
             else None
         return _WPrimeConvolution.apply(lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales,
@@ -514,10 +600,11 @@ class WPrime(torch.nn.Module):
     def extra_repr(self):
         outputs = self.gprime.shape[1 if self.vector else 2]
         vector = f", q-major float{self.vector}" if self.vector else ""
-        return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}"
+        table = ", value table (w from the table)" if self.table_w else ""
+        return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["WPrime", "WPrimeBackward", "density_backward", "density_column", "derivative_table", "padded_terms",
-           "render",
+__all__ = ["TABLE_W", "WPrime", "WPrimeBackward", "density_backward", "density_column", "derivative_table",
+           "padded_terms", "render", "value_table",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_recompute", "wprime_arguments",
            "wprime_reference"]
