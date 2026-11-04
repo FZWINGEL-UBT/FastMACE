@@ -210,6 +210,60 @@ for forward in (None, fused):
     assert torch.equal(captured[0], new[0]) and torch.equal(captured[2], new[2]), name
     report[name] = {"dr error": err, "dsh max rel": float((new[4] - stored[4]).abs().max() / stored[4].abs().max()),
                     "dx max rel": float((new[3] - stored[3]).abs().max() / stored[3].abs().max())}
+
+# FACTORED: each path's three trilinear sums regrouped. Against the same record unfactored: the same forward, dx and
+# dsh to rounding, dL/dr against the float64 reference (stored w and TABLE_W, both layouts), also in a CUDA graph.
+for layout in ("ir_mul", "mul_ir"):
+    kernels = StreamingKernels(problem, np.float32, layout=layout)
+    weight = torch.randn((problem.weight_numel, k), device="cuda", generator=g) / k ** 0.5
+    X = torch.randn((nodes, irreps_in1.dim), device="cuda", generator=g)
+    Y = torch.randn((edges, irreps_in2.dim), device="cuda", generator=g)
+    G = torch.randn((nodes, irreps_out.dim), device="cuda", generator=g)
+    D = torch.randn((edges, 1), device="cuda", generator=g)
+    fused = FusedFoldedForward(kernels, k)
+    a, _ = radial_table(r, pair, table.coef, table.dcoef, table.starts, table.scales, table.bins, r_lo,
+                        table.bin_scale, r_max)
+    _, _, dw = streaming_conv_backward(X, Y, a @ weight.t(), sender.int(), receiver.int(), rows, G, kernels.id)
+    ref = (wp.wprime_reference(dw.double(), r.double(), pair, wp.derivative_table(table.dcoef.double().cpu(),
+                                                                                  weight.double().cpu()).cuda(),
+                               table.starts.double(), table.scales.double(), table.bins, r_lo, table.bin_scale,
+                               r_max)
+           + wp.density_backward(r.double().cpu(), pair.cpu(), wp.density_column(table.dcoef.double().cpu()),
+                                 table.starts.double().cpu(), table.scales.double().cpu(), table.bins.cpu(),
+                                 D.double().cpu(), r_lo, table.bin_scale, r_max).cuda())
+    for table_w, scale in ((False, False), (True, False), (True, True)):
+        name = f"factored-{layout}-{'table-w' if table_w else 'stored-w'}{'-scaled' if scale else ''}"
+        wp.TABLE_W = table_w
+        try:
+            plain = wp.WPrime(table, weight, kernels)
+            wp.FACTORED, wp.FACTORED_SCALE = True, scale
+            try:
+                factored = wp.WPrime(table, weight, kernels)
+            finally:
+                wp.FACTORED, wp.FACTORED_SCALE = False, False
+        finally:
+            wp.TABLE_W = None
+        assert factored.kernel.factored and not plain.kernel.factored, name
+        assert "u_0" in factored.kernel.source and "u_0" not in plain.kernel.source, name
+        base = run(X, Y, G, D, kernels, weight, fused, plain)
+        new = run(X, Y, G, D, kernels, weight, fused, factored)
+        assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name  # the same forward
+        torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+        torch.testing.assert_close(new[4], base[4], rtol=1e-5, atol=2e-6 * float(base[4].abs().max()))  # dsh
+        dr_new = new[2].reshape(-1)
+        assert bool((dr_new[outside] == 0).all()), name
+        err = float((dr_new.double() - ref).abs().max()) / float(ref.abs().max())
+        err_base = float((base[2].reshape(-1).double() - ref).abs().max()) / float(ref.abs().max())
+        assert err <= 1e-5, (name, err)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            captured = run(X, Y, G, D, kernels, weight, fused, factored)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(captured[0], new[0]) and torch.equal(captured[2], new[2]), name
+        report[name] = {"dr error": err, "dr error (unfactored)": err_base,
+                        "dsh max rel": float((new[4] - base[4]).abs().max() / base[4].abs().max()),
+                        "dx max rel": float((new[3] - base[3]).abs().max() / base[3].abs().max())}
 print(json.dumps(report))
 """
 
@@ -223,4 +277,6 @@ def test_wprime_backward_matches_the_chain():
     report = json.loads(result.stdout.strip().splitlines()[-1])
     print(json.dumps(report, indent=1))
     assert set(report) == {"ir_mul-cublas", "ir_mul-fused", "mul_ir-cublas", "mul_ir-fused", "slope-vector-2",
-                           "slope-vector-4", "table-w-cublas", "table-w-fused"}
+                           "slope-vector-4", "table-w-cublas", "table-w-fused", "factored-ir_mul-stored-w",
+                           "factored-ir_mul-table-w", "factored-mul_ir-stored-w", "factored-mul_ir-table-w",
+                           "factored-ir_mul-table-w-scaled", "factored-mul_ir-table-w-scaled"}

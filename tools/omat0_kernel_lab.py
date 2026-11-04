@@ -64,8 +64,9 @@ def _after_constants(source, text):
 
 
 # ---------------------------------------------------------------------------------------------------------- wprime
-def wprime_variants(species):
-    """name -> (kind, source transform, extra NVRTC options); kind "exact" or "falsifier"."""
+def wprime_variants(species, kernel=None):
+    """name -> (kind, source transform, extra NVRTC options); kind "exact", "rounding" (compared with relative
+    errors) or "falsifier"."""
     load_w = "const scalar_t radial_weight = weights[radial_weight_index];"
     slope = "slope += cheb[k] * __ldg(g + k * WEIGHT_DIM + weight_index);"
     group = "const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;"
@@ -142,6 +143,37 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
 
     by_piece = edge_order(lambda r, pair: pair.double() * 1e3 + r.double())  # within a pair, r orders the pieces
 
+    # The tensor product's per-term arithmetic (OMAT-0 TP backward screen, 4 November 2026). The kernel is generated
+    # from the model's schedule: its 10 paths, 40 outputs and 86 Clebsch-Gordan terms are unrolled with the
+    # coefficients as literals, so a model-specialised backward can only save arithmetic (fewer operations per term,
+    # by factoring) or loads (sh is per edge, yet read once per channel). These variants bound that.
+    dx_term = r"\w+ \+= output_gradient\s*\* radial_weight \* edge_value \* static_cast<scalar_t>\([^)]*\);"
+    dsh_term = (r"edge_gradient\[edge_component_index\] \+=\s*output_gradient \* radial_weight \* input_value"
+                r"\s*\* static_cast<scalar_t>\([^)]*\);")
+    wg_term = r"weight_gradient \+= output_gradient \* input_value\s*\* edge_value \* static_cast<scalar_t>\([^)]*\);"
+    coefficient = r"\s*\* static_cast<scalar_t>\([^)]*\)(?=;)"
+    load_sh = "const scalar_t edge_value = sh[edge_index];"
+
+    def wg_only(s):
+        """Only the weight gradient per term (the input and edge gradients' updates dropped): about 3 of the 7
+        floating-point operations per term remain, as many as any factoring of the three trilinear sums keeps."""
+        return _sub(_sub(s, dx_term, "", 86, regex=True), dsh_term, "", 86, regex=True)
+
+    def no_tp(s):
+        """No per-term arithmetic at all; each output gradient still loaded (into the weight gradient), x and sh die:
+        the outer bound of any rewrite of the tensor product."""
+        s = _sub(_sub(_sub(s, dx_term, "", 86, regex=True), dsh_term, "", 86, regex=True), wg_term, "", 86, regex=True)
+        return _sub(s, r"(const scalar_t output_gradient = [^;]*;)", r"\1 weight_gradient += output_gradient;",
+                    regex=True)
+
+    def sh_hoist(s):
+        """sh's EDGE_DIM values loaded once per edge into registers instead of once per channel and term (exact)."""
+        s = _sub(s, "acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};", """scalar_t shv[EDGE_DIM];
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) shv[c] = sh[edge_base + c];
+    acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};""", 1)
+        return _sub(s, load_sh, "const scalar_t edge_value = shv[edge_component_index];")
+
     def gslab(s):
         """w and its slope from one slab of the value table G [groups, TERMS + 1, Q]: w = sum_k T_k(x) G_k and
         w' = sum_k T_k'(x) G_k (T_k' = k U_(k-1)(x) scale), so neither the stored w nor G' is read. A timing bound:
@@ -201,8 +233,50 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                 for (int k = 0; k < GT; ++k) radial_weight += wcheb[k] * gv[k];""")
 
 
+    def rerender(**options):
+        """The plan's kernel rendered again from its schedule with ``options`` (wprime_backward.render)."""
+        def transform(s):
+            from fastmace.kernels.oeq_streaming import wprime_backward as wp
+            return wp.render(kernel.schedule, kernel.scalar, kernel.terms, vector=kernel.vector,
+                             table_w=kernel.table_w, blocks=kernel.blocks, **options)
+        return transform
+
+    def pair():
+        """The channel-pair TABLE_W kernel (wprime_pair): float2 / float4 loads, the factored product."""
+        def transform(s):
+            from fastmace.kernels.oeq_streaming import wprime_pair
+            if not kernel.table_w:
+                raise ValueError("pair needs the TABLE_W kernel")
+            return wprime_pair.render(kernel.schedule, kernel.terms, blocks=kernel.blocks)
+        return transform
+
     return {
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
+        "pair": ("rounding", pair(), ()),
+        "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
+        "pair-maxreg96": ("rounding", pair(), ("--maxrregcount=96",)),
+        "factored": ("rounding", rerender(factored=True), ()),
+        "factored-scaled": ("rounding", rerender(factored=True, scale=True), ()),
+        "factored+unordered": ("rounding", lambda s: unordered(rerender(factored=True)(s)), ()),
+        # Where the factored kernel's time goes (timing bounds on top of it).
+        "FF-one-slab": ("falsifier",
+                        lambda s: _sub(rerender(factored=True)(s), group, "const scalar_t* g = gprime;", 1), ()),
+        "FF-no-atomics": ("falsifier", lambda s: _sub(_after_constants(rerender(factored=True)(s), FAKE_ADD),
+                                                      "atomicAdd(", "fake_add("), ()),
+        "FF-no-table": ("falsifier", lambda s: _sub(rerender(factored=True)(s), "const float2 v = __ldg(gq + k);",
+                                                    "const float2 v = make_float2(t, t * t);"), ()),
+        "FF-no-xload": ("falsifier", lambda s: _sub(rerender(factored=True)(s), r"x\[input_base\s*\+", "sh[edge_base +",
+                                                    regex=True), ()),
+        "FF-no-dout": ("falsifier", lambda s: _sub(rerender(factored=True)(s),
+                                                   r"const scalar_t output_gradient = [^;]*;",
+                                                   "const scalar_t output_gradient = radial_weight;", regex=True), ()),
+        "factored-maxreg80": ("rounding", rerender(factored=True), ("--maxrregcount=80",)),
+        "factored-maxreg72": ("rounding", rerender(factored=True), ("--maxrregcount=72",)),
+        "factored-maxreg64": ("rounding", rerender(factored=True), ("--maxrregcount=64",)),
+        "sh-hoist": ("exact", sh_hoist, ()),
+        "F-tp-no-coef": ("falsifier", lambda s: _sub(s, coefficient, "", 258, regex=True), ()),
+        "F-tp-wg-only": ("falsifier", wg_only, ()),
+        "F-no-tp": ("falsifier", no_tp, ()),
         "B-gslab": ("falsifier", gslab, (), gslab_args),
         "B-gslab-f2": ("falsifier", lambda s: gslab_q(s, 2), (), lambda a: gslab_args(a, True)),
         "base": ("exact", lambda s: s, ()),
@@ -243,12 +317,13 @@ def wprime_launcher(kernel, source, extra):
         nodes, edges = x.shape[0], sh.shape[0]
         blocks = (edges * kernel.cohort + kernel.num_threads - 1) // kernel.num_threads
         p = ctypes.c_void_p
+        douts = list(dout) if isinstance(dout, (list, tuple)) else [dout]  # BLOCK_MESSAGE: one pointer per group
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), weights.data_ptr(), senders.data_ptr(),
-                  receivers.data_ptr(), dout.data_ptr(), dx.data_ptr(), dsh.data_ptr(), r.data_ptr(),
+                  receivers.data_ptr(), *[d.data_ptr() for d in douts], dx.data_ptr(), dsh.data_ptr(), r.data_ptr(),
                   pair.data_ptr(), gprime.data_ptr(), starts.data_ptr(), scales.data_ptr(), bins.data_ptr(),
                   r_lo, bin_scale, r_max, bins.shape[0], starts.shape[0], dr.data_ptr())
-        types = (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p, p, p, p, p, p, ctypes.c_float,
-                 ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p)
+        types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + len(douts))
+                 + (ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p))
         stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
         _check(driver.cuLaunchKernel(function, blocks, 1, 1, kernel.num_threads, 1, 1, kernel.shared_memory, stream,
                                      (values, types), 0))
@@ -430,7 +505,8 @@ def capture(args):
             capturing = torch.cuda.is_current_stream_capturing()
             seen.append((name, edges, capturing))
             if not capturing and edges > (captured[name][1][edge_arg[name]].shape[0] if name in captured else -1):
-                captured[name] = (self, [t.clone() if isinstance(t, torch.Tensor) else t for t in a])
+                captured[name] = (self, [t.clone() if isinstance(t, torch.Tensor)
+                                         else [u.clone() for u in t] if isinstance(t, list) else t for t in a])
             return original(self, *a)
         return call
 
@@ -516,7 +592,8 @@ def compare(name, base, other):
             result[key] = f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}"
         else:
             same = bool(torch.equal(a, b))
-            result[key] = "bitwise" if same else f"max|d| = {float((a - b).abs().max()):.3e}"
+            scale = float(a.abs().max()) or 1.0
+            result[key] = "bitwise" if same else f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}"
     return result
 
 
@@ -560,7 +637,7 @@ def main(argv=None):
         if name == "wprime":
             gprime, starts = cargs[10], cargs[11]
             species = round((gprime.shape[0] // starts.shape[0]) ** 0.5)
-            table, launcher = wprime_variants(species), wprime_launcher
+            table, launcher = wprime_variants(species, kernel), wprime_launcher
             shapes = dict(edges=cargs[1].shape[0], gprime=list(gprime.shape),
                           gprime_MB=gprime.numel() * gprime.element_size() / 2**20, species=species,
                           pieces=starts.shape[0], threads=kernel.num_threads, cohort=kernel.cohort)
@@ -595,7 +672,7 @@ def main(argv=None):
                 reset(name, b["args"])
                 b["launch"](b["args"])
             torch.cuda.synchronize()
-            if variant != "base" and b["kind"] == "exact" and "launch" in built["base"]:
+            if variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
         times = {v: [] for v in live}
         for _ in range(args.rounds):  # round-robin

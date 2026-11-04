@@ -170,6 +170,29 @@ def test_render_both_layouts():
         wp.render(_schedule(), "double", 17, vector=2)
 
 
+def test_render_factored():
+    """FACTORED: per path the u/v sums, then one weight-gradient, input- and edge-gradient update per component."""
+    for layout in ("ir_mul", "mul_ir"):
+        for table_w in (False, True):
+            plain = wp.render(_schedule(layout, edge_mul=2), "float", 6, vector=2, table_w=table_w)
+            source = wp.render(_schedule(layout, edge_mul=2), "float", 6, vector=2, table_w=table_w, factored=True)
+            assert "FACTORED" not in plain and "u_0 += scaled * edge_value;" not in plain
+            assert "u_0 += scaled * edge_value;" in source and "v_0 += scaled * input_value;" in source
+            assert "weight_gradient += output_gradient * input_value" not in source
+            assert "+= scaled_weight * u_0;" in source
+            flat = " ".join(source.split())
+            assert "edge_gradient[0] += scaled_weight * v_0;" in flat  # edge channel 0
+            assert "edge_gradient[1] += scaled_weight * v_0;" in flat  # edge channel 1
+    paths = wp.factored_paths(_schedule())
+    assert len(paths) == 2 and all(p["inputs"] and p["edges"] for p in paths)
+    assert all(p["alpha"] == 1.0 for p in paths)
+    # FACTORED_SCALE: a path's common coefficient magnitude applied once per path.
+    scaled = wp.factored_paths(_schedule(), scale=True)
+    assert any(p["alpha"] != 1.0 for p in scaled)
+    source = wp.render(_schedule(), "float", 6, vector=2, table_w=True, factored=True, scale=True)
+    assert "const scalar_t scaled_weight = radial_weight * alpha;" in source and "weight_gradient *= alpha;" in source
+
+
 def test_generated_source_compiles_with_nvrtc():
     from fastmace.kernels import nvrtc_available
     if not nvrtc_available():
@@ -180,6 +203,8 @@ def test_generated_source_compiles_with_nvrtc():
         for capability in ((12, 0), (8, 9), (8, 0)):
             assert compile_cubin(wp.render(_schedule(layout), "float", 10), capability)
             assert compile_cubin(wp.render(_schedule(layout), "float", 7, vector=2), capability)
+            assert compile_cubin(wp.render(_schedule(layout), "float", 7, vector=2, table_w=True, factored=True),
+                                 capability)
 
 
 def test_record_and_requirements():

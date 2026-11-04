@@ -76,6 +76,18 @@ BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 A
 # BLOCK_LDG_GPUS (decision 66); True / False: an A/B side's choice on every GPU.
 BLOCK_LDG = None
 BLOCK_LDG_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# The tensor product's backward factored per path (OMAT-0 TP backward screen, 4 November 2026). False: per
+# Clebsch-Gordan term the vendored three updates (weight, input and edge gradient; about 7 floating-point operations).
+# True: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i (3 operations per term), then the weight gradient
+# sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j. Rounding (the same sums regrouped); every wprime kernel built while
+# it is set. A module constant for the A/B: OMAT-0 medium, Benchmark_loup MD step b/a in both orders, RTX 4000 Ada
+# 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940 (wprime kernel 0.90 / 0.73; docs/validation/omat0-tp-backward.md).
+FACTORED = False
+# With FACTORED: each path's most common coefficient magnitude applied once per path (to w and the weight gradient);
+# its terms carry only the sign, the others the ratio |c| / alpha (OMAT-0 medium: 50 of 86 terms without a multiply).
+# Rounding. Rejected (A100-SXM4-80GB: kernel 0.830 against FACTORED's 0.722, MD step 1.025 / 1.024 against FACTORED);
+# kept for the record. A module constant for the A/B.
+FACTORED_SCALE = False
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -198,6 +210,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         {%- endfor %}
 
         {% for path in schedule.paths %}
+            {%- set path_index = loop.index0 %}
             {% for edge_channel in range(path.edge_mul) %} {
                 const int weight_index =
                     {{ path.weight_start + edge_channel * schedule.channels }} + channel;
@@ -226,6 +239,16 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                                                   else "weights[radial_weight_index]" }};
                 {%- endif %}
                 acc_t weight_gradient = acc_t(0);
+                {%- if factored %}
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                {%- for i in factored[path_index].inputs %}
+                acc_t u_{{ i }} = acc_t(0);
+                {%- endfor %}
+                {%- for j in factored[path_index].edges %}
+                acc_t v_{{ j }} = acc_t(0);
+                {%- endfor %}
+                {%- endif %}
 
                 {% for output in path.outputs %} {
                     {%- set slot = output.accumulator %}
@@ -244,6 +267,27 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     const scalar_t output_gradient = dout[output_index];
                     {%- endif %}
 
+                    {%- if factored %}
+                    {%- for term in output.terms %} {
+                        const scalar_t input_value =
+                            x[input_base
+                              + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }}];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + {{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];
+                        {%- set fp = factored[path_index] %}
+                        {%- set ratio = term.coefficient / fp.alpha %}
+                        {%- set op = "-=" if fp.alpha != 1.0 and ratio < 0 else "+=" %}
+                        {%- set ratio = ratio | abs if fp.alpha != 1.0 else ratio %}
+                        {%- if (ratio - 1.0) | abs < 1e-12 %}
+                        const scalar_t scaled = output_gradient;
+                        {%- else %}
+                        const scalar_t scaled = output_gradient * {{ cpp_scalar_literal(ratio, scalar) }};
+                        {%- endif %}
+                        u_{{ term.input_component }} {{ op }} scaled * edge_value;
+                        v_{{ term.edge_component }} {{ op }} scaled * input_value;
+                    } {%- endfor %}
+                    {%- else %}
                     {% for term in output.terms %} {
                         const int64_t input_index = input_base
                             + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }};
@@ -263,7 +307,30 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                             output_gradient * radial_weight * input_value
                             * {{ cpp_scalar_literal(term.coefficient, scalar) }};
                     } {%- endfor %}
+                    {%- endif %}
                 } {%- endfor %}
+                {%- if factored %}
+                {%- set alpha = factored[path_index].alpha %}
+                {%- if alpha != 1.0 %}
+                // The path's common coefficient magnitude, applied once (FACTORED_SCALE).
+                const scalar_t alpha = {{ cpp_scalar_literal(alpha, scalar) }};
+                const scalar_t scaled_weight = radial_weight * alpha;
+                {%- else %}
+                const scalar_t scaled_weight = radial_weight;
+                {%- endif %}
+                {%- for i, slot in factored[path_index].inputs.items() %}
+                weight_gradient +=
+                    x[input_base + {{ node_offset(path.input_start, i, path.input_irrep_dim) }}] * u_{{ i }};
+                {{ slot }} += scaled_weight * u_{{ i }};
+                {%- endfor %}
+                {%- if alpha != 1.0 %}
+                weight_gradient *= alpha;
+                {%- endif %}
+                {%- for j in factored[path_index].edges %}
+                edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] +=
+                    scaled_weight * v_{{ j }};
+                {%- endfor %}
+                {%- endif %}
                 if (sloped) {
                     acc_t slope = acc_t(0);
                     {%- if table_w %}
@@ -318,13 +385,37 @@ def padded_terms(terms, vector):
     return -(-int(terms) // vector) * vector if vector else int(terms)
 
 
-def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False):
+def factored_paths(schedule, scale=False):
+    """Per path of ``schedule`` (``FACTORED``): ``inputs`` {input component: its input-gradient accumulator},
+    ``edges`` (the edge components), in first-use order, and ``alpha``: with ``scale`` (``FACTORED_SCALE``) the
+    path's most common coefficient magnitude (ties: the largest), which the kernel applies once per path (its terms
+    then carry the sign and the ratio |c| / alpha, 1 for most), else 1."""
+    result = []
+    for path in schedule.paths:
+        inputs, edges, magnitudes = {}, {}, {}
+        for output in path.outputs:
+            for term in output.terms:
+                inputs.setdefault(term.input_component, term.input_accumulator.name)
+                edges.setdefault(term.edge_component, None)
+                key = round(abs(float(term.coefficient)), 12)
+                magnitudes[key] = magnitudes.get(key, 0) + 1
+        alpha = 1.0
+        if scale and magnitudes:
+            alpha = max(magnitudes, key=lambda m: (magnitudes[m], m))
+            alpha = 1.0 if abs(alpha - 1.0) < 1e-12 else alpha
+        result.append(dict(inputs=inputs, edges=tuple(edges), alpha=float(alpha)))
+    return result
+
+
+def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
+           factored=False, scale=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
     ``table_w`` (``TABLE_W``): the table is the q-major value table (``value_table``, ``terms`` = D + 1), from which
     the kernel evaluates w and its slope; the stored weights are not read (needs ``vector``). ``blocks``
-    (``fused_forward.block_map``'s input; ir_mul): the message gradient read per group, one pointer each."""
+    (``fused_forward.block_map``'s input; ir_mul): the message gradient read per group, one pointer each.
+    ``factored`` (``FACTORED``): each path's three trilinear sums regrouped (rounding)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -345,7 +436,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             slope_vector=vector, vector_type=f"float{vector}",
                                             padded_terms=padded_terms(terms, vector), table_w=bool(table_w),
                                             blocks=None if blocks is None else block_map(blocks, schedule.channels),
-                                            n_blocks=0 if blocks is None else len(blocks), block_ldg=block_ldg)
+                                            n_blocks=0 if blocks is None else len(blocks), block_ldg=block_ldg,
+                                            factored=factored_paths(schedule, scale) if factored else None)
 
 
 def derivative_table(dcoef, weight, vector=0):
@@ -422,7 +514,7 @@ class WPrimeBackward:
     (``StreamingKernels``) and a derivative table of ``terms`` terms (``vector``: its q-major layout's load width,
     ``SLOPE_VECTOR``)."""
 
-    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None):
+    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -434,8 +526,11 @@ class WPrimeBackward:
         self.output_dim, self.channels = kernels.output_dim, kernels.schedule.channels
         self.table_w = bool(table_w)
         self.blocks = blocks
+        self.schedule = kernels.schedule
+        self.factored = FACTORED if factored is None else bool(factored)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
-                             blocks=blocks, block_ldg=block_ldg_default(device))
+                             blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
+                             scale=self.factored and FACTORED_SCALE)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -820,9 +915,10 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime",
-           "WPrimeBackward", "block_ldg_default", "block_message_default", "block_spec", "dense_message",
-           "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
+__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_SCALE",
+           "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default", "block_message_default",
+           "block_spec", "dense_message", "density_backward", "density_column", "derivative_table", "factored_paths",
+           "padded_terms", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
            "wprime_reference"]

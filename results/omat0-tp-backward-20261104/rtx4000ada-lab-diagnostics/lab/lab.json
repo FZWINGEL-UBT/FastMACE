@@ -1,0 +1,109 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-04T16:03:09.789859+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "6852e1883dab0c442652889f9258a094b786b3d0",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 38.84477700898424,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          5616,
+          1280,
+          6
+        ],
+        "gprime_MB": 164.53125,
+        "species": 3,
+        "pieces": 624,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 6768.991947174072,
+          "min_us": 6707.2319984436035,
+          "max_us": 6818.016052246094,
+          "ratio": 1.0
+        },
+        "factored": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 2.94e-07",
+            "dx": "max|d|/max|a| = 2.65e-07"
+          },
+          "median_us": 6117.37585067749,
+          "min_us": 6050.816059112549,
+          "max_us": 6172.671794891357,
+          "ratio": 0.9037351349238021
+        },
+        "FF-one-slab": {
+          "kind": "falsifier",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 5084.159851074219,
+          "min_us": 5015.423774719238,
+          "max_us": 5195.456027984619,
+          "ratio": 0.751095567959238
+        },
+        "FF-no-atomics": {
+          "kind": "falsifier",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 6098.944187164307,
+          "min_us": 6064.1279220581055,
+          "max_us": 6174.71981048584,
+          "ratio": 0.9010121794738583
+        },
+        "FF-no-table": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 4051.9680976867676,
+          "min_us": 4028.416156768799,
+          "max_us": 4187.136173248291,
+          "ratio": 0.5986073154331921
+        },
+        "FF-no-xload": {
+          "kind": "falsifier",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 5947.487831115723,
+          "min_us": 5874.911785125732,
+          "max_us": 6205.440044403076,
+          "ratio": 0.8786371556548664
+        },
+        "FF-no-dout": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 4513.792037963867,
+          "min_us": 4472.576141357422,
+          "max_us": 4710.400104522705,
+          "ratio": 0.6668337136740562
+        }
+      }
+    }
+  },
+  "constants": {}
+}
