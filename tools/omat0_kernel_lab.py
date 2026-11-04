@@ -64,8 +64,9 @@ def _after_constants(source, text):
 
 
 # ---------------------------------------------------------------------------------------------------------- wprime
-def wprime_variants(species):
-    """name -> (kind, source transform, extra NVRTC options); kind "exact" or "falsifier"."""
+def wprime_variants(species, kernel=None):
+    """name -> (kind, source transform, extra NVRTC options); kind "exact", "rounding" (compared with relative
+    errors) or "falsifier"."""
     load_w = "const scalar_t radial_weight = weights[radial_weight_index];"
     slope = "slope += cheb[k] * __ldg(g + k * WEIGHT_DIM + weight_index);"
     group = "const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;"
@@ -232,8 +233,17 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                 for (int k = 0; k < GT; ++k) radial_weight += wcheb[k] * gv[k];""")
 
 
+    def rerender(**options):
+        """The plan's kernel rendered again from its schedule with ``options`` (wprime_backward.render)."""
+        def transform(s):
+            from fastmace.kernels.oeq_streaming import wprime_backward as wp
+            return wp.render(kernel.schedule, kernel.scalar, kernel.terms, vector=kernel.vector,
+                             table_w=kernel.table_w, blocks=kernel.blocks, **options)
+        return transform
+
     return {
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
+        "factored": ("rounding", rerender(factored=True), ()),
         "sh-hoist": ("exact", sh_hoist, ()),
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, coefficient, "", 258, regex=True), ()),
         "F-tp-wg-only": ("falsifier", wg_only, ()),
@@ -553,7 +563,8 @@ def compare(name, base, other):
             result[key] = f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}"
         else:
             same = bool(torch.equal(a, b))
-            result[key] = "bitwise" if same else f"max|d| = {float((a - b).abs().max()):.3e}"
+            scale = float(a.abs().max()) or 1.0
+            result[key] = "bitwise" if same else f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}"
     return result
 
 
@@ -597,7 +608,7 @@ def main(argv=None):
         if name == "wprime":
             gprime, starts = cargs[10], cargs[11]
             species = round((gprime.shape[0] // starts.shape[0]) ** 0.5)
-            table, launcher = wprime_variants(species), wprime_launcher
+            table, launcher = wprime_variants(species, kernel), wprime_launcher
             shapes = dict(edges=cargs[1].shape[0], gprime=list(gprime.shape),
                           gprime_MB=gprime.numel() * gprime.element_size() / 2**20, species=species,
                           pieces=starts.shape[0], threads=kernel.num_threads, cohort=kernel.cohort)
@@ -632,7 +643,7 @@ def main(argv=None):
                 reset(name, b["args"])
                 b["launch"](b["args"])
             torch.cuda.synchronize()
-            if variant != "base" and b["kind"] == "exact" and "launch" in built["base"]:
+            if variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
         times = {v: [] for v in live}
         for _ in range(args.rounds):  # round-robin
