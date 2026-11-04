@@ -820,8 +820,8 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
-           "block_message_default", "block_spec", "dense_message",
+__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime",
+           "WPrimeBackward", "block_ldg_default", "block_message_default", "block_spec", "dense_message",
            "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
