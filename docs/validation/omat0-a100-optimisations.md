@@ -1,150 +1,213 @@
-# What makes the OMAT-0 A100 profile fast, and where each idea came from (4 November 2026)
+# How FastMACE runs OMAT-0 on the A100, and where each part came from (4 November 2026)
 
-**Scope.** Every optimisation active in the fastest recorded OMAT-0 run:
-- **Run:** `results/omat0-a100-profile-20261103/` (source `3501a499`, result commit `57b4f31e`).
-- **Setup:** MACE-OMAT-0 medium, SrTiO3 10×10×10 (5,000 atoms), float32, hybrid cuEq/OEq backend, Modal
-  A100-SXM4-80GB.
-- **Protocol:** Benchmark_loup (`tools/bench/loup_md.py`: from rest, skin 0.5 Å, 1 fs, 5 warm-up and 20 timed steps,
-  3 fresh processes).
+**The run described.** Everything below describes the fastest OMAT-0 run we have recorded:
+- **Record:** `results/omat0-a100-profile-20261103/` (source `3501a499`, result commit `57b4f31e`).
+- **Model and system:** MACE-OMAT-0 medium on a Modal A100-SXM4-80GB, Benchmark_loup's SrTiO3 10×10×10 (5,000 atoms),
+  float32.
+- **Protocol:** skin 0.5 Å, 1 fs (`tools/bench/loup_md.py`).
+- **Speed:** 3.64 µs/atom/step in NVE and 3.59 µs/atom/step in Langevin (`loup/*.json`). On the A100 PCIe card,
+  Symmetrix-XL ran the same benchmark at 5.00 µs/atom/step ([loup-a100.md](loup-a100.md):7). That number is from
+  another card and is context, not an A/B.
 
-**Result:**
-- **NVE:** 3.64 µs/atom/step (3.641–3.645).
-- **Langevin:** 3.59 µs/atom/step (3.576–3.606) (`loup/*.json`).
-- **Force graph:** 18.43 of the 18.50 ms step (`breakdown/summary.json`).
+**Where each part came from.** Every part in §3 carries one of four verdicts:
 
-For comparison, the same benchmark on the A100 80GB PCIe before 3 November gave:
-- FastMACE: 5.35 / 5.29 µs/atom/step;
-- Symmetrix-XL under LAMMPS: 5.00 ([loup-a100.md:7](loup-a100.md)).
-
-Those numbers are from a different card and commit. They are context, not an A/B.
-
-**How to read the citations.**
-- `path:line` is a FastMACE path from the repository root.
-- `RM:LT/path:line` is `Experiments/Langevin_Thermostat/path` in ResearchModule. It was read at ResearchModule main
-  `d56b5550` (29 October 2026); the research-engine code itself is frozen at tag `research-engine-baseline-20261017`.
-- Every quote was checked against its line.
-
-**Origin classes.**
-
-| Class | Meaning |
+| Verdict | Meaning |
 | --- | --- |
-| **RE** | Own idea of a research-engine session (ResearchModule, 7–16 October 2026), carried into FastMACE in phase 1a |
-| **FM** | Own idea of a FastMACE session (from 17 October 2026) |
-| **SXL** | Taken from Symmetrix-XL ([bonan-group/symmetrix-xl](https://github.com/bonan-group/symmetrix-xl), arXiv 2610.01036), as the source document says |
-| **UP** | Upstream code or a paper: MACE, OpenEquivariance, CUTLASS, PyTorch |
-| **EXT** | An external research report, review or proposal given to us by the owner |
-| **OWNER** | The owner asked for this specific thing |
+| **COPIED** | External code that we use or vendored. The source is named. |
+| **EXTERNAL IDEA** | The idea came from outside (a project, paper, report or review); we wrote the code. |
+| **OWN** | The records show that we came up with it, from our own profile, op map or derivation. |
+| **UNCLEAR** | No record says where the idea came from. These are listed for investigation in §4. |
 
-Several entries have more than one class; the table gives the chain.
+**How to read the citations:**
+- `path:line` is a file in this repository.
+- `RM:LT/path:line` is `Experiments/Langevin_Thermostat/path` in ResearchModule, read at main `d56b5550`.
+- "RE" is the research engine in ResearchModule, from 7 to 16 October 2026. FastMACE was extracted from it.
 
-## 1. Where the force call's time goes now
+## 1. How standard MACE runs MD
 
-From the kernels of one force call, 18.47 ms (`breakdown/ops.csv`, `breakdown/categories.csv`):
+**The MD loop.** ASE drives the loop and calls `MACECalculator` once per step. The CPU and the GPU take turns, and
+every step crosses PCIe twice:
 
-| Kernel | ms | Share | Optimisation |
-| --- | ---: | ---: | --- |
-| `oeq_projected_backward_wprime` (+ 0.22 ms Inductor epilogue) | 6.92 | 37 % | §2.4 `wprime_backward` |
-| `fused_folded_forward` | 5.06 | 27 % | §2.3 `fused_folded_forward` |
-| CUTLASS `fm_tf32x3_*_64x64`, 44 launches | 1.85 | 10 % | §3.6 `tf32x3_gemms` |
-| Atom-level elementwise (79 kernels) | 1.52 | 8 % | Inductor fusion (§4.6) |
-| Radial tables, forward + backward | 0.97 | 5 % | §2.1 `radial_tables` |
-| Reassociated first interaction (`edge_outer_sum_*`) | 0.75 | 4 % | §3.3 |
-| cuEq symmetric contraction | 0.41 | 2 % | §3.1 (hybrid backend) |
-| Remaining atom GEMMs on cuBLAS IEEE | 0.06 | 0.3 % | below §3.6's shape rule |
+```mermaid
+flowchart LR
+  subgraph CPU["CPU (ASE, NumPy)"]
+    I1["integrator: half kick, drift"] --> NL["neighbour list<br/>(matscipy, every step)"]
+    NL --> BATCH["build graph batch"]
+    I2["integrator: half kick"]
+  end
+  subgraph GPU["GPU (PyTorch, eager)"]
+    FWD["model forward<br/>(energy)"] --> BWD["autograd backward<br/>(forces = −dE/dr)"]
+  end
+  BATCH -- "copy positions, edges" --> FWD
+  BWD -- "copy forces" --> I2
+  I2 --> I1
+```
 
-**Outside the force graph:**
-- **Cost:** noise, the integrator stage, neighbour rebuilds and the host together take about 0.07 ms per step (wall
-  18.50 against the B replay's 18.43 ms; `breakdown/summary.json`).
-- **Gaps:** the 178 kernels of the force graph leave 5.7 µs of gaps in total.
+**One force call** of a two-interaction model like OMAT-0 medium. Every arrow is one or more separate PyTorch kernels,
+and every edge tensor is written to and read back from device memory. The backward then retraces the whole graph
+through autograd:
 
-## 2. Radial path and convolution weights
+```mermaid
+flowchart TB
+  R["positions, cell, species"] --> E["edge vectors r_ij, lengths r"]
+  E --> Y["spherical harmonics Y(r̂)"]
+  E --> RB["radial basis: Bessel(r) × cutoff,<br/>Agnesi transform (species pair)"]
+  RB --> MLP1["radial MLP 1 → per-edge weights w₁ [E × W]"]
+  RB --> MLP2["radial MLP 2 → per-edge weights w₂ [E × W]"]
+  S["species one-hot (89)"] --> H0["node embedding"]
+  subgraph INT1["Interaction 1"]
+    U1["linear_up"] --> C1["conv_tp: gather sender features,<br/>tensor product with Y and w₁, scatter-sum to receivers"]
+    C1 --> D1["÷ edge density, linear, skip_tp (89-species one-hot)"]
+    D1 --> P1["symmetric contraction (ν ≤ 3), linear"]
+  end
+  H0 --> U1
+  MLP1 --> C1
+  subgraph INT2["Interaction 2"]
+    U2["linear_up"] --> C2["conv_tp with Y and w₂"]
+    C2 --> D2["÷ density, linear, skip_tp"] --> P2["symmetric contraction, linear"]
+  end
+  P1 --> U2
+  MLP2 --> C2
+  P1 --> RO1["readout 1"]
+  P2 --> RO2["readout 2 (MLP)"]
+  RO1 --> EN["site energies → total energy"]
+  RO2 --> EN
+  EN -. "autograd backward through everything above" .-> F["forces"]
+```
 
-**OMAT-0 is a generic-family model.** Its density interaction blocks are not MH-1's class, so MH-1's `factor_species`,
-`fold_cutoff`, `joint_radial_input`, `density_first` and `folded_backward_tiles` are off (plan off reasons,
-`breakdown/summary.json`). Instead, the generic records below do the same job.
+## 2. How FastMACE runs MD
 
-| # | Optimisation (record) | What it does | Exactness | Origin, with evidence | Adopted, with evidence | ms here |
-| --- | --- | --- | --- | --- | --- | ---: |
-| 2.1 | `radial_tables` (generic record `generic_radial_tables`) | Per interaction and ordered species pair: piecewise Chebyshev tables, fitted in float64 at setup, replace the whole chain r → `[h c, c, density]` (Bessel basis, Agnesi transform, MLP, cutoff). One Triton op with a recomputing backward. | certified (decision 61): table error ≤ the float32 network's | **EXT → OWNER → FM.** The MH-1 tables: "The idea (owner, 27 October 2026, from an external proposal)" (`docs/validation/opt6-T04.md:21`; `plans/opt-6.md:26`). No document names that proposal. The generic version is an FM finding: "The one worth building: radial tables for OMAT-0-type models" (`docs/validation/tiled-omat.md:164`). **Not from SXL:** Symmetrix-XL uses "cubic Hermite splines (256 knots)", but the RE set tabulation aside on 14 October as "already measured" (`RM:LT/studies/symmetrix_xl/README.md:20`, `:26-28`). | MH-1: decision 62, 27 October. Generic on the A100s: owner "Yes go ahead", 3 November (`SPEC.md:3310`). Step b/a 0.902 / 0.901 (A100 PCIe, SrTiO3) and 0.917 / 0.917 (A100-SXM4, NaCl) (`docs/validation/loup-a100.md:46`, `:52`). | 0.97 |
-| 2.2 | `fused_folded_backward` (generic `generic_fused_radial_backward`) | Triton input gradient of the last radial layer: the 64 columns and the bias column's row sum in one pass. | rounding | **RE**, third round, 14 October (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:43`). Generic version on user request, 15 October (`RM:LT/studies/other_models/README.md:269`). | RE 14 October (MH-1 −0.6 to −1.4 %, `…/2026-10-14-third-round.md:61`); generic −3 to −5 % (`docs/optimisation-ledger.md:302`) | **0**: on only as a prerequisite of 2.1; interaction 2 takes the w′ path, interaction 1 is reassociated |
-| 2.3 | `fused_folded_forward` (generic `generic_fused_folded_forward`) | Generated from the streaming schedule, an NVRTC kernel computes `w = [h c, c] @ [W, b]ᵀ` per edge tile inside the receiver-streaming convolution forward. It stores `w [E, 1280]` for the backward. | exact | **SXL → FM → OWNER.** The streamed-edges idea is "Origin: the one idea from Symmetrix-XL" (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES.md:7`). FM re-proposed it as "Fuse the radial network's last layer into the streaming convolution" (`docs/design/opt-T09-step-breakdown.md:183`). The rejected OPT2-T01 build is at `docs/optimisation-ledger.md:1726`. Round 8 is an "Owner request, 27 October 2026" (`plans/opt-8.md:3`); the variant that stores `w` was an "Owner follow-up" (`plans/opt-8.md:34`). Sobek's reassociation (arXiv 2607.18074) was considered there and not used (`plans/opt-8.md:22-27`). | MH-1: decision 64, 27 October. OMAT-0 on the A100-SXM4: owner, 3 November, **only as a pair with 2.4**. Alone it is 1.289 / 1.287 (slower); the pair is 0.895 / 0.894, and 0.885 / 0.885 with tf32x3 on in both sides (`docs/validation/generic-wprime.md:58`, `:71`; "never the fused forward alone", `:13`). | 5.06 |
-| 2.4 | `wprime_backward` (generic `generic_wprime_backward`) | Within a table piece, `w(r) = Σ_t T_t(x) G_t` with `G = C Wᵀ`, so the streaming backward forms `dr = Σ_c dw_c · w′_c(r)` from derivative tables `G′ = C′ Wᵀ`: 10 × 1280 FMAs per edge instead of 65 × 1280. No `dw` store, no folded input gradient. | rounding | **FM → OWNER.** The idea was first written down as float64 idea D2 in the FM ideas round (`plans/ideas-20261027.md:57`, "`dr = Σ_c dw_c · w'_c(r)`"). The float32, backward-only form: "Owner request, 28 October 2026" (`plans/opt-9.md:3`). Its A100 ceiling triggered decision 66, which allows per-GPU defaults (`SPEC.md:2775`). | MH-1: decision 66, 29 October (A100 NaNbO3 0.815 / 0.812, `docs/validation/opt9-T03.md:28`). OMAT-0: owner "Yes, build it", then default on the A100-SXM4 on 3 November (`docs/validation/generic-wprime.md:3-6`). | 6.92 + 0.22 |
-| 2.5 | `chunked_conv_backward` (generic `generic_chunked_conv_backward`) | MH-1 design: the convolution backward runs in L2-sized edge chunks, so `[E, 1280]` `dw` is never formed. | rounding (generic) | **SXL → OWNER → FM.** Step 1 of the Symmetrix-XL streamed-edges plan ("L2-resident edge chunks", `RM:LT/studies/symmetrix_xl/STREAMED_EDGES.md:97-102`). FM round 6: "Owner request, 26 October 2026: … try the L2-chunk idea first" (`plans/opt-6.md:3`). | **On here only as the carrier of 2.4**: "on as the carrier of wprime_backward, whose backward never chunks" (`fastmace/planner/fixed.py:1218`). Chunking itself is slower on the A100 (1.12 with the tables, `docs/validation/loup-a100.md:45`). | **0** (no chunked kernel runs) |
+**The MD loop.** The whole step stays on the GPU. Each step replays two captured CUDA graphs:
+- **ACP:** half kick, drift, skin check, and compaction of the edge list to the cutoff.
+- **B:** forces and the second half kick.
 
-## 3. Convolution, interactions, linear layers and GEMM precision
+The host only launches and reads flags. A neighbour-list rebuild, when the skin check asks for one, runs on a side
+stream beside B. Everything outside the force graph costs about 0.07 ms of the 18.50 ms step
+(`breakdown/summary.json`).
 
-| # | Optimisation | What it does | Exactness | Origin, with evidence | Adopted, with evidence | ms here |
-| --- | --- | --- | --- | --- | --- | ---: |
-| 3.1 | Hybrid backend, float32, TF32 off | OpenEquivariance's fused convolution replaces cuEq's gather, product and scatter; cuEq keeps the symmetric contraction and the linears. | backend | **UP (MACE 0.3.16) → RE.** "MACE 0.3.16 can run a model with two accelerated backends at once" (`RM:LT/studies/remaining_optimizations/proposal.md:96`). | User production decision, 9 October 2026 (`RM:LT/docs/status.md:7`); NaCl 9.668 → 7.075 ms, −26.8 % (`RM:LT/studies/hybrid_oeq/rtx5060ti.md:191`). | frame for all kernels |
-| 3.2 | `streaming_conv` (generic `generic_streaming`) and the `ir_mul` layout | Receiver-streaming UVU convolution, NVRTC: the forward has one writer per receiver and no atomics. `ir_mul` removes the transposes around it. | exact (summation order; atomics) | **SXL + UP + OWNER, then RE changes.** The streamed-edges idea is from Symmetrix-XL (`…/symmetrix_xl/STREAMED_EDGES.md:7`). The kernels are vendored from OpenEquivariance PR 223 "by Paul Fuchs", which adapts Sobek (arXiv 2607.18074) (`fastmace/kernels/oeq_streaming/NOTICE.md:3-8`). The owner pointed at the PR: "User pointer, 14 October 2026" (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES_RESULTS.md:121`). `ir_mul` is our own change (`NOTICE.md:12-15`). No document says the PR was written for this project. | RE default 14 October (`…/STREAMED_EDGES_RESULTS.md:159`). Generic: user decision, 15 October (`RM:LT/studies/other_models/README.md:242`), omat0-medium −16.0 / −23.9 / −18.6 % (`:219`). | runs inside 2.3 and 2.4 |
-| 3.3 | `reassociate_first` (generic `generic_reassociate`) and `segmented_first_sum` | Interaction 1 is summed per (receiver, sender species) before its last radial layer, then projected with node GEMMs. This removes the first convolution and its per-edge weights. The sums run as a run-segmented Triton kernel, one atomic per run. | rounding / exact | **EXT → RE.** The first comes from an external research report answering the RE's 10 October prompt: "move the first interaction's final radial projection after a receiver-and-species aggregation" (`ResearchModule:GPT_6_PRO_RESEARCH_2.txt:1`), assessed in `RM:LT/studies/research_prompts/2026-10-10-hybrid-default-further-optimization-assessment.md:55`. The segmented sum is RE's own third-round candidate (`…/2026-10-14-third-round.md:45`). | User, 10 October ("items 6 and 7", `RM:LT/studies/further_optimizations/README.md:199`): NaCl 4.9 %, NaNbO3 7.2 %, NbCl5 4.9 % (`:55`). Generic: user, 15 October (`…/other_models/README.md:242`). | 0.75 |
-| 3.4 | `sort_receivers` | Edges sorted by receiver at each rebuild; streaming (3.2) and the segmented sum (3.3) require it. | exact (permutation) | **RE**, proposal of 8 October: "If the neighbour list were sorted by receiver at each rebuild" (`RM:LT/studies/remaining_optimizations/proposal.md:250`). | RE hybrid default, 10 October; NaNbO3 3.3 %, NbCl5 4.9 % (`RM:LT/studies/further_optimizations/README.md:24`). | in the rebuild |
-| 3.5 | `block_linear`, `grouped_linear` | cuEq `Linear` becomes per-irrep GEMMs with extracted weights; same-irrep input segments share one product. | rounding | `block_linear`: **RE**, from an op map showing cuEq's linears "using slower kernels" (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:100`). `grouped_linear`: **OWNER → RE** ("User request: optimize OMOL-0 further", `RM:LT/studies/other_models/README.md:652`). | `block_linear` 14 October: NaCl −11.8 % (`…/2026-10-14-third-round.md:117`). `grouped_linear`: user, 16 October (`…/other_models/README.md:721`). | GEMMs counted in 3.6 |
-| 3.6 | `tf32x3_gemms` on the CUTLASS sm_80 backend | Atom GEMMs (forward and input gradients) as error-compensated 3×TF32 on tensor cores. Kernel: a prebuilt CUTLASS 4.8.1 cubin (`OpMultiplyAddFastF32`, 64×64×16). Shapes outside the rule (K, N multiples of 4; enough tiles or short K) stay on cuBLAS IEEE. No global TF32. | rounding, deterministic | **EXT + UP → OWNER → FM.** An external research report: "**3×TF32 is worth testing independently of persistence.**" (`docs/design/2026-10-20-megakernel-research.md:152`). The split is "the 3xTF32 split of CUTLASS example 27" (`fastmace/kernels/cutlass/NOTICE.md:6`). An external review of main `b6421afc` led to the 29 October screen (`docs/validation/tc-gemm-screen.md:3-4`). Then: "Owner request: \"build it for a100\"" (`docs/validation/cutlass-tf32x3.md:3`). Earlier the RE found Triton TF32x3 slower on an RTX A4000 (`RM:LT/docs/configuration/workstations.md:262`). | Owner, 3 November, decision 66, A100-SXM4-80GB only. OMAT-0 SrTiO3 0.949 / 0.947 (`docs/validation/cutlass-tf32x3.md:86`); 0.909 / 0.907 against Triton tf32x3 (`:88`). | 1.85 |
-| 3.7 | `species_skip` (generic `generic_species_skip`) | The element-dependent `skip_tp` over all 89 one-hot elements becomes one GEMM per irrep block for the species present. | exact | **OWNER → RE.** "User request: continue the per-architecture campaign" (`RM:LT/studies/other_models/README.md:269`); "about 97% of this multiplies by zero" (`:282`). | User, 15 October (`…/other_models/README.md:346`); omat0-medium NaCl −32.5 %, NaNbO3 −20.0 %, NbCl5 −38.5 % (`:318`). | GEMMs counted in 3.6 |
+```mermaid
+flowchart LR
+  subgraph GPU["GPU only (positions, velocities, forces never leave it)"]
+    ACP["graph ACP<br/>half kick, drift,<br/>skin check, compaction"] --> B["graph B (373,760 padded edges)<br/>force call + second half kick"]
+    B --> ACP
+    ACP -. "skin exceeded: early rebuild" .-> NLR["GPU pair search, receiver sort<br/>(side stream, beside B)"]
+    NLR -.-> ACP
+  end
+  HOST["host: launches graphs,<br/>reads flags one step late"] -.-> ACP
+```
 
-**On in the plan but doing nothing in this run:**
-- **`merged_residual`:** the plan text lists it, but the record stays off for this model ("this record stays off",
-  `results/omat0-a100-profile-20261103/breakdown/summary.json:394`).
-- **`single_graph_strain` (MACE PR 1498 backport, `RM:LT/studies/further_optimizations/2026-10-16-upstream-mace-survey.md:27`):**
-  it acts only where stress is computed, and a fixed-cell run computes none.
-- **`grouped_launch`:** off because "tf32x3_gemms reroutes the block products" (`fastmace/planner/fixed.py:1252-1257`).
+**One force call inside graph B** for OMAT-0 on the A100: 178 kernels and 18.4 ms. The numbers are milliseconds per
+call from `breakdown/ops.csv`:
 
-## 4. MD engine
+```mermaid
+flowchart TB
+  E["edge vectors and lengths r<br/>(receiver-sorted, padded)"] --> TAB["radial tables (§3.3): one Triton kernel per interaction,<br/>r → [h·c, c, density], 0.67 ms for both"]
+  E --> Y["spherical harmonics (MACE's code, compiled by Inductor)"]
+  subgraph INT1["Interaction 1, reassociated (§3.4)"]
+    OS["edge sums per (receiver, sender species),<br/>run-segmented Triton kernel, 0.24 ms"] --> NG1["projection as node GEMMs<br/>(no per-edge tensor product)"]
+    NG1 --> L1["linears, species skip, symmetric contraction"]
+  end
+  subgraph INT2["Interaction 2 (§3.5)"]
+    FF["fused forward: w = [h·c, c]·Wᵀ per edge tile inside<br/>the receiver-streaming convolution, 5.06 ms"] --> L2["linears, species skip, symmetric contraction"]
+  end
+  TAB --> OS
+  Y --> OS
+  TAB --> FF
+  Y --> FF
+  L1 --> FF
+  L2 --> EN["readouts → energy"]
+  L1 --> EN
+  EN -. "backward" .-> WB["w′ backward of interaction 2: dr from derivative tables,<br/>no weight gradient stored (§3.5), 6.92 ms"]
+  EN -. "backward" .-> OB["interaction-1 sum backward (Triton) 0.44 ms,<br/>table backward 0.30 ms, the rest by Inductor"]
+  NOTE["all atom GEMMs in L1, L2 and the backward: CUTLASS 3×TF32 (§3.6), 1.85 ms;<br/>symmetric contractions: cuEquivariance (§3.7), 0.41 ms"]
+```
 
-| # | Optimisation | What it does | Origin, with evidence | Adopted, with evidence | In this run |
-| --- | --- | --- | --- | --- | --- |
-| 4.1 | GPU-resident integrator and MD loop | ASE's Langevin step term for term on GPU tensors, with the same NumPy random stream. | **RE**, 7 October. The motivating line: "The larger potential optimization is reducing repeated Python/kernel dispatch" (`RM:LT/docs/protocol.md:482`). | RE 8 October; NaCl 41.4 → 30.0 ms, together with 4.4 (`docs/optimisation-ledger.md:495`) | on |
-| 4.2 | Own CUDA graphs (ACP stage and force stage B), padded edge counts, 5 % edge buckets | Each step replays captured graphs. B is captured per padded edge count, and padding edges lie beyond the cutoff. Here there is one B size (373,760) and no recapture. | **UP → RE.** PyTorch's `reduce-overhead` mode, cited at `RM:LT/docs/protocol.md:484`, failed ("Every second step was 25–30× slower", `RM:LT/docs/implementation.md:159-161`), so the engine captures its own graphs. Buckets are an RE idea (`docs/optimisation-ledger.md:498`). | RE 7 October; NaCl 30.0 → 16.5 ms: "This was the single largest step" (`RM:LT/studies/optimization_history/report.md:88`) | on |
-| 4.3 | `pipelined` steps | B is launched before the host reads the rebuild flags, and redone if a rebuild was needed. The list is rebuilt early at 0.8 of skin/2. | **RE**, from the measured host gap ("The host gap of section 5 …", `RM:LT/studies/further_optimizations/2026-10-14-third-round.md:229`) | RE 14 October; NaCl −3.0 % (`…/2026-10-14-third-round.md:255`) | on |
-| 4.4 | Skin neighbour list built on the GPU (Triton pair search) | Pairs within cutoff + skin, rebuilt only after a displacement of skin/2, with float64 pair decisions. Each step compacts to the true cutoff. | Skin list: **RE** (standard Verlet list, 7 October). GPU build: **RE**, first raised in the RE's research prompt of 9 October, which names `torch-nl`, `vesin`, `nvalchemi` and Warp (`RM:LT/studies/research_prompts/2026-10-09-hybrid-fp32-optimization-research.md:348-349`). The kernel is our own Triton. | GPU build, RE 14 October: step −1.6 to −4.6 % (`…/2026-10-14-third-round.md:64`) | on; skin 0.5 Å is the benchmark's (`loup-a100.md:5`, the same as Symmetrix-XL's default, `RM:LT/studies/symmetrix_xl/README.md:38`); the library default is 0.3 Å |
-| 4.5 | `overlap_rebuild` | An early rebuild runs on a side stream beside B. | **FM**, OPT2-T04 ("An early rebuild does not …", `docs/validation/opt2-T04.md:21`) | Owner, OPT-DEF-2, 21 October (`docs/optimisation-ledger.md:510`) | on; few or no rebuilds in a 25-step run from rest (inference, not recorded) |
-| 4.6 | torch.compile mode `default` inside the outer graphs | Inductor fuses the elementwise chains; no autotuning. | **RE**, kernel-fusion study, "Idea 1" (`RM:LT/studies/kernel_fusion/report.md:1`) | RE 8 October; coraline NaCl 17.57 → 11.13 ms (`docs/optimisation-ledger.md:532`) | on |
-| 4.7 | `fused_integrator` (Langevin only) | The Langevin ACP stage as four Triton kernels instead of about 45 PyTorch kernels. | **OWNER → FM**: "Go ahead and try all kernel opportunities" (`plans/opt-3.md:4-5`) | Owner, 21 October; NaCl 0.976 (`docs/optimisation-ledger.md:512`) | Langevin on (0.08 ms per step); not in NVE (`fastmace/kernels/triton/fused_integrator.py:211`) |
-| 4.8 | 256-step noise batches | One NumPy draw and one copy per 256 steps, in ASE's order. | **RE**, from a profile where "the GPU waited for the CPU" (`RM:LT/studies/optimization_history/report.md:149`) | RE 7 October; −5 to −8 % (`docs/optimisation-ledger.md:500`) | Langevin only |
-| 4.9 | `unfuse_full_addmm` | Stops torch 2.14's Inductor from fusing mm + full add into `addmm`, which cost two device copies per step. | **RE** diagnosis on coraline (`docs/optimisation-ledger.md:242`) | RE 8 October; local −3.7 % | installed; not measured on OMAT-0 |
-| 4.10 | Software stack: torch 2.14.1, cuEq 0.12.0 | A newer stack. | **RE**: newer torch was needed for Blackwell and was also faster: 12.6 → 10.9 → 10.5 ms (`RM:LT/studies/optimization_history/report.md:116-128`) | User, 8 October (`docs/optimisation-ledger.md:533`) | on |
+**What changed against standard MACE:**
 
-**Memory and setup only, no step-time effect here:**
-- `expandable_segments`, `warmup_in_graph_pool`, `empty_cache_before_capture`, `dynamic_edges` and
-  `model_template_cache` (`docs/optimisation-ledger.md:502-503`, `:537`, `:540`).
-- `async_output`: the benchmark writes no output.
-- `first_derivative_only`: not installed on the hybrid backend (`fastmace/model/compile.py:213`).
-
-## 5. What came from where, in one view
-
-| Source | Optimisations active here |
+| Standard MACE | FastMACE on this run |
 | --- | --- |
-| **Symmetrix-XL** (via the RE's 14 October study) | The streamed-edges idea behind `streaming_conv`, `fused_folded_forward` and the L2-chunk design (3.2, 2.3, 2.5). The skin of 0.5 Å is the benchmark's and matches Symmetrix-XL's default. Not the radial tables (2.1). |
-| **Upstream code and papers** | OEq PR 223 by Paul Fuchs, after Sobek (3.2); CUTLASS 4.8.1, `OpMultiplyAddFastF32` and example 27 (3.6); MACE 0.3.16's hybrid conversion (3.1); PyTorch's CUDA-graph and compile modes (4.2, 4.6) |
-| **External reports, reviews, proposals** | The GPT-6 Pro report: reassociation (3.3). The 20 October external research report: 3×TF32 (3.6). The 29 October external review: the CUTLASS screen (3.6). The 27 October external proposal, author not recorded: radial tables (2.1). The RE research prompt naming GPU neighbour-list libraries (4.4). |
-| **Owner requests** | Generic streaming (3.2), `species_skip` (3.7), `grouped_linear` (3.5), round 6 L2 chunks (2.5), round 8 fused forward (2.3), the float32 w′ backward (2.4), CUTLASS "build it for a100" (3.6), round 3 kernels (4.7); every default by owner decision |
-| **Own work (RE)** | Hybrid adoption, `sort_receivers`, the segmented sum, `block_linear`, `fused_folded_backward`, GPU integrator, own CUDA graphs and buckets, pipelined steps, GPU neighbour list, noise batches, the compile setup, `unfuse_full_addmm` |
-| **Own work (FM)** | The table op and certificate (2.1), the generic carry-overs (2.1–2.4), the fused forward kernel (2.3), the w′ derivation (2.4), the carrier rule (2.5), the CUTLASS integration and shape rule (3.6), `overlap_rebuild` (4.5), `fused_integrator` (4.7) |
+| CPU integrator, one PCIe round trip per step | GPU-resident step in two CUDA graphs |
+| matscipy neighbour list on the CPU every step | skin list on the GPU, rebuilt only when an atom has moved skin/2, beside the force call |
+| Bessel basis + radial MLP per edge, twice | one table lookup per edge and interaction |
+| Interaction 1: per-edge tensor product | sums per receiver and species, then node GEMMs |
+| Interaction 2: `w₂ [E × 1280]` written, then read by the convolution | `w₂` computed inside the convolution's edge tiles |
+| Backward of interaction 2 through `w₂` and the MLP | one kernel using derivative tables |
+| cuEq linears and the 89-species `skip_tp` in FP32 | per-irrep GEMMs for the present species only, on 3×TF32 tensor cores |
+| eager kernels | `torch.compile` (Inductor) inside our own graphs |
 
-## 6. Gaps and contradictions in the records (not fixed here)
+## 3. Each part in detail, and where it came from
 
-1. **`chunked_conv_backward` on the A100.**
-   - `docs/validation/loup-a100.md:100` and `SPEC.md:3310` say it "stays off on the A100".
-   - The planner turns it on there as wprime's carrier (`fastmace/planner/fixed.py:1218`). It runs no kernel, but
-     those two documents do not mention this.
-2. **SPEC has no record of the 3 November OMAT-0 defaults.**
-   - Nothing for `tf32x3_gemms` or CUTLASS on the A100, and nothing for the generic fused forward + wprime pair.
-   - Decision 66's list (`SPEC.md:2775-2808`) stops at the generic chunked backward.
-   - The §1.2 non-goal on TF32 (`SPEC.md:75`) is not amended for 3×TF32.
-   - These are recorded only in [cutlass-tf32x3.md](cutlass-tf32x3.md), [generic-wprime.md](generic-wprime.md) and
-     the commits.
-3. **The optimisation ledger is stale for this profile.**
-   - It has no `wprime_backward` entries.
-   - It shows `tf32x3_gemms` as `never_automatic` and CUTLASS on the A100 as not built
-     (`docs/optimisation-ledger.md:165`, `:414`).
-4. **Missing results directory.** `docs/validation/generic-wprime.md:12` cites `results/a100-chunk-size-20261103`, which
-   is in no branch.
-5. **The radial-table proposal's author is not named** anywhere (`docs/validation/opt6-T04.md:21`).
-6. **Two Symmetrix-XL URLs.**
-   - The RE study names `bonan-group/symmetrix-xl` (`RM:LT/studies/symmetrix_xl/README.md:13`).
-   - `docs/design/2026-10-positioning.md:27` names `amphilagus/symmetrix-xl`.
-7. **The NVE/Langevin gap is not explained by a measurement.**
-   - NVE has neither the fused integrator nor noise batching.
-   - No NVE step breakdown exists. The breakdown in this profile is Langevin, skin 0.3 Å, so its rebuild counts do not
-     describe the 0.5 Å benchmark runs.
+### 3.1 MD loop and CUDA graphs
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| GPU-resident integrator | ASE's Langevin step term for term on GPU tensors, with the same random stream. | **UNCLEAR** | The RE built it on 7 October 2026. No document says where the idea came from. The earliest note is the RE's "The larger potential optimization is reducing repeated Python/kernel dispatch" (`RM:LT/docs/protocol.md:482`). Measured: NaCl 41.4 → 30.0 ms (`docs/optimisation-ledger.md:495`). |
+| Our own CUDA graphs | Each step replays captured graphs. | **EXTERNAL IDEA** (PyTorch CUDA graphs) | The RE read about PyTorch's `reduce-overhead` mode (`RM:LT/docs/protocol.md:484`). That mode failed ("Every second step was 25–30× slower", `RM:LT/docs/implementation.md:160`), so the RE wrote its own capture. Measured: NaCl 30.0 → 16.5 ms, "the single largest step" (`RM:LT/studies/optimization_history/report.md:88`). |
+| Padded edge counts in 5 % buckets | B is captured per padded edge count; padding edges lie beyond the cutoff and add exactly zero. There is one size here and no recapture. | **UNCLEAR** | The RE added it on 7 October 2026 (`docs/optimisation-ledger.md:498`). No source is cited. Padding to fixed shapes for CUDA graphs is common practice, so this may or may not be our own idea. |
+| Pipelined steps | B is launched before the host reads the rebuild flags, and redone when a rebuild was needed. | **OWN** | Derived from our measured host gap: "The host gap of section 5 …" (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:229`). Measured: NaCl −3.0 % (`:255`). |
+| Rebuild on a side stream (`overlap_rebuild`) | An early rebuild runs beside the force graph. | **OWN** | FastMACE OPT2-T04 diagnosis: "An early rebuild does not …" drain the stream (`docs/validation/opt2-T04.md:21`). |
+| Fused integrator (Langevin only) | The Langevin ACP stage as 4 Triton kernels instead of about 45 PyTorch kernels. | **OWN** | FastMACE OPT3-T03, from the owner's "Go ahead and try all kernel opportunities" (`plans/opt-3.md:4-5`). The plan's in-kernel Philox and flags (`plans/opt-3.md:27`) resemble an outside chat's suggestion; that part was not built. |
+| 256-step noise batches | One random draw and one copy per 256 steps. | **OWN** | From the RE's profile, where "the GPU waited for the CPU" (`RM:LT/studies/optimization_history/report.md:149`). |
+| `torch.compile` mode `default` | Inductor fuses the elementwise chains inside our graphs. | **COPIED** (PyTorch Inductor) | Using it there was the RE's kernel-fusion "Idea 1" (`RM:LT/studies/kernel_fusion/report.md:1`). |
+| `unfuse_full_addmm` | Keeps torch 2.14's Inductor from fusing mm + full add into `addmm`, which cost two device copies per step. | **OWN** | The RE's diagnosis on coraline (`docs/optimisation-ledger.md:242`). |
+
+### 3.2 Neighbour list
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| Skin (Verlet) list | Pairs within cutoff + skin, rebuilt after skin/2 of displacement; each step compacts to the cutoff. | **EXTERNAL IDEA** (the standard Verlet list) | Textbook technique: "A Verlet skin list stores every pair closer than `cutoff + skin`" (`RM:LT/docs/implementation.md:108`). The 0.5 Å skin is Benchmark_loup's ([loup-a100.md](loup-a100.md):5), the same as Symmetrix-XL's default (`RM:LT/studies/symmetrix_xl/README.md:38`). |
+| GPU pair search | One Triton kernel screens all sender × receiver tiles, with float64 pair decisions; the same pairs as matscipy. | **EXTERNAL IDEA, OWN CODE** | GPU rebuilds were raised in our own research prompt, with existing libraries as examples: "torch-nl, vesin, nvalchemi or NVIDIA Warp" (`RM:LT/studies/research_prompts/2026-10-09-hybrid-fp32-optimization-research.md:348-349`). The kernel is ours. Measured: step −1.6 to −4.6 % (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:64`). |
+| Receiver-sorted edges | Edges are sorted by receiver at each rebuild. The streaming convolution and the segmented sum require it. | **UNCLEAR** | The idea first appears in an RE ideas list "proposed on 8 October" (`RM:LT/studies/remaining_optimizations/proposal.md:4`, `:250`). The list names no author. It was committed in a bulk reorganisation (ResearchModule `c733f69e`). |
+
+### 3.3 Radial network → radial tables
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| Radial tables (`generic_radial_tables`) | Per interaction and species pair, piecewise Chebyshev series fitted in float64 at setup replace the whole chain r → `[h·c, c, density]` (Bessel, Agnesi, MLP, cutoff). A setup certificate requires the table's float32 error to be at most the float32 network's. | **UNCLEAR** (idea); **OWN** (certificate, generic version) | Recorded as "owner, 27 October 2026, from an external proposal" (`docs/validation/opt6-T04.md:21`). The proposal's author is not named. Its NumPy scripts (`results/opt6-T04-radial-stub-20261027/table-check/`) already use adaptive Chebyshev pieces and FastMACE's MH-1 internals. **Related outside ideas, different method:** Symmetrix-XL uses "cubic Hermite splines (256 knots)" (`RM:LT/studies/symmetrix_xl/README.md:20`), and two outside research chats suggested Hermite splines. The RE had set tabulation aside on 14 October as "already measured" (`:27`). The certified class (decision 61) and the OMAT-0 version ("The one worth building", `docs/validation/tiled-omat.md:164`) are ours. Measured on the A100: 0.902 / 0.901 ([loup-a100.md](loup-a100.md):46). |
+
+### 3.4 Interaction 1, reassociated
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| Reassociation (`generic_reassociate`) | Interaction 1's input is species-only. Its messages are summed per (receiver, sender species) before the last radial layer, then projected with node GEMMs. This removes the first convolution and its per-edge weights. | **EXTERNAL IDEA, OWN CODE** | From an external research report (GPT-6 Pro): "move the first interaction's final radial projection after a receiver-and-species aggregation" (`ResearchModule:GPT_6_PRO_RESEARCH_2.txt:1`), assessed in `RM:LT/studies/research_prompts/2026-10-10-hybrid-default-further-optimization-assessment.md:55`. Measured: NaCl 4.9 %, NaNbO3 7.2 %, NbCl5 4.9 % (`RM:LT/studies/further_optimizations/README.md:55`). |
+| Segmented sum (`segmented_first_sum`) | Those sums run as a run-segmented Triton kernel, one atomic per run. | **UNCLEAR** (idea); **OWN** (kernel) | The general idea, "Receiver-sorted edges and segmented aggregation", is in the same unattributed 8 October list (`RM:LT/studies/remaining_optimizations/proposal.md:242`). The concrete kernel is the RE's third-round candidate (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:45`). |
+
+### 3.5 Interaction 2: streaming convolution, fused forward, w′ backward
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| Receiver-streaming convolution kernels | One writer per receiver, with no atomics in the forward; compiled with NVRTC. | **COPIED** (OpenEquivariance PR 223, after the Sobek paper) | Vendored from "OpenEquivariance pull request 223 … by Paul Fuchs", which "adapts the streaming schedule of Chorošajev and Bény, Sobek" (arXiv 2607.18074) (`fastmace/kernels/oeq_streaming/NOTICE.md:3-8`). The owner pointed at the PR (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES_RESULTS.md:121`). Our change is the `ir_mul` layout (`NOTICE.md:12-15`). |
+| Fused forward (`generic_fused_folded_forward`) | `w = [h·c, c]·[W, b]ᵀ` is computed per edge tile inside the streaming convolution, instead of an `[E × 1280]` tensor written and read back. | **EXTERNAL IDEA** (Symmetrix-XL), **OWN CODE** | "Origin: the one idea from Symmetrix-XL" (`RM:LT/studies/symmetrix_xl/STREAMED_EDGES.md:7`). The idea "computes `w[e]` from `a[e]` inside the kernel" (`:27-28`). Our kernel is generated from the streaming schedule (round 8, "Owner request", `plans/opt-8.md:3`). On the A100 it is used only together with the w′ backward, because alone it is slower (1.289; pair 0.885, `docs/validation/generic-wprime.md:58`, `:71`). |
+| w′ backward (`generic_wprime_backward`) | Within a table piece, `w(r) = Σ_t T_t(x) G_t`. The backward forms `dr = Σ_c dw_c · w′_c(r)` from derivative tables: 10 instead of 65 multiply-adds per weight, with no stored weight gradient and no radial backward. | **OWN** | Derived in our own ideas session: "`dr = Σ_c dw_c · w'_c(r)`" (`plans/ideas-20261027.md:57`; "Side session \"fm-ideas\"", `:3`). The float32 form was an "Owner request, 28 October 2026" (`plans/opt-9.md:3`). It depends on the radial tables (§3.3). |
+
+### 3.6 Atom-level linear layers and GEMM precision
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| Per-irrep block GEMMs (`block_linear`) | cuEq `Linear` becomes per-irrep GEMMs with extracted weights. | **OWN** | From the RE's op map, where cuEq's linears were "using slower kernels" (`RM:LT/studies/further_optimizations/2026-10-14-third-round.md:100`). Measured: NaCl −11.8 % (`:117`). |
+| Grouped products (`grouped_linear`) | Same-irrep input segments share one product. | **OWN** | The RE's answer to the owner's "optimize OMOL-0 further" (`RM:LT/studies/other_models/README.md:652`, adopted `:721`). |
+| Species-restricted skip (`species_skip`) | The `skip_tp` over 89 one-hot elements becomes one GEMM per irrep block for the species present. | **OWN** | From the RE's step breakdown: "about 97% of this multiplies by zero" (`RM:LT/studies/other_models/README.md:282`). Measured on OMAT-0: −20 to −39 % (`:318`). |
+| 3×TF32 GEMMs on CUTLASS (`tf32x3_gemms`) | All of the above GEMMs run as error-compensated 3×TF32 on tensor cores, through a prebuilt CUTLASS cubin. Shapes outside the rule stay on cuBLAS IEEE. | **COPIED** (CUTLASS kernel); **EXTERNAL IDEA**; **OWN** integration and shape rule | The kernel is "the 3xTF32 split of CUTLASS example 27" (`fastmace/kernels/cutlass/NOTICE.md:6`). The idea reached us through an external research report, "3×TF32 is worth testing" (`docs/design/2026-10-20-megakernel-research.md:152`), and an external review that started the 29 October screen (`docs/validation/tc-gemm-screen.md:4`). Then: "build it for a100" (`docs/validation/cutlass-tf32x3.md:3`). Measured on OMAT-0: 0.949 / 0.947 (`:86`). |
+
+### 3.7 Backend, symmetric contraction, precision
+
+| Part | What it does | Verdict | Evidence |
+| --- | --- | --- | --- |
+| Hybrid cuEq + OEq backend | OpenEquivariance for the convolution; cuEquivariance for the symmetric contraction and the rest. | **COPIED** (MACE 0.3.16, OEq, cuEq) | "MACE 0.3.16 can run a model with two accelerated backends at once" (`RM:LT/studies/remaining_optimizations/proposal.md:96`). Adopting it was the user's decision of 9 October (`RM:LT/docs/status.md:7`). |
+| Symmetric contraction | cuEquivariance's kernel, unchanged (0.41 ms). | **COPIED** (cuEquivariance) | No rewrite. |
+| Float32 with TF32 off, energy summed in float64 | The precision policy; 3×TF32 (§3.6) is the only tensor-core use. | **OWN** (decision) | User production decision, 9 October (`RM:LT/docs/status.md:7`). |
+
+**On in the plan but doing nothing in this run** (no kernels):
+- `fused_folded_backward` and `chunked_conv_backward` are on only as prerequisites of §3.3 and §3.5
+  (`fastmace/planner/fixed.py:1218`).
+- `merged_residual`: "this record stays off" for this model (`breakdown/summary.json:394`).
+- `single_graph_strain`: acts only where stress is computed, and this fixed-cell run computes none.
+
+## 4. To investigate: parts whose origin is not recorded
+
+| Part | What is known | Where to look |
+| --- | --- | --- |
+| Radial tables (§3.3) | "From an external proposal" on 27 October; author unknown. Its NumPy scripts use our MH-1 internals, so whoever wrote them could see our code. It is not the Hermite-spline idea of Symmetrix-XL or of the two research chats. | Who sent the scripts in `results/opt6-T04-radial-stub-20261027/table-check/` |
+| Receiver-sorted edges (§3.2) and segmented aggregation (§3.4) | Both are in the 8 October ideas list, which names no author. The first external research report is dated 9 October, one day later. | The session or chat behind `RM:LT/studies/remaining_optimizations/proposal.md` |
+| GPU-resident integrator (§3.1) | Built by the RE on 7 October; no source is recorded. | The 1–7 October sessions behind `RM:LT/docs/protocol.md` |
+| Padded edge buckets for CUDA graphs (§3.1) | Built by the RE on 7 October; no source is recorded. | Same as the integrator |
