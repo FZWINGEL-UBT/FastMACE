@@ -174,6 +174,14 @@ def wprime_launcher(kernel, source, extra):
 
 
 # --------------------------------------------------------------------------------------------------- fused forward
+def _tc_no_wsplit(s):
+    """The tensor-core product with W's fragments used unsplit (the high part twice): no split instructions for W."""
+    for i, offset in enumerate(("0", "8", "4 * WS", "4 * WS + 8")):
+        s = _sub(s, f"split_tf32(wp[{offset}], ah[{i}], al[{i}]);",
+                 f"ah[{i}] = __float_as_uint(wp[{offset}]); al[{i}] = ah[{i}];")
+    return s
+
+
 def forward_variants():
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -199,6 +207,18 @@ def forward_variants():
         "F-gemm-only": ("falsifier", lambda s: _sub(_sub(s, tp, r"if (false) {\1", regex=True),
                                                     "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;",
                                                     1), ()),
+        # Tensor-core base (--constant ...fused_forward:TENSOR_CORES=True): where the 3xTF32 product's time goes.
+        "F-tc-1pass": ("falsifier", lambda s: _sub(_sub(s, "mma_tf32(wacc[g][m], al, bh);", ""),
+                                                   "mma_tf32(wacc[g][m], ah, bl);", ""), ()),
+        "F-tc-no-mma": ("falsifier", lambda s: _sub(_sub(_sub(s, "mma_tf32(wacc[g][m], al, bh);", ""),
+                                                         "mma_tf32(wacc[g][m], ah, bl);", ""),
+                                                    "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
+                                                    "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
+        "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
+        "F-tc-no-product": ("falsifier", lambda s: _sub(s, "for (int k0 = 0; k0 < KP; k0 += 8) {",
+                                                        "for (int k0 = 0; k0 < 0; k0 += 8) {"), ()),
+        "F-tc-no-redistribute": ("falsifier", lambda s: _sub(s, "w[g][b] = r_s[(g * B + b) * RS + lane];",
+                                                             "w[g][b] = wacc[g][b & 1][b >> 1 & 3];"), ()),
     }
 
 
