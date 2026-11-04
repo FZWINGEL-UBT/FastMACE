@@ -1,4 +1,7 @@
-"""The ``TABLE_W`` wprime backward with two adjacent channels per lane (``wprime_backward.CHANNEL_PAIRS``).
+"""The ``TABLE_W`` wprime backward with two adjacent channels per lane: a kernel-lab record
+(``tools/omat0_kernel_lab.py`` variant ``pair``), not used by any plan. Measured against ``FACTORED`` (OMAT-0 medium,
+4 November 2026): RTX 4000 Ada 0.898 vs 0.900, A100-SXM4-80GB 0.708 vs 0.722 of the default kernel (128 registers);
+not built as a switch.
 
 The vendored schedule gives each lane the channels ``lane, lane + 32, ...``, so every node-feature, output-gradient
 and table load is a scalar (or float2 for the table row). Here a lane owns the pairs ``2 lane + 64 k, + 1``: the

@@ -73,11 +73,13 @@ BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-S
 # Clebsch-Gordan term the vendored three updates (weight, input and edge gradient; about 7 floating-point operations).
 # True: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i (3 operations per term), then the weight gradient
 # sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j. Rounding (the same sums regrouped); every wprime kernel built while
-# it is set. A module constant for the A/B (kernel lab on the RTX 4000 Ada: 0.903 of the TABLE_W wprime kernel).
+# it is set. A module constant for the A/B: OMAT-0 medium, Benchmark_loup MD step b/a in both orders, RTX 4000 Ada
+# 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940 (wprime kernel 0.90 / 0.73; docs/validation/omat0-tp-backward.md).
 FACTORED = False
 # With FACTORED: each path's most common coefficient magnitude applied once per path (to w and the weight gradient);
 # its terms carry only the sign, the others the ratio |c| / alpha (OMAT-0 medium: 50 of 86 terms without a multiply).
-# Rounding. A module constant for the A/B.
+# Rounding. Rejected (A100-SXM4-80GB: kernel 0.830 against FACTORED's 0.722, MD step 1.025 / 1.024 against FACTORED);
+# kept for the record. A module constant for the A/B.
 FACTORED_SCALE = False
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
@@ -892,7 +894,8 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_SCALE", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
+__all__ = ["BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_SCALE", "TABLE_W", "TABLE_W_GPUS", "WPrime",
+           "WPrimeBackward",
            "block_message_default", "block_spec", "dense_message",
            "density_backward", "density_column", "derivative_table", "factored_paths", "padded_terms",
            "prepare_block_messages",

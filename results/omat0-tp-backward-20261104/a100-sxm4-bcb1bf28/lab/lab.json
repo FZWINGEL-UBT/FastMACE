@@ -1,0 +1,124 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-04T16:10:00.411563+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "bcb1bf282d236d07033a376841d45f42c615636d",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 66.060198445,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          5616,
+          1280,
+          6
+        ],
+        "gprime_MB": 164.53125,
+        "species": 3,
+        "pieces": 624,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 4135.9357833862305,
+          "min_us": 4118.527889251709,
+          "max_us": 4930.560111999512,
+          "ratio": 1.0
+        },
+        "factored": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 2.94e-07",
+            "dx": "max|d|/max|a| = 2.65e-07"
+          },
+          "median_us": 3006.4640045166016,
+          "min_us": 2994.175910949707,
+          "max_us": 3491.83988571167,
+          "ratio": 0.7269126412922948
+        },
+        "factored+unordered": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 2.94e-07",
+            "dx": "max|d|/max|a| = 3.31e-07"
+          },
+          "median_us": 2982.912063598633,
+          "min_us": 2967.5519466400146,
+          "max_us": 3473.407983779907,
+          "ratio": 0.7212181764477064
+        },
+        "unordered": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 4128.767967224121,
+          "min_us": 4116.479873657227,
+          "max_us": 4826.111793518066,
+          "ratio": 0.9982669421051211
+        },
+        "pair": {
+          "kind": "rounding",
+          "registers": 128,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 6.62e-07",
+            "dx": "max|d|/max|a| = 2.65e-07"
+          },
+          "median_us": 2950.144052505493,
+          "min_us": 2934.783935546875,
+          "max_us": 3437.567949295044,
+          "ratio": 0.713295420193906
+        },
+        "FF-one-slab": {
+          "kind": "falsifier",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 2823.1680393218994,
+          "min_us": 2811.903953552246,
+          "max_us": 3286.0159873962402,
+          "ratio": 0.6825947469161323
+        },
+        "F-tp-wg-only": {
+          "kind": "falsifier",
+          "registers": 64,
+          "local_bytes": 0,
+          "median_us": 2431.999921798706,
+          "min_us": 2424.8321056365967,
+          "max_us": 2783.2319736480713,
+          "ratio": 0.5880168477392426
+        }
+      }
+    }
+  },
+  "constants": {}
+}
