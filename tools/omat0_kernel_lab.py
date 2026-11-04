@@ -256,6 +256,7 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
         "pair-maxreg96": ("rounding", pair(), ("--maxrregcount=96",)),
         "factored": ("rounding", rerender(factored=True), ()),
+        "factored+unordered": ("rounding", lambda s: unordered(rerender(factored=True)(s)), ()),
         # Where the factored kernel's time goes (timing bounds on top of it).
         "FF-one-slab": ("falsifier",
                         lambda s: _sub(rerender(factored=True)(s), group, "const scalar_t* g = gprime;", 1), ()),
