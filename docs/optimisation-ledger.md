@@ -587,6 +587,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-tc-forward](#omat0-tc-forward) | 3×TF32 tensor-core a·W product in the fused forward (A100 only) | `fused_forward.TENSOR_CORES`, `TC_SPLIT` | FM | DEFAULT | 2026-11-04 | A100 80GB only (decision 66), mask split: OMAT-0 step 0.933, MH-1 0.97-0.98 (A100-SXM4); loup 3.17 -> 2.92 µs/atom/step; rna split 1.040; Ada 1.124, 5060 Ti 1.272 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-cutlass-tile](#omat0-cutlass-tile) | Two-warp 32x64 / 64x32 tiles for the CUTLASS 3×TF32 GEMMs (A100) | `cutlass.tf32x3.TILE` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.014 / 1.012 (32x64), 1.017 / 1.017 (64x32); bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-tc-presplit](#omat0-tc-presplit) | W slice split into TF32 parts once per block (tensor-core forward, A100) | `fused_forward.TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | fused forward A100-SXM4 1.362 (12 -> 8 warps), RTX 5060 Ti 1.707 (2 -> 4 parts); bitwise; bound F-tc-no-wsplit 0.862 | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-species-gemm](#omat0-species-gemm) | Species skip as one grouped GEMM: each atom's rows through its own species' matrix only (Triton, fixed grid) | `generic.modules.SPECIES_GEMM` | FM | PENDING | 2026-11-04 (owner decision per GPU) | step RTX 4000 Ada 0.955 / 0.952, RTX 5060 Ti 0.950 (one order), A100-SXM4 0.992 / 0.991; gate passes (5060 Ti) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-species-gemm-tc](#omat0-species-gemm-tc) | The species GEMM in our own mma.sync 3xTF32 kernel (for the A100) | `species_gemm.TENSOR_CORES`, `TC_CHUNK`, `TC_PRESPLIT` | FM | REJECTED | 2026-11-04 | kernel lab vs Triton: A100 0.94 (16p), Ada 0.91, 5060 Ti 0.86; step A100-SXM4 1.003 / 1.002 vs default (Triton species GEMM 0.992), Ada 1.001 / 0.999 vs Triton species GEMM | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-first-table-columns](#omat0-first-table-columns) | First interaction's radial table stores only the columns it uses | `generic.modules.FIRST_TABLE_COLUMNS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.002 / 0.999, RTX 5060 Ti 1.002; bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -598,6 +601,37 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 - Measured: kernel lab, OMAT-0 medium on Benchmark_loup (SrTiO3 5,000 atoms), the plan's forward kernel, round-robin in one process: A100-SXM4-80GB (Modal, 3de2e597, $0.06) base 3.688 ms, pre-split 5.023 (1.362; 8 warps per block instead of 12, 194 registers instead of 168), F-tc-no-wsplit (no W split at all) 3.178 (0.862); RTX 5060 Ti (tensor cores forced on) 1.707, 4 parts instead of 2.
 - Why: the doubled slice costs a third of the block's warps; the latency hiding lost outweighs the split instructions saved.
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §14; `tools/modal/omat0_a100_presplit_lab.sh`.
+
+<a id="omat0-species-gemm"></a>
+#### omat0-species-gemm: the species skip as one grouped GEMM
+- Switch: `fastmace.rewrites.generic.modules.SPECIES_GEMM` (False); kernel `fastmace/kernels/triton/species_gemm.py`
+- Engine: FM
+- Date/round: 4 November 2026 (owner's goal: Benchmark_loup as fast as possible; owner's four ideas, idea 1)
+- What: `SpeciesSkip` multiplies every atom's rows by all present species' concatenated matrices and keeps its own block. The grouped kernel sorts the atoms by species on the device (stable argsort, counts by `index_add`, no host sync), cuts each species' rows into 64-row tiles on a fixed grid of `ceil(atoms*size/64) + species` programs, gathers the rows and scatters the results: a third of the products for three species, CUDA-graph safe when atoms change species. Same dot products (ieee bitwise on the 5060 Ti; tf32x3 within the 3xTF32 bound).
+- Status: PENDING (owner decision; a default only per GPU by exact device name, decision 66).
+- Measured (Benchmark_loup, OMAT-0 medium, SrTiO3 5,000 atoms, 1 fs, skin 0.5, `ab_rewrites.py`, 8 blocks): NVIDIA RTX 4000 Ada Generation (leto) 0.9548 / 0.9522 (both orders); NVIDIA GeForce RTX 5060 Ti 0.9504 (one order); A100-SXM4-80GB 0.9919 / 0.9914 (Modal, 31799fb6; the A100 runs the skip through tf32x3, where Triton's dot is about 3x slower per FLOP than CUTLASS). The first version (data-dependent tiles) measured Ada 0.970 / 0.968, 5060 Ti 0.962, A100 1.040 / 1.036.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/species_skip_lab.py`; `tools/modal/species_gemm_a100.sh`, `species_gemm_a100b.sh`.
+
+<a id="omat0-species-gemm-tc"></a>
+#### omat0-species-gemm-tc: the species GEMM in our own 3xTF32 tensor-core kernel
+- Switch: `fastmace.kernels.triton.species_gemm.TENSOR_CORES` (False); `TC_CHUNK` (16), `TC_PRESPLIT` (False)
+- Engine: FM
+- Date/round: 4 November 2026 (owner: "could we then not try to make our own TF32x3 version ... so that it runs faster on a100?")
+- What: an NVRTC kernel on the same fixed tiles: K reduced in chunks in shared memory, 8 warps of 3xTF32 mma.sync m16n8k8 with the fused forward's split; `TC_PRESPLIT` splits each chunk once into TF32 parts in shared memory.
+- Status: REJECTED.
+- Measured: species skip lab (forward + input backward, size 16 = interaction 0), against the Triton species GEMM: A100-SXM4-80GB (Modal, 97250a3f) Triton 591.5 us, tc16 594.7, tc32 585.3, tc64 693.2, tc16p 553.3 (0.94), tc32p 659.6, tc64p 930.0; bound (one CUTLASS product, no gather) 204.8 us. RTX 4000 Ada Triton 946.3, tc16 863.3 (0.91), bound 831.5. RTX 5060 Ti Triton 1189.2, tc16 1027.1 (0.86); the first, unchunked version (whole W half per block, 71 KB shared memory) 3125 us. MD step: A100-SXM4 default vs SPECIES_GEMM + tensor cores (16p) 1.0031 / 1.0017 (the Triton species GEMM gave 0.992 there); Ada SPECIES_GEMM vs SPECIES_GEMM + tensor cores (16) 1.0006 / 0.9986.
+- Why: a simple mma.sync kernel only reaches Triton's rate; the A100's CUTLASS 3xTF32 is about 2.7x faster per product (bound 205 vs 553 us). Closing that gap needs a multi-stage cp.async pipeline with larger warp tiles, i.e. a CUTLASS-class grouped GEMM, for at most about 5 % of the A100 step.
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15; `tools/modal/species_gemm_tc_a100.sh`.
+
+<a id="omat0-first-table-columns"></a>
+#### omat0-first-table-columns: only the used columns of the first radial table
+- Switch: `fastmace.rewrites.generic.modules.FIRST_TABLE_COLUMNS` (False); `radial_table(..., columns=)`
+- Engine: FM
+- Date/round: 4 November 2026 (owner's four ideas, idea 2: interaction-0 radial/edge backward)
+- What: the first interaction's radial table forward stores, and its backward reads, only the leading columns the first product uses, instead of computing the full width and slicing.
+- Status: REJECTED.
+- Measured: MD step A100-SXM4-80GB 1.0018 / 0.9993 (Modal, 31799fb6), RTX 5060 Ti 1.002; bitwise (`test_leading_columns_bit_for_bit`).
+- Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15.
 
 ### Alternative backends and external comparisons
 

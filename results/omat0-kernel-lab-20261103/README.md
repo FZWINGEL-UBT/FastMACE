@@ -366,3 +366,42 @@ splitting the fragments in every batch (bitwise). Kernel lab, forward kernel of 
 
 The split instructions cost at most 14 % of the kernel on the A100, but holding the split slice costs a third of the
 block's warps. Rejected; the switch stays for A/Bs.
+
+## 15. Species skip: grouped GEMM, our own tensor-core kernel, the narrow first table (4 November 2026)
+
+`SpeciesSkip` multiplies every atom's rows by all present species' concatenated [128, species x 128] matrices and keeps
+its own block. `SPECIES_GEMM` replaces that with one grouped GEMM (`fastmace/kernels/triton/species_gemm.py`): atoms
+sorted by species on the device, 64-row species-pure tiles on a fixed grid (CUDA-graph safe when atoms change
+species), rows gathered and results scattered. Benchmark_loup MD step (`ab_rewrites.py`, 8 blocks, b/a):
+
+| GPU | SPECIES_GEMM (count tiles) | first version | folder |
+| --- | --- | --- | --- |
+| NVIDIA RTX 4000 Ada Generation (leto) | 0.9548 / 0.9522 | 0.9695 / 0.9682 | `rtx4000ada-species-gemm-2/`, `rtx4000ada-species-gemm/` |
+| NVIDIA GeForce RTX 5060 Ti | 0.9504 (one order) | 0.9621 | `rtx5060ti-species-gemm/`, `rtx5060ti-species-gemm-first/` |
+| A100-SXM4-80GB (Modal) | 0.9919 / 0.9914 | 1.0402 / 1.0363 | `a100-sxm4-species-gemm-b/`, `a100-sxm4-species-gemm/` |
+
+The 5060 Ti gate (`gate-rtx5060ti-species-gemm/`) passes. On the A100 the skip runs through tf32x3, and Triton's
+tf32x3 dot is about 3x slower per FLOP than the CUTLASS kernels, so the third of the products only ties.
+
+**Our own tensor-core kernel** (`species_gemm.TENSOR_CORES`, NVRTC, 3xTF32 mma.sync m16n8k8, K in chunks of
+`TC_CHUNK` in shared memory; `TC_PRESPLIT` splits each chunk once). Species skip lab, size 16 (interaction 0),
+forward + input backward, median us:
+
+| GPU | Triton | tc16 | tc32 | tc64 | tc16p | tc32p | bound | folder |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A100-SXM4-80GB (Modal 97250a3f) | 591.5 | 594.7 | 585.3 | 693.2 | 553.3 | 659.6 | 204.8 | `a100-sxm4-species-gemm-tc/` |
+| RTX 4000 Ada (leto) | 946.3 | 863.3 | 872.2 | 1526.5 | 894.8 | 1548.3 | 831.5 | `rtx4000ada-species-gemm-tc/` |
+| RTX 5060 Ti | 1189.2 | 1027.1 | 1091.6 | 2072.6 | 1128.2 | 1948.5 | 910.8 | `rtx5060ti-species-gemm-tc/` |
+
+("bound": one product of all rows through one species' matrix, no gather, wrong result; on the A100 CUTLASS.) The
+first, unchunked kernel (a whole W half per block, 71 KB shared memory, one block per SM) took 3125 us on the 5060 Ti.
+MD step: A100-SXM4 default vs SPECIES_GEMM with tensor cores (16p, the lab's fastest) 1.0031 / 1.0017; Ada
+SPECIES_GEMM vs SPECIES_GEMM with tensor cores 1.0006 / 0.9986. Rejected: a plain mma.sync kernel only reaches
+Triton's rate, while CUTLASS is about 2.7x faster per product on the A100; closing that needs a multi-stage cp.async
+pipeline with larger warp tiles (a CUTLASS-class grouped GEMM) for at most about 5 % of the A100 step.
+
+**Narrow first table** (`FIRST_TABLE_COLUMNS`: the first radial table stores only the columns the first product
+uses; bitwise): A100-SXM4 1.0018 / 0.9993, RTX 5060 Ti 1.002. Rejected.
+
+Lab folders of the first round: `rtx5060ti-skiplab/`, `a100-sxm4-skiplab/` (A100 lab times differ between Modal
+machines; compare only within one job).
