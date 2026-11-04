@@ -7,9 +7,17 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 ## [Unreleased]
 
 ### Added
-- `wprime_backward.TABLE_W` (off; A/B switch): the wprime backward evaluates w and its slope from one q-major
+- `wprime_backward.BLOCK_MESSAGE` (off; A/B switch): the conv message in linear_1's block layout, no relayout
+  copies. Benchmark_loup step 1.060 (RTX 5060 Ti, slower), 0.974 / 0.971 (RTX 4000 Ada), 0.983 / 0.977
+  (A100-SXM4).
+- `wprime_backward.TABLE_W`: the wprime backward evaluates w and its slope from one q-major
   value-table slab, so the fused forward stores no w (1.9 GB on Benchmark_loup). Benchmark_loup step 0.888 /
-  0.892 (RTX 5060 Ti), 0.928 / 0.931 (RTX 4000 Ada), 0.943 / 0.943 (A100-SXM4); force gates pass.
+  0.892 (RTX 5060 Ti), 0.928 / 0.931 (RTX 4000 Ada), 0.943 / 0.943 (A100-SXM4); force gates pass. Default on for
+  the generic family (OMAT-0) on these GPUs and every A100 (owner, 4 November 2026).
+
+### Changed
+- Decision-66 GPU lists (`kernels/gpu_models.GPUModels`): an A100 entry stands for every A100 model, so the
+  A100-SXM4-40GB and A100-PCIE-40GB take the A100 defaults (owner, 4 November 2026).
 
 - `generic.modules.SPECIES_GEMM` (default on for the RTX 5060 Ti and RTX 4000 Ada, `SPECIES_GEMM_GPUS`, decision
   66): the species skip as one grouped GEMM (`kernels/triton/species_gemm.py`, fixed grid, CUDA-graph safe).

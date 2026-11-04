@@ -476,3 +476,26 @@ The `TABLE_W` wprime kernel (6.67 ms): no slope 0.924, no atomics 0.986, `unorde
 `TABLE_W` (RTX 5060 Ti, `rtx5060ti-tablew-breakdown/`): edge kernels 17.3 ms per force call (forward 7.6, wprime 7.0),
 atom elementwise 4.3 ms in 85 kernels, atom GEMMs 3.1 ms, interaction-1 edge sums 2.0 ms, symmetric contraction
 0.85 ms.
+
+**Default (owner, 4 November 2026: "Turn on the table_w for all a100s and the other gpus").** `TABLE_W = None`: on for
+the generic family's wprime_backward on `TABLE_W_GPUS` (RTX 5060 Ti, RTX 4000 Ada, every A100 model), off for MH-1
+(not measured). An A100 entry in a decision-66 list now stands for every A100 model (`kernels/gpu_models.py`).
+
+## 17. The message in linear_1's block layout (`wprime_backward.BLOCK_MESSAGE`, 4 November 2026)
+
+The `TABLE_W` breakdown showed about 1.15 ms per step (RTX 5060 Ti) in relayout copies around linear_1: the grouped
+BlockLinear cut the `[5000, 5120]` ir_mul message into same-irrep rows and concatenated the paths (forward), and the
+backward reassembled the gradient. With `BLOCK_MESSAGE` the message-only forward writes each group as its own
+`[N * dim, P * 128]` tensor and the `TABLE_W` wprime kernel reads the gradient groups through one pointer each.
+
+| GPU | MD step b/a (ab / ba), a = default with `TABLE_W` | folder |
+|---|---|---|
+| RTX 5060 Ti | 1.0599 / 1.0600 (29.27 -> 31.03 ms) | `rtx5060ti-block-ab/` |
+| RTX 4000 Ada (leto) | 0.9738 / 0.9710 | `rtx4000ada-block-ab/` |
+| A100-SXM4-80GB (Modal) | 0.9834 / 0.9773 (14.46 -> 14.22 ms) | `a100-sxm4-block/` |
+
+Force gate (RTX 5060 Ti, `gate-rtx5060ti-block/`): passes, errors as the default's. Breakdown (RTX 5060 Ti,
+`rtx5060ti-block-breakdown/`): the copies are gone, but the block wprime kernel takes 10.3 ms against 7.6 ms (80
+registers both); without `__restrict__` on the gradient pointers the step is the same (1.059). Not adopted; a default
+on the Ada and the A100s alone awaits the owner. The owner stopped OMAT-0 work after this round.
+
