@@ -179,12 +179,18 @@ def test_render_factored():
             assert "FACTORED" not in plain and "u_0 += scaled * edge_value;" not in plain
             assert "u_0 += scaled * edge_value;" in source and "v_0 += scaled * input_value;" in source
             assert "weight_gradient += output_gradient * input_value" not in source
-            assert "+= radial_weight * u_0;" in source
+            assert "+= scaled_weight * u_0;" in source
             flat = " ".join(source.split())
-            assert "edge_gradient[0] += radial_weight * v_0;" in flat  # edge channel 0
-            assert "edge_gradient[1] += radial_weight * v_0;" in flat  # edge channel 1
+            assert "edge_gradient[0] += scaled_weight * v_0;" in flat  # edge channel 0
+            assert "edge_gradient[1] += scaled_weight * v_0;" in flat  # edge channel 1
     paths = wp.factored_paths(_schedule())
     assert len(paths) == 2 and all(p["inputs"] and p["edges"] for p in paths)
+    assert all(p["alpha"] == 1.0 for p in paths)
+    # FACTORED_SCALE: a path's common coefficient magnitude applied once per path.
+    scaled = wp.factored_paths(_schedule(), scale=True)
+    assert any(p["alpha"] != 1.0 for p in scaled)
+    source = wp.render(_schedule(), "float", 6, vector=2, table_w=True, factored=True, scale=True)
+    assert "const scalar_t scaled_weight = radial_weight * alpha;" in source and "weight_gradient *= alpha;" in source
 
 
 def test_generated_source_compiles_with_nvrtc():

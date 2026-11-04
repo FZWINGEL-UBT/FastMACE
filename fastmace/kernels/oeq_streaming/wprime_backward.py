@@ -257,13 +257,17 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                         const scalar_t edge_value =
                             sh[edge_base
                                + {{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];
-                        {%- if term.coefficient == 1.0 %}
+                        {%- set fp = factored[path_index] %}
+                        {%- set ratio = term.coefficient / fp.alpha %}
+                        {%- set op = "-=" if fp.alpha != 1.0 and ratio < 0 else "+=" %}
+                        {%- set ratio = ratio | abs if fp.alpha != 1.0 else ratio %}
+                        {%- if (ratio - 1.0) | abs < 1e-12 %}
                         const scalar_t scaled = output_gradient;
                         {%- else %}
-                        const scalar_t scaled = output_gradient * {{ cpp_scalar_literal(term.coefficient, scalar) }};
+                        const scalar_t scaled = output_gradient * {{ cpp_scalar_literal(ratio, scalar) }};
                         {%- endif %}
-                        u_{{ term.input_component }} += scaled * edge_value;
-                        v_{{ term.edge_component }} += scaled * input_value;
+                        u_{{ term.input_component }} {{ op }} scaled * edge_value;
+                        v_{{ term.edge_component }} {{ op }} scaled * input_value;
                     } {%- endfor %}
                     {%- else %}
                     {% for term in output.terms %} {
@@ -288,14 +292,25 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     {%- endif %}
                 } {%- endfor %}
                 {%- if factored %}
+                {%- set alpha = factored[path_index].alpha %}
+                {%- if alpha != 1.0 %}
+                // The path's common coefficient magnitude, applied once (FACTORED_SCALE).
+                const scalar_t alpha = {{ cpp_scalar_literal(alpha, scalar) }};
+                const scalar_t scaled_weight = radial_weight * alpha;
+                {%- else %}
+                const scalar_t scaled_weight = radial_weight;
+                {%- endif %}
                 {%- for i, slot in factored[path_index].inputs.items() %}
                 weight_gradient +=
                     x[input_base + {{ node_offset(path.input_start, i, path.input_irrep_dim) }}] * u_{{ i }};
-                {{ slot }} += radial_weight * u_{{ i }};
+                {{ slot }} += scaled_weight * u_{{ i }};
                 {%- endfor %}
+                {%- if alpha != 1.0 %}
+                weight_gradient *= alpha;
+                {%- endif %}
                 {%- for j in factored[path_index].edges %}
                 edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] +=
-                    radial_weight * v_{{ j }};
+                    scaled_weight * v_{{ j }};
                 {%- endfor %}
                 {%- endif %}
                 if (sloped) {
@@ -352,21 +367,30 @@ def padded_terms(terms, vector):
     return -(-int(terms) // vector) * vector if vector else int(terms)
 
 
-def factored_paths(schedule):
-    """Per path of ``schedule`` (``FACTORED``): ``inputs`` {input component: its input-gradient accumulator} and
-    ``edges`` (the edge components), in first-use order."""
+def factored_paths(schedule, scale=False):
+    """Per path of ``schedule`` (``FACTORED``): ``inputs`` {input component: its input-gradient accumulator},
+    ``edges`` (the edge components), in first-use order, and ``alpha``: with ``scale`` (``FACTORED_SCALE``) the
+    path's most common coefficient magnitude (ties: the largest), which the kernel applies once per path (its terms
+    then carry the sign and the ratio |c| / alpha, 1 for most), else 1."""
     result = []
     for path in schedule.paths:
-        inputs, edges = {}, {}
+        inputs, edges, magnitudes = {}, {}, {}
         for output in path.outputs:
             for term in output.terms:
                 inputs.setdefault(term.input_component, term.input_accumulator.name)
                 edges.setdefault(term.edge_component, None)
-        result.append(dict(inputs=inputs, edges=tuple(edges)))
+                key = round(abs(float(term.coefficient)), 12)
+                magnitudes[key] = magnitudes.get(key, 0) + 1
+        alpha = 1.0
+        if scale and magnitudes:
+            alpha = max(magnitudes, key=lambda m: (magnitudes[m], m))
+            alpha = 1.0 if abs(alpha - 1.0) < 1e-12 else alpha
+        result.append(dict(inputs=inputs, edges=tuple(edges), alpha=float(alpha)))
     return result
 
 
-def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, factored=False):
+def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, factored=False,
+           scale=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -395,7 +419,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             padded_terms=padded_terms(terms, vector), table_w=bool(table_w),
                                             blocks=None if blocks is None else block_map(blocks, schedule.channels),
                                             n_blocks=0 if blocks is None else len(blocks),
-                                            factored=factored_paths(schedule) if factored else None)
+                                            factored=factored_paths(schedule, scale) if factored else None)
 
 
 def derivative_table(dcoef, weight, vector=0):
