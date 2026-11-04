@@ -291,15 +291,12 @@ class SpeciesSkip(torch.nn.Module):
             from fastmace.kernels.triton.species_gemm import species_mm, species_plan
             kind = onehot.argmax(dim=1)
             precision = "tf32x3" if self.tf32x3 else "ieee"
-            plans = {}
+            order, counts = species_plan(kind, species)
         for index, (i, j) in enumerate(self.pairs):
             weight = getattr(self, f"w{index}")
             xi = self._view(x1, self.segments_in[i])  # [atoms, size, mul_in]
             if grouped:
-                size = xi.shape[1]
-                if size not in plans:
-                    plans[size] = species_plan(kind, species, size)
-                y = species_mm(xi, getattr(self, f"ws{index}"), getattr(self, f"wt{index}"), kind, *plans[size],
+                y = species_mm(xi, getattr(self, f"ws{index}"), getattr(self, f"wt{index}"), kind, order, counts,
                                precision)
                 outputs[j] = y if outputs[j] is None else outputs[j] + y
                 continue

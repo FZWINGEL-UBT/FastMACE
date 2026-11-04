@@ -69,8 +69,8 @@ def grouped(mm, x, groups, w):
 
 def triton_grouped(x, w, w_t, species, precision):
     from fastmace.kernels.triton.species_gemm import species_mm, species_plan
-    order, tile = species_plan(species, len(COUNTS), x.shape[1])
-    return species_mm(x, w, w_t, species, order, tile, precision)
+    order, counts = species_plan(species, len(COUNTS))
+    return species_mm(x, w, w_t, species, order, counts, precision)
 
 
 def bound(mm, x, w):

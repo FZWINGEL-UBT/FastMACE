@@ -28,8 +28,8 @@ def test_product_and_gradient(precision, limit, counts, size, k, n):
         pytest.skip("tf32x3 needs compute capability 8.0")
     index, x, w = _case(counts, size, k, n)
     x.requires_grad_()
-    order, tile = sg.species_plan(index, len(counts), size)
-    y = sg.species_mm(x, w, w.transpose(1, 2).contiguous(), index, order, tile, precision)
+    order, found = sg.species_plan(index, len(counts))
+    y = sg.species_mm(x, w, w.transpose(1, 2).contiguous(), index, order, found, precision)
     wa = w[index]
     exact = torch.einsum("ajk,akn->ajn", x.detach().double(), wa.double())
     scale = torch.einsum("ajk,akn->ajn", x.detach().double().abs(), wa.double().abs())
@@ -46,8 +46,8 @@ def test_species_change_under_graph():
     w_t = w.transpose(1, 2).contiguous()
 
     def call():
-        order, tile = sg.species_plan(index, 3, 3)
-        return sg.species_mm(x, w, w_t, index, order, tile, "ieee")
+        order, counts = sg.species_plan(index, 3)
+        return sg.species_mm(x, w, w_t, index, order, counts, "ieee")
 
     call()
     torch.cuda.synchronize()

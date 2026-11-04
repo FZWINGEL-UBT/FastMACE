@@ -1,6 +1,6 @@
-"""fastmace.kernels.triton.species_gemm on the CPU: the tile plan (fixed count, every row of every species in exactly
-one tile of its species, empty tiles past the last), the PyTorch fallback of ``species_mm`` and its gradient, and
-``SpeciesSkip`` with ``SPECIES_GEMM`` equal to the concatenated product."""
+"""fastmace.kernels.triton.species_gemm on the CPU: the plan and the kernel's tile rule (fixed count, every row of
+every species in exactly one tile of its species, empty tiles past the last), the PyTorch fallback of
+``species_mm`` and its gradient, and ``SpeciesSkip`` with ``SPECIES_GEMM`` equal to the concatenated product."""
 
 import pytest
 import torch
@@ -12,13 +12,14 @@ from fastmace.kernels.triton import species_gemm as sg
 def test_plan_covers_every_row_once(counts, size):
     index = torch.cat([torch.full((n,), s) for s, n in enumerate(counts)])
     index = index[torch.randperm(index.numel(), generator=torch.Generator().manual_seed(0))]
-    order, tile = sg.species_plan(index, len(counts), size)
+    order, found = sg.species_plan(index, len(counts))
     atoms = index.numel()
-    assert tile.shape == (sg.tiles(atoms, size, len(counts)), 3)
+    assert found.tolist() == list(counts)
     assert sorted(order.tolist()) == list(range(atoms))
     assert index[order.long()].tolist() == sorted(index.tolist())
     seen = []
-    for species, first, end in tile.tolist():
+    for t in range(sg.tiles(atoms, size, len(counts))):
+        species, first, end = sg.tile_rows(t, list(counts), size)
         assert 0 <= end - first <= sg.BLOCK_M
         for r in range(first, end):
             atom, j = int(order[r // size]), r % size
@@ -33,8 +34,8 @@ def test_fallback_and_gradient():
     x = torch.randn(6, 3, 5, generator=g, dtype=torch.float64).transpose(1, 2).contiguous().transpose(1, 2)
     x.requires_grad_()
     w = torch.randn(3, 5, 4, generator=g, dtype=torch.float64)
-    order, tile = sg.species_plan(index, 3, 3)
-    y = sg.species_mm(x, w, w.transpose(1, 2).contiguous(), index, order, tile, "ieee")
+    order, counts = sg.species_plan(index, 3)
+    y = sg.species_mm(x, w, w.transpose(1, 2).contiguous(), index, order, counts, "ieee")
     expected = torch.stack([x[a] @ w[index[a]] for a in range(6)])
     assert torch.equal(y, expected)
     grad = torch.randn(6, 3, 4, generator=g, dtype=torch.float64)
