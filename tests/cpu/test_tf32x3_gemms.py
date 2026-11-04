@@ -147,14 +147,13 @@ def test_decision_66_turns_auto_on_for_mh1_and_omat0_on_the_a100_only():
     assert plan.rewrites.tf32x3_gemms == "off" and plan.rewrites.grouped_launch == "on"
 
 
-def test_decision_66_on_the_a100_pcie_for_omat0_only():
-    """The A100 80GB PCIe (owner, 4 November 2026): OMAT-0 medium only, where Benchmark_loup measured it."""
-    pcie = Hardware("NVIDIA A100 80GB PCIe", (8, 0), 80 * 2**30)
-    plan = _plan(RewriteConfig(), pcie, label="omat0-medium")
-    assert plan.rewrites.tf32x3_gemms == "on" and plan.rewrites.grouped_launch == "off"
-    plan = _plan(RewriteConfig(), pcie, label="mh1-r2scan")
-    assert plan.rewrites.tf32x3_gemms == "off"
-    assert dict(plan.auto_options_off)["tf32x3_gemms"] == "not a measured GPU, decision 66 (NVIDIA A100 80GB PCIe)"
+def test_decision_66_on_every_a100():
+    """Every A100 model (owner, 4 November 2026: "turn on a100 speedups no matter which version"): the A100 80GB
+    PCIe and the 40 GB cards take the SXM4's tf32x3_gemms for MH-1 and OMAT-0 medium."""
+    for name, memory in (("NVIDIA A100 80GB PCIe", 80), ("NVIDIA A100-PCIE-40GB", 40), ("NVIDIA A100-SXM4-40GB", 40)):
+        for label in ("omat0-medium", "mh1-r2scan"):
+            plan = _plan(RewriteConfig(), Hardware(name, (8, 0), memory * 2**30), label=label)
+            assert plan.rewrites.tf32x3_gemms == "on" and plan.rewrites.grouped_launch == "off", (name, label)
 
 
 def test_planner_keeps_it_off_unless_asked_and_enables_an_explicit_on():

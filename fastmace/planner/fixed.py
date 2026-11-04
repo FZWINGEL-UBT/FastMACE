@@ -53,6 +53,7 @@ from fastmace.config import (
     RewriteConfig,
 )
 from fastmace.errors import PlanRefused, Reason
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.rewrites import versions
 
 from . import rules
@@ -364,6 +365,8 @@ def _cuda_available():
 FP64_EMULATION_RATE = 1 / 8
 FP64_EMULATION_MANTISSA_NAME = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"
 
+# The decision-66 lists below are GPUModels sets: an A100 entry stands for every A100 model (owner, 4 November
+# 2026: "turn on a100 speedups no matter which version of it it runs on"; kernels/gpu_models.py).
 # Owner decision 65 (28 October 2026): "Make all 3 default on gpu where we measured a speed up but if slowdown or
 # nothing measured dont enable it". The 56 fixed mantissa bits (D1), w_tables (D2) and save_transcendentals (D3)
 # are "auto" on in float64 MH-1 plans that are not reproducible, on these GPU models only (same-process A/Bs in
@@ -378,34 +381,37 @@ DECISION_65_MAX_SPECIES = 3
 # Decision 66 (owner, 29 October 2026): per-GPU defaults where same-process whole-step A/Bs in both build orders
 # measured a speed-up, by exact device name. grouped_launch for MH-1 on the RTX 5060 Ti (current main, 29 October):
 # NaCl 0.971 / 0.975, NbCl5 1.002 / 0.998, NaNbO3 1.001 / 0.999. The RTX 4000 Ada lost 0.5 % in OPT-T03b.
-DECISION_66_GROUPED_LAUNCH_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
+DECISION_66_GROUPED_LAUNCH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 # wprime_backward (OPT9-T05, owner 29 October 2026): MD step b/a in both build orders, every block pair below 1.
 # A100-SXM4-80GB: NaNbO3 0.815 / 0.812, NbCl5 0.889 / 0.889. RTX 5060 Ti: NaNbO3 0.937 / 0.940, NbCl5 0.970 / 0.971,
 # NaCl 0.946 / 0.935. RTX 4000 Ada: NaNbO3 0.938 / 0.939, NbCl5 0.964 / 0.964, NaCl 0.934 / 0.934
 # (docs/validation/opt9-T03.md). The A100-SXM4-40GB was not measured.
-DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+DECISION_66_WPRIME_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                     "NVIDIA RTX 4000 Ada Generation"))
 # gate_epilogue with the K-outer gated_products kernel (speed-def E2, owner 31 October 2026): MD step b/a, both build
 # orders. RTX 5060 Ti: NbCl5 1,944 0.983 / 0.982, 9,216 0.958 / 0.957; NaNbO3 1,920 0.982 / 0.988, 8,640 0.972 /
 # 0.968; NaCl 1.000 / 1.005. RTX 4000 Ada: NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969;
 # NaCl 0.998 / 1.003 (docs/validation/speed-def.md). The A100 was not measured.
-DECISION_66_GATE_EPILOGUE_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
 # tf32x3_gemms on the CUTLASS backend (owner, 3 November 2026; docs/validation/cutlass-tf32x3.md): MD step b/a in
 # both build orders against IEEE with grouped_launch off. A100-SXM4-80GB: MH-1 NaCl 0.887 / 0.882, NbCl5 0.772 /
 # 0.770; OMAT-0 medium SrTiO3 5,000 atoms 0.948 / 0.947 (grouped_launch itself: no change there). Force gates pass;
 # OMAT-0's energy error is 4-11x the float32 reference's, under the 10 meV floor. A precision change, owner-approved
 # for these two models on this GPU only (the Ada and the RTX 5060 Ti measured Triton's tf32x3 slower).
-DECISION_66_TF32X3_GPUS = ("NVIDIA A100-SXM4-80GB",)
+DECISION_66_TF32X3_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
 # The A100 80GB PCIe (owner, 4 November 2026: "Yes"): for OMAT-0 medium only, where it was measured (Benchmark_loup
 # with the SXM4's switches: 4.61 -> 3.31 us/atom/step; results/omat0-kernel-lab-20261103 section 9). MH-1 was not
-# measured there.
-DECISION_66_TF32X3_OMAT0_GPUS = ("NVIDIA A100 80GB PCIe",)
+# measured there. Since the owner's A100 rule (4 November 2026) DECISION_66_TF32X3_GPUS covers every A100 model,
+# MH-1 included; this entry stays for the record.
+DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe",))
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
 # build orders: RTX 4000 Ada NaCl 8,000 atoms 0.953 / 0.953, SrTiO3 6,655 0.916 / 0.916; RTX 5060 Ti NaCl 5,832
 # 0.972 / 0.972, SrTiO3 3,645 0.949 / 0.951. The A100 was not measured (no Colab compute units).
-DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce RTX 5060 Ti",
+                                                               "NVIDIA RTX 4000 Ada Generation"))
 # generic_radial_tables (radial_tables on a generic model, docs/validation/generic-radial-tables.md) under decision
 # 66 (owner, 2 November 2026): "auto" on only on these GPUs, exact device names. MACE-OMAT-0 medium, MD step b/a in
 # the two build orders: RTX 4000 Ada NaCl 8,000 atoms 0.864 / 0.862, SrTiO3 6,655 0.845 / 0.844; RTX 5060 Ti NaCl
@@ -421,12 +427,12 @@ DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti
 # wprime_backward. Force gates pass (rounding only, as IEEE float32).
 # The A100 80GB PCIe (owner, 4 November 2026: "Yes"; the generic set there on Benchmark_loup with tf32x3_gemms and
 # the skipped zero column: 4.61 -> 3.31 us/atom/step).
-DECISION_66_GENERIC_WPRIME_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                   "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
+DECISION_66_GENERIC_WPRIME_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                             "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
-DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = ("NVIDIA GeForce RTX 5060 Ti",
-                                                           "NVIDIA RTX 4000 Ada Generation",
-                                                           "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB")
+DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce RTX 5060 Ti",
+                                                                     "NVIDIA RTX 4000 Ada Generation",
+                                                                     "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB"))
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):

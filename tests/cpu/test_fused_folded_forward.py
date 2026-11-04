@@ -99,9 +99,10 @@ def test_stream_store_w_only_changes_the_store():
 def test_tensor_cores_render_and_launch_rule(monkeypatch):
     """``TENSOR_CORES``: the a.W product in 3xTF32 mma.sync tiles over a k padded to a multiple of 8, the W slice
     with row stride ``TC_STRIDE``, a per-warp redistribution tile; sm_80 and later only."""
-    assert ff.TENSOR_CORES is None  # per GPU (decision 66): the two A100 80GB cards
+    assert ff.TENSOR_CORES is None  # per GPU (decision 66): every A100 model (owner, 4 November 2026)
     assert ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-80GB") and ff.tensor_cores((8, 0), "NVIDIA A100 80GB PCIe")
-    assert not ff.tensor_cores((8, 0)) and not ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-40GB")
+    assert ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-40GB")
+    assert not ff.tensor_cores((8, 0)) and not ff.tensor_cores((8, 6), "NVIDIA RTX A4000")
     assert not ff.tensor_cores((12, 0), "NVIDIA GeForce RTX 5060 Ti")
     monkeypatch.setattr(ff, "TENSOR_CORES", False)
     assert not ff.tensor_cores((8, 0), "NVIDIA A100-SXM4-80GB")

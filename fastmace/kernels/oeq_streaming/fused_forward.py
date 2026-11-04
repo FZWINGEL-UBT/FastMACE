@@ -38,6 +38,8 @@ from dataclasses import dataclass
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 BATCH = 8  # edges per batch: two float4 broadcasts of a per k
 RECEIVERS_PER_CHUNK = 2  # receivers per work chunk (OPT8-T01 screen: 2 balanced best on NbCl5 and NaNbO3)
 TAIL_EDGES = 64  # padding edges (past the last CSR row) per work chunk
@@ -56,7 +58,8 @@ SKIP_ZERO_COLUMN = None
 # A100-SXM4-80GB 0.986 (degree 5 and the skip against degree 5 alone; both orders 0.896 / 0.895 against degree 10).
 # The RTX 5060 Ti gained nothing (1.000) and keeps the full k-loop; other GPUs are not measured. The A100 80GB PCIe
 # (owner, 4 November 2026: "Yes"): Benchmark_loup 4.61 -> 3.31 us/atom/step with the SXM4's decision-66 switches.
-SKIP_ZERO_COLUMN_GPUS = ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
+# Every A100 model (GPUModels; owner, 4 November 2026).
+SKIP_ZERO_COLUMN_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 # The stored per-edge weights are read only by the backward, long after: store them with the streaming cache hint
 # (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
 # forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
@@ -71,7 +74,7 @@ TENSOR_CORES = None
 # A100-SXM4-80GB, Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms): MD step b/a 0.933 / 0.933 in both orders;
 # loup 3.17 -> 2.92 (NVE), 3.12 -> 2.90 us/atom/step (Langevin). Force gate passes (SrTiO3 energy error 1.39 meV
 # against 0.73, floor 10 meV). Slower on the RTX 5060 Ti and the RTX 4000 Ada (TF32 there is 2x FP32).
-TENSOR_CORES_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
+TENSOR_CORES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))  # every A100 model
 TC_STRIDE = 40  # W slice row stride with tensor cores: the fragment loads hit 32 distinct banks
 # The W slice split into its TF32 parts once per block (float2 {hi, lo} per weight) instead of in every batch's
 # fragment loads: bitwise the same product (the same TC_SPLIT), twice the slice's shared memory. A/B switch.

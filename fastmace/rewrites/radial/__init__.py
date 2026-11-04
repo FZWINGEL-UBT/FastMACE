@@ -854,7 +854,7 @@ def attach_generic_wprime(model):
         if size > W_TABLE_MAX_BYTES:
             raise RewriteError(f"generic_wprime_backward: interactions.{index} would hold {size / 2**30:.1f} GiB of "
                                f"tables (more than W_TABLE_MAX_BYTES)")
-        interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels)
+        interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels, generic=True)
         names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB)")
     if not names:
         raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the "

@@ -1039,7 +1039,10 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
                                                    model_label="mh1-r2scan")
         item, choice, reason = decision(plan, "RewriteConfig.wprime_backward")
         assert choice == "on" and f"MH-1 on a measured GPU, decision 66 ({hardware.name})" in reason, hardware.name
-    for hardware in (A100, L4, RTX_5090):  # same capability or family, never measured
+    plan = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), A100,
+                                               model_label="mh1-r2scan")
+    assert plan.rewrites.wprime_backward == "on"  # every A100 model (owner, 4 November 2026)
+    for hardware in (L4, RTX_5090):  # same family, never measured
         plan = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), hardware,
                                                    model_label="mh1-r2scan")
         assert plan.rewrites.wprime_backward == "off", hardware.name
@@ -1080,7 +1083,9 @@ def test_decision_66_generic_wprime_and_fused_forward_for_omat0():
         assert f"omat0-medium (generic) on a measured GPU, decision 66 ({hardware.name})" in \
             decision(p, "RewriteConfig.wprime_backward")[2]
     assert "carrier of wprime_backward" in decision(p, "RewriteConfig.chunked_conv_backward")[2]  # the A100
-    for hardware in (A100, L4):  # never measured
+    p = plan(A100)  # every A100 model (owner, 4 November 2026)
+    assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) == ("on", "on")
+    for hardware in (L4,):  # never measured
         p = plan(hardware)
         assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) == ("off", "off"), hardware.name
         assert dict(p.auto_options_off)["wprime_backward"] == f"not a measured GPU, decision 66 ({hardware.name})"

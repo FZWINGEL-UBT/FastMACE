@@ -189,7 +189,7 @@ wp.TABLE_W = True
 try:
     w_prime = wp.WPrime(table, weight, kernels)
 finally:
-    wp.TABLE_W = False
+    wp.TABLE_W = None
 assert w_prime.gprime.shape == (pairs * pieces, problem.weight_numel, wp.padded_terms(degree + 1, 2))
 for forward in (None, fused):
     name = f"table-w-{'fused' if forward is not None else 'cublas'}"

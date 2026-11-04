@@ -29,6 +29,8 @@ import ctypes
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 _REGISTRY = {}
 # The w-rebuilding backward's launch for recompute_conv_weights: one path part, four edges per batch (the fastest of
 # the shapes timed in docs/validation/capacity-T08-inventory.md section 2).
@@ -49,8 +51,13 @@ SLOPE_VECTOR = 0
 # G = C [W, b]^T instead, q-major with float2 loads ([groups, Q, D + 1 rounded up to even]), and evaluates both
 # w = sum_k T_k(x) G_k and w' = sum_k T_k'(x) scale G_k from the one slab, so the forward stores no w (its
 # message-only kernel) and the backward reads neither w nor G'. Rounding: the backward's w is the table's series, not
-# the forward's a . W product. A module constant for the A/B.
-TABLE_W = False
+# the forward's a . W product. None: on for the generic family's wprime_backward (OMAT-0, where it was measured) on
+# TABLE_W_GPUS (decision 66; owner, 4 November 2026: "Enable it", every A100 model included), off for MH-1;
+# True / False: an A/B side's choice on every GPU and model.
+TABLE_W = None
+# Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms), MD step b/a in both orders: RTX 5060 Ti 0.888 / 0.892, RTX 4000
+# Ada 0.928 / 0.931, A100-SXM4-80GB 0.943 / 0.943; force gate passes (results/omat0-kernel-lab-20261103 section 16).
+TABLE_W_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 TABLE_W_VECTOR = 2
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
@@ -533,14 +540,23 @@ class _WPrimeConvolution(torch.autograd.Function):
                 None, None, None, None, None, None, None, None, None, None)
 
 
+def table_w_default(device, generic):
+    """``TABLE_W`` for a WPrime on ``device``: the constant when set, else on for the generic family on
+    ``TABLE_W_GPUS``."""
+    if TABLE_W is not None:
+        return bool(TABLE_W)
+    device = torch.device(device)
+    return bool(generic) and device.type == "cuda" and torch.cuda.get_device_name(device) in TABLE_W_GPUS
+
+
 class WPrime(torch.nn.Module):
     """One interaction's ``wprime_backward``: the derivative table ``G'``, the density's derivative series and
     the compiled kernel, built from its radial table, folded weight and streaming kernels."""
 
-    def __init__(self, table, weight, kernels):
+    def __init__(self, table, weight, kernels, generic=False):
         super().__init__()
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
-        self.table_w = bool(TABLE_W) and table.coef.dtype == torch.float32
+        self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
         if self.table_w:
             self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
             gprime = value_table(table.coef, weight, self.vector)
@@ -604,7 +620,7 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["TABLE_W", "WPrime", "WPrimeBackward", "density_backward", "density_column", "derivative_table",
-           "padded_terms", "render", "value_table",
+__all__ = ["TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "density_backward", "density_column",
+           "derivative_table", "padded_terms", "render", "table_w_default", "value_table",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_recompute", "wprime_arguments",
            "wprime_reference"]
