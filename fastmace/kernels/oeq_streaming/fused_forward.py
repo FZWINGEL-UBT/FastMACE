@@ -73,6 +73,10 @@ TENSOR_CORES = None
 # against 0.73, floor 10 meV). Slower on the RTX 5060 Ti and the RTX 4000 Ada (TF32 there is 2x FP32).
 TENSOR_CORES_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
 TC_STRIDE = 40  # W slice row stride with tensor cores: the fragment loads hit 32 distinct banks
+# The W slice split into its TF32 parts once per block (float2 {hi, lo} per weight) instead of in every batch's
+# fragment loads: bitwise the same product (the same TC_SPLIT), twice the slice's shared memory. A/B switch.
+TC_PRESPLIT = False
+TC_PSTRIDE = 36  # the pre-split slice's row stride in float2: the 64-bit fragment loads are conflict-free
 TC_RSTRIDE = 36  # the redistribution tile's row stride: conflict-free fragment stores
 
 _REGISTRY = {}
@@ -127,9 +131,17 @@ __device__ __forceinline__ void mma_tf32(float (&d)[4], const unsigned (&a)[4], 
 """
 
 
-def tc_wfill(npl, stride):
+def tc_wfill(npl, stride, presplit=False):
     """A block's W slice for the tensor-core product: rows padded to KP with zeros, row stride WS; ``stride``: the
-    name of W's row stride in the kernel."""
+    name of W's row stride in the kernel. ``presplit``: stored as float2 {hi, lo} (``TC_PRESPLIT``)."""
+    if presplit:
+        return f"""            for (int i = threadIdx.x; i < {npl} * KP * CB; i += blockDim.x) {{
+                const int p = i / (KP * CB), rem = i - p * (KP * CB), k = rem / CB, l = rem - k * CB;
+                unsigned hi, lo;
+                split_tf32(k < K ? W[(int64_t)(wst[p] + cb * CB + l) * {stride} + k] : 0.f, hi, lo);
+                reinterpret_cast<float2*>(Ws)[(p * KP + k) * WS + l] = make_float2(__uint_as_float(hi),
+                                                                                   __uint_as_float(lo));
+            }}"""
     return f"""            for (int i = threadIdx.x; i < {npl} * KP * CB; i += blockDim.x) {{
                 const int p = i / (KP * CB), rem = i - p * (KP * CB), k = rem / CB, l = rem - k * CB;
                 Ws[(p * KP + k) * WS + l] = k < K ? W[(int64_t)(wst[p] + cb * CB + l) * {stride} + k] : 0.f;
@@ -144,9 +156,25 @@ def tc_astage(stride):
                 }}"""
 
 
-def tc_product(npl):
+def tc_product(npl, presplit=False):
     """``float w[npl][B]`` (lane = channel) from the staged a and the W slice through 3xTF32 mma.sync m16n8k8 tiles
-    (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``."""
+    (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``; ``presplit``: the slice holds the
+    split parts (``tc_wfill``)."""
+    if presplit:
+        wload = """                                const float2* wp = reinterpret_cast<const float2*>(Ws)
+                                                   + (g * KP + k0 + tq) * WS + m * 16 + gid;
+                                const float2 v0 = wp[0], v1 = wp[8], v2 = wp[4 * WS], v3 = wp[4 * WS + 8];
+                                const unsigned ah[4] = {__float_as_uint(v0.x), __float_as_uint(v1.x),
+                                                        __float_as_uint(v2.x), __float_as_uint(v3.x)};
+                                const unsigned al[4] = {__float_as_uint(v0.y), __float_as_uint(v1.y),
+                                                        __float_as_uint(v2.y), __float_as_uint(v3.y)};"""
+    else:
+        wload = """                                const float* wp = Ws + (g * KP + k0 + tq) * WS + m * 16 + gid;
+                                unsigned ah[4], al[4];
+                                split_tf32(wp[0], ah[0], al[0]);
+                                split_tf32(wp[8], ah[1], al[1]);
+                                split_tf32(wp[4 * WS], ah[2], al[2]);
+                                split_tf32(wp[4 * WS + 8], ah[3], al[3]);"""
     return f"""                float wacc[{npl}][2][4];
                 #pragma unroll
                 for (int g = 0; g < {npl}; ++g)
@@ -165,12 +193,7 @@ def tc_product(npl):
                         for (int g = 0; g < {npl}; ++g)
                             #pragma unroll
                             for (int m = 0; m < 2; ++m) {{  // W fragment: channel m*16 + gid (+8), k0 + tq (+4)
-                                const float* wp = Ws + (g * KP + k0 + tq) * WS + m * 16 + gid;
-                                unsigned ah[4], al[4];
-                                split_tf32(wp[0], ah[0], al[0]);
-                                split_tf32(wp[8], ah[1], al[1]);
-                                split_tf32(wp[4 * WS], ah[2], al[2]);
-                                split_tf32(wp[4 * WS + 8], ah[3], al[3]);
+{wload}
                                 mma_tf32(wacc[g][m], al, bh);
                                 mma_tf32(wacc[g][m], ah, bl);
                                 mma_tf32(wacc[g][m], ah, bh);
@@ -219,8 +242,9 @@ class LaunchRule:
 
 def slice_floats(paths_per_part, k, tc=False):
     """Floats of a block's W slice (row stride CHANNEL_BLOCK + 1; with tensor cores ``TC_STRIDE`` and k padded to a
-    multiple of 8), rounded up to keep the staging 16-byte aligned."""
-    rows, stride = (_kpad(k), TC_STRIDE) if tc else (k, CHANNEL_BLOCK + 1)
+    multiple of 8; ``tc="presplit"``: ``TC_PSTRIDE`` float2), rounded up to keep the staging 16-byte aligned."""
+    rows, stride = ((_kpad(k), 2 * TC_PSTRIDE) if tc == "presplit" else (_kpad(k), TC_STRIDE) if tc
+                    else (k, CHANNEL_BLOCK + 1))
     return -(-paths_per_part * rows * stride // 4) * 4
 
 
@@ -290,7 +314,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
     default ``k``), a's and W's rows keep the stride ``k``. ``stream_store`` (default ``STREAM_STORE_W``): ``w``
     stored with ``__stcs``. ``tc``: the a.W product on tensor cores in 3xTF32 (``TENSOR_CORES``, sm_80+; the launch
-    rule must be ``launch_rule(..., tc=True)``'s)."""
+    rule must be ``launch_rule(..., tc=tc)``'s); ``"presplit"``: with the W slice split once (``TC_PRESPLIT``)."""
     check_problem(schedule)
     used = int(k) if used is None else int(used)
     if not 1 <= used <= k:
@@ -322,7 +346,7 @@ constexpr int KA = {k};  // a's and W's row stride
 constexpr int KP = {_kpad(used) if tc else used};  // the k-loop's padded length (tensor cores: steps of 8)
 constexpr int RS = {TC_RSTRIDE};
 constexpr int CB = {CHANNEL_BLOCK};
-constexpr int WS = {TC_STRIDE if tc else CHANNEL_BLOCK + 1};
+constexpr int WS = {TC_PSTRIDE if tc == "presplit" else TC_STRIDE if tc else CHANNEL_BLOCK + 1};
 constexpr int ED = {schedule.edge_dim};
 constexpr int IN_DIM = {schedule.input_dim};
 constexpr int OUT_DIM = {schedule.output_dim};
@@ -386,7 +410,8 @@ def _part(schedule, part, slots, C, layout, store, tc=False):
                 gemm.append(f"                      w[{g}][{b}] = fmaf(av{q}.{comp}, wk, w[{g}][{b}]);")
         gemm.append("                    }")
     if tc:
-        wfill, astage, product = tc_wfill(npl, "KA"), tc_astage("KA"), tc_product(npl)
+        pre = tc == "presplit"
+        wfill, astage, product = tc_wfill(npl, "KA", pre), tc_astage("KA"), tc_product(npl, pre)
     else:
         wfill = f"""            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
                 const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
@@ -503,11 +528,13 @@ class FusedFoldedForward:
             raise ValueError("fused_folded_forward needs float32 streaming kernels")
         schedule = kernels.schedule
         check_problem(schedule)
+        self.schedule = schedule
         device = torch.device("cuda", torch.cuda.current_device()) if device is None else torch.device(device)
         props = torch.cuda.get_device_properties(device)
         self.k, self.channels, self.paths = int(k), schedule.channels, len(schedule.paths)
         self.used = self.k if used is None else int(used)
         self.tc = tensor_cores(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
+        self.tc = "presplit" if self.tc and TC_PRESPLIT else self.tc
         self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
                                 schedule.channels, int(props.shared_memory_per_block_optin),
                                 int(props.multi_processor_count), tc=self.tc)

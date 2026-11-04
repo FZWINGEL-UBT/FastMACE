@@ -188,7 +188,30 @@ def _tc_no_wsplit(s):
     return s
 
 
-def forward_variants():
+_RULES = {}  # a re-rendered variant's source -> its launch rule
+
+
+def _tc_presplit(kernel):
+    """The tensor-core kernel re-rendered with the W slice split once per block (fused_forward.TC_PRESPLIT): bitwise
+    the plan's tensor-core kernel, its own launch rule (twice the slice's shared memory)."""
+    def transform(s):
+        import torch
+
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        if not kernel.tc:
+            raise ValueError("tc-presplit needs the tensor-core kernel (--constant ...:TENSOR_CORES=True)")
+        props = torch.cuda.get_device_properties(0)
+        rule = ff.launch_rule(kernel.paths, kernel.used, kernel.schedule.edge_dim, kernel.channels,
+                              int(props.shared_memory_per_block_optin), int(props.multi_processor_count),
+                              tc="presplit")
+        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc="presplit")
+        _RULES[source] = rule
+        print(f"tc-presplit rule {rule} (plan {kernel.rule})", flush=True)
+        return source
+    return transform
+
+
+def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
     def k64(s):
@@ -230,6 +253,7 @@ def forward_variants():
                                                 TC_SPLIT_RAW_LO), ()),
         "F-tc-no-product": ("falsifier", lambda s: _sub(s, "for (int k0 = 0; k0 < KP; k0 += 8) {",
                                                         "for (int k0 = 0; k0 < 0; k0 += 8) {"), ()),
+        "tc-presplit": ("exact", _tc_presplit(kernel), ()),
         "F-tc-no-redistribute": ("falsifier", lambda s: _sub(s, "w[g][b] = r_s[(g * B + b) * RS + lane];",
                                                              "w[g][b] = wacc[g][b & 1][b >> 1 & 3];"), ()),
     }
@@ -246,11 +270,12 @@ def forward_launcher(kernel, source, extra):
     module = _check(driver.cuModuleLoadData(cubin))
     function = _check(driver.cuModuleGetFunction(module, b"fused_folded_forward"))
     attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
-    _check(driver.cuFuncSetAttribute(function, attribute, kernel.rule.shared_bytes))
+    rule = _RULES.get(source, kernel.rule)
+    _check(driver.cuFuncSetAttribute(function, attribute, rule.shared_bytes))
     registers = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))
     spills = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
                                               function))
-    counters = torch.zeros(kernel.slices, dtype=torch.int32, device="cuda")
+    counters = torch.zeros((kernel.channels // CHANNEL_BLOCK) * rule.parts, dtype=torch.int32, device="cuda")
 
     def launch(args):
         a, weight, x, sh, senders, receivers, row_ptr, out, w = args
@@ -261,8 +286,8 @@ def forward_launcher(kernel, source, extra):
                   w.data_ptr())
         types = (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p, p)
         stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
-        _check(driver.cuLaunchKernel(function, kernel.rule.blocks_per_slice, kernel.channels // CHANNEL_BLOCK,
-                                     kernel.rule.parts, kernel.rule.warps * 32, 1, 1, kernel.rule.shared_bytes, stream,
+        _check(driver.cuLaunchKernel(function, rule.blocks_per_slice, kernel.channels // CHANNEL_BLOCK,
+                                     rule.parts, rule.warps * 32, 1, 1, rule.shared_bytes, stream,
                                      (values, types), 0))
     return launch, dict(registers=int(registers), local_bytes=int(spills))
 
@@ -423,7 +448,7 @@ def main(argv=None):
                           gprime_MB=gprime.numel() * gprime.element_size() / 2**20, species=species,
                           pieces=starts.shape[0], threads=kernel.num_threads, cohort=kernel.cohort)
         else:
-            table, launcher = forward_variants(), forward_launcher
+            table, launcher = forward_variants(kernel), forward_launcher
             shapes = dict(edges=cargs[3].shape[0], k=kernel.k, rule=str(kernel.rule),
                           weight_last_column_zero=bool((cargs[1][:, -1] == 0).all()))
         (args.output / f"{name}.cu").write_text(kernel.source)
