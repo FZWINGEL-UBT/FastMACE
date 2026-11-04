@@ -1,6 +1,6 @@
 """fastmace.kernels.triton.species_gemm on CUDA: ``species_mm`` against float64 within float32 rounding of the row
-scale |x| |w| (ieee) and the 3xTF32 bound (tf32x3), its input gradient, strided inputs, a species without atoms,
-atoms changing species under one captured CUDA graph, and ``SpeciesSkip`` with ``SPECIES_GEMM`` bitwise or within
+scale |x| |w| (ieee) and the 3xTF32 bound (tf32x3: Triton and ``TENSOR_CORES``), its input gradient, strided inputs,
+a species without atoms, atoms changing species under one captured CUDA graph, and ``SpeciesSkip`` with ``SPECIES_GEMM`` bitwise or within
 rounding of the concatenated product."""
 
 import pytest
@@ -20,12 +20,16 @@ def _case(counts, size, k, n, seed=0):
     return index, x, w
 
 
-@pytest.mark.parametrize("precision, limit", [("ieee", 2e-6), ("tf32x3", 2e-5)])
+@pytest.mark.parametrize("precision, limit", [("ieee", 2e-6), ("tf32x3", 2e-5), ("tc", 2e-5)])
 @pytest.mark.parametrize("counts, size, k, n", [((1000, 1000, 3000), 7, 128, 128), ((37, 0, 101), 3, 128, 64),
                                                  ((5,), 1, 96, 130)])
-def test_product_and_gradient(precision, limit, counts, size, k, n):
-    if precision == "tf32x3" and torch.cuda.get_device_capability()[0] < 8:
+def test_product_and_gradient(monkeypatch, precision, limit, counts, size, k, n):
+    if precision != "ieee" and torch.cuda.get_device_capability()[0] < 8:
         pytest.skip("tf32x3 needs compute capability 8.0")
+    if precision == "tc":  # the tensor-core kernel (n = 130 falls back to Triton)
+        assert sg.tc_supported("cuda", k, n) == (n % 16 == 0)
+        monkeypatch.setattr(sg, "TENSOR_CORES", True)
+        precision = "tf32x3"
     index, x, w = _case(counts, size, k, n)
     x.requires_grad_()
     order, found = sg.species_plan(index, len(counts))
@@ -41,13 +45,19 @@ def test_product_and_gradient(precision, limit, counts, size, k, n):
     assert float(((gx.double() - exact).abs() / scale).max()) < limit
 
 
-def test_species_change_under_graph():
+@pytest.mark.parametrize("precision", ["ieee", "tc"])
+def test_species_change_under_graph(monkeypatch, precision):
+    if precision == "tc":
+        if torch.cuda.get_device_capability()[0] < 8:
+            pytest.skip("tf32x3 needs compute capability 8.0")
+        monkeypatch.setattr(sg, "TENSOR_CORES", True)
+        precision = "tf32x3"
     index, x, w = _case((40, 30, 50), 3, 64, 64, seed=3)
     w_t = w.transpose(1, 2).contiguous()
 
     def call():
         order, counts = sg.species_plan(index, 3)
-        return sg.species_mm(x, w, w_t, index, order, counts, "ieee")
+        return sg.species_mm(x, w, w_t, index, order, counts, precision)
 
     call()
     torch.cuda.synchronize()

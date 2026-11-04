@@ -10,6 +10,8 @@ it back. Timed here, forward plus input backward, CUDA events, median, variants 
   bound of an exact grouped kernel (eager, data-dependent shapes; a production kernel needs fixed shapes);
 - ``triton``: ``fastmace.kernels.triton.species_gemm`` (fixed grid; its plan, the argsort and tile table, timed
   with it), precision tf32x3 with ``--tf32x3``, else ieee;
+- ``tc<chunk>`` and ``tc<chunk>p`` (``--tf32x3`` only, ``--tc``): the same with ``species_gemm.TENSOR_CORES``, our
+  mma.sync 3xTF32 kernel, with ``TC_CHUNK`` = chunk, ``p``: ``TC_PRESPLIT``;
 - ``bound`` (wrong result): every row through one species' matrix, no gather: what a grouped GEMM that gathers its
   rows in the prologue and scatters in the epilogue could cost at best.
 
@@ -69,10 +71,13 @@ def grouped(mm, x, groups, w):
     return out
 
 
-def triton_grouped(x, w, w_t, species, precision):
-    from fastmace.kernels.triton.species_gemm import species_mm, species_plan
-    order, counts = species_plan(species, len(COUNTS))
-    return species_mm(x, w, w_t, species, order, counts, precision)
+def triton_grouped(x, w, w_t, species, precision, tc=None):
+    from fastmace.kernels.triton import species_gemm
+    species_gemm.TENSOR_CORES = tc is not None
+    if tc is not None:
+        species_gemm.TC_CHUNK, species_gemm.TC_PRESPLIT = tc
+    order, counts = species_gemm.species_plan(species, len(COUNTS))
+    return species_gemm.species_mm(x, w, w_t, species, order, counts, precision)
 
 
 def bound(mm, x, w):
@@ -97,6 +102,7 @@ def main(argv=None):
     p.add_argument("--tf32x3", action="store_true", help="the products through tf32x3_matmul (the A100 plan)")
     p.add_argument("--blocks", type=int, default=15)
     p.add_argument("--rounds", type=int, default=20)
+    p.add_argument("--tc", default="32,16p", help="tensor-core variants: chunk, p for presplit (comma separated)")
     args = p.parse_args(argv)
     args.output.mkdir(parents=True, exist_ok=True)
     mm = product(args.tf32x3)
@@ -107,13 +113,16 @@ def main(argv=None):
         fns = {"current": lambda: current(mm, x, onehot, wcat), "grouped": lambda: grouped(mm, x, groups, w),
                "bound": lambda: bound(mm, x, w),
                "triton": lambda: triton_grouped(x, w, w_t, species, "tf32x3" if args.tf32x3 else "ieee")}
+        for variant in args.tc.split(",") if args.tf32x3 and args.tc else ():
+            tc = (int(variant.rstrip("p")), variant.endswith("p"))
+            fns[f"tc{variant}"] = lambda tc=tc: triton_grouped(x, w, w_t, species, "tf32x3", tc)
         w_t = w.transpose(1, 2).contiguous()
         # exactness: the same per-element dot products
         x.grad = None
         torch.autograd.backward(fns["current"](), grad)
         ref_y, ref_g = fns["current"]().detach(), x.grad.clone()
         diff = {}
-        for name in ("grouped", "triton"):
+        for name in [n for n in fns if n not in ("current", "bound")]:
             x.grad = None
             torch.autograd.backward(fns[name](), grad)
             diff[name] = dict(y=float((fns[name]().detach() - ref_y).abs().max()),
@@ -131,10 +140,8 @@ def main(argv=None):
                                      bound_ratio=med["bound"] / med["current"],
                                      triton_ratio=med["triton"] / med["current"], max_abs_diff=diff,
                                      times_us=times)
-        print(f"size {size:2d}: current {med['current']:8.1f} us  grouped {med['grouped']:8.1f} us  "
-              f"triton {med['triton']:8.1f} us  bound {med['bound']:8.1f} us  ratios "
-              f"{med['grouped'] / med['current']:.3f} {med['triton'] / med['current']:.3f} "
-              f"{med['bound'] / med['current']:.3f}  diff {diff}", flush=True)
+        print(f"size {size:2d}: " + "  ".join(f"{name} {t:8.1f} us" for name, t in med.items())
+              + f"  diff {diff}", flush=True)
     (args.output / "species_skip_lab.json").write_text(json.dumps(result, indent=1))
 
 

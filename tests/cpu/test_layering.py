@@ -75,6 +75,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # (tools/modal/omat0_a100_launch_screen.sh); config fields only if adopted.
     "fastmace/kernels/triton/edge_outer_sum.py": {"STRIDED_ROWS": "strided rows in place; copy kept for the A/B"},
     "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B"},
+    "fastmace/kernels/triton/species_gemm.py": {"TENSOR_CORES": "species products in our mma.sync kernel; A/B"},
     "fastmace/rewrites/generic/modules.py": {"FIRST_FULL_ROWS": "reassociation on the full table row; screen A/B",
                                              "FIRST_TABLE_COLUMNS": "first table without its cutoff column; A/B",
                                              "SPECIES_GEMM": "skip rows through their own species only; A/B"},
