@@ -174,6 +174,12 @@ def wprime_launcher(kernel, source, extra):
 
 
 # --------------------------------------------------------------------------------------------------- fused forward
+TC_SPLIT_RNA_HI = 'asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(hi) : "f"(x));'
+TC_SPLIT_MASK_HI = "hi = __float_as_uint(x) & 0xffffe000u;"
+TC_SPLIT_RNA_LO = 'asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(lo) : "f"(rest));'
+TC_SPLIT_RAW_LO = "lo = __float_as_uint(rest);"
+
+
 def _tc_no_wsplit(s):
     """The tensor-core product with W's fragments used unsplit (the high part twice): no split instructions for W."""
     for i, offset in enumerate(("0", "8", "4 * WS", "4 * WS + 8")):
@@ -215,6 +221,12 @@ def forward_variants():
                                                     "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
                                                     "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
+        # Cheaper splits (accuracy checked by the GPU test once adopted): the high part by masking the low 13 mantissa
+        # bits (truncation), the low part the exact remainder, rounded to TF32 (mask-rna) or passed raw (mask: the
+        # tensor core reads its top 19 bits).
+        "tc-mask-rna": ("falsifier", lambda s: _sub(s, TC_SPLIT_RNA_HI, TC_SPLIT_MASK_HI), ()),
+        "tc-mask": ("falsifier", lambda s: _sub(_sub(s, TC_SPLIT_RNA_HI, TC_SPLIT_MASK_HI), TC_SPLIT_RNA_LO,
+                                                TC_SPLIT_RAW_LO), ()),
         "F-tc-no-product": ("falsifier", lambda s: _sub(s, "for (int k0 = 0; k0 < KP; k0 += 8) {",
                                                         "for (int k0 = 0; k0 < 0; k0 += 8) {"), ()),
         "F-tc-no-redistribute": ("falsifier", lambda s: _sub(s, "w[g][b] = r_s[(g * B + b) * RS + lane];",

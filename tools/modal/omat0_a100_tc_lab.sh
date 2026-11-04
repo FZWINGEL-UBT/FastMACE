@@ -15,7 +15,7 @@ python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels forward \
 echo "simt exit=$?" >> "$out/summary.txt"
 python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels forward \
   --constant fastmace.kernels.oeq_streaming.fused_forward:TENSOR_CORES=True \
-  --variants base F-no-store F-no-tp F-tc-1pass F-tc-no-mma F-tc-no-wsplit F-tc-no-redistribute F-tc-no-product \
+  --variants base tc-mask-rna tc-mask F-tc-no-wsplit F-tc-no-product \
   --output "$out/tc" > "$out/tc.log" 2>&1
 echo "tc exit=$?" >> "$out/summary.txt"
 grep -h -E "^forward " "$out/simt.log" "$out/tc.log" | cut -c1-200 | tee -a "$out/summary.txt"
