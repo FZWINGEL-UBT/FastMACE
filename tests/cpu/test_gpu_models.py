@@ -63,3 +63,9 @@ def test_block_message_default(monkeypatch):
     monkeypatch.setattr(wprime_backward, "BLOCK_MESSAGE", True)
     assert wprime_backward.block_message_default(torch.device("cuda", 0))
 
+
+def test_block_gradient_reads_use_ldg():
+    """Plain loads through the group pointers cost 47 % of the kernel on the RTX 5060 Ti (``BLOCK_LDG``)."""
+    assert wprime_backward.BLOCK_LDG is True
+    assert "__ldg(dout{{ bk[0] }} + int64_t(receiver)" in wprime_backward.TEMPLATE
+

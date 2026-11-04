@@ -69,6 +69,10 @@ BLOCK_MESSAGE = None
 # Benchmark_loup MD step b/a (a = the default with TABLE_W) in both orders: RTX 4000 Ada 0.974 / 0.971,
 # A100-SXM4-80GB 0.983 / 0.977 (every A100 model, GPUModels); the RTX 5060 Ti measured 1.060 and keeps it off.
 BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# The block kernel's gradient reads through __ldg (read-only data, written before the launch). Plain loads through the
+# group pointers took 9.9 ms against 6.6 ms on the RTX 5060 Ti, whatever the tensors' placement (same layout and
+# registers; the kernel alone, Benchmark_loup, 4 November 2026). False: an A/B side.
+BLOCK_LDG = True
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -224,8 +228,13 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     {%- set slot = output.accumulator %}
                     {%- if blocks %}
                     {%- set bk = blocks[slot.start] %}
+                    {%- if block_ldg %}
+                    const scalar_t output_gradient = __ldg(dout{{ bk[0] }} + int64_t(receiver) * {{ bk[1] }}
+                        + {{ bk[2] + slot.component * bk[3] }} + channel);
+                    {%- else %}
                     const scalar_t output_gradient = dout{{ bk[0] }}[int64_t(receiver) * {{ bk[1] }}
                         + {{ bk[2] + slot.component * bk[3] }} + channel];
+                    {%- endif %}
                     {%- else %}
                     const int64_t output_index =
                         output_base + {{ node_offset(slot.start, slot.component, slot.irrep_dim) }};
@@ -333,7 +342,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             slope_vector=vector, vector_type=f"float{vector}",
                                             padded_terms=padded_terms(terms, vector), table_w=bool(table_w),
                                             blocks=None if blocks is None else block_map(blocks, schedule.channels),
-                                            n_blocks=0 if blocks is None else len(blocks))
+                                            n_blocks=0 if blocks is None else len(blocks), block_ldg=BLOCK_LDG)
 
 
 def derivative_table(dcoef, weight, vector=0):
@@ -800,7 +809,7 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
+__all__ = ["BLOCK_LDG", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward",
            "block_message_default", "block_spec", "dense_message",
            "density_backward", "density_column", "derivative_table", "padded_terms", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
