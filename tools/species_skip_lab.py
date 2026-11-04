@@ -10,6 +10,7 @@ it back. Timed here, forward plus input backward, CUDA events, median, variants 
   bound of an exact grouped kernel (eager, data-dependent shapes; a production kernel needs fixed shapes);
 - ``triton``: ``fastmace.kernels.triton.species_gemm`` (fixed grid; its plan, the argsort and tile table, timed
   with it), precision tf32x3 with ``--tf32x3``, else ieee;
+- ``cutlass`` (``--tf32x3`` only): the same with ``species_gemm.CUTLASS``, gathered CUTLASS 3xTF32;
 - ``tc<chunk>`` and ``tc<chunk>p`` (``--tf32x3`` only, ``--tc``): the same with ``species_gemm.TENSOR_CORES``, our
   mma.sync 3xTF32 kernel, with ``TC_CHUNK`` = chunk, ``p``: ``TC_PRESPLIT``;
 - ``bound`` (wrong result): every row through one species' matrix, no gather: what a grouped GEMM that gathers its
@@ -71,9 +72,10 @@ def grouped(mm, x, groups, w):
     return out
 
 
-def triton_grouped(x, w, w_t, species, precision, tc=None):
+def triton_grouped(x, w, w_t, species, precision, tc=None, cutlass=False):
     from fastmace.kernels.triton import species_gemm
     species_gemm.TENSOR_CORES = tc is not None
+    species_gemm.CUTLASS = species_gemm.CUTLASS_FAMILY = cutlass
     if tc is not None:
         species_gemm.TC_CHUNK, species_gemm.TC_PRESPLIT = tc
     order, counts = species_gemm.species_plan(species, len(COUNTS))
@@ -113,6 +115,8 @@ def main(argv=None):
         fns = {"current": lambda: current(mm, x, onehot, wcat), "grouped": lambda: grouped(mm, x, groups, w),
                "bound": lambda: bound(mm, x, w),
                "triton": lambda: triton_grouped(x, w, w_t, species, "tf32x3" if args.tf32x3 else "ieee")}
+        if args.tf32x3:
+            fns["cutlass"] = lambda: triton_grouped(x, w, w_t, species, "tf32x3", cutlass=True)
         for variant in args.tc.split(",") if args.tf32x3 and args.tc else ():
             tc = (int(variant.rstrip("p")), variant.endswith("p"))
             fns[f"tc{variant}"] = lambda tc=tc: triton_grouped(x, w, w_t, species, "tf32x3", tc)

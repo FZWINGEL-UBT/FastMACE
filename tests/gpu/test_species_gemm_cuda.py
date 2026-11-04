@@ -1,7 +1,7 @@
 """fastmace.kernels.triton.species_gemm on CUDA: ``species_mm`` against float64 within float32 rounding of the row
-scale |x| |w| (ieee) and the 3xTF32 bound (tf32x3: Triton and ``TENSOR_CORES``), its input gradient, strided inputs,
-a species without atoms, atoms changing species under one captured CUDA graph, and ``SpeciesSkip`` with
-``SPECIES_GEMM`` bitwise or within rounding of the concatenated product."""
+scale |x| |w| (ieee) and the 3xTF32 bound (tf32x3: Triton, ``TENSOR_CORES`` and ``CUTLASS``), its input gradient,
+strided inputs, a species without atoms, atoms changing species under one captured CUDA graph, and ``SpeciesSkip``
+with ``SPECIES_GEMM`` bitwise or within rounding of the concatenated product."""
 
 import pytest
 import torch
@@ -20,7 +20,16 @@ def _case(counts, size, k, n, seed=0):
     return index, x, w
 
 
-@pytest.mark.parametrize("precision, limit", [("ieee", 2e-6), ("tf32x3", 2e-5), ("tc", 2e-5)])
+def _cutlass(monkeypatch):
+    """species_gemm.CUTLASS on any compute capability 8.x (the sm_80 cubin runs there too)."""
+    from fastmace.kernels.cutlass import tf32x3
+    if not tf32x3.available("cuda", family=True):
+        pytest.skip("the CUTLASS cubin needs compute capability 8.x")
+    monkeypatch.setattr(sg, "CUTLASS", True)
+    monkeypatch.setattr(sg, "CUTLASS_FAMILY", True)
+
+
+@pytest.mark.parametrize("precision, limit", [("ieee", 2e-6), ("tf32x3", 2e-5), ("tc", 2e-5), ("cutlass", 2e-5)])
 @pytest.mark.parametrize("counts, size, k, n", [((1000, 1000, 3000), 7, 128, 128), ((37, 0, 101), 3, 128, 64),
                                                  ((5,), 1, 96, 130)])
 def test_product_and_gradient(monkeypatch, precision, limit, counts, size, k, n):
@@ -30,7 +39,13 @@ def test_product_and_gradient(monkeypatch, precision, limit, counts, size, k, n)
         assert sg.tc_supported("cuda", k, n) == (n % 16 == 0)
         monkeypatch.setattr(sg, "TENSOR_CORES", True)
         precision = "tf32x3"
+    if precision == "cutlass":  # gathered CUTLASS (strided x: lda = gcd of the row strides; n = 130 falls back)
+        _cutlass(monkeypatch)
+        precision = "tf32x3"
     index, x, w = _case(counts, size, k, n)
+    if sg.CUTLASS:  # rows with unit column stride (the case's strided x would fall back to Triton)
+        x = x.contiguous()
+        assert bool(sg._cutlass_rows(x, w, x.new_empty(x.shape[0], size, n))) == (n % 4 == 0)
     x.requires_grad_()
     order, found = sg.species_plan(index, len(counts))
     y = sg.species_mm(x, w, w.transpose(1, 2).contiguous(), index, order, found, precision)
@@ -45,8 +60,11 @@ def test_product_and_gradient(monkeypatch, precision, limit, counts, size, k, n)
     assert float(((gx.double() - exact).abs() / scale).max()) < limit
 
 
-@pytest.mark.parametrize("precision", ["ieee", "tc"])
+@pytest.mark.parametrize("precision", ["ieee", "tc", "cutlass"])
 def test_species_change_under_graph(monkeypatch, precision):
+    if precision == "cutlass":
+        _cutlass(monkeypatch)
+        precision = "tf32x3"
     if precision == "tc":
         if torch.cuda.get_device_capability()[0] < 8:
             pytest.skip("tf32x3 needs compute capability 8.0")

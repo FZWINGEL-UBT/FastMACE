@@ -50,6 +50,10 @@ class _Kernels:
             pointer, size = _check(driver.cuModuleGetGlobal(self.module, b"fm_tf32x3_info"))
             info = np.zeros(size // 4, dtype=np.int32)
             _check(driver.cuMemcpyDtoH(info, pointer, size))
+            self.species_function = _check(driver.cuModuleGetFunction(self.module, b"fm_tf32x3_species_rr_64x64"))
+            pointer, size = _check(driver.cuModuleGetGlobal(self.module, b"fm_tf32x3_species_info"))
+            species_info = np.zeros(size // 4, dtype=np.int32)
+            _check(driver.cuMemcpyDtoH(species_info, pointer, size))
         two_warps = int(info[5])
         self.threads = {"64x64": int(info[0]), "32x64": two_warps, "64x32": two_warps}
         self.tile = {t: tuple(int(x) for x in t.split("x")) for t in _TILES}
@@ -59,15 +63,20 @@ class _Kernels:
         for key, function in self.functions.items():
             if self.shared[key] > 48 * 1024:
                 _check(driver.cuFuncSetAttribute(function, attribute, self.shared[key]))
+        self.species_threads, self.species_shared = int(species_info[0]), int(species_info[1])
+        if self.species_shared > 48 * 1024:
+            _check(driver.cuFuncSetAttribute(self.species_function, attribute, self.species_shared))
 
 
-def available(device) -> bool:
-    """Whether the CUTLASS kernels run on ``device``: CUDA, compute capability 8.0, the cubin present and loadable."""
+def available(device, family=False) -> bool:
+    """Whether the CUTLASS kernels run on ``device``: CUDA, compute capability 8.0 (``family``: any 8.x, where the
+    sm_80 cubin also runs; for tests), the cubin present and loadable."""
     device = torch.device(device)
     if device.type != "cuda" or not CUBIN.is_file():
         return False
     index = torch.cuda.current_device() if device.index is None else device.index
-    if tuple(torch.cuda.get_device_capability(index)) != CAPABILITY:
+    capability = tuple(torch.cuda.get_device_capability(index))
+    if capability != CAPABILITY and not (family and capability[0] == CAPABILITY[0]):
         return False
     try:
         _kernels(index)
@@ -162,5 +171,28 @@ def mm_into(a, b, out):
                                  kernels.shared[key], stream, (values, types), 0))
 
 
+def species_into(a, lda, gather, w, out, scatter, counts, size, grid_rows):
+    """``out[scatter[r]] = a[gather[r]] @ w[s]`` for every species s's rows r (rows sorted by species, ``counts[s] *
+    size`` of them; ``grid_rows`` = ``species_gemm.tiles``): ``a`` the base of rows ``lda`` floats apart, ``w`` [S, K,
+    N] contiguous, ``out`` [rows, N] contiguous, ``gather`` / ``scatter`` int32 row indices
+    (``fm_tf32x3_species_rr_64x64``). K, N, lda multiples of ``ALIGNMENT``, pointers 16-byte aligned."""
+    from cuda.bindings import driver
+
+    from fastmace.kernels.oeq_streaming.runtime import _check
+    index = out.device.index if out.device.index is not None else torch.cuda.current_device()
+    kernels = _kernels(index)
+    current = _check(driver.cuCtxGetCurrent())
+    if int(current) != int(kernels.context):
+        _check(driver.cuCtxSetCurrent(kernels.context))
+    _, k, n = w.shape
+    p, i = ctypes.c_void_p, ctypes.c_int
+    values = (counts.shape[0], counts.data_ptr(), size, n, k, a.data_ptr(), lda, gather.data_ptr(), w.data_ptr(),
+              out.data_ptr(), n, scatter.data_ptr())
+    types = (i, p, i, i, i, p, i, p, p, p, i, p)
+    stream = driver.CUstream(torch.cuda.current_stream(out.device).cuda_stream)
+    _check(driver.cuLaunchKernel(kernels.species_function, grid_rows, -(-n // 64), 1, kernels.species_threads, 1, 1,
+                                 kernels.species_shared, stream, (values, types), 0))
+
+
 __all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "LONG_K", "MIN_TILES", "TILE", "available", "eligible", "fit",
-           "mm_into", "takes"]
+           "mm_into", "species_into", "takes"]

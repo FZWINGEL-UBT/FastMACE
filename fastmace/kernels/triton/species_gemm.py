@@ -29,6 +29,11 @@ import torch
 
 BLOCK_M, BLOCK_N, BLOCK_K = 64, 64, 32
 NUM_WARPS, NUM_STAGES = 4, 2
+# The tf32x3 product as one CUTLASS 3xTF32 launch with gathered rows and scattered results
+# (``cutlass.tf32x3.species_into``) on compute capability 8.0 (4 November 2026; on the A100 Triton's tf32x3 dot runs
+# at about a third of CUTLASS's rate). A/B switch; ``CUTLASS_FAMILY`` also allows any 8.x (tests).
+CUTLASS = False
+CUTLASS_FAMILY = False
 TENSOR_CORES = False  # A/B switch (4 November 2026): the tf32x3 product in the mma.sync kernel
 TC_ROWS = BLOCK_M  # the tensor-core kernel's tile rows: the same tiles as the Triton kernel's
 TC_CHUNK = 16  # its reduction chunk: shared memory for several blocks per SM, loads overlapping other blocks' MMAs
@@ -269,11 +274,44 @@ def _launch_tc(x, w, order, counts, out):
                                  (values, types), 0))
 
 
+def _cutlass_rows(x, w, out):
+    """The leading dimension of ``x``'s rows for ``species_into`` (row (a, j) at a * sxa + j * sxj = index * lda),
+    or 0 when the operands do not fit."""
+    import math
+
+    from fastmace.kernels.cutlass import tf32x3
+    atoms, size, k = x.shape
+    n = w.shape[2]
+    if x.stride(2) != 1 or k % 4 or n % 4 or not out.is_contiguous() or not w.is_contiguous():
+        return 0
+    lda = math.gcd(x.stride(0), x.stride(1)) if size > 1 else x.stride(0)
+    if lda % 4 or lda <= 0 or x.data_ptr() % 16 or w.data_ptr() % 16 or out.data_ptr() % 16:
+        return 0
+    if not tf32x3.available(x.device, family=CUTLASS_FAMILY):
+        return 0
+    return lda
+
+
+def _launch_cutlass(x, w, order, counts, out, lda):
+    from fastmace.kernels.cutlass import tf32x3
+    atoms, size, _ = x.shape
+    j = torch.arange(size, device=x.device)
+    a = order.long()[:, None]
+    gather = ((a * x.stride(0) + j * x.stride(1)) // lda).to(torch.int32).flatten()
+    scatter = (a * size + j).to(torch.int32).flatten()
+    tf32x3.species_into(x, lda, gather, w, out, scatter, counts, size, tiles(atoms, size, counts.shape[0]))
+
+
 def _launch(x, w, order, counts, out, precision):
     import triton
 
     atoms, size, k = x.shape
     n = w.shape[2]
+    if CUTLASS and precision == "tf32x3":
+        lda = _cutlass_rows(x, w, out)
+        if lda:
+            _launch_cutlass(x, w, order, counts, out, lda)
+            return
     if TENSOR_CORES and precision == "tf32x3" and tc_supported(x.device, k, n):
         _launch_tc(x, w, order, counts, out)
         return
@@ -321,5 +359,5 @@ def _backward(ctx, grad):
 species_mm.register_autograd(_backward, setup_context=_setup_context)
 
 
-__all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "TENSOR_CORES", "species_mm", "species_plan", "tc_supported",
+__all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "CUTLASS", "TENSOR_CORES", "species_mm", "species_plan", "tc_supported",
            "tile_rows", "tiles"]
