@@ -95,21 +95,25 @@ PREFETCH_GPUS = GPUModels(())
 # edge_dim % 4 == 0; a sh whose address is not 16-byte aligned is copied first. None: on for VEC_SH_GPUS (decision
 # 66); True / False: an A/B side's choice.
 VEC_SH = None
-VEC_SH_GPUS = GPUModels(())
+# Defaults (decision 66, 5 November 2026): MD step b/a, SrTiO3 10x10x10 and NbCl5, both build orders: RTX 5060 Ti
+# 0.977 / 0.977, 0.984 / 0.984 (VEC_SH alone); A100-SXM4-80GB with VEC_A 0.973 / 0.976, 0.976 / 0.981.
+VEC_SH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
 # Round 4: the tensor-core kernel stages a with float4 loads from rows padded to a multiple of 4 floats (the radial
 # table writes them padded: ``a_columns``; any other a is padded by a copy first) into an edge-major tile, XOR-swizzled
 # per 4-float group so the fragment reads stay conflict-free: 4 vector loads per lane and batch instead of 16 scalar
 # ones (A100-SXM4-80GB kernel lab, with VEC_SH: 0.903, the bound without any a loads 0.900). Bitwise. Needs the TF32
 # product (not fp16) and used columns a multiple of 32. None: on for VEC_A_GPUS (decision 66); True / False: A/B.
 VEC_A = None
-VEC_A_GPUS = GPUModels(())
+VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))  # every A100 (see VEC_SH_GPUS; TC_WFRAG_GPUS)
 # Round 4: the tensor-core kernel's W slice stored in mma.sync fragment order, [paths][KP / 8][2 m-tiles][32 lanes][4],
 # so each lane loads its four W values of a fragment with one float4 shared load (consecutive 16 B per lane: no bank
 # conflicts) instead of four scalar loads at row stride TC_STRIDE. The same values reach the same mma: bitwise.
 # A100-SXM4-80GB kernel lab: 0.965 alone, 0.860 with VEC_A and VEC_SH (0.905 without). Needs the TF32 product (not
 # presplit, not fp16) without prefetch. None: on for TC_WFRAG_GPUS (decision 66); True / False: an A/B side's choice.
 TC_WFRAG = None
-TC_WFRAG_GPUS = GPUModels(())
+# Default (decision 66): A100-SXM4-80GB with VEC_A and VEC_SH, MD step b/a 0.960 / 0.954 (SrTiO3), 0.970 / 0.969
+# (NbCl5), both build orders; force gate as the plan (NbCl5 stress 1.57e-7, the A100's accepted exception).
+TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 
 _REGISTRY = {}
 

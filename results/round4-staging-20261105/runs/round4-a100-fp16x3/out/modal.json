@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "A100-80GB",
+  "source_commit": "21b0bc6efe68b9667fe03c91f991b3f0f6a027d4",
+  "command": "nvidia-smi --query-gpu=name --format=csv,noheader; python tools/fp16x3_gemm_bench.py --output $OUT/fp16x3.json > $OUT/fp16x3.log 2>&1; echo exit=$? >> $OUT/fp16x3.log",
+  "nvidia_smi": "NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 16.273494958877563,
+  "estimated_gpu_cost_usd": 0.011301038165887197
+}

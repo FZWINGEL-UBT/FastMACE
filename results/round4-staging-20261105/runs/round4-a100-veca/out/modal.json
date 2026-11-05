@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "A100-80GB",
+  "source_commit": "30afdef8bb01d6f054b2d4fc156babc6bf50df91",
+  "command": "nvidia-smi --query-gpu=name --format=csv,noheader; python -m pytest -p no:cacheprovider -q -rs tests/gpu/test_fused_folded_forward_cuda.py > $OUT/gputest.log 2>&1; echo gputest exit=$? >> $OUT/gputest.log; NAME=vec-a-sh B_CONSTANTS='fastmace.kernels.oeq_streaming.fused_forward:VEC_A=True fastmace.kernels.oeq_streaming.fused_forward:VEC_SH=True' bash tools/modal/round2_ab.sh",
+  "nvidia_smi": "NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 805.6282086372375,
+  "estimated_gpu_cost_usd": 0.5594640337758594
+}

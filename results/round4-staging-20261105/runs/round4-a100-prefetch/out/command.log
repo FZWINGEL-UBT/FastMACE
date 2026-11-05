@@ -1,0 +1,17 @@
+forward ptxas base                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-rerender rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-rerender                  {'8.0': {'registers': None, 'spill_store_bytes': 0}, '8.9': {'registers': None, 'spill_store_bytes': 0}}
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch                  {'8.0': {'registers': 168, 'spill_store_bytes': 12}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch-w10              {'8.0': {'registers': None, 'spill_store_bytes': 0}, '8.9': {'registers': None, 'spill_store_bytes': 0}}
+forward ptxas F-no-loads                   {'8.0': {'registers': 159, 'spill_store_bytes': 0}, '8.9': {'registers': 162, 'spill_store_bytes': 0}}
+tc-rerender rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward  base                3726.3 us  ratio 1.000  regs 168 local 40  
+forward  tc-rerender         3725.3 us  ratio 1.000  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch         3990.5 us  ratio 1.071  regs 168 local 56  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch-w10     3991.6 us  ratio 1.071  regs 168 local 56  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-no-loads          2762.8 us  ratio 0.741  regs 159 local 40  
+grep: /tmp/fastmace-out/wprime.log: No such file or directory

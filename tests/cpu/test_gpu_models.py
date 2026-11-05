@@ -131,3 +131,26 @@ def test_round2_defaults(monkeypatch):
     for name, registers in (("NVIDIA GeForce RTX 5060 Ti", 80), ("NVIDIA A100-SXM4-80GB", 0)):
         monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
         assert wprime_backward.max_registers_default(torch.device("cuda", 0)) == registers
+
+
+def test_round4_defaults(monkeypatch):
+    """Round 4 (5 November 2026, decision 66): VEC_SH on the A100s and the RTX 5060 Ti, VEC_A and TC_WFRAG on the
+    A100s (where the tensor-core kernel runs); off elsewhere and on the CPU; the constants override."""
+    names = {"a100": "NVIDIA A100 80GB PCIe", "5060": "NVIDIA GeForce RTX 5060 Ti",
+             "ada": "NVIDIA RTX 4000 Ada Generation", "a4000": "NVIDIA RTX A4000"}
+    checks = (
+        ("VEC_SH", lambda name: fused_forward.vec_sh_default(16, name), {"a100", "5060"}),
+        ("VEC_A", fused_forward.vec_a_default, {"a100"}),
+        ("TC_WFRAG", fused_forward.tc_wfrag_default, {"a100"}),
+    )
+    for constant, default, on in checks:
+        assert getattr(fused_forward, constant) is None, constant
+        assert not default(None), constant
+        for key, name in names.items():
+            assert bool(default(name)) is (key in on), (constant, name)
+        monkeypatch.setattr(fused_forward, constant, True)
+        assert default(names["ada"]), constant
+        monkeypatch.setattr(fused_forward, constant, False)
+        assert not default(names["a100"]), constant
+        monkeypatch.setattr(fused_forward, constant, None)
+    assert not fused_forward.vec_sh_default(18, names["a100"])  # float4 staging needs ED % 4 == 0

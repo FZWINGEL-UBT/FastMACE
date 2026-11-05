@@ -438,3 +438,105 @@ than about 15 %.
 l2 ≤ 3, l3 ≤ 3): 134 terms against 116. The saving applies only to `u`, one of the three FMAs per term, so it is
 about 4 % of the arithmetic before forming M, below the 15 % threshold. Paths: (0,l,l) and (1,0,1), (1,1,x) equal;
 (1,2,1) 11→9, (1,2,2) 16→14, (1,2,3) 21→19, (1,3,2) 21→15, (1,3,3) 26→20.
+
+## Round 4: the fused forward's staging (5 November 2026)
+
+The owner asked to try interaction 2's table inside the fused forward and to look for new ideas. Records:
+`results/round4-staging-20261105/`.
+
+### Interaction 2's table inside the fused forward: bounded, not built
+
+The forward grid reads each edge's `a` row in 8 blocks (4 channel blocks × 2 parts). Evaluating `a` in the kernel
+would read the edge's Chebyshev coefficients instead (6 terms × 64 columns = 1.5 KB against `a`'s 256 B) in every one
+of those blocks: about 8 × 374k × 1.5 KB = 4.5 GB of L2 traffic per call against 0.77 GB now, plus 8 × 6 × 64 FMAs per
+edge, to save the 204 µs table kernel. That loses at any L2 bandwidth, so it was not built. The table kernel's own
+launch shapes (`tools/radial_table_lab.py`, A100 80GB PCIe): edge blocks 8–64, column blocks 16–64, 1–8 warps; the
+best (8 edges, 2 warps) 0.925 of a 271 µs lab call, about 20 µs. Not pursued.
+
+### Where the A100 forward's time goes (kernel lab, A100-SXM4-80GB, `9f5c02cf`)
+
+| Variant | µs | Ratio |
+|---|---|---|
+| base (tensor cores, mask split) | 3,706 | 1.000 |
+| no `a` loads (`F-no-aload`) | 3,334 | 0.900 |
+| no x loads (`F-no-xload`) | 3,102 | 0.837 |
+| no sh loads (`F-no-shload`) | 3,581 | 0.966 |
+| no loads at all (`F-no-loads`) | 2,749 | 0.742 |
+| no output stores (`F-no-out`) | 3,458 | 0.933 |
+| no a·W product (`F-tc-no-product`) | 2,037 | 0.550 |
+| no tensor product (`F-no-tp`) | 2,411 | 0.650 |
+
+The staging loads cost a quarter of the kernel. The 16 scalar `a` loads per lane and batch read the row-major `a`
+transposed, and the 4 scalar sh loads read 4-byte pieces.
+
+### Staging double-buffered with cp.async (`PREFETCH`): rejected on the A100
+
+While a warp computes a batch, `cp.async` copies the next batch's `a` and sh rows (`"x"`: also the sender rows of x)
+into a second shared buffer. Bitwise. Kernel lab, forward alone:
+
+| Variant | GPU | Ratio |
+|---|---|---|
+| tc-prefetch | A100-SXM4 | 1.071, 1.038 (56 B spills) |
+| tc-prefetch-x | A100-SXM4 | 1.152 (240 registers) |
+| tc-prefetch | RTX 5060 Ti | 0.861 |
+| simt-prefetch | RTX 5060 Ti | 0.930 |
+| simt-prefetch-x | RTX 5060 Ti | 1.110 (6 warps) |
+| simt-prefetch | RTX 4000 Ada | 1.025 |
+
+The A100 kernel runs 12 warps at 168 registers; the second buffer costs spills or warps, and 12 warps already hide
+the load latency. Kept off everywhere (`PREFETCH_GPUS` empty).
+
+### Vector staging (`VEC_SH`, `VEC_A`) and the W slice in fragment order (`TC_WFRAG`)
+
+- `VEC_SH`: sh staged with float4 loads (4 vector loads per lane and batch instead of 16 scalar ones). Bitwise.
+- `VEC_A`: `a` staged with float4 loads from rows padded to a multiple of 4 floats into an edge-major tile,
+  XOR-swizzled per 4-float group so the mma fragment reads stay conflict-free. The radial table writes the padded
+  rows itself (`a_columns`); any other `a` is padded by a copy. Bitwise; needs the TF32 product and `used % 32 == 0`.
+- `TC_WFRAG`: the tensor-core W slice stored in mma.sync fragment order, `[paths][KP / 8][2][32 lanes][4]`, so each
+  lane loads its four W values with one float4 shared load instead of four scalar loads. Bitwise.
+
+Kernel lab (forward alone):
+
+| Variant | GPU | Ratio |
+|---|---|---|
+| sh4 | A100-SXM4 | 0.984 |
+| tc-a4 (a and sh) | A100-SXM4 | 0.903, 0.905 (the bound without any `a` loads: 0.900) |
+| tc-wfrag | A100-SXM4 | 0.965 |
+| tc-a4 + wfrag | A100-SXM4 | 0.860 |
+| sh4 (tensor-core kernel) | RTX 5060 Ti | 0.865 |
+| VEC_SH on the plan's SIMT kernel | RTX 5060 Ti | 0.905 |
+| tc-wfrag, tc-a4 + wfrag | RTX 5060 Ti (tensor cores forced) | 0.996, 0.894 |
+| sh4 | RTX 4000 Ada | 1.021, 1.005 |
+| simt-a4, simt-a4 + sh4 | RTX 4000 Ada | 1.070, 1.095 |
+
+MD A/B (SrTiO3 10×10×10 and NbCl5, both build orders): VEC_SH on the RTX 5060 Ti 0.977 / 0.977 and 0.984 / 0.984
+(`~/fm-runs/round4-vecsh-5060ti`). A100-SXM4-80GB (Modal), force gate as the plan (NbCl5 stress 1.49e-7 and
+1.57e-7, the accepted exception), GPU test passes:
+
+| Switches | SrTiO3 b/a (ab / ba) | NbCl5 b/a (ab / ba) |
+|---|---|---|
+| VEC_A + VEC_SH | 0.973 / 0.976 | 0.976 / 0.981 |
+| VEC_A + VEC_SH + TC_WFRAG | 0.960 / 0.954 | 0.970 / 0.969 |
+
+Defaults (decision 66): VEC_SH on every A100 and the RTX 5060 Ti; VEC_A and TC_WFRAG on every A100.
+
+### Tried and dropped
+
+- **x in a per-warp shared tile (`xs`)**: frees 9 registers (168 → 159) but does not launch on the A100
+  (`CUDA_ERROR_INVALID_VALUE`; it adds 4 KB of shared memory per warp to the plan's). The registers would not
+  add a warp at 12 warps per block anyway. Dropped.
+- **Cache hints**: x gathers through `__ldg` or `ld.global.nc.L1::evict_last`, `a` / sh through
+  `L1::no_allocate`. Bitwise. A100-SXM4: x-ldg 1.021, x-el 1.021; tc-a4 with hints 0.912–0.923 against 0.903
+  without. RTX 5060 Ti: 0.996. Rejected.
+- **Atom order for the x gathers**: SrTiO3 10×10×10 in ASE repeat order, Morton (Z-order) and a seeded shuffle
+  (`results/round4-staging-20261105/orders/`). RTX 5060 Ti forward 6,724, 6,737 and 6,679 µs. The 10 MB of x stay
+  in L2 in any order, so locality does not matter. Dropped.
+- **Fewer coefficient multiplies in the tensor product**: the falsifier without any coefficient multiply gives
+  0.961 (RTX 5060 Ti). Dropped.
+- **3xFP16 GEMMs instead of CUTLASS 3xTF32** (`tools/fp16x3_gemm_bench.py`, A100-SXM4-80GB): A's rows and B's columns
+  scaled by powers of two, one FP16 GEMM over 3K, `[2^11 Ah, Ah, 2^11 Al] @ [Bh; 2^11 Bl; Bh]`, FP32 output. For the
+  profile's shapes, the GEMM alone takes 0.49–0.66 of the 3xTF32 kernel's time (5000×2048×128: 88 against 143 µs).
+  The unfused split (row max, split, concatenation) costs 78–138 µs, as much as the GEMM saves. The error relative to
+  |A| |B| is 1.1–2.0e-6, against 1.1–2.7e-7 for 3xTF32 and 0.8–4.2e-7 for FP32: the FP16 MMA accumulates more
+  coarsely. Even fully fused it would save at most about 0.8 ms of the 12.3 ms step, at 6–10× the GEMM error.
+  Rejected on accuracy (FP32-equivalent rule).

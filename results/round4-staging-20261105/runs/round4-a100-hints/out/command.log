@@ -1,0 +1,16 @@
+forward ptxas base                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas tc-a4                        {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas x-ldg                        {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas x-el                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas tc-a4+x-el                   {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas tc-a4-na                     {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas tc-a4-na+x-el                {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward  base                3691.5 us  ratio 1.000  regs 168 local 40  
+forward  tc-a4               3334.1 us  ratio 0.903  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  x-ldg               3769.3 us  ratio 1.021  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  x-el                3767.3 us  ratio 1.021  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-a4+x-el          3382.3 us  ratio 0.916  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-a4-na            3364.9 us  ratio 0.912  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-a4-na+x-el       3406.8 us  ratio 0.923  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+NVIDIA A100-SXM4-80GB, 610.57.04
+grep: /tmp/fastmace-out/wprime.log: No such file or directory
