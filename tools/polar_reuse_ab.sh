@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # PolarMACE with the MH-1 and OMAT-0 label-gated rewrites (task polar-T01, docs/validation/polar-reuse.md): the
 # force gate with the candidate set on (NaCl, NbCl5 3x3x3), then same-process MD-step A/Bs in both build orders.
-# Side a is the default POLAR-1 plan; each b adds explicit "on" fields: the fused forward + wprime pair (decision 66
-# for MH-1 and OMAT-0), wprime alone, the gate epilogue, and all three.
-#   MODEL=polar1-s CKPT=MACE-POLAR-1-S.model; on leto through fm-tiled/run.sh (idle check, NAS caches).
+# Side a is the default plan; each b adds explicit "on" fields: the fused forward + wprime pair (decision 66
+# for MH-1 and OMAT-0), wprime alone, the gate epilogue, and all three; or an OMAT-0 kernel switch as a module
+# constant (edgesh: EDGE_SH, tablew: TABLE_W, both: the two); species: side a without the species tables.
+#   MODEL=polar1-s CKPT=MACE-POLAR-1-S.model; REPEAT="2 2 2" for the gate's cell (POLAR-1-L's float64 reference
+#   does not fit 20 GB at 3x3x3); GATE_REWRITES / GATE_CONSTANTS for the gate's production side.
+#   PROFILE=on: tools/module_profile.py per structure first. On leto through fm-tiled/run_bash.sh (idle check,
+#   NAS caches).
 set -uo pipefail
 out=${OUT:?the job sets OUT}
 log=$out/run.log
@@ -23,24 +27,37 @@ note "$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noh
 if [ "${GATE:-on}" = on ]; then
   job "gate-$model" python tools/force_stress_gate.py --output "$out/gate-$model" --engine fastmace --checkpoint "$ckpt" \
     --model "$model" --structures-root "$FASTMACE_STRUCTURES" --structures "${structs[@]}" \
-    --rewrites wprime_backward=on fused_folded_forward=on gate_epilogue=on
+    --repeat ${REPEAT:-3 3 3} --rewrites ${GATE_REWRITES:-wprime_backward=on fused_folded_forward=on gate_epilogue=on} \
+    ${GATE_CONSTANTS:+--production-constant $GATE_CONSTANTS}
 fi
-ab() {  # name b-fields...
+if [ "${PROFILE:-off}" = on ]; then  # where a force call's kernels come from (local part against long range)
+  for s in "${structs[@]}"; do
+    job "profile-$model-$s" python tools/module_profile.py --output "$out/profile-$model-$s" --checkpoint "$ckpt" \
+      --model "$model" --structure "$s"
+  done
+fi
+ab() {  # name side-arguments...
   local name=$1; shift
   for order in ab ba; do
     pattern=$([ "$order" = ab ] && echo abab || echo abba)
     job "ab-$name-$order" python tools/ab_rewrites.py --output "$out/ab-$name-$order" --checkpoint "$ckpt" \
       --model "$model" --structures "${structs[@]}" --warmup "${WARMUP:-300}" --block "${BLOCK:-200}" \
-      --blocks "${BLOCKS:-8}" --order "$order" --pattern "$pattern" --b "$@"
+      --blocks "${BLOCKS:-8}" --order "$order" --pattern "$pattern" "$@"
   done
 }
+EDGE_SH=fastmace.rewrites.generic.modules:EDGE_SH
+TABLE_W=fastmace.kernels.oeq_streaming.wprime_backward:TABLE_W
 for set in ${SETS:-pair wprime epilogue all}; do
   case $set in
-    pair) ab pair wprime_backward=on fused_folded_forward=on ;;
-    wprime) ab wprime wprime_backward=on ;;
-    ffwd) ab ffwd fused_folded_forward=on ;;
-    epilogue) ab epilogue gate_epilogue=on ;;
-    all) ab all wprime_backward=on fused_folded_forward=on gate_epilogue=on ;;
+    pair) ab pair --b wprime_backward=on fused_folded_forward=on ;;
+    wprime) ab wprime --b wprime_backward=on ;;
+    ffwd) ab ffwd --b fused_folded_forward=on ;;
+    epilogue) ab epilogue --b gate_epilogue=on ;;
+    all) ab all --b wprime_backward=on fused_folded_forward=on gate_epilogue=on ;;
+    edgesh) ab edgesh --a-constant $EDGE_SH=False --b-constant $EDGE_SH=True ;;
+    tablew) ab tablew --a-constant $TABLE_W=False --b-constant $TABLE_W=True ;;
+    species) ab species --a species_tables=off ;;
+    both) ab both --a-constant $EDGE_SH=False $TABLE_W=False --b-constant $EDGE_SH=True $TABLE_W=True ;;
   esac
 done
 note done

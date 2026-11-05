@@ -393,6 +393,19 @@ DECISION_66_WPRIME_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RT
 # 0.968; NaCl 1.000 / 1.005. RTX 4000 Ada: NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969;
 # NaCl 0.998 / 1.003 (docs/validation/speed-def.md). The A100 was not measured.
 DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
+# POLAR-1 (PolarMACE on MH-1's interaction class) under decision 66 (owner, 5 November 2026: "turn it on for 2
+# interaction models"; docs/validation/polar-reuse.md): MD step b/a, same process, both build orders, leto's RTX 4000
+# Ada, NaCl and NbCl5 3x3x3. POLAR-1-M, wprime_backward + fused_folded_forward: NaCl 0.963 / 0.965, NbCl5 0.970 /
+# 0.971; with gate_epilogue too: NaCl 0.966 / 0.966, NbCl5 0.957 / 0.958 (force gate passes). gate_epilogue alone:
+# POLAR-1-M NaCl 1.002 / 0.999, NbCl5 0.989 / 0.989; POLAR-1-S NaCl 0.998 / 1.001, NbCl5 0.994 / 0.993. The fused
+# forward goes with wprime_backward, as for OMAT-0; POLAR-1-S has no interaction for either (SECOND_INTERACTION).
+POLAR_DECISION_66_WPRIME_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
+POLAR_DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
+# The records that act on the interactions after the reassociated first one (fastmace.rewrites.radial attach_wprime
+# and attach_w_tables, mh1 fused_folded_forwards skip it): a one-interaction model with reassociate_first has none,
+# and the build would fail. Refused (explicit) or off (auto) at plan time.
+SECOND_INTERACTION_RECORDS = ("fused_folded_forward", "wprime_backward", "w_tables")
+SECOND_INTERACTION = "no interaction after the reassociated first one (the model has one interaction)"
 # tf32x3_gemms on the CUTLASS backend (owner, 3 November 2026; docs/validation/cutlass-tf32x3.md): MD step b/a in
 # both build orders against IEEE with grouped_launch off. A100-SXM4-80GB: MH-1 NaCl 0.887 / 0.882, NbCl5 0.772 /
 # 0.770; OMAT-0 medium SrTiO3 5,000 atoms 0.948 / 0.947 (grouped_launch itself: no change there). Force gates pass;
@@ -1304,11 +1317,26 @@ class FixedPlanner:
                 v["_why"][name] += f"; stage 2: off, {reason}"
             elif v[name] and name not in explicit:
                 v["_why"][name] += f"; stage 2: {model_label}, decision 58"
+        if v["reassociate_first"] and len(tuple(traits.interaction_classes)) < 2:
+            for name in SECOND_INTERACTION_RECORDS:
+                if not v[name]:
+                    continue
+                if name in explicit:
+                    book.refuse(f"RewriteConfig.{name}='on': {SECOND_INTERACTION}", "rewrite-unsupported-by-model")
+                    continue
+                v[name] = False
+                v["_auto_off"][name] = SECOND_INTERACTION
+                v["_why"][name] += f"; stage 2: off, {SECOND_INTERACTION}"
+        polar_wprime = (_qualified_polar(traits, model_label) and v["wprime_backward"]
+                        and getattr(hardware, "name", None) in POLAR_DECISION_66_WPRIME_GPUS)
         if v["fused_folded_forward"] and "fused_folded_forward" not in explicit:
             # Decision 64: measured faster on MH-1 only (POLAR-1-S neutral, OMOL-0 XL 3.5 % slower; OPT8-T02).
             if _mh1(model_label):
                 v["_why"]["fused_folded_forward"] += f"; stage 2: {model_label}, decision 64"
             elif generic_wprime:
+                v["_why"]["fused_folded_forward"] += (f"; stage 2: on with wprime_backward, {model_label} on a "
+                                                      f"measured GPU, decision 66 ({hardware.name})")
+            elif polar_wprime:
                 v["_why"]["fused_folded_forward"] += (f"; stage 2: on with wprime_backward, {model_label} on a "
                                                       f"measured GPU, decision 66 ({hardware.name})")
             else:
@@ -1326,6 +1354,8 @@ class FixedPlanner:
             elif generic_wprime:
                 v["_why"]["wprime_backward"] += (f"; stage 2: on, {model_label} (generic) on a measured GPU, "
                                                  f"decision 66 ({name})")
+            elif polar_wprime:
+                v["_why"]["wprime_backward"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
             else:
                 measured = _mh1(model_label) or model_label in DECISION_66_GENERIC_WPRIME_LABELS
                 reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
@@ -1338,8 +1368,11 @@ class FixedPlanner:
             name = getattr(hardware, "name", None)
             if _mh1(model_label) and name in DECISION_66_GATE_EPILOGUE_GPUS:
                 v["_why"]["gate_epilogue"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            elif _qualified_polar(traits, model_label) and name in POLAR_DECISION_66_GATE_EPILOGUE_GPUS:
+                v["_why"]["gate_epilogue"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
             else:
-                reason = (f"not MH-1, decision 66 (label {model_label})" if not _mh1(model_label)
+                measured = _mh1(model_label) or _qualified_polar(traits, model_label)
+                reason = (f"not MH-1 or POLAR-1, decision 66 (label {model_label})" if not measured
                           else f"not a measured GPU, decision 66 ({name})")
                 v["gate_epilogue"] = False
                 v["_auto_off"]["gate_epilogue"] = reason

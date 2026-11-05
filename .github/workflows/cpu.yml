@@ -50,12 +50,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Torch from the PyTorch CPU index first, so the editable install keeps it and does not
-          # pull a CUDA build from PyPI (same recipe as the fastmace_cpu venv, docs/development.md).
+          # pull a CUDA build from PyPI (same recipe as the fastmace_cpu venv, docs/development.md). [polar]
+          # (graph-longrange) so the PolarMACE CPU tests run instead of skipping (polar-T01).
           python -m pip install "torch==${{ matrix.torch }}" --index-url https://download.pytorch.org/whl/cpu
           if [ -n "${{ matrix.constraints }}" ]; then
-            python -m pip install -c "${{ matrix.constraints }}" -e ".[dev]"
+            python -m pip install -c "${{ matrix.constraints }}" -e ".[dev,polar]"
           else
-            python -m pip install -e ".[dev]"
+            python -m pip install -e ".[dev,polar]"
           fi
           python -m pip check
           python -m pip freeze

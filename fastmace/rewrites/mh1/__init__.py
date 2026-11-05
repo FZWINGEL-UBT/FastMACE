@@ -288,6 +288,11 @@ def streaming_convolutions(model):
         if _streamable(interaction):
             m.attach_streaming_kernels(interaction)
             names.append(f"interactions.{index}")
+    if names:
+        from fastmace.rewrites.generic import modules as gm
+
+        if gm.attach_edge_sh(model, gm.EDGE_SH_MH1_GPUS):  # EDGE_SH for MH-1's class (polar-T01)
+            names.append("spherical_harmonics")
     return names
 
 

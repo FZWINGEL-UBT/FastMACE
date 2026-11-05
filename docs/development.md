@@ -15,7 +15,7 @@ export PIP_CACHE_DIR=~/pip-cache TMPDIR=~/tmp
 python3.10 -m venv ~/environments/fastmace_cpu
 ~/environments/fastmace_cpu/bin/python -m pip install --upgrade pip
 ~/environments/fastmace_cpu/bin/python -m pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
-~/environments/fastmace_cpu/bin/python -m pip install -e "/mnt/d/Margraf/FastMACE[dev]"
+~/environments/fastmace_cpu/bin/python -m pip install -e "/mnt/d/Margraf/FastMACE[dev,polar]"
 ~/environments/fastmace_cpu/bin/python -m pip check
 ~/environments/fastmace_cpu/bin/python -m pip freeze > ~/environments/fastmace_cpu.requirements.txt
 ```
@@ -263,7 +263,7 @@ qualified stack (torch 2.14.1, mace-torch 0.3.16, cuequivariance and
 cuequivariance-torch 0.12.0, e3nn 0.4.4, ASE 3.27.0, NumPy 2.2.6); update it
 together with SPEC §4.1.
 
-Each cell installs torch first, then `pip install -e ".[dev]"`, runs
+Each cell installs torch first, then `pip install -e ".[dev,polar]"`, runs
 `ruff check fastmace tests` and then
 `CUDA_VISIBLE_DEVICES='' pytest -n auto --dist=load --maxschedchunk=1 tests/cpu tests/gpu`; the GPU tests
 skip. The same checks locally, from the repository root:

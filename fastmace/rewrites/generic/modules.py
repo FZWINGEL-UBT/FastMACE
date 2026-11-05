@@ -333,18 +333,34 @@ SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generati
 EDGE_SH = None
 EDGE_SH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                           "NVIDIA A100 80GB PCIe"))
+# MH-1's interaction class (MH-1, POLAR-1): applied by MH-1's streaming record (fastmace.rewrites.mh1
+# streaming_convolutions) on these GPUs; none measured yet (decision 66), EDGE_SH=True for the A/B (polar-T01).
+EDGE_SH_MH1_GPUS = GPUModels(())
 
 
-def edge_sh_default(device=None):
+def edge_sh_default(device=None, gpus=None):
     """``EDGE_SH`` on ``device`` (a torch.device, a device name or None): the constant when set, else on for
-    ``EDGE_SH_GPUS``."""
+    ``gpus`` (default ``EDGE_SH_GPUS``, the generic family's)."""
     if EDGE_SH is not None:
         return bool(EDGE_SH)
     if isinstance(device, torch.device):
         if device.type != "cuda":
             return False
         device = torch.cuda.get_device_name(device)
-    return device is not None and device in EDGE_SH_GPUS
+    return device is not None and device in (EDGE_SH_GPUS if gpus is None else gpus)
+
+
+def attach_edge_sh(model, gpus=None):
+    """Replace ``model.spherical_harmonics`` by ``EdgeSH`` where it is e3nn's l <= 3 component harmonics and
+    ``edge_sh_default`` holds for the model's device and ``gpus``; True if it did."""
+    sh = getattr(model, "spherical_harmonics", None)
+    if not edge_sh_replaceable(sh):
+        return False
+    parameter = next(model.parameters(), None)
+    if not edge_sh_default(parameter.device if parameter is not None else None, gpus):
+        return False
+    model.spherical_harmonics = EdgeSH(sh)
+    return True
 
 
 class EdgeSH(torch.nn.Module):
@@ -368,7 +384,7 @@ def edge_sh_replaceable(module):
         return False
     if getattr(module, "normalization", None) != "component":
         return False
-    return [int(l) for l in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
+    return [int(ell) for ell in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
 
 
 class SpeciesSkip(torch.nn.Module):
