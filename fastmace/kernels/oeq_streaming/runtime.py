@@ -63,13 +63,14 @@ def render_kernels(problem, dtype=np.float32, num_threads=None, layout="mul_ir")
     return schedule, kernel
 
 
-def compile_cubin(source, capability, extra_options=()):
-    """Compile CUDA source to a cubin for compute capability (major, minor) with NVRTC."""
+def compile_cubin(source, capability, extra_options=(), suffix=""):
+    """Compile CUDA source to a cubin for compute capability (major, minor) with NVRTC; ``suffix``: an architecture
+    suffix such as "a" (sm_90a: wgmma)."""
     from cuda.bindings import nvrtc
 
     major, minor = capability
     program = _check(nvrtc.nvrtcCreateProgram(source.encode(), b"oeq_streaming.cu", 0, [], []))
-    options = [f"--gpu-architecture=sm_{major}{minor}".encode(), b"--std=c++17", b"-default-device"]
+    options = [f"--gpu-architecture=sm_{major}{minor}{suffix}".encode(), b"--std=c++17", b"-default-device"]
     options += [option.encode() for option in extra_options]  # e.g. register caps (timing screens)
     result = nvrtc.nvrtcCompileProgram(program, len(options), options)
     if int(result[0]) != 0:

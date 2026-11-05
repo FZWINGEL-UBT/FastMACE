@@ -69,7 +69,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # prototype was adopted, so neither is a config field (conductor, batch-2 trial merge).
     "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89"},
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted",
-                                              "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of interaction 1's linear; A/B"},
+                                              "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B"},
     "fastmace/integrators/langevin.py": {"NOISE_DRAW_AHEAD": "round 6 noise batch drawn ahead on a thread; A/B"},
     "fastmace/kernels/cutlass/segment_rows.py": {"SEGMENT_ROWS": "block linear rows read and written in place; "
                                                                  "per GPU, A/B"},
@@ -97,6 +97,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/rewrites/radial/__init__.py": {"SYMMETRIC_PAIRS": "mirror pairs read one table row; per GPU, A/B"},
     "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B",
                                                           "TABLE_W": "w and slope from the value table; per GPU, A/B",
+                                                          "TABLE_PAIRS": "value table interleaved by term pair; A/B",
+                                                          "HOIST_SCALE": "piece scale once per edge (Horner); A/B",
                                                           "BLOCK_MESSAGE": "block-layout message; per GPU, A/B",
                                                           "BLOCK_LDG": "block reads through __ldg; per GPU, A/B",
                                                           "FACTORED": "factored TP backward; per GPU, A/B",
@@ -114,7 +116,9 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "VEC_SH": "sh staged with float4 loads; per GPU, A/B",
                                                         "VEC_A": "a staged with float4 loads; per GPU, A/B",
                                                         "TC_WFRAG": "W slice in mma fragment order; per GPU, A/B",
-                                                        "TC_TP": "tensor product on tensor cores; per GPU, A/B"},
+                                                        "TC_TP": "tensor product on tensor cores; per GPU, A/B",
+                                                        "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
+                                                        "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")

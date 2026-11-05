@@ -1,0 +1,21 @@
+2026-11-05T19:03:57Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; source f38f5b0d413b29e4a8fe2e3c0ee81d75659c516a
+2026-11-05T19:03:57Z start test
+2026-11-05T19:05:22Z end test exit=0 1 passed in 74.56s (0:01:14)
+  "wgmma": {
+  "wgmma": {
+2026-11-05T19:05:22Z start loup-1
+2026-11-05T19:06:30Z end loup-1 exit=0 {"gpu": "NVIDIA H200", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {"fastmace.kernels.oeq_streaming.fused_forward:WGMMA": true}, "median_us_per_atom_step": 1.1690241299999116, "ms_per_step": 5.845120649999558, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_pr
+2026-11-05T19:06:30Z start loup-2
+2026-11-05T19:07:17Z end loup-2 exit=0 {"gpu": "NVIDIA H200", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {"fastmace.kernels.oeq_streaming.fused_forward:WGMMA": true}, "median_us_per_atom_step": 1.164428209999926, "ms_per_step": 5.82214104999963, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_prod
+2026-11-05T19:07:17Z start ab-wgmma-ab
+2026-11-05T19:09:18Z end ab-wgmma-ab exit=0 SrTiO3 a 5.8705 ms b 6.0130 ms b/a 1.0243 valid
+SrTiO3 a 5.8705 ms b 6.0130 ms b/a 1.0243 valid
+2026-11-05T19:09:18Z start ab-wgmma-ba
+2026-11-05T19:10:59Z end ab-wgmma-ba exit=0 SrTiO3 b 6.0148 ms a 5.8713 ms b/a 1.0245 valid
+SrTiO3 b 6.0148 ms a 5.8713 ms b/a 1.0245 valid
+2026-11-05T19:10:59Z start gate
+2026-11-05T19:16:00Z end gate exit=0 SrTiO3 summary {"energy": {"production_max_abs": 0.0031574233398040867, "ase_f32_max_abs": 0.0003268462141595255, "ratio": 9.660272027085579, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 2.9249619219129386e-05, "ase_f32_max_abs": 3.139531709805965e-0
+NaCl summary {"energy": {"production_max_abs": 0.00038333783910123503, "ase_f32_max_abs": 0.00014731561011389945, "ratio": 2.6021535586408744, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.5476214997887112e-06, "ase_f32_max_abs": 4.992600669939673e-06, "ratio": 0.7105758570175368, "floor": 1e-05, "limit": 1e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 4.6443533022882955e-08, "ase_f32_max_abs": 4.757691253291785e-08, "ratio": 0.9761779516640403, "floor": 1e-07, "limit": 1e-07, "passed": true, "gated": true}, "passed": true}
+NbCl5 summary {"energy": {"production_max_abs": 0.0009034776074019306, "ase_f32_max_abs": 0.00021897570453196144, "ratio": 4.125926249823117, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 8.137850856471118e-05, "ase_f32_max_abs": 8.161692714381275e-05, "ratio": 0.9970788096606301, "floor": 1e-05, "limit": 0.0001632338542876255, "passed": true, "gated": true}, "stress": {"production_max_abs": 1.2859686441060725e-07, "ase_f32_max_abs": 6.061031646367732e-08, "ratio": 2.1216992735497935, "floor": 1e-07, "limit": 1.2122063292735463e-07, "passed": false, "gated": true}, "passed": false}
+SrTiO3 summary {"energy": {"production_max_abs": 0.0031574233398040867, "ase_f32_max_abs": 0.0003268462141595255, "ratio": 9.660272027085579, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 2.9249619219129386e-05, "ase_f32_max_abs": 3.139531709805965e-05, "ratio": 0.9316554799485406, "floor": 1e-05, "limit": 6.27906341961193e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 2.742521719723001e-07, "ase_f32_max_abs": 2.6169617962923386e-07, "ratio": 1.0479792726086232, "floor": 1e-07, "limit": 5.233923592584677e-07, "passed": true, "gated": true}, "passed": true}
+2026-11-05T19:16:00Z done

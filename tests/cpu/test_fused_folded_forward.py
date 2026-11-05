@@ -130,6 +130,47 @@ def test_tensor_cores_render_and_launch_rule(monkeypatch):
     assert "mma.sync" not in plain and "constexpr int KP = 65;" in plain
 
 
+SM90 = dict(shared_optin=232448, sms=132)  # H200
+
+
+def test_wgmma_switch_launch_rule_and_source(monkeypatch):
+    """``WGMMA`` (round 5): sm_90 only, off everywhere by default; parts of at most 8 paths, warps a multiple of 4,
+    the two W planes beside the warps' staging; the product as wgmma m64nNk8 tf32 with the warpgroup vote; NVRTC
+    compiles it for sm_90a."""
+    assert ff.WGMMA is None and "NVIDIA H200" not in ff.WGMMA_GPUS
+    assert not ff.wgmma_default((9, 0), "NVIDIA H200") and not ff.wgmma_default((9, 0))
+    monkeypatch.setattr(ff, "WGMMA", True)
+    assert ff.wgmma_default((9, 0)) and not ff.wgmma_default((8, 0)) and not ff.wgmma_default((12, 0))
+    rule = ff.launch_rule_wgmma(10, 64, 16, 128, **SM90)
+    assert (rule.parts, rule.warps, rule.blocks_per_slice) == (2, 8, 17)
+    assert rule.shared_bytes == 8 * 5 * 32 * 64 + 8 * 4 * ff.wgmma_staging_floats(64, 16, 5) <= SM90["shared_optin"]
+    small = ff.launch_rule_wgmma(2, 9, 4, 64, **SM90)
+    assert small.parts == 1 and small.warps % 4 == 0
+    source = ff.render(_schedule(), 9, small, tc=True, wgmma=True)
+    assert "wgmma.mma_async.sync.aligned.m64n64k8.f32.tf32.tf32" in source and "bar.red.or.pred" in source
+    assert "constexpr int AW = KP + 4;" in source
+    assert "wgmma_n64(d, al[ks], gmma_desc(bh_addr + 256 * ks), ks > 0);" in source
+    kernel = source.split('extern "C"')[-1]
+    assert "mma_tf32(" not in kernel
+    monkeypatch.setattr(ff, "WGMMA_PIPELINED", True)
+    piped = ff.render(_schedule(), 9, small, tc=True, wgmma=True)
+    assert piped != source and "if (pend) {" in piped and "const int64_t e0 = pew + 0;" in piped
+    assert "mma_tf32(" not in piped.split('extern "C"')[-1]
+    monkeypatch.setattr(ff, "WGMMA_PIPELINED", False)
+    with pytest.raises(ValueError, match="wgmma"):
+        ff.render(_schedule(), 9, small, tc=False, wgmma=True)
+    from fastmace.kernels import nvrtc_available
+    if nvrtc_available():
+        from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+        for layout in ("ir_mul", "mul_ir"):
+            assert compile_cubin(ff.render(_schedule(layout), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
+            assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule_wgmma(2, 64, 4, 64, **SM90), used=64,
+                                           tc=True, vec_a=True, vec_sh=True, wgmma=True, store_w=False), (9, 0),
+                                 suffix="a")
+        monkeypatch.setattr(ff, "WGMMA_PIPELINED", True)
+        assert compile_cubin(ff.render(_schedule(), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
+
+
 def test_render_refuses_unsupported_problems():
     rule = ff.launch_rule(2, 9, 4, 64, **SM120)
     with pytest.raises(ValueError, match="divisible"):

@@ -29,12 +29,26 @@ WARPS = 1
 # False: an A/B side's choice on every GPU. MD step b/a (ab / ba) with FUSED_FIRST_BACKWARD against the default,
 # OMAT-0 medium, SrTiO3 10x10x10 and NbCl5: RTX 5060 Ti 0.945 / 0.945, 0.948 / 0.955; RTX 4000 Ada 0.949 / 0.944,
 # 0.978 / 0.968 (FUSED_FIRST_BACKWARD alone 0.962-0.979); A100-SXM4-80GB 0.966 / 0.962, 0.970 / 0.982 (alone
-# 0.966-0.984; every A100 model).
+# 0.966-0.984; every A100 model); NVIDIA H200 (5 November 2026, after the recapture fix, SrTiO3, TABLED_FORWARD
+# alone against the H200 defaults) 0.984 / 0.987.
 TABLED_FORWARD = None
 TABLED_FORWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                 "NVIDIA A100-SXM4-80GB"))
+                                 "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
+
+
+@torch.compiler.assume_constant_result
+def _listed(index: int) -> bool:
+    """Whether CUDA device ``index`` is one of ``TABLED_FORWARD_GPUS``. A compile-time constant for Dynamo: the
+    device name cannot change within a process. Traced as a plain call, ``torch.cuda.get_device_name`` (it returns a
+    str) broke the graph inside ``_TabledOuterSum.forward``; Dynamo then compiled that forward as a frame of its own,
+    and its tracer state (``AutogradFunctionContextVariable``) kept the eager call's ctx, with the saved edge lengths
+    and their autograd graph, in a reference cycle. That graph held the positions' AccumulateGrad of the eager force
+    call (the engine's initial forces, default stream) until the next garbage collection, so a CUDA-graph capture
+    before it failed ("stale reference to the default stream"; ab_rewrites --order ba with a None side built second,
+    H200, 5 November 2026)."""
+    return torch.cuda.get_device_name(index) in TABLED_FORWARD_GPUS
 
 
 def tabled_forward(device):
@@ -42,7 +56,9 @@ def tabled_forward(device):
     if TABLED_FORWARD is not None:
         return bool(TABLED_FORWARD)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in TABLED_FORWARD_GPUS
+    if device.type != "cuda":
+        return False
+    return _listed(device.index if device.index is not None else torch.cuda.current_device())
 
 
 @cache

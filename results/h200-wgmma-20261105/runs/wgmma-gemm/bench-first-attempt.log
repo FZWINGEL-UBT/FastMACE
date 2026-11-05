@@ -1,0 +1,11 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+{"m": 5000, "k": 128, "n": 128, "layout": "rr", "cutlass_us": 29.92, "best": {"tile": "128x64x32x2", "us": 28.51, "ratio": 0.953}}
+{"m": 5000, "k": 128, "n": 384, "layout": "rr", "cutlass_us": 31.78, "best": {"tile": "128x128x32x1", "us": 36.96, "ratio": 1.163}}
+Traceback (most recent call last):
+  File "/tmp/fastmace-src/tools/bench/wgmma_gemm_bench.py", line 339, in <module>
+    sys.exit(main())
+  File "/tmp/fastmace-src/tools/bench/wgmma_gemm_bench.py", line 323, in main
+    best = min((v["us"], t) for t, v in row["wgmma"].items() if "us" in v and v["err"] < 4 * cut_err + 1e-6)
+ValueError: min() arg is an empty sequence
+exit=1

@@ -1,0 +1,18 @@
+{"gpu": "NVIDIA H200", "sms": 132, "edges": 373760, "slices": 8, "rows": 160, "k": 64, "results": [
+  {"kernel": "mma.sync", "blocks_per_sm": 1, "ms": 1.3951, "tflops": 43.9, "err": 4.733e-07},
+  {"kernel": "mma.sync", "blocks_per_sm": 2, "ms": 1.0824, "tflops": 56.6, "err": 4.733e-07},
+  {"kernel": "mma.sync", "blocks_per_sm": 3, "ms": 1.1357, "tflops": 53.9, "err": 4.733e-07},
+  {"kernel": "wgmma", "warpgroups": 1, "n": 160, "lbo": 128, "sbo": 2048, "ms": 0.9756, "tflops": 62.8, "err": 5.762e-07},
+  {"kernel": "wgmma", "warpgroups": 1, "n": 160, "lbo": 2048, "sbo": 128, "ms": 0.9743, "tflops": 62.9, "err": 8.409e-01},
+  {"kernel": "wgmma", "warpgroups": 2, "n": 160, "lbo": 128, "sbo": 2048, "ms": 0.5541, "tflops": 110.5, "err": 5.762e-07},
+  {"kernel": "wgmma", "warpgroups": 2, "n": 160, "lbo": 2048, "sbo": 128, "ms": 0.5546, "tflops": 110.4, "err": 8.409e-01},
+  {"kernel": "wgmma", "warpgroups": 3, "n": 160, "lbo": 128, "sbo": 2048, "ms": 0.6222, "tflops": 98.4, "err": 5.762e-07},
+  {"kernel": "wgmma", "warpgroups": 3, "n": 160, "lbo": 2048, "sbo": 128, "ms": 0.6237, "tflops": 98.2, "err": 8.409e-01},
+  {"kernel": "wgmma", "warpgroups": 2, "n": 80, "lbo": 128, "sbo": 2048, "ms": 0.5749, "tflops": 106.5, "err": 5.762e-07},
+  {"kernel": "wgmma", "warpgroups": 2, "n": 80, "lbo": 2048, "sbo": 128, "ms": 0.5742, "tflops": 106.6, "err": 9.953e-01},
+  {"kernel": "wgmma", "warpgroups": 3, "n": 80, "lbo": 128, "sbo": 2048, "ms": 0.6251, "tflops": 98.0, "err": 5.762e-07},
+  {"kernel": "wgmma", "warpgroups": 3, "n": 80, "lbo": 2048, "sbo": 128, "ms": 0.6248, "tflops": 98.0, "err": 9.953e-01},
+  {"kernel": "wgmma", "warpgroups": 2, "n": 40, "lbo": 128, "sbo": 2048, "ms": 0.6002, "tflops": 102.0, "err": 5.762e-07},
+  {"kernel": "wgmma", "warpgroups": 2, "n": 40, "lbo": 2048, "sbo": 128, "ms": 0.5991, "tflops": 102.2, "err": 9.242e-01},
+  {"kernel": "end"}
+]}
