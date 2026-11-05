@@ -1,0 +1,18 @@
+wprime ptxas base                         {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas factored                     {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas FF-no-table                  {'8.0': {'registers': 79, 'spill_store_bytes': 0}, '8.9': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas FF-one-slab                  {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas FF-no-atomics                {'8.0': {'registers': 95, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas FF-no-xload                  {'8.0': {'registers': 95, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas F-no-tp                      {'error': "variant pattern found 0 times: '\\\\w+ \\\\+= output_gradient\\\\s*\\\\* radial_weight \\\\* edge_value \\\\* static_cast<scalar_t'"}
+wprime ptxas B-piece-sorted               {'8.0': {'registers': None, 'spill_store_bytes': 0}, '8.9': {'registers': None, 'spill_store_bytes': 0}}
+wprime F-no-tp: variant pattern found 0 times: '\\w+ \\+= output_gradient\\s*\\* radial_weight \\* edge_value \\* static_cast<scalar_t'
+wprime   base                2825.2 us  ratio 1.000  regs 96 local 0  
+wprime   factored            2996.2 us  ratio 1.061  regs 96 local 0  {'dsh': 'max|d|/max|a| = 9.17e-05', 'dr': 'max|d|/max|a| = 5.42e-03', 'dx': 'max|d|/max|a| = 2.39e-04'}
+wprime   FF-no-table         2373.6 us  ratio 0.840  regs 79 local 0  
+wprime   FF-one-slab         2836.5 us  ratio 1.004  regs 96 local 0  
+wprime   FF-no-atomics       2897.9 us  ratio 1.026  regs 95 local 0  
+wprime   FF-no-xload         2966.5 us  ratio 1.050  regs 95 local 0  
+wprime   F-no-tp                nan us  ratio nan  regs None local None  variant pattern found 0 times: '\\w+ \\+= output_gradient\\s*\\* radial_weight \\* edge_value \\* static_cast<scalar_t'
+wprime   B-piece-sorted      3313.7 us  ratio 1.173  regs 96 local 0  
+grep: /tmp/fastmace-out/forward*.log: No such file or directory

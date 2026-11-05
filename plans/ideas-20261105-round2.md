@@ -406,3 +406,30 @@ Open:
   the A100's bandwidth. Measure its DRAM bytes (Nsight Compute) before ideas: a w table ordered so that a run of
   receivers touches fewer lines, or TABLE_W off for interaction 2 on the A100 where FP32 arithmetic is cheaper than
   that traffic.
+
+### The w′ backward's cost, attributed (A100 80GB, Modal, `02bf534c`)
+
+Kernel lab, Benchmark_loup interaction 2 (`results/round3-profile-20261105/round3-a100-wprime`), each variant in the
+same process. The falsifiers (`FF-*`) are built on the factored kernel without Horner (2,996 µs); the default
+(factored + Horner + scalar paths) takes 2,825 µs.
+
+| Variant | µs | Against factored |
+|---|---|---|
+| no table evaluation (`FF-no-table`) | 2,374 | 0.792 |
+| every edge on one table slab, perfect L2 hits (`FF-one-slab`) | 2,837 | 0.947 |
+| no atomics (`FF-no-atomics`) | 2,898 | 0.967 |
+| no x loads (`FF-no-xload`) | 2,967 | 0.990 |
+| edges sorted by table piece (`B-piece-sorted`, on the default) | 3,314 | 1.173 of the default |
+
+- **Table traffic: refuted.** The value-table traffic idea (12 KB per edge from DRAM) does not hold: the table stays
+  in L2, and perfect locality gains about 5 %. The table's evaluation costs about 0.6 ms, and Horner has already
+  taken part of that.
+- **The rest is the tensor product's FP32 arithmetic.** About 86 CG terms × 3 FMAs × 128 channels × 374k edges is
+  about 25 GFLOP, 1.3 ms at the A100's FP32 peak, so the kernel runs at about half of peak.
+- **`F-no-tp` failed to apply** (its pattern predates the factored body).
+
+Idea left from this, not started: per edge and path, form `M_io(y) = Σ_j C_ijo y_j` once, so that
+`u_i = Σ_o M_io g_o` costs `nnz(M)` FMAs per channel instead of one per CG term. It pays only for paths whose CG
+terms outnumber M's nonzeros (l2 = 2, 3); `v_j = Σ C_ijo x_i g_o` is bilinear in channel quantities and does not
+shrink. First count terms against `nnz(M)` per path of OMAT-0 medium; build it only if the FMA count drops by more
+than about 15 %.
