@@ -232,6 +232,22 @@ for layout in ("ir_mul", "mul_ir"):
             deg_out = fused_folded_forward(a, weight, X, Y, *args, deg.id)
             assert torch.equal(deg_out[0], base_out[0]) and torch.equal(deg_out[1], base_out[1]), (layout, k, tc_on)
             report[name][f"degree parts {'tc' if tc_on else 'simt'}"] = deg.groups
+        # LANE_INDICES (ideas session idea 15a): the batch's index loads lane-parallel, bitwise, on the SIMT kernel and
+        # with the tensor-core product.
+        for tc_on in ((False, True) if torch.cuda.get_device_capability() >= (8, 0) else (False,)):
+            ff_module.TENSOR_CORES = tc_on
+            try:
+                ff_module.LANE_INDICES = False
+                plain = FusedFoldedForward(kernels, k)
+                ff_module.LANE_INDICES = True
+                lanes = FusedFoldedForward(kernels, k)
+            finally:
+                ff_module.TENSOR_CORES, ff_module.LANE_INDICES = False, None
+            assert lanes.lane_idx and "lane_snd" in lanes.source and "lane_snd" not in plain.source, (layout, k)
+            base_out = fused_folded_forward(a, weight, X, Y, *args, plain.id)
+            lane_out = fused_folded_forward(a, weight, X, Y, *args, lanes.id)
+            assert torch.equal(lane_out[0], base_out[0]) and torch.equal(lane_out[1], base_out[1]), (layout, k, tc_on)
+            report[name][f"lane indices {'tc' if tc_on else 'simt'}"] = True
         # VEC_SH on the FP32-SIMT kernel: bitwise.
         ff_module.VEC_SH = True
         try:

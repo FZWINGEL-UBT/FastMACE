@@ -34,6 +34,7 @@ Launch rule (``launch_rule``), from the device and the problem only:
 from __future__ import annotations
 
 import ctypes
+import re
 from dataclasses import dataclass
 
 import torch
@@ -135,6 +136,11 @@ TC_WFRAG = None
 # memory (the TC_PRESPLIT slice size). H200 kernel lab bound (W used unsplit): 0.853 of the forward. None: on for
 # TC_WFRAG_SPLIT_GPUS (decision 66); True / False: an A/B side's choice.
 TC_WFRAG_SPLIT = None
+# Ideas session idea 15(a) (6 November 2026): each batch's receiver and sender indices loaded by lanes 0..B-1 in one
+# go and broadcast with shuffles, so the batch's x gathers no longer wait on a serial chain of index loads (ptxas
+# reused one register for senders 2-7). Bitwise: the same indices and loads. H200 kernel lab: 0.966 of the forward;
+# RTX 5060 Ti (H200 plan) 1.024. None: on for LANE_INDICES_GPUS (decision 66); True / False: an A/B side's choice.
+LANE_INDICES = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -150,6 +156,7 @@ TC_TP_GPUS = GPUModels(())
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.022 / 1.024 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 TC_WFRAG_SPLIT_GPUS = GPUModels(())
+LANE_INDICES_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -221,6 +228,29 @@ def tc_wfrag_default(name=None):
     if on is None:
         on = name in TC_WFRAG_GPUS
     return bool(on)
+
+
+def lane_indices_default(name=None):
+    """``LANE_INDICES`` (None: ``name`` in ``LANE_INDICES_GPUS``)."""
+    on = LANE_INDICES
+    if on is None:
+        on = name in LANE_INDICES_GPUS
+    return bool(on)
+
+
+def lane_indices(source):
+    """``source`` with every batch's index loads made lane-parallel (``LANE_INDICES``); raises if a batch loop does
+    not have the expected form."""
+    old = re.compile(r"(\n(\s*)float xv\[B\]\[\d+\];)((?:(?!float xv\[B\]).)*?)"
+                     r"rv\[b\] = \(b < nb && !tail\) \? receivers\[e0 \+ b\] : 0x7fffffff;\n(\s*)"
+                     r"int snd = \(b < nb && !tail\) \? senders\[e0 \+ b\] : -1;", re.S)
+    new = (r"\n\2const int lane_rv = (lane < nb && !tail) ? receivers[e0 + lane] : 0x7fffffff;"
+           r"\n\2const int lane_snd = (lane < nb && !tail) ? senders[e0 + lane] : -1;\1\3"
+           r"rv[b] = __shfl_sync(FULL, lane_rv, b);\n\4int snd = __shfl_sync(FULL, lane_snd, b);")
+    out, count = old.subn(new, source)
+    if not count:
+        raise ValueError("lane_indices: no batch index loads found")
+    return out
 
 
 def tc_wfrag_split_default(name=None):
@@ -793,7 +823,15 @@ def _node(layout, channels, start, component, dim):
 
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None):
+           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, lane_idx=False):
+    """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``)."""
+    source = _render(schedule, k, rule, store_w, used, stream_store, tc, blocks, prefetch, vec_sh, vec_a, wfrag, tctp,
+                     wgmma, groups)
+    return lane_indices(source) if lane_idx else source
+
+
+def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
+            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -1750,9 +1788,10 @@ class FusedFoldedForward:
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
+        self.lane_idx = lane_indices_default(torch.cuda.get_device_name(device)) and not self.wgmma
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                              prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
-                             tctp=self.tctp, wgmma=self.wgmma, groups=self.groups)
+                             tctp=self.tctp, wgmma=self.wgmma, groups=self.groups, lane_idx=self.lane_idx)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
