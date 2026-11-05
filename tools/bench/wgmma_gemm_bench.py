@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (CUDA source lines)
 """Hopper wgmma 3xTF32 GEMM against the CUTLASS mma.sync 3xTF32 kernel (``fastmace.kernels.cutlass.tf32x3``) on
 the node-level GEMM shapes of OMAT-0 on Benchmark_loup (``tools/bench/gemm_shapes.py``): ``C = A @ B``, A row-major
 [M, K], B row-major [K, N] ("rr") or column-major ("rc"). Round 5, 5 November 2026 (owner: "What about the backward
@@ -289,9 +290,9 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    import fastmace  # noqa: F401
     import torch
 
+    import fastmace  # noqa: F401
     from fastmace.kernels.cutlass import tf32x3
 
     torch.manual_seed(0)

@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (CUDA source lines)
 """Generate ``wgmma_tf32x3_bench.cu``: the fused forward's w = a.W GEMM shape (a slice of NR = 160 W rows, K = 64,
 3xTF32 with the mask split) on mma.sync m16n8k8 (the current kernel: 8 edges per warp, W in fragment order, split
 per load) against Hopper wgmma m64nNk8 (64 edges per warpgroup, a from registers, W pre-split into hi/lo planes in
