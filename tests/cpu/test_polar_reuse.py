@@ -112,6 +112,7 @@ def _plan(label, hardware=None, **configs):
     import dataclasses
 
     import test_planner as tp
+
     from fastmace.config import IntegratorConfig
 
     hardware = tp.GPU if hardware is None else dataclasses.replace(tp.GPU, name=hardware)
@@ -133,7 +134,9 @@ def test_polar1_defaults_take_the_class_rewrites_not_the_label_gated_ones(label,
 
 @pytest.mark.parametrize("name", LABEL_GATED)
 def test_polar1_accepts_each_label_gated_rewrite_when_asked(name):
-    rewrites = _plan("polar1-s", rewrites=RewriteConfig(**{name: "on"})).rewrites
+    # POLAR-1-M: wprime_backward and the fused forward act on the interactions after the first, and POLAR-1-S has
+    # only one (its plan takes them too, then the build fails: the report's follow-up on plan-time refusal).
+    rewrites = _plan("polar1-m", rewrites=RewriteConfig(**{name: "on"})).rewrites
     assert getattr(rewrites, name) == "on"
 
 
