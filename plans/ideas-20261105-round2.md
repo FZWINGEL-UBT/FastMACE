@@ -761,3 +761,12 @@ capture, where every receiver has the same number of edges. On the 5060 Ti the S
 inputs, so the defect is in the tensor-core prefetch path, probably its handling of uneven batches. PREFETCH is off on
 every GPU (PREFETCH_GPUS empty); it must not be enabled with tensor cores until that is fixed and tested on uneven
 neighbourhoods.
+
+A100-SXM4 w′ lab and REDUX A/B (thermalised capture, 6c2f2967, BUTTERFLY off as on the A100): base 3.14 ms at 96
+registers, no spills. Register caps: 72 1.201 (88 B local), 64 1.477 (128 B local), so the A100 stays uncapped.
+butterfly 1.006, redux-pc 1.104, no-reduce 0.969 (the reduction is 3 %). REDUX MD A/B (b/a): SrTiO3 1.029 / 1.025,
+NbCl5 1.022 / 1.018, so slower; REDUX stays off on the A100. The A100 w′ kernel keeps its round-4 configuration.
+
+The leto CPU suite at 6c2f2967 (5143 passed, 2 failed) caught a name clash: GRAPH_SUM's forward edit registered
+`_fastmace_graph_sum`, which replaced PolarMACE's graph-sums helper of that name in its compiled forward. It now uses
+`_fastmace_batch_sum` (4bfe3307).

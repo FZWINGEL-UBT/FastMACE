@@ -1,0 +1,18 @@
+wprime ptxas base                         {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas maxreg72                     {'8.0': {'registers': 72, 'spill_store_bytes': 132}, '8.9': {'registers': 72, 'spill_store_bytes': 132}}
+wprime ptxas maxreg64                     {'8.0': {'registers': 64, 'spill_store_bytes': 196}, '8.9': {'registers': 64, 'spill_store_bytes': 196}}
+wprime ptxas butterfly                    {'8.0': {'registers': 95, 'spill_store_bytes': 0}, '8.9': {'registers': 83, 'spill_store_bytes': 0}}
+wprime ptxas redux-pc                     {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas F-no-reduce                  {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 82, 'spill_store_bytes': 0}}
+wprime   base                3136.5 us  ratio 1.000  regs 96 local 0  
+wprime   maxreg72            3766.3 us  ratio 1.201  regs 72 local 88  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.25e-07'}
+wprime   maxreg64            4632.6 us  ratio 1.477  regs 64 local 128  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   butterfly           3156.0 us  ratio 1.006  regs 95 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   redux-pc            3462.1 us  ratio 1.104  regs 96 local 0  {'dsh': 'max|d|/max|a| = 1.40e-07', 'dr': 'max|d|/max|a| = 2.75e-07', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   F-no-reduce         3040.3 us  ratio 0.969  regs 96 local 0  
+2026-11-05T11:57:54Z gate-redux exit=0 NaCl summary {"energy": {"production_max_abs": 0.0006157965515285468, "ase_f32_max_abs": 0.0001517307700388065, "ratio": 4.0584816868131055, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.6668307890064256e-06, "ase_f32_max_abs": 4.515763511403481e-06, "ratio": 0.8120068244819998, "floor": 1e-05, "limit": 1e-05, "passed": true, "gated": true}, "stre
+2026-11-05T11:59:43Z end ab-redux-SrTiO3-10x10x10-ab exit=0 SrTiO3 a 11.6997 ms b 12.0419 ms b/a 1.0292 valid 
+2026-11-05T12:01:28Z end ab-redux-SrTiO3-10x10x10-ba exit=0 SrTiO3 b 12.0126 ms a 11.7237 ms b/a 1.0246 valid 
+2026-11-05T12:02:49Z end ab-redux-NbCl5-ab exit=0 NbCl5 a 2.9374 ms b 3.0008 ms b/a 1.0216 valid 
+2026-11-05T12:04:01Z end ab-redux-NbCl5-ba exit=0 NbCl5 b 3.0075 ms a 2.9534 ms b/a 1.0183 valid 
+grep: /tmp/fastmace-out/forward*.log: No such file or directory
