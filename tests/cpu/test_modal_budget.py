@@ -51,7 +51,7 @@ def _no_env_limit(monkeypatch):
 
 
 def test_cap_is_30_with_a_3_reserve():
-    assert budget.CAP_USD == 30 and budget.RESERVE_USD == 3 and budget.LIMIT_USD == 27
+    assert budget.CAP_USD == 30 and budget.RESERVE_USD == 0 and budget.LIMIT_USD == 30
 
 
 def test_worst_case_counts_gpu_cpu_memory_and_start():
@@ -64,7 +64,7 @@ def test_under_the_cap_is_allowed():
     decision = _check("3.65")
     assert decision.allowed
     assert decision.metered_usd == Decimal("3.65") and decision.worst_case_usd == _worst()
-    assert "$3.65" in decision.message and "$27.00" in decision.message
+    assert "$3.65" in decision.message and "$30.00" in decision.message
 
 
 def test_exactly_at_the_cap_is_allowed():
@@ -77,7 +77,7 @@ def test_over_the_cap_is_refused_naming_the_numbers():
     with pytest.raises(budget.BudgetRefused) as refused:
         _check(str(metered))
     text = str(refused.value)
-    assert f"${metered:.2f}" in text and f"${_worst():.2f}" in text and "$27.00" in text
+    assert f"${metered:.2f}" in text and f"${_worst():.2f}" in text and "$30.00" in text
 
 
 @pytest.mark.parametrize("read_metered", [

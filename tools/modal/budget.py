@@ -4,8 +4,9 @@ i get for free per month").
 Pure Python, no Modal import, so the CPU tests can fake the billing calls. ``fastmace_modal.py`` calls
 ``check`` before every launch and ``record`` after it.
 
-- **Cap:** ``CAP_USD`` = $30 per calendar month (Modal's free credit) with a ``RESERVE_USD`` = $3 reserve. A job
-  is refused when this month's metered cost plus the job's worst case exceeds ``LIMIT_USD`` = $27.
+- **Cap:** ``CAP_USD`` = $30 per calendar month and profile (Modal's free credit). A job is refused when the
+  profile's metered cost this month plus the job's worst case exceeds ``LIMIT_USD`` = $30. The $3 reserve was
+  dropped on 5 November 2026 (owner: "You can use the full 30$ on both profiles").
 - **Lower limits:** ``limit`` may be set lower (``FASTMACE_MODAL_LIMIT_USD`` or ``--limit-usd``) and never higher,
   except with an explicit owner override (``--owner-override "who: why"``). The override is written to the
   ledger with the job.
@@ -32,7 +33,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 CAP_USD = Decimal("30")
-RESERVE_USD = Decimal("3")
+RESERVE_USD = Decimal("0")  # owner, 5 November 2026: the full $30 on each profile
 LIMIT_USD = CAP_USD - RESERVE_USD
 START_S = 300  # container start, image pull and the volume commit, billed like the job (generous)
 GPU_RATE_KEYS = {"L4": "gpu_hour_cost_l4", "A100": "gpu_hour_cost_a100_40gb", "A100-80GB": "gpu_hour_cost_a100_80gb",
