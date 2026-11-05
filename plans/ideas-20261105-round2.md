@@ -784,3 +784,11 @@ A100 stage bounds at 6c2f2967 (thermalised capture): forward 3.25 ms; F-tc-no-pr
 F-tc-no-mma 0.664, F-tc-1pass 0.677. The projection (1.71 ms) and the contraction (1.26 ms) add up: no overlap now.
 One MMA pass costs 42 us, three 1.09 ms. Chain variants: tc-mma-free 0.999 (bitwise), tc-2acc 1.306 (144 B spills),
 tc-3acc 1.504 (280 B). Producer/consumer microbenchmark (tools/pc_microbench.py) running on the A100.
+
+Producer/consumer warps (third set, idea 1), `tools/pc_microbench.py` on two A100-SXM4 containers (Modal; 12 warps,
+one CTA per SM, npl 5, KP 72, the forward's MMA loop against an FMA contraction). Run 1 (bc0a84ae), 6+6 warps with a
+2-tile ring: 0.915 of serial at C/P 0.76, 1.07-1.31 above. Run 2 (975e560f), another container: 6+6x2 0.988 / 1.044 /
+1.079 / 1.104 at C/P 0.61 / 0.75 / 0.90 / 1.07; 6+6x1 1.70-1.74; 8+4 1.14-1.39; 9+3 1.28-1.67; 4+8 1.08-1.28. Run 1's
+win came with a slower serial base (P 2.96 against 2.46 ms in run 2). No spills anywhere; a 3-tile ring does not fit.
+Each side keeps only part of the 12 warps for its own latency, which costs what the overlap gains. **Closed** by the
+proposal's own rule (more than 10 % of serial).

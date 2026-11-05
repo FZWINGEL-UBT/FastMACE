@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "A100-80GB",
+  "source_commit": "975e560f1b5c772dfefdd3073859972d2b09a9f3",
+  "command": "nvidia-smi --query-gpu=name --format=csv,noheader | grep -q SXM4 || exit 3; python tools/pc_microbench.py --fmas 24 32 40 48 --splits 6:2 6:1 8:1 9:1 4:1 --output \"$OUT/pc\" > \"$OUT/pc.log\" 2>&1; echo \"pc exit=$?\" >> \"$OUT/summary.txt\"",
+  "nvidia_smi": "NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 13.217252016067505,
+  "estimated_gpu_cost_usd": 0.009178647233380213
+}
