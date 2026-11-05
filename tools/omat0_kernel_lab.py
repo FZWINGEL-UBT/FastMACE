@@ -583,6 +583,8 @@ def forward_variants(kernel=None):
                     reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
                         ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);"""),
                    ()),
+        # The TP's coefficient multiplies dropped (x e instead of x e c): how much its arithmetic weighs.
+        "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),

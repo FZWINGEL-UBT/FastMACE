@@ -90,6 +90,12 @@ TC_RSTRIDE = 36  # the redistribution tile's row stride: conflict-free fragment 
 # A100 kernel lab: without the x loads the tensor-core forward is 16 % faster).
 PREFETCH = None
 PREFETCH_GPUS = GPUModels(())
+# Round 4 (5 November 2026): the edge harmonics sh staged with float4 loads (one per lane and batch instead of four
+# scalar ones; the kernel lab: the RTX 5060 Ti FP32-SIMT forward 0.916, its tensor-core forward 0.865). Bitwise. Needs
+# edge_dim % 4 == 0; a sh whose address is not 16-byte aligned is copied first. None: on for VEC_SH_GPUS (decision
+# 66); True / False: an A/B side's choice.
+VEC_SH = None
+VEC_SH_GPUS = GPUModels(())
 
 _REGISTRY = {}
 
@@ -103,6 +109,15 @@ def prefetch_default(capability, name=None):
     if not on or tuple(capability) < (8, 0):
         return False
     return "x" if on == "x" else True
+
+
+def vec_sh_default(edge_dim, name=None):
+    """Whether the kernel stages sh with float4 loads: ``VEC_SH`` (None: ``name`` in ``VEC_SH_GPUS``) and
+    ``edge_dim % 4 == 0``."""
+    on = VEC_SH
+    if on is None:
+        on = name in VEC_SH_GPUS
+    return bool(on) and int(edge_dim) % 4 == 0
 
 
 def tensor_cores(capability, name=None):
@@ -498,7 +513,8 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
-def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False):
+def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
+           vec_sh=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -508,7 +524,10 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
 ``"fp16"``: exponent-shifted 3xFP16 instead (``TC_FP16_HELPERS``; kernel lab only, used columns padded to 16).
     ``blocks`` (``block_map``'s input; ir_mul, message only): the message written per group, one output
     pointer each (``out0``, ``out1``, ...). ``prefetch`` (sm_80+, not fp16): the staging double-buffered with
-    cp.async (``PREFETCH``; the launch rule must be ``launch_rule(..., prefetch=True)``'s)."""
+    cp.async (``PREFETCH``; the launch rule must be ``launch_rule(..., prefetch=True)``'s). ``vec_sh``: sh staged
+    with float4 loads (``VEC_SH``; edge_dim % 4 == 0, sh 16-byte aligned)."""
+    if vec_sh and schedule.edge_dim % 4:
+        raise ValueError(f"fused_folded_forward: vec_sh needs edge_dim % 4 == 0, not {schedule.edge_dim}")
     check_problem(schedule)
     if prefetch and tc == "fp16":
         raise ValueError("fused_folded_forward: prefetch with the fp16 product is not built")
@@ -534,7 +553,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch)}    }} break;"
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch, vec_sh)}    }} break;"
                       for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
         raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
@@ -660,7 +679,7 @@ def _out(slot, C, layout, bmap):
     return f"out{g}[cur * {width} + {base + slot.component * stride} + ch]"
 
 
-def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False):
+def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False):
     paths = schedule.paths
     xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
                     for pi in part for o in paths[pi].outputs for t in o.terms})
@@ -714,6 +733,12 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                 for (int k = 0; k < K; ++k) {{
 {nl.join(gemm)}
                 }}"""
+    if vec_sh:
+        shstage = """                for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);"""
+    else:
+        shstage = "                for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;"
     if prefetch == "x":
         loop_head = f"""            int buf = 0;
             __syncwarp();  // every lane done with the last chunk's buffers
@@ -763,7 +788,7 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                 const int nb = (int)((eend - e0) < B ? (eend - e0) : B);
                 __syncwarp();
 {astage}
-                for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;"""
+{shstage}"""
         loop_tail = "            }"
     tp = []
     for g, pi in enumerate(part):
@@ -869,6 +894,7 @@ class FusedFoldedForward:
         self.tc = tensor_cores(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
         self.tc = "presplit" if self.tc and TC_PRESPLIT else self.tc
         self.prefetch = prefetch_default(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
+        self.vec_sh = vec_sh_default(schedule.edge_dim, torch.cuda.get_device_name(device)) and not self.prefetch
         self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
                                 schedule.channels, int(props.shared_memory_per_block_optin),
                                 int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch,
@@ -877,7 +903,7 @@ class FusedFoldedForward:
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
-                             prefetch=self.prefetch)
+                             prefetch=self.prefetch, vec_sh=self.vec_sh)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -895,6 +921,8 @@ class FusedFoldedForward:
 
         from fastmace.kernels.oeq_streaming.runtime import _check
         nodes, edges = x.shape[0], sh.shape[0]
+        if self.vec_sh and sh.data_ptr() % 16:  # float4 loads need a 16-byte aligned sh
+            sh = sh.clone()
         counters = torch.zeros(self.slices, dtype=torch.int32, device=x.device)
         p = ctypes.c_void_p
         values = (nodes, edges, a.data_ptr(), weight.data_ptr(), x.data_ptr(), sh.data_ptr(), senders.data_ptr(),
