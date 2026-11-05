@@ -187,6 +187,29 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                 args[i] = t[order].contiguous()
         return args
 
+    # The exact form of mirror order: the data stays in receiver order and warp k processes edge perm[k], perm the
+    # mirror order of the edges (built once per neighbour list). Outputs land at their own edges, so the result is
+    # the base kernel's up to the dx atomics' order.
+    def mirror_perm(args):
+        import torch
+        args = list(args)
+        nodes = args[0].shape[0]
+        senders, receivers = args[3].long(), args[4].long()
+        key = torch.minimum(senders, receivers) * nodes + torch.maximum(senders, receivers)
+        args.append(torch.sort(key, stable=True).indices.to(torch.int32).contiguous())
+        return args
+
+    def perm_source(s):
+        s, n = re.subn(r"(scalar_t\* dr)\) \{", r"\1,\n    const int32_t* __restrict__ edge_perm) {", s, count=1)
+        s, m = re.subn(r"const int64_t e =\s*int64_t\(blockIdx\.x\) \* \(blockDim\.x / LOGICAL_GROUP_SIZE\) "
+                       r"\+ logical_group;\s*if \(e >= edge_count\) return;",
+                       "const int64_t slot =\n        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + "
+                       "logical_group;\n    if (slot >= edge_count) return;\n    const int64_t e = edge_perm[slot];", s,
+                       count=1)
+        if not (n and m):
+            raise ValueError("perm_source: the kernel signature or edge index was not found")
+        return s
+
     horner_block = (r"scalar_t gv\[PADDED_TERMS\];.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
 
     def skip_table(condition):
@@ -491,6 +514,7 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "B-mirror-share": ("falsifier", skip_table("e & 1"), (), mirror_order),
         "F-no-table-horner": ("falsifier", skip_table("true"), ()),
         "F-half-table": ("falsifier", skip_table("e & 1"), ()),
+        "M-mirror-perm": ("rounding", perm_source, (), mirror_perm),
         "B-sender-order": ("falsifier", lambda s: s, (), sender_order),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
@@ -582,7 +606,7 @@ def wprime_launcher(kernel, source, extra):
 
     def launch(args):
         (x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins, r_lo, bin_scale,
-         r_max, dr) = args
+         r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
         blocks = (edges * kernel.cohort + kernel.num_threads - 1) // kernel.num_threads
         p = ctypes.c_void_p
@@ -590,9 +614,9 @@ def wprime_launcher(kernel, source, extra):
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), weights.data_ptr(), senders.data_ptr(),
                   receivers.data_ptr(), *[d.data_ptr() for d in douts], dx.data_ptr(), dsh.data_ptr(), r.data_ptr(),
                   pair.data_ptr(), gprime.data_ptr(), starts.data_ptr(), scales.data_ptr(), bins.data_ptr(),
-                  r_lo, bin_scale, r_max, bins.shape[0], starts.shape[0], dr.data_ptr())
+                  r_lo, bin_scale, r_max, bins.shape[0], starts.shape[0], dr.data_ptr(), *[t.data_ptr() for t in perm])
         types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + len(douts))
-                 + (ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p))
+                 + (ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p) + (p,) * len(perm))
         stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
         _check(driver.cuLaunchKernel(function, blocks, 1, 1, kernel.num_threads, 1, 1, kernel.shared_memory, stream,
                                      (values, types), 0))
