@@ -561,3 +561,38 @@ cursor. Built as `fused_forward.TC_TP` (off), with `TC_TP_SPLIT = "round"`.
 - **Why it loses:** each A element serves one mma triple (N = 8 outputs, K = 8 edges). Its preparation (multiply
   by x, round-to-nearest split of both operands) costs about as much as the FP32 TP's terms it replaces. With the
   per-path a-fragment reloads and segment loops on top, the kernel is slower.
+
+## Round 5: the A100 profile at `5b6c5550` (5 November 2026)
+
+Profile: `results/omat0-a100-profile-5b6c5550/` (Modal A100 80GB PCIe). Benchmark_loup 2.38 µs per atom and step
+(NVE) and 2.35 (Langevin), against 2.50 / 2.47 at `2e9a3878`. The eager force call takes 11.72 ms in 223 kernels:
+
+| Kernel or bucket | µs |
+|---|---|
+| fused forward | 3,175 |
+| w′ backward | 3,109 |
+| CUTLASS GEMMs (41 launches) | 1,811 |
+| Triton atom kernels (55) | 1,035 |
+| tabled outer sums | 849 |
+| symmetric contraction | 402 |
+| edge geometry and radial glue | 307 |
+
+Records: `results/round5-20261105/`.
+
+Tried:
+- **Edge spherical harmonics in Triton (`EDGE_SH`): adopted** on the RTX 5060 Ti, the RTX 4000 Ada and every A100. MD step
+  0.96–0.998, faster in both orders on all three GPUs; the gate passes.
+- **The species GEMM on the A100, again: rejected.** SrTiO3 gains (0.979–0.996), but NbCl5 loses 2.6–5.8 %.
+- **w from the value table in the forward: rejected.** The lab bound with the table's real footprint is 1.333 of the
+  forward on the A100; even with the table cached it is 0.988.
+
+Left from the profile, by size:
+- **GEMM layout glue, about 0.34 ms of pure copies** (`clone_slice_*tf32x3_mm` 162 µs, `cat_view` 182 µs) between
+  `[N, 16·128]` and `[N·dim, 128]`. The cubin's gathered and scattered entry (`fm_tf32x3_species_rr_64x64`, one
+  species) can read and write those rows through index arrays without a rebuild. It needs a custom op that takes
+  the full feature tensor, and consumers that accept the block layout (cuEq's symmetric contraction does not).
+- **The ZBL pair term in Inductor:** 48 + 27 µs plus a 37 µs scatter; a fused kernel each way.
+- **MACE's head selection `[arange, heads]`:** its backward sorts (`IndexBackward0`, about 70 µs with the forward
+  gathers), because the readouts run in eager frames between compiled graphs.
+- **The interaction-1 outer sum's 61 MB zero fill (32 µs) and its atomics:** they disappear if each program owns
+  whole receivers.

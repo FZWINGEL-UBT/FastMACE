@@ -1,0 +1,11 @@
+category,op,gflop_per_call,us_per_call,invocations_per_call,achieved_tflops,share_of_fp32_peak,kernels,input_dims,input_strides
+Atom-level linear layers (GEMM),aten::mm,0.1139,15.6,1.0,7.295,0.374,ampere_sgemm_128x32_nn,"[[5000, 89], [89, 128], [5000, 128]]","[[89, 1], [128, 1], [128, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0568,11.7,1.0,4.848,0.249,ampere_sgemm_32x128_nn,"[[11392, 86], [86, 29], [11392, 29]]","[[86, 1], [29, 1], [29, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0205,9.2,1.0,2.220,0.114,ampere_sgemm_32x32_sliced1x4_nn,"[[5000, 128], [128, 16], [5000, 16]]","[[128, 1], [16, 1], [16, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0083,6.9,1.0,1.210,0.062,ampere_sgemm_32x128_nn,"[[11392, 28], [28, 13], [11392, 13]]","[[28, 1], [13, 1], [13, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0205,6.6,1.0,3.104,0.159,ampere_sgemm_128x32_nn,"[[5000, 16], [16, 128], [5000, 128]]","[[16, 1], [128, 1], [128, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0013,5.7,1.0,0.223,0.011,ampere_sgemm_32x128_nn,"[[5000, 1], [1, 128], [5000, 128]]","[[1, 1], [1, 1], [128, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0009,5.6,1.0,0.158,0.008,"void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 2, 2, false, false, cublasGemvParamsEx<int, cublas","[[5000, 89], [89, 1], [5000, 1]]","[[89, 1], [1, 89], [1, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0002,4.8,1.0,0.034,0.002,ampere_sgemm_32x128_nn,"[[5000, 1], [1, 16], [5000, 16]]","[[1, 1], [1, 1], [16, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0013,4.1,1.0,0.316,0.016,"void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 2, 2, false, false, cublasGemvParamsEx<int, cublas","[[5000, 128], [128, 1], [5000, 1]]","[[128, 1], [1, 1], [1, 1]]"
+Atom-level linear layers (GEMM),aten::mm,0.0002,3.2,1.0,0.050,0.003,"std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, float, float, float, false, true, true, fa","[[5000, 16], [16, 1], [5000, 1]]","[[16, 1], [1, 1], [1, 1]]"

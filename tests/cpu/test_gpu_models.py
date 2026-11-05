@@ -154,3 +154,22 @@ def test_round4_defaults(monkeypatch):
         assert not default(names["a100"]), constant
         monkeypatch.setattr(fused_forward, constant, None)
     assert not fused_forward.vec_sh_default(18, names["a100"])  # float4 staging needs ED % 4 == 0
+
+
+def test_round5_edge_sh_default(monkeypatch):
+    """Round 5 (5 November 2026, decision 66): EDGE_SH on the RTX 5060 Ti, the RTX 4000 Ada and every A100; off on
+    other GPUs, the CPU and without a device; the constant overrides."""
+    import torch
+
+    from fastmace.rewrites.generic import modules as gm
+    assert gm.EDGE_SH is None
+    for name in ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
+                 "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-40GB"):
+        assert gm.edge_sh_default(name), name
+    for name in ("NVIDIA RTX A4000", "NVIDIA L4", None):
+        assert not gm.edge_sh_default(name), name
+    assert not gm.edge_sh_default(torch.device("cpu"))
+    monkeypatch.setattr(gm, "EDGE_SH", True)
+    assert gm.edge_sh_default("NVIDIA L4")
+    monkeypatch.setattr(gm, "EDGE_SH", False)
+    assert not gm.edge_sh_default("NVIDIA A100 80GB PCIe")
