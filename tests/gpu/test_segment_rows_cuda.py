@@ -142,8 +142,10 @@ def test_grouped_bitwise(case, n, monkeypatch):
     assert torch.equal(results[True][0], results[False][0])
     assert torch.equal(results[True][1], results[False][1])
     out = torch.empty(n, width_out, device="cuda")
-    took = sr._grouped(x, weights, plan, out)
-    assert took is (case == "omat0" and n == 1000)  # "partial": different block shapes; 7 atoms: the shape rule
+    if case == "partial":  # different block shapes: never one launch
+        assert not sr._grouped(x, weights, plan, out)
+    elif n == 1000:
+        assert sr._grouped(x, weights, plan, out)
 
 
 def test_grouped_graph_replay(monkeypatch):

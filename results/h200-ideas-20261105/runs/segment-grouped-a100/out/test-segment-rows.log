@@ -1,0 +1,35 @@
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+.........F..                                                             [100%]
+=================================== FAILURES ===================================
+________________________ test_grouped_bitwise[7-omat0] _________________________
+
+case = 'omat0', n = 7
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x2b7a7f6290f0>
+
+    @pytest.mark.parametrize("case", sorted(CASES))
+    @pytest.mark.parametrize("n", [1000, 7])
+    def test_grouped_bitwise(case, n, monkeypatch):
+        _available()
+        _, _, _, weights, width_in, width_out, plan = _blocks(case)
+        weights_t = [w.t().contiguous() for w in weights]
+        x = torch.randn(n, width_in, device="cuda", generator=torch.Generator(device="cuda").manual_seed(2))
+        grad = torch.randn(n, width_out, device="cuda", generator=torch.Generator(device="cuda").manual_seed(3))
+        results = {}
+        for grouped in (False, True):
+            monkeypatch.setattr(sr, "SEGMENT_GROUPED", grouped)
+            xg = x.clone().requires_grad_()
+            y = sr.segment_rows(xg, weights, weights_t, plan, width_out)
+            (gx,) = torch.autograd.grad(y, xg, grad)
+            results[grouped] = (y.detach(), gx)
+        assert torch.equal(results[True][0], results[False][0])
+        assert torch.equal(results[True][1], results[False][1])
+        out = torch.empty(n, width_out, device="cuda")
+        took = sr._grouped(x, weights, plan, out)
+>       assert took is (case == "omat0" and n == 1000)  # "partial": different block shapes; 7 atoms: the shape rule
+E       AssertionError: assert True is (('omat0' == 'omat0'
+E         
+E           omat0 and 7 == 1000))
+
+tests/gpu/test_segment_rows_cuda.py:146: AssertionError
+1 failed, 11 passed in 1.13s

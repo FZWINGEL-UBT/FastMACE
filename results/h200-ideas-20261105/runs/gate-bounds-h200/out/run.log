@@ -1,0 +1,17 @@
+2026-11-05T21:46:59Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; alias NVIDIA H200=NVIDIA H200; source 891bf370ef6e17f87e06497871c36b0ea572f0ed
+2026-11-05T21:46:59Z start gate
+2026-11-05T21:52:04Z end gate exit=0 SrTiO3 summary {"energy": {"production_max_abs": 0.003098924957224948, "ase_f32_max_abs": 0.0004080851390931962, "ratio": 7.593819672314098, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.0203293536423814e-05, "ase_f32_max_abs": 3.0441642784317935e-0
+NaCl summary {"energy": {"production_max_abs": 0.00039658331677064443, "ase_f32_max_abs": 0.0001406928718055227, "ratio": 2.8187875596059664, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.547621500010756e-06, "ase_f32_max_abs": 4.7839844127262054e-06, "ratio": 0.7415620942604838, "floor": 1e-05, "limit": 1e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 4.6443533022882955e-08, "ase_f32_max_abs": 4.5714267376748e-08, "ratio": 1.0159526924083637, "floor": 1e-07, "limit": 1e-07, "passed": true, "gated": true}, "passed": true}
+NbCl5 summary {"energy": {"production_max_abs": 0.0009053172606748117, "ase_f32_max_abs": 0.0002291550967271522, "ratio": 3.9506747770604664, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 8.090167139851445e-05, "ase_f32_max_abs": 8.114008997761601e-05, "ratio": 0.9970616426581812, "floor": 1e-05, "limit": 0.00016228017995523203, "passed": true, "gated": true}, "stress": {"production_max_abs": 1.351161224624059e-07, "ase_f32_max_abs": 6.508807322627708e-08, "ratio": 2.075896792837576, "floor": 1e-07, "limit": 1.3017614645255415e-07, "passed": false, "gated": true}, "passed": false}
+SrTiO3 summary {"energy": {"production_max_abs": 0.003098924957224948, "ase_f32_max_abs": 0.0004080851390931962, "ratio": 7.593819672314098, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.0203293536423814e-05, "ase_f32_max_abs": 3.0441642784317935e-05, "ratio": 0.9921702895739613, "floor": 1e-05, "limit": 6.088328556863587e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 2.7425217195842233e-07, "ase_f32_max_abs": 2.8717996616856034e-07, "ratio": 0.9549836488157045, "floor": 1e-07, "limit": 5.743599323371207e-07, "passed": true, "gated": true}, "passed": true}
+2026-11-05T21:52:04Z start loup-1
+2026-11-05T21:52:58Z end loup-1 exit=0 {"gpu": "NVIDIA H200", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 1.10083641000017, "ms_per_step": 5.50418205000085, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_product_linear", "fused_folded_backward", "fused_folded_forward
+2026-11-05T21:52:58Z start lab-forward
+2026-11-05T21:53:57Z end lab-forward exit=0 forward  F-s-tile            1634.4 us  ratio 0.966  regs 167 local 0  
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-tp-no-coef                 {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-s-tile                     {'9.0': {'registers': 167, 'spill_store_bytes': 0}}
+forward  base                1691.3 us  ratio 1.000  regs 168 local 0  
+forward  F-tp-no-coef        1642.8 us  ratio 0.971  regs 168 local 0  
+forward  F-s-tile            1634.4 us  ratio 0.966  regs 167 local 0  
+2026-11-05T21:53:57Z done

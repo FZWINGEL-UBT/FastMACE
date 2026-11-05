@@ -1,0 +1,87 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T21:06:18.719726+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "716450de3aa2af16087d4e80c9f93da88d8b616f",
+  "model": "omat0-medium",
+  "rounds": 5,
+  "capture_s": 43.756196510003065,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=9, shared_bytes=74016)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 0,
+          "median_us": 6470.911979675293,
+          "min_us": 6438.240051269531,
+          "max_us": 7105.504035949707,
+          "ratio": 1.0
+        },
+        "F-no-xload": {
+          "kind": "falsifier",
+          "registers": 155,
+          "local_bytes": 0,
+          "median_us": 6145.823955535889,
+          "min_us": 6121.376037597656,
+          "max_us": 6849.4720458984375,
+          "ratio": 0.9497616371292819
+        },
+        "F-no-aload4": {
+          "kind": "falsifier",
+          "error": "variant pattern found 0 times: '__ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q)'"
+        },
+        "F-no-shload4": {
+          "kind": "falsifier",
+          "registers": 167,
+          "local_bytes": 0,
+          "median_us": 6579.19979095459,
+          "min_us": 6292.736053466797,
+          "max_us": 7232.800006866455,
+          "ratio": 1.0167345517323403
+        },
+        "F-no-ash4": {
+          "kind": "falsifier",
+          "error": "variant pattern found 0 times: '__ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q)'"
+        },
+        "F-no-tp": {
+          "kind": "falsifier",
+          "registers": 61,
+          "local_bytes": 0,
+          "median_us": 3345.0241088867188,
+          "min_us": 2282.6240062713623,
+          "max_us": 3392.319917678833,
+          "ratio": 0.5169324075792127
+        },
+        "F-tp-no-coef": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 0,
+          "median_us": 6321.50411605835,
+          "min_us": 6061.888217926025,
+          "max_us": 6338.46378326416,
+          "ratio": 0.9769108490292832
+        }
+      }
+    }
+  },
+  "constants": {}
+}

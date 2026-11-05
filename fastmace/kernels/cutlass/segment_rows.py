@@ -25,8 +25,9 @@ all read from x's base and written to out's base by row indices, with the blocks
 (cached per weight set). Only when every block has the same k and m and every block would take the kernel on its own,
 so each element's arithmetic is unchanged: bitwise against the per-block launches. The bound
 (``tools/bench/grouped_gemm_bound.py``, A100 80GB PCIe: one launch over the four OMAT-0 message products' rows against
-four launches) was 26-52 us per group of four. None: on for ``SEGMENT_GROUPED_GPUS`` (decision 66); True / False: an
-A/B side's choice.
+four launches) was 26-52 us per group of four, but the MD step on the A100-SXM4-80GB was neutral (b/a 0.9987 /
+1.0004; results/h200-ideas-20261105): rejected, off everywhere. None: on for ``SEGMENT_GROUPED_GPUS`` (decision 66);
+True / False: an A/B side's choice.
 """
 
 from __future__ import annotations

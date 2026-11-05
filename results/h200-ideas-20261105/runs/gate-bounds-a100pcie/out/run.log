@@ -1,0 +1,17 @@
+2026-11-05T21:36:27Z Modal NVIDIA A100 80GB PCIe, 610.57.04, 81920 MiB, 8.0; alias NVIDIA A100 80GB PCIe=NVIDIA A100-SXM4-80GB; source 891bf370ef6e17f87e06497871c36b0ea572f0ed
+2026-11-05T21:36:27Z start gate
+2026-11-05T21:41:20Z end gate exit=0 SrTiO3 summary {"energy": {"production_max_abs": 0.004674253641159911, "ase_f32_max_abs": 0.00036569961055108623, "ratio": 12.781675195431863, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.1633805013697724e-05, "ase_f32_max_abs": 2.9487968461694436e
+NaCl summary {"energy": {"production_max_abs": 0.000498794841940219, "ase_f32_max_abs": 0.00013958908314011583, "ratio": 3.5733083900231795, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.547621499677689e-06, "ase_f32_max_abs": 4.783984412615183e-06, "ratio": 0.7415620942080721, "floor": 1e-05, "limit": 1e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 5.1302202827910315e-08, "ase_f32_max_abs": 4.5714267380217444e-08, "ratio": 1.1222361369420308, "floor": 1e-07, "limit": 1e-07, "passed": true, "gated": true}, "passed": true}
+NbCl5 summary {"energy": {"production_max_abs": 0.0012308125832656335, "ase_f32_max_abs": 0.00010994581466192405, "ratio": 11.194719754001541, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 8.161692713937185e-05, "ase_f32_max_abs": 8.114008998116873e-05, "ratio": 1.0058767146833802, "floor": 1e-05, "limit": 0.00016228017996233746, "passed": true, "gated": true}, "stress": {"production_max_abs": 1.56948665785972e-07, "ase_f32_max_abs": 7.06760086774394e-08, "ratio": 2.22067811585506, "floor": 1e-07, "limit": 1.413520173548788e-07, "passed": false, "gated": true}, "passed": false}
+SrTiO3 summary {"energy": {"production_max_abs": 0.004674253641159911, "ase_f32_max_abs": 0.00036569961055108623, "ratio": 12.781675195431863, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.1633805013697724e-05, "ase_f32_max_abs": 2.9487968461694436e-05, "ratio": 1.0727699012155, "floor": 1e-05, "limit": 5.897593692338887e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 3.129075045182894e-07, "ase_f32_max_abs": 2.5737764376698724e-07, "ratio": 1.2157524637282608, "floor": 1e-07, "limit": 5.147552875339745e-07, "passed": true, "gated": true}, "passed": true}
+2026-11-05T21:41:20Z start loup-1
+2026-11-05T21:42:09Z end loup-1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 2.177937509999879, "ms_per_step": 10.889687549999394, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_product_linear", "fused_folded_backward", "fused_f
+2026-11-05T21:42:09Z start lab-forward
+2026-11-05T21:43:01Z end lab-forward exit=0 forward  F-s-tile            3093.5 us  ratio 0.951  regs 167 local 48  
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-tp-no-coef                 {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-s-tile                     {'9.0': {'registers': 167, 'spill_store_bytes': 0}}
+forward  base                3253.2 us  ratio 1.000  regs 168 local 64  
+forward  F-tp-no-coef        3074.0 us  ratio 0.945  regs 168 local 64  
+forward  F-s-tile            3093.5 us  ratio 0.951  regs 167 local 48  
+2026-11-05T21:43:01Z done
