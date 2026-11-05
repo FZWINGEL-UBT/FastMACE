@@ -156,6 +156,30 @@ for layout in ("ir_mul", "mul_ir"):
                         vec_message, vec_w = fused_folded_forward(source, zero, X, Y, *args, vec.id)
                         assert torch.equal(vec_message, skip_message) and torch.equal(vec_w, skip_w), (layout, k)
                     report[name]["vec a + sh bitwise"] = True
+                # TC_WFRAG (round 4): the W slice in fragment order, bitwise the tensor-core kernel's (also with
+                # VEC_A + VEC_SH where those apply).
+                if split == "mask":
+                    ff_module.TENSOR_CORES, ff_module.TC_WFRAG = True, True
+                    try:
+                        frag = FusedFoldedForward(kernels, k, used=k - 1)
+                    finally:
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG = False, None
+                    assert frag.wfrag and "reinterpret_cast<const float4*>(Ws)" in frag.source, (layout, k)
+                    frag_out = fused_folded_forward(a, zero, X, Y, *args, frag.id)
+                    assert torch.equal(frag_out[0], skip_message) and torch.equal(frag_out[1], skip_w), (layout, k)
+                    report[name]["wfrag bitwise"] = True
+                    if (k - 1) % 32 == 0:
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG = True, True
+                        ff_module.VEC_A, ff_module.VEC_SH = True, True
+                        try:
+                            both = FusedFoldedForward(kernels, k, used=k - 1)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG = False, None
+                            ff_module.VEC_A, ff_module.VEC_SH = None, None
+                        assert both.wfrag and both.vec_a, (layout, k)
+                        both_out = fused_folded_forward(a, zero, X, Y, *args, both.id)
+                        assert torch.equal(both_out[0], skip_message) and torch.equal(both_out[1], skip_w)
+                        report[name]["wfrag + vec a bitwise"] = True
         # VEC_SH on the FP32-SIMT kernel: bitwise.
         ff_module.VEC_SH = True
         try:
