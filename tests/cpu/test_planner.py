@@ -254,7 +254,8 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            # (generic_chunked_conv_backward; decision 66: this file's GPU is measured)
            "chunked_conv_backward": LABELS,
            "radial_tables": (*FACTORED_LABELS, *GENERIC_FAMILY_LABELS),  # generic: decision 66 (this file's GPU)
-           "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
+           # species_tables: PolarMACE.forward pinned too (polar-T01); the folds stay MH-1's
+           "species_tables": (*MH1_LABELS, *fixed.POLAR_GRAPH_LABELS), "fold_product_linear": MH1_LABELS,
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
@@ -1051,11 +1052,13 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
                                                    model_label="mh1-r2scan")
         assert plan.rewrites.wprime_backward == "off", hardware.name
         assert dict(plan.auto_options_off)["wprime_backward"] == f"not a measured GPU, decision 66 ({hardware.name})"
-    for label in ("polar1-s", "omol0-xl"):
-        plan = plan_for(label)
-        assert plan.rewrites.wprime_backward == "off", label
-        assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured model, decision 66"), \
-            label
+    plan = plan_for("omol0-xl")
+    assert plan.rewrites.wprime_backward == "off"
+    assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured model, decision 66")
+    # POLAR-1-M/L: measured on the RTX 4000 Ada only (polar-T01), not on this file's GPU; POLAR-1-S: one interaction.
+    plan = plan_for("polar1-m")
+    assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured GPU, decision 66")
+    assert dict(plan_for("polar1-s").auto_options_off)["wprime_backward"] == fixed.SECOND_INTERACTION
     float64 = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
     item, choice, reason = decision(float64, "RewriteConfig.wprime_backward")
     assert choice == "off" and "float64 plans keep the chained backward" in reason

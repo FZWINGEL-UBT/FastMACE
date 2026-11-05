@@ -1358,7 +1358,8 @@ class FixedPlanner:
             elif polar_wprime:
                 v["_why"]["wprime_backward"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
             else:
-                measured = _mh1(model_label) or model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                measured = (_mh1(model_label) or model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                            or _qualified_polar(traits, model_label))
                 reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
                           else f"not a measured GPU, decision 66 ({name})")
                 v["wprime_backward"] = False

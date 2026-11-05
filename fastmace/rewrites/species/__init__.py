@@ -103,11 +103,11 @@ def _forward_pinned(model):
         return None
     if kind != "PolarMACE":
         return f"{kind}: only ScaleShiftMACE's and PolarMACE's forwards are pinned"
-    from fastmace.longrange.polar import SOURCE_HASHES
-    from fastmace.rewrites.registry import source_sha256
+    # The polar path's install() replaces PolarMACE.forward; its own record of the original is what is pinned.
+    from fastmace.longrange.polar import SOURCE_HASHES, _original, source_digest
 
     try:
-        found = source_sha256(POLAR_FORWARD)
+        found = source_digest(_original(POLAR_FORWARD))
     except Exception as error:  # graph_longrange missing or MACE changed: not pinned
         return f"PolarMACE.forward cannot be read ({type(error).__name__}: {error})"
     if found != SOURCE_HASHES[POLAR_FORWARD]:
