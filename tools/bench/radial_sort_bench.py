@@ -12,6 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+import fastmace  # noqa: F401  (soft file locks before torch)
+
 
 def timed(fn, reps=50):
     import torch
@@ -38,7 +40,6 @@ def main(argv=None):
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
-    import fastmace  # noqa: F401  (soft file locks before torch)
     import torch
 
     from fastmace.kernels.triton.radial_table import radial_table_forward
