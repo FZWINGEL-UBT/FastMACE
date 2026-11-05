@@ -611,7 +611,27 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-one-slab": ("falsifier", lambda s: _sub(s, group, "const scalar_t* g = gprime;", 1), ()),
         "F-no-atomics": ("falsifier", lambda s: _sub(_after_constants(s, FAKE_ADD), "atomicAdd(", "fake_add("), ()),
         "F-no-wload": ("falsifier", lambda s: _sub(s, load_w, "const scalar_t radial_weight = scalar_t(1);"), ()),
+        # Receiver-local forward + backward of the last interaction (6 November 2026): a kernel that owns a receiver
+        # tile would hold the receiver's output gradient (dout) and its edges' sh in shared memory; the sender
+        # features x would still be gathered (2 KB per edge does not fit). These bounds read them from a 4 KB shared
+        # array instead of global memory (values garbage, timing only). F-smem-dout-sh is the realistic one,
+        # F-smem-all (x too) the optimistic one. Pair with the forward's F-no-out (no message store).
+        **{name: ("falsifier", lambda s, keys=keys: _smem_reads(s, keys), ())
+           for name, keys in (("F-smem-dout", ("dout",)), ("F-smem-sh", ("sh",)), ("F-smem-x", ("x",)),
+                              ("F-smem-dout-sh", ("dout", "sh")), ("F-smem-all", ("dout", "sh", "x")))},
     }
+
+
+def _smem_reads(source, keys):
+    """The w' kernel with the global reads of ``keys`` (``dout``, ``sh``, ``x``) taken from a shared array."""
+    s = _sub(source, "const int lane = threadIdx.x % LOGICAL_GROUP_SIZE;",
+             "__shared__ scalar_t fm_s[1024];\n    const int lane = threadIdx.x % LOGICAL_GROUP_SIZE;", 1)
+    patterns = {"dout": (r"\bdout(\d)\[([^\[\]]*)\]", r"fm_s[(\2) & 1023]"),
+                "sh": (r"\bsh\[([^\[\]]*)\]", r"fm_s[(\1) & 1023]"),
+                "x": (r"\bx\[([^\[\]]*)\]", r"fm_s[(\1) & 1023]")}
+    for key in keys:
+        s = _sub(s, *patterns[key], regex=True)
+    return s
 
 
 def plan_options(kernel, extra):
