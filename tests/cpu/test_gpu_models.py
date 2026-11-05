@@ -216,6 +216,9 @@ def test_segment_rows_default(monkeypatch):
         assert segment_rows.segment_rows_default(torch.device("cuda", 0)) is on, name
     monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", False)
     assert not segment_rows.segment_rows_default(torch.device("cuda", 0))
+    assert segment_rows.SEGMENT_GROUPED is None and not segment_rows.segment_grouped_default("cpu")
+    monkeypatch.setattr(segment_rows, "SEGMENT_GROUPED", True)
+    assert segment_rows.segment_grouped_default(torch.device("cuda", 0))
 
 
 def test_h200_defaults():

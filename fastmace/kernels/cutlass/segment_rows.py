@@ -18,6 +18,15 @@ or cuBLAS IEEE into a temporary, then copied into place).
 
 ``SEGMENT_ROWS``: None: on for ``SEGMENT_ROWS_GPUS`` (decision 66, after the MD-step A/Bs); True / False: an A/B
 side's choice. Only where the module's tf32x3 backend is CUTLASS (compute capability 8.0).
+
+``SEGMENT_GROUPED`` (H200 ideas plan, idea 6; 5 November 2026): every block of the op in one launch of the same kernel
+instead of one launch per block. Each block is one "species" of ``species_into`` with ``size`` 1 (its n * d rows),
+all read from x's base and written to out's base by row indices, with the blocks' weights stacked [blocks, k, m]
+(cached per weight set). Only when every block has the same k and m and every block would take the kernel on its own,
+so each element's arithmetic is unchanged: bitwise against the per-block launches. The bound
+(``tools/bench/grouped_gemm_bound.py``, A100 80GB PCIe: one launch over the four OMAT-0 message products' rows against
+four launches) was 26-52 us per group of four. None: on for ``SEGMENT_GROUPED_GPUS`` (decision 66); True / False: an
+A/B side's choice.
 """
 
 from __future__ import annotations
@@ -32,6 +41,8 @@ from fastmace.kernels.gpu_models import GPUModels
 # 0.988; the gate passes.
 SEGMENT_ROWS = None
 SEGMENT_ROWS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+SEGMENT_GROUPED = None
+SEGMENT_GROUPED_GPUS = GPUModels(())
 
 _INDICES = {}  # (device index, rows, size, row stride, dim stride, ld) -> int32 row indices (built outside captures)
 
@@ -42,6 +53,14 @@ def segment_rows_default(device) -> bool:
         return bool(SEGMENT_ROWS)
     device = torch.device(device)
     return device.type == "cuda" and torch.cuda.get_device_name(device) in SEGMENT_ROWS_GPUS
+
+
+def segment_grouped_default(device) -> bool:
+    """``SEGMENT_GROUPED`` for ``device``: the constant when set, else on for a ``SEGMENT_GROUPED_GPUS`` device."""
+    if SEGMENT_GROUPED is not None:
+        return bool(SEGMENT_GROUPED)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in SEGMENT_GROUPED_GPUS
 
 
 def plan_of(segments_in, segments_out, block_ends, weights):
@@ -119,10 +138,65 @@ def _product(a, w, y):
     y.copy_(out.view(n, d, m))
 
 
+def _cached(key, build):
+    cached = _INDICES.get(key)
+    if cached is not None:
+        return cached
+    value = build()
+    if not torch.cuda.is_current_stream_capturing():
+        _INDICES[key] = value
+    return value
+
+
+def _grouped(x, weights, plan, out):
+    """Every block in one ``species_into`` launch (``SEGMENT_GROUPED``); False (nothing written) when they do not
+    fit."""
+    from fastmace.kernels.cutlass import tf32x3
+    from fastmace.kernels.triton import species_gemm
+
+    n, width = x.shape
+    width_out = out.shape[1]
+    shapes = {tuple(w.shape) for w in weights}
+    if n == 0 or len(weights) < 2 or len(shapes) != 1:
+        return False
+    k, m = shapes.pop()
+    lda = math.gcd(width, k)
+    blocks = [plan[3 * b:3 * b + 3] for b in range(len(weights))]
+    if (k % 4 or m % 4 or lda % 4 or width_out % m or x.data_ptr() % 16 or out.data_ptr() % 16
+            or any(o_in % lda or (o_in * 4) % 16 or o_out % m or (o_out * 4) % 16 for o_in, _, o_out in blocks)
+            or not all(tf32x3.takes(n * d, k, m) for _, d, _ in blocks)
+            or not all(w.is_contiguous() and w.data_ptr() % 16 == 0 for w in weights)):
+        return False
+    device = x.device
+    plan_key = tuple(plan)
+
+    def indices():
+        a = torch.arange(n, device=device, dtype=torch.int64)[:, None]
+        gather, scatter = [], []
+        for o_in, d, o_out in blocks:
+            j = torch.arange(d, device=device, dtype=torch.int64)
+            gather.append(((a * width + o_in + j * k) // lda).flatten())
+            scatter.append(((a * width_out + o_out + j * m) // m).flatten())
+        counts = torch.tensor([n * d for _, d, _ in blocks], dtype=torch.int32, device=device)
+        return torch.cat(gather).to(torch.int32), torch.cat(scatter).to(torch.int32), counts
+
+    gather, scatter, counts = _cached((device.index, "grouped", n, width, width_out, plan_key), indices)
+    stacked = _cached((device.index, "stacked") + tuple(w.data_ptr() for w in weights),
+                      lambda: torch.stack(weights).contiguous())
+    rows = n * sum(d for _, d, _ in blocks)
+    tf32x3.species_into(x, lda, gather, stacked, out, scatter, counts, 1, species_gemm.tiles(rows, 1, len(blocks)))
+    return True
+
+
 def _apply(x, weights, plan, width_out):
     n = x.shape[0]
     out = x.new_empty((n, width_out))
-    written = []
+    if segment_grouped_default(x.device) and _grouped(x, weights, plan, out):
+        grouped_weights, weights = weights, []  # every block written; only the zero columns below remain
+        written = [(plan[3 * b + 2], plan[3 * b + 2] + plan[3 * b + 1] * w.shape[1])
+                   for b, w in enumerate(grouped_weights)]
+    else:
+        written = []
     for b, w in enumerate(weights):
         o_in, d, o_out = plan[3 * b:3 * b + 3]
         k, m = w.shape
@@ -175,4 +249,5 @@ def _backward(ctx, grad):
 
 segment_rows.register_autograd(_backward, setup_context=_setup_context)
 
-__all__ = ["SEGMENT_ROWS", "SEGMENT_ROWS_GPUS", "plan_of", "reversed_plan", "segment_rows", "segment_rows_default"]
+__all__ = ["SEGMENT_GROUPED", "SEGMENT_GROUPED_GPUS", "SEGMENT_ROWS", "SEGMENT_ROWS_GPUS", "plan_of", "reversed_plan",
+           "segment_grouped_default", "segment_rows", "segment_rows_default"]
