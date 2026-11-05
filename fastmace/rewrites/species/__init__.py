@@ -374,8 +374,11 @@ def _product_selfcheck(original, rewritten, context):
 # Round 6 (5 November 2026, research report idea 1, minimal variant): with the generic fold, also compose a density
 # first interaction's ``linear`` into its species skip (``modules.compose_species_skip``; the 1 / (d + 1) row scale
 # between them commutes) and leave the identity in its place: one 128 x 128 per-l GEMM less forward and backward
-# (A100 profile: 0.25 ms). Rounding, as the fold. Prototype for an A/B: False keeps the round-5 fold.
-FOLD_FIRST_DENSITY_LINEAR = False
+# (A100 profile: 0.25 ms). Rounding, as the fold. On wherever the generic fold is (decision 66: the RTX 4000 Ada and the
+# A100-SXM4-80GB, DECISION_66_GENERIC_FOLD_PRODUCT_GPUS), both measured: MD step b/a A100-SXM4 SrTiO3 0.978 / 0.977,
+# NbCl5 0.954 / 0.956; Ada SrTiO3 0.954 / 0.955, NbCl5 0.920 / 0.920; force gates pass (the A100's NbCl5 stress
+# exception unchanged). False: the round-5 fold alone.
+FOLD_FIRST_DENSITY_LINEAR = True
 
 
 def _generic_product_support(model):
