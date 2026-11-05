@@ -29,7 +29,7 @@ budget = _load_budget()
 
 # Modal's rate table as `modal billing rates` returns it (strings), October 2026.
 RATES = {"gpu_hour_cost_l4": "0.80", "gpu_hour_cost_a100_40gb": "2.10", "gpu_hour_cost_a100_80gb": "2.50",
-         "gpu_hour_cost_h100": "3.95", "cpu_hour_cost": "0.04730", "mem_gib_hour_cost": "0.00800"}
+         "gpu_hour_cost_h100": "3.95", "gpu_hour_cost_h200": "4.54", "cpu_hour_cost": "0.04730", "mem_gib_hour_cost": "0.00800"}
 JOB = dict(gpu="L4", timeout_s=4200, cpu_limit=8.0, memory_limit_gib=32.0)
 
 
@@ -50,7 +50,7 @@ def _no_env_limit(monkeypatch):
     monkeypatch.delenv("FASTMACE_MODAL_LIMIT_USD", raising=False)
 
 
-def test_cap_is_30_with_a_3_reserve():
+def test_cap_is_30_without_a_reserve():
     assert budget.CAP_USD == 30 and budget.RESERVE_USD == 0 and budget.LIMIT_USD == 30
 
 
@@ -99,6 +99,14 @@ def test_unreadable_metered_cost_refuses(read_metered):
 def test_unreadable_rates_refuse(rates):
     with pytest.raises(budget.BudgetRefused, match="refused"):
         _check("1.00", rates=rates)
+
+
+def test_every_job_gpu_has_a_rate():
+    tree = ast.parse((MODAL_DIR / "fastmace_modal.py").read_text(encoding="utf-8"))
+    gpus = next(ast.literal_eval(node.value) for node in tree.body
+                if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "GPUS")
+    assert "H200" in gpus and set(gpus) <= set(budget.GPU_RATE_KEYS)
+    assert budget.worst_case(RATES, "H200", 3600, 8.0, 32.0) > budget.worst_case(RATES, "H100", 3600, 8.0, 32.0)
 
 
 def test_unknown_gpu_refuses():
