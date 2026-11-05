@@ -153,6 +153,16 @@ BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200"))
 # over BUTTERFLY.
 REDUX = None
 REDUX_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# TABLE_W's value table interleaved by term pair (H200 ideas plan, idea 1; 5 November 2026): [groups, terms / 2, Q, 2]
+# in place of q-major [groups, Q, terms], so a warp's float2 load of one term pair covers 256 contiguous bytes (two
+# L1 wavefronts) instead of 768 bytes spread over six lines. The same values in the same registers: bitwise. None: on
+# for TABLE_PAIRS_GPUS (decision 66); True / False: an A/B side's choice.
+TABLE_PAIRS = None
+TABLE_PAIRS_GPUS = GPUModels(())
+# HORNER's slope without the piece scale per weight (idea 9): the edge's sum of dweights * dw/dt times the scale once.
+# Only dr changes, at rounding level. None: on for HOIST_SCALE_GPUS; True / False: an A/B side's choice.
+HOIST_SCALE = None
+HOIST_SCALE_GPUS = GPUModels(())
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -289,11 +299,16 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 {%- if table_w %}
                 scalar_t gv[PADDED_TERMS];
                 if (inside) {
+                    {%- if table_pairs %}
+                    // TABLE_PAIRS: term pair k of weight q at (k * WEIGHT_DIM + q) float2s.
+                    const {{ vector_type }}* gq = reinterpret_cast<const {{ vector_type }}*>(g) + weight_index;
+                    {%- else %}
                     const {{ vector_type }}* gq =
                         reinterpret_cast<const {{ vector_type }}*>(g + weight_index * PADDED_TERMS);
+                    {%- endif %}
                     #pragma unroll
                     for (int k = 0; k < PADDED_TERMS / {{ slope_vector }}; ++k) {
-                        const {{ vector_type }} v = __ldg(gq + k);
+                        const {{ vector_type }} v = __ldg(gq + {{ "k * WEIGHT_DIM" if table_pairs else "k" }});
                         {%- for component in "xyzw"[:slope_vector] %}
                         gv[{{ slope_vector }} * k + {{ loop.index0 }}] = v.{{ component }};
                         {%- endfor %}
@@ -430,7 +445,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 if (sloped) {
                     acc_t slope = acc_t(0);
                     {%- if horner %}
-                    slope = radial_dt * sc;
+                    slope = {{ "radial_dt" if hoist_scale else "radial_dt * sc" }};
                     {%- elif table_w %}
                     #pragma unroll
                     for (int k = 1; k < TERMS; ++k) slope += dcheb[k] * gv[k];
@@ -460,6 +475,9 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 scalar_t({{ slot.name }}));
         {%- endfor %}
     }
+    {%- if hoist_scale %}
+    radial_gradient *= sc;  // HOIST_SCALE: the piece scale once per edge
+    {%- endif %}
 
     {%- if redux %}
     // REDUX: each component's 32 partials summed in fixed point (redux.sync); lane 0 writes dsh[e, :] and dr[e].
@@ -548,7 +566,8 @@ def factored_paths(schedule, scale=False):
 
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
-           factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False):
+           factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
+           table_pairs=False, hoist_scale=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -559,7 +578,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     (round 2, 5 November 2026): ``horner`` (with ``table_w``): the value table in the power basis of t
     (``power_table``), w and its slope by dual Horner; ``scalar_paths`` (with ``factored``): l1 = 0 paths add
     their edge gradient per term from w x0, without the v_j sums. ``butterfly`` (``BUTTERFLY``, round 5): the
-    end-of-edge reduction as a butterfly reduce-scatter (exact; ``butterfly_supported``)."""
+    end-of-edge reduction as a butterfly reduce-scatter (exact; ``butterfly_supported``). ``table_pairs``
+    (``TABLE_PAIRS``, with ``table_w`` and vector 2): the value table interleaved by term pair (``pair_table``).
+    ``hoist_scale`` (``HOIST_SCALE``, with ``horner``): the piece scale applied once per edge."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -582,6 +603,10 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("butterfly needs a power-of-two edge dimension <= 32 and 32-lane cohorts")
     if redux and not redux_supported(schedule, scalar):
         raise ValueError("redux needs float32 and 32-lane cohorts")
+    if table_pairs and not (table_w and vector == 2):
+        raise ValueError("table_pairs interleaves TABLE_W's value table by float2: it needs table_w and vector 2")
+    if hoist_scale and not horner:
+        raise ValueError("hoist_scale moves HORNER's piece scale: it needs horner")
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
@@ -592,6 +617,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             factored=factored_paths(schedule, scale) if factored else None,
                                             horner=bool(horner), scalar_paths=bool(scalar_paths),
                                             butterfly=bool(butterfly), redux=bool(redux),
+                                            table_pairs=bool(table_pairs), hoist_scale=bool(hoist_scale),
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
 
 
@@ -651,6 +677,13 @@ def value_table(coef, weight, vector=TABLE_W_VECTOR):
     return g.to(coef.dtype).contiguous()
 
 
+def pair_table(g):
+    """A q-major value table ``g [groups, Q, padded]`` interleaved by term pair (``TABLE_PAIRS``): ``[groups,
+    padded / 2, Q, 2]``, the same values."""
+    groups, q, padded = g.shape
+    return g.reshape(groups, q, padded // 2, 2).permute(0, 2, 1, 3).contiguous()
+
+
 def density_column(dcoef):
     """The derivative series of the edge density alone, ``[P, K, D', 1]`` (``density_backward``)."""
     return dcoef[..., -1:].contiguous()
@@ -699,7 +732,7 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False):
+                 horner=False, table_pairs=False):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -714,6 +747,8 @@ class WPrimeBackward:
         self.schedule = kernels.schedule
         self.factored = factored_default(device) if factored is None else bool(factored)
         self.horner = bool(horner)  # the caller's table is power_table's (HORNER)
+        self.table_pairs = bool(table_pairs)  # the caller's table is pair_table's (TABLE_PAIRS)
+        self.hoist_scale = self.horner and hoist_scale_default(device)
         self.scalar_paths = self.factored and scalar_paths_default(device)
         self.max_registers = max_registers_default(device)
         self.redux = redux_default(device) and redux_supported(kernels.schedule, scalar)
@@ -722,7 +757,7 @@ class WPrimeBackward:
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and FACTORED_SCALE, horner=self.horner,
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
-                             redux=self.redux)
+                             redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1023,6 +1058,16 @@ def scalar_paths_default(device):
     return bool(SCALAR_PATHS) if SCALAR_PATHS is not None else _device_name(device) in SCALAR_PATHS_GPUS
 
 
+def table_pairs_default(device):
+    """``TABLE_PAIRS`` on ``device``: the constant when set, else on for ``TABLE_PAIRS_GPUS``."""
+    return bool(TABLE_PAIRS) if TABLE_PAIRS is not None else _device_name(device) in TABLE_PAIRS_GPUS
+
+
+def hoist_scale_default(device):
+    """``HOIST_SCALE`` on ``device``: the constant when set, else on for ``HOIST_SCALE_GPUS``."""
+    return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
+
+
 def redux_default(device):
     """``REDUX`` on ``device``: the constant when set, else on for ``REDUX_GPUS``."""
     return bool(REDUX) if REDUX is not None else _device_name(device) in REDUX_GPUS
@@ -1070,10 +1115,13 @@ class WPrime(torch.nn.Module):
             self.terms = int(table.dcoef.shape[2])
             self.vector = SLOPE_VECTOR if table.dcoef.dtype == torch.float32 else 0
             gprime = derivative_table(table.dcoef, weight, self.vector)
+        self.table_pairs = self.table_w and self.vector == 2 and table_pairs_default(table.coef.device)
+        if self.table_pairs:
+            gprime = pair_table(gprime)
         self.register_buffer("gprime", gprime, persistent=False)
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
-                                     table_w=self.table_w, horner=self.horner)
+                                     table_w=self.table_w, horner=self.horner, table_pairs=self.table_pairs)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.kernels = kernels
@@ -1098,7 +1146,7 @@ class WPrime(torch.nn.Module):
         self.block = (fused.id, blocks,
                       FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
                       WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
-                                     horner=self.horner))
+                                     horner=self.horner, table_pairs=self.table_pairs))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1160,7 +1208,7 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "SCALAR_PATHS_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "derivative_table", "factored_default", "factored_paths", "horner_default", "max_registers_default",
-           "padded_terms", "power_table", "prepare_block_messages",
+           "padded_terms", "pair_table", "power_table", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table",
            "wprime_arguments",

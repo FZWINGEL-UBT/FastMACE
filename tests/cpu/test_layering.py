@@ -97,6 +97,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/rewrites/radial/__init__.py": {"SYMMETRIC_PAIRS": "mirror pairs read one table row; per GPU, A/B"},
     "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B",
                                                           "TABLE_W": "w and slope from the value table; per GPU, A/B",
+                                                          "TABLE_PAIRS": "value table interleaved by term pair; A/B",
+                                                          "HOIST_SCALE": "piece scale once per edge (Horner); A/B",
                                                           "BLOCK_MESSAGE": "block-layout message; per GPU, A/B",
                                                           "BLOCK_LDG": "block reads through __ldg; per GPU, A/B",
                                                           "FACTORED": "factored TP backward; per GPU, A/B",

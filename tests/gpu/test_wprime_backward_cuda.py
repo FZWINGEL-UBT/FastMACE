@@ -359,6 +359,55 @@ for layout in ("ir_mul", "mul_ir"):
         assert torch.equal(captured[2], new[2]) and torch.equal(captured[4], new[4]), name
         report[name] = {"dsh": float((new[4] - base[4]).abs().max() / base[4].abs().max()),
                         "dr": float((new[2] - base[2]).abs().max() / base[2].abs().max())}
+    # H200 ideas (5 November 2026): TABLE_PAIRS, the value table interleaved by term pair (the same values in the
+    # same registers: dsh and dL/dr bitwise, dx up to the atomics' order), with and without HORNER; HOIST_SCALE,
+    # Horner's piece scale once per edge (dL/dr at rounding level against the float64 reference, dsh and dx unchanged).
+    for horner in (False, True):
+        name = f"table-pairs{'-horner' if horner else ''}-{layout}"
+        wp.TABLE_W, wp.HORNER, wp.HOIST_SCALE = True, horner, False
+        try:
+            wp.TABLE_PAIRS = False
+            plain = wp.WPrime(table, weight, kernels)
+            wp.TABLE_PAIRS = True
+            new_w = wp.WPrime(table, weight, kernels)
+        finally:
+            wp.TABLE_W = wp.HORNER = wp.TABLE_PAIRS = wp.HOIST_SCALE = None
+        assert new_w.table_pairs and new_w.kernel.table_pairs and not plain.table_pairs, name
+        assert new_w.gprime.dim() == 4 and torch.equal(wp.pair_table(plain.gprime), new_w.gprime), name
+        base = run(X, Y, G, D, kernels, weight, fused, plain)
+        new = run(X, Y, G, D, kernels, weight, fused, new_w)
+        assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name  # the same forward
+        assert torch.equal(new[4], base[4]) and torch.equal(new[2], base[2]), name  # dsh, dL/dr bitwise
+        torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            captured = run(X, Y, G, D, kernels, weight, fused, new_w)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(captured[2], new[2]) and torch.equal(captured[4], new[4]), name
+        report[name] = {"bitwise": True}
+    name = f"hoist-scale-{layout}"
+    wp.TABLE_W, wp.HORNER = True, True
+    try:
+        wp.HOIST_SCALE = False
+        plain = wp.WPrime(table, weight, kernels)
+        wp.HOIST_SCALE = True
+        new_w = wp.WPrime(table, weight, kernels)
+    finally:
+        wp.TABLE_W = wp.HORNER = wp.HOIST_SCALE = None
+    assert new_w.kernel.hoist_scale and not plain.kernel.hoist_scale, name
+    assert "radial_gradient *= sc;" in new_w.kernel.source and "radial_gradient *= sc;" not in plain.kernel.source
+    base = run(X, Y, G, D, kernels, weight, fused, plain)
+    new = run(X, Y, G, D, kernels, weight, fused, new_w)
+    assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name
+    assert torch.equal(new[4], base[4]), name  # dsh bitwise
+    torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+    dr_new = new[2].reshape(-1)
+    assert bool((dr_new[outside] == 0).all()), name
+    err = float((dr_new.double() - ref).abs().max()) / float(ref.abs().max())
+    err_base = float((base[2].reshape(-1).double() - ref).abs().max()) / float(ref.abs().max())
+    assert err <= 1e-5, (name, err)
+    report[name] = {"dr error": err, "dr error (unhoisted)": err_base}
 print(json.dumps(report))
 """
 
@@ -378,4 +427,6 @@ def test_wprime_backward_matches_the_chain():
                                f"{case}-{layout}" for case in ("horner", "horner-scalar", "horner-80")
                                for layout in ("ir_mul", "mul_ir")} | {
                                f"{case}-{layout}-{w}" for case in ("butterfly", "redux")
-                               for layout in ("ir_mul", "mul_ir") for w in ("stored-w", "table-w")}
+                               for layout in ("ir_mul", "mul_ir") for w in ("stored-w", "table-w")} | {
+                               f"{case}-{layout}" for case in ("table-pairs", "table-pairs-horner", "hoist-scale")
+                               for layout in ("ir_mul", "mul_ir")}
