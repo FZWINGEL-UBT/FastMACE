@@ -770,3 +770,17 @@ NbCl5 1.022 / 1.018, so slower; REDUX stays off on the A100. The A100 w′ kerne
 The leto CPU suite at 6c2f2967 (5143 passed, 2 failed) caught a name clash: GRAPH_SUM's forward edit registered
 `_fastmace_graph_sum`, which replaced PolarMACE's graph-sums helper of that name in its compiled forward. It now uses
 `_fastmace_batch_sum` (4bfe3307).
+
+Correction (5 November 2026, later): the "wrong outputs" of the A100 prefetch variants were a kernel-lab bug, not a
+kernel defect. With `VEC_A` (A100 default) the radial table writes a with rows padded to AS = 68 floats (K = 65); the
+lab gave that a to variants rendered without `VEC_A`, which read rows of KA = 65 floats, so every atom differed (all
+5,000 rows). tc-rerender keeps `VEC_A` and was bitwise. Lab fixes: a compacted a for such variants (a9074c5b), output
+buffers cleared before each variant (c544221a), the base's w zeroed, and the rows of a mismatch reported. Confirmed on
+the A100: tc-prefetch bitwise (1.253), simt and simt-prefetch 1.5-2.4e-6 (1.510 / 1.519). Production was never
+affected (its gate against float64 passes). Earlier A100 lab correctness labels of variants without VEC_A (prefetch,
+simt, fp16, presplit, round 4) are void; their timings stand. PREFETCH stays rejected on timing.
+
+A100 stage bounds at 6c2f2967 (thermalised capture): forward 3.25 ms; F-tc-no-product 0.473, F-no-tp 0.613,
+F-tc-no-mma 0.664, F-tc-1pass 0.677. The projection (1.71 ms) and the contraction (1.26 ms) add up: no overlap now.
+One MMA pass costs 42 us, three 1.09 ms. Chain variants: tc-mma-free 0.999 (bitwise), tc-2acc 1.306 (144 B spills),
+tc-3acc 1.504 (280 B). Producer/consumer microbenchmark (tools/pc_microbench.py) running on the A100.

@@ -1,0 +1,15 @@
+forward ptxas base                         {'8.0': {'registers': 167, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas simt                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 166, 'spill_store_bytes': 0}}
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch                  {'8.0': {'registers': 168, 'spill_store_bytes': 12}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-rerender rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-rerender                  {'8.0': {'registers': None, 'spill_store_bytes': 0}, '8.9': {'registers': None, 'spill_store_bytes': 0}}
+simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-rerender rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward  base                3197.2 us  ratio 1.000  regs 167 local 40  
+forward  simt                4832.6 us  ratio 1.511  regs 168 local 40  {'out0': 'max|d|/max|a| = 1.39e+00 in 5000/5000 rows (0..4999; 5000 CSR rows; degrees of the bad rows [62, 63, 64, 65, 66, 67, 71, 72])', 'out1': 'max|d|/max|a| = 6.35e
+forward  tc-prefetch         4017.8 us  ratio 1.257  regs 168 local 56  {'out0': 'max|d|/max|a| = 1.39e+00 in 5000/5000 rows (0..4999; 5000 CSR rows; degrees of the bad rows [62, 63, 64, 65, 66, 67, 71, 72])', 'out1': 'max|d|/max|a| = 6.35e
+forward  tc-rerender         3204.4 us  ratio 1.002  regs 167 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+grep: /tmp/fastmace-out/wprime.log: No such file or directory
