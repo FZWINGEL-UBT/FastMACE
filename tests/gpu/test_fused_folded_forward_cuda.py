@@ -205,6 +205,23 @@ for layout in ("ir_mul", "mul_ir"):
                         only = fused_folded_message(a, source_w, X, Y, *args, wg_msg.id)
                         assert torch.equal(only, wg_message), (layout, k, used)
                         report[name].setdefault("wgmma", {})[str(used)] = wg_error
+        # DEGREE_PARTS (H200 ideas plan, idea 2): one path part per input degree, bitwise the cost-balanced parts'
+        # (each output slot keeps its terms and edge order), on the SIMT kernel and with the tensor-core product.
+        for tc_on in ((False, True) if torch.cuda.get_device_capability() >= (8, 0) else (False,)):
+            ff_module.TENSOR_CORES = tc_on
+            try:
+                ff_module.DEGREE_PARTS = False
+                plain = FusedFoldedForward(kernels, k)
+                ff_module.DEGREE_PARTS = True
+                deg = FusedFoldedForward(kernels, k)
+            finally:
+                ff_module.TENSOR_CORES, ff_module.DEGREE_PARTS = False, None
+            assert deg.groups == ff_module.degree_parts(kernels.schedule) or deg.groups is None, (layout, k)
+            assert plain.groups is None, (layout, k)
+            base_out = fused_folded_forward(a, weight, X, Y, *args, plain.id)
+            deg_out = fused_folded_forward(a, weight, X, Y, *args, deg.id)
+            assert torch.equal(deg_out[0], base_out[0]) and torch.equal(deg_out[1], base_out[1]), (layout, k, tc_on)
+            report[name][f"degree parts {'tc' if tc_on else 'simt'}"] = deg.groups
         # VEC_SH on the FP32-SIMT kernel: bitwise.
         ff_module.VEC_SH = True
         try:
