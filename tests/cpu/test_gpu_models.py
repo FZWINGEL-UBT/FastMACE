@@ -239,3 +239,16 @@ def test_h200_defaults():
     assert "NVIDIA H200" not in segment_rows.SEGMENT_ROWS_GPUS  # 1.0006 / 1.0000: no gain
     assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
     assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured
+
+
+def test_radial_table_warps(monkeypatch):
+    """The radial table forward's num_warps: WARPS when set, else the per-GPU entry (H200: 8), else Triton's."""
+    from fastmace.kernels.triton import radial_table as rt
+
+    assert rt.WARPS is None and rt.WARPS_GPUS == {"NVIDIA H200": 8}
+    monkeypatch.setattr(rt, "_device_warps", lambda index: rt.WARPS_GPUS.get("NVIDIA H200"))
+    assert rt.forward_warps("cuda:0") == 8
+    monkeypatch.setattr(rt, "_device_warps", lambda index: rt.WARPS_GPUS.get("NVIDIA A100-SXM4-80GB"))
+    assert rt.forward_warps("cuda:0") is None
+    monkeypatch.setattr(rt, "WARPS", 2)
+    assert rt.forward_warps("cuda:0") == 2

@@ -33,6 +33,23 @@ BLOCK_E = 32
 # A/B (OMAT-0 A100 profile, 3 November 2026); the backward sums over the columns and keeps one program.
 COLUMN_BLOCK = None
 WARPS = None  # the forward's num_warps (None: Triton's default, 4); a module constant for the lab (round 4)
+# Per-GPU num_warps of the forward when WARPS is None (decision 66): NVIDIA H200 8, MD step b/a 0.9946 / 0.9950
+# (OMAT-0 medium, SrTiO3 10x10x10, abab / abba; 2 warps 0.9984 / 0.9990; results/h200-defaults-20261105). Other GPUs:
+# Triton's 4.
+WARPS_GPUS = {"NVIDIA H200": 8}  # device name -> warps
+
+
+@cache
+def _device_warps(index):
+    return WARPS_GPUS.get(torch.cuda.get_device_name(index))
+
+
+def forward_warps(device):
+    """The forward's num_warps on ``device`` (None: Triton's default): ``WARPS`` when set, else ``WARPS_GPUS``."""
+    if WARPS is not None:
+        return int(WARPS)
+    return _device_warps(torch.device(device).index if torch.device(device).index is not None
+                         else torch.cuda.current_device())
 
 
 def evaluate(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, derivative=False):
@@ -152,11 +169,12 @@ def radial_table_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor
     out = r.new_empty((edges, int(density)))
     if edges:
         forward, _ = _kernels()
+        warps = forward_warps(r.device)
         block_j = _block_j(width) if COLUMN_BLOCK is None else min(_block_j(width), int(COLUMN_BLOCK))
         forward[(-(-edges // BLOCK_E), -(-width // block_j))](
             r, pair, coef, starts, scales, bins, g, out if density else g, edges, coef.shape[1], bins.shape[0], r_lo,
             bin_scale, r_max, TERMS=coef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=block_j,
-            DENSITY=density, G=columns, **({} if WARPS is None else {"num_warps": int(WARPS)}))
+            DENSITY=density, G=columns, **({} if warps is None else {"num_warps": warps}))
     return g, out
 
 
