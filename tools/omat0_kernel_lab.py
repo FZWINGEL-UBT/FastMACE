@@ -619,7 +619,54 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         **{name: ("falsifier", lambda s, keys=keys: _smem_reads(s, keys), ())
            for name, keys in (("F-smem-dout", ("dout",)), ("F-smem-sh", ("sh",)), ("F-smem-x", ("x",)),
                               ("F-smem-dout-sh", ("dout", "sh")), ("F-smem-all", ("dout", "sh", "x")))},
+        # dout staging (6 November 2026, after the conductor's FF-dout-one-row 1.001): the block's first and last
+        # receivers' dout rows copied to shared memory once, then a __syncthreads; warps whose receiver is one of
+        # them read shared memory, any other receiver reads global memory. Exact (the same values, the same order).
+        # stage-dout-r0 stages the first receiver only. F-stage-dout-nofill reads the same shared layout (real
+        # per-receiver offsets, so bank conflicts show) without the copy and the barrier: the staging's read bound.
+        "stage-dout": ("exact", lambda s: _stage_dout(s, 2), ()),
+        "stage-dout-r0": ("exact", lambda s: _stage_dout(s, 1), ()),
+        "F-stage-dout-nofill": ("falsifier", lambda s: _stage_dout(s, 2, fill=False), ()),
     }
+
+
+def _stage_dout(source, rows, fill=True):
+    """The w' kernel with the block's receivers' dout rows staged in shared memory (see ``stage-dout``)."""
+    pattern = r"\bdout(\d)\[int64_t\(receiver\) \* (\d+)([^\[\]]*)\]"
+    dims = {}
+    for n, d, _ in re.findall(pattern, source):
+        dims[int(n)] = int(d)
+    if not dims:
+        raise ValueError("variant pattern found 0 times: dout[int64_t(receiver) * D ...]")
+    offsets, total = {}, 0
+    for n in sorted(dims):
+        offsets[n], total = total, total + dims[n]
+    copy = "".join(
+        f"        for (int i = threadIdx.x; i < {dims[n]}; i += blockDim.x) fm_d[q][{offsets[n]} + i] = "
+        f"dout{n}[int64_t(r) * {dims[n]} + i];\n" for n in sorted(dims))
+    stage = f"""    __shared__ scalar_t fm_d[{rows}][{total}];
+    const int64_t fm_e0 = int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE);
+    int64_t fm_e1 = fm_e0 + blockDim.x / LOGICAL_GROUP_SIZE - 1;
+    fm_e1 = fm_e1 < edge_count ? fm_e1 : edge_count - 1;
+    const int32_t fm_r0 = receivers[fm_e0];
+    const int32_t fm_r1 = {"receivers[fm_e1]" if rows == 2 else "fm_r0"};
+"""
+    if fill:
+        stage += f"""    for (int q = 0; q < {rows}; ++q) {{
+        const int32_t r = q == 0 ? fm_r0 : fm_r1;
+        if (r < 0 || r >= node_count || (q == 1 && r == fm_r0)) continue;
+{copy}    }}
+    __syncthreads();
+"""
+    s = _sub(source, "    if (e >= edge_count) return;", stage + "    if (e >= edge_count) return;", 1)
+    # One generic pointer per dout block, chosen once per warp (a three-way select per read spilled: 40-248 bytes on
+    # the RTX 5060 Ti at its 80-register cap).
+    pointers = "".join(
+        f"    const scalar_t* fm_p{n} = receiver == fm_r0 ? &fm_d[0][{offsets[n]}] : receiver == fm_r1 ? "
+        f"&fm_d[{rows - 1}][{offsets[n]}] : dout{n} + int64_t(receiver) * {dims[n]};\n" for n in sorted(dims))
+    s = _sub(s, "    const int64_t input_base = int64_t(sender) * INPUT_DIM;",
+             pointers + "    const int64_t input_base = int64_t(sender) * INPUT_DIM;", 1)
+    return re.sub(pattern, lambda m: f"fm_p{m.group(1)}[0 {m.group(3)}]", s)
 
 
 def _smem_reads(source, keys):
