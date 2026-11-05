@@ -489,6 +489,36 @@ def _tc_a4(s):
                         ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
+def _simt_a4(s):
+    """The FP32-SIMT kernel with a staged by float4 loads from rows padded to A4_STRIDE floats (``_a4_args``),
+    scattered into the k-major tile as before. Bitwise."""
+    k = int(re.search(r"constexpr int K = (\d+);", s).group(1))
+    if -(-k // 4) * 4 > A4_STRIDE:
+        raise ValueError(f"simt-a4: K {k} exceeds the padded stride {A4_STRIDE}")
+    s = _sub(s, "constexpr int KA = ", f"constexpr int AS = {A4_STRIDE};\nconstexpr int KQ = (K + 3) / 4;\n"
+             "constexpr int KA = ", 1)
+    return _sub(s, """                for (int i = lane; i < B * K; i += 32) {
+                    const int b = i / K, k = i - b * K;
+                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * KA + k] : 0.f;
+                }""", """                for (int i = lane; i < B * KQ; i += 32) {
+                    const int b = i / KQ, q = i - b * KQ, k = 4 * q;
+                    float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+                    if (b < nb) v = __ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q);
+                    a_s[k * B + b] = v.x;
+                    if (k + 1 < K) a_s[(k + 1) * B + b] = v.y;
+                    if (k + 2 < K) a_s[(k + 2) * B + b] = v.z;
+                    if (k + 3 < K) a_s[(k + 3) * B + b] = v.w;
+                }""")
+
+
+def _sh4(s):
+    """sh staged by float4 loads (fused_forward.VEC_SH). Bitwise."""
+    return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
+                """for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+
+
 def _a4_args(args):
     import torch
 
@@ -578,11 +608,9 @@ def forward_variants(kernel=None):
                                                         "(snd >= 0) ? 0.5f : 0.f", regex=True),
                                                    "sh[e0 * ED + i]", "0.5f"), ()),
         "tc-a4": ("exact", _tc_a4, (), _a4_args),
-        "sh4": ("exact", lambda s: _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? "
-                                              "sh[e0 * ED + i] : 0.f;", """for (int i = lane; i < B * ED / 4; i += 32)
-                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
-                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);"""),
-                   ()),
+        "simt-a4": ("exact", _simt_a4, (), _a4_args),
+        "simt-a4+sh4": ("exact", lambda s: _sh4(_simt_a4(s)), (), _a4_args),
+        "sh4": ("exact", lambda s: _sh4(s), ()),
         # The TP's coefficient multiplies dropped (x e instead of x e c): how much its arithmetic weighs.
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
