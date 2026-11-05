@@ -165,10 +165,12 @@ class FirstInteractionReassociation(torch.nn.Module):
         if self._buffers.get("species_feats") is not species_feats:
             self.register_buffer("species_feats", species_feats, persistent=False)
 
-    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None):
+    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None, summed_fn=None):
         """``rows``: the message of the first ``rows`` nodes only, when every edge's receiver is one of them (the
         tiled call's tiles: the halo's rows are senders only, and the padding edges join a receiver slot); the
-        senders' species still come from every row. None: every node's."""
+        senders' species still come from every row. None: every node's. ``summed_fn(key, slots) -> (sums [slots,
+        D * K], K)``: the per-slot sums from elsewhere (``augmented`` unused; the tabled outer sum,
+        ``generic.FUSED_FIRST_BACKWARD``)."""
         onehot = node_attrs[:, self.columns]
         species = onehot.argmax(dim=1)
         x = self.species_feats  # identity basis of the superset (SPEC §8.5), not the first atom of each species
@@ -178,11 +180,16 @@ class FirstInteractionReassociation(torch.nn.Module):
         nodes, slots = onehot.shape
         if rows is not None:
             nodes = int(rows)
-        width, dim = augmented.shape[1], edge_attrs.shape[1]
+        dim = edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
         # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
-        summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots,
-                                segmented=self.segmented).view(nodes, slots, dim, width)
+        if summed_fn is not None:
+            summed, width = summed_fn(key, nodes * slots)
+            summed = summed.view(nodes, slots, dim, width)
+        else:
+            width = augmented.shape[1]
+            summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots,
+                                    segmented=self.segmented).view(nodes, slots, dim, width)
         blocks = []
         start = 0
         c = self.channels

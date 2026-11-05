@@ -275,3 +275,134 @@ radial work was cheap and the pairing overhead dominated. Here the shared work i
 2. **One A100 lab job** (about $0.3): idea 1's timing variant and range probe, and idea 2's two falsifiers. The Ada
    counterparts run on leto after the idle check.
 3. **Build** what the bounds support, starting with ideas 1 and 2. Idea 3 only after 2 wins.
+
+## Results (5 November 2026, branch `fastmace/round2-screens`)
+
+Kernel lab on Benchmark_loup's captured calls (OMAT-0 medium, SrTiO3 10×10×10), each variant against the GPU's
+default kernel in the same process; Modal A100-SXM4-80GB (profile `second`), leto's RTX 4000 Ada (NAS
+`mace_cueq_oeq`, idle check), the local RTX 5060 Ti (WSL `mace_cueq_oeq`). Records: `results/round2-screens-20261105/`.
+
+**Free checks:**
+- **Degree 3 (idea 4): dead.** By the fit's own criterion (value and slope within TOLERANCE 1e-7 of the degree-5
+  series), 6.7 % of (pair, piece)s could drop to degree 3, but they carry 0 % of the edges for all pairs and 0.09 %
+  for any pair (`tools/degree3_share.py`); the median (pair, piece) misses by 192× (interaction 2: 290×). Degree 4
+  covers at most 20 % of the edges. The slope criterion binds.
+- **ptxas (idea 5):** Horner frees no register at the uncapped 96 (the compiler spends them), but fits the cap of 80
+  without spills on sm_80 with the l₁ = 0 paths (4 bytes without), against 136 bytes for the factored kernel capped
+  at 80.
+- **Glue attribution (ideas 7 and 10)** from the A100 profile's kernel names and shapes:
+  - 36 Triton kernels fused around `tf32x3_mm` take 521 µs. 140 µs of that is the species skip (round 1 #1).
+    Pure layout (the `[N, 2048]` features sliced and copied into `[N·dim, 128]` per irrep, and `cat` back) takes
+    124.5 µs. Residual adds and per-node divisions fused with such copies take 229 µs, the backward's transposed
+    copies for weight gradients included (79.8 µs). A strided-batched GEMM entry (batch over irrep components,
+    row stride 2048) with a row-scale and add epilogue would remove most of the 354 µs: about 1.5–2 % of the
+    A100 call, at the cost of a CUTLASS rebuild.
+  - Edge glue outside the custom kernels, 645 µs in 12 kernels: the geometry forward 142.5, its backward 110.2,
+    `gather_radial_table_backward_slice_backward` 108.5 (interaction 1's table backward on the outer-sum
+    backward's grad_a, padded from 64 to 65 columns), scatters 66.5 + 36.9, the force assembly 64.9.
+
+**Screens:**
+
+| Idea | A100-SXM4-80GB | RTX 4000 Ada | RTX 5060 Ti | Verdict |
+|---|---|---|---|---|
+| 1. 3×FP16 m16n8k16 forward (exponent-shifted, scaled per slice and per edge) | 1.197 (104 B spills); its big·big product alone 0.964 | not run (leto, murphy busy) | 1.07 (TF32 TC base) | **Rejected:** the MMAs are not the limit; even the one-product bound gains 3.6 % |
+| 2. Outer-sum backward run walk (16 edges, 1 warp) | 0.802 | 1.03–1.11 | 0.94 | **A100 candidate** (the RTX GPUs sit near their DRAM floor, copy 0.80 / 0.73) |
+| 5. Horner in the w′ backward | 0.997 | **0.975** | 1.053 (0.977 capped at 80) | Ada candidate |
+| 5. Horner + l₁ = 0 scalar paths | **0.940** | 0.987 | — | A100 candidate |
+| 5. l₁ = 0 scalar paths alone | 1.036 | 1.001 | 1.003 | no |
+| 5. Horner capped at 80 registers | 1.059 | 1.000 | — | no |
+| FACTORED without BLOCK_LDG (the RTX 5060 Ti's default is unfactored) | — | — | **0.929**; + Horner capped at 80: **0.887** | 5060 Ti candidate |
+
+Accuracy against the default kernel: Horner dr 5.2–6.6e-7 relative (the factored regrouping alone 3.7e-7), dsh
+1.8e-7; the walk's grad_a 1.0e-7 against a float64 reference (base 1.8e-7). The forward variants' odd-l message
+groups differ by up to 24 % of their maxima even between the SIMT and the TF32 kernel: SrTiO3 is centrosymmetric and
+those messages cancel, so only the even groups (1e-6) measure the product's rounding.
+
+The candidates are module switches (`wprime_backward.HORNER`, `SCALAR_PATHS`, `MAX_REGISTERS`;
+`edge_outer_sum.BACKWARD_WALK`), off until the force gate and MD-step A/Bs in both build orders
+(`tools/modal/round2_ab.sh`) decide them per GPU (decision 66).
+
+**New ideas from these results:**
+- **Fewer warps in the A100 tensor-core forward.** The production kernel spills 40 bytes at the 168-register bound
+  of 384 threads; 8 or 10 warps allow 255 or 204 registers (lab `tc-warps8`, `tc-warps10`).
+- **The table backward inside the outer-sum walk.** dr from the grad_a row in registers and the edge's derivative
+  row (L2-resident 10 MB table): no grad_a write (96 MB) nor the 108.5 µs padded pass. Every GPU, the
+  DRAM-bound Ada first. Lab bound `walk-dr` against `walk+table-bwd`.
+- **Per-component strided products instead of the relayout copies (A100, idea 7 without a cubin rebuild).** The
+  CUTLASS entry (`cutlass.tf32x3.mm_into`) already takes a row-major A with any leading dimension and a row- or
+  column-major B. For an irrep of dimension `dim`, BlockLinear's left operand `[N·dim, 128]` is a copy of `dim`
+  strided `[N, 128]` views of the `[N, 2048]` features (lda 2048), all multiplied by the same weight. `dim`
+  products on the views, each writing a strided slice of the output, need no copy and keep the same tiles
+  (79 × 2 = 158 ≥ MIN_TILES). The backward's weight gradient sums the `dim` products' `xᵀ g`. Up to the 124.5 µs
+  of pure layout plus the copies under the 229 µs of fused adds and divisions; it costs more launches (up to 7
+  per irrep) and a change in `rewrites/linear` (rows are built per irrep there).
+
+### MD-step A/Bs and the defaults (5 November 2026, night)
+
+`tools/modal/round2_ab.sh`: the force/stress gate with the candidate's module constants in the production process,
+then `tools/ab_rewrites.py` in both build orders (abab and abba, 8 blocks of 200 steps after 200 warm-up, 1 fs,
+skin 0.5 Å) on Benchmark_loup's SrTiO3 10×10×10 (5,000 atoms) and NbCl5, OMAT-0 medium, float32. Sides a: the GPU's
+default plan at that commit. Modal A100-SXM4-80GB (profile `second`), leto's RTX 4000 Ada (idle check, NAS
+`mace_cueq_oeq`), the local RTX 5060 Ti (WSL `mace_cueq_oeq`). b/a below 1 is faster.
+
+| Candidate | GPU | SrTiO3 ab / ba | NbCl5 ab / ba | Gate | Default |
+|---|---|---|---|---|---|
+| HORNER + SCALAR_PATHS | A100-SXM4-80GB | 0.986 / 0.983 | 0.994 / 0.978 | A100 exception only | **on** |
+| BACKWARD_WALK | A100-SXM4-80GB | 0.995 / 0.987 | 0.995 / 0.996 | A100 exception only | **on** |
+| HORNER | RTX 4000 Ada | 1.004 / 1.001 | 1.000 / 1.000 | pass | off |
+| FACTORED, no BLOCK_LDG, HORNER, 80 registers | RTX 5060 Ti | 0.979 / 0.982 | 0.986 / 0.989 | 12/12 | **on** |
+| FUSED_FIRST_BACKWARD | RTX 5060 Ti | 0.962 / 0.963 | 0.972 / 0.969 | 13/13 | **on** |
+| FUSED_FIRST_BACKWARD | RTX 4000 Ada | 0.962 / 0.963 | 0.979 / 0.975 | 13/13 | **on** |
+| FUSED_FIRST_BACKWARD | A100-SXM4-80GB | 0.969 / 0.966 | 0.983 / 0.984 | A100 exception only | **on** |
+| + TABLED_FORWARD | RTX 5060 Ti | 0.945 / 0.945 | 0.948 / 0.955 | pass | **on** |
+| + TABLED_FORWARD | RTX 4000 Ada | 0.949 / 0.944 | 0.978 / 0.968 | pass | **on** |
+| + TABLED_FORWARD | A100-SXM4-80GB | 0.966 / 0.962 | 0.970 / 0.982 | A100 exception only | **on** |
+
+"A100 exception only": OMAT-0 NbCl5 stress misses the 2× float32 limit as the A100 default plan already does (the
+accepted exception, `docs/validation/omat0-a100-optimisations.md`): 1.55–1.60e-7 eV/Å³ against the default's 1.8e-7.
+Every other check passes.
+
+The first fused A/Bs (`b70bcad9`) gave 0.997–1.004 everywhere: the fused branch sat in `first_table_region`, which
+only the memory-rescue checkpoint calls. A probe counting kernel launches found none; `b4f37680` routes the default
+tabled path through `fused_first_message`, after which the kernels launch once per step and the numbers above follow.
+
+Lab, A100 (`38eae731`): 8 or 10 warps in the tensor-core forward 1.160 / 1.109 (rejected); the walk's chunk and warp
+sweep (16 edges and one warp best, 0.813); `walk-dr` (the fused backward's bound) 464 µs against 872 µs for the walk
+and the table backward apart.
+
+Defaults: `03125b0c` (Horner, scalar paths, register cap, walk, the 5060 Ti's factored kernel), `8466ac92` and
+`2e9a3878` (the fused first interaction). Next: a fresh A100 profile at `2e9a3878`.
+
+
+### A100 profile at `2e9a3878` and the next ideas (5 November 2026)
+
+Modal A100 80GB PCIe (`omat0-a100-profile-2e9a3878`; earlier profiles ran on the SXM4): Benchmark_loup 2.50 µs per
+atom and step (NVE), 2.47 (Langevin); eager force call 12.33 ms. Largest kernels per call:
+
+| Kernel | µs | Note |
+|---|---|---|
+| `fused_folded_forward` (interaction 2) | 3,722 | 384 threads, 168 registers, 151 KB shared: one block per SM |
+| `oeq_projected_backward_wprime` | 3,119 | 128 threads, 96 registers, 31 % occupancy |
+| `tabled_outer_sum_backward` | 459 | new; replaces about 870 µs |
+| CUTLASS `fm_tf32x3` GEMMs | about 1,760 | over 37 launches |
+| `tabled_outer_sum_forward` | 391 | new; replaces about 410 µs |
+| cuEq symmetric contraction (forward and backward) | 409 | |
+| `radial_table_forward` (interaction 2's `a` for the fused forward) | 204 | |
+
+Checked and dropped:
+- **Launch shapes of the tabled outer sum** (`tools/tabled_sum_lab.py`, RTX 5060 Ti): 8–64 edges per program and one
+  warp stay within noise of the defaults (0.95–1.01); 2 or 4 warps 1.26–2.64. The kernels read about 1.5 KB of
+  Chebyshev coefficients per edge from L2, which no launch shape changes.
+- **Two fused-forward blocks per SM** through more parts (half the W slice in shared memory): occupancy is bound by
+  registers, not shared memory: 384 threads × 168 registers fill the 64 K register file, so two blocks would need
+  6 warps each, the same 12 warps.
+
+Open:
+- **Interaction 2's table inside the fused forward** (TABLED_FORWARD for the second interaction): `a` evaluated from
+  r in the kernel instead of `radial_table_forward`'s [E, 65] output (204 µs plus its read). The grid reads each edge
+  row in 8 blocks (4 channel blocks × 2 parts), so the evaluation must be shared or cheap; bound it first in the lab.
+- **The w′ backward's value-table traffic.** Its w table for interaction 2 is about [pairs, pieces, 6, 512] floats;
+  each edge loads 6 × 512 × 4 B = 12 KB, about 4.6 GB per call if nothing hits L2, which alone is about 2.4 ms at
+  the A100's bandwidth. Measure its DRAM bytes (Nsight Compute) before ideas: a w table ordered so that a run of
+  receivers touches fewer lines, or TABLE_W off for interaction 2 on the A100 where FP32 arithmetic is cheaper than
+  that traffic.

@@ -1,0 +1,19 @@
+eos exit=0
+  import pynvml  # type: ignore[import]
+base              930.8 us  ratio 1.000  {'err_a': '1.7e-07', 'err_y': '1.3e-07'}
+F-one-block       776.0 us  ratio 0.834  {}
+F-const-G         775.2 us  ratio 0.833  {}
+copy              767.8 us  ratio 0.825  {}
+walk-c16-w1      1012.7 us  ratio 1.088  {'err_a': '1.0e-07', 'err_y': '1.3e-07'}
+walk-c16-w2       988.2 us  ratio 1.062  {'err_a': '9.5e-08', 'err_y': '1.3e-07'}
+walk-c16-w4      1334.3 us  ratio 1.433  {'err_a': '1.0e-07', 'err_y': '1.3e-07'}
+walk-c32-w1       994.3 us  ratio 1.068  {'err_a': '1.0e-07', 'err_y': '1.3e-07'}
+walk-c32-w2      1002.5 us  ratio 1.077  {'err_a': '9.5e-08', 'err_y': '1.3e-07'}
+walk-c32-w4      1337.4 us  ratio 1.437  {'err_a': '1.0e-07', 'err_y': '1.3e-07'}
+walk-c64-w1      1058.8 us  ratio 1.138  {'err_a': '1.0e-07', 'err_y': '1.3e-07'}
+walk-c64-w2      1063.8 us  ratio 1.143  {'err_a': '9.5e-08', 'err_y': '1.3e-07'}
+walk-c64-w4      1347.6 us  ratio 1.448  {'err_a': '1.0e-07', 'err_y': '1.3e-07'}
+table-bwd         699.4 us  ratio 0.751  {}
+base+table-bwd   1603.6 us  ratio 1.723  {}
+walk+table-bwd   1607.7 us  ratio 1.727  {}
+walk-dr           706.4 us  ratio 0.759  {'err_dr': '1.2e-07'}

@@ -66,12 +66,13 @@ def test_block_message_default(monkeypatch):
 
 
 def test_block_ldg_default(monkeypatch):
-    """BLOCK_LDG: only the RTX 5060 Ti, where plain loads through the group pointers cost 47 % of the kernel."""
+    """BLOCK_LDG: no GPU since round 2 (the RTX 5060 Ti's factored kernel is faster with plain loads); the constant
+    overrides."""
     assert wprime_backward.BLOCK_LDG is None
     assert "__ldg(dout{{ bk[0] }} + int64_t(receiver)" in wprime_backward.TEMPLATE
     assert not wprime_backward.block_ldg_default(torch.device("cpu"))
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA GeForce RTX 5060 Ti")
-    assert wprime_backward.block_ldg_default(torch.device("cuda", 0))
+    assert not wprime_backward.block_ldg_default(torch.device("cuda", 0))
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
     assert not wprime_backward.block_ldg_default(torch.device("cuda", 0))
     monkeypatch.setattr(wprime_backward, "BLOCK_LDG", True)
@@ -79,14 +80,15 @@ def test_block_ldg_default(monkeypatch):
 
 
 def test_factored_and_symmetric_pairs_defaults(monkeypatch):
-    """FACTORED and SYMMETRIC_PAIRS: on for the RTX 4000 Ada and every A100 (decision 66), off elsewhere (the RTX 5060
-    Ti was not measured); the constants override."""
-    for module, constant, default in ((wprime_backward, "FACTORED", wprime_backward.factored_default),
-                                      (radial, "SYMMETRIC_PAIRS", radial.symmetric_pairs_default)):
+    """FACTORED and SYMMETRIC_PAIRS: on for the RTX 4000 Ada and every A100 (decision 66), FACTORED also on the RTX
+    5060 Ti (round 2), off elsewhere; the constants override."""
+    for module, constant, default, on_5060 in (
+            (wprime_backward, "FACTORED", wprime_backward.factored_default, True),
+            (radial, "SYMMETRIC_PAIRS", radial.symmetric_pairs_default, False)):
         assert getattr(module, constant) is None
         assert not default(torch.device("cpu"))
         for name, on in (("NVIDIA RTX 4000 Ada Generation", True), ("NVIDIA A100 80GB PCIe", True),
-                         ("NVIDIA A100-SXM4-40GB", True), ("NVIDIA GeForce RTX 5060 Ti", False),
+                         ("NVIDIA A100-SXM4-40GB", True), ("NVIDIA GeForce RTX 5060 Ti", on_5060),
                          ("NVIDIA RTX A4000", False)):
             monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
             assert default(torch.device("cuda", 0)) is on, (constant, name)
@@ -95,3 +97,37 @@ def test_factored_and_symmetric_pairs_defaults(monkeypatch):
         monkeypatch.setattr(module, constant, False)
         monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
         assert not default(torch.device("cuda", 0))
+
+
+def test_round2_defaults(monkeypatch):
+    """Round 2 (5 November 2026, decision 66): HORNER on the A100s and the RTX 5060 Ti, SCALAR_PATHS and
+    BACKWARD_WALK on the A100s, 80 registers on the RTX 5060 Ti, the fused first interaction (FUSED_FIRST_BACKWARD,
+    TABLED_FORWARD) on all three measured models; off elsewhere; the constants override."""
+    from fastmace.kernels.triton import edge_outer_sum, tabled_outer_sum
+    from fastmace.rewrites.generic import modules as generic
+
+    def walk(device):
+        edge_outer_sum._walk_on.cache_clear()
+        return edge_outer_sum.backward_walk(device)
+
+    checks = (
+        (wprime_backward, "HORNER", wprime_backward.horner_default, {"a100", "5060"}),
+        (wprime_backward, "SCALAR_PATHS", wprime_backward.scalar_paths_default, {"a100"}),
+        (edge_outer_sum, "BACKWARD_WALK", walk, {"a100"}),
+        (generic, "FUSED_FIRST_BACKWARD", generic.fused_first_backward, {"a100", "5060", "ada"}),
+        (tabled_outer_sum, "TABLED_FORWARD", tabled_outer_sum.tabled_forward, {"a100", "5060", "ada"}),
+    )
+    names = {"a100": "NVIDIA A100 80GB PCIe", "5060": "NVIDIA GeForce RTX 5060 Ti",
+             "ada": "NVIDIA RTX 4000 Ada Generation", "a4000": "NVIDIA RTX A4000"}
+    for module, constant, default, on in checks:
+        assert getattr(module, constant) is None, constant
+        assert not default(torch.device("cpu")), constant
+        for key, name in names.items():
+            monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
+            assert bool(default(torch.device("cuda", 0))) is (key in on), (constant, name)
+        monkeypatch.setattr(module, constant, True)
+        assert default(torch.device("cuda", 0)), constant
+        monkeypatch.setattr(module, constant, None)
+    for name, registers in (("NVIDIA GeForce RTX 5060 Ti", 80), ("NVIDIA A100-SXM4-80GB", 0)):
+        monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
+        assert wprime_backward.max_registers_default(torch.device("cuda", 0)) == registers

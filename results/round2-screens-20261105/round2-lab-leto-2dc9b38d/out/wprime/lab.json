@@ -1,0 +1,208 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T00:15:08.436216+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "2dc9b38d",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 26.49125149101019,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          5616,
+          1280,
+          6
+        ],
+        "gprime_MB": 164.53125,
+        "species": 3,
+        "pieces": 624,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 5989.503860473633,
+          "min_us": 5862.400054931641,
+          "max_us": 6255.616188049316,
+          "ratio": 1.0
+        },
+        "horner": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 5.15e-07",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 5839.871883392334,
+          "min_us": 5718.016147613525,
+          "max_us": 6113.471984863281,
+          "ratio": 0.9750176340867295
+        },
+        "scalar-l1": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.33e-07"
+          },
+          "median_us": 5993.472099304199,
+          "min_us": 5865.471839904785,
+          "max_us": 6291.45622253418,
+          "ratio": 1.0006625321433973
+        },
+        "horner+scalar-l1": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 5.15e-07",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 5914.624214172363,
+          "min_us": 5844.927787780762,
+          "max_us": 6218.751907348633,
+          "ratio": 0.9874981888240493
+        },
+        "horner-maxreg80": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 5.15e-07",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 5992.447853088379,
+          "min_us": 5940.224170684814,
+          "max_us": 6347.775936126709,
+          "ratio": 1.000491525288793
+        },
+        "horner+scalar-l1-maxreg80": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.83e-07",
+            "dr": "max|d|/max|a| = 5.15e-07",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 6066.239833831787,
+          "min_us": 6020.0958251953125,
+          "max_us": 6394.8798179626465,
+          "ratio": 1.0128117411968887
+        },
+        "factored-maxreg80": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 80,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.99e-07"
+          },
+          "median_us": 8474.623680114746,
+          "min_us": 8407.039642333984,
+          "max_us": 8865.792274475098,
+          "ratio": 1.4149124664633903
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "wprime": {
+      "base": {
+        "8.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "horner": {
+        "8.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "scalar-l1": {
+        "8.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "horner+scalar-l1": {
+        "8.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "horner-maxreg80": {
+        "8.0": {
+          "registers": 80,
+          "spill_store_bytes": 4
+        },
+        "8.9": {
+          "registers": 80,
+          "spill_store_bytes": 0
+        }
+      },
+      "horner+scalar-l1-maxreg80": {
+        "8.0": {
+          "registers": 80,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 80,
+          "spill_store_bytes": 0
+        }
+      },
+      "factored-maxreg80": {
+        "8.0": {
+          "registers": 80,
+          "spill_store_bytes": 136
+        },
+        "8.9": {
+          "registers": 80,
+          "spill_store_bytes": 128
+        }
+      }
+    }
+  }
+}

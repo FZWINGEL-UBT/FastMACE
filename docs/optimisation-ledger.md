@@ -597,6 +597,10 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-block-message](#omat0-block-message) | The conv message written in linear_1's block layout (one tensor per same-irrep group); no relayout copies | `wprime_backward.BLOCK_MESSAGE`, `BLOCK_MESSAGE_GPUS`, `BLOCK_LDG` | FM | DEFAULT on the RTX 5060 Ti (with `__ldg` reads, `BLOCK_LDG_GPUS`), the RTX 4000 Ada and every A100 (decision 66) | 2026-11-04 | Benchmark_loup MD step b/a (a = the default with `TABLE_W` on): RTX 5060 Ti 1.060 / 1.060 (slower), RTX 4000 Ada 0.974 / 0.971, A100-SXM4-80GB 0.983 / 0.977; gate passes (5060 Ti) | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-wprime-aprime](#omat0-wprime-aprime) | wprime slope as dr = a'(r) . (dw W) instead of the per-edge G' slab | none (bound `tools/wprime_da_bound.py`) | FM | REJECTED | 2026-11-04 | A100-SXM4: the da = dw W product alone 2.27 ms (CUTLASS 3xTF32), 4.14 ms (FP32) against the slope's 1.81 ms | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
 | [omat0-first-table-columns](#omat0-first-table-columns) | First interaction's radial table stores only the columns it uses | `generic.modules.FIRST_TABLE_COLUMNS` | FM | REJECTED | 2026-11-04 | step A100-SXM4 1.002 / 0.999, RTX 5060 Ti 1.002; bitwise | [kernel lab](../results/omat0-kernel-lab-20261103/README.md) |
+| [omat0-fused-first](#omat0-fused-first) | The tabled first interaction's table and outer sums with one fused backward; the table read inside the sums' walk | `generic.modules.FUSED_FIRST_BACKWARD`, `tabled_outer_sum.TABLED_FORWARD` (`*_GPUS`) | FM | DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66) | 2026-11-05 | step together 5060 Ti 0.945 / 0.945, 0.948 / 0.955; Ada 0.949 / 0.944, 0.978 / 0.968; A100-SXM4 0.966 / 0.962, 0.970 / 0.982 | [round 2](../plans/ideas-20261105-round2.md) |
+| [omat0-horner](#omat0-horner) | Power-basis value table with dual Horner in wprime; l1 = 0 paths without the v_j sums; register cap | `wprime_backward.HORNER`, `SCALAR_PATHS`, `MAX_REGISTERS` (`*_GPUS`) | FM | DEFAULT: A100 HORNER + SCALAR_PATHS; 5060 Ti FACTORED (plain loads) + HORNER + 80 registers; off on the Ada | 2026-11-05 | A100 step 0.986 / 0.983, 0.994 / 0.978; 5060 Ti 0.979 / 0.982, 0.986 / 0.989; Ada HORNER 1.000-1.004 | [round 2](../plans/ideas-20261105-round2.md) |
+| [omat0-eos-walk](#omat0-eos-walk) | `edge_outer_sum` backward walking key runs (each slot's block loaded once per run) | `edge_outer_sum.BACKWARD_WALK` (`_GPUS`) | FM | DEFAULT on every A100 | 2026-11-05 | lab A100 0.802, Ada 1.03-1.11, 5060 Ti 0.94; A100 step 0.995 / 0.987, 0.995 / 0.996 | [round 2](../plans/ideas-20261105-round2.md) |
+| [omat0-fp16-tc](#omat0-fp16-tc) | 3×FP16 m16n8k16 MMAs in the tensor-core forward; 8 or 10 warps | `render(tc="fp16")` (lab only) | FM | REJECTED | 2026-11-05 | lab A100 1.197 (bound of its big·big product 0.964), 5060 Ti 1.07; 8 / 10 warps 1.160 / 1.109 | [round 2](../plans/ideas-20261105-round2.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -3864,6 +3868,52 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Checks: GPU test on Ada and A100; force gates pass on Ada (OMAT-0 and MH-1). On the A100 FACTORED's errors equal the default's; the A100 default fails OMAT-0 NbCl5 stress (1.8e-7 against 1.2–1.5e-7) with or without it. The bisection (`a100-sxm4-stress-bisect-3812b56e`) traces that to tf32x3 GEMMs + tensor-core forward together (each alone passes). CPU suite on leto 5,122 passed, 200 skipped at `3812b56e`.
 - Why: on the A100 the kernel is bound by FP32 arithmetic, which the regrouping cuts; on the Ada the value-table loads limit it.
 - Sources: [tp backward](validation/omat0-tp-backward.md), [results](../results/omat0-tp-backward-20261104/README.md).
+
+<a id="omat0-fused-first"></a>
+#### omat0-fused-first: the first interaction's table and outer sums, one fused backward
+- Switch: `fastmace.rewrites.generic.modules.FUSED_FIRST_BACKWARD` (`FUSED_FIRST_BACKWARD_GPUS`), `fastmace.kernels.triton.tabled_outer_sum.TABLED_FORWARD` (`TABLED_FORWARD_GPUS`); None: on for the sets, True / False: an A/B side
+- Engine: FM
+- Date/round: 5 November 2026, round 2 (`b70bcad9`, wired into the default tabled path at `b4f37680`; defaults `8466ac92`, `2e9a3878`)
+- What: `tabled_outer_sum` per edge: `grad_a = G[key]^T y` in registers, contracted at once with the table's derivative row (and the density column), so neither `grad_a [E, h c]`, its padded copy nor the separate table backward exist; with TABLED_FORWARD the forward evaluates `a = g(r)` inside the segmented sum's walk and the backward evaluates it again (no `[E, K]` table output). Rounding (regrouped sums, the same Clenshaw recurrence).
+- Status: DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66).
+- Measured: Benchmark_loup MD step b/a (ab / ba) SrTiO3 10×10×10 and NbCl5, FUSED_FIRST_BACKWARD alone: 5060 Ti 0.962 / 0.963, 0.972 / 0.969; Ada 0.962 / 0.963, 0.979 / 0.975; A100-SXM4 0.969 / 0.966, 0.983 / 0.984. With TABLED_FORWARD: 5060 Ti 0.945 / 0.945, 0.948 / 0.955; Ada 0.949 / 0.944, 0.978 / 0.968; A100-SXM4 0.966 / 0.962, 0.970 / 0.982.
+- Checks: `tests/gpu/test_round2_kernels_cuda.py` against float64 (dr within 1e-5 of the maximum; both forward modes, with and without density). Force gates 13/13 on the 5060 Ti and Ada; on the A100 only its accepted NbCl5 stress exception (1.55–1.60e-7; the default plan 1.8e-7). The first A/Bs at `b70bcad9` measured 1.000 because the default tabled path never reached the fused branch (probe: 0 launches); fixed in `b4f37680`.
+- Why: the backward wrote and read 96 MB of `grad_a` and its padded copy; the forward wrote and read the `[E, K]` table output.
+- Sources: [round 2](../plans/ideas-20261105-round2.md), `results/round2-screens-20261105/`.
+
+<a id="omat0-horner"></a>
+#### omat0-horner: dual Horner, l1 = 0 scalar paths and a register cap in wprime
+- Switch: `fastmace.kernels.oeq_streaming.wprime_backward.HORNER` (`HORNER_GPUS`), `SCALAR_PATHS` (`SCALAR_PATHS_GPUS`), `MAX_REGISTERS` (`MAX_REGISTERS_GPUS`, device name → registers); `BLOCK_LDG_GPUS` emptied and the RTX 5060 Ti added to `FACTORED_GPUS`
+- Engine: FM
+- Date/round: 5 November 2026, round 2 (`38eae731`; defaults `03125b0c`)
+- What: the value table converted once at build to the power basis of t (`power_table`, float64), w and its slope by dual Horner; with FACTORED the l1 = 0 paths add their edge gradient per term from `w x0`; `--maxrregcount`. Rounding (Horner dr 1.5–2.2e-6 relative against float64, bound 1e-5).
+- Status: DEFAULT on every A100 (HORNER + SCALAR_PATHS) and the RTX 5060 Ti (FACTORED with plain loads + HORNER + 80 registers); the RTX 4000 Ada keeps its plan.
+- Measured: MD step b/a SrTiO3 10×10×10 and NbCl5: A100-SXM4 0.986 / 0.983, 0.994 / 0.978; 5060 Ti 0.979 / 0.982, 0.986 / 0.989; Ada HORNER 1.004 / 1.001, 1.000 / 1.000 (lab 0.975). Lab (wprime alone): A100 HORNER + SCALAR_PATHS 0.940, Ada HORNER 0.975, 5060 Ti 0.887.
+- Checks: `tests/gpu/test_wprime_backward_cuda.py` (Horner cases, both layouts); gates 12/12 on the 5060 Ti and Ada; on the A100 the accepted NbCl5 stress exception only.
+- Why: fewer live values per edge; the 5060 Ti is faster with plain loads once factored.
+- Sources: [round 2](../plans/ideas-20261105-round2.md).
+
+<a id="omat0-eos-walk"></a>
+#### omat0-eos-walk: the outer-sum backward walks key runs
+- Switch: `fastmace.kernels.triton.edge_outer_sum.BACKWARD_WALK` (`BACKWARD_WALK_GPUS`), `BACKWARD_WALK_CHUNK = 16`
+- Engine: FM
+- Date/round: 5 November 2026, round 2 (`38eae731`; default `03125b0c`)
+- What: each program walks 16 consecutive edges and loads a slot's `[D, K]` gradient block once per run of equal keys. Rounding (tree sums); correct for any key order.
+- Status: DEFAULT on every A100. Interaction 1's sums now go through omat0-fused-first.
+- Measured: lab A100 0.802 (32 or 64 edges 0.81–0.82, 2 or 4 warps worse), Ada 1.03–1.11, 5060 Ti 0.94 (both near their DRAM floor); A100 step 0.995 / 0.987, 0.995 / 0.996.
+- Checks: `tests/gpu/test_round2_kernels_cuda.py` (sorted and unsorted keys).
+- Sources: [round 2](../plans/ideas-20261105-round2.md).
+
+<a id="omat0-fp16-tc"></a>
+#### omat0-fp16-tc: 3×FP16 MMAs and fewer warps in the A100 tensor-core forward
+- Switch: lab only (`fused_forward.render(tc="fp16")`; `tools/omat0_kernel_lab.py` variants `tc-fp16*`, `tc-warps8`, `tc-warps10`)
+- Engine: FM
+- Date/round: 5 November 2026, round 2
+- What: the a·W product as three exponent-shifted FP16 m16n8k16 products (scaled per slice and per edge) instead of 3×TF32; separately 8 or 10 warps instead of 12 to lift the 168-register bound.
+- Status: REJECTED.
+- Measured: lab forward A100 1.197 (104 B spills), its big·big product alone 0.964; 5060 Ti 1.07; 8 or 10 warps 1.160 / 1.109 (no spills, bitwise).
+- Why: the MMAs are not the limit, and fewer warps lose more latency hiding than the spills cost.
+- Sources: [round 2](../plans/ideas-20261105-round2.md).
 
 <a id="omat0-skip-zero-column"></a>
 #### omat0-skip-zero-column: the fused forward skips the all-zero bias column

@@ -134,6 +134,152 @@ __device__ __forceinline__ void mma_tf32(float (&d)[4], const unsigned (&a)[4], 
 """
 
 
+# Exponent-shifted 3xFP16 (round 2, 5 November 2026; kernel lab only, ``tc="fp16"``): W split once per block into
+# two FP16 planes (big, and the remainder times 2^11), the same 4 bytes per weight as the FP32 slice; a split per
+# batch; m16n8k16 MMAs, C = big*big + 2^-11 (big*small + small*big). Power-of-two scales keep both operands in FP16's
+# normal range: one per block slice for W, one per edge for a (its row maximum), undone on w. FP16 and TF32 both
+# carry 11 significant bits: the 22-bit split matches 3xTF32 with both parts rounded to nearest ("round").
+TC_FP16_HELPERS = """// 3xFP16 (tc="fp16"): x = big + 2^-11 small, both FP16 (rounded to nearest); low k packed first.
+__device__ __forceinline__ void split_f16x2(float x0, float x1, unsigned& hi, unsigned& lo) {
+    asm("cvt.rn.f16x2.f32 %0, %1, %2;" : "=r"(hi) : "f"(x1), "f"(x0));
+    float b0, b1;
+    asm("{.reg .b16 l, u; mov.b32 {l, u}, %2; cvt.f32.f16 %0, l; cvt.f32.f16 %1, u;}"
+        : "=f"(b0), "=f"(b1) : "r"(hi));
+    asm("cvt.rn.f16x2.f32 %0, %1, %2;" : "=r"(lo) : "f"((x1 - b1) * 2048.f), "f"((x0 - b0) * 2048.f));
+}
+__device__ __forceinline__ void mma_f16(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, "
+                 "{%8, %9}, {%0, %1, %2, %3};"
+                 : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
+}
+// The power of two that maps a largest magnitude m into [2^13, 2^14) (1 for m = 0).
+__device__ __forceinline__ float fp16_scale(float m) {
+    if (!(m > 0.f)) return 1.f;
+    int e;
+    frexpf(m, &e);
+    int s = 14 - e;
+    s = s < -126 ? -126 : (s > 127 ? 127 : s);
+    return __int_as_float((127 + s) << 23);
+}
+"""
+
+
+def tc_wfill_fp16(npl, stride):
+    """The W slice as two FP16 planes of half2 k-pairs, ``[npl][KP / 2][WS]`` words each (big, then small), scaled by
+    one power of two per slice (``wscale``). The slice maximum goes through the warps' staging words (A_BASE)."""
+    return f"""            {{
+                float m = 0.f;
+                for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
+                    const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
+                    m = fmaxf(m, fabsf(W[(int64_t)(wst[p] + cb * CB + l) * {stride} + k]));
+                }}
+                #pragma unroll
+                for (int o = 16; o > 0; o >>= 1) m = fmaxf(m, __shfl_xor_sync(FULL, m, o));
+                if (lane == 0) smem[A_BASE + warp * A_STRIDE] = m;
+                __syncthreads();
+                m = 0.f;
+                for (int v = 0; v < (int)(blockDim.x >> 5); ++v) m = fmaxf(m, smem[A_BASE + v * A_STRIDE]);
+                wscale = fp16_scale(m);
+                __syncthreads();
+            }}
+            {{
+                unsigned* big = reinterpret_cast<unsigned*>(Ws);
+                unsigned* small = big + {npl} * (KP / 2) * WS;
+                for (int i = threadIdx.x; i < {npl} * (KP / 2) * CB; i += blockDim.x) {{
+                    const int p = i / ((KP / 2) * CB), rem = i - p * ((KP / 2) * CB), kk = rem / CB,
+                              l = rem - kk * CB;
+                    const int64_t row = (int64_t)(wst[p] + cb * CB + l) * {stride};
+                    const float x0 = 2 * kk < K ? W[row + 2 * kk] * wscale : 0.f;
+                    const float x1 = 2 * kk + 1 < K ? W[row + 2 * kk + 1] * wscale : 0.f;
+                    unsigned hi, lo;
+                    split_f16x2(x0, x1, hi, lo);
+                    big[(p * (KP / 2) + kk) * WS + l] = hi;
+                    small[(p * (KP / 2) + kk) * WS + l] = lo;
+                }}
+            }}"""
+
+
+def tc_astage_fp16(stride):
+    """A warp's a staging [KP][B], each edge's row scaled by its own power of two; lane b keeps edge b's inverse
+    scale (``eunscale``)."""
+    return f"""                #pragma unroll 1
+                for (int b = 0; b < B; ++b) {{
+                    float v[(KP + 31) / 32], m = 0.f;
+                    #pragma unroll
+                    for (int j = 0; j < (KP + 31) / 32; ++j) {{
+                        const int k = lane + 32 * j;
+                        v[j] = (b < nb && k < K) ? a[(e0 + b) * {stride} + k] : 0.f;
+                        m = fmaxf(m, fabsf(v[j]));
+                    }}
+                    #pragma unroll
+                    for (int o = 16; o > 0; o >>= 1) m = fmaxf(m, __shfl_xor_sync(FULL, m, o));
+                    const float sc = fp16_scale(m);
+                    if (lane == b) eunscale = 1.f / sc;
+                    #pragma unroll
+                    for (int j = 0; j < (KP + 31) / 32; ++j) {{
+                        const int k = lane + 32 * j;
+                        if (k < KP) a_s[k * B + b] = v[j] * sc;
+                    }}
+                }}"""
+
+
+def tc_product_fp16(npl):
+    """``float w[npl][B]`` from the staged, scaled a and the FP16 W planes through 3xFP16 m16n8k16 tiles."""
+    return f"""                float wacc[{npl}][2][4];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int m = 0; m < 2; ++m)
+                        #pragma unroll
+                        for (int i = 0; i < 4; ++i) wacc[g][m][i] = 0.f;
+                {{
+                    const int gid = lane >> 2, tq = lane & 3;
+                    const unsigned* big = reinterpret_cast<const unsigned*>(Ws);
+                    const unsigned* small = big + {npl} * (KP / 2) * WS;
+                    #pragma unroll 2
+                    for (int k0 = 0; k0 < KP; k0 += 16) {{
+                        unsigned bh[2], bl[2];  // a^T fragment: k = k0 + 2 tq (+1; +8, +9), edge = gid
+                        split_f16x2(a_s[(k0 + 2 * tq) * B + gid], a_s[(k0 + 2 * tq + 1) * B + gid], bh[0], bl[0]);
+                        split_f16x2(a_s[(k0 + 2 * tq + 8) * B + gid], a_s[(k0 + 2 * tq + 9) * B + gid], bh[1], bl[1]);
+                        #pragma unroll
+                        for (int g = 0; g < {npl}; ++g)
+                            #pragma unroll
+                            for (int m = 0; m < 2; ++m) {{  // W fragment: channel m*16 + gid (+8), pair k0/2 + tq (+4)
+                                const int o = (g * (KP / 2) + k0 / 2 + tq) * WS + m * 16 + gid;
+                                const unsigned ah[4] = {{big[o], big[o + 8], big[o + 4 * WS], big[o + 4 * WS + 8]}};
+                                const unsigned al[4] = {{small[o], small[o + 8], small[o + 4 * WS],
+                                                        small[o + 4 * WS + 8]}};
+                                float cross[4] = {{0.f, 0.f, 0.f, 0.f}};
+                                mma_f16(cross, al, bh);
+                                mma_f16(cross, ah, bl);
+                                mma_f16(wacc[g][m], ah, bh);
+                                #pragma unroll
+                                for (int i = 0; i < 4; ++i) wacc[g][m][i] = fmaf(cross[i], 0x1p-11f, wacc[g][m][i]);
+                            }}
+                    }}
+                    #pragma unroll
+                    for (int g = 0; g < {npl}; ++g)
+                        #pragma unroll
+                        for (int m = 0; m < 2; ++m) {{  // C fragment: channel m*16 + gid (+8), edge 2 tq (+1)
+                            float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;
+                            rp[0] = wacc[g][m][0];
+                            rp[RS] = wacc[g][m][1];
+                            rp[8] = wacc[g][m][2];
+                            rp[RS + 8] = wacc[g][m][3];
+                        }}
+                }}
+                __syncwarp();
+                float w[{npl}][B];
+                const float wun = 1.f / wscale;
+                #pragma unroll
+                for (int b = 0; b < B; ++b) {{
+                    const float un = __shfl_sync(FULL, eunscale, b) * wun;
+                    #pragma unroll
+                    for (int g = 0; g < {npl}; ++g) w[g][b] = r_s[(g * B + b) * RS + lane] * un;
+                }}"""
+
+
 def tc_wfill(npl, stride, presplit=False):
     """A block's W slice for the tensor-core product: rows padded to KP with zeros, row stride WS; ``stride``: the
     name of W's row stride in the kernel. ``presplit``: stored as float2 {hi, lo} (``TC_PRESPLIT``)."""
@@ -336,6 +482,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     default ``k``), a's and W's rows keep the stride ``k``. ``stream_store`` (default ``STREAM_STORE_W``): ``w``
     stored with ``__stcs``. ``tc``: the a.W product on tensor cores in 3xTF32 (``TENSOR_CORES``, sm_80+; the launch
     rule must be ``launch_rule(..., tc=tc)``'s); ``"presplit"``: with the W slice split once (``TC_PRESPLIT``).
+``"fp16"``: exponent-shifted 3xFP16 instead (``TC_FP16_HELPERS``; kernel lab only, used columns padded to 16).
     ``blocks`` (``block_map``'s input; ir_mul, message only): the message written per group, one output
     pointer each (``out0``, ``out1``, ...)."""
     check_problem(schedule)
@@ -363,9 +510,12 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     npp = max(len(p) for p in parts)
     cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap)}    }} break;"
                       for q, part in enumerate(parts))
-    helpers = tc_helpers() if tc else ""
+    if tc == "fp16" and _kpad(used) % 16:
+        raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
+    helpers = (tc_helpers() + TC_FP16_HELPERS) if tc == "fp16" else tc_helpers() if tc else ""
     ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
-    a_offset = f"{slice_floats(npp, ka, tc)} + warp * {staging_floats(ka, schedule.edge_dim, tc, npp)}"
+    a_base, a_stride = slice_floats(npp, ka, tc), staging_floats(ka, schedule.edge_dim, tc, npp)
+    a_offset = "A_BASE + warp * A_STRIDE"
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
 constexpr bool STORE_W = {"true" if store_w else "false"};
@@ -383,6 +533,8 @@ constexpr int B = {BATCH};
 constexpr int RC = {RECEIVERS_PER_CHUNK};
 constexpr int TAIL = {TAIL_EDGES};
 constexpr unsigned FULL = 0xffffffffu;
+constexpr int A_BASE = {a_base};  // the warps' staging: a_s of warp v at A_BASE + v * A_STRIDE
+constexpr int A_STRIDE = {a_stride};
 {helpers}
 extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_forward(
     int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
@@ -441,7 +593,10 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None):
                 b = 4 * q + c
                 gemm.append(f"                      w[{g}][{b}] = fmaf(av{q}.{comp}, wk, w[{g}][{b}]);")
         gemm.append("                    }")
-    if tc:
+    fp16_decl = "float wscale = 1.f, eunscale = 1.f;" if tc == "fp16" else ""
+    if tc == "fp16":
+        wfill, astage, product = tc_wfill_fp16(npl, "KA"), tc_astage_fp16("KA"), tc_product_fp16(npl)
+    elif tc:
         pre = tc == "presplit"
         wfill, astage, product = tc_wfill(npl, "KA", pre), tc_astage("KA"), tc_product(npl, pre)
     else:
@@ -482,6 +637,7 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None):
                 ++cur;
             }}"""
     return f"""
+        {fp16_decl}
         {{
             const int wst[{npl}] = {{{wst}}};
 {wfill}

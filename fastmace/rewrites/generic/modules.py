@@ -31,6 +31,8 @@ from types import MappingProxyType
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 # Class name -> (variant, sha256 of inspect.getsource(<class>.forward) in mace-torch 0.3.16);
 # generic_interaction_forward reproduces each of them.
 GENERIC_INTERACTIONS: Mapping[str, tuple[str, str]] = MappingProxyType({
@@ -67,6 +69,26 @@ FIRST_FULL_ROWS = False
 # gradient as it is, without the zero-padded copy (OMAT-0 A100 profile, 4 November 2026: 0.11 ms per force call).
 # Bitwise: the dropped column's gradient is zero. A module constant for the A/B.
 FIRST_TABLE_COLUMNS = False
+# The tabled first interaction's table and outer sums with one fused backward (round 2, 5 November 2026;
+# kernels.triton.tabled_outer_sum): per edge dr and the edge attributes' gradient from the slots' gradient in one walk,
+# without grad_a [E, h c], its assembled copy and the separate table backward. Rounding (regrouped sums). Needs the
+# segmented first sum and float32. None: on for FUSED_FIRST_BACKWARD_GPUS (decision 66, after the MD-step A/Bs);
+# True / False: an A/B side's choice on every GPU. MD step b/a (ab / ba), OMAT-0 medium, SrTiO3 10x10x10 and NbCl5:
+# RTX 5060 Ti 0.962 / 0.963 and 0.972 / 0.969; RTX 4000 Ada 0.962 / 0.963 and 0.979 / 0.975 (with TABLED_FORWARD:
+# 0.945 / 0.945, 0.948 / 0.955; 0.949 / 0.944, 0.978 / 0.968); A100-SXM4-80GB 0.969 / 0.966 and 0.983 / 0.984
+# (0.966 / 0.962, 0.970 / 0.982), its NbCl5 stress error 1.55-1.60e-7, under the default plan's accepted 1.8e-7
+# (docs/validation/omat0-a100-optimisations.md).
+FUSED_FIRST_BACKWARD = None
+FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                       "NVIDIA A100-SXM4-80GB"))
+
+
+def fused_first_backward(device):
+    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``FUSED_FIRST_BACKWARD_GPUS``."""
+    if FUSED_FIRST_BACKWARD is not None:
+        return bool(FUSED_FIRST_BACKWARD)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
 
 
 def _first_inputs(augmented, last):
@@ -89,12 +111,48 @@ def bias_free(linear):
                 if "bias" in name and tensor.numel() > 0]
 
 
+def fused_first_applies(self, edge_feats):
+    """Whether ``fused_first_message`` serves this tabled, reassociated interaction (``FUSED_FIRST_BACKWARD``)."""
+    table, reassociation = getattr(self, "radial_table", None), getattr(self, "first_reassociation", None)
+    return (table is not None and reassociation is not None and not FIRST_FULL_ROWS and reassociation.segmented
+            and table.coef.dtype == torch.float32 and edge_feats.dtype == torch.float32
+            and fused_first_backward(table.coef.device))
+
+
+def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
+    """``(message, edge density)`` through the tabled outer sum (the table read inside the reassociation's per-slot
+    sums, one fused backward; ``kernels.triton.tabled_outer_sum``), or None where ``fused_first_applies`` is false."""
+    if not fused_first_applies(self, edge_feats):
+        return None
+    from fastmace.kernels.triton.tabled_outer_sum import tabled_outer_sum
+
+    table, reassociation = self.radial_table, self.first_reassociation
+    weight = fc_last_weight(self.radial_last)
+    width = weight.shape[-1]
+    pair = table.pair(node_attrs, edge_index)
+    density = []
+
+    def summed_fn(key, slots):
+        summed, edge_density = tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts, table.scales,
+                                                table.bins, table.r_lo, table.bin_scale, table.r_max, width,
+                                                edge_attrs.contiguous(), key, slots)
+        density.append(edge_density)
+        return summed, width
+
+    message = reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, rows=rows,
+                            summed_fn=summed_fn)
+    return message, density[0]
+
+
 def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
     """``(message, edge density)`` of a reassociated generic interaction with a radial table: the table, then the
     reassociation of its ``h c``. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward
     keeps the lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again (MH-1's
     ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
     backward rebuilds only the table."""
+    fused = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index)
+    if fused is not None:
+        return fused
     columns = fc_last_weight(self.radial_last).shape[-1] if FIRST_TABLE_COLUMNS and not FIRST_FULL_ROWS else -1
     augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index, columns=columns)
     rows, weight = _first_inputs(augmented, self.radial_last)
@@ -150,6 +208,9 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         from fastmace.rewrites.mh1.modules import streaming_message
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                    node_attrs=node_attrs, wprime_lengths=wprime_lengths)
+    elif tabled and reassociation is not None and fused_first_applies(self, edge_feats):
+        message, table_density = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                                                     rows=n_real)
     elif tabled:
         augmented, table_density = table(edge_feats, node_attrs, edge_index,
                                          density=kind != "residual")  # [h c, c] and the density

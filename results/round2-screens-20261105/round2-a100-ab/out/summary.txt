@@ -1,0 +1,30 @@
+forward exit=0
+eos exit=0
+forward ptxas base                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-warps8 rule LaunchRule(parts=2, warps=8, blocks_per_slice=27, shared_bytes=117760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-warps8                    {'8.0': {'registers': 192, 'spill_store_bytes': 0}, '8.9': {'registers': 196, 'spill_store_bytes': 0}}
+tc-warps10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=134400) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-warps10                   {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-warps8 rule LaunchRule(parts=2, warps=8, blocks_per_slice=27, shared_bytes=117760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-warps10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=134400) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward  base                4472.8 us  ratio 1.000  regs 168 local 40  
+forward  tc-warps8           5186.6 us  ratio 1.160  regs 192 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-warps10          4961.3 us  ratio 1.109  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+  import pynvml  # type: ignore[import]
+base              520.2 us  ratio 1.000  {'err_a': '1.8e-07', 'err_y': '1.1e-07'}
+F-one-block       375.8 us  ratio 0.722  {}
+F-const-G         283.6 us  ratio 0.545  {}
+copy              172.0 us  ratio 0.331  {}
+walk-c16-w1       422.9 us  ratio 0.813  {'err_a': '1.0e-07', 'err_y': '1.1e-07'}
+walk-c16-w2       474.1 us  ratio 0.911  {'err_a': '1.1e-07', 'err_y': '1.1e-07'}
+walk-c16-w4       763.9 us  ratio 1.469  {'err_a': '1.2e-07', 'err_y': '1.1e-07'}
+walk-c32-w1       423.9 us  ratio 0.815  {'err_a': '1.0e-07', 'err_y': '1.1e-07'}
+walk-c32-w2       479.2 us  ratio 0.921  {'err_a': '1.1e-07', 'err_y': '1.1e-07'}
+walk-c32-w4       764.9 us  ratio 1.470  {'err_a': '1.2e-07', 'err_y': '1.1e-07'}
+walk-c64-w1       427.0 us  ratio 0.821  {'err_a': '1.0e-07', 'err_y': '1.1e-07'}
+walk-c64-w2       490.5 us  ratio 0.943  {'err_a': '1.1e-07', 'err_y': '1.1e-07'}
+walk-c64-w4       778.2 us  ratio 1.496  {'err_a': '1.2e-07', 'err_y': '1.1e-07'}
+table-bwd         379.9 us  ratio 0.730  {}
+base+table-bwd    872.4 us  ratio 1.677  {}
+walk+table-bwd    761.9 us  ratio 1.465  {}
+walk-dr           463.9 us  ratio 0.892  {'err_dr': '1.0e-07'}

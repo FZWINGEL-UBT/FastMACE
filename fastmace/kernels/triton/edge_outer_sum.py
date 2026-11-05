@@ -31,11 +31,38 @@ from functools import cache
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 FORWARD_CHUNK = 32  # edges per program of the segmented forward (fixed for every crystal and GPU)
 # The kernels read ``a`` at its row stride where its rows are unit-stride (False: a contiguous copy first, as before
 # 3 November 2026; kept for the A/B).
 STRIDED_ROWS = True
 BACKWARD_BLOCK_EDGES = 32  # edges per program of the backward (fixed for every crystal and GPU)
+# The run-walking backward (round 2, outside idea 2, 5 November 2026): each program walks BACKWARD_WALK_CHUNK
+# consecutive edges and loads a slot's [D, K] gradient block once per run of equal keys (about 25 edges per block
+# with the segmented first sum's order) instead of once per edge. Rounding: its sums over d and k are tree sums.
+# Correct for any key order. Kernel lab (tools/eos_backward_lab.py, Benchmark_loup's keys): A100-SXM4-80GB 0.802 of
+# the base backward with 16-edge chunks and one warp (0.81 with 32 or 64); RTX 4000 Ada 1.03-1.11 and RTX 5060 Ti
+# 0.94, both near their DRAM floor (a copy of a, y and the outputs: 0.80 and 0.73). MD step b/a (ab / ba), OMAT-0
+# medium: A100-SXM4-80GB SrTiO3 10x10x10 0.995 / 0.987, NbCl5 0.995 / 0.996 (on, every A100 model). None: on for
+# BACKWARD_WALK_GPUS (decision 66); True / False: an A/B side's choice on every GPU.
+BACKWARD_WALK = None
+BACKWARD_WALK_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+BACKWARD_WALK_CHUNK = 16
+BACKWARD_WALK_WARPS = 1
+
+
+@cache
+def _walk_on(index):
+    return torch.cuda.get_device_name(index) in BACKWARD_WALK_GPUS
+
+
+def backward_walk(device):
+    """``BACKWARD_WALK`` on ``device``: the constant when set, else on for ``BACKWARD_WALK_GPUS``."""
+    if BACKWARD_WALK is not None:
+        return bool(BACKWARD_WALK)
+    device = torch.device(device)
+    return device.type == "cuda" and _walk_on(device.index if device.index is not None else torch.cuda.current_device())
 
 
 @cache
@@ -158,6 +185,39 @@ def _triton_backward():
     return kernel
 
 
+@cache
+def _triton_backward_walk():
+    import triton
+    import triton.language as tl
+
+    _base = _base_fn()
+
+    @triton.jit
+    def kernel(grad_ptr, a_ptr, y_ptr, key_ptr, grad_a_ptr, grad_y_ptr, num_edges, a_stride,
+               K: tl.constexpr, D: tl.constexpr, INNER: tl.constexpr, CHUNK: tl.constexpr,
+               BLOCK_K: tl.constexpr, BLOCK_D: tl.constexpr):
+        start = tl.program_id(0) * CHUNK
+        d = tl.arange(0, BLOCK_D)
+        k = tl.arange(0, BLOCK_K)
+        mask = (d < D)[:, None] & (k < K)[None, :]
+        offsets = d[:, None] * (INNER * K) + k[None, :]
+        current = tl.load(key_ptr + start).to(tl.int64)
+        block = tl.load(grad_ptr + _base(current, D, K, INNER) + offsets, mask=mask, other=0.0)
+        stop = tl.minimum(start + CHUNK, num_edges)
+        for edge in range(start, stop):
+            key = tl.load(key_ptr + edge).to(tl.int64)
+            if key != current:  # a new run: its slot's block, once
+                block = tl.load(grad_ptr + _base(key, D, K, INNER) + offsets, mask=mask, other=0.0)
+                current = key
+            row = edge.to(tl.int64)
+            a = tl.load(a_ptr + row * a_stride + k, mask=k < K, other=0.0)
+            y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
+            tl.store(grad_a_ptr + row * K + k, tl.sum(block * y[:, None], axis=0), mask=k < K)
+            tl.store(grad_y_ptr + row * D + d, tl.sum(block * a[None, :], axis=1), mask=d < D)
+
+    return kernel
+
+
 @torch.library.custom_op("fastmace::edge_outer_sum_backward", mutates_args=())
 def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor,
                             key: torch.Tensor, inner: int = 1) -> tuple[torch.Tensor, torch.Tensor]:
@@ -171,7 +231,12 @@ def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor
     grad, a, y, key = grad.contiguous(), _rows(a), y.contiguous(), key.contiguous()
     grad_a = a.new_empty(a.shape)
     grad_y = torch.empty_like(y)
-    if num_edges:
+    if num_edges and backward_walk(a.device):
+        _triton_backward_walk()[(triton.cdiv(num_edges, BACKWARD_WALK_CHUNK),)](
+            grad, a, y, key, grad_a, grad_y, num_edges, a.stride(0),
+            K=k, D=d, INNER=inner, CHUNK=BACKWARD_WALK_CHUNK, BLOCK_K=triton.next_power_of_2(k),
+            BLOCK_D=triton.next_power_of_2(d), num_warps=BACKWARD_WALK_WARPS)
+    elif num_edges:
         _triton_backward()[(triton.cdiv(num_edges, BACKWARD_BLOCK_EDGES),)](
             grad, a, y, key, grad_a, grad_y, num_edges, a.stride(0),
             K=k, D=d, INNER=inner, BLOCK_E=BACKWARD_BLOCK_EDGES, BLOCK_K=triton.next_power_of_2(k))
