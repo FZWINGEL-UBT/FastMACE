@@ -146,6 +146,64 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
 
     by_piece = edge_order(lambda r, pair: pair.double() * 1e3 + r.double())  # within a pair, r orders the pieces
 
+    # Mirror pairs (H200 research answers, 5 November 2026: share w and w' between an edge and its reverse). The edges
+    # ordered as (lo <- hi, hi <- lo) pairs by their atoms (lo < hi), the receiver-sorted order kept within a key, so
+    # edge 2k and 2k + 1 are mirrors with the same table row (SYMMETRIC_PAIRS) and length. Reports how many edges have
+    # exactly one mirror and how many mirror lengths are bitwise equal.
+    def mirror_order(args):
+        import torch
+        args = list(args)
+        nodes = args[0].shape[0]
+        senders, receivers = args[3].long(), args[4].long()
+        lo, hi = torch.minimum(senders, receivers), torch.maximum(senders, receivers)
+        key = lo * nodes + hi
+        order = torch.sort(key, stable=True).indices
+        edges = key.shape[0]
+        sk = key[order]
+        paired = bool(edges % 2 == 0 and torch.equal(sk[0::2], sk[1::2])
+                      and (edges < 4 or bool((sk[2::2] != sk[1:-1:2]).all())))
+        valid = (senders >= 0) & (senders < nodes) & (receivers >= 0) & (receivers < nodes)
+        multiplicity = torch.bincount(torch.unique(key[valid], return_counts=True)[1])
+        print(f"mirror_order: invalid edges {int((~valid).sum())}, self edges {int((senders == receivers).sum())}, "
+              f"keys by multiplicity {multiplicity.tolist()}", flush=True)
+        r = args[8][order]
+        equal_r = float((r[0::2] == r[1::2]).float().mean()) if paired else float("nan")
+        print(f"mirror_order: {edges} edges, every edge paired: {paired}, bitwise-equal mirror lengths: "
+              f"{equal_r:.4f}", flush=True)
+        for i in (1, 2, 3, 4, 7, 8, 9, 17):  # sh, weights, senders, receivers, dsh, r, pair, dr
+            t = args[i]
+            if t.dim() >= 1 and t.shape[0] == edges:
+                args[i] = t[order].contiguous()
+        return args
+
+    def sender_order(args):
+        import torch
+        args = list(args)
+        edges = args[3].shape[0]
+        order = torch.sort(args[3].long(), stable=True).indices
+        for i in (1, 2, 3, 4, 7, 8, 9, 17):
+            t = args[i]
+            if t.dim() >= 1 and t.shape[0] == edges:
+                args[i] = t[order].contiguous()
+        return args
+
+    horner_block = (r"scalar_t gv\[PADDED_TERMS\];.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
+
+    def skip_table(condition):
+        """The value-table load and the dual Horner replaced by constants where ``condition`` holds (warp-uniform:
+        one warp per edge). Timing only."""
+        def transform(s):
+            def repl(m):
+                body = (m.group(0).replace("scalar_t radial_weight = gv[TERMS - 1];", "radial_weight = gv[TERMS - 1];")
+                        .replace("scalar_t radial_dt = scalar_t(0);", "radial_dt = scalar_t(0);"))
+                return (f"scalar_t radial_weight = t, radial_dt = sc;\n                if (!({condition})) {{\n"
+                        f"                {body}\n                }}")
+            out, n = re.subn(horner_block, repl, s, flags=re.S)
+            if not n:
+                raise ValueError("skip_table: the HORNER value-table block was not found")
+            return out
+        return transform
+
     # The tensor product's per-term arithmetic (OMAT-0 TP backward screen, 4 November 2026). The kernel is generated
     # from the model's schedule: its 10 paths, 40 outputs and 86 Clebsch-Gordan terms are unrolled with the
     # coefficients as literals, so a model-specialised backward can only save arithmetic (fewer operations per term,
@@ -429,6 +487,11 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-reduce-sh-only": ("falsifier", lambda s: re.sub(r"radial_gradient \+= __shfl_down_sync\([^;]*;", "",
                                                          s, count=1), ()),
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
+        "B-mirror-order": ("falsifier", lambda s: s, (), mirror_order),
+        "B-mirror-share": ("falsifier", skip_table("e & 1"), (), mirror_order),
+        "F-no-table-horner": ("falsifier", skip_table("true"), ()),
+        "F-half-table": ("falsifier", skip_table("e & 1"), ()),
+        "B-sender-order": ("falsifier", lambda s: s, (), sender_order),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
         "pair-maxreg96": ("rounding", pair(), ("--maxrregcount=96",)),
