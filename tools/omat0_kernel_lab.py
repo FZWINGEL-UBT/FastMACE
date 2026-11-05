@@ -168,6 +168,12 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
               f"keys by multiplicity {multiplicity.tolist()}", flush=True)
         r = args[8][order]
         equal_r = float((r[0::2] == r[1::2]).float().mean()) if paired else float("nan")
+        both = sk[1:] == sk[:-1]  # adjacent edges of one atom pair (every key has at most two edges)
+        if bool(both.any()):
+            same = r[1:][both] == r[:-1][both]
+            largest = float((r[1:][both] - r[:-1][both]).abs().max())
+            print(f"mirror_order: {int(both.sum())} mirror pairs, bitwise-equal lengths "
+                  f"{float(same.float().mean()):.6f}, largest |dr| {largest:.3e}", flush=True)
         print(f"mirror_order: {edges} edges, every edge paired: {paired}, bitwise-equal mirror lengths: "
               f"{equal_r:.4f}", flush=True)
         for i in (1, 2, 3, 4, 7, 8, 9, 17):  # sh, weights, senders, receivers, dsh, r, pair, dr
@@ -1268,6 +1274,9 @@ def forward_variants(kernel=None):
         # Ideas session idea 10 (5 November 2026): de-phase the forward's warps. The chunk loop has no block barrier,
         # so warps that start out of phase stay so unless something locks them; odd warps (or warp % 4) start late by
         # a sleep. Bitwise: only the start time changes.
+        # Ideas session third revision (6 November 2026): idea 15(a) (exact) and idea 14's bound.
+        "x-lane-idx": ("exact", _lane_indices, ()),
+        "F-tp-stored-w": ("falsifier", _stored_w, (), _stored_w_args(kernel)),
         "F-skew-100ns": ("exact", lambda s: _skew(s, "(warp & 1) * 100"), ()),
         "F-skew-300ns": ("exact", lambda s: _skew(s, "(warp & 1) * 300"), ()),
         "F-skew-1us": ("exact", lambda s: _skew(s, "(warp & 1) * 1000"), ()),
@@ -1278,6 +1287,50 @@ def forward_variants(kernel=None):
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),
     }
+
+
+def _lane_indices(source):
+    """Ideas session idea 15(a): each batch's sender and receiver indices loaded by lanes 0..B-1 at once and
+    broadcast with shuffles, so the x gathers no longer wait on a serial index chain. Bitwise."""
+    old = ("rv[b] = (b < nb && !tail) ? receivers[e0 + b] : 0x7fffffff;\n"
+           "                    int snd = (b < nb && !tail) ? senders[e0 + b] : -1;")
+    new = ("rv[b] = __shfl_sync(FULL, lane_rv, b);\n"
+           "                    int snd = __shfl_sync(FULL, lane_snd, b);")
+    source = _sub(source, old, new)
+    head = r"(\n(\s*)float xv\[B\]\[\d+\];)"
+    load = (r"\n\2const int lane_rv = (lane < nb && !tail) ? receivers[e0 + lane] : 0x7fffffff;"
+            r"\n\2const int lane_snd = (lane < nb && !tail) ? senders[e0 + lane] : -1;\1")
+    return _sub(source, head, load, regex=True)
+
+
+def _stored_w(source):
+    """Ideas session idea 14 bound: the forward with w read from HBM (``wout``, one row per edge, as the pair-shared
+    form must) instead of the product: no a staging and no MMAs (the W loads and splits then fall away too)."""
+    source = _sub(source, "if (b < nb) v = __ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q);", "")
+    source = _sub(source, r"\n\s*mma_tf32\(wacc\[g\]\[m\], a[hl], b[hl]\);", "", regex=True)
+    out, pos = [], 0
+    pattern = re.compile(r"float w\[(\d+)\]\[B\];(.*?)w\[g\]\[b\] = r_s\[\(g \* B \+ b\) \* RS \+ lane\];"
+                         r"(.*?)const int wst\[\1\] = (\{[^}]*\});", re.S)
+    for m in pattern.finditer(source):
+        out.append(source[pos:m.start()])
+        out.append(f"const int wsl[{m.group(1)}] = {m.group(4)};\n                float w[{m.group(1)}][B];{m.group(2)}"
+                   f"w[g][b] = (b < nb) ? __ldg(wout + (e0 + b) * Q + wsl[g] + ch) : 0.f;{m.group(3)}"
+                   f"const int wst[{m.group(1)}] = {m.group(4)};")
+        pos = m.end()
+    if not out:
+        raise ValueError("F-tp-stored-w: the w redistribution was not found")
+    return "".join(out) + source[pos:]
+
+
+def _stored_w_args(kernel):
+    """``F-tp-stored-w``'s w buffer: [E, Q] (the plan's H200 forward stores no w, so its own buffer is empty)."""
+    def transform(args):
+        import torch
+        args = list(args)
+        edges = args[3].shape[0]
+        args[8] = torch.zeros(edges, kernel.weight_dim, device=args[3].device, dtype=args[3].dtype)
+        return args
+    return transform
 
 
 def _skew(source, nanoseconds):
