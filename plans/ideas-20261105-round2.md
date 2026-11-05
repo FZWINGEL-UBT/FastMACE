@@ -833,4 +833,9 @@ them commutes) and replaced by the identity. Rounding class; the fold's self-che
 (fold_product_linear on for both sides): SrTiO3 b/a 0.9525 (pairs 0.949-0.953). A100-SXM4 (Modal): SrTiO3 0.9784 /
 0.9772 (a 11.15 ms, b 10.91 ms: 2.18 us per atom and step), NbCl5 0.9542 / 0.9561; force gate passes for NaCl and
 SrTiO3, NbCl5 stress 1.569e-7 (ratio 2.34) is the A100's accepted exception at the same value as the default
-(`results/round5-20261105/runs/a100-fold-first-linear-gate-ab/`). RTX 4000 Ada A/B on leto running.
+(`results/round5-20261105/runs/a100-fold-first-linear-gate-ab/`). RTX 4000 Ada (leto): SrTiO3 0.9536 / 0.9545,
+NbCl5 0.9197 / 0.9197, gate passes for all three (`rtx4000ada-fold-first-linear-gate-ab/`). **Default** (f1c5dcbc)
+wherever the generic fold is on (decision 66: Ada and A100-SXM4, both measured).
+
+GPU memory against Symmetrix-XL (RTX 5060 Ti, `results/vram-compare-rtx5060ti-20261105/`): on the 5,000-atom cell
+FastMACE takes 1,381 MiB at 24.4 ms per step, Symmetrix-XL under LAMMPS 767 MiB at 50.8 ms.
