@@ -1150,6 +1150,11 @@ def forward_variants(kernel=None):
                                                     "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
                                                     "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
+        # Ideas session census (5 November 2026): the W split in the wfrag kernel (TC_WFRAG), each fragment value
+        # used unsplit. Bounds a pre-split fragment-order W slice (two float4 per lane, no split instructions).
+        "F-wfrag-no-wsplit": ("falsifier", lambda s: _sub(s, r"split_tf32\(wv\.([xyzw]), ah\[(\d)\], al\[\d\]\);",
+                                                          r"ah[\2] = __float_as_uint(wv.\1); al[\2] = ah[\2];",
+                                                          regex=True), ()),
         # Round 5 (A100 stage bounds, 5 November 2026): one MMA pass costs 42 us, three dependent passes 1.09 ms, so
         # the passes wait on each other. tc-mma-free: the MMA asm without volatile (the compiler may interleave the
         # (g, m) chains; per accumulator the order is the same: bitwise). tc-2acc / tc-3acc: the small products into
