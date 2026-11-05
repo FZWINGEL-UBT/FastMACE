@@ -230,3 +230,37 @@ def test_attach_edge_sh_wraps_l3_harmonics_and_falls_through_on_the_cpu(monkeypa
     assert not gm.attach_edge_sh(holder, gm.EDGE_SH_MH1_GPUS)  # idempotent
     vectors = torch.randn(64, 3)
     assert torch.equal(holder.spherical_harmonics(vectors), original(vectors))
+
+
+# --------------------------------------------------------------------------- FUSED_FIRST_BACKWARD on MH-1's class
+
+
+@pytest.mark.parametrize("family", ["mh1", "polar"])
+def test_fused_first_message_on_mh1_class(monkeypatch, family):
+    """The tabled outer sum (generic FUSED_FIRST_BACKWARD) in MH-1's reassociated first interaction: the folded
+    weight [W, b] reads the table's leading h + 1 columns. On the CPU the op falls back to the table and
+    edge_outer_sum, so with the switch on the model must agree with the plain path to float32 rounding, and the
+    op must have been called. Off by default (FUSED_FIRST_MH1_GPUS empty: nothing measured)."""
+    import fastmace.kernels.triton.tabled_outer_sum as tos
+    from fastmace.rewrites.generic import modules as gm
+    from fastmace.rewrites.mh1 import modules as mm
+
+    assert not any(name in mm.FUSED_FIRST_MH1_GPUS for name in DECISION_66_GPUS)
+    model, batch = _float32(*tiny(family))
+    rewritten, applied, resolution = _apply(model, batch, (*PACKAGE, "radial_tables"))
+    assert {"reassociate_first", "segmented_first_sum", "radial_tables"} <= set(resolution.enabled)
+    calls = []
+    original = tos.tabled_outer_sum
+
+    def spy(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(tos, "tabled_outer_sum", spy)
+    monkeypatch.setattr(gm, "FUSED_FIRST_BACKWARD", False)
+    energy, forces = energy_and_forces(rewritten, batch)
+    assert not calls
+    monkeypatch.setattr(gm, "FUSED_FIRST_BACKWARD", True)
+    new_energy, new_forces = energy_and_forces(rewritten, batch)
+    assert calls
+    assert relative(new_energy, energy) <= 1e-6 and relative(new_forces, forces) <= 1e-5

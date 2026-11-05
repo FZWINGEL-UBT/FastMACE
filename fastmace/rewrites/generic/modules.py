@@ -83,12 +83,14 @@ FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX
                                        "NVIDIA A100-SXM4-80GB"))
 
 
-def fused_first_backward(device):
-    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``FUSED_FIRST_BACKWARD_GPUS``."""
+def fused_first_backward(device, gpus=None):
+    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``gpus`` (default
+    ``FUSED_FIRST_BACKWARD_GPUS``, the generic family's; MH-1's class passes its own list)."""
     if FUSED_FIRST_BACKWARD is not None:
         return bool(FUSED_FIRST_BACKWARD)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in (
+        FUSED_FIRST_BACKWARD_GPUS if gpus is None else gpus)
 
 
 def _first_inputs(augmented, last):
@@ -111,12 +113,12 @@ def bias_free(linear):
                 if "bias" in name and tensor.numel() > 0]
 
 
-def fused_first_applies(self, edge_feats):
+def fused_first_applies(self, edge_feats, gpus=None):
     """Whether ``fused_first_message`` serves this tabled, reassociated interaction (``FUSED_FIRST_BACKWARD``)."""
     table, reassociation = getattr(self, "radial_table", None), getattr(self, "first_reassociation", None)
     return (table is not None and reassociation is not None and not FIRST_FULL_ROWS and reassociation.segmented
             and table.coef.dtype == torch.float32 and edge_feats.dtype == torch.float32
-            and fused_first_backward(table.coef.device))
+            and fused_first_backward(table.coef.device, gpus))
 
 
 def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):

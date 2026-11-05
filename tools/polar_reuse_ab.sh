@@ -3,7 +3,7 @@
 # force gate with the candidate set on (NaCl, NbCl5 3x3x3), then same-process MD-step A/Bs in both build orders.
 # Side a is the default plan; each b adds explicit "on" fields: the fused forward + wprime pair (decision 66
 # for MH-1 and OMAT-0), wprime alone, the gate epilogue, and all three; or an OMAT-0 kernel switch as a module
-# constant (edgesh: EDGE_SH, tablew: TABLE_W, both: the two); species: side a without the species tables.
+# constant (edgesh: EDGE_SH, tablew: TABLE_W, both: the two, fusedfirst: FUSED_FIRST_BACKWARD); species: side a without the species tables.
 #   MODEL=polar1-s CKPT=MACE-POLAR-1-S.model; REPEAT="2 2 2" for the gate's cell (POLAR-1-L's float64 reference
 #   does not fit 20 GB at 3x3x3); GATE_REWRITES / GATE_CONSTANTS for the gate's production side.
 #   PROFILE=on: tools/module_profile.py per structure first. On leto through fm-tiled/run_bash.sh (idle check,
@@ -47,6 +47,7 @@ ab() {  # name side-arguments...
 }
 EDGE_SH=fastmace.rewrites.generic.modules:EDGE_SH
 TABLE_W=fastmace.kernels.oeq_streaming.wprime_backward:TABLE_W
+FUSED_FIRST=fastmace.rewrites.generic.modules:FUSED_FIRST_BACKWARD
 for set in ${SETS:-pair wprime epilogue all}; do
   case $set in
     pair) ab pair --b wprime_backward=on fused_folded_forward=on ;;
@@ -57,6 +58,7 @@ for set in ${SETS:-pair wprime epilogue all}; do
     edgesh) ab edgesh --a-constant $EDGE_SH=False --b-constant $EDGE_SH=True ;;
     tablew) ab tablew --a-constant $TABLE_W=False --b-constant $TABLE_W=True ;;
     species) ab species --a species_tables=off ;;
+    fusedfirst) ab fusedfirst --a-constant $FUSED_FIRST=False --b-constant $FUSED_FIRST=True ;;
     both) ab both --a-constant $EDGE_SH=False $TABLE_W=False --b-constant $EDGE_SH=True $TABLE_W=True ;;
   esac
 done
