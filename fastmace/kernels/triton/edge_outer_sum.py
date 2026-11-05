@@ -43,10 +43,11 @@ BACKWARD_BLOCK_EDGES = 32  # edges per program of the backward (fixed for every 
 # with the segmented first sum's order) instead of once per edge. Rounding: its sums over d and k are tree sums.
 # Correct for any key order. Kernel lab (tools/eos_backward_lab.py, Benchmark_loup's keys): A100-SXM4-80GB 0.802 of
 # the base backward with 16-edge chunks and one warp (0.81 with 32 or 64); RTX 4000 Ada 1.03-1.11 and RTX 5060 Ti
-# 0.94, both near their DRAM floor (a copy of a, y and the outputs: 0.80 and 0.73). None: on for BACKWARD_WALK_GPUS
-# (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice on every GPU.
+# 0.94, both near their DRAM floor (a copy of a, y and the outputs: 0.80 and 0.73). MD step b/a (ab / ba), OMAT-0
+# medium: A100-SXM4-80GB SrTiO3 10x10x10 0.995 / 0.987, NbCl5 0.995 / 0.996 (on, every A100 model). None: on for
+# BACKWARD_WALK_GPUS (decision 66); True / False: an A/B side's choice on every GPU.
 BACKWARD_WALK = None
-BACKWARD_WALK_GPUS = GPUModels(())
+BACKWARD_WALK_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 BACKWARD_WALK_CHUNK = 16
 BACKWARD_WALK_WARPS = 1
 

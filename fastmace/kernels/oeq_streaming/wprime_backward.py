@@ -72,10 +72,11 @@ BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 A
                                 "NVIDIA A100-SXM4-80GB"))
 # The block kernel's gradient reads through __ldg (read-only data, written before the launch). The RTX 5060 Ti took
 # 9.9 ms with plain loads through the group pointers and 6.6 ms with __ldg, whatever the tensors' placement (the
-# kernel alone, Benchmark_loup, 4 November 2026); the RTX 4000 Ada gains nothing (MD step 1.004 / 1.001). None: on for
-# BLOCK_LDG_GPUS (decision 66); True / False: an A/B side's choice on every GPU.
+# kernel alone, Benchmark_loup, 4 November 2026); the RTX 4000 Ada gains nothing (MD step 1.004 / 1.001). With
+# FACTORED the RTX 5060 Ti is faster with plain loads (round 2, 5 November 2026: the pack below), so no GPU keeps it.
+# None: on for BLOCK_LDG_GPUS (decision 66); True / False: an A/B side's choice on every GPU.
 BLOCK_LDG = None
-BLOCK_LDG_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+BLOCK_LDG_GPUS = GPUModels(())
 # The tensor product's backward factored per path (OMAT-0 TP backward screen, 4 November 2026). False: per
 # Clebsch-Gordan term the vendored three updates (weight, input and edge gradient; about 7 floating-point operations).
 # True: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i (3 operations per term), then the weight gradient
@@ -83,9 +84,10 @@ BLOCK_LDG_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 # it is set. A module constant for the A/B: OMAT-0 medium, Benchmark_loup MD step b/a in both orders, RTX 4000 Ada
 # 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940 (wprime kernel 0.90 / 0.73; docs/validation/omat0-tp-backward.md).
 # None: on for FACTORED_GPUS (owner, 4 November 2026, decision 66; every A100 model, GPUModels); True / False: an A/B
-# side's choice on every GPU. The RTX 5060 Ti was not measured and keeps the per-term body.
+# side's choice on every GPU. RTX 5060 Ti since round 2 (5 November 2026), with plain loads, HORNER and 80 registers:
+# MD step b/a SrTiO3 0.979 / 0.982, NbCl5 0.986 / 0.989 (gate 12/12).
 FACTORED = None
-FACTORED_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+FACTORED_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
 # With FACTORED: each path's most common coefficient magnitude applied once per path (to w and the weight gradient);
 # its terms carry only the sign, the others the ratio |c| / alpha (OMAT-0 medium: 50 of 86 terms without a multiply).
 # Rounding. Rejected (A100-SXM4-80GB: kernel 0.830 against FACTORED's 0.722, MD step 1.025 / 1.024 against FACTORED);
@@ -99,13 +101,16 @@ FACTORED_SCALE = False
 # A100-SXM4-80GB HORNER + SCALAR_PATHS 0.940 (HORNER alone 0.997, capped at 80 1.059); RTX 4000 Ada HORNER 0.975
 # (+ SCALAR_PATHS 0.987); RTX 5060 Ti FACTORED without BLOCK_LDG 0.929, + HORNER capped at 80 0.887.
 # None: on for the *_GPUS sets (decision 66, after the MD-step A/Bs); True / False (an int for MAX_REGISTERS): an A/B
-# side's choice on every GPU.
+# side's choice on every GPU. MD-step A/Bs b/a (ab / ba), SrTiO3 10x10x10 and NbCl5, OMAT-0 medium, 1 fs:
+# A100-SXM4-80GB HORNER + SCALAR_PATHS 0.986 / 0.983 and 0.994 / 0.978 (on); RTX 5060 Ti FACTORED without BLOCK_LDG,
+# HORNER and MAX_REGISTERS 80 0.979 / 0.982 and 0.986 / 0.989 (on); RTX 4000 Ada HORNER 1.004 / 1.001 and
+# 1.000 / 1.000 (off).
 HORNER = None
-HORNER_GPUS = GPUModels(())
+HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
 SCALAR_PATHS = None
-SCALAR_PATHS_GPUS = GPUModels(())
+SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 MAX_REGISTERS = None
-MAX_REGISTERS_GPUS = {}  # device name -> registers
+MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
