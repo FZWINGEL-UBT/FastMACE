@@ -1,0 +1,14 @@
+forward ptxas base                         {'8.0': {'registers': 167, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-tc-no-product              {'8.0': {'registers': 166, 'spill_store_bytes': 0}, '8.9': {'registers': 156, 'spill_store_bytes': 0}}
+forward ptxas F-no-tp                      {'8.0': {'registers': 124, 'spill_store_bytes': 0}, '8.9': {'registers': 128, 'spill_store_bytes': 0}}
+forward ptxas F-tc-no-mma                  {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 166, 'spill_store_bytes': 0}}
+forward ptxas F-tc-no-wsplit               {'error': "variant pattern found 0 times: 'split_tf32(wp[0], ah[0], al[0]);'"}
+forward ptxas F-tc-1pass                   {'8.0': {'registers': 168, 'spill_store_bytes': 8}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward F-tc-no-wsplit: variant pattern found 0 times: 'split_tf32(wp[0], ah[0], al[0]);'
+forward  base                3246.1 us  ratio 1.000  regs 167 local 40  
+forward  F-tc-no-product     1536.0 us  ratio 0.473  regs 166 local 40  
+forward  F-no-tp             1990.7 us  ratio 0.613  regs 124 local 24  
+forward  F-tc-no-mma         2154.5 us  ratio 0.664  regs 168 local 40  
+forward  F-tc-no-wsplit         nan us  ratio nan  regs None local None  variant pattern found 0 times: 'split_tf32(wp[0], ah[0], al[0]);'
+forward  F-tc-1pass          2196.5 us  ratio 0.677  regs 168 local 48  
+grep: /tmp/fastmace-out/wprime.log: No such file or directory

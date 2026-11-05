@@ -1,0 +1,15 @@
+forward ptxas base                         {'8.0': {'registers': 167, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch                  {'8.0': {'registers': 168, 'spill_store_bytes': 12}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch-w10              {'8.0': {'registers': None, 'spill_store_bytes': 0}, '8.9': {'registers': None, 'spill_store_bytes': 0}}
+tc-prefetch-x rule LaunchRule(parts=2, warps=7, blocks_per_slice=27, shared_bytes=156032) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch-x                {'8.0': {'registers': 240, 'spill_store_bytes': 0}, '8.9': {'registers': 238, 'spill_store_bytes': 0}}
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch-x rule LaunchRule(parts=2, warps=7, blocks_per_slice=27, shared_bytes=156032) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward  base                3177.5 us  ratio 1.000  regs 167 local 40  
+forward  tc-prefetch         3987.1 us  ratio 1.255  regs 168 local 56  {'out0': 'max|d|/max|a| = 1.39e+00', 'out1': 'max|d|/max|a| = 6.35e+00', 'out2': 'max|d|/max|a| = 2.36e+00', 'out3': 'max|d|/max|a| = 5.60e+00', 'w': 'bitwise'}
+forward  tc-prefetch-w10     3998.3 us  ratio 1.258  regs 168 local 56  {'out0': 'max|d|/max|a| = 1.39e+00', 'out1': 'max|d|/max|a| = 6.35e+00', 'out2': 'max|d|/max|a| = 2.36e+00', 'out3': 'max|d|/max|a| = 5.60e+00', 'w': 'bitwise'}
+forward  tc-prefetch-x       4397.9 us  ratio 1.384  regs 240 local 40  {'out0': 'max|d|/max|a| = 1.39e+00', 'out1': 'max|d|/max|a| = 6.35e+00', 'out2': 'max|d|/max|a| = 2.36e+00', 'out3': 'max|d|/max|a| = 5.60e+00', 'w': 'bitwise'}
+grep: /tmp/fastmace-out/wprime.log: No such file or directory

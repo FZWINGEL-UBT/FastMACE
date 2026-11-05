@@ -1,0 +1,7 @@
+wprime exit=0
+wprime ptxas base                         {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas butterfly                    {'8.0': {'registers': 95, 'spill_store_bytes': 0}, '8.9': {'registers': 83, 'spill_store_bytes': 0}}
+wprime ptxas F-no-reduce                  {'8.0': {'registers': 96, 'spill_store_bytes': 0}, '8.9': {'registers': 82, 'spill_store_bytes': 0}}
+wprime   base                3050.5 us  ratio 1.000  regs 96 local 0  
+wprime   butterfly           3016.7 us  ratio 0.989  regs 95 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.99e-07'}
+wprime   F-no-reduce         2914.3 us  ratio 0.955  regs 96 local 0  

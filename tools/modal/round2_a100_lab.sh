@@ -9,7 +9,7 @@
 # ptxas registers and spills for sm_80 with every lab variant. Exits 3 at once on any other GPU unless ALLOW_ANY_GPU=1
 # (the RTX 4000 Ada on leto: FORWARD_CONSTANTS="fastmace.kernels.oeq_streaming.fused_forward:TENSOR_CORES=True" puts
 # the forward lab on tensor cores, and the default SIMT forward is timed first as forward-simt).
-# PARTS (default "forward wprime eos") picks the labs. Usage (from WSL, Modal client venv):
+# PARTS (default "forward wprime eos") picks the labs; WPRIME_CONSTANTS (MODULE:NAME=VALUE) go to the wprime lab. Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu A100-80GB --timeout-min 40 --commit <sha> \
 #     --command "bash tools/modal/round2_a100_lab.sh" --out ~/fm-runs/round2-a100-lab
 set -uo pipefail
@@ -31,7 +31,9 @@ python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels forward --rounds 2
 echo "forward exit=$?" >> "$out/summary.txt"
 fi
 if [[ $parts == *" wprime "* ]]; then
-python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels wprime --rounds 21 --ptxas-archs 8.0 8.9 \
+wc=()
+[ -n "${WPRIME_CONSTANTS:-}" ] && read -r -a wc <<< "--constant $WPRIME_CONSTANTS"
+python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels wprime --rounds 21 --ptxas-archs 8.0 8.9 "${wc[@]}" \
   --variants ${WPRIME_VARIANTS:-base horner scalar-l1 horner+scalar-l1 horner-maxreg80 horner+scalar-l1-maxreg80 \
   factored-maxreg80} \
   --output "$out/wprime" > "$out/wprime.log" 2>&1

@@ -106,6 +106,7 @@ class BlockLinear(torch.nn.Module):
         self.grouped_launch = False  # grouped_launch: small products in one Triton launch (block_products)
         self.sms = None  # grouped_launch: the device's SM count for the shape rule (None: not float32 on CUDA)
         self.tf32x3 = False  # tf32x3_gemms: every product as 3xTF32 (block_products)
+        self.segment_plan = None  # tf32x3 on CUTLASS with SEGMENT_ROWS: the blocks' plan (cutlass.segment_rows)
         if self.grouped:  # one product per output segment
             blocks = _group(blocks)
             self.block_ends = tuple((i, j) for i, j, _ in blocks)
@@ -123,10 +124,21 @@ class BlockLinear(torch.nn.Module):
                 outputs[j] = part if outputs[j] is None else outputs[j] + part
             return self.transpose_out(join_rows(self.segments_out, outputs, n, x[0]))
         x = self.transpose_in(x)
+        if self.segment_plan is not None and self.tf32x3:  # products on x itself, results written in place
+            from fastmace.kernels.cutlass.segment_rows import segment_rows
+
+            count = len(self.block_ends)
+            return self.transpose_out(segment_rows(
+                x, [getattr(self, f"weight_{k}") for k in range(count)],
+                [getattr(self, f"weight_t_{k}") for k in range(count)], self.segment_plan, self.width_out))
         n = x.shape[0]
         rows = [x[:, offset:offset + dim * mul].reshape(n * dim, mul)
                 for offset, mul, dim in self.segments_in]
         return self.transpose_out(join_rows(self.segments_out, self.products(rows), n, x))
+
+    @property
+    def width_out(self):
+        return sum(m * d for _, m, d in self.segments_out)
 
     def products(self, rows):
         """Per output segment, its rows [n * dim, mul] (None where no product reaches it), from the

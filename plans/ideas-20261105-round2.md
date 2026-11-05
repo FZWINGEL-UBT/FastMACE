@@ -596,3 +596,191 @@ Left from the profile, by size:
   gathers), because the readouts run in eager frames between compiled graphs.
 - **The interaction-1 outer sum's 61 MB zero fill (32 µs) and its atomics:** they disappear if each program owns
   whole receivers.
+
+### Round 5, continued: the profile at `2a016fd4` and the w′ reduction (5 November 2026)
+
+Profile with EDGE_SH: `results/omat0-a100-profile-2a016fd4/` (Modal A100-SXM4-80GB). Benchmark_loup NVE 2.35, 2.51,
+2.44 µs per atom and step (three fresh processes; the spread is the card's, the median is close to `5b6c5550`'s
+2.38 on the PCIe card). The eager force call is 11.43 ms in 217 kernels. The edge spherical harmonics now take
+13.9 µs forward and 27.9 µs backward, against about 228 µs in Inductor. What is left of the edge glue (the
+normalisation's backward and the force scatter 54 µs, ZBL 47 + 27 µs and two 32 µs scatters, the vectors 10 µs) is
+about 0.22 ms, 2 % of the call. That is the ceiling of the review's force-epilogue fusion (priority 2); a fused
+ZBL kernel each way is the part of it worth building (about 0.1 ms).
+
+**The w′ backward's end-of-edge reduction.** Every lane shuffles all 16 edge-gradient components and dr down 5
+levels: 85 SHFL, 85 WARPSYNC and 170 FADD, about half of the kernel's static SASS (sm_120: 1,448 instructions
+with it, 752 without). Kernel lab (`results/round5-20261105/runs/`):
+
+| Variant | RTX 5060 Ti | A100-SXM4-80GB |
+|---|---|---|
+| default | 7,370 µs | 3,050 µs |
+| butterfly reduce-scatter (`BUTTERFLY`; 21 shuffles; dsh and dr bitwise) | 0.965 / 0.963 | 0.989 |
+| no reduction at all (falsifier) | 0.675 | 0.955 |
+| dr reduced, dsh not (falsifier) | 0.680 | |
+| dsh reduced, dr not (falsifier) | 0.998 | |
+
+On the RTX 5060 Ti the reduction of the 16 components costs a third of the kernel. The butterfly removes two
+thirds of its instructions (992 static) but only a tenth of its time. So the cost is the tail's latency or
+issue, not the shuffle count. On the A100 the whole reduction is 4.5 %.
+
+### The external review's six ideas (5 November 2026), assessed
+
+1. **Several warps per edge (channels split across 2 or 4 warps): bounded.** Registers per thread come from the
+   per-edge state, not from the number of channels a lane handles: 16 edge-gradient accumulators, the Chebyshev
+   and slope terms, and the input-gradient slots of one channel, reused across the loop. Splitting the channels does
+   not shrink it. It multiplies the per-edge preamble and adds a cross-warp reduction, and on the A100 lowering the
+   registers (MAX_REGISTERS 80) made the kernel slower (1.059). Lab bound `F-split2` / `F-split4` (partials added
+   with atomics): see the table below.
+2. **W as packed scaled FP16 hi/lo pairs: not built.** Storage stays 32 bits per coefficient, as in TC_WFRAG's FP32
+   slice, so the shared-memory footprint gains nothing. Decoding takes two conversions plus a rescale, or a second
+   accumulator for the 2^11-scaled low products, against the split's three instructions now. The split's ceiling
+   was 14 % of the forward before TC_WFRAG (`F-tc-no-wsplit` 0.862); it is re-measured on the current default below.
+3. **One program per receiver/species run (no atomics, no zero fill): small.** The forward's zero fill is 31 µs, and
+   its atomics write the same 61 MB that plain stores would. With about 25 edges per slot and 32-edge programs, most
+   runs straddle at most one boundary. The ceiling is about 30–60 µs, 0.3–0.5 % of the step, below the review's
+   0.1–0.25 ms. Kept on the list (above: "whole receivers"), after ZBL.
+4. **The backward split into path-group kernels: not built.** It has the same premise as 1: fewer registers buy
+   occupancy. On the A100 they did not (MAX_REGISTERS 80: 1.059). The receiver-owned and path-grouping
+   attempts (ledger `conv-receiver-backward`, `conv-path-grouping`) lost to the per-edge kernel.
+5. **Cartesian edge gradients inside the w′ kernel: small.** After EDGE_SH the SH backward is 28 µs, and the dsh
+   tensor (24 MB) is written once and read once. Interaction 1's dsh must be contracted as well, so both
+   kernels would need the Jacobian. Ceiling about 50 µs (0.4 %).
+6. **A symbolic joint forward/VJP generator: not started.** The counted CG algebra (134 terms against 116 for
+   nnz(M), about 4 % of the arithmetic) and the arithmetic bounds already measured (`F-tp-no-coef` 0.947–0.961) leave
+   less than the 15 % threshold such a generator would need.
+
+### Interface items from the `2a016fd4` profile (5 November 2026)
+
+- **Head selection (`energy.HEAD_SLICE`, built, A/Bs running).** MACE's `values[num_atoms_arange, node_heads]`
+  becomes `values[:, 0]` for one-head models (source edit of the pinned forward). It removes the IndexBackward
+  radix sort, scan, histogram, memsets and gathers, about 98 µs per force call. Bitwise.
+- **One-graph energy sums (`energy.GRAPH_SUM`, built).** `scatter_sum(..., data["batch"], dim_size=1)` becomes
+  `sum(keepdim=True)`. Three single-address atomic scatters (37.9 µs + 5.5 µs of fills) become reductions. Forces
+  are bitwise; the float64 energy's order changes.
+- **Density sums (not built).** Two `[E, 1] → [5000, 1]` atomic scatters, 31–32 µs each. The edges are
+  receiver-sorted, so a CSR segment sum would take a few µs, but the row pointer is built inside
+  `streaming_message` and is not available to the density. Ceiling about 45 µs.
+- **GEMM layout glue (design).** `[N, 16·128]` viewed as `[N·16, 128]` makes each irrep block's rows the index
+  pattern `n·16 + base_l + m`. CUTLASS's gathered and scattered entry (`species_into`, one species) can read A
+  through that pattern and write D straight into the concatenated output. Attributed on the A100:
+  - pure A copies (`clone_slice_*tf32x3_mm`): about 160 µs;
+  - output concatenations (`cat_view`): about 135 µs;
+  - the other glue kernels fuse divisions and residual adds and would stay.
+
+  Only ungrouped 1:1 blocks qualify. Grouped products concatenate segments along K, which a row gather cannot
+  express, and `species_into` has no β (no accumulate). The backward needs the same gather and scatter for
+  `grad @ Wᵀ`. Ceiling about 0.25 ms (2 % on the A100).
+- **ZBL (not built).** The forward is already one Inductor kernel (47 µs) and the backward 27 µs; a hand kernel
+  saves perhaps 30–40 µs.
+
+### External ideas, third set (5 November 2026)
+
+Assessed against the ledger and the round-5 falsifiers. RTX 5060 Ti w′ falsifiers (BUTTERFLY off as the base,
+7.37 ms): no reduction 0.675, dr reduced but not dsh 0.680, dsh but not dr 0.998, butterfly 0.965, two warps per edge
+0.954, four warps per edge 0.891. On the A100 no reduction is 0.955. Reducing one value costs almost nothing; the 16
+dsh components cost the 32 %, and the butterfly's quarter of the shuffles recovers only a ninth of it.
+
+1. **Producer/consumer warps in the A100 forward (MMA warps feed FP32 warps).** Parked. The forward is at the
+   168-register cap with 12 warps and 151 KB of shared memory. Fewer warps lost more than they saved (8 / 10 warps
+   1.160 / 1.109; pre-split W 1.362 because it cost a third of the warps). An exchange ring of w for 8 edges is
+   about 40 KB per stage. The tensor pipe is not the limit: the big·big product alone is 0.964. Dropping the W split
+   altogether is 0.862, but the split runs on the same issue slots as the FP32 consumer, so warp roles cannot hide
+   it. The 12 warps already interleave both pipes. First check, if reopened: Nsight barrier-stall share and pipe
+   utilisation of the forward. Without a large barrier share there is nothing to overlap.
+2. **Cartesian gradient before the w′ reduction.** Promoted. The falsifiers above make it the strongest 5060 Ti
+   lead: three reduced values instead of sixteen, with dr folded in through the unit vector, so dr's own reduction
+   goes too. Lab falsifiers `F-cart3`, plus `F-redux16` and `F-cart3-redux` for idea 5, are running. They time a
+   16×3 projection whose Jacobian is read from sh as a stand-in. A real Jacobian costs some tens of FMAs more per
+   lane and edge. Production would need the edge-SH backward to take a per-edge 3-vector from interaction 2 next to
+   interaction 1's dsh. It is rounding, not bitwise; gate and stress as usual.
+3. **Radial-manifold compression.** Closed today by `tools/radial_rank_lab.py`, before this proposal. That test is
+   the one proposed: OMAT-0, every species pair, a dense Chebyshev grid over [0.5, r_max). Errors are output-weighted
+   on w = aW and on dw/dr, with an SVD of the values and scaled slopes. Every interaction is full rank. Rank 56
+   still leaves 1.6e-5 relative w error against 3–6e-8 from float32 rounding, so rank ≤ 32 is far off (ledger
+   rad-low-rank: MH-1 rank 65 of 65). The six-dimensional space per piece is real. TABLE_W exploits it in the
+   backward. The forward cannot: a per-edge W·C read is about 30 KB against a's 256 B.
+4. **Pre-split constant weights in the CUTLASS atom GEMMs.** Low. The same trade in the forward (TC_PRESPLIT) lost
+   1.362, and the producer-side splits lost too (prec-presplit-epilogue, prec-producer-split). K = 128 GEMMs are near
+   their memory time, and B is half the split work. Bound first, if ever: an OpMultiplyAdd (1×TF32) build of the same
+   tile gives the ceiling of all split work; stop below 10 % of the CUTLASS GEMM time.
+5. **Integer warp reductions (redux.sync).** Raised from speculative to a lab falsifier, because the cost scales
+   with the number of reduced components. Fixed point: one redux.sync.max of the lanes' largest exponent, 2^25 head
+   room, 32-bit sums. That is deterministic, with about 2^-25 of the warp's largest partial per term, comparable to
+   FP32's error against Σ|g| (the gate decides). Timed as `F-redux16` and `F-cart3-redux`.
+6. **Path-specific precision in the forward.** Rejected. The bound is 0.964 even with every path on one TF32
+   product, and it is approximate arithmetic on top of the accepted NbCl5 stress exception.
+7. **Static receiver schedule instead of the work counter.** Low. About 2,500 atomics per call on uniform SrTiO3.
+   The counter's dynamic balance is what a static list would give up. Falsifier when idle: the same arithmetic with
+   a precomputed list; stop below 5 % of the forward.
+8. **Structure-aware plan selection at warm-up.** Not ours to adopt. Per-crystal tuning was ruled out by the owner
+   (10 October 2026); decision 66 opens per-GPU defaults only. Timing-noise selection would also make a run's plan,
+   and its rounding, irreproducible. Opt-in calibration exists (decision 55). This is an owner decision.
+
+Separately, the multi-warp falsifier (idea 1 of the second set) did not fail on the 5060 Ti: four warps per edge
+gave 0.891 with atomics. Its A100 bound is running. A deterministic version would combine the four partials in
+shared memory in a fixed order.
+
+### Correction: the lab's 5060 Ti w′ base lacked the register cap (5 November 2026, about 13:30 UTC)
+
+`tools/omat0_kernel_lab.py` compiled every w′ variant without the plan kernel's per-GPU `--maxrregcount`
+(`MAX_REGISTERS_GPUS`: 80 on the RTX 5060 Ti since round 2). On the 5060 Ti its "base" was therefore the uncapped
+kernel. On thermalised inputs that kernel takes 7.88 ms against the plan's 6.77 ms; a cap of 255 (242 registers)
+takes 9.17 ms. The cap is right; the lab was wrong. The A100 and the Ada have no cap, so their lab numbers stand.
+Two more lab fixes the same day:
+
+- the capture now follows 300 MD steps (`--equilibrate-steps`); before, it was the first steps from the ideal lattice;
+- every timed launch now follows a 256 MB L2 flush (`--flush-l2-mb`); this changed nothing measurable.
+
+Corrected 5060 Ti w′ numbers: plan kernel (cap 80, BUTTERFLY off) 6.78 ms. Relative to it:
+
+| Variant | Ratio |
+| --- | --- |
+| butterfly | 0.984 |
+| redux-pc | 0.966 |
+| no reduction (falsifier) | 0.954 |
+| four warps per edge | 1.131 |
+
+So the end-of-edge reduction is about 4.6 % of the kernel, not 32 %. Consequences:
+
+- the Cartesian projection (idea 2 of the third set) has at most a few percent of the kernel to win: closed;
+- several warps per edge loses on both GPUs: closed;
+- the REDUX MD A/Bs stand as measured: 5060 Ti 0.998 / 0.999 (SrTiO3) and 0.999 / 0.998 (NbCl5) against the
+  butterfly default; Ada 1.009 / 1.008 and 1.011 / 1.008.
+
+Every earlier 5060 Ti w′ lab ratio was taken against the uncapped base. That covers this round's butterfly, split
+and reduction falsifiers. The MD A/Bs, which decide defaults, are not affected.
+
+Forward prefetch re-screen on the RTX 5060 Ti (thermalised capture, 5 November 2026): base (SIMT, 167 registers)
+6.26 ms, simt-prefetch 1.013 (40 B spills). The round-4 lab's 0.930 came from the ideal-lattice capture; closed on
+the 5060 Ti.
+
+Forward prefetch re-screen on the A100-SXM4 (thermalised capture, 6c2f2967, Modal): base 3.18 ms; tc-prefetch 1.255,
+tc-prefetch-w10 1.258, tc-prefetch-x 1.384. All three tensor-core prefetch variants also give wrong outputs on
+thermal inputs: out0..3 max|d| / max|a| of 1.4 to 6.4. Round 4 called them bitwise, but only on the ideal-lattice
+capture, where every receiver has the same number of edges. On the 5060 Ti the SIMT prefetch stayed bitwise on thermal
+inputs, so the defect is in the tensor-core prefetch path, probably its handling of uneven batches. PREFETCH is off on
+every GPU (PREFETCH_GPUS empty); it must not be enabled with tensor cores until that is fixed and tested on uneven
+neighbourhoods.
+
+A100-SXM4 w′ lab and REDUX A/B (thermalised capture, 6c2f2967, BUTTERFLY off as on the A100): base 3.14 ms at 96
+registers, no spills. Register caps: 72 1.201 (88 B local), 64 1.477 (128 B local), so the A100 stays uncapped.
+butterfly 1.006, redux-pc 1.104, no-reduce 0.969 (the reduction is 3 %). REDUX MD A/B (b/a): SrTiO3 1.029 / 1.025,
+NbCl5 1.022 / 1.018, so slower; REDUX stays off on the A100. The A100 w′ kernel keeps its round-4 configuration.
+
+The leto CPU suite at 6c2f2967 (5143 passed, 2 failed) caught a name clash: GRAPH_SUM's forward edit registered
+`_fastmace_graph_sum`, which replaced PolarMACE's graph-sums helper of that name in its compiled forward. It now uses
+`_fastmace_batch_sum` (4bfe3307).
+
+Correction (5 November 2026, later): the "wrong outputs" of the A100 prefetch variants were a kernel-lab bug, not a
+kernel defect. With `VEC_A` (A100 default) the radial table writes a with rows padded to AS = 68 floats (K = 65); the
+lab gave that a to variants rendered without `VEC_A`, which read rows of KA = 65 floats, so every atom differed (all
+5,000 rows). tc-rerender keeps `VEC_A` and was bitwise. Lab fixes: a compacted a for such variants (a9074c5b), output
+buffers cleared before each variant (c544221a), the base's w zeroed, and the rows of a mismatch reported. Confirmed on
+the A100: tc-prefetch bitwise (1.253), simt and simt-prefetch 1.5-2.4e-6 (1.510 / 1.519). Production was never
+affected (its gate against float64 passes). Earlier A100 lab correctness labels of variants without VEC_A (prefetch,
+simt, fp16, presplit, round 4) are void; their timings stand. PREFETCH stays rejected on timing.
+
+A100 stage bounds at 6c2f2967 (thermalised capture): forward 3.25 ms; F-tc-no-product 0.473, F-no-tp 0.613,
+F-tc-no-mma 0.664, F-tc-1pass 0.677. The projection (1.71 ms) and the contraction (1.26 ms) add up: no overlap now.
+One MMA pass costs 42 us, three 1.09 ms. Chain variants: tc-mma-free 0.999 (bitwise), tc-2acc 1.306 (144 B spills),
+tc-3acc 1.504 (280 B). Producer/consumer microbenchmark (tools/pc_microbench.py) running on the A100.
