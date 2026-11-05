@@ -1086,6 +1086,19 @@ def outputs_of(name, args):
     return args
 
 
+def poison(name, args):
+    """Zero every output a variant writes, as the base's fresh buffers are (the variants share buffers: a variant
+    that writes nothing then shows zeros, not the previous variant's values; the forward leaves rows without edges
+    unwritten, as production's zero fill expects). wprime's dx is zeroed by ``reset`` before each launch."""
+    if name == "forward":
+        for o in (args[7] if isinstance(args[7], list) else [args[7]]):
+            o.zero_()
+        args[8].zero_()
+    else:
+        args[7].zero_()
+        args[17].zero_()
+
+
 def reset(name, args):
     if name == "wprime":
         args[6].zero_()
@@ -1207,6 +1220,8 @@ def main(argv=None):
         live = [v for v in names if "launch" in built[v]]
         for variant in live:  # base first: the reference of the comparisons
             b = built[variant]
+            if variant != "base":  # the variants share buffers: cleared first, so a stale output cannot pass as theirs
+                poison(name, b["args"])
             for _ in range(args.warmup):
                 reset(name, b["args"])
                 b["launch"](b["args"])
