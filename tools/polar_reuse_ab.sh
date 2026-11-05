@@ -3,7 +3,8 @@
 # force gate with the candidate set on (NaCl, NbCl5 3x3x3), then same-process MD-step A/Bs in both build orders.
 # Side a is the default plan; each b adds explicit "on" fields: the fused forward + wprime pair (decision 66
 # for MH-1 and OMAT-0), wprime alone, the gate epilogue, and all three; or an OMAT-0 kernel switch as a module
-# constant (edgesh: EDGE_SH, tablew: TABLE_W, both: the two, fusedfirst: FUSED_FIRST_BACKWARD); species: side a without the species tables.
+# constant (edgesh: EDGE_SH, tablew: TABLE_W, both: the two, fusedfirst: FUSED_FIRST_BACKWARD); tf32 and pairtf
+# add tf32x3_gemms (the A100's MH-1 default); species: side a without the species tables.
 #   MODEL=polar1-s CKPT=MACE-POLAR-1-S.model; REPEAT="2 2 2" for the gate's cell (POLAR-1-L's float64 reference
 #   does not fit 20 GB at 3x3x3); GATE_REWRITES / GATE_CONSTANTS for the gate's production side.
 #   PROFILE=on: tools/module_profile.py per structure first. On leto through fm-tiled/run_bash.sh (idle check,
@@ -48,6 +49,10 @@ ab() {  # name side-arguments...
 EDGE_SH=fastmace.rewrites.generic.modules:EDGE_SH
 TABLE_W=fastmace.kernels.oeq_streaming.wprime_backward:TABLE_W
 FUSED_FIRST=fastmace.rewrites.generic.modules:FUSED_FIRST_BACKWARD
+# BASE: RewriteConfig fields both sides of the constant and species sets take (a GPU where the label-gated
+# rewrites are not yet default, e.g. BASE="wprime_backward=on fused_folded_forward=on").
+BASE_A=${BASE:+--a $BASE}
+BASE_B=${BASE:+--b $BASE}
 for set in ${SETS:-pair wprime epilogue all}; do
   case $set in
     pair) ab pair --b wprime_backward=on fused_folded_forward=on ;;
@@ -55,11 +60,13 @@ for set in ${SETS:-pair wprime epilogue all}; do
     ffwd) ab ffwd --b fused_folded_forward=on ;;
     epilogue) ab epilogue --b gate_epilogue=on ;;
     all) ab all --b wprime_backward=on fused_folded_forward=on gate_epilogue=on ;;
-    edgesh) ab edgesh --a-constant $EDGE_SH=False --b-constant $EDGE_SH=True ;;
-    tablew) ab tablew --a-constant $TABLE_W=False --b-constant $TABLE_W=True ;;
-    species) ab species --a species_tables=off ;;
-    fusedfirst) ab fusedfirst --a-constant $FUSED_FIRST=False --b-constant $FUSED_FIRST=True ;;
-    both) ab both --a-constant $EDGE_SH=False $TABLE_W=False --b-constant $EDGE_SH=True $TABLE_W=True ;;
+    edgesh) ab edgesh $BASE_A $BASE_B --a-constant $EDGE_SH=False --b-constant $EDGE_SH=True ;;
+    tablew) ab tablew $BASE_A $BASE_B --a-constant $TABLE_W=False --b-constant $TABLE_W=True ;;
+    tf32) ab tf32 --b tf32x3_gemms=on ;;
+    pairtf) ab pairtf --b wprime_backward=on fused_folded_forward=on tf32x3_gemms=on ;;
+    species) ab species --a species_tables=off $BASE $BASE_B ;;
+    fusedfirst) ab fusedfirst $BASE_A $BASE_B --a-constant $FUSED_FIRST=False --b-constant $FUSED_FIRST=True ;;
+    both) ab both $BASE_A $BASE_B --a-constant $EDGE_SH=False $TABLE_W=False --b-constant $EDGE_SH=True $TABLE_W=True ;;
   esac
 done
 note done
