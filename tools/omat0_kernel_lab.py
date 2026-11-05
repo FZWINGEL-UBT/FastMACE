@@ -456,6 +456,47 @@ def _ns_slab(s):
     return _sub(s, "for (int k = 0; k < K; ++k) {", "for (int k = 0; k < 0; ++k) {")
 
 
+A4_STRIDE = 68  # tc-a4: a's padded row stride (a multiple of 4 floats: 16-byte rows)
+
+
+def _tc_a4(s):
+    """The tensor-core kernel with a staged by float4 loads from rows padded to A4_STRIDE floats (the argument
+    transform ``_a4_args``) into a batch-major tile, XOR-swizzled by 4-float group so the fragment reads stay
+    conflict-free (bank (group ^ edge) * 4 + tq), and sh by float4 loads. Bitwise: the same values reach the product.
+    Needs K == KP (every staged column used) and ED % 4 == 0."""
+    k = int(re.search(r"constexpr int K = (\d+);", s).group(1))
+    kp = int(re.search(r"constexpr int KP = (\d+);", s).group(1))
+    ed = int(re.search(r"constexpr int ED = (\d+);", s).group(1))
+    if k != kp or ed % 4:
+        raise ValueError(f"tc-a4 needs K == KP and ED % 4 == 0 (K {k}, KP {kp}, ED {ed})")
+    s = _sub(s, "constexpr int KA = ", f"constexpr int AS = {A4_STRIDE};\nconstexpr int KA = ", 1)
+    s = _sub(s, """                for (int i = lane; i < B * KP; i += 32) {
+                    const int b = i / KP, k = i - b * KP;
+                    a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * KA + k] : 0.f;
+                }""", """                for (int i = lane; i < B * (KP / 4); i += 32) {
+                    const int b = i / (KP / 4), q = i - b * (KP / 4);
+                    float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+                    if (b < nb) v = __ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q);
+                    *reinterpret_cast<float4*>(&a_s[b * KP + ((q ^ b) << 2)]) = v;
+                }""")
+    s = _sub(s, "split_tf32(a_s[(k0 + tq) * B + gid], bh[0], bl[0]);",
+             "split_tf32(a_s[gid * KP + (((k0 >> 2) ^ gid) << 2) + tq], bh[0], bl[0]);")
+    s = _sub(s, "split_tf32(a_s[(k0 + tq + 4) * B + gid], bh[1], bl[1]);",
+             "split_tf32(a_s[gid * KP + ((((k0 >> 2) + 1) ^ gid) << 2) + tq], bh[1], bl[1]);")
+    return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
+                """for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+
+
+def _a4_args(args):
+    import torch
+
+    a, *rest = args
+    padded = torch.nn.functional.pad(a, (0, A4_STRIDE - a.shape[1])).contiguous()
+    return (padded, *rest)
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -536,6 +577,12 @@ def forward_variants(kernel=None):
                                                         r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
                                                         "(snd >= 0) ? 0.5f : 0.f", regex=True),
                                                    "sh[e0 * ED + i]", "0.5f"), ()),
+        "tc-a4": ("exact", _tc_a4, (), _a4_args),
+        "sh4": ("exact", lambda s: _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? "
+                                              "sh[e0 * ED + i] : 0.f;", """for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);"""),
+                   ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),

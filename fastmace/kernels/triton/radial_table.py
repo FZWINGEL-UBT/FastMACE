@@ -32,6 +32,7 @@ BLOCK_E = 32
 # column program takes the last two columns. Bitwise: every column is its own Clenshaw sum. A module constant for the
 # A/B (OMAT-0 A100 profile, 3 November 2026); the backward sums over the columns and keeps one program.
 COLUMN_BLOCK = None
+WARPS = None  # the forward's num_warps (None: Triton's default, 4); a module constant for the lab (round 4)
 
 
 def evaluate(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, derivative=False):
@@ -153,7 +154,7 @@ def radial_table_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor
         forward[(-(-edges // BLOCK_E), -(-width // block_j))](
             r, pair, coef, starts, scales, bins, g, out if density else g, edges, coef.shape[1], bins.shape[0], r_lo,
             bin_scale, r_max, TERMS=coef.shape[2], J=width, BLOCK_E=BLOCK_E, BLOCK_J=block_j,
-            DENSITY=density, G=columns)
+            DENSITY=density, G=columns, **({} if WARPS is None else {"num_warps": int(WARPS)}))
     return g, out
 
 
