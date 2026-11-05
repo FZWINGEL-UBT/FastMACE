@@ -31,6 +31,8 @@ from functools import cache
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 FORWARD_CHUNK = 32  # edges per program of the segmented forward (fixed for every crystal and GPU)
 # The kernels read ``a`` at its row stride where its rows are unit-stride (False: a contiguous copy first, as before
 # 3 November 2026; kept for the A/B).
@@ -39,10 +41,27 @@ BACKWARD_BLOCK_EDGES = 32  # edges per program of the backward (fixed for every 
 # The run-walking backward (round 2, outside idea 2, 5 November 2026): each program walks BACKWARD_WALK_CHUNK
 # consecutive edges and loads a slot's [D, K] gradient block once per run of equal keys (about 25 edges per block
 # with the segmented first sum's order) instead of once per edge. Rounding: its sums over d and k are tree sums.
-# Correct for any key order. A module constant for the A/B.
-BACKWARD_WALK = False
-BACKWARD_WALK_CHUNK = 32
+# Correct for any key order. Kernel lab (tools/eos_backward_lab.py, Benchmark_loup's keys): A100-SXM4-80GB 0.802 of
+# the base backward with 16-edge chunks and one warp (0.81 with 32 or 64); RTX 4000 Ada 1.03-1.11 and RTX 5060 Ti
+# 0.94, both near their DRAM floor (a copy of a, y and the outputs: 0.80 and 0.73). None: on for BACKWARD_WALK_GPUS
+# (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice on every GPU.
+BACKWARD_WALK = None
+BACKWARD_WALK_GPUS = GPUModels(())
+BACKWARD_WALK_CHUNK = 16
 BACKWARD_WALK_WARPS = 1
+
+
+@cache
+def _walk_on(index):
+    return torch.cuda.get_device_name(index) in BACKWARD_WALK_GPUS
+
+
+def backward_walk(device):
+    """``BACKWARD_WALK`` on ``device``: the constant when set, else on for ``BACKWARD_WALK_GPUS``."""
+    if BACKWARD_WALK is not None:
+        return bool(BACKWARD_WALK)
+    device = torch.device(device)
+    return device.type == "cuda" and _walk_on(device.index if device.index is not None else torch.cuda.current_device())
 
 
 @cache
@@ -211,7 +230,7 @@ def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor
     grad, a, y, key = grad.contiguous(), _rows(a), y.contiguous(), key.contiguous()
     grad_a = a.new_empty(a.shape)
     grad_y = torch.empty_like(y)
-    if num_edges and BACKWARD_WALK:
+    if num_edges and backward_walk(a.device):
         _triton_backward_walk()[(triton.cdiv(num_edges, BACKWARD_WALK_CHUNK),)](
             grad, a, y, key, grad_a, grad_y, num_edges, a.stride(0),
             K=k, D=d, INNER=inner, CHUNK=BACKWARD_WALK_CHUNK, BLOCK_K=triton.next_power_of_2(k),

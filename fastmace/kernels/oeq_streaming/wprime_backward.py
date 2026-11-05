@@ -91,6 +91,21 @@ FACTORED_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-8
 # Rounding. Rejected (A100-SXM4-80GB: kernel 0.830 against FACTORED's 0.722, MD step 1.025 / 1.024 against FACTORED);
 # kept for the record. A module constant for the A/B.
 FACTORED_SCALE = False
+# Round 2 (5 November 2026, plans/ideas-20261105-round2.md). HORNER (with TABLE_W): the value table converted to the
+# power basis of t once at build (``power_table``, float64), w and its slope by dual Horner instead of the Chebyshev
+# basis and its derivative (12 live values per edge). Rounding. SCALAR_PATHS (with FACTORED): l1 = 0 paths add their
+# edge gradient per term from w x0, without the v_j sums. Rounding. MAX_REGISTERS: the kernel compiled with
+# --maxrregcount (0: no cap). Kernel lab, Benchmark_loup (OMAT-0 medium), the w' kernel against each GPU's default:
+# A100-SXM4-80GB HORNER + SCALAR_PATHS 0.940 (HORNER alone 0.997, capped at 80 1.059); RTX 4000 Ada HORNER 0.975
+# (+ SCALAR_PATHS 0.987); RTX 5060 Ti FACTORED without BLOCK_LDG 0.929, + HORNER capped at 80 0.887.
+# None: on for the *_GPUS sets (decision 66, after the MD-step A/Bs); True / False (an int for MAX_REGISTERS): an A/B
+# side's choice on every GPU.
+HORNER = None
+HORNER_GPUS = GPUModels(())
+SCALAR_PATHS = None
+SCALAR_PATHS_GPUS = GPUModels(())
+MAX_REGISTERS = None
+MAX_REGISTERS_GPUS = {}  # device name -> registers
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -574,7 +589,8 @@ class WPrimeBackward:
     (``StreamingKernels``) and a derivative table of ``terms`` terms (``vector``: its q-major layout's load width,
     ``SLOPE_VECTOR``)."""
 
-    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None):
+    def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
+                 horner=False):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -588,10 +604,18 @@ class WPrimeBackward:
         self.blocks = blocks
         self.schedule = kernels.schedule
         self.factored = factored_default(device) if factored is None else bool(factored)
+        self.horner = bool(horner)  # the caller's table is power_table's (HORNER)
+        self.scalar_paths = self.factored and scalar_paths_default(device)
+        self.max_registers = max_registers_default(device)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
-                             scale=self.factored and FACTORED_SCALE)
-        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
+                             scale=self.factored and FACTORED_SCALE, horner=self.horner,
+                             scalar_paths=self.scalar_paths)
+        options = ()
+        if self.max_registers:
+            options = (f"--maxrregcount={self.max_registers}",)
+            self.source += f"\n// compiled with --maxrregcount={self.max_registers}\n"  # in the content id
+        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), options)
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
         self._function = _check(driver.cuModuleGetFunction(self._module, b"oeq_projected_backward_wprime"))
@@ -871,6 +895,26 @@ def factored_default(device):
     return device.type == "cuda" and torch.cuda.get_device_name(device) in FACTORED_GPUS
 
 
+def _device_name(device):
+    device = torch.device(device)
+    return torch.cuda.get_device_name(device) if device.type == "cuda" else None
+
+
+def horner_default(device):
+    """``HORNER`` on ``device``: the constant when set, else on for ``HORNER_GPUS``."""
+    return bool(HORNER) if HORNER is not None else _device_name(device) in HORNER_GPUS
+
+
+def scalar_paths_default(device):
+    """``SCALAR_PATHS`` on ``device``: the constant when set, else on for ``SCALAR_PATHS_GPUS``."""
+    return bool(SCALAR_PATHS) if SCALAR_PATHS is not None else _device_name(device) in SCALAR_PATHS_GPUS
+
+
+def max_registers_default(device):
+    """``MAX_REGISTERS`` on ``device`` (0: no cap): the constant when set, else ``MAX_REGISTERS_GPUS``' entry."""
+    return int(MAX_REGISTERS) if MAX_REGISTERS is not None else int(MAX_REGISTERS_GPUS.get(_device_name(device), 0))
+
+
 def prepare_block_messages(model):
     """``WPrime.prepare_blocks`` in every interaction of ``model`` with ``wprime_backward`` (after the rewrites;
     a no-op where ``BLOCK_MESSAGE`` is off). Returns how many interactions write the block layout."""
@@ -893,9 +937,12 @@ class WPrime(torch.nn.Module):
         super().__init__()
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
         self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
+        self.horner = self.table_w and horner_default(table.coef.device)
         if self.table_w:
             self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
             gprime = value_table(table.coef, weight, self.vector)
+            if self.horner:  # HORNER: the power basis of t, for both kernels
+                gprime = power_table(gprime, self.terms)
         else:
             self.terms = int(table.dcoef.shape[2])
             self.vector = SLOPE_VECTOR if table.dcoef.dtype == torch.float32 else 0
@@ -903,7 +950,7 @@ class WPrime(torch.nn.Module):
         self.register_buffer("gprime", gprime, persistent=False)
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
-                                     table_w=self.table_w)
+                                     table_w=self.table_w, horner=self.horner)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.kernels = kernels
@@ -927,7 +974,8 @@ class WPrime(torch.nn.Module):
         device = self.gprime.device
         self.block = (fused.id, blocks,
                       FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
-                      WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks))
+                      WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
+                                     horner=self.horner))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -980,14 +1028,16 @@ class WPrime(torch.nn.Module):
         outputs = self.gprime.shape[1 if self.vector else 2]
         vector = f", q-major float{self.vector}" if self.vector else ""
         table = ", value table (w from the table)" if self.table_w else ""
+        table += ", power basis (Horner)" if self.horner else ""
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "FACTORED_SCALE", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
+           "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "SCALAR_PATHS_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
-           "derivative_table", "factored_default", "factored_paths",
-           "padded_terms", "prepare_block_messages",
+           "derivative_table", "factored_default", "factored_paths", "horner_default", "max_registers_default",
+           "padded_terms", "power_table", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
-           "streaming_conv_wprime_backward_recompute", "table_w_default", "value_table", "wprime_arguments",
+           "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table", "wprime_arguments",
            "wprime_reference"]

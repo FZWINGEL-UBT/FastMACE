@@ -285,6 +285,15 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "horner-maxreg80": ("rounding", rerender(factored=True, horner=True), ("--maxrregcount=80",), power_args),
         "horner+scalar-l1-maxreg80": ("rounding", rerender(factored=True, horner=True, scalar_paths=True),
                                       ("--maxrregcount=80",), power_args),
+        # Horner on the plan's own kernel (its FACTORED and BLOCK_LDG defaults), e.g. the RTX 5060 Ti's unfactored one.
+        "horner-default": ("rounding", lambda s: rerender(factored=kernel.factored, horner=True,
+                                                          block_ldg=_block_ldg())(s), (), power_args),
+        "horner-default-maxreg80": ("rounding", lambda s: rerender(factored=kernel.factored, horner=True,
+                                                                   block_ldg=_block_ldg())(s),
+                                    ("--maxrregcount=80",), power_args),
+        "factored-noldg": ("rounding", rerender(factored=True, block_ldg=False), ()),
+        "factored-noldg-horner-maxreg80": ("rounding", rerender(factored=True, horner=True, block_ldg=False),
+                                           ("--maxrregcount=80",), power_args),
         "factored-maxreg72": ("rounding", rerender(factored=True), ("--maxrregcount=72",)),
         "factored-maxreg64": ("rounding", rerender(factored=True), ("--maxrregcount=64",)),
         "sh-hoist": ("exact", sh_hoist, ()),
@@ -360,6 +369,13 @@ def _tc_no_wsplit(s):
 
 
 _RULES = {}  # a re-rendered variant's source -> its launch rule
+
+
+def _block_ldg():
+    import torch
+
+    from fastmace.kernels.oeq_streaming import wprime_backward as wp
+    return wp.block_ldg_default(torch.device("cuda", torch.cuda.current_device()))
 
 
 def _tc_rerender(kernel, tc, name):
