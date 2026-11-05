@@ -844,6 +844,100 @@ def _tc_split_accumulators(source, count):
                 "                            float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;")
 
 
+HYBRID16_HELPERS = """// TF32 + FP16 hybrid (round 5 lab): x = hi + lo as for 3xTF32; the small products in FP16 m16n8k16.
+__device__ __forceinline__ unsigned pack_h2(float k_low, float k_high) {
+    unsigned r;
+    asm("cvt.rn.f16x2.f32 %0, %1, %2;" : "=r"(r) : "f"(k_high), "f"(k_low));
+    return r;
+}
+__device__ __forceinline__ void mma_f16(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, "
+                 "{%8, %9}, {%0, %1, %2, %3};"
+                 : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
+}
+"""
+
+HYBRID16_LOOP = """#pragma unroll 1
+                    for (int k0 = 0; k0 < KP; k0 += 16) {  // two TF32 k-steps: the k16 FP16 MMA's slots
+                        // slot 2tq <- k0 + 8s + tq, slot 2tq + 1 <- k0 + 8s + tq + 4 (the same in A and B: exact)
+                        unsigned bs[2][2], bh16[2], bl16[2];
+                        #pragma unroll
+                        for (int s = 0; s < 2; ++s) {
+                            float hi[2], lo[2];
+                            #pragma unroll
+                            for (int j = 0; j < 2; ++j) {
+                                const float v = a_s[gid * KP + ((((k0 >> 2) + 2 * s + j) ^ gid) << 2) + tq];
+                                hi[j] = __uint_as_float(__float_as_uint(v) & 0xffffe000u);
+                                lo[j] = (v - hi[j]) * 2048.f;
+                                bs[s][j] = __float_as_uint(hi[j] * 2048.f);  // TF32-exact: the main product x 2^11
+                            }
+                            bh16[s] = pack_h2(hi[0], hi[1]);
+                            bl16[s] = pack_h2(lo[0], lo[1]);
+                        }
+                        #pragma unroll
+                        for (int g = 0; g < NPL_H; ++g)
+                            #pragma unroll
+                            for (int m = 0; m < 2; ++m) {
+                                const float4 w0 = reinterpret_cast<const float4*>(Ws)[
+                                    ((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 32 + lane];
+                                const float4 w1 = reinterpret_cast<const float4*>(Ws)[
+                                    ((g * (KP / 8) + (k0 >> 3) + 1) * 2 + m) * 32 + lane];
+                                const float wv[2][4] = {{w0.x, w0.y, w0.z, w0.w}, {w1.x, w1.y, w1.z, w1.w}};
+                                float wh[2][4], wl[2][4];
+                                unsigned ah[2][4];
+                                #pragma unroll
+                                for (int s = 0; s < 2; ++s)
+                                    #pragma unroll
+                                    for (int i = 0; i < 4; ++i) {
+                                        ah[s][i] = __float_as_uint(wv[s][i]) & 0xffffe000u;
+                                        wh[s][i] = __uint_as_float(ah[s][i]);
+                                        wl[s][i] = (wv[s][i] - wh[s][i]) * 2048.f;
+                                    }
+                                // A rows gid (x, z) and gid + 8 (y, w); k slots as in B
+                                const unsigned alo[4] = {pack_h2(wl[0][0], wl[0][2]), pack_h2(wl[0][1], wl[0][3]),
+                                                         pack_h2(wl[1][0], wl[1][2]), pack_h2(wl[1][1], wl[1][3])};
+                                const unsigned ahi[4] = {pack_h2(wh[0][0], wh[0][2]), pack_h2(wh[0][1], wh[0][3]),
+                                                         pack_h2(wh[1][0], wh[1][2]), pack_h2(wh[1][1], wh[1][3])};
+                                mma_f16(wacc[g][m], alo, bh16);  // 2^11 W_lo a_hi
+                                mma_f16(wacc[g][m], ahi, bl16);  // 2^11 W_hi a_lo
+                                mma_tf32(wacc[g][m], ah[0], bs[0]);  // 2^11 W_hi a_hi
+                                mma_tf32(wacc[g][m], ah[1], bs[1]);
+                            }
+                    }
+"""
+
+
+def _tc_hybrid16(source):
+    """The 3xTF32 projection as TF32 big*big plus FP16 m16n8k16 for both small products (lab, round 5): 4 MMAs per
+    16 k instead of 6, the FP16 MMA at twice the TF32 rate. Every product carries 2^11 (exact), undone on the store.
+    Needs TC_WFRAG's float4 W fragments and VEC_A's staging (the A100 default)."""
+    start = "#pragma unroll 2\n                    for (int k0 = 0; k0 < KP; k0 += 8) {"
+    end = "                    #pragma unroll\n                    for (int g = 0; g < "
+    npl = re.search(r"float wacc\[(\d+)\]\[2\]\[4\];", source)
+    if npl is None or start not in source or "const float4 wv = reinterpret_cast<const float4*>(Ws)[" not in source:
+        raise ValueError("variant pattern found 0 times: the TC_WFRAG product loop")
+    kp = int(re.search(r"constexpr int KP = (\d+);", source).group(1))
+    if kp % 16:
+        raise ValueError(f"tc-hybrid16 needs KP % 16 == 0 (KP = {kp}; SKIP_ZERO_COLUMN gives 64 for OMAT-0)")
+    loop = HYBRID16_LOOP.replace("NPL_H", npl.group(1))
+    out, pos = [], 0
+    while True:
+        i = source.find(start, pos)
+        if i < 0:
+            break
+        j = source.index(end, i)
+        out += [source[pos:i], loop]
+        pos = j
+    source = "".join(out) + source[pos:]
+    for k, v in (("rp[0] = wacc[g][m][0];", "rp[0] = wacc[g][m][0] * 0x1p-11f;"),
+                 ("rp[RS] = wacc[g][m][1];", "rp[RS] = wacc[g][m][1] * 0x1p-11f;"),
+                 ("rp[8] = wacc[g][m][2];", "rp[8] = wacc[g][m][2] * 0x1p-11f;"),
+                 ("rp[RS + 8] = wacc[g][m][3];", "rp[RS + 8] = wacc[g][m][3] * 0x1p-11f;")):
+        source = _sub(source, k, v)
+    return _after_constants(source, HYBRID16_HELPERS)
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -896,6 +990,8 @@ def forward_variants(kernel=None):
                                                 'asm("mma.sync.aligned.m16n8k8.row.col.f32.tf32'), ()),
         "tc-2acc": ("rounding", lambda s: _tc_split_accumulators(s, 2), ()),
         "tc-3acc": ("rounding", lambda s: _tc_split_accumulators(s, 3), ()),
+        # TF32 + FP16 hybrid (round 5): W_hi a_hi in TF32, both small products in FP16 m16n8k16 (4 MMAs per 16 k).
+        "tc-hybrid16": ("rounding", _tc_hybrid16, ()),
         # Cheaper splits than rounding both parts; they need the rounded split in the capture
         # (--constant ...fused_forward:TC_SPLIT="'rna'"; "mask" is fused_forward.TC_SPLIT's default):
         # the high part by masking the low 13 mantissa bits (truncation), the low part the exact remainder, rounded to
