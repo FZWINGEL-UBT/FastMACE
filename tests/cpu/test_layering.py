@@ -117,6 +117,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "VEC_SH": "sh staged with float4 loads; per GPU, A/B",
                                                         "VEC_A": "a staged with float4 loads; per GPU, A/B",
                                                         "TC_WFRAG": "W slice in mma fragment order; per GPU, A/B",
+                                                        "TC_WFRAG_SPLIT": "fragment-order slice stored split; A/B",
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
                                                         "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",
