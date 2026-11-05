@@ -390,13 +390,15 @@ def _tc_rerender(kernel, tc, name, warps=None, prefetch=False):
         props = torch.cuda.get_device_properties(0)
         rule = ff.launch_rule(kernel.paths, kernel.used if tc else kernel.k, kernel.schedule.edge_dim,
                               kernel.channels, int(props.shared_memory_per_block_optin),
-                              int(props.multi_processor_count), tc=tc, prefetch=prefetch)
+                              int(props.multi_processor_count), tc=tc, prefetch=prefetch,
+                              x_slots=kernel.schedule.input_dim // kernel.channels)
         if warps is not None:
             import dataclasses
             per = -(-kernel.paths // rule.parts)
             width = kernel.used if tc else kernel.k
             rule = dataclasses.replace(rule, warps=warps, shared_bytes=4 * ff.slice_floats(per, width, tc) + warps * 4
-                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per, prefetch))
+                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per, prefetch,
+                                                           kernel.schedule.input_dim // kernel.channels))
         source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc,
                            blocks=kernel.blocks, prefetch=prefetch)
         _RULES[source] = rule
@@ -514,6 +516,9 @@ def forward_variants(kernel=None):
         # The FP32-SIMT kernel (the plan's own, no TENSOR_CORES constant) re-rendered, without and with prefetch.
         "simt-rerender": ("exact", _tc_rerender(kernel, False, "simt-rerender"), ()),
         "simt-prefetch": ("exact", _tc_rerender(kernel, False, "simt-prefetch", prefetch=True), ()),
+        "simt-prefetch-x": ("exact", _tc_rerender(kernel, False, "simt-prefetch-x", prefetch="x"), ()),
+        "tc-prefetch-x": ("exact", _tc_rerender(kernel, True, "tc-prefetch-x", prefetch="x"), ()),
+        "tc-prefetch-x-w10": ("exact", _tc_rerender(kernel, True, "tc-prefetch-x-w10", warps=10, prefetch="x"), ()),
         "tc-prefetch-w10": ("exact", _tc_rerender(kernel, True, "tc-prefetch-w10", warps=10, prefetch=True), ()),
         "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
         "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),

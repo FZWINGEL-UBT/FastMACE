@@ -85,7 +85,9 @@ TC_RSTRIDE = 36  # the redistribution tile's row stride: conflict-free fragment 
 # next batch's a and sh into the warp's second buffer, so their load latency is hidden behind the product and the
 # tensor product (kernel lab: without a's and sh's loads the tensor-core forward is 18 % and 12 % faster on the
 # RTX 5060 Ti). Bitwise: the same values reach the same shared addresses. None: on for PREFETCH_GPUS (decision 66);
-# True / False: an A/B side's choice on every sm_80+ GPU (the fp16 lab product excepted).
+# True / False: an A/B side's choice on every sm_80+ GPU (the fp16 lab product excepted). "x": the senders' x rows
+# too, gathered with cp.async into one more per-warp tile [BATCH][input_dim / channels][32] after the product (the
+# A100 kernel lab: without the x loads the tensor-core forward is 16 % faster).
 PREFETCH = None
 PREFETCH_GPUS = GPUModels(())
 
@@ -97,8 +99,10 @@ def prefetch_default(capability, name=None):
     capability 8.0 or later (cp.async)."""
     on = PREFETCH
     if on is None:
-        on = name in PREFETCH_GPUS
-    return bool(on) and tuple(capability) >= (8, 0)
+        on = PREFETCH_GPUS.get(name, False) if isinstance(PREFETCH_GPUS, dict) else name in PREFETCH_GPUS
+    if not on or tuple(capability) < (8, 0):
+        return False
+    return "x" if on == "x" else True
 
 
 def tensor_cores(capability, name=None):
@@ -413,23 +417,24 @@ def slice_floats(paths_per_part, k, tc=False):
     return -(-paths_per_part * rows * stride // 4) * 4
 
 
-def staging_floats(k, edge_dim, tc=False, paths_per_part=0, prefetch=False):
+def staging_floats(k, edge_dim, tc=False, paths_per_part=0, prefetch=False, x_slots=0):
     """Floats of one warp's staging: a [K][BATCH] and sh [BATCH][edge_dim]; with tensor cores a [K padded][BATCH]
     and the redistribution tile [paths per part][BATCH][TC_RSTRIDE] after them (``prefetch``: two a and sh
-    buffers, ``PREFETCH``)."""
+    buffers, ``PREFETCH``; ``prefetch="x"``: and the x tile, ``x_slots`` values per edge and lane)."""
+    xs = BATCH * CHANNEL_BLOCK * int(x_slots) if prefetch == "x" else 0
     if tc:
-        return (1 + bool(prefetch)) * BATCH * (_kpad(k) + edge_dim) + paths_per_part * BATCH * TC_RSTRIDE
-    return (1 + bool(prefetch)) * BATCH * (k + edge_dim)
+        return (1 + bool(prefetch)) * BATCH * (_kpad(k) + edge_dim) + paths_per_part * BATCH * TC_RSTRIDE + xs
+    return (1 + bool(prefetch)) * BATCH * (k + edge_dim) + xs
 
 
-def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefetch=False):
+def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefetch=False, x_slots=0):
     """The kernel's parts, warps and grid for ``paths`` uvu paths of ``k``-wide folded inputs on a device with
     ``shared_optin`` bytes of opt-in shared memory per block and ``sms`` SMs (module docstring); ``tc``: the
     tensor-core product's shared layout (``TENSOR_CORES``)."""
     parts = max(1, -(-paths * BATCH // W_TILE_REGISTERS))
     while parts <= paths:
         per = -(-paths // parts)
-        if (4 * slice_floats(per, k, tc) + MIN_WARPS * 4 * staging_floats(k, edge_dim, tc, per, prefetch)
+        if (4 * slice_floats(per, k, tc) + MIN_WARPS * 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
                 <= shared_optin):
             break
         parts += 1
@@ -438,7 +443,7 @@ def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefe
                          "shared memory")
     per = -(-paths // parts)
     parts = -(-paths // per)
-    staging = 4 * staging_floats(k, edge_dim, tc, per, prefetch)
+    staging = 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
     wbytes = 4 * slice_floats(per, k, tc)
     warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
     slices = (channels // CHANNEL_BLOCK) * parts
@@ -536,7 +541,9 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     helpers = (tc_helpers() + TC_FP16_HELPERS) if tc == "fp16" else tc_helpers() if tc else ""
     helpers += CP_ASYNC_HELPERS if prefetch else ""
     ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
-    a_base, a_stride = slice_floats(npp, ka, tc), staging_floats(ka, schedule.edge_dim, tc, npp, prefetch)
+    x_slots = schedule.input_dim // C
+    a_base = slice_floats(npp, ka, tc)
+    a_stride = staging_floats(ka, schedule.edge_dim, tc, npp, prefetch, x_slots)
     a_offset = "A_BASE + warp * A_STRIDE"
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
@@ -566,7 +573,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
-{pointers(a_offset, prefetch)}
+{pointers(a_offset, prefetch, x_slots)}
     const int cb = blockIdx.y;
     const int ch = cb * CB + lane;
     int* ctr = counters + blockIdx.y * gridDim.z + blockIdx.z;
@@ -588,12 +595,19 @@ __device__ __forceinline__ void cp_async4(float* dst, const float* src, int byte
 }
 __device__ __forceinline__ void cp_async_commit() { asm volatile("cp.async.commit_group;\\n" ::: "memory"); }
 __device__ __forceinline__ void cp_async_wait1() { asm volatile("cp.async.wait_group 1;\\n" ::: "memory"); }
+__device__ __forceinline__ void cp_async_wait0() { asm volatile("cp.async.wait_group 0;\\n" ::: "memory"); }
 """
 
 
-def pointers(a_offset, prefetch):
+def pointers(a_offset, prefetch, x_slots=0):
     """The warp's staging pointers: a_s, sh_s and r_s; with ``prefetch`` the two buffers' base ``a_s0`` (a_s and sh_s
     are then set per batch) and SS, one buffer's floats."""
+    if prefetch == "x":
+        return f"""    constexpr int SS = KP * B + B * ED;  // one staging buffer: a [KP][B], sh [B][ED]
+    constexpr int NX = {x_slots};  // x values per edge and lane in the x tile
+    float* a_s0 = Ws + {a_offset};
+    float* x_s = a_s0 + 2 * SS;  // the warp's x tile [B][NX][32]
+    float* r_s = x_s + B * NX * 32;  // the warp's redistribution tile [paths][B][RS]"""
     if prefetch:
         return f"""    constexpr int SS = KP * B + B * ED;  // one staging buffer: a [KP][B], sh [B][ED]
     float* a_s0 = Ws + {a_offset};
@@ -603,7 +617,7 @@ def pointers(a_offset, prefetch):
     float* r_s = sh_s + B * ED;  // tensor cores: the warp's redistribution tile [paths][B][RS]"""
 
 
-def stage_async(first, count, abuf):
+def stage_async(first, count, abuf, commit=True):
     """cp.async of the batch at edge ``first`` (``count`` edges) into the buffer at ``abuf``, then a commit."""
     return f"""                {{
                     float* na = {abuf};
@@ -619,8 +633,24 @@ def stage_async(first, count, abuf):
                         const bool ok = i / ED < nn;
                         cp_async4(&ns[i], ok ? sh + en * ED + i : sh, ok ? 4 : 0);
                     }}
-                }}
-                cp_async_commit();"""
+                }}""" + ("\n                cp_async_commit();" if commit else "")
+
+
+def gather_x(first, count, nodes):
+    """cp.async of the x rows of the batch at edge ``first`` (``count`` edges; lane b < count holds its sender in
+    ``sn``) into the x tile: ``nodes``, each value's offset expression in a row (the lane's channel included)."""
+    lines = "\n".join(f"                        cp_async4(&x_s[(b * NX + {i}) * 32 + lane], src + {node}, ok ? 4 : 0);"
+                      for i, node in enumerate(nodes))
+    return f"""                {{
+                    const int nn = {count};
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) {{
+                        const int s = __shfl_sync(FULL, sn, b);
+                        const bool ok = b < nn && !tail && s >= 0 && s < N;
+                        const float* src = x + (int64_t)(ok ? s : 0) * IN_DIM;
+{lines}
+                    }}
+                }}"""
 
 
 def _out(slot, C, layout, bmap):
@@ -643,6 +673,10 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
     wst = ", ".join(str(paths[pi].weight_start) for pi in part)
     xloads = "\n".join(f"                    xv[b][{i}] = (snd >= 0) ? x[(int64_t)snd * IN_DIM + "
                        f"{_node(layout, C, s, c, d)}] : 0.f;" for (s, c, d), i in xi.items())
+    before_product = after_product = ""
+    if prefetch == "x":
+        xloads = "\n".join(f"                    xv[b][{i}] = x_s[(b * NX + {i}) * 32 + lane];" for i in range(nx))
+        nodes = [_node(layout, C, s, c, d) for (s, c, d) in xkeys]
     outs = "\n".join(f"                {_out(slots[name], C, layout, bmap)} = acc[{i}];" for name, i in si.items())
     gemm = []
     for q in range(BATCH // 4):
@@ -680,7 +714,33 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                 for (int k = 0; k < K; ++k) {{
 {nl.join(gemm)}
                 }}"""
-    if prefetch:
+    if prefetch == "x":
+        loop_head = f"""            int buf = 0;
+            __syncwarp();  // every lane done with the last chunk's buffers
+            if (ebeg < eend) {{
+                const int64_t ex = ebeg;
+{stage_async("ebeg", "(int)((eend - ebeg) < B ? (eend - ebeg) : B)", "a_s0", commit=False)}
+                const int sn = (lane < B && ex + lane < eend && !tail) ? senders[ex + lane] : -1;
+{gather_x("ex", "(int)((eend - ex) < B ? (eend - ex) : B)", nodes)}
+            }}
+            cp_async_commit();
+            for (int64_t e0 = ebeg; e0 < eend; e0 += B) {{
+                const int nb = (int)((eend - e0) < B ? (eend - e0) : B);
+                cp_async_wait0();
+                __syncwarp();  // the batch's copies of every lane visible; every lane done with the other buffer
+                float* a_s = a_s0 + buf * SS;
+                float* sh_s = a_s + KP * B;"""
+        before_product = f"""                const int64_t ex = e0 + B;
+                const int sn = (lane < B && ex + lane < eend && !tail) ? senders[ex + lane] : -1;
+                if (ex < eend) {{
+{stage_async("ex", "(int)((eend - ex) < B ? (eend - ex) : B)", "a_s0 + (buf ^ 1) * SS", commit=False)}
+                }}"""
+        after_product = f"""                if (ex < eend) {{
+{gather_x("ex", "(int)((eend - ex) < B ? (eend - ex) : B)", nodes)}
+                }}
+                cp_async_commit();"""
+        loop_tail = "                buf ^= 1;\n            }"
+    elif prefetch:
         loop_head = f"""            int buf = 0;
             __syncwarp();  // every lane done with the last chunk's buffers
             if (ebeg < eend) {{
@@ -763,7 +823,9 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
 {xloads}
                 }}
                 __syncwarp();
+{before_product}
 {product}
+{after_product}
                 if (STORE_W) {{
                     const int wst[{npl}] = {{{wst}}};
                     #pragma unroll
@@ -809,7 +871,8 @@ class FusedFoldedForward:
         self.prefetch = prefetch_default(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
         self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
                                 schedule.channels, int(props.shared_memory_per_block_optin),
-                                int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch)
+                                int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch,
+                                x_slots=schedule.input_dim // schedule.channels)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
