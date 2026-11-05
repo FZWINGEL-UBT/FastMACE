@@ -540,3 +540,24 @@ Defaults (decision 66): VEC_SH on every A100 and the RTX 5060 Ti; VEC_A and TC_W
   |A| |B| is 1.1–2.0e-6, against 1.1–2.7e-7 for 3xTF32 and 0.8–4.2e-7 for FP32: the FP16 MMA accumulates more
   coarsely. Even fully fused it would save at most about 0.8 ms of the 12.3 ms step, at 6–10× the GEMM error.
   Rejected on accuracy (FP32-equivalent rule).
+
+### The tensor product on tensor cores (`TC_TP`): correct, slower, rejected
+
+The a·W product's C fragments hold w as (channel, edge) tiles. Give each lane's edge pair 2 tq, 2 tq + 1 the k columns
+tq, tq + 4. Then `(w x)[channel, (edge, m1)]` is directly the A fragment of a second 3×TF32 product against
+`S_e[m1, m3] = Σ_m2 CG sh_e[m2]`, with a receiver's edges as its k dimension. The message stays in mma accumulators
+until the receiver changes. The kernel goes path by path (8 product registers live) with a per-path receiver
+cursor. Built as `fused_forward.TC_TP` (off), with `TC_TP_SPLIT = "round"`.
+
+- **Correctness:**
+  - w is bitwise the tensor-core kernel's.
+  - The message is within 4–6e-7 rms and 1.5e-6 max (relative) of the FP32 TP, with mask split 7e-7 rms.
+  - Checked for both layouts, the block layout, C = 128 and MACE's full path set.
+  - The real SrTiO3 call's 1o and 3o groups show large *relative* differences only because their values are
+    rounding noise: odd-l sums over a centrosymmetric lattice cancel to about 1e-5 against 8. The absolute
+    differences, 2–9e-6, are the same as in the other groups.
+- **A100-SXM4 kernel lab:** 1.276, at 162 registers without spills; the bound without any TP is 0.617.
+  RTX 5060 Ti (tensor cores forced): 1.64.
+- **Why it loses:** each A element serves one mma triple (N = 8 outputs, K = 8 edges). Its preparation (multiply
+  by x, round-to-nearest split of both operands) costs about as much as the FP32 TP's terms it replaces. With the
+  per-path a-fragment reloads and segment loops on top, the kernel is slower.
