@@ -180,12 +180,18 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const int32_t piece = bins[bin];
     const scalar_t t = (clamped - starts[piece]) * scales[piece] - scalar_t(1);
     const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;
+    {%- if horner %}
+    // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
+    const bool inside = r < r_max;
+    const scalar_t sc = scales[piece];
+    {%- else %}
     scalar_t cheb[PADDED_TERMS];
     cheb[0] = scalar_t(1);
     if (PADDED_TERMS > 1) cheb[1] = t;
     #pragma unroll
     for (int k = 2; k < PADDED_TERMS; ++k) cheb[k] = scalar_t(2) * t * cheb[k - 1] - cheb[k - 2];
-    {%- if table_w %}
+    {%- endif %}
+    {%- if table_w and not horner %}
     // TABLE_W: w from the value series (zero at or beyond the cutoff) and its r-derivative T_k'(x) * scale,
     // T_k' = k U_(k-1).
     const bool inside = r < r_max;
@@ -234,9 +240,19 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     #pragma unroll
                     for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
                 }
+                {%- if horner %}
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                {%- else %}
                 scalar_t radial_weight = scalar_t(0);
                 #pragma unroll
                 for (int k = 0; k < TERMS; ++k) radial_weight += cheb[k] * gv[k];
+                {%- endif %}
                 {%- else %}
                 const scalar_t radial_weight = {{ "__ldcs(weights + radial_weight_index)" if stream_w
                                                   else "weights[radial_weight_index]" }};
@@ -245,12 +261,19 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 {%- if factored %}
                 // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
                 // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                {%- set scalar_path = scalar_paths and path.input_irrep_dim == 1 and factored[path_index].alpha == 1.0 %}
                 {%- for i in factored[path_index].inputs %}
                 acc_t u_{{ i }} = acc_t(0);
                 {%- endfor %}
+                {%- if scalar_path %}
+                // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.
+                const scalar_t weighted_input =
+                    radial_weight * x[input_base + {{ node_offset(path.input_start, 0, path.input_irrep_dim) }}];
+                {%- else %}
                 {%- for j in factored[path_index].edges %}
                 acc_t v_{{ j }} = acc_t(0);
                 {%- endfor %}
+                {%- endif %}
                 {%- endif %}
 
                 {% for output in path.outputs %} {
@@ -288,7 +311,12 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                         const scalar_t scaled = output_gradient * {{ cpp_scalar_literal(ratio, scalar) }};
                         {%- endif %}
                         u_{{ term.input_component }} {{ op }} scaled * edge_value;
+                        {%- if scalar_path %}
+                        edge_gradient[{{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}]
+                            += weighted_input * scaled;
+                        {%- else %}
                         v_{{ term.edge_component }} {{ op }} scaled * input_value;
+                        {%- endif %}
                     } {%- endfor %}
                     {%- else %}
                     {% for term in output.terms %} {
@@ -329,14 +357,18 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 {%- if alpha != 1.0 %}
                 weight_gradient *= alpha;
                 {%- endif %}
+                {%- if not scalar_path %}
                 {%- for j in factored[path_index].edges %}
                 edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] +=
                     scaled_weight * v_{{ j }};
                 {%- endfor %}
                 {%- endif %}
+                {%- endif %}
                 if (sloped) {
                     acc_t slope = acc_t(0);
-                    {%- if table_w %}
+                    {%- if horner %}
+                    slope = radial_dt * sc;
+                    {%- elif table_w %}
                     #pragma unroll
                     for (int k = 1; k < TERMS; ++k) slope += dcheb[k] * gv[k];
                     {%- elif slope_vector %}
@@ -411,14 +443,17 @@ def factored_paths(schedule, scale=False):
 
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
-           factored=False, scale=False):
+           factored=False, scale=False, horner=False, scalar_paths=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
     ``table_w`` (``TABLE_W``): the table is the q-major value table (``value_table``, ``terms`` = D + 1), from which
     the kernel evaluates w and its slope; the stored weights are not read (needs ``vector``). ``blocks``
     (``fused_forward.block_map``'s input; ir_mul): the message gradient read per group, one pointer each.
-    ``factored`` (``FACTORED``): each path's three trilinear sums regrouped (rounding)."""
+    ``factored`` (``FACTORED``): each path's three trilinear sums regrouped (rounding). Kernel-lab options
+    (round 2, 5 November 2026): ``horner`` (with ``table_w``): the value table in the power basis of t
+    (``power_table``), w and its slope by dual Horner; ``scalar_paths`` (with ``factored``): l1 = 0 paths add
+    their edge gradient per term from w x0, without the v_j sums."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -431,6 +466,10 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("the derivative table needs at least one term")
     if vector not in (0, 2, 4) or (vector and scalar != "float"):
         raise ValueError(f"slope vector {vector!r}: 0, or 2 or 4 for float kernels")
+    if horner and not table_w:
+        raise ValueError("horner evaluates the value table: it needs table_w")
+    if scalar_paths and not factored:
+        raise ValueError("scalar_paths regroups the factored sums: it needs factored")
     if table_w and not vector:
         raise ValueError("table_w reads the q-major value table: it needs a slope vector of 2 or 4")
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
@@ -440,7 +479,25 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             padded_terms=padded_terms(terms, vector), table_w=bool(table_w),
                                             blocks=None if blocks is None else block_map(blocks, schedule.channels),
                                             n_blocks=0 if blocks is None else len(blocks), block_ldg=block_ldg,
-                                            factored=factored_paths(schedule, scale) if factored else None)
+                                            factored=factored_paths(schedule, scale) if factored else None,
+                                            horner=bool(horner), scalar_paths=bool(scalar_paths))
+
+
+def power_table(g, terms):
+    """A q-major value table ``g [groups, Q, padded]`` whose first ``terms`` entries are Chebyshev coefficients in
+    t, converted to power-basis coefficients in t (float64, stored in ``g``'s dtype; the padding stays zero)."""
+    import numpy as np
+
+    basis = np.zeros((terms, terms))  # column k: T_k in the power basis
+    for k in range(terms):
+        unit = np.zeros(terms)
+        unit[k] = 1.0
+        power = np.polynomial.chebyshev.cheb2poly(unit)  # trailing zeros trimmed
+        basis[: power.size, k] = power
+    m = torch.as_tensor(basis, dtype=torch.float64, device=g.device)
+    out = g.clone()
+    out[..., :terms] = (g[..., :terms].to(torch.float64) @ m.T).to(g.dtype)
+    return out.contiguous()
 
 
 def derivative_table(dcoef, weight, vector=0):

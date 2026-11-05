@@ -241,6 +241,13 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                              table_w=kernel.table_w, blocks=kernel.blocks, **options)
         return transform
 
+    def power_args(a):
+        """The argument list with the value table in the power basis of t (``horner``)."""
+        from fastmace.kernels.oeq_streaming import wprime_backward as wp
+        a = list(a)
+        a[10] = wp.power_table(a[10], kernel.terms)
+        return a
+
     def pair():
         """The channel-pair TABLE_W kernel (wprime_pair): float2 / float4 loads, the factored product."""
         def transform(s):
@@ -271,6 +278,13 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                                                    r"const scalar_t output_gradient = [^;]*;",
                                                    "const scalar_t output_gradient = radial_weight;", regex=True), ()),
         "factored-maxreg80": ("rounding", rerender(factored=True), ("--maxrregcount=80",)),
+        # Round 2 (5 November 2026): dual Horner on a power-basis table, l1 = 0 paths without v_j.
+        "horner": ("rounding", rerender(factored=True, horner=True), (), power_args),
+        "scalar-l1": ("rounding", rerender(factored=True, scalar_paths=True), ()),
+        "horner+scalar-l1": ("rounding", rerender(factored=True, horner=True, scalar_paths=True), (), power_args),
+        "horner-maxreg80": ("rounding", rerender(factored=True, horner=True), ("--maxrregcount=80",), power_args),
+        "horner+scalar-l1-maxreg80": ("rounding", rerender(factored=True, horner=True, scalar_paths=True),
+                                      ("--maxrregcount=80",), power_args),
         "factored-maxreg72": ("rounding", rerender(factored=True), ("--maxrregcount=72",)),
         "factored-maxreg64": ("rounding", rerender(factored=True), ("--maxrregcount=64",)),
         "sh-hoist": ("exact", sh_hoist, ()),
@@ -346,6 +360,24 @@ def _tc_no_wsplit(s):
 
 
 _RULES = {}  # a re-rendered variant's source -> its launch rule
+
+
+def _tc_rerender(kernel, tc, name):
+    """The tensor-core kernel re-rendered in mode ``tc`` (fused_forward.render) with its own launch rule."""
+    def transform(s):
+        import torch
+
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        if not kernel.tc:
+            raise ValueError(f"{name} needs the tensor-core kernel (--constant ...:TENSOR_CORES=True)")
+        props = torch.cuda.get_device_properties(0)
+        rule = ff.launch_rule(kernel.paths, kernel.used, kernel.schedule.edge_dim, kernel.channels,
+                              int(props.shared_memory_per_block_optin), int(props.multi_processor_count), tc=tc)
+        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc, blocks=kernel.blocks)
+        _RULES[source] = rule
+        print(f"{name} rule {rule} (plan {kernel.rule})", flush=True)
+        return source
+    return transform
 
 
 def _tc_presplit(kernel):
@@ -446,6 +478,11 @@ def forward_variants(kernel=None):
         "F-tc-no-product": ("falsifier", lambda s: _sub(s, "for (int k0 = 0; k0 < KP; k0 += 8) {",
                                                         "for (int k0 = 0; k0 < 0; k0 += 8) {"), ()),
         "tc-presplit": ("exact", _tc_presplit(kernel), ()),
+        # Exponent-shifted 3xFP16 m16n8k16 (round 2, 5 November 2026): rounded 22-bit split, 2x the TF32 MMA rate.
+        "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
+        "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),
+                                                            "mma_f16(cross, al, bh);", ""),
+                                                       "mma_f16(cross, ah, bl);", ""), ()),
         "F-tc-no-redistribute": ("falsifier", lambda s: _sub(s, "w[g][b] = r_s[(g * B + b) * RS + lane];",
                                                              "w[g][b] = wacc[g][b & 1][b >> 1 & 3];"), ()),
     }
@@ -482,6 +519,27 @@ def forward_launcher(kernel, source, extra):
                                      rule.parts, rule.warps * 32, 1, 1, rule.shared_bytes, stream,
                                      (values, types), 0))
     return launch, dict(registers=int(registers), local_bytes=int(spills))
+
+
+def ptxas_report(source, capability, extra=()):
+    """(registers, spill bytes) of ``source`` compiled with NVRTC for ``capability`` (no device needed)."""
+    from cuda.bindings import nvrtc
+
+    from fastmace.kernels.oeq_streaming.runtime import _check
+    major, minor = capability
+    program = _check(nvrtc.nvrtcCreateProgram(source.encode(), b"lab.cu", 0, [], []))
+    options = [f"--gpu-architecture=sm_{major}{minor}".encode(), b"--std=c++17", b"-default-device",
+               b"--ptxas-options=-v"] + [o.encode() for o in extra]
+    result = nvrtc.nvrtcCompileProgram(program, len(options), options)
+    size = _check(nvrtc.nvrtcGetProgramLogSize(program))
+    log = b" " * size
+    nvrtc.nvrtcGetProgramLog(program, log)
+    log = log.decode(errors="replace")
+    if int(result[0]) != 0:
+        raise RuntimeError(log[-2000:])
+    registers = [int(v) for v in re.findall(r"Used (\d+) registers", log)]
+    spills = [int(v) for v in re.findall(r"(\d+) bytes spill stores", log)]
+    return dict(registers=max(registers) if registers else None, spill_store_bytes=max(spills) if spills else 0)
 
 
 # ------------------------------------------------------------------------------------------------------- capture
@@ -563,8 +621,8 @@ def outputs_of(name, args):
     """Fresh output buffers of a captured argument list (the launch writes them)."""
     import torch
     args = list(args)
-    if name == "forward":
-        args[7] = torch.empty_like(args[7])
+    if name == "forward":  # out: one tensor, or a list of groups (wprime_backward.BLOCK_MESSAGE)
+        args[7] = [torch.empty_like(o) for o in args[7]] if isinstance(args[7], list) else torch.empty_like(args[7])
         args[8] = torch.empty_like(args[8])
     else:
         args[6] = torch.zeros_like(args[6])  # dx: atomic adds
@@ -582,7 +640,10 @@ def compare(name, base, other):
     """Bitwise comparison of a variant's outputs with the base kernel's (dx with a relative tolerance)."""
     import torch
     if name == "forward":
-        pairs = {"out": (base[7], other[7]), "w": (base[8], other[8])}
+        outs = base[7] if isinstance(base[7], list) else [base[7]]
+        others = other[7] if isinstance(other[7], list) else [other[7]]
+        pairs = {f"out{i}" if len(outs) > 1 else "out": (a, b) for i, (a, b) in enumerate(zip(outs, others))}
+        pairs["w"] = (base[8], other[8])
     else:
         pairs = {"dsh": (base[7], other[7]), "dr": (base[17], other[17]), "dx": (base[6], other[6])}
     result = {}
@@ -614,6 +675,9 @@ def main(argv=None):
     p.add_argument("--rounds", type=int, default=15)
     p.add_argument("--warmup", type=int, default=3)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--ptxas-archs", nargs="*", default=[], metavar="MAJOR.MINOR",
+                   help="also report ptxas registers and spills of every variant for these architectures")
+    p.add_argument("--ptxas-only", action="store_true", help="report ptxas only; no launches or timings")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -655,6 +719,20 @@ def main(argv=None):
         captured[name] = None
         cargs = None
         built = {}
+        if args.ptxas_archs:
+            report = {}
+            for variant in names:
+                kind, transform, extra, *_ = table[variant]
+                try:
+                    source = transform(kernel.source)
+                    report[variant] = {arch: ptxas_report(source, tuple(int(x) for x in arch.split(".")), extra)
+                                       for arch in args.ptxas_archs}
+                except Exception as error:
+                    report[variant] = dict(error=str(error)[-400:])
+                print(f"{name} ptxas {variant:28s} {report[variant]}", flush=True)
+            meta.setdefault("ptxas", {})[name] = report
+            if args.ptxas_only:
+                continue
         for variant in names:
             kind, transform, extra, *arguments = table[variant]  # arguments: a transform of the argument list
             try:

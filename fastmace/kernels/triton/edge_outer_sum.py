@@ -36,6 +36,13 @@ FORWARD_CHUNK = 32  # edges per program of the segmented forward (fixed for ever
 # 3 November 2026; kept for the A/B).
 STRIDED_ROWS = True
 BACKWARD_BLOCK_EDGES = 32  # edges per program of the backward (fixed for every crystal and GPU)
+# The run-walking backward (round 2, outside idea 2, 5 November 2026): each program walks BACKWARD_WALK_CHUNK
+# consecutive edges and loads a slot's [D, K] gradient block once per run of equal keys (about 25 edges per block
+# with the segmented first sum's order) instead of once per edge. Rounding: its sums over d and k are tree sums.
+# Correct for any key order. A module constant for the A/B.
+BACKWARD_WALK = False
+BACKWARD_WALK_CHUNK = 32
+BACKWARD_WALK_WARPS = 1
 
 
 @cache
@@ -158,6 +165,39 @@ def _triton_backward():
     return kernel
 
 
+@cache
+def _triton_backward_walk():
+    import triton
+    import triton.language as tl
+
+    _base = _base_fn()
+
+    @triton.jit
+    def kernel(grad_ptr, a_ptr, y_ptr, key_ptr, grad_a_ptr, grad_y_ptr, num_edges, a_stride,
+               K: tl.constexpr, D: tl.constexpr, INNER: tl.constexpr, CHUNK: tl.constexpr,
+               BLOCK_K: tl.constexpr, BLOCK_D: tl.constexpr):
+        start = tl.program_id(0) * CHUNK
+        d = tl.arange(0, BLOCK_D)
+        k = tl.arange(0, BLOCK_K)
+        mask = (d < D)[:, None] & (k < K)[None, :]
+        offsets = d[:, None] * (INNER * K) + k[None, :]
+        current = tl.load(key_ptr + start).to(tl.int64)
+        block = tl.load(grad_ptr + _base(current, D, K, INNER) + offsets, mask=mask, other=0.0)
+        stop = tl.minimum(start + CHUNK, num_edges)
+        for edge in range(start, stop):
+            key = tl.load(key_ptr + edge).to(tl.int64)
+            if key != current:  # a new run: its slot's block, once
+                block = tl.load(grad_ptr + _base(key, D, K, INNER) + offsets, mask=mask, other=0.0)
+                current = key
+            row = edge.to(tl.int64)
+            a = tl.load(a_ptr + row * a_stride + k, mask=k < K, other=0.0)
+            y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
+            tl.store(grad_a_ptr + row * K + k, tl.sum(block * y[:, None], axis=0), mask=k < K)
+            tl.store(grad_y_ptr + row * D + d, tl.sum(block * a[None, :], axis=1), mask=d < D)
+
+    return kernel
+
+
 @torch.library.custom_op("fastmace::edge_outer_sum_backward", mutates_args=())
 def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor,
                             key: torch.Tensor, inner: int = 1) -> tuple[torch.Tensor, torch.Tensor]:
@@ -171,7 +211,12 @@ def edge_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tensor
     grad, a, y, key = grad.contiguous(), _rows(a), y.contiguous(), key.contiguous()
     grad_a = a.new_empty(a.shape)
     grad_y = torch.empty_like(y)
-    if num_edges:
+    if num_edges and BACKWARD_WALK:
+        _triton_backward_walk()[(triton.cdiv(num_edges, BACKWARD_WALK_CHUNK),)](
+            grad, a, y, key, grad_a, grad_y, num_edges, a.stride(0),
+            K=k, D=d, INNER=inner, CHUNK=BACKWARD_WALK_CHUNK, BLOCK_K=triton.next_power_of_2(k),
+            BLOCK_D=triton.next_power_of_2(d), num_warps=BACKWARD_WALK_WARPS)
+    elif num_edges:
         _triton_backward()[(triton.cdiv(num_edges, BACKWARD_BLOCK_EDGES),)](
             grad, a, y, key, grad_a, grad_y, num_edges, a.stride(0),
             K=k, D=d, INNER=inner, BLOCK_E=BACKWARD_BLOCK_EDGES, BLOCK_K=triton.next_power_of_2(k))
