@@ -1,0 +1,90 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T23:03:11.451851+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "7e4da9e9ca995505478dc81accd72b5f7b5b1494",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 51.76951226,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 0,
+          "median_us": 1687.77596950531,
+          "min_us": 1676.2239933013916,
+          "max_us": 1727.1679639816284,
+          "ratio": 1.0
+        },
+        "tc-wfrag-split": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 1806.1439990997314,
+          "min_us": 1795.2640056610107,
+          "max_us": 1815.7440423965454,
+          "ratio": 1.0701325482369057
+        },
+        "F-wfrag-no-wsplit": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 32,
+          "median_us": 1438.207983970642,
+          "min_us": 1432.7679872512817,
+          "max_us": 1450.592041015625,
+          "ratio": 0.8521320423777471
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-wfrag-split": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-wfrag-no-wsplit": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 32
+        }
+      }
+    }
+  }
+}

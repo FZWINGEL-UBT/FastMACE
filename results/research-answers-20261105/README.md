@@ -113,3 +113,36 @@ except one: M 15,000, K 384, N 128, rc (0.87 with 64×32), which already fills 3
 
 Modal cost on profile `third`: these five jobs ran with $8.88 metered at the start; it was $9.33 before the last
 two.
+
+## Ideas session, revised H200 plan (6 November 2026)
+
+The ideas session's revised plan (`plans/h200-ideas-20261105.md` at `29d88d15` on its branch) proposed ideas 10–13
+from a CPU-side SASS census of the H200 kernels. Each got a cheap falsifier on the H200 (Modal `third`) first.
+
+| Idea | Falsifier | H200 | RTX 5060 Ti (H200 plan) | Verdict |
+| --- | --- | ---: | ---: | --- |
+| 10: de-phase the forward's warps | F-skew: odd warps start after `__nanosleep` (bitwise) | 1.094 (100 ns), 1.103 (300 ns), 1.114 (1 µs) | 1.043 (100 ns) to 1.534 (16 µs) | dead: any skew costs |
+| 12: receiver-staged dout in the w′ | FF-dout-one-row: every edge reads receiver 0's dout | 1.001 | 0.999 | dead: dout locality is worth nothing |
+| census: the forward's W split | F-wfrag-no-wsplit: W fragments used unsplit | 0.853 (H200 base 1,685 µs) | 0.982–0.993 | bound only, see below |
+| W split stored once | `fused_forward.TC_WFRAG_SPLIT` (lab `tc-wfrag-split`), bitwise | 1.070 | 1.144 (parts 4 instead of 2: 100 KB shared memory) | rejected (off) |
+| 11: W-stationary wgmma | register arithmetic | | | dead without a build |
+| 2, 4, 7 (conditional) | the earlier bounds | | | decided before: 2 adopted (DEGREE_PARTS), 4 and 7 dropped |
+
+- **W split, stored once (`TC_WFRAG_SPLIT`):**
+  - What: the wfrag slice holds every fragment as a float4 of high parts and a float4 of low parts per lane, so the
+    batches load two float4 and run no split instructions.
+  - On the H200 it keeps the plan's launch rule (2 parts, 12 warps, 33 blocks per slice; 224 KB instead of 175 KB of
+    shared memory) and is bitwise, yet takes 1.070 of the forward.
+  - So the second shared load per fragment costs more than the LOP3 + FADD it saves: the forward is limited by
+    shared-memory loads, not by the split's ALU work.
+  - `tests/gpu/test_fused_folded_forward_cuda.py` checks it bitwise (passed on the RTX 5060 Ti). The switch stays
+    off, for A/Bs.
+- **Larger batches (W reuse over 16 edges):** not viable. The product's mma tiles hard-code 8 edges per fragment.
+  A second n-tile doubles the accumulators past the 168 registers that 12 warps allow, the same warp loss that sank
+  WGMMA.
+- **Idea 11 (W-stationary wgmma): dead on register count.** One part's W slice is about 5 paths × 64 × 32 floats per
+  warp, roughly 320 registers per lane before the high/low split.
+
+Runs: `runs/ideas-r2-h200/` (`2472c0e0`: F-skew, FF-dout-one-row), `runs/ideas-r3-h200/` (`614f4779`:
+F-wfrag-no-wsplit), `runs/ideas-r4-h200/` (`7e4da9e9`: tc-wfrag-split), `runs/rtx5060ti/ideas-lab/`. Modal `third`
+stood at $9.90 metered before the last job.

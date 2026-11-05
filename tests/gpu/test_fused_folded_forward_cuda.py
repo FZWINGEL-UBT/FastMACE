@@ -168,6 +168,16 @@ for layout in ("ir_mul", "mul_ir"):
                     frag_out = fused_folded_forward(a, zero, X, Y, *args, frag.id)
                     assert torch.equal(frag_out[0], skip_message) and torch.equal(frag_out[1], skip_w), (layout, k)
                     report[name]["wfrag bitwise"] = True
+                    # TC_WFRAG_SPLIT (research answers round): the fragment-order slice stored split, bitwise.
+                    ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.TC_WFRAG_SPLIT = True, True, True
+                    try:
+                        fsplit = FusedFoldedForward(kernels, k, used=k - 1)
+                    finally:
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.TC_WFRAG_SPLIT = False, None, None
+                    assert fsplit.wfrag and fsplit.tc == "presplit" and "wq[32]" in fsplit.source, (layout, k)
+                    fsplit_out = fused_folded_forward(a, zero, X, Y, *args, fsplit.id)
+                    assert torch.equal(fsplit_out[0], skip_message) and torch.equal(fsplit_out[1], skip_w), (layout, k)
+                    report[name]["wfrag split bitwise"] = True
                     if (k - 1) % 32 == 0:
                         ff_module.TENSOR_CORES, ff_module.TC_WFRAG = True, True
                         ff_module.VEC_A, ff_module.VEC_SH = True, True

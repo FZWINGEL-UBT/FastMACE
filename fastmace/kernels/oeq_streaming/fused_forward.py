@@ -129,6 +129,12 @@ DEGREE_PARTS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # A100-SXM4-80GB kernel lab: 0.965 alone, 0.860 with VEC_A and VEC_SH (0.905 without). Needs the TF32 product (not
 # presplit, not fp16) without prefetch. None: on for TC_WFRAG_GPUS (decision 66); True / False: an A/B side's choice.
 TC_WFRAG = None
+# Research answers round (5 November 2026): TC_WFRAG's slice stored already split, each fragment as a float4 of high
+# parts then a float4 of low parts per lane ([paths][KP / 8][2 m-tiles][2 parts][32 lanes][4]), so the batches load
+# two float4 and run no split instructions; the same TC_SPLIT of the same values: bitwise. Twice the W slice's shared
+# memory (the TC_PRESPLIT slice size). H200 kernel lab bound (W used unsplit): 0.853 of the forward. None: on for
+# TC_WFRAG_SPLIT_GPUS (decision 66); True / False: an A/B side's choice.
+TC_WFRAG_SPLIT = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -143,6 +149,7 @@ TC_TP_GPUS = GPUModels(())
 # (NbCl5), both build orders; force gate as the plan (NbCl5 stress 1.57e-7, the A100's accepted exception).
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.022 / 1.024 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+TC_WFRAG_SPLIT_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -213,6 +220,14 @@ def tc_wfrag_default(name=None):
     on = TC_WFRAG
     if on is None:
         on = name in TC_WFRAG_GPUS
+    return bool(on)
+
+
+def tc_wfrag_split_default(name=None):
+    """``TC_WFRAG_SPLIT`` (None: ``name`` in ``TC_WFRAG_SPLIT_GPUS``); acts only with ``TC_WFRAG``."""
+    on = TC_WFRAG_SPLIT
+    if on is None:
+        on = name in TC_WFRAG_SPLIT_GPUS
     return bool(on)
 
 
@@ -488,7 +503,19 @@ def tc_wfill(npl, stride, presplit=False, wfrag=False):
     """A block's W slice for the tensor-core product: rows padded to KP with zeros, row stride WS; ``stride``: the
     name of W's row stride in the kernel. ``presplit``: stored as float2 {hi, lo} (``TC_PRESPLIT``). ``wfrag``: in
     fragment order (``TC_WFRAG``): element (channel l, column k) at lane (l % 8) * 4 + k % 4, slot (l % 16) / 8 +
-    2 ((k % 8) / 4) of tile ((p, k / 8), l / 16)."""
+    2 ((k % 8) / 4) of tile ((p, k / 8), l / 16); with ``presplit`` too (``TC_WFRAG_SPLIT``), each tile is its 128
+    high parts, then its 128 low parts."""
+    if wfrag and presplit:
+        return f"""            for (int i = threadIdx.x; i < {npl} * KP * CB; i += blockDim.x) {{
+                const int p = i / (KP * CB), rem = i - p * (KP * CB), k = rem / CB, l = rem - k * CB;
+                const int fr = l & 15, fk = k & 7;
+                const int at = ((p * (KP / 8) + (k >> 3)) * 2 + (l >> 4)) * 256 + ((fr & 7) * 4 + (fk & 3)) * 4
+                               + (fr >> 3) + 2 * (fk >> 2);
+                unsigned hi, lo;
+                split_tf32(k < K ? W[(int64_t)(wst[p] + cb * CB + l) * {stride} + k] : 0.f, hi, lo);
+                Ws[at] = __uint_as_float(hi);
+                Ws[at + 128] = __uint_as_float(lo);
+            }}"""
     if wfrag:
         return f"""            for (int i = threadIdx.x; i < {npl} * KP * CB; i += blockDim.x) {{
                 const int p = i / (KP * CB), rem = i - p * (KP * CB), k = rem / CB, l = rem - k * CB;
@@ -533,7 +560,15 @@ def tc_product(npl, presplit=False, vec_a=False, wfrag=False, keep=False):
     """``float w[npl][B]`` (lane = channel) from the staged a and the W slice through 3xTF32 mma.sync m16n8k8 tiles
     (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``; ``presplit``: the slice holds the
     split parts (``tc_wfill``)."""
-    if presplit:
+    if presplit and wfrag:  # tc_wfill's split fragment order: two float4 per lane
+        wload = """                                const float4* wq = reinterpret_cast<const float4*>(Ws)
+                                                   + ((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 64 + lane;
+                                const float4 hv = wq[0], lv = wq[32];
+                                const unsigned ah[4] = {__float_as_uint(hv.x), __float_as_uint(hv.y),
+                                                        __float_as_uint(hv.z), __float_as_uint(hv.w)};
+                                const unsigned al[4] = {__float_as_uint(lv.x), __float_as_uint(lv.y),
+                                                        __float_as_uint(lv.z), __float_as_uint(lv.w)};"""
+    elif presplit:
         wload = """                                const float2* wp = reinterpret_cast<const float2*>(Ws)
                                                    + (g * KP + k0 + tq) * WS + m * 16 + gid;
                                 const float2 v0 = wp[0], v1 = wp[8], v2 = wp[4 * WS], v3 = wp[4 * WS + 8];
@@ -775,8 +810,8 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
         raise ValueError("fused_folded_forward: wgmma needs the TF32 product without prefetch, tctp or wfrag")
     if vec_a and (tc not in (True, "presplit") or prefetch or (used if used is not None else k) % 32):
         raise ValueError("fused_folded_forward: vec_a needs the TF32 product without prefetch and used % 32 == 0")
-    if wfrag and (tc is not True or prefetch or CHANNEL_BLOCK != 32):
-        raise ValueError("fused_folded_forward: wfrag needs the TF32 product (not presplit) without prefetch")
+    if wfrag and (tc not in (True, "presplit") or prefetch or CHANNEL_BLOCK != 32):
+        raise ValueError("fused_folded_forward: wfrag needs the TF32 product without prefetch")
     if tctp and (tc is not True or prefetch or not tc_tp_applies(schedule)):
         raise ValueError("fused_folded_forward: tctp needs the TF32 product (not presplit), no prefetch and "
                          "tc_tp_applies(schedule)")
@@ -1695,6 +1730,9 @@ class FusedFoldedForward:
                       and CHANNEL_BLOCK == 32)
         self.wgmma = (wgmma_default(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
                       and self.tc is True and not self.prefetch and not self.tctp)
+        if (self.wfrag and not self.wgmma and not self.tctp
+                and tc_wfrag_split_default(torch.cuda.get_device_name(device))):
+            self.tc = "presplit"  # TC_WFRAG_SPLIT: the presplit slice size, in fragment order
         self.groups = None
         if self.wgmma:
             self.wfrag = False

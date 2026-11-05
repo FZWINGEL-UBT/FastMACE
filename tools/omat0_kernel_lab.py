@@ -561,6 +561,10 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                                                     "const float2 v = make_float2(t, t * t);"), ()),
         "FF-no-xload": ("falsifier", lambda s: _sub(rerender(factored=True)(s), r"x\[input_base\s*\+", "sh[edge_base +",
                                                     regex=True), ()),
+        # Ideas session idea 12 (5 November 2026): receiver-staged dout. Bound: every edge reads receiver 0's dout
+        # row, which then stays in L1.
+        "FF-dout-one-row": ("falsifier", lambda s: _sub(
+            s, "const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;", "const int64_t output_base = 0;"), ()),
         "FF-no-dout": ("falsifier", lambda s: _sub(rerender(factored=True)(s),
                                                    r"const scalar_t output_gradient = [^;]*;",
                                                    "const scalar_t output_gradient = radial_weight;", regex=True), ()),
@@ -745,6 +749,32 @@ def _tc_presplit(kernel):
         source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc="presplit")
         _RULES[source] = rule
         print(f"tc-presplit rule {rule} (plan {kernel.rule})", flush=True)
+        return source
+    return transform
+
+
+def _tc_wfrag_split(kernel):
+    """The plan's wfrag kernel re-rendered with its W slice stored split (fused_forward.TC_WFRAG_SPLIT): bitwise, its
+    own launch rule (the presplit slice size), the plan's parts, staging and flags otherwise."""
+    def transform(s):
+        import torch
+
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        if not getattr(kernel, "wfrag", False):
+            raise ValueError("tc-wfrag-split needs the plan's wfrag kernel (TC_WFRAG)")
+        props = torch.cuda.get_device_properties(0)
+        shape = (kernel.paths, kernel.used, kernel.schedule.edge_dim, kernel.channels,
+                 int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
+        options = dict(tc="presplit", prefetch=False, x_slots=kernel.schedule.input_dim // kernel.schedule.channels)
+        groups = kernel.groups
+        rule = ff.launch_rule(*shape, groups=groups, **options) if groups else None
+        if rule is None:
+            groups, rule = None, ff.launch_rule(*shape, **options)
+        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc="presplit",
+                           blocks=kernel.blocks, prefetch=False, vec_sh=kernel.vec_sh, vec_a=kernel.vec_a, wfrag=True,
+                           groups=groups)
+        _RULES[source] = rule
+        print(f"tc-wfrag-split rule {rule} (plan {kernel.rule})", flush=True)
         return source
     return transform
 
@@ -1146,6 +1176,12 @@ def forward_variants(kernel=None):
                                                     "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
                                                     "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
+        # Ideas session census (5 November 2026): the W split in the wfrag kernel (TC_WFRAG), each fragment value
+        # used unsplit. Bounds a pre-split fragment-order W slice (two float4 per lane, no split instructions).
+        "tc-wfrag-split": ("exact", _tc_wfrag_split(kernel), ()),
+        "F-wfrag-no-wsplit": ("falsifier", lambda s: _sub(s, r"split_tf32\(wv\.([xyzw]), ah\[(\d)\], al\[\d\]\);",
+                                                          r"ah[\2] = __float_as_uint(wv.\1); al[\2] = ah[\2];",
+                                                          regex=True), ()),
         # Round 5 (A100 stage bounds, 5 November 2026): one MMA pass costs 42 us, three dependent passes 1.09 ms, so
         # the passes wait on each other. tc-mma-free: the MMA asm without volatile (the compiler may interleave the
         # (g, m) chains; per accumulator the order is the same: bitwise). tc-2acc / tc-3acc: the small products into
@@ -1229,10 +1265,25 @@ def forward_variants(kernel=None):
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
         # H200 ideas plan, idea 4: the per-lane TP of an S tile (one product per output and input component).
         "F-s-tile": ("falsifier", _s_tile, ()),
+        # Ideas session idea 10 (5 November 2026): de-phase the forward's warps. The chunk loop has no block barrier,
+        # so warps that start out of phase stay so unless something locks them; odd warps (or warp % 4) start late by
+        # a sleep. Bitwise: only the start time changes.
+        "F-skew-100ns": ("exact", lambda s: _skew(s, "(warp & 1) * 100"), ()),
+        "F-skew-300ns": ("exact", lambda s: _skew(s, "(warp & 1) * 300"), ()),
+        "F-skew-1us": ("exact", lambda s: _skew(s, "(warp & 1) * 1000"), ()),
+        "F-skew-4us": ("exact", lambda s: _skew(s, "(warp & 1) * 4000"), ()),
+        "F-skew-16us": ("exact", lambda s: _skew(s, "(warp & 1) * 16000"), ()),
+        "F-skew4-4us": ("exact", lambda s: _skew(s, "(warp & 3) * 4000"), ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),
     }
+
+
+def _skew(source, nanoseconds):
+    """The forward's warps start their chunk loop after ``__nanosleep(nanoseconds)`` (an expression of ``warp``)."""
+    anchor = "const int gid = lane >> 2, tq = lane & 3;"
+    return _sub(source, anchor, f"{anchor}\n        if ({nanoseconds}) __nanosleep({nanoseconds});")
 
 
 def forward_launcher(kernel, source, extra):
