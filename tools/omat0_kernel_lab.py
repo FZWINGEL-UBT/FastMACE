@@ -611,7 +611,20 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-one-slab": ("falsifier", lambda s: _sub(s, group, "const scalar_t* g = gprime;", 1), ()),
         "F-no-atomics": ("falsifier", lambda s: _sub(_after_constants(s, FAKE_ADD), "atomicAdd(", "fake_add("), ()),
         "F-no-wload": ("falsifier", lambda s: _sub(s, load_w, "const scalar_t radial_weight = scalar_t(1);"), ()),
+        # Kernel review (5 November 2026): every pointer argument __restrict__, so loads of x and sh can be kept
+        # across the dx atomics (exact).
+        "restrict": ("exact", _restrict_all, ()),
     }
+
+
+def _restrict_all(s):
+    """The w' kernel with __restrict__ on every pointer argument that lacks it (kernel review, 5 November 2026)."""
+    head, sep, body = s.partition("oeq_projected_backward_wprime(")
+    args, close, rest = body.partition(") {")
+    if not sep or not close:
+        raise ValueError("restrict: kernel signature not found")
+    args = re.sub(r"(\b(?:scalar_t|int32_t|float|int)\*) (?!__restrict__)", r"\1 __restrict__ ", args)
+    return head + sep + args + close + rest
 
 
 def plan_options(kernel, extra):
@@ -1274,6 +1287,11 @@ def forward_variants(kernel=None):
         "F-skew-4us": ("exact", lambda s: _skew(s, "(warp & 1) * 4000"), ()),
         "F-skew-16us": ("exact", lambda s: _skew(s, "(warp & 1) * 16000"), ()),
         "F-skew4-4us": ("exact", lambda s: _skew(s, "(warp & 3) * 4000"), ()),
+        # Kernel review (5 November 2026): x gathered at hashed sender indices without loading senders (the same
+        # random L2 gathers, no load-to-load dependency; wrong results), and the TP's sh_s reads as float4 (exact).
+        "F-x-nodep": ("falsifier", lambda s: _sub(s, "senders[e0 + b]",
+                                                  "(int)((unsigned)((e0 + b) * 2654435761u) % (unsigned)N)"), ()),
+        "sh-lds4": ("exact", _sh_lds4, ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),
@@ -1284,6 +1302,18 @@ def _skew(source, nanoseconds):
     """The forward's warps start their chunk loop after ``__nanosleep(nanoseconds)`` (an expression of ``warp``)."""
     anchor = "const int gid = lane >> 2, tq = lane & 3;"
     return _sub(source, anchor, f"{anchor}\n        if ({nanoseconds}) __nanosleep({nanoseconds});")
+
+
+def _sh_lds4(s):
+    """The tensor product's sh_s reads as four float4 loads per edge (ED = 16) instead of one scalar LDS per
+    component. Bitwise (kernel review, 5 November 2026)."""
+    if "constexpr int ED = 16;" not in s:
+        raise ValueError("sh-lds4: needs ED = 16")
+    s = _sub(s, "if (b >= nb) break;", "if (b >= nb) break;\n"
+             "                        const float4* shp = reinterpret_cast<const float4*>(sh_s + b * ED);\n"
+             "                        const float4 shq[4] = {shp[0], shp[1], shp[2], shp[3]};")
+    return _sub(s, r"sh_s\[b \* ED \+ (\d+)\]",
+                lambda m: f"shq[{int(m.group(1)) // 4}].{'xyzw'[int(m.group(1)) % 4]}", regex=True)
 
 
 def forward_launcher(kernel, source, extra):

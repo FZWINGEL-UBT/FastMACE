@@ -120,7 +120,7 @@ VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # slot keeps its terms and edge order. Only where the groups' W slices and staging fit (launch_rule's groups); not
 # with WGMMA. None: on for DEGREE_PARTS_GPUS (decision 66); True / False: an A/B side's choice.
 DEGREE_PARTS = None
-# MD step b/a (b = on; OMAT-0 medium, SrTiO3 10x10x10, ab / ba, results/degree-parts-20261105): NVIDIA H200
+# MD step b/a (b = on; OMAT-0 medium, SrTiO3 10x10x10, ab / ba, results/h200-ideas-20261105 idea 2): NVIDIA H200
 # 0.9818 / 0.9845, A100-SXM4-80GB 0.9920 / 0.9932.
 DEGREE_PARTS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Round 4: the tensor-core kernel's W slice stored in mma.sync fragment order, [paths][KP / 8][2 m-tiles][32 lanes][4],
@@ -171,7 +171,21 @@ WGMMA_BLOCKS_PER_SM = 1
 # waited for after it, so the tensor cores work during the TP (the TP's receiver cursor lags one round behind).
 WGMMA_PIPELINED = False
 
+# Kernel review (5 November 2026): the tensor product reads each edge's sh row from the warp's staging tile as
+# ED / 4 float4 loads instead of one scalar shared load per component. Bitwise (the same values, the same products).
+# Needs the float4 staging (VEC_SH: sh_s 16-byte aligned, edge_dim % 4 == 0). None: on for SH_LDS4_GPUS (decision
+# 66); True / False: an A/B side's choice. Kernel lab (OMAT-0 medium, Benchmark_loup): fused forward 0.972 on the RTX
+# 5060 Ti, 0.989 on the H200, 0.993 on the A100-SXM4-80GB. MD step b/a (b = on; SrTiO3 10x10x10, ab / ba,
+# results/kernel-review-20261105): RTX 5060 Ti 0.9932 / 0.9902 (on); H200 1.0014 / 1.0027, A100-SXM4-80GB 1.0008 /
+# 0.9949 (off).
+SH_LDS4 = None
+SH_LDS4_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 _REGISTRY = {}
+
+
+def sh_lds4_default(name=None):
+    """``SH_LDS4`` (None: ``name`` in ``SH_LDS4_GPUS``); built only with ``vec_sh`` (``FusedFoldedForward``)."""
+    return bool(SH_LDS4) if SH_LDS4 is not None else name in SH_LDS4_GPUS
 
 
 def prefetch_default(capability, name=None):
@@ -793,7 +807,7 @@ def _node(layout, channels, start, component, dim):
 
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None):
+           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -805,7 +819,11 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     pointer each (``out0``, ``out1``, ...). ``prefetch`` (sm_80+, not fp16): the staging double-buffered with
     cp.async (``PREFETCH``; the launch rule must be ``launch_rule(..., prefetch=True)``'s). ``vec_sh``: sh staged
     with float4 loads (``VEC_SH``; edge_dim % 4 == 0, sh 16-byte aligned). ``wgmma``: the product on Hopper wgmma
-    (``WGMMA``; the TF32 product without prefetch, tctp or wfrag; the rule must be ``launch_rule_wgmma``'s)."""
+    (``WGMMA``; the TF32 product without prefetch, tctp or wfrag; the rule must be ``launch_rule_wgmma``'s).
+    ``sh_lds4``: the tensor product's sh reads as float4 shared loads (``SH_LDS4``; needs ``vec_sh``, not with tctp
+    or wgmma)."""
+    if sh_lds4 and (not vec_sh or tctp or wgmma):
+        raise ValueError("fused_folded_forward: sh_lds4 needs vec_sh, without tctp or wgmma")
     if wgmma and (tc is not True or prefetch or tctp or wfrag):
         raise ValueError("fused_folded_forward: wgmma needs the TF32 product without prefetch, tctp or wfrag")
     if vec_a and (tc not in (True, "presplit") or prefetch or (used if used is not None else k) % 32):
@@ -844,7 +862,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    flags = (tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp, wgmma)
+    flags = (tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp, wgmma, sh_lds4)
     cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, *flags)}    }} break;"
                       for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
@@ -1500,7 +1518,7 @@ def _wgmma_pipelined(names, slots, C, layout, bmap, nw, npl, wst, eb, astage, sh
 
 
 def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False, vec_a=False,
-          wfrag=False, tctp=False, wgmma=False):
+          wfrag=False, tctp=False, wgmma=False, sh_lds4=False):
     if wgmma:
         return _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a)
     if tctp:
@@ -1621,13 +1639,19 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
         p = paths[pi]
         tp.append("                        {")
         for j in range(p.edge_irrep_dim):
-            tp.append(f"                        const float e{j} = sh_s[b * ED + {p.edge_start + j}];")
+            q = p.edge_start + j
+            tp.append(f"                        const float e{j} = shq[{q // 4}].{'xyzw'[q % 4]};" if sh_lds4 else
+                      f"                        const float e{j} = sh_s[b * ED + {q}];")
         for o in p.outputs:
             terms = " + ".join(f"xv[b][{xi[(p.input_start, t.input_component, p.input_irrep_dim)]}]"
                                f" * e{t.edge_component} * {_lit(t.coefficient)}" for t in o.terms) or "0.f"
             tp.append(f"                        acc[{si[o.accumulator.name]}] = fmaf(w[{g}][b], {terms},"
                       f" acc[{si[o.accumulator.name]}]);")
         tp.append("                        }")
+    shq = ("\n                        const float4* shp = reinterpret_cast<const float4*>(sh_s + b * ED);"
+           "\n                        float4 shq[ED / 4];"
+           "\n                        #pragma unroll"
+           "\n                        for (int i = 0; i < ED / 4; ++i) shq[i] = shp[i];") if sh_lds4 else ""
     flush = f"""{{
 {outs}
                 #pragma unroll
@@ -1690,7 +1714,7 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                     #pragma unroll
                     for (int b = 0; b < B; ++b) {{
                         if (b >= nb) break;
-                        while (cur < rv[b]) {flush}
+                        while (cur < rv[b]) {flush}{shq}
 {chr(10).join(tp)}
                     }}
                 }}
@@ -1747,12 +1771,14 @@ class FusedFoldedForward:
             if self.rule is None:
                 self.groups = None
                 self.rule = launch_rule(*shape, **options)
+        self.sh_lds4 = (sh_lds4_default(torch.cuda.get_device_name(device)) and self.vec_sh and not self.tctp
+                        and not self.wgmma)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                              prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
-                             tctp=self.tctp, wgmma=self.wgmma, groups=self.groups)
+                             tctp=self.tctp, wgmma=self.wgmma, groups=self.groups, sh_lds4=self.sh_lds4)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))

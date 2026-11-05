@@ -121,7 +121,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
                                                         "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",
-                                                        "DEGREE_PARTS": "path parts by input degree; per GPU, A/B"},
+                                                        "DEGREE_PARTS": "path parts by input degree; per GPU, A/B",
+                                                        "SH_LDS4": "TP sh reads as float4 LDS; per GPU, A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")
