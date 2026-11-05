@@ -32,7 +32,8 @@ echo "forward exit=$?" >> "$out/summary.txt"
 fi
 if [[ $parts == *" wprime "* ]]; then
 python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels wprime --rounds 21 --ptxas-archs 8.0 8.9 \
-  --variants base horner scalar-l1 horner+scalar-l1 horner-maxreg80 horner+scalar-l1-maxreg80 factored-maxreg80 \
+  --variants ${WPRIME_VARIANTS:-base horner scalar-l1 horner+scalar-l1 horner-maxreg80 horner+scalar-l1-maxreg80 \
+  factored-maxreg80} \
   --output "$out/wprime" > "$out/wprime.log" 2>&1
 echo "wprime exit=$?" >> "$out/summary.txt"
 fi
