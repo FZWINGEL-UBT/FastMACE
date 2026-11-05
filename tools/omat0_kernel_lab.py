@@ -257,7 +257,48 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
             return wprime_pair.render(kernel.schedule, kernel.terms, blocks=kernel.blocks)
         return transform
 
+    # The end-of-edge reduction (round 5): 16 edge-gradient components and dr are shuffled down at 5 offsets each,
+    # 85 shuffles per lane and edge. A butterfly reduce-scatter swaps half of the remaining components with the xor
+    # partner at each step (8 + 4 + 2 + 1 shuffles, then 1 for the last pair), so lane 2c ends with component c and
+    # 16 lanes write dsh coalesced; dr keeps its 5 shuffles: 21 in all. Summation order differs: "rounding".
+    reduction = (r"for \(int offset = 16; offset > 0; offset >>= 1\) \{.*?"
+                 r"dr\[e\] = scalar_t\(radial_gradient\);\s*\}")
+    butterfly_code = """static_assert(EDGE_DIM == 16 && LOGICAL_GROUP_SIZE == 32, "butterfly: 16 components, 32 lanes");
+    #pragma unroll
+    for (int step = 0; step < 4; ++step) {
+        const int half = 8 >> step, offset = 16 >> step;
+        const bool upper = (lane & offset) != 0;
+        #pragma unroll
+        for (int i = 0; i < 8; ++i) {
+            if (i < half) {
+                const acc_t send = upper ? edge_gradient[i] : edge_gradient[i + half];
+                const acc_t keep = upper ? edge_gradient[i + half] : edge_gradient[i];
+                edge_gradient[i] = keep + __shfl_xor_sync(FULL_MASK, send, offset, 32);
+            }
+        }
+    }
+    edge_gradient[0] += __shfl_xor_sync(FULL_MASK, edge_gradient[0], 1, 32);
+    #pragma unroll
+    for (int offset = 16; offset > 0; offset >>= 1)
+        radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
+    if ((lane & 1) == 0) dsh[edge_base + (lane >> 1)] = scalar_t(edge_gradient[0]);
+    if (lane == 0) dr[e] = scalar_t(radial_gradient);"""
+
+    def butterfly(s):
+        return re.sub(reduction, lambda m: butterfly_code, s, count=1, flags=re.S) if re.search(
+            reduction, s, flags=re.S) else _sub(s, reduction, "", 1, regex=True)
+
+    def no_reduce(s):
+        """Falsifier: no cross-lane reduction; lane 0 writes its own partial sums (the outer bound)."""
+        return re.sub(reduction, lambda m: """if (lane == 0) {
+        for (int component = 0; component < EDGE_DIM; ++component)
+            dsh[edge_base + component] = scalar_t(edge_gradient[component]);
+        dr[e] = scalar_t(radial_gradient);
+    }""", s, count=1, flags=re.S)
+
     return {
+        "butterfly": ("rounding", butterfly, ()),
+        "F-no-reduce": ("falsifier", no_reduce, ()),
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
