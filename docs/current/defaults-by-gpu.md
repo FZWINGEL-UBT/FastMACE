@@ -60,6 +60,28 @@ The A100 plan's one accepted gate failure: OMAT-0 NbCl5 stress 1.8e-7 eV/Å³ ag
 the 3×TF32 GEMMs and the tensor-core forward together (each passes alone); the owner kept both (5 November 2026;
 [omat0-tp-backward](../validation/omat0/omat0-tp-backward.md) §3.1).
 
+### NVIDIA H200 (5 November 2026)
+
+The tables above have no H200 column. The H200 (Modal, sm_90) is in these sets, every one from MD-step A/Bs in both
+build orders on OMAT-0 medium, Benchmark_loup (b = switch off unless noted, so b/a above 1 means the switch is
+faster): planner `DECISION_66_GENERIC_RADIAL_TABLES_GPUS` 2.030 / 2.027, `GENERIC_WPRIME` 1.771 / 1.768,
+`TF32X3_OMAT0_GPUS` 1.068 / 1.069, `GENERIC_FOLD_PRODUCT` 1.033 / 1.032; w′ `FACTORED` 1.160 / 1.159, `TABLE_W`
+1.142 / 1.141, `BLOCK_MESSAGE` 1.066 / 1.065, `HORNER` 1.046 / 1.046, `SCALAR_PATHS` 1.030 / 1.030, `BUTTERFLY`
+(b = on) 0.994 / 0.994; fused forward `TENSOR_CORES` 1.107 / 1.105, `SKIP_ZERO_COLUMN` 1.092 / 1.090, `VEC_A` 1.047 /
+1.046, `TC_WFRAG` 1.022 / 1.024, `VEC_SH` 1.003 / 1.003, `DEGREE_PARTS` (b = on) 0.9818 / 0.9845; generic
+`FUSED_FIRST_BACKWARD` 1.051 / 1.052, `EDGE_SH` 1.019 / 1.018; tabled `TABLED_FORWARD` (b = on, after the recapture
+fix) 0.9838 / 0.9871; energy `HEAD_SLICE` 1.016 / 1.017, `GRAPH_SUM` 1.005 / 1.004; radial `SYMMETRIC_PAIRS` 1.005 /
+1.004, radial-table forward 8 warps (`WARPS_GPUS`; b = on) 0.9946 / 0.9950. Off there: `BACKWARD_WALK`,
+`SEGMENT_ROWS`, `SPECIES_GEMM`, CUTLASS tile 32x64, `TABLE_PAIRS`, `HOIST_SCALE`, `WGMMA`, `SEGMENT_GROUPED`.
+Sources: [h200-defaults](../../results/h200-defaults-20261105/README.md), [hopper sweep](../../results/hopper-sweep-h200-20261105/README.md),
+[h200-ideas](../../results/h200-ideas-20261105/README.md), [h200-wgmma](../../results/h200-wgmma-20261105/README.md),
+[wprime-pairs](../../results/wprime-pairs-20261105/README.md).
+
+Two of these change precision: `TENSOR_CORES` (3xTF32 a·W product) and `TF32X3_OMAT0_GPUS` (CUTLASS 3xTF32 GEMMs).
+On the A100 the owner approved both explicitly (3 and 4 November 2026). For the H200 the code cites the
+measurements and the passing gate (NaCl, NbCl5, SrTiO3), but no owner approval is recorded (kernel review,
+[kernel-review-20261105](../validation/kernel-review-20261105.md)).
+
 ### Tiled (capacity) mode
 
 | Switch | 5060 Ti | Ada | A100 | Evidence | Report |

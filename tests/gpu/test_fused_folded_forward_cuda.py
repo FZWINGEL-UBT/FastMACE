@@ -232,6 +232,21 @@ for layout in ("ir_mul", "mul_ir"):
         vec_sh_out = fused_folded_forward(a, weight, X, Y, *args, vec_sh.id)
         assert torch.equal(vec_sh_out[0], message) and torch.equal(vec_sh_out[1], w), (layout, k)
         report[name]["vec sh bitwise"] = True
+        # SH_LDS4 (kernel review, 5 November 2026): the TP's sh reads as float4 shared loads, bitwise the VEC_SH
+        # kernel's, on the SIMT kernel and with the tensor-core product.
+        for tc_on in ((False, True) if torch.cuda.get_device_capability() >= (8, 0) else (False,)):
+            ff_module.TENSOR_CORES, ff_module.VEC_SH = tc_on, True
+            try:
+                plain = FusedFoldedForward(kernels, k)
+                ff_module.SH_LDS4 = True
+                lds4 = FusedFoldedForward(kernels, k)
+            finally:
+                ff_module.TENSOR_CORES, ff_module.VEC_SH, ff_module.SH_LDS4 = False, None, None
+            assert lds4.sh_lds4 and "shq[" in lds4.source and "shq[" not in plain.source, (layout, k, tc_on)
+            base_out = fused_folded_forward(a, weight, X, Y, *args, plain.id)
+            lds4_out = fused_folded_forward(a, weight, X, Y, *args, lds4.id)
+            assert torch.equal(lds4_out[0], base_out[0]) and torch.equal(lds4_out[1], base_out[1]), (layout, k, tc_on)
+            report[name][f"sh lds4 bitwise {'tc' if tc_on else 'simt'}"] = True
 print(json.dumps(report))
 """
 
