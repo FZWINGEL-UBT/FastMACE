@@ -378,8 +378,9 @@ def _block_ldg():
     return wp.block_ldg_default(torch.device("cuda", torch.cuda.current_device()))
 
 
-def _tc_rerender(kernel, tc, name):
-    """The tensor-core kernel re-rendered in mode ``tc`` (fused_forward.render) with its own launch rule."""
+def _tc_rerender(kernel, tc, name, warps=None):
+    """The tensor-core kernel re-rendered in mode ``tc`` (fused_forward.render) with its own launch rule;
+    ``warps``: that many warps per block (the launch bound, so more registers per thread with fewer)."""
     def transform(s):
         import torch
 
@@ -390,6 +391,12 @@ def _tc_rerender(kernel, tc, name):
         rule = ff.launch_rule(kernel.paths, kernel.used if tc else kernel.k, kernel.schedule.edge_dim,
                               kernel.channels, int(props.shared_memory_per_block_optin),
                               int(props.multi_processor_count), tc=tc)
+        if warps is not None:
+            import dataclasses
+            per = -(-kernel.paths // rule.parts)
+            width = kernel.used if tc else kernel.k
+            rule = dataclasses.replace(rule, warps=warps, shared_bytes=4 * ff.slice_floats(per, width, tc) + warps * 4
+                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per))
         source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc,
                            blocks=kernel.blocks)
         _RULES[source] = rule
@@ -498,7 +505,10 @@ def forward_variants(kernel=None):
         "tc-presplit": ("exact", _tc_presplit(kernel), ()),
         # Exponent-shifted 3xFP16 m16n8k16 (round 2, 5 November 2026): rounded 22-bit split, 2x the TF32 MMA rate.
         "tc-rerender": ("exact", _tc_rerender(kernel, True, "tc-rerender"), ()),  # the re-render check: bitwise
-        "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),  # the FP32-SIMT product: a third opinion
+        "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),
+        # Fewer warps per block: the launch bound allows more registers (the A100 kernel spills 40 bytes at 168).
+        "tc-warps8": ("exact", _tc_rerender(kernel, True, "tc-warps8", warps=8), ()),
+        "tc-warps10": ("exact", _tc_rerender(kernel, True, "tc-warps10", warps=10), ()),  # the FP32-SIMT product: a third opinion
         "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
         "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),
                                                             "mma_f16(cross, al, bh);", ""),

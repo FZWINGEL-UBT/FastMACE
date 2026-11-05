@@ -27,7 +27,7 @@ if [ -n "${FORWARD_CONSTANTS:-}" ]; then
   read -r -a fc <<< "--constant $FORWARD_CONSTANTS"
 fi
 python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels forward --rounds 21 --ptxas-archs 8.0 8.9 "${fc[@]}" \
-  --variants base simt tc-fp16 tc-fp16-1pass --output "$out/forward" > "$out/forward.log" 2>&1
+  --variants ${FORWARD_VARIANTS:-base simt tc-fp16 tc-fp16-1pass} --output "$out/forward" > "$out/forward.log" 2>&1
 echo "forward exit=$?" >> "$out/summary.txt"
 fi
 if [[ $parts == *" wprime "* ]]; then
