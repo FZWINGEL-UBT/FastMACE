@@ -4215,3 +4215,9 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured: Langevin 13.12 ms per step (2.62 µs per atom and step), NVE 13.32 ms (2.66 µs); torch peak 4,867 MiB. The H200 is in no decision-66 GPU set, so it runs the generic plan (A100-SXM4 with its plan: 10.91 ms, 2.18 µs).
 - Why: the per-GPU rewrites are keyed by exact device names; the H200 has not been screened.
 - Sources: [H200 profile](../results/omat0-h200-profile-0ab2bd9a/README.md).
+
+### ext-sx-h200-loup: Symmetrix-XL 0.1.1 on the H200, Benchmark_loup (5 November 2026)
+
+- Measured: Symmetrix-XL (LAMMPS, float32, sm_90 JIT artifact) NVE 14.60 ms per step (2.92 µs per atom and step), Langevin 14.86 ms (2.97 µs). FastMACE on the H200 under the A100-SXM4 plan: Langevin 5.66 ms (1.13 µs), 2.63x faster; under its generic plan 13.12 ms, 1.13x faster.
+- Why: an external reference point for the H200 numbers; same protocol as `tools/bench/loup_md.py` (`tools/bench/sx_loup.py`).
+- Sources: [Symmetrix-XL on the H200](../results/symmetrix-xl-h200-loup-20261105/README.md).
