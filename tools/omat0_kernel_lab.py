@@ -1056,6 +1056,15 @@ def forward_variants(kernel=None):
                                                         r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
                                                         "(snd >= 0) ? 0.5f : 0.f", regex=True),
                                                    "sh[e0 * ED + i]", "0.5f"), ()),
+        # H200 ideas plan (5 November 2026): the same bounds for the float4 staging (VEC_A, VEC_SH; idea 7).
+        "F-no-aload4": ("falsifier", lambda s: _sub(
+            s, "__ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"),
+            ()),
+        "F-no-shload4": ("falsifier", lambda s: _sub(
+            s, "__ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"), ()),
+        "F-no-ash4": ("falsifier", lambda s: _sub(_sub(
+            s, "__ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"),
+            "__ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"), ()),
         "tc-a4": ("exact", _tc_a4, (), _a4_args),
         "simt-a4": ("exact", _simt_a4, (), _a4_args),
         "xs": ("exact", _xs(kernel), ()),
