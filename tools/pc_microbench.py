@@ -32,9 +32,10 @@ from pathlib import Path
 SOURCE = r"""
 typedef unsigned long long u64;
 constexpr int NPL = {npl}, KP = {kp}, B = 8, F = {fmas}, NX = {nx}, S = {stages}, NBATCH = {nbatch};
-constexpr int WARPS = 12, PAIRS = WARPS / 2, MODE = {mode}, DOP = {dop}, DOC = {doc};
+constexpr int WARPS = 12, NP = {np}, NC = WARPS - NP, MODE = {mode}, DOP = {dop}, DOC = {doc};
+constexpr int R = NP > NC ? NP : NC, RATIO = NP > NC ? NP / NC : NC / NP;  // one ring per warp of the larger side
 constexpr int WS = 40, RS = 36, TILE = NPL * B * RS;
-constexpr int NTILES = MODE == 1 ? PAIRS * S : WARPS;
+constexpr int NTILES = MODE == 1 ? R * S : WARPS;
 
 __device__ __forceinline__ void split_tf32(float x, unsigned& hi, unsigned& lo) {
     hi = __float_as_uint(x) & 0xffffe000u;
@@ -134,14 +135,14 @@ extern "C" __global__ void __launch_bounds__(WARPS * 32, 1)
 pc_bench(const float* __restrict__ A, const float* __restrict__ Wg, const float* __restrict__ X,
          const int* __restrict__ snd, int nedges, float* __restrict__ out) {
     extern __shared__ __align__(16) float sm[];
-    u64* bars = reinterpret_cast<u64*>(sm);  // full[PAIRS][S], empty[PAIRS][S]
-    float* Ws = sm + 4 * PAIRS * S;
+    u64* bars = reinterpret_cast<u64*>(sm);  // full[R][S], empty[R][S]
+    float* Ws = sm + 4 * R * S;
     float* a_all = Ws + NPL * KP * WS;
-    float* ring = a_all + (MODE == 1 ? PAIRS : WARPS) * KP * B;  // pc: a staging for the producers only
+    float* ring = a_all + (MODE == 1 ? NP : WARPS) * KP * B;  // pc: a staging for the producers only
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
     for (int i = threadIdx.x; i < NPL * KP * 32; i += blockDim.x) Ws[(i >> 5) * WS + (i & 31)] = Wg[i];
     for (int i = threadIdx.x; i < NTILES * TILE; i += blockDim.x) ring[i] = 1e-3f * (float)(i & 255);
-    if (MODE == 1 && threadIdx.x < 2 * PAIRS * S) bar_init(bars + threadIdx.x, 32);
+    if (MODE == 1 && threadIdx.x < 2 * R * S) bar_init(bars + threadIdx.x, 32);
     __syncthreads();
     float acc[16];
     #pragma unroll
@@ -157,25 +158,29 @@ pc_bench(const float* __restrict__ A, const float* __restrict__ Wg, const float*
         }
         if (!DOC) acc[0] += tile[lane];
     } else {
-        const int pair = warp % PAIRS;
-        u64* full = bars + pair * S;
-        u64* empty = bars + PAIRS * S + pair * S;
-        const int count = NBATCH / PAIRS;
-        if (warp < PAIRS) {
-            for (int n = 0; n < count; ++n) {
-                const int s = n % S;
-                if (n >= S) bar_wait(empty + s, ((n / S) - 1) & 1);
-                produce(pair + n * PAIRS, ring + (pair * S + s) * TILE, a_s, A, Ws, nedges, lane);
+        // The side with more warps owns one ring each; a warp of the other side serves RATIO rings in turn.
+        const bool producer = warp < NP;
+        const int self = producer ? warp : warp - NP;
+        const bool owner = (producer ? NP : NC) == R;
+        const int count = NBATCH / R;  // batches per ring
+        const int steps = owner ? count : count * RATIO;
+        for (int i = 0; i < steps; ++i) {
+            const int r = owner ? self : self * RATIO + i % RATIO;
+            const int n = owner ? i : i / RATIO;
+            const int s = n % S;
+            float* tile = ring + (r * S + s) * TILE;
+            u64* full = bars + r * S + s;
+            u64* empty = bars + R * S + r * S + s;
+            if (producer) {
+                if (n >= S) bar_wait(empty, ((n / S) - 1) & 1);
+                produce(r + n * R, tile, a_s, A, Ws, nedges, lane);
                 __syncwarp();
-                bar_arrive(full + s);
-            }
-        } else {
-            for (int n = 0; n < count; ++n) {
-                const int s = n % S;
-                bar_wait(full + s, (n / S) & 1);
-                consume(pair + n * PAIRS, ring + (pair * S + s) * TILE, X, snd, nedges, lane, acc);
+                bar_arrive(full);
+            } else {
+                bar_wait(full, (n / S) & 1);
+                consume(r + n * R, tile, X, snd, nedges, lane, acc);
                 __syncwarp();
-                bar_arrive(empty + s);
+                bar_arrive(empty);
             }
         }
     }
@@ -209,10 +214,10 @@ def build(params, shared_bytes):
 
 
 def shared_floats(p):
-    pairs = 6
-    tiles = pairs * p["stages"] if p["mode"] == 1 else 12
-    staging = (pairs if p["mode"] == 1 else 12) * p["kp"] * 8
-    return 4 * pairs * p["stages"] + p["npl"] * p["kp"] * 40 + staging + tiles * p["npl"] * 8 * 36
+    rings = max(p["np"], 12 - p["np"])
+    tiles = rings * p["stages"] if p["mode"] == 1 else 12
+    staging = (p["np"] if p["mode"] == 1 else 12) * p["kp"] * 8
+    return 4 * rings * p["stages"] + p["npl"] * p["kp"] * 40 + staging + tiles * p["npl"] * 8 * 36
 
 
 def main(argv=None):
@@ -221,7 +226,8 @@ def main(argv=None):
     ap.add_argument("--kp", type=int, default=72)  # OMAT-0 medium's folded radial input (K = 65, KP = 72)
     ap.add_argument("--nx", type=int, default=4)
     ap.add_argument("--fmas", type=int, nargs="+", default=[32, 64, 96, 128, 192])
-    ap.add_argument("--stages", type=int, nargs="+", default=[2, 3])  # 3 fits only with fewer path groups
+    ap.add_argument("--splits", nargs="+", default=["6:2", "8:1", "9:1", "4:1"],
+                    help="producer warps : stages per ring (of 12 warps; one side a multiple of the other)")
     ap.add_argument("--nbatch", type=int, default=3456)  # about the forward's batches per CTA (46,720 x 8 / 108)
     ap.add_argument("--rounds", type=int, default=15)
     ap.add_argument("--output", type=Path)
@@ -272,20 +278,22 @@ def main(argv=None):
 
     rows = []
     for fmas in args.fmas:
-        base = dict(npl=args.npl, kp=args.kp, nx=args.nx, fmas=fmas, nbatch=args.nbatch, stages=2)
+        base = dict(npl=args.npl, kp=args.kp, nx=args.nx, fmas=fmas, nbatch=args.nbatch, stages=2, np=6)
         r = {"fmas": fmas}
         r["P"] = timed(dict(base, mode=0, dop=1, doc=0))
         r["C"] = timed(dict(base, mode=0, dop=0, doc=1))
         r["serial"] = timed(dict(base, mode=0, dop=1, doc=1))
-        for s in args.stages:
-            r[f"pc{s}"] = timed(dict(base, stages=s, mode=1, dop=1, doc=1))
+        for split in args.splits:
+            n, s = (int(v) for v in split.split(":"))
+            r[f"pc{n}x{s}"] = timed(dict(base, np=n, stages=s, mode=1, dop=1, doc=1))
         ser = r["serial"]["us"]
         line = (f"F {fmas:4d}: P {r['P']['us']:8.1f}  C {r['C']['us']:8.1f}  (C/P {r['C']['us'] / r['P']['us']:.2f})"
                 f"  serial {ser:8.1f} (P+C {r['P']['us'] + r['C']['us']:8.1f}, regs {r['serial']['regs']} "
                 f"local {r['serial']['local']})")
-        for s in args.stages:
-            pc = r[f"pc{s}"]
-            line += (f"  pc{s} {pc.get('us', float('nan')):8.1f} = {pc.get('us', float('nan')) / ser:.3f} of serial"
+        for split in args.splits:
+            key = "pc{}x{}".format(*split.split(":"))
+            pc = r[key]
+            line += (f"\n    {key} {pc.get('us', float('nan')):8.1f} = {pc.get('us', float('nan')) / ser:.3f} of serial"
                      f" (regs {pc.get('regs')} local {pc.get('local')})")
         print(line, flush=True)
         rows.append(r)
