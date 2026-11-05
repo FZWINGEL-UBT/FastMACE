@@ -184,6 +184,44 @@ HEAD_SLICE_GPUS = GPUModels(())
 _HEAD_INDEX = re.compile(r"\[\n\s*num_atoms_arange, node_heads\n\s*\]")
 
 
+# GRAPH_SUM: MACE sums node energies per structure with ``scatter_sum(..., data["batch"], dim_size=num_graphs)``.
+# For one structure every atomic add hits one address: on the A100 three such scatters of [5000] -> [1] take 37.9 us
+# plus 5.5 us of zero fills per force call (profile at 2a016fd4). With one graph this is a plain reduction. Forces and
+# stress are bitwise (the gradient of either sum is exactly 1 per atom); the float64 energy's summation order changes
+# (the atomics' order is unspecified anyway). None: on for GRAPH_SUM_GPUS (decision 66); True / False: an A/B side.
+GRAPH_SUM = None
+GRAPH_SUM_GPUS = GPUModels(())
+_GRAPH_SCATTER = re.compile(r"scatter_sum\(((?:[^()]|\([^()]*\))*data\[\"batch\"\](?:[^()]|\([^()]*\))*)\)")
+
+
+def graph_sum(src, index, dim=-1, dim_size=None):
+    """``scatter_sum(src, index, dim, dim_size)`` over the batch index; one graph: ``src.sum(dim, keepdim=True)``."""
+    if dim_size == 1:
+        return src.sum(dim=dim, keepdim=True)
+    from mace.tools.scatter import scatter_sum
+
+    return scatter_sum(src=src, index=index, dim=dim, dim_size=dim_size)
+
+
+def graph_sum_default(model):
+    """``GRAPH_SUM`` for ``model``: the constant when set, else on for a ``GRAPH_SUM_GPUS`` device."""
+    return bool(GRAPH_SUM) if GRAPH_SUM is not None else _on_gpus(model, GRAPH_SUM_GPUS)
+
+
+def graph_sum_edit(source):
+    """``source`` with every ``scatter_sum`` over ``data["batch"]`` through ``graph_sum``."""
+    return _GRAPH_SCATTER.sub(r"_fastmace_graph_sum(\1)", source)
+
+
+def _on_gpus(model, gpus):
+    import torch
+
+    parameter = next(iter(model.parameters()), None)
+    if parameter is None or parameter.device.type != "cuda":
+        return False
+    return torch.cuda.get_device_name(parameter.device) in gpus
+
+
 def head_index(model, arange, heads):
     """The head-selection index of ``model``: ``(:, 0)`` for one head, else ``(arange, heads)`` (MACE's)."""
     if len(getattr(model, "heads", None) or ()) == 1:
@@ -194,14 +232,7 @@ def head_index(model, arange, heads):
 def head_slice_default(model):
     """``HEAD_SLICE`` for ``model``: the constant when set, else on when its parameters are on a ``HEAD_SLICE_GPUS``
     device."""
-    if HEAD_SLICE is not None:
-        return bool(HEAD_SLICE)
-    import torch
-
-    parameter = next(iter(model.parameters()), None)
-    if parameter is None or parameter.device.type != "cuda":
-        return False
-    return torch.cuda.get_device_name(parameter.device) in HEAD_SLICE_GPUS
+    return bool(HEAD_SLICE) if HEAD_SLICE is not None else _on_gpus(model, HEAD_SLICE_GPUS)
 
 
 def head_slice_edit(source):
@@ -223,6 +254,7 @@ def compile_forward(source, namespace, filename):
     namespace = dict(namespace)
     namespace["_fastmace_node_e0"] = node_e0
     namespace["_fastmace_head_index"] = head_index
+    namespace["_fastmace_graph_sum"] = graph_sum
     exec(compile(textwrap.dedent(source), filename, "exec"), namespace)
     return namespace["forward"]
 
@@ -230,9 +262,10 @@ def compile_forward(source, namespace, filename):
 _FORWARDS: dict = {}
 
 
-def float64_forward(model, head_slice=None):
+def float64_forward(model, head_slice=None, graph_sum=None):
     """MACE's forward of ``model``'s class with the float64 reduction, as a plain function (cached).
-    ``head_slice`` (default ``head_slice_default(model)``): the head selection as ``head_index`` (``HEAD_SLICE``).
+    ``head_slice`` (default ``head_slice_default(model)``): the head selection as ``head_index`` (``HEAD_SLICE``);
+    ``graph_sum`` (default ``graph_sum_default(model)``): the per-structure sums as ``graph_sum`` (``GRAPH_SUM``).
 
     ``MACE`` and ``ScaleShiftMACE`` only; PolarMACE takes it through ``fastmace.longrange.polar``.
     Raises ``EnergyReductionError`` for any other class or an unqualified source.
@@ -243,7 +276,8 @@ def float64_forward(model, head_slice=None):
     if name is None:
         raise EnergyReductionError(f"{type(model).__name__}: no float64 energy reduction for this model class")
     head_slice = head_slice_default(model) if head_slice is None else bool(head_slice)
-    key = (name, head_slice) if head_slice else name
+    graph_sum = graph_sum_default(model) if graph_sum is None else bool(graph_sum)
+    key = (name, head_slice, graph_sum) if head_slice or graph_sum else name
     if key in _FORWARDS:
         return _FORWARDS[key]
     import mace.modules.models as models
@@ -257,6 +291,8 @@ def float64_forward(model, head_slice=None):
     source = apply_edits(inspect.getsource(original), EDITS[name], qualified)
     if head_slice:
         source = head_slice_edit(source)
+    if graph_sum:
+        source = graph_sum_edit(source)
     _FORWARDS[key] = compile_forward(source, vars(models), f"<fastmace float64-energy {name}.forward>")
     return _FORWARDS[key]
 

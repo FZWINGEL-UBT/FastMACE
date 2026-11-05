@@ -409,19 +409,21 @@ def test_refusal_has_the_message_shape_and_pickles():
 
 @pytest.mark.parametrize("dtype", ["float32", "float64"])
 @pytest.mark.parametrize("family", ["mh1", "omol"])
-def test_head_slice_is_bitwise(family, dtype, monkeypatch):
-    """HEAD_SLICE (5 November 2026): one-head models select their head with a slice, several heads keep MACE's
-    advanced index; energy, forces and stress are bitwise those of the advanced index either way."""
+@pytest.mark.parametrize("switch", ["HEAD_SLICE", "GRAPH_SUM"])
+def test_source_edits_keep_forces_bitwise(family, dtype, switch, monkeypatch):
+    """HEAD_SLICE and GRAPH_SUM (5 November 2026): one-head models select their head with a slice (several heads keep
+    MACE's advanced index); one-graph batches sum their energies by a reduction. Forces and stress are bitwise those of
+    MACE's indexing and scatters; the energy agrees to float64 rounding."""
     model, atoms = model64(family), structure(family)
     results = {}
     for on in (False, True):
-        monkeypatch.setattr(energy, "HEAD_SLICE", on)
+        monkeypatch.setattr(energy, switch, on)
         monkeypatch.setattr(energy, "_FORWARDS", {})
         calc = calculator(model, dtype)
         ff = field(calc, atoms, compute_stress=True)
         forces, stress = _forces_and_stress(ff, atoms)
         results[on] = (ff.evaluate(atoms)[0], forces, stress)
-    assert results[True][0] == results[False][0]
+    np.testing.assert_allclose(results[True][0], results[False][0], rtol=1e-14, atol=0)
     assert torch.equal(results[True][1], results[False][1]) and torch.equal(results[True][2], results[False][2])
 
 
@@ -433,5 +435,11 @@ def test_head_index_slices_one_head_only():
     assert energy.head_index(two, arange, heads) == (arange, heads)
     source = energy.head_slice_edit("x = f(y)[\n    num_atoms_arange, node_heads\n]\n")
     assert source == "x = f(y)[_fastmace_head_index(self, num_atoms_arange, node_heads)]\n"
-    monkeypatch_default = energy.HEAD_SLICE
-    assert monkeypatch_default is None and not energy.head_slice_default(torch.nn.Linear(1, 1))
+    assert energy.HEAD_SLICE is None and not energy.head_slice_default(torch.nn.Linear(1, 1))
+    assert energy.GRAPH_SUM is None and not energy.graph_sum_default(torch.nn.Linear(1, 1))
+    edited = energy.graph_sum_edit('e = scatter_sum(\n    src=x, index=data["batch"], dim=0, dim_size=num_graphs\n)\n'
+                                   'd = scatter_sum(src=y, index=edge_index[1], dim=0)\n')
+    assert edited.startswith("e = _fastmace_graph_sum(") and "d = scatter_sum(" in edited
+    values = torch.arange(5.0, dtype=torch.float64)
+    assert torch.equal(energy.graph_sum(values, torch.zeros(5, dtype=torch.long), dim=-1, dim_size=1),
+                       values.sum().reshape(1))
