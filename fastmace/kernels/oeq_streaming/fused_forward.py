@@ -139,7 +139,8 @@ TC_WFRAG_SPLIT = None
 # Ideas session idea 15(a) (6 November 2026): each batch's receiver and sender indices loaded by lanes 0..B-1 in one
 # go and broadcast with shuffles, so the batch's x gathers no longer wait on a serial chain of index loads (ptxas
 # reused one register for senders 2-7). Bitwise: the same indices and loads. H200 kernel lab: 0.966 of the forward;
-# RTX 5060 Ti (H200 plan) 1.024. None: on for LANE_INDICES_GPUS (decision 66); True / False: an A/B side's choice.
+# RTX 5060 Ti (H200 plan) 1.024; H200 MD step 0.990 (decision 66: default there). None: on for LANE_INDICES_GPUS
+# (decision 66); True / False: an A/B side's choice.
 LANE_INDICES = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
@@ -156,7 +157,8 @@ TC_TP_GPUS = GPUModels(())
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.022 / 1.024 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 TC_WFRAG_SPLIT_GPUS = GPUModels(())
-LANE_INDICES_GPUS = GPUModels(())
+# H200 MD-step A/B (6 November 2026, results/research-answers-20261105): 0.9897 / 0.9913, both build orders.
+LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
