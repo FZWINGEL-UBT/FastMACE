@@ -595,6 +595,23 @@ def _tc_rerender(kernel, tc, name, warps=None, prefetch=False, tctp=False):
     return transform
 
 
+def _grid(kernel, blocks_per_sm):
+    """The plan's kernel with a persistent grid of ``blocks_per_sm`` blocks per SM over all slices (the source gets
+    a comment so that its launch rule has its own key)."""
+    def transform(s):
+        import dataclasses
+
+        import torch
+
+        sms = int(torch.cuda.get_device_properties(0).multi_processor_count)
+        slices = (kernel.channels // 32) * kernel.rule.parts
+        source = s + f"\n// lab grid: {blocks_per_sm} blocks per SM\n"
+        _RULES[source] = dataclasses.replace(kernel.rule, blocks_per_slice=max(1, -(-blocks_per_sm * sms // slices)))
+        print(f"grid{blocks_per_sm} rule {_RULES[source]} (plan {kernel.rule})", flush=True)
+        return source
+    return transform
+
+
 def _tc_presplit(kernel):
     """The tensor-core kernel re-rendered with the W slice split once per block (fused_forward.TC_PRESPLIT): bitwise
     the plan's tensor-core kernel, its own launch rule (twice the slice's shared memory)."""
@@ -1008,6 +1025,11 @@ def forward_variants(kernel=None):
         "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),  # the FP32-SIMT product: a third opinion
         # Fewer warps per block: the launch bound allows more registers (the A100 kernel spills 40 bytes at 168).
         "tc-warps8": ("exact", _tc_rerender(kernel, True, "tc-warps8", warps=8), ()),
+        # Launch shapes for other SM counts (H200, 5 November 2026): the persistent grid at 1, 3 or 4 blocks per SM
+        # (BLOCKS_PER_SM, 2 by default) and work chunks of 1, 3 or 4 receivers (RECEIVERS_PER_CHUNK, 2). Bitwise.
+        **{f"grid{n}": ("exact", _grid(kernel, n), ()) for n in (1, 3, 4)},
+        **{f"rc{n}": ("exact", lambda s, n=n: _sub(s, "constexpr int RC = 2;", f"constexpr int RC = {n};"), ())
+           for n in (1, 3, 4)},
         "tc-warps10": ("exact", _tc_rerender(kernel, True, "tc-warps10", warps=10), ()),
         # Round 4: the staging double-buffered with cp.async (fused_forward.PREFETCH): bitwise.
         "tc-prefetch": ("exact", _tc_rerender(kernel, True, "tc-prefetch", prefetch=True), ()),

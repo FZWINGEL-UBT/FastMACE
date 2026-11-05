@@ -59,7 +59,10 @@ SKIP_ZERO_COLUMN = None
 # The RTX 5060 Ti gained nothing (1.000) and keeps the full k-loop; other GPUs are not measured. The A100 80GB PCIe
 # (owner, 4 November 2026: "Yes"): Benchmark_loup 4.61 -> 3.31 us/atom/step with the SXM4's decision-66 switches.
 # Every A100 model (GPUModels; owner, 4 November 2026).
-SKIP_ZERO_COLUMN_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.092 / 1.090 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+SKIP_ZERO_COLUMN_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe",
+                                   "NVIDIA H200"))
 # The stored per-edge weights are read only by the backward, long after: store them with the streaming cache hint
 # (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
 # forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
@@ -74,7 +77,9 @@ TENSOR_CORES = None
 # A100-SXM4-80GB, Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms): MD step b/a 0.933 / 0.933 in both orders;
 # loup 3.17 -> 2.92 (NVE), 3.12 -> 2.90 us/atom/step (Langevin). Force gate passes (SrTiO3 energy error 1.39 meV
 # against 0.73, floor 10 meV). Slower on the RTX 5060 Ti and the RTX 4000 Ada (TF32 there is 2x FP32).
-TENSOR_CORES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))  # every A100 model
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.107 / 1.105 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+TENSOR_CORES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"))  # every A100 model
 TC_STRIDE = 40  # W slice row stride with tensor cores: the fragment loads hit 32 distinct banks
 # The W slice split into its TF32 parts once per block (float2 {hi, lo} per weight) instead of in every batch's
 # fragment loads: bitwise the same product (the same TC_SPLIT), twice the slice's shared memory. A/B switch.
@@ -97,14 +102,18 @@ PREFETCH_GPUS = GPUModels(())
 VEC_SH = None
 # Defaults (decision 66, 5 November 2026): MD step b/a, SrTiO3 10x10x10 and NbCl5, both build orders: RTX 5060 Ti
 # 0.977 / 0.977, 0.984 / 0.984 (VEC_SH alone); A100-SXM4-80GB with VEC_A 0.973 / 0.976, 0.976 / 0.981.
-VEC_SH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.003 / 1.003 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+VEC_SH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200"))
 # Round 4: the tensor-core kernel stages a with float4 loads from rows padded to a multiple of 4 floats (the radial
 # table writes them padded: ``a_columns``; any other a is padded by a copy first) into an edge-major tile, XOR-swizzled
 # per 4-float group so the fragment reads stay conflict-free: 4 vector loads per lane and batch instead of 16 scalar
 # ones (A100-SXM4-80GB kernel lab, with VEC_SH: 0.903, the bound without any a loads 0.900). Bitwise. Needs the TF32
 # product (not fp16) and used columns a multiple of 32. None: on for VEC_A_GPUS (decision 66); True / False: A/B.
 VEC_A = None
-VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))  # every A100 (see VEC_SH_GPUS; TC_WFRAG_GPUS)
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.047 / 1.046 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))  # every A100 (see VEC_SH_GPUS; TC_WFRAG_GPUS)
 # Round 4: the tensor-core kernel's W slice stored in mma.sync fragment order, [paths][KP / 8][2 m-tiles][32 lanes][4],
 # so each lane loads its four W values of a fragment with one float4 shared load (consecutive 16 B per lane: no bank
 # conflicts) instead of four scalar loads at row stride TC_STRIDE. The same values reach the same mma: bitwise.
@@ -123,7 +132,9 @@ TC_TP_SPLIT = "round"  # the TP operands' split (``_TC_SPLITS``; "round": both p
 TC_TP_GPUS = GPUModels(())
 # Default (decision 66): A100-SXM4-80GB with VEC_A and VEC_SH, MD step b/a 0.960 / 0.954 (SrTiO3), 0.970 / 0.969
 # (NbCl5), both build orders; force gate as the plan (NbCl5 stress 1.57e-7, the A100's accepted exception).
-TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.022 / 1.024 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 
 _REGISTRY = {}
 

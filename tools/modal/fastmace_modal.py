@@ -16,8 +16,8 @@ Entry points (``modal run tools/modal/fastmace_modal.py::<name> ...``):
 - ``smoke``: ``nvidia-smi``, the image's ``pip freeze``, torch's CUDA view, ``tests/gpu/test_smoke.py``.
 - ``job``: ``--tarball`` (a ``git archive`` of a commit, with ``.source_commit``) or ``--commit`` (archived
   from ``--repo``), ``--command`` (a shell command run from the source root; ``$OUT`` is the results
-  directory), ``--gpu L4|A100|A100-80GB|H100|H200|RTX-PRO-6000``, ``--timeout-min``, ``--out`` (a local directory for the
-  returned results).
+  directory), ``--gpu L4|A100|A100-80GB|H100|H200|RTX-PRO-6000``, ``--timeout-min``, ``--out`` (a local
+  directory for the returned results).
 - ``sx_job``: as ``job``, in the Symmetrix-XL image (``sx_image``: Ubuntu 24.04, Python 3.12, the Symmetrix-XL
   wheels for one architecture, ``SX_WHEEL_ARCH``; 5 November 2026, the Benchmark_loup comparison on the H200). Its
   LAMMPS binary is built locally (``symmetrix_build.py lammps``, MPI off) and uploaded with ``put``.
@@ -76,7 +76,11 @@ GRACE_S = 600  # the job function's timeout above the command's own
 # worktrees each pass the guard alone).
 STATE = Path(os.path.expanduser(os.environ.get("FASTMACE_MODAL_STATE", "~/.fastmace-modal")))
 LEDGER = STATE / "modal-ledger.csv"
-IN_FLIGHT = STATE / "modal-in-flight.json"
+# One in-flight file per Modal profile (5 November 2026): each profile has its own $30 a month, so a job running on
+# one profile must not count against the other (a parallel launch on the second profile was refused for the first's
+# worst case). Within a profile the parallel-launch rule above holds.
+PROFILE = os.environ.get("MODAL_PROFILE") or getattr(getattr(modal, "config", None), "_profile", None) or "default"
+IN_FLIGHT = STATE / f"modal-in-flight-{PROFILE}.json"
 
 app = modal.App(APP_NAME)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
@@ -308,8 +312,8 @@ def job(command: str, commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastMACE
 
 @app.local_entrypoint()
 def sx_job(command: str, commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastMACE", tarball: str = "",
-           gpu: str = "H200", timeout_min: int = 30, out: str = "~/fastmace-acceptance/modal-sx-job", limit_usd: str = "",
-           owner_override: str = ""):
+           gpu: str = "H200", timeout_min: int = 30, out: str = "~/fastmace-acceptance/modal-sx-job",
+           limit_usd: str = "", owner_override: str = ""):
     """``job`` in the Symmetrix-XL image (``sx_image``); needs FASTMACE_MODAL_SX=1 in the environment."""
     if not SX:
         raise SystemExit("sx_job needs FASTMACE_MODAL_SX=1 (the Symmetrix-XL image is defined only then)")

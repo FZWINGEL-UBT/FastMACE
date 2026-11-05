@@ -1,0 +1,45 @@
+2026-11-05T18:13:58Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; alias none; source 27d27f21e3e1ab6a72d5c0f72516cff36c592f52
+2026-11-05T18:13:58Z start loup-1
+2026-11-05T18:16:41Z end loup-1 exit=0 {"gpu": "NVIDIA H200", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 1.2715863600001853, "ms_per_step": 6.357931800000927, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_product_linear", "fused_folded_backward", "fused_folded_forw
+2026-11-05T18:16:41Z start loup-2
+2026-11-05T18:17:29Z end loup-2 exit=0 {"gpu": "NVIDIA H200", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 1.2675639899998714, "ms_per_step": 6.337819949999357, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_product_linear", "fused_folded_backward", "fused_folded_forw
+2026-11-05T18:17:29Z start gate
+2026-11-05T18:23:00Z end gate exit=0 SrTiO3 summary {"energy": {"production_max_abs": 0.0031344645119841313, "ase_f32_max_abs": 0.0003321444048062269, "ratio": 9.437053482242998, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.0203293537311993e-05, "ase_f32_max_abs": 3.139531710516508e-0
+NaCl summary {"energy": {"production_max_abs": 0.0003873120793632215, "ase_f32_max_abs": 0.00013158096702749455, "ratio": 2.9435266217665856, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.4880168546802537e-06, "ase_f32_max_abs": 4.694577445341075e-06, "ratio": 0.7429884574897749, "floor": 1e-05, "limit": 1e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 4.830617817211391e-08, "ase_f32_max_abs": 4.7576912525978954e-08, "ratio": 1.015328141474854, "floor": 1e-07, "limit": 1e-07, "passed": true, "gated": true}, "passed": true}
+NbCl5 summary {"energy": {"production_max_abs": 0.0009048266846597015, "ase_f32_max_abs": 0.00022437201449873907, "ratio": 4.032707406407792, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 8.16169271455891e-05, "ase_f32_max_abs": 8.066325282918285e-05, "ratio": 1.0118229092301274, "floor": 1e-05, "limit": 0.0001613265056583657, "passed": true, "gated": true}, "stress": {"production_max_abs": 1.3418479987738208e-07, "ase_f32_max_abs": 7.440129897937076e-08, "ratio": 1.8035276496259494, "floor": 1e-07, "limit": 1.488025979587415e-07, "passed": true, "gated": true}, "passed": true}
+SrTiO3 summary {"energy": {"production_max_abs": 0.0031344645119841313, "ase_f32_max_abs": 0.0003321444048062269, "ratio": 9.437053482242998, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.0203293537311993e-05, "ase_f32_max_abs": 3.139531710516508e-05, "ratio": 0.9620318035374462, "floor": 1e-05, "limit": 6.279063421033015e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 2.5935101079233025e-07, "ase_f32_max_abs": 2.573151096640913e-07, "ratio": 1.0079120931953691, "floor": 1e-07, "limit": 5.146302193281826e-07, "passed": true, "gated": true}, "passed": true}
+2026-11-05T18:23:00Z start breakdown
+2026-11-05T18:23:55Z end breakdown exit=0 }
+2026-11-05T18:23:55Z start lab-forward
+2026-11-05T18:24:59Z end lab-forward exit=0 forward  F-no-xload          1928.8 us  ratio 0.830  regs 161 local 0  
+forward F-gemm-only: variant pattern found 0 times: 'constexpr bool STORE_W = true;'
+forward F-no-store: variant pattern found 0 times: 'constexpr bool STORE_W = true;'
+forward  base                2323.4 us  ratio 1.000  regs 168 local 16  
+forward  grid1               2650.8 us  ratio 1.141  regs 168 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  grid3               2584.5 us  ratio 1.112  regs 168 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  grid4               2499.9 us  ratio 1.076  regs 168 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rc1                 2304.3 us  ratio 0.992  regs 168 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rc3                 2411.0 us  ratio 1.038  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rc4                 2541.7 us  ratio 1.094  regs 168 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-tc-1pass          1664.9 us  ratio 0.717  regs 168 local 0  
+forward  F-tc-no-mma         1637.5 us  ratio 0.705  regs 155 local 0  
+forward  F-tc-no-product     1224.7 us  ratio 0.527  regs 158 local 0  
+forward  F-tc-no-redistribute    2258.4 us  ratio 0.972  regs 168 local 0  
+forward  F-gemm-only            nan us  ratio nan  regs None local None  variant pattern found 0 times: 'constexpr bool STORE_W = true;'
+forward  F-no-tp             1554.7 us  ratio 0.669  regs 119 local 0  
+forward  F-no-store             nan us  ratio nan  regs None local None  variant pattern found 0 times: 'constexpr bool STORE_W = true;'
+forward  F-no-xload          1928.8 us  ratio 0.830  regs 161 local 0  
+2026-11-05T18:24:59Z start lab-wprime
+2026-11-05T18:25:52Z end lab-wprime exit=0 wprime   F-one-slab          1473.5 us  ratio 0.925  regs 96 local 0  
+wprime F-no-wload: variant pattern found 0 times: 'const scalar_t radial_weight = weights[radial_weight_index];'
+wprime F-no-tp: variant pattern found 0 times: '\\w+ \\+= output_gradient\\s*\\* radial_weight \\* edge_value \\* static_cast<scalar_t'
+wprime F-tp-no-coef: variant pattern found 67 times: '\\s*\\* static_cast<scalar_t>\\([^)]*\\)(?=;)'
+wprime F-no-reduce: no-reduce: the shfl_down reduction is not in the source
+wprime   base                1593.2 us  ratio 1.000  regs 96 local 0  
+wprime   F-no-atomics        1735.7 us  ratio 1.089  regs 80 local 0  
+wprime   F-no-wload             nan us  ratio nan  regs None local None  variant pattern found 0 times: 'const scalar_t radial_weight = weights[radial_weight_index];'
+wprime   F-no-tp                nan us  ratio nan  regs None local None  variant pattern found 0 times: '\\w+ \\+= output_gradient\\s*\\* radial_weight \\* edge_value \\* static_cast<scalar_t'
+wprime   F-tp-no-coef           nan us  ratio nan  regs None local None  variant pattern found 67 times: '\\s*\\* static_cast<scalar_t>\\([^)]*\\)(?=;)'
+wprime   F-no-reduce            nan us  ratio nan  regs None local None  no-reduce: the shfl_down reduction is not in the source
+wprime   F-one-slab          1473.5 us  ratio 0.925  regs 96 local 0  
+2026-11-05T18:25:52Z done

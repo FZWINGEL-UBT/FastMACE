@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "27d27f21e3e1ab6a72d5c0f72516cff36c592f52",
+  "command": "L=$(python -c \"import nvidia, os; print(os.path.join(list(nvidia.__path__)[0], \\\"cu13\\\", \\\"lib\\\"))\"); cp /data/bench/cublasdx_int8_emulation_sm90 /tmp/b && chmod +x /tmp/b && LD_LIBRARY_PATH=$L:${LD_LIBRARY_PATH:-} /tmp/b > $OUT/int8.json 2> $OUT/int8.err; echo \"exit=$?\" >> $OUT/int8.err; nvidia-smi > $OUT/nvidia-smi.txt",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 6.381774187088013,
+  "estimated_gpu_cost_usd": 0.00804812633593877
+}

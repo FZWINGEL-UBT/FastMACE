@@ -181,7 +181,10 @@ def source_digest(function):
 # heads keep the advanced index. MD-step A/Bs at 65bc1ee5 (SrTiO3 10x10x10 / NbCl5, B/A in both orders): RTX 5060 Ti
 # 0.996 / 0.998, 0.989 / 0.993; RTX 4000 Ada 0.999 / 0.997, 0.993 / 0.992; A100-SXM4 0.992 / 0.987, 0.975 / 0.979.
 HEAD_SLICE = None
-HEAD_SLICE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.016 / 1.017 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+HEAD_SLICE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
+                             "NVIDIA H200"))
 _HEAD_INDEX = re.compile(r"\[\n\s*num_atoms_arange, node_heads\n\s*\]")
 
 
@@ -193,7 +196,9 @@ _HEAD_INDEX = re.compile(r"\[\n\s*num_atoms_arange, node_heads\n\s*\]")
 # MD-step A/Bs (SrTiO3 / NbCl5, b/a in both orders): A100-SXM4 0.997 / 0.998, 0.992 / 0.998 (on); RTX 5060 Ti
 # 1.000 / 0.999, 0.998 / 0.998 (SrTiO3 a tie: off); RTX 4000 Ada 1.001 / 0.999, 0.999 / 0.996 (off).
 GRAPH_SUM = None
-GRAPH_SUM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.005 / 1.004 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+GRAPH_SUM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 _GRAPH_SCATTER = re.compile(r"scatter_sum\(((?:[^()]|\([^()]*\))*data\[\"batch\"\](?:[^()]|\([^()]*\))*)\)")
 
 

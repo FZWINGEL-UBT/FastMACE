@@ -29,7 +29,8 @@ budget = _load_budget()
 
 # Modal's rate table as `modal billing rates` returns it (strings), October 2026.
 RATES = {"gpu_hour_cost_l4": "0.80", "gpu_hour_cost_a100_40gb": "2.10", "gpu_hour_cost_a100_80gb": "2.50",
-         "gpu_hour_cost_h100": "3.95", "gpu_hour_cost_h200": "4.54", "cpu_hour_cost": "0.04730", "mem_gib_hour_cost": "0.00800"}
+         "gpu_hour_cost_h100": "3.95", "gpu_hour_cost_h200": "4.54",
+         "cpu_hour_cost": "0.04730", "mem_gib_hour_cost": "0.00800"}
 JOB = dict(gpu="L4", timeout_s=4200, cpu_limit=8.0, memory_limit_gib=32.0)
 
 

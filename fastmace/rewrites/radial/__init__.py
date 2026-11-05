@@ -71,7 +71,9 @@ PIECE_BUCKET = 16
 # (docs/validation/omat0/omat0-tp-backward.md section 4). None: on for SYMMETRIC_PAIRS_GPUS (owner, 4 November 2026,
 # decision 66; every A100 model); True / False: an A/B side's choice on every GPU.
 SYMMETRIC_PAIRS = None
-SYMMETRIC_PAIRS_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.005 / 1.004 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+SYMMETRIC_PAIRS_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 CERTIFY_POINTS = 6000  # uniform and as many random lengths; the w-level tensors are [12000, 1280] float64
 FIXED_SPECIES_SUPERSET = "fixed_species_superset"
 

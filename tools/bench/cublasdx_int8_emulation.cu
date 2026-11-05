@@ -16,6 +16,7 @@
 //   D=<mathdx>/nvidia/mathdx/26.10
 //   nvcc -std=c++17 -O3 -w --expt-relaxed-constexpr -gencode arch=compute_89,code=sm_89 \
 //     -gencode arch=compute_120,code=sm_120 -gencode arch=compute_80,code=sm_80 -I$D/include \
+//     (H200, 5 November 2026: -gencode arch=compute_90,code=sm_90 alone)
 //     -I$D/external/cutlass/include cublasdx_int8_emulation.cu -o cublasdx_int8_emulation -lcublas
 // For Ubuntu 22.04 (glibc 2.35, leto) also link results/cublasdx-int8-20261103/glibc235_shim.c (gcc -c -O2) and add
 // -Xcompiler -static-libstdc++,-static-libgcc.
@@ -203,6 +204,8 @@ int main() {
             if (arch == 890) run_bits<890>(label, da, db, dc, m, n, k, c64, mag, first);
             else if (arch == 1200) run_bits<1200>(label, da, db, dc, m, n, k, c64, mag, first);
             else if (arch == 800) run_bits<800>(label, da, db, dc, m, n, k, c64, mag, first);
+            else if (arch == 900) run_bits<900>(label, da, db, dc, m, n, k, c64, mag, first);
+            else if (arch == 900) run_bits<900>(label, da, db, dc, m, n, k, c64, mag, first);
             fflush(stdout);
         }
         printf("\n  ], \"cublas_random_us\": %.2f}", cublas_us);

@@ -1,0 +1,87 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/autograd/graph.py:1072: UserWarning: The AccumulateGrad node's stream does not match the stream of the node that produced the incoming gradient. This may incur unnecessary synchronization and break CUDA graph capture if the AccumulateGrad node's stream is the default stream. This mismatch is caused by an AccumulateGrad node created prior to the current iteration being kept alive. This can happen if the autograd graph is still being kept alive by tensors such as the loss, or if you are using DDP, which will stash a reference to the node. To resolve the mismatch, delete all references to the autograd graph or ensure that DDP initialization is performed under the same stream as subsequent forwards. If the mismatch is intentional, you can use torch.autograd.graph.set_warn_on_accumulate_grad_stream_mismatch(False) to suppress this warning. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/input_buffer.cpp:310.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+Traceback (most recent call last):
+  File "/tmp/fastmace-src/tools/ab_rewrites.py", line 311, in <module>
+    main()
+  File "/tmp/fastmace-src/tools/ab_rewrites.py", line 279, in main
+    step_time.warm_up(sides[side], protocol.warmup)
+  File "/tmp/fastmace-src/fastmace/bench/step_time.py", line 83, in warm_up
+    engine.step()
+  File "/tmp/fastmace-src/tools/ab_rewrites.py", line 163, in step
+    self.side.step()
+  File "/tmp/fastmace-src/tools/ab_step_time.py", line 152, in step
+    self.side.step()
+  File "/tmp/fastmace-src/tools/ab_step_time.py", line 93, in step
+    self.engine.step()
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 353, in step
+    self._step_pipelined()
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 1020, in _step_pipelined
+    self._run(("B", edges))
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 1212, in _run
+    self._captured(key)
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 1241, in _captured
+    self._capture(key)
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 1391, in _capture
+    stage()
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 1164, in _stage_b
+    self._force_stage()
+  File "/tmp/fastmace-src/fastmace/engine/graph.py", line 1127, in _force_stage
+    out = self.force_field(self.state.positions)
+  File "/tmp/fastmace-src/fastmace/model/forces.py", line 962, in __call__
+    out = self._outputs(positions)
+  File "/tmp/fastmace-src/fastmace/model/forces.py", line 1053, in _outputs
+    return self._split_outputs(self._compute_stress)
+  File "/tmp/fastmace-src/fastmace/model/forces.py", line 1075, in _split_outputs
+    forces, virials, stress_out, _, _ = utils.get_outputs(
+  File "/usr/local/lib/python3.10/site-packages/mace/modules/utils.py", line 197, in get_outputs
+    compute_forces(
+  File "/usr/local/lib/python3.10/site-packages/mace/modules/utils.py", line 26, in compute_forces
+    gradient = torch.autograd.grad(
+  File "/usr/local/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594, in grad
+    result = _engine_run_backward(
+  File "/usr/local/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: During CUDA graph capture, autograd node 'torch::autograd::AccumulateGrad' has a stale reference to the default stream (stream 0) from warmup. This will invalidate the capture because cudaStreamWaitEvent on the default stream pulls a non-capturing stream into the graph.
+
+To fix, either:
+  (a) Run warmup on the same stream that capture will use, or
+  (b) Delete references to the loss / autograd graph (e.g. `del loss`) before capture, or
+  (c) Call torch.autograd.graph.set_override_stale_capture_stream(True) to automatically redirect stale nodes to the capturing stream.

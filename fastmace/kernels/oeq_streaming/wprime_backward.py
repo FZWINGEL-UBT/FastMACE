@@ -57,7 +57,10 @@ SLOPE_VECTOR = 0
 TABLE_W = None
 # Benchmark_loup (OMAT-0 medium, SrTiO3 5,000 atoms), MD step b/a in both orders: RTX 5060 Ti 0.888 / 0.892, RTX 4000
 # Ada 0.928 / 0.931, A100-SXM4-80GB 0.943 / 0.943; force gate passes (results/omat0-kernel-lab-20261103 section 16).
-TABLE_W_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.142 / 1.141 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+TABLE_W_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
+                          "NVIDIA H200"))
 TABLE_W_VECTOR = 2
 # The message in linear_1's block layout (OMAT-0 work, 4 November 2026): with TABLE_W and the fused forward, the
 # message-only kernel writes each same-irrep group of the grouped BlockLinear's input as its own [N * dim, P * C]
@@ -68,8 +71,10 @@ TABLE_W_VECTOR = 2
 BLOCK_MESSAGE = None
 # Benchmark_loup MD step b/a (a = the default with TABLE_W) in both orders: RTX 4000 Ada 0.974 / 0.971,
 # A100-SXM4-80GB 0.983 / 0.977 (every A100 model, GPUModels), RTX 5060 Ti 0.976 / 0.975 with BLOCK_LDG (1.060 without).
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.066 / 1.065 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 BLOCK_MESSAGE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                "NVIDIA A100-SXM4-80GB"))
+                                "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # The block kernel's gradient reads through __ldg (read-only data, written before the launch). The RTX 5060 Ti took
 # 9.9 ms with plain loads through the group pointers and 6.6 ms with __ldg, whatever the tensors' placement (the
 # kernel alone, Benchmark_loup, 4 November 2026); the RTX 4000 Ada gains nothing (MD step 1.004 / 1.001). With
@@ -87,7 +92,10 @@ BLOCK_LDG_GPUS = GPUModels(())
 # side's choice on every GPU. RTX 5060 Ti since round 2 (5 November 2026), with plain loads, HORNER and 80 registers:
 # MD step b/a SrTiO3 0.979 / 0.982, NbCl5 0.986 / 0.989 (gate 12/12).
 FACTORED = None
-FACTORED_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.160 / 1.159 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+FACTORED_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                           "NVIDIA H200"))
 # With FACTORED: each path's most common coefficient magnitude applied once per path (to w and the weight gradient);
 # its terms carry only the sign, the others the ratio |c| / alpha (OMAT-0 medium: 50 of 86 terms without a multiply).
 # Rounding. Rejected (A100-SXM4-80GB: kernel 0.830 against FACTORED's 0.722, MD step 1.025 / 1.024 against FACTORED);
@@ -106,9 +114,13 @@ FACTORED_SCALE = False
 # HORNER and MAX_REGISTERS 80 0.979 / 0.982 and 0.986 / 0.989 (on); RTX 4000 Ada HORNER 1.004 / 1.001 and
 # 1.000 / 1.000 (off).
 HORNER = None
-HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.046 / 1.046 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200"))
 SCALAR_PATHS = None
-SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.030 / 1.030 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
@@ -123,7 +135,9 @@ MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> regist
 # b/a (ab / ba), SrTiO3 10x10x10 and NbCl5, OMAT-0 medium, 1 fs: RTX 5060 Ti 0.997 / 0.993 and 0.998 / 0.999 (on);
 # RTX 4000 Ada 1.008 / 1.007 and 1.006 / 1.000 (off); A100-SXM4-80GB 1.001 / 0.999 and 1.002 / 1.002 (off).
 BUTTERFLY = None
-BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 0.994 / 0.994 (b = on; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200"))
 # Round 5 (5 November 2026, external idea "integer warp reductions"). REDUX: the end-of-edge sums of the EDGE_DIM
 # edge-gradient components and dr in fixed point through the hardware integer reduction (redux.sync.add.s32,
 # compute capability 8.0+): per component one redux.sync.max of the lanes' exponents sets a power-of-two scale with

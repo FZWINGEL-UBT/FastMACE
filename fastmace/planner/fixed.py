@@ -404,7 +404,9 @@ DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
 # with the SXM4's switches: 4.61 -> 3.31 us/atom/step; results/omat0-kernel-lab-20261103 section 9). MH-1 was not
 # measured there. Since the owner's A100 rule (4 November 2026) DECISION_66_TF32X3_GPUS covers every A100 model,
 # MH-1 included; this entry stays for the record.
-DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe",))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.068 / 1.069 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
@@ -427,18 +429,26 @@ DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce R
 # wprime_backward. Force gates pass (rounding only, as IEEE float32).
 # The A100 80GB PCIe (owner, 4 November 2026: "Yes"; the generic set there on Benchmark_loup with tf32x3_gemms and
 # the skipped zero column: 4.61 -> 3.31 us/atom/step).
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.771 / 1.768 (b = off, with the fused
+# forward; OMAT-0 medium, SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 DECISION_66_GENERIC_WPRIME_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                             "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+                                             "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 2.030 / 2.027 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce RTX 5060 Ti",
                                                                      "NVIDIA RTX 4000 Ada Generation",
-                                                                     "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB"))
+                                                                     "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB",
+                                                                     "NVIDIA H200"))
 # generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
 # whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
 # medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;
 # A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828 (docs/validation/omat0/generic-fold-product.md). The RTX 5060 Ti was
 # not measured and keeps it off unless asked for.
-DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.033 / 1.032 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
+                                                   "NVIDIA H200"))
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
