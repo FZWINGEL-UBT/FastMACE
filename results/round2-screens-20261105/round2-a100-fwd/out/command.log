@@ -1,0 +1,15 @@
+forward ptxas base                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas simt                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 167, 'spill_store_bytes': 0}}
+tc-fp16 rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-fp16                      {'8.0': {'registers': 168, 'spill_store_bytes': 68}, '8.9': {'registers': 168, 'spill_store_bytes': 24}}
+tc-fp16-1pass rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-fp16-1pass                {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-fp16 rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-fp16-1pass rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward  base                3731.5 us  ratio 1.000  regs 168 local 40  
+forward  simt                4829.2 us  ratio 1.294  regs 168 local 40  {'out0': 'max|d|/max|a| = 1.80e-06', 'out1': 'max|d|/max|a| = 2.28e-01', 'out2': 'max|d|/max|a| = 1.88e-06', 'out3': 'max|d|/max|a| = 1.22e-01', 'w': 'bitwise'}
+forward  tc-fp16             4466.7 us  ratio 1.197  regs 168 local 104  {'out0': 'max|d|/max|a| = 1.22e-06', 'out1': 'max|d|/max|a| = 2.38e-01', 'out2': 'max|d|/max|a| = 1.45e-06', 'out3': 'max|d|/max|a| = 1.01e-01', 'w': 'bitwise'}
+forward  tc-fp16-1pass       3598.3 us  ratio 0.964  regs 168 local 40  
+grep: /tmp/fastmace-out/wprime.log: No such file or directory

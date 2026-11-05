@@ -1,0 +1,35 @@
+forward ptxas base                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-fp16 rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-fp16                      {'8.0': {'registers': 168, 'spill_store_bytes': 68}}
+tc-fp16-1pass rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-fp16-1pass                {'8.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-fp16 rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-fp16-1pass rule LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+wprime ptxas base                         {'8.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas horner                       {'8.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas scalar-l1                    {'8.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas horner+scalar-l1             {'8.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas horner-maxreg80              {'8.0': {'registers': 80, 'spill_store_bytes': 4}}
+wprime ptxas horner+scalar-l1-maxreg80    {'8.0': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas factored-maxreg80            {'8.0': {'registers': 80, 'spill_store_bytes': 136}}
+wprime   base                2998.3 us  ratio 1.000  regs 96 local 0  
+wprime   horner              2989.1 us  ratio 0.997  regs 96 local 0  {'dsh': 'max|d|/max|a| = 1.83e-07', 'dr': 'max|d|/max|a| = 5.88e-07', 'dx': 'max|d|/max|a| = 2.65e-07'}
+wprime   scalar-l1           3104.8 us  ratio 1.036  regs 96 local 0  {'dsh': 'max|d|/max|a| = 1.83e-07', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 2.65e-07'}
+wprime   horner+scalar-l1    2817.0 us  ratio 0.940  regs 96 local 0  {'dsh': 'max|d|/max|a| = 1.83e-07', 'dr': 'max|d|/max|a| = 5.88e-07', 'dx': 'max|d|/max|a| = 2.65e-07'}
+wprime   horner-maxreg80     3176.4 us  ratio 1.059  regs 80 local 8  {'dsh': 'max|d|/max|a| = 1.83e-07', 'dr': 'max|d|/max|a| = 5.88e-07', 'dx': 'max|d|/max|a| = 2.65e-07'}
+wprime   horner+scalar-l1-maxreg80    3262.5 us  ratio 1.088  regs 80 local 0  {'dsh': 'max|d|/max|a| = 1.83e-07', 'dr': 'max|d|/max|a| = 5.88e-07', 'dx': 'max|d|/max|a| = 1.99e-07'}
+wprime   factored-maxreg80    3351.6 us  ratio 1.118  regs 80 local 80  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 2.65e-07'}
+  import pynvml  # type: ignore[import]
+base              527.4 us  ratio 1.000  {'err_a': '1.8e-07', 'err_y': '1.1e-07'}
+F-one-block       379.9 us  ratio 0.720  {}
+F-const-G         286.7 us  ratio 0.544  {}
+copy              169.0 us  ratio 0.320  {}
+walk-c16-w1       422.9 us  ratio 0.802  {'err_a': '1.0e-07', 'err_y': '1.1e-07'}
+walk-c16-w2       479.2 us  ratio 0.909  {'err_a': '1.1e-07', 'err_y': '1.1e-07'}
+walk-c16-w4       770.0 us  ratio 1.460  {'err_a': '1.2e-07', 'err_y': '1.1e-07'}
+walk-c32-w1       425.0 us  ratio 0.806  {'err_a': '1.0e-07', 'err_y': '1.1e-07'}
+walk-c32-w2       484.4 us  ratio 0.918  {'err_a': '1.1e-07', 'err_y': '1.1e-07'}
+walk-c32-w4       772.1 us  ratio 1.464  {'err_a': '1.2e-07', 'err_y': '1.1e-07'}
+walk-c64-w1       429.1 us  ratio 0.814  {'err_a': '1.0e-07', 'err_y': '1.1e-07'}
+walk-c64-w2       494.6 us  ratio 0.938  {'err_a': '1.1e-07', 'err_y': '1.1e-07'}
+walk-c64-w4       785.4 us  ratio 1.489  {'err_a': '1.2e-07', 'err_y': '1.1e-07'}

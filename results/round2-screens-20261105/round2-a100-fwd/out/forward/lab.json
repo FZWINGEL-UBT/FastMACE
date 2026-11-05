@@ -1,0 +1,128 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T00:21:52.403084+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "a344f4715cf5edcc6933ac056efa34d657ca377c",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 65.335463451,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 40,
+          "median_us": 3731.4560413360596,
+          "min_us": 3693.567991256714,
+          "max_us": 4555.776119232178,
+          "ratio": 1.0
+        },
+        "simt": {
+          "kind": "rounding",
+          "registers": 168,
+          "local_bytes": 40,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.80e-06",
+            "out1": "max|d|/max|a| = 2.28e-01",
+            "out2": "max|d|/max|a| = 1.88e-06",
+            "out3": "max|d|/max|a| = 1.22e-01",
+            "w": "bitwise"
+          },
+          "median_us": 4829.184055328369,
+          "min_us": 4781.055927276611,
+          "max_us": 5933.055877685547,
+          "ratio": 1.2941822178345332
+        },
+        "tc-fp16": {
+          "kind": "rounding",
+          "registers": 168,
+          "local_bytes": 104,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.22e-06",
+            "out1": "max|d|/max|a| = 2.38e-01",
+            "out2": "max|d|/max|a| = 1.45e-06",
+            "out3": "max|d|/max|a| = 1.01e-01",
+            "w": "bitwise"
+          },
+          "median_us": 4466.68815612793,
+          "min_us": 4431.8718910217285,
+          "max_us": 5384.191989898682,
+          "ratio": 1.197036252510325
+        },
+        "tc-fp16-1pass": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 40,
+          "median_us": 3598.3359813690186,
+          "min_us": 3572.7360248565674,
+          "max_us": 4339.712142944336,
+          "ratio": 0.9643249019974045
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "simt": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 167,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-fp16": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 68
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 24
+        }
+      },
+      "tc-fp16-1pass": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

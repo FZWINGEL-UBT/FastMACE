@@ -1,0 +1,115 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T00:08:55.971203+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "88fa7b82a8ffa4ec2e9152247a92221defa35bee",
+  "model": "omat0-medium",
+  "rounds": 9,
+  "capture_s": 35.01524228699418,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=6, blocks_per_slice=9, shared_bytes=101120)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 195,
+          "local_bytes": 0,
+          "median_us": 11887.455940246582,
+          "min_us": 11779.040336608887,
+          "max_us": 12278.400421142578,
+          "ratio": 1.0
+        },
+        "tc-fp16": {
+          "kind": "rounding",
+          "registers": 208,
+          "local_bytes": 0,
+          "compare": {
+            "out": "max|d|/max|a| = 9.30e-07",
+            "w": "bitwise"
+          },
+          "median_us": 12713.855743408203,
+          "min_us": 12621.664047241211,
+          "max_us": 13227.168083190918,
+          "ratio": 1.0695186427874557
+        },
+        "tc-fp16-1pass": {
+          "kind": "falsifier",
+          "registers": 163,
+          "local_bytes": 0,
+          "median_us": 11111.231803894043,
+          "min_us": 11072.896003723145,
+          "max_us": 11408.512115478516,
+          "ratio": 0.9347022491394035
+        }
+      }
+    }
+  },
+  "constants": {
+    "fastmace.kernels.oeq_streaming.fused_forward:TENSOR_CORES": true,
+    "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:BLOCK_MESSAGE": false
+  },
+  "ptxas": {
+    "forward": {
+      "base": {
+        "8.0": {
+          "registers": 192,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 196,
+          "spill_store_bytes": 0
+        },
+        "12.0": {
+          "registers": 195,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-fp16": {
+        "8.0": {
+          "registers": 214,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 218,
+          "spill_store_bytes": 0
+        },
+        "12.0": {
+          "registers": 208,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-fp16-1pass": {
+        "8.0": {
+          "registers": 192,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 200,
+          "spill_store_bytes": 0
+        },
+        "12.0": {
+          "registers": 163,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

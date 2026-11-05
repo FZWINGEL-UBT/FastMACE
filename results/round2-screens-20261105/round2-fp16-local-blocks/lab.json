@@ -1,0 +1,78 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T00:18:35.026934+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "2dc9b38d92a85f9d4918553dcea97e1ceb8ec526",
+  "model": "omat0-medium",
+  "rounds": 3,
+  "capture_s": 26.75138532299752,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=6, blocks_per_slice=9, shared_bytes=101120)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 193,
+          "local_bytes": 0,
+          "median_us": 11794.015884399414,
+          "min_us": 11778.623580932617,
+          "max_us": 11947.039604187012,
+          "ratio": 1.0
+        },
+        "simt": {
+          "kind": "rounding",
+          "registers": 168,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.28e-06",
+            "out1": "max|d|/max|a| = 2.37e-01",
+            "out2": "max|d|/max|a| = 1.37e-06",
+            "out3": "max|d|/max|a| = 1.11e-01",
+            "w": "bitwise"
+          },
+          "median_us": 5838.912010192871,
+          "min_us": 5820.96004486084,
+          "max_us": 7373.37589263916,
+          "ratio": 0.4950741178767037
+        },
+        "tc-fp16": {
+          "kind": "rounding",
+          "registers": 206,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "max|d|/max|a| = 9.88e-07",
+            "out1": "max|d|/max|a| = 1.85e-01",
+            "out2": "max|d|/max|a| = 1.28e-06",
+            "out3": "max|d|/max|a| = 8.45e-02",
+            "w": "bitwise"
+          },
+          "median_us": 12671.104431152344,
+          "min_us": 12656.671524047852,
+          "max_us": 13040.448188781738,
+          "ratio": 1.0743672516087672
+        }
+      }
+    }
+  },
+  "constants": {
+    "fastmace.kernels.oeq_streaming.fused_forward:TENSOR_CORES": true,
+    "fastmace.kernels.oeq_streaming.fused_forward:SKIP_ZERO_COLUMN": true
+  }
+}

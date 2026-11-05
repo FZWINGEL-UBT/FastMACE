@@ -336,3 +336,40 @@ The candidates are module switches (`wprime_backward.HORNER`, `SCALAR_PATHS`, `M
   (79 × 2 = 158 ≥ MIN_TILES). The backward's weight gradient sums the `dim` products' `xᵀ g`. Up to the 124.5 µs
   of pure layout plus the copies under the 229 µs of fused adds and divisions; it costs more launches (up to 7
   per irrep) and a change in `rewrites/linear` (rows are built per irrep there).
+
+### MD-step A/Bs and the defaults (5 November 2026, night)
+
+`tools/modal/round2_ab.sh`: the force/stress gate with the candidate's module constants in the production process,
+then `tools/ab_rewrites.py` in both build orders (abab and abba, 8 blocks of 200 steps after 200 warm-up, 1 fs,
+skin 0.5 Å) on Benchmark_loup's SrTiO3 10×10×10 (5,000 atoms) and NbCl5, OMAT-0 medium, float32. Sides a: the GPU's
+default plan at that commit. Modal A100-SXM4-80GB (profile `second`), leto's RTX 4000 Ada (idle check, NAS
+`mace_cueq_oeq`), the local RTX 5060 Ti (WSL `mace_cueq_oeq`). b/a below 1 is faster.
+
+| Candidate | GPU | SrTiO3 ab / ba | NbCl5 ab / ba | Gate | Default |
+|---|---|---|---|---|---|
+| HORNER + SCALAR_PATHS | A100-SXM4-80GB | 0.986 / 0.983 | 0.994 / 0.978 | A100 exception only | **on** |
+| BACKWARD_WALK | A100-SXM4-80GB | 0.995 / 0.987 | 0.995 / 0.996 | A100 exception only | **on** |
+| HORNER | RTX 4000 Ada | 1.004 / 1.001 | 1.000 / 1.000 | pass | off |
+| FACTORED, no BLOCK_LDG, HORNER, 80 registers | RTX 5060 Ti | 0.979 / 0.982 | 0.986 / 0.989 | 12/12 | **on** |
+| FUSED_FIRST_BACKWARD | RTX 5060 Ti | 0.962 / 0.963 | 0.972 / 0.969 | 13/13 | **on** |
+| FUSED_FIRST_BACKWARD | RTX 4000 Ada | 0.962 / 0.963 | 0.979 / 0.975 | 13/13 | **on** |
+| FUSED_FIRST_BACKWARD | A100-SXM4-80GB | 0.969 / 0.966 | 0.983 / 0.984 | A100 exception only | **on** |
+| + TABLED_FORWARD | RTX 5060 Ti | 0.945 / 0.945 | 0.948 / 0.955 | pass | **on** |
+| + TABLED_FORWARD | RTX 4000 Ada | 0.949 / 0.944 | 0.978 / 0.968 | pass | **on** |
+| + TABLED_FORWARD | A100-SXM4-80GB | 0.966 / 0.962 | 0.970 / 0.982 | A100 exception only | **on** |
+
+"A100 exception only": OMAT-0 NbCl5 stress misses the 2× float32 limit as the A100 default plan already does (the
+accepted exception, `docs/validation/omat0-a100-optimisations.md`): 1.55–1.60e-7 eV/Å³ against the default's 1.8e-7.
+Every other check passes.
+
+The first fused A/Bs (`b70bcad9`) gave 0.997–1.004 everywhere: the fused branch sat in `first_table_region`, which
+only the memory-rescue checkpoint calls. A probe counting kernel launches found none; `b4f37680` routes the default
+tabled path through `fused_first_message`, after which the kernels launch once per step and the numbers above follow.
+
+Lab, A100 (`38eae731`): 8 or 10 warps in the tensor-core forward 1.160 / 1.109 (rejected); the walk's chunk and warp
+sweep (16 edges and one warp best, 0.813); `walk-dr` (the fused backward's bound) 464 µs against 872 µs for the walk
+and the table backward apart.
+
+Defaults: `03125b0c` (Horner, scalar paths, register cap, walk, the 5060 Ti's factored kernel), `8466ac92` and
+`2e9a3878` (the fused first interaction). Next: a fresh A100 profile at `2e9a3878`.
+
