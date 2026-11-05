@@ -519,6 +519,32 @@ def _sh4(s):
                         ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
+def _xs(kernel):
+    """The sender features x kept in a per-warp shared tile [B][NX][32] (after the plan's shared memory) instead of
+    32 registers live across the product; each lane writes and reads its own column (no sync). Bitwise. Own launch
+    rule (more shared memory, the same warps)."""
+    def transform(s):
+        import dataclasses
+
+        nx = max(int(v) for v in re.findall(r"float xv\[B\]\[(\d+)\];", s))
+        rule = kernel.rule
+        base = rule.shared_bytes // 4
+        tile = BATCH_LAB * nx * 32
+        s = _sub(s, "    const int cb = blockIdx.y;\n", f"    constexpr int NX = {nx};\n"
+                 f"    float* x_s = smem + {base} + warp * {tile};  // the warp's x tile [B][NX][32]\n"
+                 "    const int cb = blockIdx.y;\n", 1)
+        s = _sub(s, r"xv\[b\]\[(\d+)\] = \(snd >= 0\) \? (x\[[^\]]*\]) : 0\.f;",
+                 r"x_s[(b * NX + \1) * 32 + lane] = (snd >= 0) ? \2 : 0.f;", regex=True)
+        s = _sub(s, r"xv\[b\]\[(\d+)\]", r"x_s[(b * NX + \1) * 32 + lane]", regex=True)
+        s = _sub(s, r"float xv\[B\]\[\d+\];", "", regex=True)
+        _RULES[s] = dataclasses.replace(rule, shared_bytes=rule.shared_bytes + 4 * tile * rule.warps)
+        return s
+    return transform
+
+
+BATCH_LAB = 8  # fused_forward.BATCH
+
+
 def _a4_args(args):
     import torch
 
@@ -609,6 +635,8 @@ def forward_variants(kernel=None):
                                                    "sh[e0 * ED + i]", "0.5f"), ()),
         "tc-a4": ("exact", _tc_a4, (), _a4_args),
         "simt-a4": ("exact", _simt_a4, (), _a4_args),
+        "xs": ("exact", _xs(kernel), ()),
+        "tc-a4+xs": ("exact", lambda s: _xs(kernel)(_tc_a4(s)), (), _a4_args),
         "simt-a4+sh4": ("exact", lambda s: _sh4(_simt_a4(s)), (), _a4_args),
         "sh4": ("exact", lambda s: _sh4(s), ()),
         # The TP's coefficient multiplies dropped (x e instead of x e c): how much its arithmetic weighs.
