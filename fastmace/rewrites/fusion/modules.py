@@ -6,7 +6,7 @@
 products of each irrep segment stay as rows ``[atoms * (2l + 1), channels]`` from the residual
 products through the gate to ``linear_2``. The stock chain instead joins them into one
 ``[atoms, width]`` tensor for the gate, which ``linear_2`` slices and copies into rows again; the
-backward does the same with zero-filled wide gradients (``docs/design/opt-T02-fusion.md``, stage A).
+backward does the same with zero-filled wide gradients (``docs/design/speed/opt-T02-fusion.md``, stage A).
 
 The arithmetic is the gate's, element by element (mace-torch 0.3.16
 ``GatedEquivariantBlock.forward``, ir_mul branch, pinned by sha256 in the record): the scalars and

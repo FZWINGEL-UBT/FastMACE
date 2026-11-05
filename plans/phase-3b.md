@@ -151,11 +151,11 @@ follow in the next section.
 | 3b-T03 D3 kernel, three passes | L | yes | T01 | `longrange/d3_kernel.py` (Triton) |
 | 3b-T04 Integration | L | yes | T02, T03 | `model/forcefield.py`, `engine/graph.py`, `planner/`, `simulation.py`, `quick.py`, `ase/md.py`, `cli/`, `reference/`, restart |
 | 3b-T05 NPT with D3, pressure setter, independent comparison | M | yes | T04 | `integrators/baoab.py`, `simulation.py`, tools |
-| 3b-T06 D3 cost on the production ramp | S–M | yes | T04 | tools, `docs/validation/3b-T06.md` |
+| 3b-T06 D3 cost on the production ramp | S–M | yes | T04 | tools, `docs/validation/phases/3b-T06.md` |
 | 3b-T07 NPT melt–quench protocol | M | yes | T04, T05 | `protocols/` (profile fields, data), `cli/run.py` |
-| 3b-T08 PolarMACE hybrid stress precision | S–M | yes | T01 | tools, `docs/validation/3b-T08.md` |
+| 3b-T08 PolarMACE hybrid stress precision | S–M | yes | T01 | tools, `docs/validation/phases/3b-T08.md` |
 | 3b-T09 ResearchModule `main.py --dispersion` | S | smoke | T04, T05 | ResearchModule `langevin/` (conductor's ResearchModule worktree) |
-| 3b-T10 Acceptance runs and report | M | yes | all except T09 | `docs/validation/phase-3b.md` |
+| 3b-T10 Acceptance runs and report | M | yes | all except T09 | `docs/validation/phases/phase-3b.md` |
 
 **3b-T01 Contracts and references.**
 - `fm.D3` gets the explicit numbers (choice 2), an identity hash entry, and

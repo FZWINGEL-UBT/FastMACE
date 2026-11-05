@@ -1,6 +1,6 @@
 """The converted-model template cache of ``ForceField.execution_model`` (opt-1 OPT-T06).
 
-Design: ``docs/design/opt-T06-template-cache.md``. On CUDA with the cuEq or hybrid backend, a plan's
+Design: ``docs/design/speed/opt-T06-template-cache.md``. On CUDA with the cuEq or hybrid backend, a plan's
 execution model after the first is a private copy of a cached template instead of a reload and
 conversion. These tests run on the CPU with a fake converted model: ``loading.load`` is replaced by
 a counter that returns a ``LoadedModel`` around a small torch module, and the CUDA rule

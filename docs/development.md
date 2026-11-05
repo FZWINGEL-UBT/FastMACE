@@ -75,8 +75,8 @@ and in addition the acceptance tier on merges that touch `model/`, `rewrites/` o
 
 The first run after a change of environment, or with emptied caches, is slower,
 because it compiles everything and builds the OEq extension once. Measurements:
-[validation/1b-T24-test-suite-speed.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T24-test-suite-speed.md),
-[validation/1b-T27-gpu-tiers.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T27-gpu-tiers.md).
+[validation/phases/1b-T24-test-suite-speed.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/phases/1b-T24-test-suite-speed.md),
+[validation/phases/1b-T27-gpu-tiers.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/phases/1b-T27-gpu-tiers.md).
 
 The CPU suite (`tests/cpu`) has no tiers: everyone runs all of it.
 
@@ -144,7 +144,7 @@ POLAR-1-S (30 s to 5 min each). Two of them have tiny-model versions in the fast
 failing a broken captured graph while the eager stages pass. Tiny versions of the others were
 tried. They cost almost as much as the MH-1 tests, because fresh processes, compiles and the
 tests' own child processes dominate, so they were left out
-([validation/1b-T26-gpu-retiering.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T26-gpu-retiering.md)). These behaviours
+([validation/phases/1b-T26-gpu-retiering.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/phases/1b-T26-gpu-retiering.md)). These behaviours
 are tested **only in the full tier**:
 
 - an engine resumed from canonical restart points follows the uninterrupted run within 1e-12 Å
@@ -208,9 +208,9 @@ Use `--dist=load --maxschedchunk=1` with xdist, keeping the local limit of eight
 scheduler queues large consecutive batches (162 cases per worker in a 5,199-case, eight-worker run), so
 the MC cases can occupy one worker while the others finish. Small scheduling chunks spread that work
 without dropping cases, shortening trajectories or changing tolerances. They do not increase the worker
-limit. Timing evidence and the coverage comparison are recorded in `docs/validation/6-T16.md`.
+limit. Timing evidence and the coverage comparison are recorded in `docs/validation/phases/6-T16.md`.
 
-Since suite-speed (27 October 2026, `docs/validation/suite-speed.md`) `tests/conftest.py` applies these
+Since suite-speed (27 October 2026, `docs/validation/phases/suite-speed.md`) `tests/conftest.py` applies these
 defaults itself whenever `-n` is given, so a plain `pytest -n 8 -m "not acceptance" tests/cpu` gets them
 too. It sets `OMP_NUM_THREADS=2`, `MKL_NUM_THREADS=2` and `TORCHINDUCTOR_COMPILE_THREADS=1` for the
 workers and their child processes, unless the caller already set them, and `--maxschedchunk=1` with
@@ -543,7 +543,7 @@ ssh murphy "echo $(git rev-parse main) > /mnt/homes/zwingel/FastMACE/.source_com
 `tar -x` never deletes, so a file removed from git stays on the NAS; remove
 it by hand after checking that it is not a result. Run tests there with the
 NAS environment's Python and `PYTHONPATH=/mnt/homes/zwingel/FastMACE`; the
-full command is in `docs/validation/phase-0.md`. pytest needs
+full command is in `docs/validation/phases/phase-0.md`. pytest needs
 `--basetemp=/mnt/homes/zwingel/fastmace-cache/<name>`: under a `TMPDIR` on
 the NAS it refuses its `pytest-of-zwingel` directory, because NFS reports
 another owner uid (1024) than the workstation login (1012).
@@ -754,7 +754,7 @@ unattended. The driver keeps everything else in a local store, `~/.fastmace-cola
   the fast tier, against 7.9 min locally warm). Give one call several `--command`s rather than one VM per
   tier.
 
-**Measured on a G4** (23 October 2026, `docs/validation/ops-colab-g4-20261023.md`):
+**Measured on a G4** (23 October 2026, `docs/validation/comparisons/ops-colab-g4-20261023.md`):
 - **Setup:** a VM is ready to run commands about a minute after the call starts (56 s cold, 81 s for the
   environment build). With the compile caches it takes 204 s, because uploading the 513 MB cache takes 154 s.
 - **The compatibility tier:** 40.8 min of tests cold and 36.6 min warm. The caches save about 10 %, about

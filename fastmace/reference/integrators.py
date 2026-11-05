@@ -252,5 +252,7 @@ QUALIFICATION = {
                   "variant_difference_positions_A": 6.1e-6},
     },
     "ase_source_sha256": ASE_SOURCE_SHA256,
+    # Part of the qualified record's hash, so the 1b path stays; the report is now
+    # docs/validation/phases/1b-T09-integrators.md.
     "report": "docs/validation/1b-T09-integrators.md",
 }

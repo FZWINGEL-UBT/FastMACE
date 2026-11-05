@@ -1,4 +1,4 @@
-"""The persistent subprocess worker (plan task OPT-T07; docs/design/opt-T07-persistent-worker.md).
+"""The persistent subprocess worker (plan task OPT-T07; docs/design/speed/opt-T07-persistent-worker.md).
 
 One child serves every ``run()`` of a ``Plan.runner == "subprocess"`` simulation and keeps its
 engine. Each call still ends with the canonical restart write of 2-T07, so the worker is the

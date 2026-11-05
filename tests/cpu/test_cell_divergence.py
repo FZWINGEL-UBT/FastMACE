@@ -2,7 +2,7 @@
 
 The full NbCl5 melt-quench at 0 GPa vaporised and its cell grew without bound (7e12 Å³/atom) until a
 non-finite energy stopped it, and a CPU neighbour search of such a cell exhausted the memory of the
-machine (docs/validation/3b-T07.md). Now:
+machine (docs/validation/phases/3b-T07.md). Now:
 - ``LangevinBAOAB(max_volume_ratio=20, max_cell_length_A=1000)``: a ``Simulation`` checks the cell at
   every thermo row and at the end of every ``run()``, and stops with ``CellDivergedError`` once V/V0
   leaves [1/ratio, ratio] or a cell vector is longer than the limit. It writes ``metadata.json`` and a

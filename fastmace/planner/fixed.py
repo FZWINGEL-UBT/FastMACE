@@ -1,7 +1,7 @@
 """The fixed-plan planner: one plan, the one the research engine's ``main.py`` runs (SPEC §9.1, §9.5, §16).
 
 Plan task 1a-T15. ``FixedPlanner`` takes the caller's config objects (any field may be ``"auto"``)
-and resolves them as the research engine does, in its two stages (docs/design/switch-map.md,
+and resolves them as the research engine does, in its two stages (docs/current/switch-map.md,
 "Auto resolution rules"):
 
 - **stage 1** (``workflow.parse_args``, before the model is loaded): from the backend, the graph
@@ -385,15 +385,15 @@ DECISION_66_GROUPED_LAUNCH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 # wprime_backward (OPT9-T05, owner 29 October 2026): MD step b/a in both build orders, every block pair below 1.
 # A100-SXM4-80GB: NaNbO3 0.815 / 0.812, NbCl5 0.889 / 0.889. RTX 5060 Ti: NaNbO3 0.937 / 0.940, NbCl5 0.970 / 0.971,
 # NaCl 0.946 / 0.935. RTX 4000 Ada: NaNbO3 0.938 / 0.939, NbCl5 0.964 / 0.964, NaCl 0.934 / 0.934
-# (docs/validation/opt9-T03.md). The A100-SXM4-40GB was not measured.
+# (docs/validation/speed/opt9-T03.md). The A100-SXM4-40GB was not measured.
 DECISION_66_WPRIME_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
                                      "NVIDIA RTX 4000 Ada Generation"))
 # gate_epilogue with the K-outer gated_products kernel (speed-def E2, owner 31 October 2026): MD step b/a, both build
 # orders. RTX 5060 Ti: NbCl5 1,944 0.983 / 0.982, 9,216 0.958 / 0.957; NaNbO3 1,920 0.982 / 0.988, 8,640 0.972 /
 # 0.968; NaCl 1.000 / 1.005. RTX 4000 Ada: NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969;
-# NaCl 0.998 / 1.003 (docs/validation/speed-def.md). The A100 was not measured.
+# NaCl 0.998 / 1.003 (docs/validation/speed/speed-def.md). The A100 was not measured.
 DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
-# tf32x3_gemms on the CUTLASS backend (owner, 3 November 2026; docs/validation/cutlass-tf32x3.md): MD step b/a in
+# tf32x3_gemms on the CUTLASS backend (owner, 3 November 2026; docs/validation/omat0/cutlass-tf32x3.md): MD step b/a in
 # both build orders against IEEE with grouped_launch off. A100-SXM4-80GB: MH-1 NaCl 0.887 / 0.882, NbCl5 0.772 /
 # 0.770; OMAT-0 medium SrTiO3 5,000 atoms 0.948 / 0.947 (grouped_launch itself: no change there). Force gates pass;
 # OMAT-0's energy error is 4-11x the float32 reference's, under the 10 meV floor. A precision change, owner-approved
@@ -406,20 +406,20 @@ DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
 # MH-1 included; this entry stays for the record.
 DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe",))
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
-# docs/validation/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
+# docs/validation/omat0/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
 # build orders: RTX 4000 Ada NaCl 8,000 atoms 0.953 / 0.953, SrTiO3 6,655 0.916 / 0.916; RTX 5060 Ti NaCl 5,832
 # 0.972 / 0.972, SrTiO3 3,645 0.949 / 0.951. The A100 was not measured (no Colab compute units).
 DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce RTX 5060 Ti",
                                                                "NVIDIA RTX 4000 Ada Generation"))
-# generic_radial_tables (radial_tables on a generic model, docs/validation/generic-radial-tables.md) under decision
+# generic_radial_tables (radial_tables on a generic model, docs/validation/omat0/generic-radial-tables.md) under decision
 # 66 (owner, 2 November 2026): "auto" on only on these GPUs, exact device names. MACE-OMAT-0 medium, MD step b/a in
 # the two build orders: RTX 4000 Ada NaCl 8,000 atoms 0.864 / 0.862, SrTiO3 6,655 0.845 / 0.844; RTX 5060 Ti NaCl
 # 0.849 / 0.848, SrTiO3 0.821 / 0.821. Tiled compiled calls: Ada 975,560 atoms 0.861 / 0.862, 5060 Ti 320,000 0.912
-# / 0.882. The A100s (owner, 3 November 2026, after Benchmark_loup; docs/validation/loup-a100.md): A100 80GB PCIe
+# / 0.882. The A100s (owner, 3 November 2026, after Benchmark_loup; docs/validation/omat0/loup-a100.md): A100 80GB PCIe
 # SrTiO3 5,000 atoms 0.902 / 0.901, A100-SXM4-80GB NaCl 8,000 0.917 / 0.917. The A100-SXM4-40GB was not measured.
 # generic_fused_folded_forward and generic_wprime_backward together (owner, 3 November 2026;
-# docs/validation/generic-wprime.md): "auto" on for these labels on these GPUs, exact device names. MACE-OMAT-0
+# docs/validation/omat0/generic-wprime.md): "auto" on for these labels on these GPUs, exact device names. MACE-OMAT-0
 # medium, SrTiO3 5,000 atoms, MD step b/a in both build orders with both on: RTX 5060 Ti 0.839 / 0.831, RTX 4000 Ada
 # 0.832 / 0.833, A100-SXM4-80GB 0.895 / 0.894. On the A100, where decision 66 leaves the generic chunked path off,
 # chunked_conv_backward stays on as their carrier: wprime_backward's backward writes no chunked weight gradient, so
@@ -436,7 +436,7 @@ DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeF
 # generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
 # whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
 # medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;
-# A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828 (docs/validation/generic-fold-product.md). The RTX 5060 Ti was
+# A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828 (docs/validation/omat0/generic-fold-product.md). The RTX 5060 Ti was
 # not measured and keeps it off unless asked for.
 DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 
@@ -1387,7 +1387,7 @@ class FixedPlanner:
                         "radial-tables-needs-float32")
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
-        # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
+        # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/speed/opt-def-2.md).
         # Decision 63 (27 October 2026): also on in float64 plans that are not reproducible (f64-T01: forces within
         # the stock float64 backends' own scatter).
         for name in ("species_tables", "fold_readout_tail", "fold_product_linear", "species_residual"):

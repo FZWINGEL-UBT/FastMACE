@@ -6,7 +6,7 @@ process (a fresh allocator and one compile family, SPEC §8.7). Every case write
 the plan's prediction, the estimate's run and build terms (the planner's final ``memory.estimate``, captured
 while it plans), the build's peak, the steps' own peak and the overall peak.
 
-``fit`` reads the case files and prints the markdown table of ``docs/validation/5-T03.md``. The run's estimate
+``fit`` reads the case files and prints the markdown table of ``docs/validation/phases/5-T03.md``. The run's estimate
 is judged against the steps' peak: the smallest ``SAFETY`` (one global factor, SPEC §9.3 rule 12 as amended 23
 October 2026) that keeps every graph-tier case's run at or above it. The build's estimate is judged against the
 build's peak, with no factor. Then the prediction, max(build, run), at the fitted factor against the overall

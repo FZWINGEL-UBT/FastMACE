@@ -7,8 +7,8 @@ kernel, ``grad @ b.T`` (with ``b_t``, the contiguous transpose, where the caller
 
 The split is FP32-class on typical operands but not IEEE-equivalent under cancellation: the dropped
 small * small term costs a few float32 roundoffs of the sum of |a b| per output
-(``docs/validation/opt-T01-tensor-cores.md`` §6-§7). Stage 1 measures whether that matters for forces
-(``docs/validation/opt4-T03.md``); speed does not count here.
+(``docs/validation/speed/opt-T01-tensor-cores.md`` §6-§7). Stage 1 measures whether that matters for forces
+(``docs/validation/speed/opt4-T03.md``); speed does not count here.
 
 One fixed tile configuration (``tile_rule``'s), no autotuning (SPEC §9.1). K is reduced in a fixed order with
 no atomics, so the result is deterministic. Triton's ``tf32x3`` needs compute capability 8.0 or newer

@@ -1,4 +1,4 @@
-"""The persistent subprocess worker on the GPU (plan task OPT-T07; docs/design/opt-T07-persistent-worker.md).
+"""The persistent subprocess worker on the GPU (plan task OPT-T07; docs/design/speed/opt-T07-persistent-worker.md).
 
 MH-1 (``mh1-r2scan``) on NaCl 3x3x3, float64, Langevin at 300 K, 2 fs. The parent initialises CUDA
 first, so a ``reproducible=True`` plan runs in a child (2-T16's trigger):

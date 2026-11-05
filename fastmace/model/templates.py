@@ -6,7 +6,7 @@ fallback candidate. A ``TemplateCache`` keeps the converted model of the first p
 conversion key (the template) and gives every later plan a private copy of it
 (``compile.private_copy``, 0.5–0.7 s), so no module, tensor or calculator state is shared between
 plans (SPEC §8.7). The template itself never reaches a plan. Design and measurements:
-``docs/design/opt-T06-template-cache.md``.
+``docs/design/speed/opt-T06-template-cache.md``.
 
 - **Where:** CUDA with the cuEq or hybrid backend only (``applies``). On the CPU a deepcopy of a
   cuEq model rebuilds its naive kernels, as long as the reload; e3nn has no conversion to save.

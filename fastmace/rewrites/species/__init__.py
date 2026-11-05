@@ -1,4 +1,4 @@
-"""The species family of optimisation round 1 (OPT-T08; ``docs/design/opt-T08-linear-audit.md``).
+"""The species family of optimisation round 1 (OPT-T08; ``docs/design/speed/opt-T08-linear-audit.md``).
 
 ``RECORDS`` holds two opt-in records (default off). Both are rounding class and deterministic.
 

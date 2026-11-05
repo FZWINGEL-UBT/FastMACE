@@ -49,7 +49,7 @@ WAVEFRONT_LAYERS = 12
 # boundary skins is still smaller than the plain state and its alias window, and without it the call fails.
 WAVEFRONT_MIN_LAYERS = 4
 # TileConfig.lanes "auto": the GPUs where two sweep-2 tiles on disjoint halves of the SMs ran faster than one after
-# the other (docs/validation/tiled-concurrent-tiles.md: 1.09x per pair on the RTX 4000 Ada, 1.05x on the RTX 5060 Ti,
+# the other (docs/validation/tiled/tiled-concurrent-tiles.md: 1.09x per pair on the RTX 4000 Ada, 1.05x on the RTX 5060 Ti,
 # under cudaMallocAsync); by exact device name (decision 66).
 LANE_GPUS = ("NVIDIA RTX 4000 Ada Generation",)
 # TileConfig.backward_chunk_scale "auto" (decision 66, by exact device name): the chunked streaming backward's edges
@@ -76,7 +76,7 @@ class TileConfig:
     the memory model: the first call measures its workspace per receiver (the peak above what stays allocated
     after it: the tiled state, the field and the outputs), and the call then takes the largest candidate whose
     predicted workspace, with 10 % headroom, fits the memory left on the device. Larger tiles run faster (fewer
-    launches, a smaller halo fraction; docs/validation/tiled-screen.md), and at the capacity limit the
+    launches, a smaller halo fraction; docs/validation/tiled/tiled-screen.md), and at the capacity limit the
     workspace does not fit, so the cap stays at ``receivers``. Chosen once; needs a CUDA device (elsewhere the
     cap stays).
     ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pageable host memory; each

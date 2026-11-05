@@ -4,7 +4,7 @@ The owner asked for the branches not yet on main to be merged: `tile-grid-fit`, 
 `tiled-slot-growth` and `reassoc-layout`. Production behaviour is unchanged:
 
 - `TileConfig.grid_fit` is merged off (the branch had it on): one unrepeated 20M pair is not an A/B in both orders.
-- `reassoc-layout` was rejected as 5 % slower on MH-1 (`docs/validation/tiled-1m-speed.md`), so `edge_outer_sum`'s
+- `reassoc-layout` was rejected as 5 % slower on MH-1 (`docs/validation/tiled/tiled-1m-speed.md`), so `edge_outer_sum`'s
   `inner=` layout is merged and the MH-1 caller stays on the plain layout.
 - `FASTMACE_SPLIT_PRECISION` keeps its default `tf32x3`.
 - `tiled-slot-growth`: main already has the code in a later form; the merge adds the run records.

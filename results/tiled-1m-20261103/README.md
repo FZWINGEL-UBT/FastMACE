@@ -1,6 +1,6 @@
 # Tiled call at 1M atoms (3 November 2026)
 
-SrTiO3 58×58×58 (975,560 atoms), OMAT-0 medium, float32. Report: `docs/validation/tiled-1m-speed.md`.
+SrTiO3 58×58×58 (975,560 atoms), OMAT-0 medium, float32. Report: `docs/validation/tiled/tiled-1m-speed.md`.
 
 - `rtx4000ada-murphy/murphy-1m-profile-{device,host}`: `--profile-last` (source `b64cf7ba`).
 - `rtx4000ada-murphy/murphy-1m-sweeps-{device,host}`: `--sweep-times` (`95a6f879`).

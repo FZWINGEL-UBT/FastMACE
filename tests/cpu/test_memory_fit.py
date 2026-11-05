@@ -1,6 +1,6 @@
 """Rule 12's fit on the measured GPU peaks, as a regression test (plan task 5-T03; SPEC §9.3 rule 12, decision 51).
 
-``tests/_support/data/rule12_fit.json`` holds 60 measured cases from docs/validation/5-T03.md:
+``tests/_support/data/rule12_fit.json`` holds 60 measured cases from docs/validation/phases/5-T03.md:
 - the 14 labels that run on Na, Nb and Cl (the 5 MACE-OFF models have no Na embedding), on NaCl and NbCl5
   3x3x3, NVT and NPT, graph tier, hybrid float32, on the RTX 5060 Ti and the A100;
 - MH-1 and MP-0 medium on the plain cuEq backend.
@@ -16,7 +16,7 @@ formula, a rewrite's declared term, ``SAFETY`` or the workspaces that moves any 
 its measured peak fails here.
 
 ``tests/_support/data/rule12_capacity.json`` holds the capacity scan's MH-1 cells (decision 67, plans/capacity.md
-CAP-T02; docs/validation/capacity-T02.md): NaCl, NbCl5 and SrTiO3 from 2,000 to 30,600 atoms, float32 and float64,
+CAP-T02; docs/validation/capacity/capacity-T02.md): NaCl, NbCl5 and SrTiO3 from 2,000 to 30,600 atoms, float32 and float64,
 the default plan with the fused path on, measured on the RTX 5060 Ti (WSL2) and the RTX 4000 Ada (Linux). Their
 estimate must stay between the measured peak and ``CAPACITY_HIGH`` times it, so that rule 12 predicts the
 limit instead of acting at half of it.
@@ -36,7 +36,7 @@ LOW, HIGH = 1.0, 1.25
 CAPACITY = json.loads((DATA.parent / "rule12_capacity.json").read_text())
 CAPACITY_HIGH = 1.25
 RESCUE = json.loads((DATA.parent / "rule12_rescue.json").read_text())
-# docs/validation/estimate-band.md: the highest ratio per stage of the rescue matrix (five crystals, three GPUs),
+# docs/validation/capacity/estimate-band.md: the highest ratio per stage of the rescue matrix (five crystals, three GPUs),
 # rounded up. The spread within a stage is the allocator's reserve, which differs between crystals by the graph
 # pool's packing.
 RESCUE_HIGH = {"s0-default": 1.30, "s1-conv": 1.06, "s2-table": 1.05, "s3-segments": 1.15, "s4-geoff": 1.25,
@@ -98,7 +98,7 @@ def test_large_mh1_cells_stay_within_the_capacity_fit(case):
 @pytest.mark.parametrize("case", RESCUE, ids=[f"{c['structure']}-{c['natoms']}-{c['stage']}-{c['gpu'].split()[-1]}"
                                                for c in RESCUE])
 def test_every_stage_of_the_memory_rescue_stays_within_its_band(case):
-    """docs/validation/estimate-band.md: with the memory-rescue records on, the estimate stays between the measured
+    """docs/validation/capacity/estimate-band.md: with the memory-rescue records on, the estimate stays between the measured
     peak and the stage's RESCUE_HIGH times it, on every crystal: the records keep fractions of their own side (per edge
     or per atom), and the stage's allocator reserve (memory.RESCUE_RESERVE) scales what they keep."""
     found = predicted(case)
@@ -107,7 +107,7 @@ def test_every_stage_of_the_memory_rescue_stays_within_its_band(case):
 
 
 GENERIC_RESCUE = json.loads((DATA.parent / "rule12_generic_rescue.json").read_text())
-# docs/validation/omat0-capacity.md: MACE-OMAT-0 medium's three stages (the default plan without and with
+# docs/validation/omat0/omat0-capacity.md: MACE-OMAT-0 medium's three stages (the default plan without and with
 # generic_chunked_conv_backward, and generic_recompute_conv_weights), [low, high] rounded out. The chunked stage's
 # low is NaNbO3's (held out) 0.995 at 19,360 atoms.
 GENERIC_BAND = {"s0-default": (1.0, 1.05), "s1-chunked": (0.99, 1.08), "s2-recompute": (1.0, 1.12)}

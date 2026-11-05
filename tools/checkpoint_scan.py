@@ -12,7 +12,7 @@ For each checkpoint it loads the pickled MACE model on the CPU (no conversion, n
   uses one head and the others' readout columns are computed and thrown away;
 - the species table (``atomic_numbers``).
 
-It changes nothing; the JSON summary feeds ``docs/validation/opt-T04-checkpoint-scan.md``.
+It changes nothing; the JSON summary feeds ``docs/validation/speed/opt-T04-checkpoint-scan.md``.
 """
 
 from __future__ import annotations

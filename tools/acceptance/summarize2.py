@@ -1,4 +1,4 @@
-"""Summaries and verdicts of a phase 2 acceptance run (plan task 2-T23), for docs/validation/phase-2.md.
+"""Summaries and verdicts of a phase 2 acceptance run (plan task 2-T23), for docs/validation/phases/phase-2.md.
 
     python3 tools/acceptance/summarize2.py RUN_ROOT --machine murphy [--output results/<run id>/summary.json]
 
@@ -7,8 +7,8 @@ Reads the jobs' outputs under RUN_ROOT (from run.py) and derives:
 - regression (item 8): this checkout's median step time over fastmace-1b's, per A/B process and
   structure. The rule is |ratio - 1| <= that machine's own noise floor for 12 blocks (with --one-sided,
   ratio - 1 <= floor: the combined acceptance after optimisation round 1) (murphy 0.16 %,
-  docs/validation/1a-noise-floor.md; RTX 5060 Ti 1.1 % NaCl and 0.4 % NbCl5,
-  docs/validation/2-T12-local-noise-floor.md). A row is valid only if nothing compiled and no process-wide
+  docs/validation/phases/1a-noise-floor.md; RTX 5060 Ti 1.1 % NaCl and 0.4 % NbCl5,
+  docs/validation/phases/2-T12-local-noise-floor.md). A row is valid only if nothing compiled and no process-wide
   patch changed while timed, and the two plans' engine options are equal;
 - forces: each side's starting forces in the A/B processes against its control process (equal plans
   must give the same forces);

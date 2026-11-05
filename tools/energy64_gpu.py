@@ -15,7 +15,7 @@ Two commands, each in its own process, writing one JSON file:
 
 Structures are read as tools/ab_step_time.py reads them in a FastMACE-only process (benchmark
 names under FASTMACE_STRUCTURES, the baseline export). Use an otherwise idle GPU; ``ab`` refuses
-a busy one. docs/validation/1b-T03-energy.md has the commands and the results.
+a busy one. docs/validation/phases/1b-T03-energy.md has the commands and the results.
 """
 
 from __future__ import annotations

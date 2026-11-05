@@ -19,7 +19,7 @@ from __future__ import annotations
 _KEY_BYTES = 8
 # int32 senders and receivers per edge, saved by the streaming convolution for its backward.
 _STREAMING_INDEX_BYTES = 2 * 4
-# MH-1's fused path, measured on the GPU (decision 67, plans/capacity.md CAP-T02; docs/validation/capacity-T02.md):
+# MH-1's fused path, measured on the GPU (decision 67, plans/capacity.md CAP-T02; docs/validation/capacity/capacity-T02.md):
 # the share of the estimate's stock per-edge floats (``_stock_edge_floats``; 8,265 for MH-1) each record does not
 # keep. chunked_conv_backward and radial_tables: the change in the peak when the record alone is turned off (NbCl5,
 # 14,976 atoms, RTX 5060 Ti, float32: 2,086 and 2,306 bytes per edge, 521 and 576 of MH-1's floats). The
@@ -27,7 +27,7 @@ _STREAMING_INDEX_BYTES = 2 * 4
 # stays 1.05-1.34x above the capacity scan's measured peaks (tests/cpu/test_memory_fit.py's capacity cases); per
 # precision, as the fused paths keep different tensors in float32 and float64. Shares, so a smaller model's terms
 # shrink with its widths. In float32 291 more floats (2,291): the rescue matrix's default stage
-# (docs/validation/estimate-band.md) measured 5.3 kB per edge against the estimate's 8.4, an overstatement 1.58 times
+# (docs/validation/capacity/estimate-band.md) measured 5.3 kB per edge against the estimate's 8.4, an overstatement 1.58 times
 # against 1.36 per atom, so crystals with many edges per atom (SrTiO3, NaTaO3) came out 9 % higher; the extra share
 # brings the per-edge overstatement to the per-atom one.
 _CHUNKED_BACKWARD_SHARE = 521 / 8265
@@ -38,7 +38,7 @@ _MH1_STREAMING_SHARE = {4: 2291 / 8265, 8: 673 / 8265}
 # tensors, the node segments, the node region and gate_epilogue per-node ones. Each is the ratio of the measured live
 # peak's per-edge or per-node slope (max allocated = fixed + per atom x N + per edge x E, least squares per stage of
 # the rescue ladder over NbCl5, NaCl, SrTiO3 and NaTaO3; within 1 % at every point) between consecutive stages
-# (docs/validation/estimate-band.md). As fractions of the whole remainder (estimate-refit) they mixed the two sides,
+# (docs/validation/capacity/estimate-band.md). As fractions of the whole remainder (estimate-refit) they mixed the two sides,
 # so a crystal with more edges per atom came out 1.2 times higher at the node-side stages.
 # Cells of at least 15,000 atoms (below it the build's fixed transient sets the live peak), five crystals.
 # conv_weights keeps 0.43 of 5.3 kB per edge (the second interaction's [E, 1280] weights go); first_table 0.17 of 0.43
@@ -187,7 +187,7 @@ def recompute_node_region(dims, width):
 
 def gate_epilogue(dims, width):
     """The gate's backward in ``linear_2``'s epilogue keeps more for the backward than the separate gate:
-    ``_GATE_EPILOGUE_KEEP`` of the remaining per-node activations (docs/validation/region-norm.md)."""
+    ``_GATE_EPILOGUE_KEEP`` of the remaining per-node activations (docs/validation/capacity/region-norm.md)."""
     return 0, 0, 1.0, _GATE_EPILOGUE_KEEP
 
 

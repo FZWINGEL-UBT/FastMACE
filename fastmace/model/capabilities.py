@@ -8,7 +8,7 @@ model.
 
 ``rewrite_support``, ``padding_is_exact`` and ``first_inputs_species_only`` keep the research
 engine's verdicts and reason strings, so the two-stage ``auto`` resolution (1a-T15,
-docs/design/switch-map.md) can reproduce ``adapt_options_to_model`` exactly.
+docs/current/switch-map.md) can reproduce ``adapt_options_to_model`` exactly.
 
 This module never imports MACE; it only looks at attributes and class names, so it works on
 stand-ins as well. ``torch`` and ``ase`` are imported inside the functions that need them.
@@ -283,7 +283,7 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
     support["fused_folded_backward"] = RewriteSupport(fold or generic,
                                                       "ok" if fold or generic else support["fold_cutoff"].reason)
     # The chunked streaming backward: MH-1's folded class, or a generic interaction's split radial network on the
-    # same folded path (generic_chunked_conv_backward, docs/validation/omat0-capacity.md).
+    # same folded path (generic_chunked_conv_backward, docs/validation/omat0/omat0-capacity.md).
     support["chunked_conv_backward"] = RewriteSupport(
         fold or generic, "ok" if fold else "ok (generic folded path)" if generic else support["fold_cutoff"].reason)
     # Certified radial tables: MH-1's folded class (radial_tables), or a model whose every interaction is generic

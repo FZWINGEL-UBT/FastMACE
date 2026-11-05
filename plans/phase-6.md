@@ -3,8 +3,8 @@
 **Current status:** released as `v1.0.0`; FastMACE and all four OEq extension wheels are on PyPI, the public-index
 hybrid installation passed, and the documentation site is live. 6-T15 adds the validated Python 3.13 wheel,
 and 6-T16 reduces the complete local CPU suite from 33 minutes to 14 minutes with all prior tests preserved.
-Publication evidence: `docs/validation/release-1.0.0.md`. The inventory and decision history below describe the
-start of this phase; current evidence is in `docs/validation/phase-6.md`, `6-T15.md` and `6-T16.md`.
+Publication evidence: `docs/validation/phases/release-1.0.0.md`. The inventory and decision history below describe the
+start of this phase; current evidence is in `docs/validation/phases/phase-6.md`, `6-T15.md` and `6-T16.md`.
 
 Status: **decided**, 25 October 2026 (owner, 14:35 UTC: D1–D8 below). Written by the conductor after the phase 5 acceptance (tag `fastmace-5`,
 `d304834c`).
@@ -85,7 +85,7 @@ notice; D8.2 (b) mark the ASE ports LGPL-2.1+ and say so in NOTICE.md.
 | 6-T10 Upstream PR drafts | M | no | D5 | `docs/upstream/` (new): MACE linear rewrites, reassociation; OEq no-`nvcc` build |
 | 6-T11 Phase 5 follow-ups | M | yes | — | slow-tier POLAR references in a child; integrator label in plan records; extended-energy `run_fresh` |
 | 6-T12 Release engineering | S–M | no | T01; D2, D7 | `.github/workflows/release.yml` (new), `CHANGELOG.md` (new), `docs/development.md` (release steps) |
-| 6-T13 Acceptance and 1.0 | M | yes | all | `docs/validation/phase-6-runbook.md`, `docs/validation/phase-6.md`; tag `v1.0.0` |
+| 6-T13 Acceptance and 1.0 | M | yes | all | `docs/validation/phases/phase-6-runbook.md`, `docs/validation/phases/phase-6.md`; tag `v1.0.0` |
 
 **Initial ready list (historical):** T01, T02, T08, T09, T11. T05 and T07 may begin on content; only the docs
 builder waits for D6.

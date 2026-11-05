@@ -1,8 +1,8 @@
 """The ``tf32x3_gemms`` record (plans/opt-4.md, OPT4-T03 stage 1): every atom GEMM as 3xTF32, opt-in.
 
 On the CPU the op runs PyTorch's product, so with the record on a tiny cuEquivariance model's energy and forces
-are bitwise those without it; the GPU accuracy is docs/validation/opt4-T03.md's force gate. The planner turns
-"auto" on only for MH-1 and OMAT-0 on the A100-SXM4-80GB (decision 66, docs/validation/cutlass-tf32x3.md), and
+are bitwise those without it; the GPU accuracy is docs/validation/speed/opt4-T03.md's force gate. The planner turns
+"auto" on only for MH-1 and OMAT-0 on the A100-SXM4-80GB (decision 66, docs/validation/omat0/cutlass-tf32x3.md), and
 refuses it in float64, below compute capability 8.0 and beside ``grouped_launch``.
 """
 

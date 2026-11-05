@@ -6,23 +6,23 @@ phase before it is under way, not all in advance. Worker rules are in
 
 | Phase | Plan | Status |
 | --- | --- | --- |
-| 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
-| 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
-| 1b. Contracts | [phase-1b.md](phase-1b.md) | **done** (19–20 October 2026), tag `fastmace-1b`; acceptance report `docs/validation/phase-1b.md` |
-| 2. Safety | [phase-2.md](phase-2.md) | **acceptance complete** (21 October 2026, report `docs/validation/phase-2.md`, merged `89ea581`): every item passes except item 7 (deferred by the owner). Results come from the freeze `be92979`, and from `f993713` for what its two defects touched (item 4, the Simulation-driven GPU tests, OMOL-0 XL). The 19-label gate passes 19 of 19. tagged `fastmace-2` (e52c482, owner, 21 October 2026) |
+| 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phases/phase-0.md` |
+| 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phases/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
+| 1b. Contracts | [phase-1b.md](phase-1b.md) | **done** (19–20 October 2026), tag `fastmace-1b`; acceptance report `docs/validation/phases/phase-1b.md` |
+| 2. Safety | [phase-2.md](phase-2.md) | **acceptance complete** (21 October 2026, report `docs/validation/phases/phase-2.md`, merged `89ea581`): every item passes except item 7 (deferred by the owner). Results come from the freeze `be92979`, and from `f993713` for what its two defects touched (item 4, the Simulation-driven GPU tests, OMOL-0 XL). The 19-label gate passes 19 of 19. tagged `fastmace-2` (e52c482, owner, 21 October 2026) |
 | Optimisation round 1 | [opt-1.md](opt-1.md) | done except OPT-T08's GPU A/B. Defaults since 20 October: `gated_rows`, `segment_gemm`, template cache, persistent worker. Measured end to end against `fastmace-1b`: NaCl −3.6 to −4.1 %, NbCl5 −13.5 to −14.9 % on both GPUs |
 | Optimisation round 2 | [opt-2.md](opt-2.md) | started 21 October 2026 (owner: "try all 5 ideas"); OPT2-T01 to T05 with 2-T20, 2-T19, 2-T15, 2-T21 and 2-T07 |
 | Optimisation round 3 | [opt-3.md](opt-3.md) | started 21 October 2026 (owner: "try all kernel opportunities"); OPT3-T01 to T05 |
-| 3. Dynamic topology and MC | [phase-3.md](phase-3.md) | **complete**, tag `fastmace-3`; [acceptance report](../docs/validation/phase-3.md) records the remaining clauses and deferred workstation check |
-| 3b. NPT for the chlorides | [phase-3b.md](phase-3b.md) | **complete**, tag `fastmace-3b`; [report](../docs/validation/phase-3b.md) records the cost target and timing limitations |
-| 4. Physics | [phase-4.md](phase-4.md) | **complete**, tag `fastmace-4`; [acceptance report](../docs/validation/phase-4.md) |
-| 5. Planner completion | [phase-5.md](phase-5.md) | **complete**, tag `fastmace-5`; [acceptance report](../docs/validation/phase-5.md) |
-| 6. Release | [phase-6.md](phase-6.md) | **released `v1.0.0`**, PyPI packages and docs live; Python 3.13 public-index hybrid install verified; [release evidence](../docs/validation/release-1.0.0.md) |
-| Optimisation round 5 | [opt-5.md](opt-5.md) | **complete** (26 October 2026); `uses_tf32x3_tile` hybrid SIMT/TC shape dispatch adopted inside `tf32x3_gemms` (`6.90× → 1.52–1.73×` max error ratio vs IEEE, `−31 to −39 %` gate energy offset); `sched_iso` and `x3_pipe` probes recorded; [report](../docs/validation/opt-5.md) |
+| 3. Dynamic topology and MC | [phase-3.md](phase-3.md) | **complete**, tag `fastmace-3`; [acceptance report](../docs/validation/phases/phase-3.md) records the remaining clauses and deferred workstation check |
+| 3b. NPT for the chlorides | [phase-3b.md](phase-3b.md) | **complete**, tag `fastmace-3b`; [report](../docs/validation/phases/phase-3b.md) records the cost target and timing limitations |
+| 4. Physics | [phase-4.md](phase-4.md) | **complete**, tag `fastmace-4`; [acceptance report](../docs/validation/phases/phase-4.md) |
+| 5. Planner completion | [phase-5.md](phase-5.md) | **complete**, tag `fastmace-5`; [acceptance report](../docs/validation/phases/phase-5.md) |
+| 6. Release | [phase-6.md](phase-6.md) | **released `v1.0.0`**, PyPI packages and docs live; Python 3.13 public-index hybrid install verified; [release evidence](../docs/validation/phases/release-1.0.0.md) |
+| Optimisation round 5 | [opt-5.md](opt-5.md) | **complete** (26 October 2026); `uses_tf32x3_tile` hybrid SIMT/TC shape dispatch adopted inside `tf32x3_gemms` (`6.90× → 1.52–1.73×` max error ratio vs IEEE, `−31 to −39 %` gate energy offset); `sched_iso` and `x3_pipe` probes recorded; [report](../docs/validation/speed/opt-5.md) |
 | Speed-up ideas (27–28 October 2026) | [ideas-20261027.md](ideas-20261027.md) | D1–D3 built and confirmed per GPU (RTX 5060 Ti, RTX 4000 Ada, A100); **decision 65**: all three on by default in float64 MH-1 plans on the two measured GPU models only (exact names), off on the A100 and unmeasured GPUs; branch `fastmace/ideas-20261027` |
 | Seven float32 ideas, cheap checks (28 October 2026) | [fp32-ideas-20261028.md](fp32-ideas-20261028.md) | L2-sized atom blocks passed the microbenchmark but lost in the model prototype (+1.7 to +9.9 %); recompute, second stream and Strassen–Winograd falsified; BF16x9 emulation inactive on sm_80/sm_120; linear folds already built; contraction fusion dropped on paper; branch `fastmace/fp32-ideas-20261028` |
 | Relaxation throughput (29 October 2026) | [relax-throughput.md](relax-throughput.md) | **plan only** (owner): A, one engine across variable-cell frames (setup is about 70 % of a 112-atom glass frame's wall time in Energy_Hull); B, several frames in one engine (batched relaxation), only if B-T00's ceiling pays. Nothing started |
-| Optimisation round 6 | [opt-6.md](opt-6.md) | started 26 October 2026 (owner). OPT6-T02 `chunked_conv_backward` **default on** (decision 60): NbCl5 0.97, NaNbO3 0.97, NaCl 1.01 ([report](../docs/validation/opt6-T02.md)). OPT6-T05 `radial_tables` (new class `certified`, decision 61), opt-in: certificates 0.15–0.30, gate passed, b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 ([report](../docs/validation/opt6-T05.md)); its default awaits the owner |
+| Optimisation round 6 | [opt-6.md](opt-6.md) | started 26 October 2026 (owner). OPT6-T02 `chunked_conv_backward` **default on** (decision 60): NbCl5 0.97, NaNbO3 0.97, NaCl 1.01 ([report](../docs/validation/speed/opt6-T02.md)). OPT6-T05 `radial_tables` (new class `certified`, decision 61), opt-in: certificates 0.15–0.30, gate passed, b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 ([report](../docs/validation/speed/opt6-T05.md)); its default awaits the owner |
 
 ## Workstation availability (owner, 20 October 2026)
 

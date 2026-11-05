@@ -1,0 +1,169 @@
+# Defaults by GPU: what runs today and why
+
+Source: main `eca7ba5d` (5 November 2026). The code is the authority: `fastmace/planner/fixed.py` (auto rules),
+the `*_GPUS` sets next to each kernel switch, and [switch-map.md](switch-map.md) (every config field and its
+`auto` rule). History of every attempt, adopted or not: [optimisation ledger](../optimisation-ledger.md).
+How the A100 OMAT-0 path fits together: [omat0-a100.md](omat0-a100.md).
+
+Conventions. b/a = candidate time over baseline time, same-process A/B, alternating blocks; two values = the two
+build orders (ab / ba); below 1 is faster. GPUs: **5060 Ti** = NVIDIA GeForce RTX 5060 Ti (local, sm_120);
+**Ada** = NVIDIA RTX 4000 Ada Generation (murphy, leto, leeloo; sm_89); **A100** = every A100 model where the set
+is a `GPUModels` (owner, 4 November 2026: "turn on a100 speedups no matter which version of it it runs on";
+`fastmace/kernels/gpu_models.py`), else the exact name given. Any other GPU (L4, RTX A4000, RTX PRO 6000, …) gets
+none of the switches below: decision 66 (owner, 29 October 2026) enables a per-GPU default only where same-process
+whole-step A/Bs in both build orders measured a speed-up, by device name, never by compute capability.
+Benchmark_loup = OMAT-0 medium, SrTiO3 5,000 atoms unless stated. "on" = default on; "–" = off (not measured, or
+measured slower: the cell says which).
+
+## 1. Per-GPU switches (decisions 65 and 66)
+
+### MH-1 (`mh1-r2scan`) plans
+
+| Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `grouped_launch` (`DECISION_66_GROUPED_LAUNCH_GPUS`) | on | – (lost 0.5 % in OPT-T03b) | – | exact | 5060 Ti NaCl 0.971 / 0.975, NbCl5 1.002 / 0.998, NaNbO3 1.001 / 0.999 | d66, 29 Oct | [decision66-grouped-launch](../validation/speed/decision66-grouped-launch.md) |
+| `wprime_backward` (`DECISION_66_WPRIME_GPUS`) | on | on | on (A100-SXM4-40GB not measured) | rounding | A100-SXM4-80GB NaNbO3 0.815 / 0.812, NbCl5 0.889 / 0.889; 5060 Ti NaNbO3 0.937 / 0.940, NbCl5 0.970 / 0.971, NaCl 0.946 / 0.935; Ada NaNbO3 0.938 / 0.939, NbCl5 0.964 / 0.964, NaCl 0.934 / 0.934 | OPT9-T05, owner 29 Oct (d66) | [opt9-T03](../validation/speed/opt9-T03.md) |
+| `gate_epilogue` with K-outer `gated_products` (`DECISION_66_GATE_EPILOGUE_GPUS`) | on | on | – (not measured) | rounding | 5060 Ti NbCl5 1,944 0.983 / 0.982, 9,216 0.958 / 0.957; NaNbO3 1,920 0.982 / 0.988, 8,640 0.972 / 0.968; NaCl 1.000 / 1.005. Ada NbCl5 0.976 / 0.975, 0.953 / 0.953; NaNbO3 0.982 / 0.981, 0.968 / 0.969; NaCl 0.998 / 1.003 | speed-def E2, owner 31 Oct | [speed-def](../validation/speed/speed-def.md) |
+| unpadded gated input-gradient kernel (`gated_products.UNPADDED_GPUS`, exact names) | on | on | – (not measured; RTX A4000 keeps `gate_epilogue` off) | bitwise | Ada NbCl5 21,600 atoms 0.947 / 0.951; 5060 Ti NbCl5 14,400 0.959 / 0.956 (threshold ≥ 3 %) | d66 | [gated-unpadded](../validation/speed/gated-unpadded.md) |
+| `segment_gemm` column tile order (`tile_rule.COLUMN_ORDER_GPUS`, exact) | on | on | – (A100-SXM4-80GB NbCl5 9,216 1.0017 / 1.0015) | bitwise | 5060 Ti NbCl5 9,216 0.940 / 0.938, NaNbO3 8,640 0.959 / 0.955 | d66, 29 Oct | [segment-gemm-order](../validation/speed/segment-gemm-order.md) |
+| 128-row tiles, 8 warps (`tile_rule.LARGE_TILE_GPUS`, exact) | – (NbCl5 1,944 1.020 / 1.007) | on | – (A100-SXM4-40GB 9,216 1.021 / 1.021) | bitwise | Ada NbCl5 9,216 0.987 / 0.986, 1,944 0.989 / 0.989, NaNbO3 0.995 / 0.994 | d66, 29 Oct | [ab-constants-audit](../validation/speed/ab-constants-audit-20261030.md) "tiles128" |
+| `tf32x3_gemms` on CUTLASS (`DECISION_66_TF32X3_GPUS`; `…_OMAT0_GPUS` = A100 80GB PCIe, kept for the record) | – (Triton tf32x3 slower) | – (slower) | on, MH-1 and OMAT-0 | precision change (owner-approved) | A100-SXM4-80GB MH-1 NaCl 0.887 / 0.882, NbCl5 0.772 / 0.770; OMAT-0 0.948 / 0.947; A100 PCIe OMAT-0 4.61 → 3.31 µs/atom/step with the SXM4's switches | owner 3 Nov; every A100 4 Nov | [cutlass-tf32x3](../validation/omat0/cutlass-tf32x3.md) |
+| float64: D1 56 mantissa bits, D2 `w_tables`, D3 `save_transcendentals` (`DECISION_65_GPUS`, exact) | D2, D3 on; D1 suspended | D2, D3 on; D1 suspended | – (D2, D3 slower) | rounding | float64 package + D1 + D2 + D3 ABBA: local NaCl 0.806, NaNbO3 0.782, NbCl5 0.797; Ada NaCl 0.804, NbCl5 0.802. D1's `auto` is `"dynamic"` everywhere since 28 Oct (a graph re-captured during a run computed wrong energies) | d65, 28 Oct | [ideas-20261027](../../plans/ideas-20261027.md), [switch-map](switch-map.md) |
+
+### OMAT-0 and the generic family
+
+| Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `generic_chunked_conv_backward` (`DECISION_66_GENERIC_CHUNKED_GPUS`) | on | on | – (not measured; stays on there only as the carrier of `generic_wprime_backward`, chunking never runs; 1.31× slower) | rounding | Ada NaCl 8,000 0.953 / 0.953, SrTiO3 6,655 0.916 / 0.916; 5060 Ti NaCl 5,832 0.972 / 0.972, SrTiO3 3,645 0.949 / 0.951; RTX A4000 (6 MB L2) 3–4× slower | d66, 2 Nov | [omat0-capacity](../validation/omat0/omat0-capacity.md) |
+| `generic_radial_tables` (`DECISION_66_GENERIC_RADIAL_TABLES_GPUS`) | on | on | on (A100-SXM4-40GB not measured) | certified | Ada NaCl 0.864 / 0.862, SrTiO3 0.845 / 0.844; 5060 Ti NaCl 0.849 / 0.848, SrTiO3 0.821 / 0.821; tiled Ada 975,560 atoms 0.861 / 0.862, 5060 Ti 320,000 0.912 / 0.882; A100 PCIe SrTiO3 0.902 / 0.901, A100-SXM4-80GB NaCl 8,000 0.917 / 0.917 | owner 2 Nov; A100s 3 Nov | [generic-radial-tables](../validation/omat0/generic-radial-tables.md), [loup-a100](../validation/omat0/loup-a100.md) |
+| `generic_fused_folded_forward` + `generic_wprime_backward` (`DECISION_66_GENERIC_WPRIME_GPUS`) | on | on | on | rounding | both on: 5060 Ti 0.839 / 0.831, Ada 0.832 / 0.833, A100-SXM4-80GB 0.895 / 0.894; the fused forward alone 1.29× slower (stays off without wprime) | owner 3 Nov | [generic-wprime](../validation/omat0/generic-wprime.md) |
+| `generic_fold_product_linear` (`DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`) | – (not measured) | on | on | rounding | Ada SrTiO3 10×10×10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849; A100-SXM4-80GB 0.9928 / 0.9931, 0.9805 / 0.9828 | d66, 4–5 Nov | [generic-fold-product](../validation/omat0/generic-fold-product.md) |
+| species GEMM (`generic.modules.SPECIES_GEMM_GPUS`, exact) | on | on | – (0.992 / 0.991: its skip runs as 3×TF32; own mma kernel no better) | exact | Benchmark_loup Ada 0.955 / 0.952, 5060 Ti 0.950 / 0.953 | owner 4 Nov ("Yes both") | [ledger: omat0-species-gemm](../optimisation-ledger.md#omat0-species-gemm-the-species-skip-as-one-grouped-gemm) |
+| `TABLE_W`: w and its slope from the value table (`wprime_backward.TABLE_W_GPUS`) | on | on | on | rounding | Benchmark_loup 5060 Ti 0.888 / 0.892, Ada 0.928 / 0.931, A100-SXM4-80GB 0.943 / 0.943 | d66, 4 Nov | `results/omat0-kernel-lab-20261103` §16 |
+| `BLOCK_MESSAGE` (`BLOCK_MESSAGE_GPUS`); `BLOCK_LDG` (`BLOCK_LDG_GPUS`, empty) | on (plain loads) | on | on | rounding | vs TABLE_W: Ada 0.974 / 0.971, A100-SXM4-80GB 0.983 / 0.977, 5060 Ti 0.976 / 0.975 with `__ldg` (1.060 without); with FACTORED the 5060 Ti is faster with plain loads, so no GPU keeps `__ldg` | d66, 4 Nov; LDG dropped 5 Nov | [ledger](../optimisation-ledger.md#omat0-block-message-the-conv-message-in-linear_1s-block-layout) |
+| `FACTORED` TP backward (`FACTORED_GPUS`) | on (since round 2, with plain loads, HORNER, 80 registers) | on | on | rounding | Ada 0.983 / 0.980; A100-SXM4-80GB 0.938 / 0.940 (w′ kernel 0.90 / 0.73); 5060 Ti SrTiO3 0.979 / 0.982, NbCl5 0.986 / 0.989. `FACTORED_SCALE` rejected (A100 1.025 / 1.024) | owner 4 Nov; 5060 Ti 5 Nov | [omat0-tp-backward](../validation/omat0/omat0-tp-backward.md) |
+| `SYMMETRIC_PAIRS` mirror table rows (`radial.SYMMETRIC_PAIRS_GPUS`) | – | on | on | bitwise | on top of FACTORED: Ada 0.996 / 0.995, A100-SXM4-80GB 0.998 / 0.990 | owner 4 Nov | [omat0-tp-backward](../validation/omat0/omat0-tp-backward.md) §4 |
+| `HORNER` (`HORNER_GPUS`), `SCALAR_PATHS` (A100), `MAX_REGISTERS` (5060 Ti: 80) | HORNER + 80 regs on | – (HORNER 1.004 / 1.001, 1.000 / 1.000) | HORNER + SCALAR_PATHS on | rounding | A100-SXM4-80GB SrTiO3 0.986 / 0.983, NbCl5 0.994 / 0.978; 5060 Ti (with FACTORED, no LDG) 0.979 / 0.982, 0.986 / 0.989 | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
+| zero-column skip in the fused forward, degree-5 tables (`fused_forward.SKIP_ZERO_COLUMN_GPUS`) | – (1.000) | on | on | exact | Ada 0.981, A100-SXM4-80GB 0.986 (vs degree 5 alone; both vs degree 10 0.896 / 0.895); A100 PCIe 4.61 → 3.31 µs/atom/step with the SXM4 set | owner 4 Nov | `results/omat0-kernel-lab-20261103` |
+| tensor-core fused forward (`TENSOR_CORES_GPUS`) | – (slower: TF32 = 2× FP32) | – (slower) | on | precision (TF32 products) | A100-SXM4-80GB 0.933 / 0.933; loup 3.17 → 2.92 (NVE), 3.12 → 2.90 µs/atom/step (Langevin); energy error 1.39 meV vs 0.73 (floor 10 meV) | owner 4 Nov | [omat0-a100](omat0-a100.md) §3.5 |
+| `VEC_SH` (`VEC_SH_GPUS`), `VEC_A` and `TC_WFRAG` (A100) | VEC_SH on | – | all three on | bitwise | 5060 Ti VEC_SH SrTiO3 10×10×10 0.977 / 0.977, NbCl5 0.984 / 0.984; A100-SXM4-80GB VEC_SH + VEC_A 0.973 / 0.976, 0.976 / 0.981; + TC_WFRAG 0.960 / 0.954, 0.970 / 0.969. `PREFETCH` and `TC_TP` rejected (sets empty) | A100 round 4, 5 Nov | [round-4 notes](../../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| fused first-interaction backward (`FUSED_FIRST_BACKWARD_GPUS`) + tabled forward (`TABLED_FORWARD_GPUS`) | on | on | on | rounding | backward alone SrTiO3 / NbCl5: 5060 Ti 0.962 / 0.963, 0.972 / 0.969; Ada 0.962 / 0.963, 0.979 / 0.975; A100-SXM4-80GB 0.969 / 0.966, 0.983 / 0.984. Both: 5060 Ti 0.945 / 0.945, 0.948 / 0.955; Ada 0.949 / 0.944, 0.978 / 0.968; A100 0.966 / 0.962, 0.970 / 0.982 | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
+| run-walking `edge_outer_sum` backward (`edge_outer_sum.BACKWARD_WALK_GPUS`) | – (kernel 0.94, near DRAM floor) | – (kernel 1.03–1.11) | on | rounding | A100-SXM4-80GB SrTiO3 0.995 / 0.987, NbCl5 0.995 / 0.996 (kernel 0.802) | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
+| `EDGE_SH` Triton edge spherical harmonics (`EDGE_SH_GPUS`) | on | on | on | rounding (5.5e-7 / 1.4e-7 of float64 e3nn) | SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | A100 round 5, 5 Nov | `results/round5-20261105` |
+| `HEAD_SLICE` one-head readout as a slice (`energy.HEAD_SLICE_GPUS`) | on | on | on (A100-SXM4-80GB) | bitwise | SrTiO3 / NbCl5: 5060 Ti 0.996 / 0.998, 0.989 / 0.993; Ada 0.999 / 0.997, 0.993 / 0.992; A100 0.992 / 0.987, 0.975 / 0.979 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
+| `GRAPH_SUM` one-graph energy sums as reductions (`energy.GRAPH_SUM_GPUS`) | – (tie) | – (1.001 / 0.999) | on (A100-SXM4-80GB) | rounding | A100 0.997 / 0.998, 0.992 / 0.998 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
+| `SEGMENT_ROWS` in-place BlockLinear 1:1 products (`segment_rows.SEGMENT_ROWS_GPUS`) | – | – | on (A100-SXM4-80GB) | rounding (3xTF32) | A100 SrTiO3 0.985 / 0.984, NbCl5 0.981 / 0.988 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
+| w′ end-of-edge reduction: `BUTTERFLY` (`BUTTERFLY_GPUS`), `REDUX` (`REDUX_GPUS`) | both on | – (REDUX 1.008–1.011) | – (BUTTERFLY 1.006, REDUX 1.018–1.029) | BUTTERFLY bitwise; REDUX fixed point | 5060 Ti REDUX 0.998 / 0.999, 0.999 / 0.998 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
+| `FOLD_FIRST_DENSITY_LINEAR` (True; follows `generic_fold_product_linear`) | – (fold off) | on | on | rounding | A100-SXM4-80GB SrTiO3 0.978 / 0.977, NbCl5 0.954 / 0.956; Ada 0.954 / 0.955, 0.920 / 0.920 | d66, 5 Nov | [round 6](../../plans/ideas-20261105-round2.md#round-6-skipping-work-around-the-big-kernels-5-november-2026) |
+
+The A100 plan's one accepted gate failure: OMAT-0 NbCl5 stress 1.8e-7 eV/Å³ against a limit of 1.2–1.5e-7, from
+the 3×TF32 GEMMs and the tensor-core forward together (each passes alone); the owner kept both (5 November 2026;
+[omat0-tp-backward](../validation/omat0/omat0-tp-backward.md) §3.1).
+
+### Tiled (capacity) mode
+
+| Switch | 5060 Ti | Ada | A100 | Evidence | Report |
+| --- | --- | --- | --- | --- | --- |
+| `TileConfig.lanes` `auto` (`tiled.LANE_GPUS`, exact): two sweep-2 tiles on disjoint SM halves | – (1.05× per pair) | on (1.09× per pair) | – | under `cudaMallocAsync` | [tiled-concurrent-tiles](../validation/tiled/tiled-concurrent-tiles.md) |
+| `TileConfig.backward_chunk_scale` `auto` (`tiled.TILE_CHUNK_SCALE`, exact) | ×4 | ×4 | ×1 | 1.08M SrTiO3, wavefront, R 8,192: 5060 Ti −10.5 %, Ada −3.2 %; RTX PRO 6000 tiles do not chunk | `results/tiled-ideas-20261102` |
+
+## 2. Default MH-1 float32 plan (GPU-independent)
+
+Compiled for the ledger at main `8a269a91` (28 October 2026); rule names checked against `fastmace/planner/fixed.py` at `eca7ba5d`.
+
+`auto` rules as in [switch-map](switch-map.md) §1–§4 and `fastmace/planner/fixed.py` on main `8a269a91`.
+"RE default" means the research engine's `main.py` default as listed in SPEC §6.2 ("defaults as in `main.py` on 16
+October 2026"), carried over in phase 1a.
+
+RewriteConfig, on in the default MH-1 float32 plan:
+
+| Field | `auto` rule | Made default by |
+| --- | --- | --- |
+| `factor_species` | `on_for_hybrid_graph_engine_if_model_supports` | RE default (9 Oct 2026, production decision); SPEC §6.2 |
+| `fold_cutoff` | `on_with_factor_species_if_model_supports` | RE default (9 Oct 2026); SPEC §6.2 |
+| `density_first` | `on_with_fold_cutoff_if_model_supports` | RE default (10 Oct 2026); SPEC §6.2 |
+| `reassociate_first` | `on_with_stage1_fold_cutoff_if_model_supports` | RE default (10 Oct 2026); SPEC §6.2 |
+| `joint_radial_input` | `on_with_fold_cutoff_if_model_supports` | RE default (14 Oct 2026); SPEC §6.2 |
+| `fused_folded_backward` | `on_with_stage1_fold_cutoff_if_model_supports` | RE default (14 Oct 2026); SPEC §6.2 |
+| `folded_backward_tiles` | `on_with_fused_folded_backward` | Owner, 21 Oct 2026 (OPT-DEF-2), SPEC §19 thirteenth amendment |
+| `segmented_first_sum` | `on_with_reassociate_first_and_sort_receivers` | RE default (14 Oct 2026); SPEC §6.2 |
+| `streaming_conv` | `on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports` | RE default (14 Oct 2026); SPEC §6.2 |
+| `block_linear` | `on_for_hybrid_graph_engine` | RE default (14 Oct 2026); SPEC §6.2 |
+| `grouped_linear`, `merged_residual` | `on_with_block_linear` | RE default (16 Oct 2026); SPEC §6.2 |
+| `gated_rows` | `on_with_merged_residual` | Owner, 20 Oct 2026 night, §19 twelfth amendment |
+| `segment_gemm` | `on_with_gated_rows_float32_unless_reproducible` | Owner, 20 Oct 2026, §19 twelfth amendment |
+| `species_tables` | `on_unless_reproducible_if_model_supports` | Owner, 21 Oct 2026 (OPT-DEF-2), thirteenth amendment; float64 by decision 63 |
+| `fold_product_linear` | `on_with_species_tables_and_block_linear_if_model_supports` | as `species_tables` |
+| `fold_readout_tail` | `on_with_block_linear_unless_reproducible_if_model_supports` | as `species_tables` |
+| `chunked_conv_backward` | `on_with_streaming_conv_and_fused_folded_backward` | Decision 60 (27 Oct 2026; §19 "Optimisation round 6") |
+| `radial_tables` | `on_with_fold_cutoff_unless_reproducible` | Decision 62 (27 Oct 2026); class `certified` by decision 61; float64 by decision 63 |
+| `fused_folded_forward` | `on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus` | Decision 64 (27 Oct 2026); OMAT-0 with wprime, decision 66 (3 Nov 2026) |
+| `single_graph_strain` | `on` (acts only where stress is computed) | RE default (16 Oct 2026); SPEC §6.2 |
+
+RewriteConfig, off or not applicable in the MH-1 float32 plan: `species_skip` (generic family only,
+`on_with_graph_engine_if_model_supports`, RE 15 Oct 2026); `grouped_launch` (generic family only, decision 57);
+`fx_e3nn_linear`, `polar_graph_sums` (POLAR-1 only, decision 58); `polar_uvu` (`True`, acts on POLAR models only, RE
+16 Oct 2026); `fused_radial_hidden`, `direct_node_feats`, `folded_constants`, `combo_kernels`, `tf32x3_gemms`
+(`never_automatic`); `inplace_block_linear` (`False`, refused if set); `w_tables`, `save_transcendentals` (float64
+only, decision 65); `selfcheck_cache` (`"use"`, inert, not built).
+
+EngineConfig: `backend` hybrid (`backend_hybrid_for_graph_engine`; RE production decision 9 Oct 2026);
+`compile_mode` `"default"` (RE, 8–9 Oct 2026, no autotuning); `pipelined` (`on_with_graph_engine_unless_speculative`,
+RE 14 Oct); `async_output` (`on_with_graph_engine`, RE 15 Oct); `speculative_graph` `False` (OPT-IN);
+`first_derivative_only` `True`, `unfuse_full_addmm` `True`, `expandable_segments` (`on_for_torch_2_14_unless_alloc_conf_set`)
+(RE 7–8 Oct); `dynamic_edges` `True` (decision 59); `model_template_cache` `True` (conductor on merge, twelfth
+amendment mentions it); `overlap_rebuild` `True` (OPT-DEF-2, thirteenth amendment); `step_graph` `False` (OPT-IN);
+`fused_integrator` `True` (owner 21 Oct 2026, fourteenth amendment); `cueq_conv_fusion` (plain cuEq only,
+`on_for_plain_cueq_unless_reproducible`, RE 16 Oct); `recapture_budget` `"auto"`, `graph_variant_cap` 64,
+`dynamo_cache_size_limit` 64, `empty_cache_before_capture` `True`, `warmup_in_graph_pool` `True` (constants).
+The CUDA-graph tier is the default tier (rule 9 as amended by decision 38); `AdaptationConfig.adapt` `"auto"`
+(decisions 52–53); `CalibrationConfig.calibrate` `False` (decision 55); `RunnerConfig.persistent` `True` (POSIX,
+conductor decision 20 Oct 2026).
+
+PrecisionConfig: `dtype` float32 (`float32_for_hybrid_float64_for_cueq`); `tf32` `False` (never default, SPEC §1.2);
+`float64_energy` `True` (1b-T01/T03).
+
+NeighbourConfig: `skin` `"auto"` (0.3 Å for MD workloads; rule 11 for MC, species-change and displacement workloads,
+3-T05); `sort_receivers` (`on_for_hybrid_graph_engine`, RE 10 Oct); `gpu_neighbour_list` (`on_with_graph_engine`,
+RE 14 Oct); `edge_multiple` 256, `edge_bucket_fraction` 0.05, `capacity_headroom` 1.15, `headroom` `"auto"`,
+`d3_skin` `"auto"` (rule 11, 3b-T02). `IntegratorConfig.noise_batch` 256, the next batch drawn ahead on a background thread (`langevin.NOISE_DRAW_AHEAD`, every GPU, bitwise; A100 PCIe step 0.97 / 0.96 against off; round 6, 5 Nov); `fixcm_projection` `mass_weighted` under
+NVT fixcm (decision 37, correctness).
+
+## 3. Default MH-1 float64 plan: extra switches
+
+| Field / part | Rule | Made default by |
+| --- | --- | --- |
+| Hybrid backend for non-reproducible float64 plans | planner backend choice | Decision 63(a) |
+| `fp64_emulation` (cuBLAS INT8 emulation, eager strategy) | `on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible` (measured FP64 rate < 1/8) | Decision 63 |
+| `species_tables`, `fold_product_linear`, `fold_readout_tail` in float64 | rules without `float32` | Decision 63(c) |
+| `radial_tables` in float64 (degree 16, tolerance 3e-13) | `on_with_fold_cutoff_unless_reproducible` | Decision 63(d) |
+| `chunked_conv_backward` float64 chunk rule (4 L2s) | library rule inside `l2_chunk_edges` | f64-T03 (`79fb1115`), no decision number |
+| `fp64_emulation_mantissa_bits` | `dynamic_decision_65_d1_suspended_after_recapture_defect` (was `56_for_mh1_float64_on_measured_gpus_decision_65_else_dynamic`) | Decision 65(a), suspended by the owner on 28 Oct 2026 (auto = `"dynamic"` everywhere; explicit requests stay); now on main |
+| `w_tables` | `on_for_mh1_float64_on_measured_gpus_decision_65` | Decision 65(b) |
+| `save_transcendentals` | `on_for_mh1_float64_on_measured_gpus_decision_65` | Decision 65(c) |
+| Not in float64: `segment_gemm`, `grouped_launch`, `fused_folded_forward` (Triton/NVRTC float32 only) | — | — |
+
+## 4. Speed reference (MH-1, 3×3×3)
+
+MD step time in ms, NVT 300 K unless stated. Rows from different days or processes are not A/B comparisons.
+
+| Date | Engine and plan | GPU | NaCl | NaNbO3 | NbCl5 | Commit | Source |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- |
+| 2026-10-07 | RE: ASE path, FP32 | local | 41.4 | – | – | – | `ResearchModule:LT/studies/optimization_history/report.md` |
+| 2026-10-08 | RE: cuEq FP32 / hybrid FP32 | local | 9.668 / 7.075 | 84.587 / 55.920 | 72.286 / 55.650 | – | `ResearchModule:LT/studies/hybrid_oeq/rtx5060ti.md` |
+| 2026-10-14 | RE: best default after streaming conv + `ir_mul` | local | ≈ 3.75 (3.71) | ≈ 23.1 (22.9) | ≈ 28.8 (28.6) | – | `ResearchModule:LT/docs/roadmap.md` item 13 / `status.md` |
+| 2026-10-16 | RE: + grouped linear + merged residual | murphy | 3.55 | 25.74 | 30.54 | – | `ResearchModule:LT/studies/other_models/README.md` |
+| 2026-10-20 | FM before round 1 (2-T20a) | local / murphy | 3.71 / 3.68 | – | 27.43 / 31.58 | not recorded | [2-T20a](../validation/phases/2-T20a-step-breakdown.md), [opt-1 plan](../../plans/opt-1.md) |
+| 2026-10-21 | FM after round 2 (OPT-T10, 1000 K, wall) | local / L4 | 3.028 / 4.264 | 18.788 / 29.589 | 21.434 / 33.126 | `072fa0a` | [OPT-T10](../design/speed/opt-T10-step-breakdown.md) |
+| 2026-10-25 | FM 0.x default, median of 4 blocks | L4 (Colab) | 3.95 | 31.5 | 35.2 | `c1f4de9c` | [benchmarks](../benchmarks.md) |
+| 2026-10-27 | FM default + `radial_tables` (before `fused_folded_forward`) | leto | 2.80 | 18.03 | 21.75 | `0cba0d7a` | [opt6-T05](../validation/speed/opt6-T05.md) |
+| 2026-10-27 | FM default + `fused_folded_forward` (today's float32 default), side b, both orders | local | 2.654 / 2.709 | 14.56 / 14.58 | 18.67 / 18.62 | `9eb1ab1e` (pinned) | [opt8-T02](../validation/speed/opt8-T02.md) |
+| 2026-10-27 | same | murphy | 2.811 / 2.809 | 17.37 / 17.50 | 21.54 / 21.62 | `059b2cfa` | [opt8-T02](../validation/speed/opt8-T02.md) |
+| 2026-10-27 | same, order a-b only | L4 (Colab) | – | 26.06 | 31.47 | `9eb1ab1e` | [opt8-T02](../validation/speed/opt8-T02.md) |
+| 2026-10-27 | FM float32 default, step breakdown at 1000 K | local | 2.78 | 15.31 | 19.21 | branch `opt7-plan` | branch fastmace/opt7-plan: plans/opt-7.md §1 |
+| 2026-10-27 | FM float64: stock → decision-63 package | local | 81.9 → 46.9 | 516 → 255 | 652 → 275 | `7562a425` | [f64-T01](../validation/speed/f64-T01.md) |
+| 2026-10-27 | FM float64: stock → package | leto | 76.3 → 44.8 | – | 579 → 233 | not recorded | [f64-T01](../validation/speed/f64-T01.md) |
+| 2026-10-28 | FM float64: package + D1 + D2 + D3, ABBA ratio | local / Ada | 0.806 / 0.804 | 0.782 / – | 0.797 / 0.802 | not recorded | [ideas](../../plans/ideas-20261027.md) |
+| 2026-10-26 | FM 1.0.0, OMAT-0 medium float32 | local | 1.651 / 1.652 | – | 9.901 / 9.921 | 1.0.0 | [ALCHEMI comparison](../validation/comparisons/alchemi-comparison-20261025.md) |
+
+A100 float32 numbers for the MH-1 default are not recorded (ledger, "Open or untried"). OMAT-0 on the A100: [omat0-a100.md](omat0-a100.md).

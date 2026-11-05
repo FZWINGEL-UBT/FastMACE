@@ -3,7 +3,7 @@
 ``compact`` computes the candidates' shifts from the unit shifts and ``build_cell`` with the build's times_3x3.
 Before cap-nlist the list stored them (``times_3x3`` on the GPU build, numpy's ``unit_shifts @ cell`` on the
 matscipy build); the comparison against both layouts, and MD trajectories bitwise equal with the old layout,
-were recorded at commit 787e44df (docs/validation/capacity-nlist.md). ``BUILD_CHUNK`` bounds the GPU build's
+were recorded at commit 787e44df (docs/validation/capacity/capacity-nlist.md). ``BUILD_CHUNK`` bounds the GPU build's
 float64 decision; the result does not depend on it.
 """
 

@@ -4,7 +4,7 @@
 in the order the research engine applies them. Every record acts in place on the
 interactions of ``FACTORED_INTERACTIONS`` (``RealAgnosticResidualNonLinearInteractionBlock``)
 and sets the attributes that ``modules.cutoff_folded_forward`` reads; the research engine's
-module switches became these records (docs/design/switch-map.md, section 1).
+module switches became these records (docs/current/switch-map.md, section 1).
 
 - ``factor_species``: the species embeddings' share of both radial networks' first layers is
   computed per atom (``ProjectedEmbedding``) and gathered per edge (``FactoredRadialMLP``).

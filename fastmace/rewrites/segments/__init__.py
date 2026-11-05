@@ -1,7 +1,7 @@
 """``recompute_node_segments``: the node-local segments recomputed in the backward (plans/capacity.md CAP-T08).
 
 **Where the memory is.** The force call keeps per-atom state for the backward, and most of it comes from each
-interaction's node-local segments, which do not mix atoms (docs/validation/capacity-T08-chunks.md):
+interaction's node-local segments, which do not mix atoms (docs/validation/capacity/capacity-T08-chunks.md):
 
 - the ``gated_rows`` chain (residual products, gate and ``linear_2``);
 - the product block (symmetric contraction, linear and skip connection).
@@ -51,7 +51,7 @@ SEGMENT_REGION = "separate"
 # recompute_node_region's atom chunks, each its own checkpoint (ninth list item 2): one count for every cell. At NbCl5
 # 9,216, 21,600 and 43,200 atoms, 4 chunks set the lowest peak, 0.773-0.774 of the separate segments' (35.2 kB per
 # atom less at every size), at 1.22-1.24 times their force call; 2 kept more, and 8 or 16 more again, at every size
-# (docs/validation/chunked-region.md). An int for A/B sides; the "combined" screen above uses it too.
+# (docs/validation/capacity/chunked-region.md). An int for A/B sides; the "combined" screen above uses it too.
 REGION_CHUNKS = 4
 
 

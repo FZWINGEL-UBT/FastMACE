@@ -6,7 +6,7 @@ shared-memory slice of ``W``, uses them for the message at once and also stores 
 (``chunked_conv_backward``) runs unchanged on them. It saves the cuBLAS product and the forward's ``w`` read.
 The stored ``w`` and the message are bitwise those of the chain on the measured GPUs: each ``w`` element is the
 same k-ordered FP32 sum of fused multiply-adds, and each receiver's message sums its edges in CSR order with the
-same angular terms. Results: ``docs/validation/opt8-T01.md`` (T01b) and ``docs/validation/opt8-T02.md``.
+same angular terms. Results: ``docs/validation/speed/opt8-T01.md`` (T01b) and ``docs/validation/speed/opt8-T02.md``.
 
 Generated, like the vendored kernels, from the streaming schedule (``FactorizedComputationSchedule``) of any uvu
 problem whose paths have one edge channel and whose channel count is a multiple of 32; float32 only. Work split:

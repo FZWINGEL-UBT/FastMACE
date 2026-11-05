@@ -200,7 +200,7 @@ sections, files it owns, tests to write first, done-when.
   workstation), and `tests/gpu` on one idle workstation GPU (murphy or
   leto).
 - Done when: both pass, and the result is recorded in
-  `docs/validation/phase-0.md` (machine, GPU, environment, commit).
+  `docs/validation/phases/phase-0.md` (machine, GPU, environment, commit).
 
 ## Order and parallelism
 
@@ -221,6 +221,6 @@ the conductor.
 ## Phase exit
 
 - Conductor merges, runs the CPU suite and `tests/gpu` locally, and writes
-  `docs/validation/phase-0.md`.
+  `docs/validation/phases/phase-0.md`.
 - Owner checkpoint: acceptance items 1–5 above, then commit, push and NAS
   sync.

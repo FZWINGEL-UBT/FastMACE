@@ -5,7 +5,7 @@
 - ``half_list(atoms, cutoff)``: every pair within ``cutoff`` from ASE's neighbour list, as the half
   list the D3 kernel takes (``i < j``, plus each self-image pair once), with its image index and
   table. It stands in for 3b-T02's GPU list in these tests;
-- ``within(deviation, agreement, floor)``: the runbook's item 1 rule (docs/validation/phase-3b-runbook.md):
+- ``within(deviation, agreement, floor)``: the runbook's item 1 rule (docs/validation/phases/phase-3b-runbook.md):
   at most twice the two references' deviation from each other, plus a rounding floor.
 """
 

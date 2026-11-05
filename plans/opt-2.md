@@ -1,7 +1,7 @@
 # Optimisation round 2 (edge side and small-cell fixed costs)
 
 The owner decided this round on 21 October 2026, after the OPT-T09 breakdown
-(`docs/design/opt-T09-step-breakdown.md`). Their words: "Go ahead and try all
+(`docs/design/speed/opt-T09-step-breakdown.md`). Their words: "Go ahead and try all
 5 ideas as much as possible".
 
 **Baseline:** main `eb70cfd`, with the OPT-T08 records on (`species_tables`,
@@ -64,7 +64,7 @@ their murphy A/B is still pending.
 ## Round-2 results and the defaults (21 October 2026)
 
 The owner's decision on 21 October 2026 ("Make all 3 defaults") was carried out in OPT-DEF-2
-(`docs/validation/opt-def-2.md`, SPEC thirteenth amendment).
+(`docs/validation/speed/opt-def-2.md`, SPEC thirteenth amendment).
 
 | Candidate | Result | Decision |
 | --- | --- | --- |

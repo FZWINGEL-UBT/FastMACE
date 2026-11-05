@@ -11,7 +11,7 @@ sorted by receiver, as the streaming convolution requires (``sort_receivers``).
 
 ``generic_chunked_conv_backward`` (the streaming convolution on MH-1's folded path with its chunked backward) is
 also checked with every cell forced into chunks of 37 edges, on MACE-OMAT-0 medium too
-(docs/validation/omat0-capacity.md).
+(docs/validation/omat0/omat0-capacity.md).
 
 Real checkpoints need ``FASTMACE_MODELS``.
 """

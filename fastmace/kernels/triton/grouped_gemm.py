@@ -1,6 +1,6 @@
 """A block linear's small per-l products in one launch (plan opt-1, OPT-T03 candidate 2).
 
-Design: ``docs/design/opt-T03-small-m.md``.
+Design: ``docs/design/speed/opt-T03-small-m.md``.
 
 A block linear multiplies each irrep segment's rows ``[atoms (2l + 1), K]`` by its weight. On small cells each
 of those products leaves most of the GPU idle (NaCl 3x3x3: 0.8–2.7 waves). ``grouped_products(lefts, weights,

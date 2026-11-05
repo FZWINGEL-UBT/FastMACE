@@ -1,6 +1,6 @@
 """Single-SM co-execution probe: CUDA-core FP32 FFMA beside tensor-core MMA (plan opt-4, OPT4-T07).
 
-The gate of docs/design/2026-10-23-heterogeneous-megakernel.md ("The gate before any work"). One kernel, one
+The gate of docs/design/research/2026-10-23-heterogeneous-megakernel.md ("The gate before any work"). One kernel, one
 block per SM; warps ``0 .. S-1`` run an FP32 FFMA workload (the SIMT side), warps ``S .. S+M-1`` run
 independent ``mma.sync`` work (TF32 m16n8k8 or BF16 m16n8k16, FP32 accumulate; the MMA side). Warp ``w`` sits
 on sub-partition ``w % 4``, so with ``S`` and ``M`` multiples of 4 every scheduler holds both kinds. Each
