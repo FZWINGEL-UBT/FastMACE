@@ -115,7 +115,15 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
   0-T07). Until plan task 1a-T00 replaces it, hybrid runs still go through
   ResearchModule's
   `Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh`.
-- **CPU suite:** from the repository root,
+- **NHR@FAU cluster (Alex):** account `v130cb18`, from the PC through
+  `csnhr.nhr.fau.de`; every job through Slurm, nothing on the frontends. See
+  [docs/nhr-cluster.md](docs/nhr-cluster.md).
+- **CPU suite:** run the full suite on **leto**, not locally (owner,
+  5 November 2026): copy the tree to `/mnt/homes/zwingel/<run>/src`, do the
+  idle check, and run it there with the NAS `mace_cueq_latest` Python, `-n 8`
+  to `-n 12`, `-m "not acceptance"` and `TMPDIR`/`--basetemp` under
+  `<run>/tmp` (recipe: `/mnt/homes/zwingel/fm-round5-suite/run.sh`). Single
+  test files may run locally. The local command, from the repository root:
 
   ```bash
   CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 tests/cpu

@@ -24,6 +24,7 @@ first table; everything else is for developers and is read on GitHub.
 | How OMAT-0 runs on the A100, part by part, and where each idea came from | [current/omat0-a100.md](current/omat0-a100.md) |
 | The contract: architecture, rules, decisions (§18), revisions (§19) | [../SPEC.md](../SPEC.md) (read only the sections you need: `grep -n '^##' SPEC.md`) |
 | Who does what, environments, how to record results | [../AGENTS.md](../AGENTS.md), [../plans/README.md](../plans/README.md), [../plans/CONDUCTOR.md](../plans/CONDUCTOR.md) |
+| How an agent runs jobs on the NHR@FAU Alex cluster (SSH, storage, Slurm) | [nhr-cluster.md](nhr-cluster.md) |
 
 ## History and evidence
 
