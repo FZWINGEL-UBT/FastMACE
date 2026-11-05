@@ -227,12 +227,15 @@ def test_h200_defaults():
 
     for models in (fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS, fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS,
                    fixed.DECISION_66_TF32X3_OMAT0_GPUS, fixed.DECISION_66_GENERIC_WPRIME_GPUS,
-                   fused_forward.TENSOR_CORES_GPUS, fused_forward.VEC_SH_GPUS, fused_forward.VEC_A_GPUS,
+                   fused_forward.SKIP_ZERO_COLUMN_GPUS, fused_forward.TENSOR_CORES_GPUS, fused_forward.VEC_SH_GPUS,
+                   fused_forward.VEC_A_GPUS,
                    fused_forward.TC_WFRAG_GPUS, wprime_backward.TABLE_W_GPUS, wprime_backward.BLOCK_MESSAGE_GPUS,
                    wprime_backward.FACTORED_GPUS, wprime_backward.HORNER_GPUS, wprime_backward.SCALAR_PATHS_GPUS,
                    wprime_backward.BUTTERFLY_GPUS, energy.HEAD_SLICE_GPUS, energy.GRAPH_SUM_GPUS,
                    modules.FUSED_FIRST_BACKWARD_GPUS, modules.EDGE_SH_GPUS, radial.SYMMETRIC_PAIRS_GPUS):
         assert "NVIDIA H200" in models
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
+    from fastmace.kernels.cutlass import segment_rows
+    assert "NVIDIA H200" not in segment_rows.SEGMENT_ROWS_GPUS  # 1.0006 / 1.0000: no gain
     assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
     assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured

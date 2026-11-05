@@ -59,7 +59,10 @@ SKIP_ZERO_COLUMN = None
 # The RTX 5060 Ti gained nothing (1.000) and keeps the full k-loop; other GPUs are not measured. The A100 80GB PCIe
 # (owner, 4 November 2026: "Yes"): Benchmark_loup 4.61 -> 3.31 us/atom/step with the SXM4's decision-66 switches.
 # Every A100 model (GPUModels; owner, 4 November 2026).
-SKIP_ZERO_COLUMN_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.092 / 1.090 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+SKIP_ZERO_COLUMN_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe",
+                                   "NVIDIA H200"))
 # The stored per-edge weights are read only by the backward, long after: store them with the streaming cache hint
 # (``__stcs``, evict-first), so they do not displace W, a and x in L2 (OMAT-0 kernel lab, 3 November 2026: the fused
 # forward 3.5 % faster on the RTX 4000 Ada, 0.5 % on the RTX 5060 Ti). Bitwise. A module constant for the A/B.
