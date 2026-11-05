@@ -378,9 +378,10 @@ def _block_ldg():
     return wp.block_ldg_default(torch.device("cuda", torch.cuda.current_device()))
 
 
-def _tc_rerender(kernel, tc, name, warps=None, prefetch=False):
+def _tc_rerender(kernel, tc, name, warps=None, prefetch=False, tctp=False):
     """The tensor-core kernel re-rendered in mode ``tc`` (fused_forward.render) with its own launch rule;
-    ``warps``: that many warps per block (the launch bound, so more registers per thread with fewer)."""
+    ``warps``: that many warps per block (the launch bound, so more registers per thread with fewer). The plan
+    kernel's VEC_SH / VEC_A / TC_WFRAG carry over where the mode allows them; ``tctp``: the TP on tensor cores."""
     def transform(s):
         import torch
 
@@ -399,8 +400,12 @@ def _tc_rerender(kernel, tc, name, warps=None, prefetch=False):
             rule = dataclasses.replace(rule, warps=warps, shared_bytes=4 * ff.slice_floats(per, width, tc) + warps * 4
                                        * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per, prefetch,
                                                            kernel.schedule.input_dim // kernel.channels))
+        plain = tc is True and not prefetch
         source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc,
-                           blocks=kernel.blocks, prefetch=prefetch)
+                           blocks=kernel.blocks, prefetch=prefetch,
+                           vec_sh=getattr(kernel, "vec_sh", False) and not prefetch,
+                           vec_a=getattr(kernel, "vec_a", False) and plain,
+                           wfrag=getattr(kernel, "wfrag", False) and plain, tctp=tctp)
         _RULES[source] = rule
         print(f"{name} rule {rule} (plan {kernel.rule})", flush=True)
         return source
@@ -657,7 +662,8 @@ def forward_variants(kernel=None):
                                                         "for (int k0 = 0; k0 < 0; k0 += 8) {"), ()),
         "tc-presplit": ("exact", _tc_presplit(kernel), ()),
         # Exponent-shifted 3xFP16 m16n8k16 (round 2, 5 November 2026): rounded 22-bit split, 2x the TF32 MMA rate.
-        "tc-rerender": ("exact", _tc_rerender(kernel, True, "tc-rerender"), ()),  # the re-render check: bitwise
+        "tc-rerender": ("exact", _tc_rerender(kernel, True, "tc-rerender"), ()),
+        "tc-tp": ("rounding", _tc_rerender(kernel, True, "tc-tp", tctp=True), ()),  # the re-render check: bitwise
         "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),  # the FP32-SIMT product: a third opinion
         # Fewer warps per block: the launch bound allows more registers (the A100 kernel spills 40 bytes at 168).
         "tc-warps8": ("exact", _tc_rerender(kernel, True, "tc-warps8", warps=8), ()),

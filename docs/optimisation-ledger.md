@@ -607,6 +607,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-tp-factor](#omat0-tp-factor) | Fewer coefficient multiplies in the fused forward's tensor product | none (bound `F-tp-no-coef`) | FM | REJECTED (bound) | 2026-11-05 | bound 0.961 (5060 Ti) | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 | [omat0-table-in-forward](#omat0-table-in-forward) | Interaction 2's radial table evaluated inside the fused forward | none (estimate) | FM | REJECTED (estimate) | 2026-11-05 | about 4.5 GB of L2 traffic per force call against 0.77 GB now | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 | [omat0-fp16x3-gemm](#omat0-fp16x3-gemm) | 3xFP16 GEMMs (one FP16 GEMM over 3K, power-of-two scaling) instead of CUTLASS 3xTF32 | none (`tools/fp16x3_gemm_bench.py`) | FM | REJECTED (accuracy) | 2026-11-05 | A100-SXM4 GEMM 0.49–0.66 of 3xTF32, split unfused as costly; error 1.1–2.0e-6 against 1.1–2.7e-7 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-tc-tp](#omat0-tc-tp) | The fused forward's tensor product as a second 3xTF32 mma (w x from the product's fragments, S = CG sh, edges as k) | `fused_forward.TC_TP` (off), `TC_TP_SPLIT` | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.276 (bound without TP 0.617), 5060 Ti 1.64; message 4-6e-7 rms of FP32 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 | [omat0-ff-hints](#omat0-ff-hints) | Cache hints in the fused forward (x evict_last / ldg, a and sh no_allocate) | none (lab) | FM | REJECTED | 2026-11-05 | A100-SXM4 x 1.021; with tc-a4 0.912–0.923 against 0.903 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 | [omat0-atom-order](#omat0-atom-order) | Morton atom order for the x gathers | none (lab, `results/round4-staging-20261105/orders`) | FM | REJECTED | 2026-11-05 | 5060 Ti forward 6,724 (repeat), 6,737 (Morton), 6,679 µs (shuffled) | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 
@@ -3964,6 +3965,17 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Status: REJECTED (estimate; not built).
 - Measured: each warp batch would read its (pair, bin) coefficient slab, about 4.5 GB of L2 traffic per force call, against 0.77 GB for the stored table now; the stored-a loads are bounded at 0.900 of the forward (A100 falsifier), and VEC_A reaches 0.903.
 - Why: the table is cheap to store once and expensive to re-evaluate per warp.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-tc-tp"></a>
+#### omat0-tc-tp: the tensor product on tensor cores
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.TC_TP` (None: `TC_TP_GPUS`, empty), `TC_TP_SPLIT` ("round"); lab variant `tc-tp`
+- Engine: FM
+- Date/round: 5 November 2026, round 4 (`f6052a00`)
+- What: the a.W product's C fragments, with a lane's edge pair as its k columns, are the A fragment `(w x)[channel, (edge, m1)]` of a second 3xTF32 product against `S_e[m1, m3] = sum_m2 CG sh_e[m2]`; a receiver's edges are the k dimension, the message stays in mma accumulators until the receiver changes. Path by path with per-path receiver cursors. Rounding: message 4-6e-7 rms of the FP32 TP; w bitwise.
+- Status: REJECTED (kept off in the code).
+- Measured: kernel lab forward A100-SXM4-80GB 1.276 (162 registers, no spills; the bound without any TP 0.617); RTX 5060 Ti with tensor cores forced 1.64.
+- Why: each A element feeds one mma triple (N = 8 outputs, K = 8 edges), and its preparation (the multiply by x and a 3xTF32 split of both operands) costs about what the FP32 TP terms cost.
 - Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
 
 <a id="omat0-fp16x3-gemm"></a>

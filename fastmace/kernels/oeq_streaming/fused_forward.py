@@ -111,6 +111,16 @@ VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))  # every A100 (see VEC_SH_GPU
 # A100-SXM4-80GB kernel lab: 0.965 alone, 0.860 with VEC_A and VEC_SH (0.905 without). Needs the TF32 product (not
 # presplit, not fp16) without prefetch. None: on for TC_WFRAG_GPUS (decision 66); True / False: an A/B side's choice.
 TC_WFRAG = None
+# Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
+# (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
+# (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
+# edge from sh and the coefficients), and the sum over a receiver's edges is its k dimension: the message stays in
+# mma accumulators until the receiver changes. No redistribution tile, no per-lane TP. Rounding (S pre-summed, the
+# products in 3xTF32): not bitwise. Needs the TF32 product (not presplit), no prefetch, each path's outputs at most 8
+# components of one segment. None: on for TC_TP_GPUS (decision 66); True / False: an A/B side's choice.
+TC_TP = None
+TC_TP_SPLIT = "round"  # the TP operands' split (``_TC_SPLITS``; "round": both parts rounded to nearest)
+TC_TP_GPUS = GPUModels(())
 # Default (decision 66): A100-SXM4-80GB with VEC_A and VEC_SH, MD step b/a 0.960 / 0.954 (SrTiO3), 0.970 / 0.969
 # (NbCl5), both build orders; force gate as the plan (NbCl5 stress 1.57e-7, the A100's accepted exception).
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
@@ -152,6 +162,32 @@ def tc_wfrag_default(name=None):
     if on is None:
         on = name in TC_WFRAG_GPUS
     return bool(on)
+
+
+def tc_tp_default(name=None):
+    """``TC_TP`` (None: ``name`` in ``TC_TP_GPUS``); built only where it applies (``FusedFoldedForward``)."""
+    on = TC_TP
+    if on is None:
+        on = name in TC_TP_GPUS
+    return bool(on)
+
+
+def tc_tp_applies(schedule):
+    """Whether ``TC_TP`` can render ``schedule``: every path has at most 8 outputs, of one segment, components 0..d-1
+    in order, and each output slot belongs to one path."""
+    owners = {}
+    for i, path in enumerate(schedule.paths):
+        outs = path.outputs
+        if not outs or len(outs) > 8 or path.input_irrep_dim > 8:
+            return False
+        starts = {o.accumulator.start for o in outs}
+        if (len(starts) != 1 or [o.accumulator.component for o in outs] != list(range(len(outs)))
+                or [o.output_component for o in outs] != list(range(len(outs)))):
+            return False
+        for o in outs:
+            if owners.setdefault(o.accumulator.name, i) != i:
+                return False
+    return True
 
 
 def a_columns(fused_id):
@@ -401,7 +437,7 @@ def tc_astage_vec():
                 }"""
 
 
-def tc_product(npl, presplit=False, vec_a=False, wfrag=False):
+def tc_product(npl, presplit=False, vec_a=False, wfrag=False, keep=False):
     """``float w[npl][B]`` (lane = channel) from the staged a and the W slice through 3xTF32 mma.sync m16n8k8 tiles
     (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``; ``presplit``: the slice holds the
     split parts (``tc_wfill``)."""
@@ -434,7 +470,7 @@ def tc_product(npl, presplit=False, vec_a=False, wfrag=False):
     else:
         afrag = """                        split_tf32(a_s[(k0 + tq) * B + gid], bh[0], bl[0]);
                         split_tf32(a_s[(k0 + tq + 4) * B + gid], bh[1], bl[1]);"""
-    return f"""                float wacc[{npl}][2][4];
+    head = f"""                float wacc[{npl}][2][4];
                 #pragma unroll
                 for (int g = 0; g < {npl}; ++g)
                     #pragma unroll
@@ -457,6 +493,10 @@ def tc_product(npl, presplit=False, vec_a=False, wfrag=False):
                                 mma_tf32(wacc[g][m], ah, bh);
                             }}
                     }}
+                }}"""
+    if keep:  # TC_TP: w stays in the C fragments
+        return head
+    return head[:-len("\n                }")] + f"""
                     #pragma unroll
                     for (int g = 0; g < {npl}; ++g)
                         #pragma unroll
@@ -588,7 +628,7 @@ def _node(layout, channels, start, component, dim):
 
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-           vec_sh=False, vec_a=False, wfrag=False):
+           vec_sh=False, vec_a=False, wfrag=False, tctp=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -604,6 +644,9 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
         raise ValueError("fused_folded_forward: vec_a needs the TF32 product without prefetch and used % 32 == 0")
     if wfrag and (tc is not True or prefetch or CHANNEL_BLOCK != 32):
         raise ValueError("fused_folded_forward: wfrag needs the TF32 product (not presplit) without prefetch")
+    if tctp and (tc is not True or prefetch or not tc_tp_applies(schedule)):
+        raise ValueError("fused_folded_forward: tctp needs the TF32 product (not presplit), no prefetch and "
+                         "tc_tp_applies(schedule)")
     if vec_sh and schedule.edge_dim % 4:
         raise ValueError(f"fused_folded_forward: vec_sh needs edge_dim % 4 == 0, not {schedule.edge_dim}")
     check_problem(schedule)
@@ -631,12 +674,15 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch, vec_sh, vec_a, wfrag)}    }} break;"
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp)}    }} break;"
                       for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
         raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
     helpers = (tc_helpers() + TC_FP16_HELPERS) if tc == "fp16" else tc_helpers() if tc else ""
     helpers += CP_ASYNC_HELPERS if prefetch else ""
+    if tctp:
+        helpers += ("__device__ __forceinline__ void split_tp(float x, unsigned& hi, unsigned& lo) {\n"
+                    + _TC_SPLITS[TC_TP_SPLIT] + "\n}\n")
     ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
     x_slots = schedule.input_dim // C
     a_base = slice_floats(npp, ka, tc)
@@ -758,8 +804,189 @@ def _out(slot, C, layout, bmap):
     return f"out{g}[cur * {width} + {base + slot.component * stride} + ch]"
 
 
+def _out_expr(slot, C, layout, bmap, comp, channel):
+    """The output address of ``slot``'s segment at component expression ``comp`` and channel expression ``channel``
+    (``TC_TP``'s flush)."""
+    if bmap is None:
+        if layout == "ir_mul":
+            return f"out[cur * OUT_DIM + {slot.start} + ({comp}) * {C} + {channel}]"
+        return f"out[cur * OUT_DIM + {slot.start} + ({comp}) + ({channel}) * {slot.irrep_dim}]"
+    g, width, base, stride = bmap[slot.start]
+    return f"out{g}[cur * {width} + {base} + ({comp}) * {stride} + {channel}]"
+
+
+def _part_tctp(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a, wfrag):
+    """``_part`` with the tensor product on tensor cores (``TC_TP``): see the module constant. One path at a time: its
+    a.W product into 8 fragment registers, then its TP over the batch's receiver segments with its own receiver
+    cursor (the paths' outputs are independent), so only the TP accumulators stay live across paths."""
+    paths = schedule.paths
+    npl = len(part)
+    wst = ", ".join(str(paths[pi].weight_start) for pi in part)
+    xkeys = sorted({(paths[pi].input_start, j, paths[pi].input_irrep_dim) for pi in part
+                    for j in range(paths[pi].input_irrep_dim)})
+    xi = {key: i for i, key in enumerate(xkeys)}
+    nx = len(xkeys)
+    nl = "\n"
+    wfill = tc_wfill(npl, "KA", False, wfrag)
+    astage = tc_astage_vec() if vec_a else tc_astage("KA")
+    one = tc_product(1, False, vec_a, wfrag, keep=True)
+    if vec_sh:
+        shstage = """                for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);"""
+    else:
+        shstage = "                for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;"
+    xloads = []
+    for (st, c, d), i in xi.items():
+        for m in range(2):
+            for h in range(2):
+                chan = f"(cb * CB + {16 * m + 8 * h} + gid)"
+                off = f"{st + c * C} + {chan}" if layout == "ir_mul" else f"{st + c} + {chan} * {d}"
+                for q in range(2):
+                    xloads.append(f"                xt[{q}][{m}][{h}][{i}] = (sq{q} >= 0) ? x[(int64_t)sq{q} * IN_DIM + {off}]"
+                                  " : 0.f;")
+    wstore = store.replace("w[g][b]", "wacc[0][m][i]").replace("(e0 + b)", "(e0 + eb)").replace(
+        "wst[g] + ch]", "wst[GP] + cb * CB + 16 * m + 8 * (i >> 1) + gid]")
+    paths_code, flush_all = [], []
+    for g, pi in enumerate(part):
+        p = paths[pi]
+        slot = slots[p.outputs[0].accumulator.name]
+        d3 = len(p.outputs)
+        outs = []
+        for m in range(2):
+            for e in range(4):
+                comp = f"(2 * tq + {e & 1})"
+                chan = f"(cb * CB + {16 * m + 8 * (e >> 1)} + gid)"
+                outs.append(f"if (2 * tq + {e & 1} < {d3}) "
+                            f"{_out_expr(slot, C, layout, bmap, comp, chan)} = tacc[{g}][{m}][{e}];")
+        zero_g = f"for (int m = 0; m < 2; ++m) for (int i = 0; i < 4; ++i) tacc[{g}][m][i] = 0.f;"
+        flush_g = " ".join(outs) + " " + zero_g
+        flush_all.append(flush_g)
+        product = one.replace("(g * KP + k0 + tq)", f"(({g} + g) * KP + k0 + tq)").replace(
+            "((g * (KP / 8) + (k0 >> 3))", f"((({g} + g) * (KP / 8) + (k0 >> 3))")
+        assert product != one or g == 0
+        svals = []
+        for j in range(p.input_irrep_dim):
+            for q in range(2):
+                cases = []
+                for o in p.outputs:
+                    terms = " + ".join(f"e{q}_{t.edge_component} * {_lit(t.coefficient)}" for t in o.terms
+                                       if t.input_component == j)
+                    if terms:
+                        cases.append((o.output_component, terms))
+                expr = "0.f"
+                for comp, terms in reversed(cases):
+                    expr = f"(gid == {comp} ? ({terms}) : {expr})"
+                svals.append((j, q, expr))
+        eloads = nl.join(f"                            const float e{q}_{k} = sh_s[(2 * tq + {q}) * ED + {p.edge_start + k}];"
+                         for q in range(2) for k in range(p.edge_irrep_dim))
+        mmas = []
+        for j in range(p.input_irrep_dim):
+            i = xi[(p.input_start, j, p.input_irrep_dim)]
+            e0x = next(e for jj, q, e in svals if jj == j and q == 0)
+            e1x = next(e for jj, q, e in svals if jj == j and q == 1)
+            mmas.append(f"""                            {{
+                                unsigned bh[2], bl[2];
+                                split_tp(ok0 ? {e0x} : 0.f, bh[0], bl[0]);
+                                split_tp(ok1 ? {e1x} : 0.f, bh[1], bl[1]);
+                                #pragma unroll
+                                for (int m = 0; m < 2; ++m) {{
+                                    unsigned ah[4], al[4];
+                                    split_tp(wacc[0][m][0] * xt[0][m][0][{i}], ah[0], al[0]);
+                                    split_tp(wacc[0][m][2] * xt[0][m][1][{i}], ah[1], al[1]);
+                                    split_tp(wacc[0][m][1] * xt[1][m][0][{i}], ah[2], al[2]);
+                                    split_tp(wacc[0][m][3] * xt[1][m][1][{i}], ah[3], al[3]);
+                                    mma_tf32(tacc[{g}][m], al, bh);
+                                    mma_tf32(tacc[{g}][m], ah, bl);
+                                    mma_tf32(tacc[{g}][m], ah, bh);
+                                }}
+                            }}""")
+        paths_code.append(f"""                {{  // path {pi}
+                    constexpr int GP = {g};
+{product}
+                    if (STORE_W) {{
+                        const int wst[{npl}] = {{{wst}}};
+                        #pragma unroll
+                        for (int m = 0; m < 2; ++m)
+                            #pragma unroll
+                            for (int i = 0; i < 4; ++i) {{
+                                const int eb = 2 * tq + (i & 1);
+                                if (eb < nb) {wstore}
+                            }}
+                    }}
+                    if (!tail) {{
+                        int64_t cg = cur;
+                        int bi = 0;
+                        while (bi < nb) {{
+                            const int r = __shfl_sync(FULL, rl, bi);
+                            while (cg < r) {{ {flush_g.replace("cur * ", "cg * ")} ++cg; }}
+                            const bool ok0 = 2 * tq < nb && rq0 == r, ok1 = 2 * tq + 1 < nb && rq1 == r;
+{eloads}
+{nl.join(mmas)}
+                            bi += __popc(__ballot_sync(FULL, lane < nb && rl == r));
+                        }}
+                    }}
+                }}""")
+    zero = f"""            #pragma unroll
+            for (int g = 0; g < {npl}; ++g)
+                #pragma unroll
+                for (int m = 0; m < 2; ++m)
+                    #pragma unroll
+                    for (int i = 0; i < 4; ++i) tacc[g][m][i] = 0.f;"""
+    flush = "{ " + " ".join(flush_all) + " ++cur; }"
+    return f"""
+        {{
+            const int wst[{npl}] = {{{wst}}};
+{wfill}
+        }}
+        __syncthreads();
+        const int gid = lane >> 2, tq = lane & 3;
+        while (true) {{
+            int cc = 0;
+            if (lane == 0) cc = atomicAdd(ctr, 1);
+            cc = __shfl_sync(FULL, cc, 0);
+            int64_t r0, r1, ebeg, eend;
+            const bool tail = cc >= receiver_chunks;
+            if (!tail) {{
+                r0 = (int64_t)cc * RC;
+                r1 = r0 + RC < N ? r0 + RC : N;
+                ebeg = row_ptr[r0] < 0 ? 0 : row_ptr[r0];
+                eend = row_ptr[r1] < ebeg ? ebeg : row_ptr[r1];
+                eend = eend > E ? E : eend;
+            }} else {{
+                r0 = r1 = N;
+                ebeg = tail_begin + (cc - receiver_chunks) * TAIL;
+                if (ebeg >= E || !STORE_W) break;
+                eend = ebeg + TAIL < E ? ebeg + TAIL : E;
+            }}
+            float tacc[{npl}][2][4];
+{zero}
+            int64_t cur = r0;
+            for (int64_t e0 = ebeg; e0 < eend; e0 += B) {{
+                const int nb = (int)((eend - e0) < B ? (eend - e0) : B);
+                __syncwarp();
+{astage}
+{shstage}
+                const int rl = (lane < nb && !tail) ? receivers[e0 + lane] : 0x7fffffff;
+                int sl = (lane < nb && !tail) ? senders[e0 + lane] : -1;
+                if (sl < 0 || sl >= N) sl = -1;
+                const int sq0 = __shfl_sync(FULL, sl, 2 * tq), sq1 = __shfl_sync(FULL, sl, 2 * tq + 1);
+                const int rq0 = __shfl_sync(FULL, rl, 2 * tq), rq1 = __shfl_sync(FULL, rl, 2 * tq + 1);
+                float xt[2][2][2][{nx}];
+{nl.join(xloads)}
+                __syncwarp();
+{nl.join(paths_code)}
+                if (!tail && nb > 0) cur = __shfl_sync(FULL, rl, nb - 1);
+            }}
+            while (cur < r1) {flush}
+        }}
+"""
+
+
 def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False, vec_a=False,
-          wfrag=False):
+          wfrag=False, tctp=False):
+    if tctp:
+        return _part_tctp(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a, wfrag)
     paths = schedule.paths
     xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
                     for pi in part for o in paths[pi].outputs for t in o.terms})
@@ -979,6 +1206,8 @@ class FusedFoldedForward:
         self.vec_a = (vec_a_default(torch.cuda.get_device_name(device)) and self.tc in (True, "presplit")
                       and not self.prefetch and self.used % 32 == 0)  # the swizzle stays inside a row
         self.a_stride = -(-self.k // 4) * 4 if self.vec_a else self.k
+        self.tctp = (tc_tp_default(torch.cuda.get_device_name(device)) and self.tc is True and not self.prefetch
+                     and tc_tp_applies(schedule))
         self.wfrag = (tc_wfrag_default(torch.cuda.get_device_name(device)) and self.tc is True and not self.prefetch
                       and CHANNEL_BLOCK == 32)
         self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
@@ -989,7 +1218,7 @@ class FusedFoldedForward:
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
-                             prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag)
+                             prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag, tctp=self.tctp)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
