@@ -749,3 +749,15 @@ So the end-of-edge reduction is about 4.6 % of the kernel, not 32 %. Consequence
 
 Every earlier 5060 Ti w′ lab ratio was taken against the uncapped base. That covers this round's butterfly, split
 and reduction falsifiers. The MD A/Bs, which decide defaults, are not affected.
+
+Forward prefetch re-screen on the RTX 5060 Ti (thermalised capture, 5 November 2026): base (SIMT, 167 registers)
+6.26 ms, simt-prefetch 1.013 (40 B spills). The round-4 lab's 0.930 came from the ideal-lattice capture; closed on
+the 5060 Ti.
+
+Forward prefetch re-screen on the A100-SXM4 (thermalised capture, 6c2f2967, Modal): base 3.18 ms; tc-prefetch 1.255,
+tc-prefetch-w10 1.258, tc-prefetch-x 1.384. All three tensor-core prefetch variants also give wrong outputs on
+thermal inputs: out0..3 max|d| / max|a| of 1.4 to 6.4. Round 4 called them bitwise, but only on the ideal-lattice
+capture, where every receiver has the same number of edges. On the 5060 Ti the SIMT prefetch stayed bitwise on thermal
+inputs, so the defect is in the tensor-core prefetch path, probably its handling of uneven batches. PREFETCH is off on
+every GPU (PREFETCH_GPUS empty); it must not be enabled with tensor cores until that is fixed and tested on uneven
+neighbourhoods.
