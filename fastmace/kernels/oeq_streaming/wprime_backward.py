@@ -749,10 +749,11 @@ class _WPrimeBlockConvolution(torch.autograd.Function):
     @staticmethod
     def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
                 sh, senders, receivers, row_ptr, message_id, wprime_id):
-        from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message_blocks
+        from fastmace.kernels.oeq_streaming.fused_forward import a_columns, fused_folded_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
-        a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
+        a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
+                                          a_columns(message_id))  # VEC_A: rows padded for float4 staging
         groups = fused_folded_message_blocks(a, weight, x, sh, senders, receivers, row_ptr, message_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins)
         ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id

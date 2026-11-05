@@ -469,7 +469,7 @@ def _tc_a4(s):
     ed = int(re.search(r"constexpr int ED = (\d+);", s).group(1))
     if k != kp or ed % 4:
         raise ValueError(f"tc-a4 needs K == KP and ED % 4 == 0 (K {k}, KP {kp}, ED {ed})")
-    s = _sub(s, "constexpr int KA = ", f"constexpr int AS = {A4_STRIDE};\nconstexpr int KA = ", 1)
+    s = _sub(s, r"constexpr int AS = \d+;", f"constexpr int AS = {A4_STRIDE};", 1, regex=True)
     s = _sub(s, """                for (int i = lane; i < B * KP; i += 32) {
                     const int b = i / KP, k = i - b * KP;
                     a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * KA + k] : 0.f;
@@ -495,8 +495,8 @@ def _simt_a4(s):
     k = int(re.search(r"constexpr int K = (\d+);", s).group(1))
     if -(-k // 4) * 4 > A4_STRIDE:
         raise ValueError(f"simt-a4: K {k} exceeds the padded stride {A4_STRIDE}")
-    s = _sub(s, "constexpr int KA = ", f"constexpr int AS = {A4_STRIDE};\nconstexpr int KQ = (K + 3) / 4;\n"
-             "constexpr int KA = ", 1)
+    s = _sub(s, r"constexpr int AS = \d+;", f"constexpr int AS = {A4_STRIDE};\nconstexpr int KQ = (K + 3) / 4;", 1,
+             regex=True)
     return _sub(s, """                for (int i = lane; i < B * K; i += 32) {
                     const int b = i / K, k = i - b * K;
                     a_s[k * B + b] = (b < nb) ? a[(e0 + b) * KA + k] : 0.f;

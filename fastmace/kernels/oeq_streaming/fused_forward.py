@@ -96,6 +96,13 @@ PREFETCH_GPUS = GPUModels(())
 # 66); True / False: an A/B side's choice.
 VEC_SH = None
 VEC_SH_GPUS = GPUModels(())
+# Round 4: the tensor-core kernel stages a with float4 loads from rows padded to a multiple of 4 floats (the radial
+# table writes them padded: ``a_columns``; any other a is padded by a copy first) into an edge-major tile, XOR-swizzled
+# per 4-float group so the fragment reads stay conflict-free: 4 vector loads per lane and batch instead of 16 scalar
+# ones (A100-SXM4-80GB kernel lab, with VEC_SH: 0.903, the bound without any a loads 0.900). Bitwise. Needs the TF32
+# product (not fp16) and used columns a multiple of 32. None: on for VEC_A_GPUS (decision 66); True / False: A/B.
+VEC_A = None
+VEC_A_GPUS = GPUModels(())
 
 _REGISTRY = {}
 
@@ -118,6 +125,21 @@ def vec_sh_default(edge_dim, name=None):
     if on is None:
         on = name in VEC_SH_GPUS
     return bool(on) and int(edge_dim) % 4 == 0
+
+
+def vec_a_default(name=None):
+    """``VEC_A`` (None: ``name`` in ``VEC_A_GPUS``); the kernel applies it only where it is built (``FusedFoldedForward``)."""
+    on = VEC_A
+    if on is None:
+        on = name in VEC_A_GPUS
+    return bool(on)
+
+
+def a_columns(fused_id):
+    """The columns the radial table should write for kernel ``fused_id``'s a: its padded row stride with ``VEC_A``,
+    else -1 (the table's own width)."""
+    fused = _REGISTRY.get(int(fused_id))
+    return fused.a_stride if fused is not None and fused.vec_a else -1
 
 
 def tensor_cores(capability, name=None):
@@ -340,7 +362,18 @@ def tc_astage(stride):
                 }}"""
 
 
-def tc_product(npl, presplit=False):
+def tc_astage_vec():
+    """``tc_astage`` with float4 loads from rows of ``AS`` floats into the edge-major, group-swizzled tile
+    (``VEC_A``; K == KP)."""
+    return """                for (int i = lane; i < B * (KP / 4); i += 32) {
+                    const int b = i / (KP / 4), q = i - b * (KP / 4);
+                    float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+                    if (b < nb) v = __ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q);
+                    *reinterpret_cast<float4*>(&a_s[b * KP + ((q ^ b) << 2)]) = v;
+                }"""
+
+
+def tc_product(npl, presplit=False, vec_a=False):
     """``float w[npl][B]`` (lane = channel) from the staged a and the W slice through 3xTF32 mma.sync m16n8k8 tiles
     (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``; ``presplit``: the slice holds the
     split parts (``tc_wfill``)."""
@@ -359,6 +392,12 @@ def tc_product(npl, presplit=False):
                                 split_tf32(wp[8], ah[1], al[1]);
                                 split_tf32(wp[4 * WS], ah[2], al[2]);
                                 split_tf32(wp[4 * WS + 8], ah[3], al[3]);"""
+    if vec_a:  # the edge-major, group-swizzled tile of tc_astage_vec
+        afrag = """                        split_tf32(a_s[gid * KP + (((k0 >> 2) ^ gid) << 2) + tq], bh[0], bl[0]);
+                        split_tf32(a_s[gid * KP + ((((k0 >> 2) + 1) ^ gid) << 2) + tq], bh[1], bl[1]);"""
+    else:
+        afrag = """                        split_tf32(a_s[(k0 + tq) * B + gid], bh[0], bl[0]);
+                        split_tf32(a_s[(k0 + tq + 4) * B + gid], bh[1], bl[1]);"""
     return f"""                float wacc[{npl}][2][4];
                 #pragma unroll
                 for (int g = 0; g < {npl}; ++g)
@@ -371,8 +410,7 @@ def tc_product(npl, presplit=False):
                     #pragma unroll 2
                     for (int k0 = 0; k0 < KP; k0 += 8) {{
                         unsigned bh[2], bl[2];  // a^T fragment: k = k0 + tq (+4), edge = gid
-                        split_tf32(a_s[(k0 + tq) * B + gid], bh[0], bl[0]);
-                        split_tf32(a_s[(k0 + tq + 4) * B + gid], bh[1], bl[1]);
+{afrag}
                         #pragma unroll
                         for (int g = 0; g < {npl}; ++g)
                             #pragma unroll
@@ -514,7 +552,7 @@ def _node(layout, channels, start, component, dim):
 
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-           vec_sh=False):
+           vec_sh=False, vec_a=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -526,6 +564,8 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     pointer each (``out0``, ``out1``, ...). ``prefetch`` (sm_80+, not fp16): the staging double-buffered with
     cp.async (``PREFETCH``; the launch rule must be ``launch_rule(..., prefetch=True)``'s). ``vec_sh``: sh staged
     with float4 loads (``VEC_SH``; edge_dim % 4 == 0, sh 16-byte aligned)."""
+    if vec_a and (tc not in (True, "presplit") or prefetch or (used if used is not None else k) % 32):
+        raise ValueError("fused_folded_forward: vec_a needs the TF32 product without prefetch and used % 32 == 0")
     if vec_sh and schedule.edge_dim % 4:
         raise ValueError(f"fused_folded_forward: vec_sh needs edge_dim % 4 == 0, not {schedule.edge_dim}")
     check_problem(schedule)
@@ -553,7 +593,7 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch, vec_sh)}    }} break;"
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch, vec_sh, vec_a)}    }} break;"
                       for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
         raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
@@ -568,7 +608,8 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
 using int64_t = long long;
 constexpr bool STORE_W = {"true" if store_w else "false"};
 constexpr int K = {used};  // the folded inputs the k-loop reads
-constexpr int KA = {k};  // a's and W's row stride
+constexpr int KA = {k};  // W's row stride (and a's, without VEC_A)
+constexpr int AS = {-(-k // 4) * 4 if vec_a else k};  // a's row stride
 constexpr int KP = {_kpad(used) if tc else used};  // the k-loop's padded length (tensor cores: steps of 8)
 constexpr int RS = {TC_RSTRIDE};
 constexpr int CB = {CHANNEL_BLOCK};
@@ -679,7 +720,7 @@ def _out(slot, C, layout, bmap):
     return f"out{g}[cur * {width} + {base + slot.component * stride} + ch]"
 
 
-def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False):
+def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False, vec_a=False):
     paths = schedule.paths
     xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
                     for pi in part for o in paths[pi].outputs for t in o.terms})
@@ -713,7 +754,8 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
         wfill, astage, product = tc_wfill_fp16(npl, "KA"), tc_astage_fp16("KA"), tc_product_fp16(npl)
     elif tc:
         pre = tc == "presplit"
-        wfill, astage, product = tc_wfill(npl, "KA", pre), tc_astage("KA"), tc_product(npl, pre)
+        wfill, astage, product = (tc_wfill(npl, "KA", pre), tc_astage_vec() if vec_a else tc_astage("KA"),
+                                  tc_product(npl, pre, vec_a))
     else:
         wfill = f"""            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
                 const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
@@ -895,6 +937,9 @@ class FusedFoldedForward:
         self.tc = "presplit" if self.tc and TC_PRESPLIT else self.tc
         self.prefetch = prefetch_default(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
         self.vec_sh = vec_sh_default(schedule.edge_dim, torch.cuda.get_device_name(device)) and not self.prefetch
+        self.vec_a = (vec_a_default(torch.cuda.get_device_name(device)) and self.tc in (True, "presplit")
+                      and not self.prefetch and self.used % 32 == 0)  # the swizzle stays inside a row
+        self.a_stride = -(-self.k // 4) * 4 if self.vec_a else self.k
         self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
                                 schedule.channels, int(props.shared_memory_per_block_optin),
                                 int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch,
@@ -903,7 +948,7 @@ class FusedFoldedForward:
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
-                             prefetch=self.prefetch, vec_sh=self.vec_sh)
+                             prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -923,6 +968,8 @@ class FusedFoldedForward:
         nodes, edges = x.shape[0], sh.shape[0]
         if self.vec_sh and sh.data_ptr() % 16:  # float4 loads need a 16-byte aligned sh
             sh = sh.clone()
+        if self.vec_a and (a.shape[1] != self.a_stride or a.stride(0) != self.a_stride or a.data_ptr() % 16):
+            a = torch.nn.functional.pad(a[:, :self.k], (0, self.a_stride - self.k)).contiguous()  # rows of AS floats
         counters = torch.zeros(self.slices, dtype=torch.int32, device=x.device)
         p = ctypes.c_void_p
         values = (nodes, edges, a.data_ptr(), weight.data_ptr(), x.data_ptr(), sh.data_ptr(), senders.data_ptr(),

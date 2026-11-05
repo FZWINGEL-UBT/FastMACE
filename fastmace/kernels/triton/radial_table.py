@@ -139,12 +139,14 @@ def radial_table_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor
     """(``[E, J - 1]`` folded input, ``[E, 1]`` edge density) of edge lengths ``r`` and pair indices ``pair``.
 
     ``density=False`` (a residual block, which has no density): the density is ``[E, 0]``, neither computed nor
-    stored. ``columns`` (-1: J - 1): the folded input's leading columns only, ``[E, columns]``."""
+    stored. ``columns`` (-1: J - 1): the folded input's leading columns only, ``[E, columns]``; past J - 1 the
+    density column and then zeros (a row padding, ``fused_forward.a_columns``)."""
     r, pair = r.reshape(-1).contiguous(), pair.contiguous()
     edges, width = r.shape[0], coef.shape[-1]
     columns = width - 1 if columns < 0 else int(columns)
     if not r.is_cuda:
         values = evaluate(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max)
+        values = torch.nn.functional.pad(values, (0, max(0, columns - width)))  # columns past J: zero
         return values[:, :columns].contiguous(), values[:, width - 1:width - 1 + int(density)].contiguous()
     g = r.new_empty((edges, columns))
     out = r.new_empty((edges, int(density)))
