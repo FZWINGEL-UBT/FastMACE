@@ -515,6 +515,19 @@ def forward_variants(kernel=None):
                                                        "mma_f16(cross, ah, bl);", ""), ()),
         "F-tc-no-redistribute": ("falsifier", lambda s: _sub(s, "w[g][b] = r_s[(g * B + b) * RS + lane];",
                                                              "w[g][b] = wacc[g][b & 1][b >> 1 & 3];"), ()),
+        # Round 4 (5 November 2026): the staging's global loads, each replaced by a constant (timing bounds of the
+        # load latency: a, the sender features x and the edge harmonics sh).
+        "F-no-aload": ("falsifier", lambda s: _sub(s, "a[(e0 + b) * KA + k]", "0.5f"), ()),
+        "F-no-xload": ("falsifier", lambda s: _sub(s, r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
+                                                   "(snd >= 0) ? 0.5f : 0.f", regex=True), ()),
+        "F-no-shload": ("falsifier", lambda s: _sub(s, "sh[e0 * ED + i]", "0.5f"), ()),
+        "F-no-loads": ("falsifier", lambda s: _sub(_sub(_sub(s, "a[(e0 + b) * KA + k]", "0.5f"),
+                                                        r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
+                                                        "(snd >= 0) ? 0.5f : 0.f", regex=True),
+                                                   "sh[e0 * ED + i]", "0.5f"), ()),
+        "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
+                                                 r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
+                                                 regex=True), ()),
     }
 
 
