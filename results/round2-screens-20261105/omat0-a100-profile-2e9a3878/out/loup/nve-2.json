@@ -1,0 +1,41 @@
+{
+ "tool": "loup_md",
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "atoms": 5000,
+ "ensemble": "nve",
+ "skin": 0.5,
+ "warmup": 5,
+ "steps": 20,
+ "blocks": 1,
+ "requested": {},
+ "constants": {},
+ "gpu": "NVIDIA A100 80GB PCIe",
+ "fastmace": "1.0.0",
+ "setup_s": 48.837157252,
+ "block_s": [
+  0.25099582500001816
+ ],
+ "us_per_atom_step": [
+  2.5099582500001816
+ ],
+ "median_us_per_atom_step": 2.5099582500001816,
+ "ms_per_step": 12.549791250000908,
+ "rewrites_on": [
+  "block_linear",
+  "chunked_conv_backward",
+  "fold_product_linear",
+  "fused_folded_backward",
+  "fused_folded_forward",
+  "grouped_linear",
+  "merged_residual",
+  "radial_tables",
+  "reassociate_first",
+  "segmented_first_sum",
+  "single_graph_strain",
+  "species_skip",
+  "streaming_conv",
+  "tf32x3_gemms",
+  "wprime_backward"
+ ],
+ "max_memory_allocated_mib": 1127.095703125
+}

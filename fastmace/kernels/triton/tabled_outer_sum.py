@@ -34,6 +34,7 @@ TABLED_FORWARD = None
 TABLED_FORWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
                                  "NVIDIA A100-SXM4-80GB"))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
+FORWARD_WARPS = 1
 
 
 def tabled_forward(device):
@@ -204,7 +205,7 @@ def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Te
             y, key, r, pair, coef, starts, scales, bins, out, density, edges, coef.shape[1], bins.shape[0],
             float(r_lo), float(bin_scale), float(r_max), K=k, D=d, INNER=inner, TERMS=coef.shape[2],
             J=coef.shape[-1], CHUNK=FORWARD_CHUNK, BLOCK_K=triton.next_power_of_2(k),
-            BLOCK_D=triton.next_power_of_2(d), num_warps=1)
+            BLOCK_D=triton.next_power_of_2(d), num_warps=FORWARD_WARPS)
     return out, density
 
 

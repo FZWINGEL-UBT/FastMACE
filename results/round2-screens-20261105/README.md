@@ -16,6 +16,8 @@ Records of [plans/ideas-20261105-round2.md](../../plans/ideas-20261105-round2.md
 | `round2-ab-leto-38eae731` | RTX 4000 Ada (leto) | `38eae731` | gate + A/B HORNER; outer-sum lab |
 | `round2-lab-leto-2dc9b38d` | RTX 4000 Ada (leto) | `2dc9b38d` | w′ kernel lab |
 | `round2-fp16-local*`, `round2-horner-default-local`, `round2-eos-5060`, `round2-ptxas` | RTX 5060 Ti, local WSL | `a344f471`–`38eae731` | kernel labs, `ptxas` register counts |
+| `omat0-a100-profile-2e9a3878` | A100 80GB PCIe, Modal | `2e9a3878` | profile with every round-2 default (benchmark and breakdown; the kernel-source step failed in the tool) |
+| `round2-tslab-5060` | RTX 5060 Ti, local WSL | working tree on `5ba24365` | `tools/tabled_sum_lab.py`: chunk and warp sweep |
 | `round2-degree3.json`, `round2-degree4.json` | CPU | `a344f471` | degree 3 / 4 share of the edges (`tools/degree3_share.py`) |
 
 Environments: local WSL `~/environments/mace_cueq_oeq`, leto NAS `mace_cueq_oeq` (idle check before every job),

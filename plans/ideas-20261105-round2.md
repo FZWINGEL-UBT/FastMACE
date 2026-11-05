@@ -373,3 +373,36 @@ and the table backward apart.
 Defaults: `03125b0c` (Horner, scalar paths, register cap, walk, the 5060 Ti's factored kernel), `8466ac92` and
 `2e9a3878` (the fused first interaction). Next: a fresh A100 profile at `2e9a3878`.
 
+
+### A100 profile at `2e9a3878` and the next ideas (5 November 2026)
+
+Modal A100 80GB PCIe (`omat0-a100-profile-2e9a3878`; earlier profiles ran on the SXM4): Benchmark_loup 2.50 µs per
+atom and step (NVE), 2.47 (Langevin); eager force call 12.33 ms. Largest kernels per call:
+
+| Kernel | µs | Note |
+|---|---|---|
+| `fused_folded_forward` (interaction 2) | 3,722 | 384 threads, 168 registers, 151 KB shared: one block per SM |
+| `oeq_projected_backward_wprime` | 3,119 | 128 threads, 96 registers, 31 % occupancy |
+| `tabled_outer_sum_backward` | 459 | new; replaces about 870 µs |
+| CUTLASS `fm_tf32x3` GEMMs | about 1,760 | over 37 launches |
+| `tabled_outer_sum_forward` | 391 | new; replaces about 410 µs |
+| cuEq symmetric contraction (forward and backward) | 409 | |
+| `radial_table_forward` (interaction 2's `a` for the fused forward) | 204 | |
+
+Checked and dropped:
+- **Launch shapes of the tabled outer sum** (`tools/tabled_sum_lab.py`, RTX 5060 Ti): 8–64 edges per program and one
+  warp stay within noise of the defaults (0.95–1.01); 2 or 4 warps 1.26–2.64. The kernels read about 1.5 KB of
+  Chebyshev coefficients per edge from L2, which no launch shape changes.
+- **Two fused-forward blocks per SM** through more parts (half the W slice in shared memory): occupancy is bound by
+  registers, not shared memory: 384 threads × 168 registers fill the 64 K register file, so two blocks would need
+  6 warps each, the same 12 warps.
+
+Open:
+- **Interaction 2's table inside the fused forward** (TABLED_FORWARD for the second interaction): `a` evaluated from
+  r in the kernel instead of `radial_table_forward`'s [E, 65] output (204 µs plus its read). The grid reads each edge
+  row in 8 blocks (4 channel blocks × 2 parts), so the evaluation must be shared or cheap; bound it first in the lab.
+- **The w′ backward's value-table traffic.** Its w table for interaction 2 is about [pairs, pieces, 6, 512] floats;
+  each edge loads 6 × 512 × 4 B = 12 KB, about 4.6 GB per call if nothing hits L2, which alone is about 2.4 ms at
+  the A100's bandwidth. Measure its DRAM bytes (Nsight Compute) before ideas: a w table ordered so that a run of
+  receivers touches fewer lines, or TABLE_W off for interaction 2 on the A100 where FP32 arithmetic is cheaper than
+  that traffic.
