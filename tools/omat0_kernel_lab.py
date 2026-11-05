@@ -378,27 +378,27 @@ def _block_ldg():
     return wp.block_ldg_default(torch.device("cuda", torch.cuda.current_device()))
 
 
-def _tc_rerender(kernel, tc, name, warps=None):
+def _tc_rerender(kernel, tc, name, warps=None, prefetch=False):
     """The tensor-core kernel re-rendered in mode ``tc`` (fused_forward.render) with its own launch rule;
     ``warps``: that many warps per block (the launch bound, so more registers per thread with fewer)."""
     def transform(s):
         import torch
 
         from fastmace.kernels.oeq_streaming import fused_forward as ff
-        if not kernel.tc:
+        if not kernel.tc and tc:
             raise ValueError(f"{name} needs the tensor-core kernel (--constant ...:TENSOR_CORES=True)")
         props = torch.cuda.get_device_properties(0)
         rule = ff.launch_rule(kernel.paths, kernel.used if tc else kernel.k, kernel.schedule.edge_dim,
                               kernel.channels, int(props.shared_memory_per_block_optin),
-                              int(props.multi_processor_count), tc=tc)
+                              int(props.multi_processor_count), tc=tc, prefetch=prefetch)
         if warps is not None:
             import dataclasses
             per = -(-kernel.paths // rule.parts)
             width = kernel.used if tc else kernel.k
             rule = dataclasses.replace(rule, warps=warps, shared_bytes=4 * ff.slice_floats(per, width, tc) + warps * 4
-                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per))
+                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per, prefetch))
         source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc,
-                           blocks=kernel.blocks)
+                           blocks=kernel.blocks, prefetch=prefetch)
         _RULES[source] = rule
         print(f"{name} rule {rule} (plan {kernel.rule})", flush=True)
         return source
@@ -509,6 +509,12 @@ def forward_variants(kernel=None):
         # Fewer warps per block: the launch bound allows more registers (the A100 kernel spills 40 bytes at 168).
         "tc-warps8": ("exact", _tc_rerender(kernel, True, "tc-warps8", warps=8), ()),
         "tc-warps10": ("exact", _tc_rerender(kernel, True, "tc-warps10", warps=10), ()),
+        # Round 4: the staging double-buffered with cp.async (fused_forward.PREFETCH): bitwise.
+        "tc-prefetch": ("exact", _tc_rerender(kernel, True, "tc-prefetch", prefetch=True), ()),
+        # The FP32-SIMT kernel (the plan's own, no TENSOR_CORES constant) re-rendered, without and with prefetch.
+        "simt-rerender": ("exact", _tc_rerender(kernel, False, "simt-rerender"), ()),
+        "simt-prefetch": ("exact", _tc_rerender(kernel, False, "simt-prefetch", prefetch=True), ()),
+        "tc-prefetch-w10": ("exact", _tc_rerender(kernel, True, "tc-prefetch-w10", warps=10, prefetch=True), ()),
         "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
         "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),
                                                             "mma_f16(cross, al, bh);", ""),
