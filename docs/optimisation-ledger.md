@@ -4254,3 +4254,12 @@ here.
 - Measured: tabled forward MD step 0.984 / 0.987. The wgmma product alone is 1.95x faster than mma.sync, but the forward's MD step is 1.024 / 1.025 and the pipelined one 1.035 / 1.033 (one block of 8 warps per SM). The wgmma GEMM is 1.19x slower over 24 shapes, up to 2.0x at M 25,000–35,000, against CUTLASS's sm80 tf32x3. Gate: NbCl5 stress ratio 2.12 and 2.22 for the wgmma kernels.
 - Not done: a wgmma w′ backward (same structure, would lose the same way); a CUTLASS 3 TMA warp-specialised 3xTF32 GEMM.
 - Sources: [H200 wgmma](../results/h200-wgmma-20261105/README.md).
+
+### wprime-pairs: term-pair value table and hoisted piece scale in the w′ backward (5 November 2026)
+
+- Date/round: H200 ideas plan, ideas 1 and 9 (`41e9ad28`).
+- What: `wprime_backward.TABLE_PAIRS` (TABLE_W's value table interleaved by term pair so a warp's float2 load is 256 contiguous bytes; bitwise) and `HOIST_SCALE` (Horner's piece scale once per edge; dL/dr at rounding level).
+- Status: REJECTED (both off).
+- Measured: MD step b/a TABLE_PAIRS RTX 5060 Ti 1.0024 / 0.9998, A100-SXM4 1.0058 / 1.0062, H200 1.0008 / 1.0003; HOIST_SCALE 0.9985 / 0.9991, 1.0104 / 0.9988, 1.0057 / 1.0017. GPU test: TABLE_PAIRS bitwise dsh and dL/dr; HOIST_SCALE dL/dr error 2.11e-6 (unhoisted 2.17e-6).
+- Note: the plan's L1-wavefront model of the w′ table reads does not hold on any of the three GPUs.
+- Sources: [w′ pairs](../results/wprime-pairs-20261105/README.md).
