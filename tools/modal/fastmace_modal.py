@@ -76,7 +76,11 @@ GRACE_S = 600  # the job function's timeout above the command's own
 # worktrees each pass the guard alone).
 STATE = Path(os.path.expanduser(os.environ.get("FASTMACE_MODAL_STATE", "~/.fastmace-modal")))
 LEDGER = STATE / "modal-ledger.csv"
-IN_FLIGHT = STATE / "modal-in-flight.json"
+# One in-flight file per Modal profile (5 November 2026): each profile has its own $30 a month, so a job running on
+# one profile must not count against the other (a parallel launch on the second profile was refused for the first's
+# worst case). Within a profile the parallel-launch rule above holds.
+PROFILE = os.environ.get("MODAL_PROFILE") or getattr(getattr(modal, "config", None), "_profile", None) or "default"
+IN_FLIGHT = STATE / f"modal-in-flight-{PROFILE}.json"
 
 app = modal.App(APP_NAME)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
