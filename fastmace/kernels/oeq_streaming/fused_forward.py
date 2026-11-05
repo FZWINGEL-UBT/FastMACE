@@ -120,7 +120,9 @@ VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # slot keeps its terms and edge order. Only where the groups' W slices and staging fit (launch_rule's groups); not
 # with WGMMA. None: on for DEGREE_PARTS_GPUS (decision 66); True / False: an A/B side's choice.
 DEGREE_PARTS = None
-DEGREE_PARTS_GPUS = GPUModels(())  # every A100 (see VEC_SH_GPUS; TC_WFRAG_GPUS)
+# MD step b/a (b = on; OMAT-0 medium, SrTiO3 10x10x10, ab / ba, results/degree-parts-20261105): NVIDIA H200
+# 0.9818 / 0.9845, A100-SXM4-80GB 0.9920 / 0.9932.
+DEGREE_PARTS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Round 4: the tensor-core kernel's W slice stored in mma.sync fragment order, [paths][KP / 8][2 m-tiles][32 lanes][4],
 # so each lane loads its four W values of a fragment with one float4 shared load (consecutive 16 B per lane: no bank
 # conflicts) instead of four scalar loads at row stride TC_STRIDE. The same values reach the same mma: bitwise.
