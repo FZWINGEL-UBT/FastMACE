@@ -106,31 +106,48 @@ def bias_free(linear):
                 if "bias" in name and tensor.numel() > 0]
 
 
+def fused_first_applies(self, edge_feats):
+    """Whether ``fused_first_message`` serves this tabled, reassociated interaction (``FUSED_FIRST_BACKWARD``)."""
+    table, reassociation = getattr(self, "radial_table", None), getattr(self, "first_reassociation", None)
+    return (table is not None and reassociation is not None and not FIRST_FULL_ROWS and reassociation.segmented
+            and table.coef.dtype == torch.float32 and edge_feats.dtype == torch.float32
+            and fused_first_backward(table.coef.device))
+
+
+def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
+    """``(message, edge density)`` through the tabled outer sum (the table read inside the reassociation's per-slot
+    sums, one fused backward; ``kernels.triton.tabled_outer_sum``), or None where ``fused_first_applies`` is false."""
+    if not fused_first_applies(self, edge_feats):
+        return None
+    from fastmace.kernels.triton.tabled_outer_sum import tabled_outer_sum
+
+    table, reassociation = self.radial_table, self.first_reassociation
+    weight = fc_last_weight(self.radial_last)
+    width = weight.shape[-1]
+    pair = table.pair(node_attrs, edge_index)
+    density = []
+
+    def summed_fn(key, slots):
+        summed, edge_density = tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts, table.scales,
+                                                table.bins, table.r_lo, table.bin_scale, table.r_max, width,
+                                                edge_attrs.contiguous(), key, slots)
+        density.append(edge_density)
+        return summed, width
+
+    message = reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, rows=rows,
+                            summed_fn=summed_fn)
+    return message, density[0]
+
+
 def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index):
     """``(message, edge density)`` of a reassociated generic interaction with a radial table: the table, then the
     reassociation of its ``h c``. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward
     keeps the lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again (MH-1's
     ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
     backward rebuilds only the table."""
-    table, reassociation = self.radial_table, self.first_reassociation
-    if (not FIRST_FULL_ROWS and reassociation.segmented and table.coef.dtype == torch.float32
-            and edge_feats.dtype == torch.float32 and fused_first_backward(table.coef.device)):
-        from fastmace.kernels.triton.tabled_outer_sum import tabled_outer_sum
-
-        weight = fc_last_weight(self.radial_last)
-        width = weight.shape[-1]
-        pair = table.pair(node_attrs, edge_index)
-        density = []
-
-        def summed_fn(key, slots):
-            summed, edge_density = tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts,
-                                                    table.scales, table.bins, table.r_lo, table.bin_scale,
-                                                    table.r_max, width, edge_attrs.contiguous(), key, slots)
-            density.append(edge_density)
-            return summed, width
-
-        message = reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, summed_fn=summed_fn)
-        return message, density[0]
+    fused = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index)
+    if fused is not None:
+        return fused
     columns = fc_last_weight(self.radial_last).shape[-1] if FIRST_TABLE_COLUMNS and not FIRST_FULL_ROWS else -1
     augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index, columns=columns)
     rows, weight = _first_inputs(augmented, self.radial_last)
@@ -186,6 +203,9 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         from fastmace.rewrites.mh1.modules import streaming_message
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                    node_attrs=node_attrs, wprime_lengths=wprime_lengths)
+    elif tabled and reassociation is not None and fused_first_applies(self, edge_feats):
+        message, table_density = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                                                     rows=n_real)
     elif tabled:
         augmented, table_density = table(edge_feats, node_attrs, edge_index,
                                          density=kind != "residual")  # [h c, c] and the density
