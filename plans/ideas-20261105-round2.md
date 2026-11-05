@@ -433,3 +433,8 @@ Idea left from this, not started: per edge and path, form `M_io(y) = Σ_j C_ijo 
 terms outnumber M's nonzeros (l2 = 2, 3); `v_j = Σ C_ijo x_i g_o` is bilinear in channel quantities and does not
 shrink. First count terms against `nnz(M)` per path of OMAT-0 medium; build it only if the FMA count drops by more
 than about 15 %.
+
+**Counted and dropped (5 November 2026):** CG terms against `nnz(M)` per path (e3nn `wigner_3j`, l1 ∈ {0, 1},
+l2 ≤ 3, l3 ≤ 3): 134 terms against 116. The saving applies only to `u`, one of the three FMAs per term, so it is
+about 4 % of the arithmetic before forming M, below the 15 % threshold. Paths: (0,l,l) and (1,0,1), (1,1,x) equal;
+(1,2,1) 11→9, (1,2,2) 16→14, (1,2,3) 21→19, (1,3,2) 21→15, (1,3,3) 26→20.
