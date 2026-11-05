@@ -792,3 +792,19 @@ one CTA per SM, npl 5, KP 72, the forward's MMA loop against an FMA contraction)
 win came with a slower serial base (P 2.96 against 2.46 ms in run 2). No spills anywhere; a 3-tile ring does not fit.
 Each side keeps only part of the 12 warps for its own latency, which costs what the overlap gains. **Closed** by the
 proposal's own rule (more than 10 % of serial).
+
+TF32 + FP16 hybrid projection (`tc-hybrid16`, kernel lab, 3e4f9310): the 3xTF32 product with W_hi a_hi kept in TF32
+m16n8k8 and both small products (W_lo a_hi, W_hi a_lo) in FP16 m16n8k16, shifted by 2^11 (exact) and unshifted on the
+store; the k16 slots map to k0 + 8s + tq (+4) in both operands, so the sum is unchanged. 4 MMAs per 16 k instead of 6.
+Needs KP % 16 == 0 (SKIP_ZERO_COLUMN, KP 64 for OMAT-0). Accuracy FP32-class (max|d|/max|a| 7e-7 to 1.7e-6, w
+bitwise as it is the base's). RTX 5060 Ti with the A100 constants: 0.851 (255 registers, 8 B local). A100-SXM4
+(Modal, `results/round5-20261105/runs/a100-hybrid16-rebuild-cost/`): **1.017** (base 3.60 ms, 167 registers and 40 B
+local; hybrid 168 and 48 B at the 12-warp launch bound). The per-fragment FP16 packs (12 cvt per (g, m, 16 k)) and the
+register limit eat the third of the MMA time it saves. **Rejected** on the A100.
+
+Neighbour-list rebuild cost (`tools/bench/rebuild_cost.py`, block time = steps t_step + rebuilds t_rebuild, 200 blocks
+of 4 steps, SrTiO3 10x10x10, OMAT-0 medium): RTX 5060 Ti skin 0.5: 44 rebuilds, 2.04 ms each, 0.11 ms per step
+(0.45 %); skin 1.0: 13 rebuilds, 3.05 ms each, 0.05 ms per step, t_step unchanged (24.707 against 24.713 ms).
+A100-SXM4: skin 0.5: 44 rebuilds, -0.46 ms each (noise), t_step 11.644 ms; skin 1.0: 13 rebuilds, +0.36 ms each,
+t_step 11.586 ms. The profile's 11.35 ms per rebuild runs beside the force call (`overlap_rebuild`): a rebuild adds
+nothing measurable on the A100, so neither a cheaper rebuild nor a larger skin can gain anything there. Closed.

@@ -19,8 +19,10 @@ computation.** Please look for those. Think from the physics and the model's alg
 
 Records: `results/omat0-a100-profile-eb66bb2c/` (breakdown/ops.csv, categories.csv, stages.csv, sources/).
 
-Per MD step (ms): force call 11.17; neighbour-list rebuild 1.36 amortised (11.35 ms per rebuild, 24 rebuilds in 200
-steps, about 7 ms of it host-side Python per rebuild); noise upload 0.53; integrator 0.08; overlaps hide about 1.3.
+Per MD step (ms): force call 11.17; neighbour-list rebuild 1.36 amortised in the breakdown (11.35 ms per rebuild, 24
+rebuilds in 200 steps), but the rebuilds run beside the force call (`overlap_rebuild`): a block-time fit
+(`tools/bench/rebuild_cost.py`, `results/round5-20261105/runs/a100-hybrid16-rebuild-cost/`) finds no measurable added
+time per rebuild on the A100 at skin 0.5 or 1.0, so the rebuild is not a target; noise upload 0.53; integrator 0.08.
 
 Inside the force call (11.04 ms of kernels):
 
@@ -83,9 +85,8 @@ Read `docs/optimisation-ledger.md` (index rows `omat0-*`, `conv-*`, `elt-*`, `mo
      exact sharing between mirror edges, or between edges with equal (pair, r), inside one kernel without a global
      round trip.
    - Reuse across MD steps: positions move about 0.01 Å per fs. Is any intermediate exactly or FP32-reproducibly
-     reusable between steps (neighbour structure, sorted orders, radial bins, sh of slow edges), or can the
-     neighbour-list rebuild (1.36 ms per step, mostly host time) be made much cheaper or rarer without changing the
-     dynamics?
+     reusable between steps (sorted orders, radial bins, sh or w of slow edges)? (The neighbour-list rebuild is
+     already hidden beside the force call; see above.)
    - Algebraic restructuring of the uvu tensor product with l <= 3 (Clebsch-Gordan sparsity, factoring the
      projection W through the product, contracting the backward's 16 sh components earlier), with a FLOP count
      against today's.
