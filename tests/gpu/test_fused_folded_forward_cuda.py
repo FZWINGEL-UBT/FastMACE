@@ -142,6 +142,54 @@ for layout in ("ir_mul", "mul_ir"):
                 zero_exact = a.double() @ zero.double().t()
                 assert float(((skip_w.double() - zero_exact).abs() / scale).max()) <= tc_limit
                 report[name]["tensor cores"][split] = tc_error
+                # VEC_A + VEC_SH (round 4): a and sh staged with float4 loads, bitwise the tensor-core kernel's, from
+                # an unpadded a (copied to padded rows first) and from rows the caller padded (a_columns).
+                if split == "mask" and (k - 1) % 32 == 0:
+                    ff_module.TENSOR_CORES, ff_module.VEC_A, ff_module.VEC_SH = True, True, True
+                    try:
+                        vec = FusedFoldedForward(kernels, k, used=k - 1)
+                    finally:
+                        ff_module.TENSOR_CORES, ff_module.VEC_A, ff_module.VEC_SH = False, None, None
+                    assert vec.vec_a and vec.vec_sh and ff_module.a_columns(vec.id) == vec.a_stride, (layout, k)
+                    padded = torch.nn.functional.pad(a, (0, vec.a_stride - k))
+                    for source in (a, padded):
+                        vec_message, vec_w = fused_folded_forward(source, zero, X, Y, *args, vec.id)
+                        assert torch.equal(vec_message, skip_message) and torch.equal(vec_w, skip_w), (layout, k)
+                    report[name]["vec a + sh bitwise"] = True
+                # TC_WFRAG (round 4): the W slice in fragment order, bitwise the tensor-core kernel's (also with
+                # VEC_A + VEC_SH where those apply).
+                if split == "mask":
+                    ff_module.TENSOR_CORES, ff_module.TC_WFRAG = True, True
+                    try:
+                        frag = FusedFoldedForward(kernels, k, used=k - 1)
+                    finally:
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG = False, None
+                    assert frag.wfrag and "reinterpret_cast<const float4*>(Ws)" in frag.source, (layout, k)
+                    frag_out = fused_folded_forward(a, zero, X, Y, *args, frag.id)
+                    assert torch.equal(frag_out[0], skip_message) and torch.equal(frag_out[1], skip_w), (layout, k)
+                    report[name]["wfrag bitwise"] = True
+                    if (k - 1) % 32 == 0:
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG = True, True
+                        ff_module.VEC_A, ff_module.VEC_SH = True, True
+                        try:
+                            both = FusedFoldedForward(kernels, k, used=k - 1)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG = False, None
+                            ff_module.VEC_A, ff_module.VEC_SH = None, None
+                        assert both.wfrag and both.vec_a, (layout, k)
+                        both_out = fused_folded_forward(a, zero, X, Y, *args, both.id)
+                        assert torch.equal(both_out[0], skip_message) and torch.equal(both_out[1], skip_w)
+                        report[name]["wfrag + vec a bitwise"] = True
+        # VEC_SH on the FP32-SIMT kernel: bitwise.
+        ff_module.VEC_SH = True
+        try:
+            vec_sh = FusedFoldedForward(kernels, k)
+        finally:
+            ff_module.VEC_SH = None
+        assert vec_sh.vec_sh and "float4*>(sh_s)" in vec_sh.source, (layout, k)
+        vec_sh_out = fused_folded_forward(a, weight, X, Y, *args, vec_sh.id)
+        assert torch.equal(vec_sh_out[0], message) and torch.equal(vec_sh_out[1], w), (layout, k)
+        report[name]["vec sh bitwise"] = True
 print(json.dumps(report))
 """
 

@@ -1,0 +1,108 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))",
+    "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T06:13:52.565994+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "c091fd376493e03b2a5938a6b8781ac103ef64e7",
+  "model": "omat0-medium",
+  "rounds": 5,
+  "capture_s": 47.56441002000065,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=5, blocks_per_slice=9, shared_bytes=100480)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 196,
+          "local_bytes": 0,
+          "median_us": 15807.77645111084,
+          "min_us": 15777.055740356445,
+          "max_us": 16519.9031829834,
+          "ratio": 1.0
+        },
+        "F-no-aload": {
+          "kind": "falsifier",
+          "registers": 194,
+          "local_bytes": 0,
+          "median_us": 13014.880180358887,
+          "min_us": 12909.88826751709,
+          "max_us": 13222.975730895996,
+          "ratio": 0.823321371010678
+        },
+        "F-no-xload": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 0,
+          "median_us": 15406.144142150879,
+          "min_us": 15257.408142089844,
+          "max_us": 16189.247131347656,
+          "ratio": 0.9745927385674955
+        },
+        "F-no-shload": {
+          "kind": "falsifier",
+          "registers": 196,
+          "local_bytes": 0,
+          "median_us": 13937.376022338867,
+          "min_us": 13917.152404785156,
+          "max_us": 13996.512413024902,
+          "ratio": 0.8816784615751233
+        },
+        "F-no-loads": {
+          "kind": "falsifier",
+          "registers": 166,
+          "local_bytes": 0,
+          "median_us": 10644.927978515625,
+          "min_us": 10556.320190429688,
+          "max_us": 11196.703910827637,
+          "ratio": 0.6733981854714037
+        },
+        "F-no-out": {
+          "kind": "falsifier",
+          "registers": 196,
+          "local_bytes": 0,
+          "median_us": 16066.400527954102,
+          "min_us": 15961.27986907959,
+          "max_us": 16839.07127380371,
+          "ratio": 1.0163605601105958
+        },
+        "F-tc-no-product": {
+          "kind": "falsifier",
+          "registers": 154,
+          "local_bytes": 0,
+          "median_us": 8770.879745483398,
+          "min_us": 8754.560470581055,
+          "max_us": 8814.88037109375,
+          "ratio": 0.5548458869347848
+        },
+        "F-no-tp": {
+          "kind": "falsifier",
+          "registers": 119,
+          "local_bytes": 0,
+          "median_us": 14009.087562561035,
+          "min_us": 13948.09627532959,
+          "max_us": 14491.647720336914,
+          "ratio": 0.8862149338894904
+        }
+      }
+    }
+  },
+  "constants": {
+    "fastmace.kernels.oeq_streaming.fused_forward:TENSOR_CORES": true
+  }
+}

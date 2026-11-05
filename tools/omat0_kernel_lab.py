@@ -378,27 +378,29 @@ def _block_ldg():
     return wp.block_ldg_default(torch.device("cuda", torch.cuda.current_device()))
 
 
-def _tc_rerender(kernel, tc, name, warps=None):
+def _tc_rerender(kernel, tc, name, warps=None, prefetch=False):
     """The tensor-core kernel re-rendered in mode ``tc`` (fused_forward.render) with its own launch rule;
     ``warps``: that many warps per block (the launch bound, so more registers per thread with fewer)."""
     def transform(s):
         import torch
 
         from fastmace.kernels.oeq_streaming import fused_forward as ff
-        if not kernel.tc:
+        if not kernel.tc and tc:
             raise ValueError(f"{name} needs the tensor-core kernel (--constant ...:TENSOR_CORES=True)")
         props = torch.cuda.get_device_properties(0)
         rule = ff.launch_rule(kernel.paths, kernel.used if tc else kernel.k, kernel.schedule.edge_dim,
                               kernel.channels, int(props.shared_memory_per_block_optin),
-                              int(props.multi_processor_count), tc=tc)
+                              int(props.multi_processor_count), tc=tc, prefetch=prefetch,
+                              x_slots=kernel.schedule.input_dim // kernel.channels)
         if warps is not None:
             import dataclasses
             per = -(-kernel.paths // rule.parts)
             width = kernel.used if tc else kernel.k
             rule = dataclasses.replace(rule, warps=warps, shared_bytes=4 * ff.slice_floats(per, width, tc) + warps * 4
-                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per))
+                                       * ff.staging_floats(width, kernel.schedule.edge_dim, tc, per, prefetch,
+                                                           kernel.schedule.input_dim // kernel.channels))
         source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc,
-                           blocks=kernel.blocks)
+                           blocks=kernel.blocks, prefetch=prefetch)
         _RULES[source] = rule
         print(f"{name} rule {rule} (plan {kernel.rule})", flush=True)
         return source
@@ -452,6 +454,157 @@ def _ns_slab(s):
     s = _sub(s, r"float w\[(\d+)\]\[B\];\s*#pragma unroll\s*for \(int g = 0; g < \d+; \+\+g\)\s*#pragma unroll\s*"
                 r"for \(int b = 0; b < B; \+\+b\) w\[g\]\[b\] = 0\.f;", slab, regex=True)
     return _sub(s, "for (int k = 0; k < K; ++k) {", "for (int k = 0; k < 0; ++k) {")
+
+
+A4_STRIDE = 68  # tc-a4: a's padded row stride (a multiple of 4 floats: 16-byte rows)
+
+
+def _tc_a4(s):
+    """The tensor-core kernel with a staged by float4 loads from rows padded to A4_STRIDE floats (the argument
+    transform ``_a4_args``) into a batch-major tile, XOR-swizzled by 4-float group so the fragment reads stay
+    conflict-free (bank (group ^ edge) * 4 + tq), and sh by float4 loads. Bitwise: the same values reach the product.
+    Needs K == KP (every staged column used) and ED % 4 == 0."""
+    k = int(re.search(r"constexpr int K = (\d+);", s).group(1))
+    kp = int(re.search(r"constexpr int KP = (\d+);", s).group(1))
+    ed = int(re.search(r"constexpr int ED = (\d+);", s).group(1))
+    if k != kp or ed % 4:
+        raise ValueError(f"tc-a4 needs K == KP and ED % 4 == 0 (K {k}, KP {kp}, ED {ed})")
+    s = _sub(s, r"constexpr int AS = \d+;", f"constexpr int AS = {A4_STRIDE};", 1, regex=True)
+    s = _sub(s, """                for (int i = lane; i < B * KP; i += 32) {
+                    const int b = i / KP, k = i - b * KP;
+                    a_s[k * B + b] = (b < nb && k < K) ? a[(e0 + b) * KA + k] : 0.f;
+                }""", """                for (int i = lane; i < B * (KP / 4); i += 32) {
+                    const int b = i / (KP / 4), q = i - b * (KP / 4);
+                    float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+                    if (b < nb) v = __ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q);
+                    *reinterpret_cast<float4*>(&a_s[b * KP + ((q ^ b) << 2)]) = v;
+                }""")
+    s = _sub(s, "split_tf32(a_s[(k0 + tq) * B + gid], bh[0], bl[0]);",
+             "split_tf32(a_s[gid * KP + (((k0 >> 2) ^ gid) << 2) + tq], bh[0], bl[0]);")
+    s = _sub(s, "split_tf32(a_s[(k0 + tq + 4) * B + gid], bh[1], bl[1]);",
+             "split_tf32(a_s[gid * KP + ((((k0 >> 2) + 1) ^ gid) << 2) + tq], bh[1], bl[1]);")
+    return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
+                """for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+
+
+def _simt_a4(s):
+    """The FP32-SIMT kernel with a staged by float4 loads from rows padded to A4_STRIDE floats (``_a4_args``),
+    scattered into the k-major tile as before. Bitwise."""
+    k = int(re.search(r"constexpr int K = (\d+);", s).group(1))
+    if -(-k // 4) * 4 > A4_STRIDE:
+        raise ValueError(f"simt-a4: K {k} exceeds the padded stride {A4_STRIDE}")
+    s = _sub(s, r"constexpr int AS = \d+;", f"constexpr int AS = {A4_STRIDE};\nconstexpr int KQ = (K + 3) / 4;", 1,
+             regex=True)
+    return _sub(s, """                for (int i = lane; i < B * K; i += 32) {
+                    const int b = i / K, k = i - b * K;
+                    a_s[k * B + b] = (b < nb) ? a[(e0 + b) * KA + k] : 0.f;
+                }""", """                for (int i = lane; i < B * KQ; i += 32) {
+                    const int b = i / KQ, q = i - b * KQ, k = 4 * q;
+                    float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+                    if (b < nb) v = __ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q);
+                    a_s[k * B + b] = v.x;
+                    if (k + 1 < K) a_s[(k + 1) * B + b] = v.y;
+                    if (k + 2 < K) a_s[(k + 2) * B + b] = v.z;
+                    if (k + 3 < K) a_s[(k + 3) * B + b] = v.w;
+                }""")
+
+
+def _sh4(s):
+    """sh staged by float4 loads (fused_forward.VEC_SH). Bitwise."""
+    return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
+                """for (int i = lane; i < B * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+
+
+CACHE_HINTS = r"""
+__device__ __forceinline__ float ld_x_el(const float* p) {  // x: kept in L1 (re-read by the next edges' senders)
+    float v;
+    asm("ld.global.nc.L1::evict_last.f32 %0, [%1];" : "=f"(v) : "l"(p));
+    return v;
+}
+__device__ __forceinline__ float4 ld_na4(const float4* p) {  // a and sh: read once, not allocated in L1
+    float4 v;
+    asm("ld.global.nc.L1::no_allocate.v4.f32 {%0, %1, %2, %3}, [%4];"
+        : "=f"(v.x), "=f"(v.y), "=f"(v.z), "=f"(v.w) : "l"(p));
+    return v;
+}
+"""
+
+
+def _hints(s, x=None, stream=False):
+    """Cache hints (round 4, after the x tile did not fit the A100's shared memory): ``x`` "ldg" (``__ldg``) or "el"
+    (L1 evict_last) on the sender-feature gathers; ``stream`` the float4 a / sh loads with L1::no_allocate, so L1
+    holds x. Bitwise (the same values)."""
+    s = _sub(s, 'extern "C" __global__', CACHE_HINTS + 'extern "C" __global__', 1)
+    if x == "ldg":
+        s = _sub(s, r"\(snd >= 0\) \? x\[([^\]]*)\]", r"(snd >= 0) ? __ldg(&x[\1])", regex=True)
+    elif x == "el":
+        s = _sub(s, r"\(snd >= 0\) \? x\[([^\]]*)\]", r"(snd >= 0) ? ld_x_el(&x[\1])", regex=True)
+    if stream:
+        s = _sub(s, "__ldg(reinterpret_cast<const float4*>(", "ld_na4(reinterpret_cast<const float4*>(")
+    return s
+
+
+def _wfrag(s):
+    """The tensor-core W slice stored in mma.sync fragment order, [npl][KP / 8][2][32 lanes][4], so each lane loads its
+    four W values of a (path, k-step, m-tile) with one float4 shared load (conflict-free: consecutive 16 B per lane)
+    instead of four scalar loads. The same values reach the same mma: bitwise. Needs CB == 32 (two m-tiles)."""
+    if "constexpr int CB = 32;" not in s:
+        raise ValueError("wfrag needs CB == 32")
+    s = _sub(s, r"""                Ws\[\(p \* KP \+ k\) \* WS \+ l\] = (k < K \? W\[[^;]*\] : 0\.f);""",
+             r"""                const int fm = l >> 4, fr = l & 15, fk = k & 7;
+                Ws[((p * (KP / 8) + (k >> 3)) * 2 + fm) * 128 + ((fr & 7) * 4 + (fk & 3)) * 4
+                   + (fr >> 3) + 2 * (fk >> 2)] = \1;""", regex=True)
+    return _sub(s, """                                const float* wp = Ws + (g * KP + k0 + tq) * WS + m * 16 + gid;
+                                unsigned ah[4], al[4];
+                                split_tf32(wp[0], ah[0], al[0]);
+                                split_tf32(wp[8], ah[1], al[1]);
+                                split_tf32(wp[4 * WS], ah[2], al[2]);
+                                split_tf32(wp[4 * WS + 8], ah[3], al[3]);""",
+                """                                const float4 wv = reinterpret_cast<const float4*>(Ws)[
+                                    ((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 32 + lane];
+                                unsigned ah[4], al[4];
+                                split_tf32(wv.x, ah[0], al[0]);
+                                split_tf32(wv.y, ah[1], al[1]);
+                                split_tf32(wv.z, ah[2], al[2]);
+                                split_tf32(wv.w, ah[3], al[3]);""")
+
+
+def _xs(kernel):
+    """The sender features x kept in a per-warp shared tile [B][NX][32] (after the plan's shared memory) instead of
+    32 registers live across the product; each lane writes and reads its own column (no sync). Bitwise. Own launch
+    rule (more shared memory, the same warps)."""
+    def transform(s):
+        import dataclasses
+
+        nx = max(int(v) for v in re.findall(r"float xv\[B\]\[(\d+)\];", s))
+        rule = kernel.rule
+        base = rule.shared_bytes // 4
+        tile = BATCH_LAB * nx * 32
+        s = _sub(s, "    const int cb = blockIdx.y;\n", f"    constexpr int NX = {nx};\n"
+                 f"    float* x_s = smem + {base} + warp * {tile};  // the warp's x tile [B][NX][32]\n"
+                 "    const int cb = blockIdx.y;\n", 1)
+        s = _sub(s, r"xv\[b\]\[(\d+)\] = \(snd >= 0\) \? (x\[[^\]]*\]) : 0\.f;",
+                 r"x_s[(b * NX + \1) * 32 + lane] = (snd >= 0) ? \2 : 0.f;", regex=True)
+        s = _sub(s, r"xv\[b\]\[(\d+)\]", r"x_s[(b * NX + \1) * 32 + lane]", regex=True)
+        s = _sub(s, r"float xv\[B\]\[\d+\];", "", regex=True)
+        _RULES[s] = dataclasses.replace(rule, shared_bytes=rule.shared_bytes + 4 * tile * rule.warps)
+        return s
+    return transform
+
+
+BATCH_LAB = 8  # fused_forward.BATCH
+
+
+def _a4_args(args):
+    import torch
+
+    a, *rest = args
+    padded = torch.nn.functional.pad(a, (0, A4_STRIDE - a.shape[1])).contiguous()
+    return (padded, *rest)
 
 
 def forward_variants(kernel=None):
@@ -509,12 +662,49 @@ def forward_variants(kernel=None):
         # Fewer warps per block: the launch bound allows more registers (the A100 kernel spills 40 bytes at 168).
         "tc-warps8": ("exact", _tc_rerender(kernel, True, "tc-warps8", warps=8), ()),
         "tc-warps10": ("exact", _tc_rerender(kernel, True, "tc-warps10", warps=10), ()),
+        # Round 4: the staging double-buffered with cp.async (fused_forward.PREFETCH): bitwise.
+        "tc-prefetch": ("exact", _tc_rerender(kernel, True, "tc-prefetch", prefetch=True), ()),
+        # The FP32-SIMT kernel (the plan's own, no TENSOR_CORES constant) re-rendered, without and with prefetch.
+        "simt-rerender": ("exact", _tc_rerender(kernel, False, "simt-rerender"), ()),
+        "simt-prefetch": ("exact", _tc_rerender(kernel, False, "simt-prefetch", prefetch=True), ()),
+        "simt-prefetch-x": ("exact", _tc_rerender(kernel, False, "simt-prefetch-x", prefetch="x"), ()),
+        "tc-prefetch-x": ("exact", _tc_rerender(kernel, True, "tc-prefetch-x", prefetch="x"), ()),
+        "tc-prefetch-x-w10": ("exact", _tc_rerender(kernel, True, "tc-prefetch-x-w10", warps=10, prefetch="x"), ()),
+        "tc-prefetch-w10": ("exact", _tc_rerender(kernel, True, "tc-prefetch-w10", warps=10, prefetch=True), ()),
         "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
         "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),
                                                             "mma_f16(cross, al, bh);", ""),
                                                        "mma_f16(cross, ah, bl);", ""), ()),
         "F-tc-no-redistribute": ("falsifier", lambda s: _sub(s, "w[g][b] = r_s[(g * B + b) * RS + lane];",
                                                              "w[g][b] = wacc[g][b & 1][b >> 1 & 3];"), ()),
+        # Round 4 (5 November 2026): the staging's global loads, each replaced by a constant (timing bounds of the
+        # load latency: a, the sender features x and the edge harmonics sh).
+        "F-no-aload": ("falsifier", lambda s: _sub(s, "a[(e0 + b) * KA + k]", "0.5f"), ()),
+        "F-no-xload": ("falsifier", lambda s: _sub(s, r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
+                                                   "(snd >= 0) ? 0.5f : 0.f", regex=True), ()),
+        "F-no-shload": ("falsifier", lambda s: _sub(s, "sh[e0 * ED + i]", "0.5f"), ()),
+        "F-no-loads": ("falsifier", lambda s: _sub(_sub(_sub(s, "a[(e0 + b) * KA + k]", "0.5f"),
+                                                        r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
+                                                        "(snd >= 0) ? 0.5f : 0.f", regex=True),
+                                                   "sh[e0 * ED + i]", "0.5f"), ()),
+        "tc-a4": ("exact", _tc_a4, (), _a4_args),
+        "simt-a4": ("exact", _simt_a4, (), _a4_args),
+        "xs": ("exact", _xs(kernel), ()),
+        "tc-a4+xs": ("exact", lambda s: _xs(kernel)(_tc_a4(s)), (), _a4_args),
+        "simt-a4+sh4": ("exact", lambda s: _sh4(_simt_a4(s)), (), _a4_args),
+        "sh4": ("exact", lambda s: _sh4(s), ()),
+        "tc-wfrag": ("exact", _wfrag, ()),
+        "tc-a4+wfrag": ("exact", lambda s: _wfrag(_tc_a4(s)), (), _a4_args),
+        "x-ldg": ("exact", lambda s: _hints(s, "ldg"), ()),
+        "x-el": ("exact", lambda s: _hints(s, "el"), ()),
+        "tc-a4+x-el": ("exact", lambda s: _hints(_tc_a4(s), "el"), (), _a4_args),
+        "tc-a4-na": ("exact", lambda s: _hints(_tc_a4(s), stream=True), (), _a4_args),
+        "tc-a4-na+x-el": ("exact", lambda s: _hints(_tc_a4(s), "el", stream=True), (), _a4_args),
+        # The TP's coefficient multiplies dropped (x e instead of x e c): how much its arithmetic weighs.
+        "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
+        "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
+                                                 r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
+                                                 regex=True), ()),
     }
 
 

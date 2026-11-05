@@ -76,7 +76,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/kernels/triton/edge_outer_sum.py": {"STRIDED_ROWS": "strided rows in place; copy kept for the A/B",
                                                   "BACKWARD_WALK": "run-walking backward; per GPU, A/B"},
     "fastmace/kernels/triton/tabled_outer_sum.py": {"TABLED_FORWARD": "table read inside the sums; per GPU, A/B"},
-    "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B"},
+    "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B",
+                                                "WARPS": "table forward num_warps; tools/radial_table_lab.py"},
     "fastmace/kernels/triton/species_gemm.py": {"TENSOR_CORES": "species products in our mma.sync kernel; A/B",
                                                 "TC_PRESPLIT": "tensor-core kernel lab switch",
                                                 "CUTLASS": "gathered CUTLASS species products; A/B",
@@ -99,7 +100,11 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/kernels/oeq_streaming/fused_forward.py": {"SKIP_ZERO_COLUMN": "skips W's zero bias column; per GPU, A/B",
                                                         "STREAM_STORE_W": "w stored with __stcs; screen A/B",
                                                         "TENSOR_CORES": "a.W in 3xTF32 on tensor cores; per GPU, A/B",
-                                                        "TC_PRESPLIT": "W slice split once per block; A/B"},
+                                                        "TC_PRESPLIT": "W slice split once per block; A/B",
+                                                        "PREFETCH": "cp.async double-buffered staging; A/B (round 4)",
+                                                        "VEC_SH": "sh staged with float4 loads; per GPU, A/B",
+                                                        "VEC_A": "a staged with float4 loads; per GPU, A/B",
+                                                        "TC_WFRAG": "W slice in mma fragment order; per GPU, A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")

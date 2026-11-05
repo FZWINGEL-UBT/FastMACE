@@ -119,6 +119,7 @@ def main(argv=None):
     p.add_argument("--structure", default="NaCl")
     p.add_argument("--backend", choices=("hybrid", "cueq"), default="hybrid")
     p.add_argument("--temperature-K", type=float, default=1000.0)
+    p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (step_breakdown's)")
     p.add_argument("--velocity-seed", type=int, default=20261007)
     p.add_argument("--equilibrate-steps", type=int, default=50)
     p.add_argument("--calls", type=int, default=5)

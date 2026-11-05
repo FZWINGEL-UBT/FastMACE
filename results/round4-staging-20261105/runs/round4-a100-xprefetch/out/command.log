@@ -1,0 +1,16 @@
+forward ptxas base                         {'8.0': {'registers': 168, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch                  {'8.0': {'registers': 168, 'spill_store_bytes': 12}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch-x rule LaunchRule(parts=2, warps=7, blocks_per_slice=27, shared_bytes=156032) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch-x                {'8.0': {'registers': 240, 'spill_store_bytes': 0}, '8.9': {'registers': 238, 'spill_store_bytes': 0}}
+tc-prefetch-x-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=200960) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward ptxas tc-prefetch-x-w10            {'8.0': {'registers': 168, 'spill_store_bytes': 192}, '8.9': {'registers': 168, 'spill_store_bytes': 192}}
+tc-prefetch rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch-x rule LaunchRule(parts=2, warps=7, blocks_per_slice=27, shared_bytes=156032) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+tc-prefetch-x-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=27, shared_bytes=200960) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040))
+forward tc-prefetch-x-w10: CUDA/NVRTC call failed: <CUresult.CUDA_ERROR_INVALID_VALUE: 1>
+forward  base                3827.7 us  ratio 1.000  regs 168 local 40  
+forward  tc-prefetch         3972.1 us  ratio 1.038  regs 168 local 56  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch-x       4409.3 us  ratio 1.152  regs 240 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch-x-w10       nan us  ratio nan  regs None local None  CUDA/NVRTC call failed: <CUresult.CUDA_ERROR_INVALID_VALUE: 1>
+grep: /tmp/fastmace-out/wprime.log: No such file or directory

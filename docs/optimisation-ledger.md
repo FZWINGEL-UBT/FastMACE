@@ -601,6 +601,14 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-horner](#omat0-horner) | Power-basis value table with dual Horner in wprime; l1 = 0 paths without the v_j sums; register cap | `wprime_backward.HORNER`, `SCALAR_PATHS`, `MAX_REGISTERS` (`*_GPUS`) | FM | DEFAULT: A100 HORNER + SCALAR_PATHS; 5060 Ti FACTORED (plain loads) + HORNER + 80 registers; off on the Ada | 2026-11-05 | A100 step 0.986 / 0.983, 0.994 / 0.978; 5060 Ti 0.979 / 0.982, 0.986 / 0.989; Ada HORNER 1.000-1.004 | [round 2](../plans/ideas-20261105-round2.md) |
 | [omat0-eos-walk](#omat0-eos-walk) | `edge_outer_sum` backward walking key runs (each slot's block loaded once per run) | `edge_outer_sum.BACKWARD_WALK` (`_GPUS`) | FM | DEFAULT on every A100 | 2026-11-05 | lab A100 0.802, Ada 1.03-1.11, 5060 Ti 0.94; A100 step 0.995 / 0.987, 0.995 / 0.996 | [round 2](../plans/ideas-20261105-round2.md) |
 | [omat0-fp16-tc](#omat0-fp16-tc) | 3×FP16 m16n8k16 MMAs in the tensor-core forward; 8 or 10 warps | `render(tc="fp16")` (lab only) | FM | REJECTED | 2026-11-05 | lab A100 1.197 (bound of its big·big product 0.964), 5060 Ti 1.07; 8 / 10 warps 1.160 / 1.109 | [round 2](../plans/ideas-20261105-round2.md) |
+| [omat0-ff-vector-staging](#omat0-ff-vector-staging) | Fused forward: sh and a staged with float4 loads (a from padded rows, swizzled tile); W slice in mma fragment order | `fused_forward.VEC_SH`, `VEC_A`, `TC_WFRAG` (`*_GPUS`) | FM | DEFAULT: VEC_SH on every A100 and the RTX 5060 Ti; VEC_A and TC_WFRAG on every A100 | 2026-11-05 | A100-SXM4 step (all three) 0.960 / 0.954, 0.970 / 0.969; VEC_A+VEC_SH 0.973 / 0.976, 0.976 / 0.981; 5060 Ti VEC_SH 0.977 / 0.977, 0.984 / 0.984 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-ff-prefetch](#omat0-ff-prefetch) | cp.async double-buffered a / sh (and x) staging in the fused forward | `fused_forward.PREFETCH` (`PREFETCH_GPUS`, empty) | FM | REJECTED on the A100 | 2026-11-05 | lab A100-SXM4 tc-prefetch 1.071 / 1.038, tc-prefetch-x 1.152; 5060 Ti 0.861 (tc), 0.930 (SIMT); Ada SIMT 1.025 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-radial-table-shapes](#omat0-radial-table-shapes) | Radial table launch shapes (BLOCK_E, COLUMN_BLOCK, warps) | `radial_table.WARPS` (None) | FM | REJECTED | 2026-11-05 | best 0.925 of 271 µs on the A100 PCIe (about 20 µs) | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-tp-factor](#omat0-tp-factor) | Fewer coefficient multiplies in the fused forward's tensor product | none (bound `F-tp-no-coef`) | FM | REJECTED (bound) | 2026-11-05 | bound 0.961 (5060 Ti) | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-table-in-forward](#omat0-table-in-forward) | Interaction 2's radial table evaluated inside the fused forward | none (estimate) | FM | REJECTED (estimate) | 2026-11-05 | about 4.5 GB of L2 traffic per force call against 0.77 GB now | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-fp16x3-gemm](#omat0-fp16x3-gemm) | 3xFP16 GEMMs (one FP16 GEMM over 3K, power-of-two scaling) instead of CUTLASS 3xTF32 | none (`tools/fp16x3_gemm_bench.py`) | FM | REJECTED (accuracy) | 2026-11-05 | A100-SXM4 GEMM 0.49–0.66 of 3xTF32, split unfused as costly; error 1.1–2.0e-6 against 1.1–2.7e-7 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-ff-hints](#omat0-ff-hints) | Cache hints in the fused forward (x evict_last / ldg, a and sh no_allocate) | none (lab) | FM | REJECTED | 2026-11-05 | A100-SXM4 x 1.021; with tc-a4 0.912–0.923 against 0.903 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-atom-order](#omat0-atom-order) | Morton atom order for the x gathers | none (lab, `results/round4-staging-20261105/orders`) | FM | REJECTED | 2026-11-05 | 5060 Ti forward 6,724 (repeat), 6,737 (Morton), 6,679 µs (shuffled) | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -3914,6 +3922,93 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured: lab forward A100 1.197 (104 B spills), its big·big product alone 0.964; 5060 Ti 1.07; 8 or 10 warps 1.160 / 1.109 (no spills, bitwise).
 - Why: the MMAs are not the limit, and fewer warps lose more latency hiding than the spills cost.
 - Sources: [round 2](../plans/ideas-20261105-round2.md).
+
+<a id="omat0-ff-prefetch"></a>
+#### omat0-ff-prefetch: cp.async double-buffered staging in the fused forward
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.PREFETCH` (None: `PREFETCH_GPUS`, empty; True / "x" / False)
+- Engine: FM
+- Date/round: 5 November 2026, round 4 (`fe48ec7f`, `0f199477`)
+- What: the next batch's a and sh rows (with "x" also the sender rows of x) copied with `cp.async` into a second shared buffer while the current batch computes. Bitwise (lab).
+- Status: REJECTED on the A100 (the target); kept off everywhere.
+- Measured: kernel lab, forward alone: A100-SXM4 tc-prefetch 1.071 and 1.038 (56 B spills), tc-prefetch-x 1.152 (240 registers); RTX 5060 Ti tc-prefetch 0.861, simt-prefetch 0.930, simt-prefetch-x 1.110 (6 warps); RTX 4000 Ada simt-prefetch 1.025.
+- Why: the A100 kernel is at 168 registers with 12 warps; the second buffer costs warps or spills, and the 12 warps already hide the load latency. The A100 attribution (no loads at all 0.742, no a·W product 0.550) put the time in the product and the tensor product, not the staging.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-radial-table-shapes"></a>
+#### omat0-radial-table-shapes: radial table launch shapes
+- Switch: `fastmace.kernels.triton.radial_table.WARPS` (None); `tools/radial_table_lab.py`
+- Engine: FM
+- Date/round: 5 November 2026, round 4
+- What: `BLOCK_E`, `COLUMN_BLOCK` and `num_warps` swept over the real edges of SrTiO3 10×10×10.
+- Status: REJECTED.
+- Measured: A100 80GB PCIe: best 0.925 of 271 µs (about 20 µs per force call, 0.1 % of the step).
+- Why: too small to pass an MD A/B.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-tp-factor"></a>
+#### omat0-tp-factor: fewer coefficient multiplies in the tensor product
+- Switch: none (lab falsifier `F-tp-no-coef`)
+- Engine: FM
+- Date/round: 5 November 2026, round 4
+- What: the bound of folding the Clebsch–Gordan coefficients into fewer multiplies: the falsifier drops them all.
+- Status: REJECTED (bound).
+- Measured: RTX 5060 Ti lab forward 0.961 with no coefficient multiply at all; a real factoring keeps most of them.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-table-in-forward"></a>
+#### omat0-table-in-forward: interaction 2's radial table inside the fused forward
+- Switch: none (estimate)
+- Engine: FM
+- Date/round: 5 November 2026, round 4 (owner: "Go ahead and try that idea out")
+- What: evaluate the radial table's polynomial per edge inside the fused forward instead of reading the stored `[E, 65]` table output.
+- Status: REJECTED (estimate; not built).
+- Measured: each warp batch would read its (pair, bin) coefficient slab, about 4.5 GB of L2 traffic per force call, against 0.77 GB for the stored table now; the stored-a loads are bounded at 0.900 of the forward (A100 falsifier), and VEC_A reaches 0.903.
+- Why: the table is cheap to store once and expensive to re-evaluate per warp.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-fp16x3-gemm"></a>
+#### omat0-fp16x3-gemm: 3xFP16 GEMMs on the A100
+- Switch: none (`tools/fp16x3_gemm_bench.py`)
+- Engine: FM
+- Date/round: 5 November 2026, round 4
+- What: the A100's FP16 tensor cores run at twice its TF32 rate, with TF32's 11-bit significand. A's rows and B's columns are scaled by powers of two into [0.5, 1), then one FP16 GEMM over 3K with FP32 output: `[2^11 Ah, Ah, 2^11 Al] @ [Bh; 2^11 Bl; Bh]`.
+- Status: REJECTED (accuracy).
+- Measured: A100-SXM4-80GB, the profile's shapes: the FP16 GEMM takes 0.49–0.66 of the CUTLASS 3xTF32 time; the unfused split takes 78–138 µs per call. Error relative to |A| |B| against float64: 1.1–2.0e-6, against 3xTF32's 1.1–2.7e-7 and FP32's 0.8–4.2e-7.
+- Why: the FP16 MMA accumulates more coarsely; the split would have to be fused into every producer for any gain (at most about 0.8 ms of 12.3).
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026); `results/round4-staging-20261105/`.
+
+<a id="omat0-ff-hints"></a>
+#### omat0-ff-hints: cache hints in the fused forward
+- Switch: none (lab variants `x-ldg`, `x-el`, `tc-a4+x-el`, `tc-a4-na`, `tc-a4-na+x-el`)
+- Engine: FM
+- Date/round: 5 November 2026, round 4
+- What: the x gathers through `__ldg` or `ld.global.nc.L1::evict_last`; the float4 a / sh loads with `L1::no_allocate`. Bitwise.
+- Status: REJECTED.
+- Measured: A100-SXM4 lab forward: x-ldg 1.021, x-el 1.021, tc-a4 + hints 0.912–0.923 against 0.903; RTX 5060 Ti 0.996.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-atom-order"></a>
+#### omat0-atom-order: Morton atom order for the x gathers
+- Switch: none (structure files in `results/round4-staging-20261105/orders/`)
+- Engine: FM
+- Date/round: 5 November 2026, round 4
+- What: the x gathers cost 0.837 of the A100 forward (falsifier); a space-filling-curve atom order could raise their cache reuse.
+- Status: REJECTED.
+- Measured: RTX 5060 Ti forward: ASE repeat order 6,724 µs, Morton 6,737, seeded shuffle 6,679.
+- Why: x (10 MB) stays in L2 in any order; the gathers cost latency, not DRAM traffic.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-ff-vector-staging"></a>
+#### omat0-ff-vector-staging: vector staging and fragment-order W in the fused forward
+- Switch: `fastmace.kernels.oeq_streaming.fused_forward.VEC_SH` (`VEC_SH_GPUS`), `VEC_A` (`VEC_A_GPUS`), `TC_WFRAG` (`TC_WFRAG_GPUS`); `a_columns` (the radial table writes padded rows)
+- Engine: FM
+- Date/round: 5 November 2026, round 4 (`38ff4072`, `30afdef8`, `f7412efa`; defaults on `fastmace/round4-staging`)
+- What: VEC_SH stages sh with float4 loads. VEC_A stages a with float4 loads from rows padded to a multiple of 4 floats into an edge-major tile, XOR-swizzled per 4-float group (conflict-free fragment reads); tensor-core product only, `used % 32 == 0`. TC_WFRAG stores the tensor-core W slice in mma.sync fragment order, so each lane loads a fragment with one float4 shared load. All bitwise (`tests/gpu/test_fused_folded_forward_cuda.py`).
+- Status: DEFAULT: VEC_SH on every A100 and the RTX 5060 Ti; VEC_A and TC_WFRAG on every A100 (decision 66). Off on the RTX 4000 Ada (lab sh4 1.021 / 1.005, simt-a4 1.070).
+- Measured: MD step b/a, SrTiO3 10×10×10 then NbCl5, both build orders: A100-SXM4-80GB all three 0.960 / 0.954, 0.970 / 0.969; VEC_A + VEC_SH 0.973 / 0.976, 0.976 / 0.981; RTX 5060 Ti VEC_SH 0.977 / 0.977, 0.984 / 0.984. Lab forward A100-SXM4: tc-a4 0.903, tc-wfrag 0.965, both 0.860.
+- Checks: force gate on the A100-SXM4 as the plan (NbCl5 stress 1.49e-7 and 1.57e-7, the accepted exception); GPU test on the 5060 Ti and the A100.
+- Why: the A100 attribution put a quarter of the forward in staging loads (16 scalar a loads per lane and batch read row-major a transposed) and showed the product's shared loads and splits as the next cost.
+- Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026); `results/round4-staging-20261105/`.
 
 <a id="omat0-skip-zero-column"></a>
 #### omat0-skip-zero-column: the fused forward skips the all-zero bias column
