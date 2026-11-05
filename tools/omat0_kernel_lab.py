@@ -288,6 +288,74 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         return re.sub(reduction, lambda m: butterfly_code, s, count=1, flags=re.S) if re.search(
             reduction, s, flags=re.S) else _sub(s, reduction, "", 1, regex=True)
 
+    # Round 5 follow-ups (5 November 2026, external ideas 2 and 5). F-cart3: each lane projects its 16 dsh partials
+    # (and dr) onto three Cartesian components with a 16x3 Jacobian before the reduction, then 3 values are reduced
+    # (the Jacobian is a stand-in read from sh: timing only). F-redux16: the 17 sums as fixed point through the
+    # hardware integer reduction (redux.sync.add.s32), with one redux.sync.max for the warp's exponent; deterministic,
+    # about 2^-25 of the warp's largest partial per term. F-cart3-redux: both.
+    jacobian = """acc_t g3[3] = {acc_t(0), acc_t(0), acc_t(0)};
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) {
+        #pragma unroll
+        for (int k = 0; k < 3; ++k)
+            g3[k] += edge_gradient[c] * acc_t(sh[edge_base + ((c + k + 1) & (EDGE_DIM - 1))]);
+    }
+    #pragma unroll
+    for (int k = 0; k < 3; ++k) g3[k] += radial_gradient * acc_t(sh[edge_base + 1 + k]);
+"""
+    cart3_code = jacobian + """    #pragma unroll
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        #pragma unroll
+        for (int k = 0; k < 3; ++k) g3[k] += __shfl_xor_sync(FULL_MASK, g3[k], offset, 32);
+    }
+    if (lane < 3) dsh[edge_base + lane] = scalar_t(lane == 0 ? g3[0] : (lane == 1 ? g3[1] : g3[2]));
+    if (lane == 0) dr[e] = scalar_t(0);"""
+
+    def redux(values, count, store):
+        return f"""float big = 0.f;
+    #pragma unroll
+    for (int c = 0; c < {count}; ++c) big = fmaxf(big, fabsf(float({values}[c])));
+    unsigned ex = __reduce_max_sync(FULL_MASK, __float_as_uint(big) >> 23);
+    ex = ex < 30u ? 30u : ex;
+    const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);
+    #pragma unroll
+    for (int c = 0; c < {count}; ++c) {{
+        const int total = __reduce_add_sync(FULL_MASK, __float2int_rn(float({values}[c]) * scale));
+        if (lane == 0) {store} = scalar_t(float(total) * inverse);
+    }}"""
+
+    redux16_code = """acc_t all[EDGE_DIM + 1];
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) all[c] = edge_gradient[c];
+    all[EDGE_DIM] = radial_gradient;
+    """ + redux("all", "EDGE_DIM + 1", "(c < EDGE_DIM ? dsh[edge_base + c] : dr[e])")
+    cart3_redux_code = jacobian + "    " + redux("g3", 3, "dsh[edge_base + c]") + """
+    if (lane == 0) dr[e] = scalar_t(0);"""
+
+    def redux_per_component(values, count, store):
+        """Fixed point with each component's own exponent (one redux.sync.max per component): small components keep
+        their bits next to large ones."""
+        return f"""#pragma unroll
+    for (int c = 0; c < {count}; ++c) {{
+        const float v = float({values}[c]);
+        unsigned ex = __reduce_max_sync(FULL_MASK, __float_as_uint(fabsf(v)) >> 23);
+        ex = ex < 30u ? 30u : ex;
+        const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);
+        const int total = __reduce_add_sync(FULL_MASK, __float2int_rn(v * scale));
+        if (lane == 0) {store} = scalar_t(float(total) * inverse);
+    }}"""
+
+    redux_pc_code = """acc_t all[EDGE_DIM + 1];
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) all[c] = edge_gradient[c];
+    all[EDGE_DIM] = radial_gradient;
+    """ + redux_per_component("all", "EDGE_DIM + 1", "(c < EDGE_DIM ? dsh[edge_base + c] : dr[e])")
+
+    def _reduced(s, code):
+        if not re.search(reduction, s, flags=re.S):
+            raise ValueError("the shfl_down reduction is not in the source (BUTTERFLY=False?)")
+        return re.sub(reduction, lambda m: code, s, count=1, flags=re.S)
+
     def no_reduce(s):
         """Falsifier: no cross-lane reduction; lane 0 writes its own partial sums (the outer bound)."""
         if not re.search(reduction, s, flags=re.S):
@@ -346,6 +414,11 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
             dsh[edge_base + component] = scalar_t(edge_gradient[component]);
         dr[e] = scalar_t(radial_gradient);
     }""", s, count=1, flags=re.S), ()),
+        "redux": ("rounding", lambda s: _reduced(s, redux16_code), ()),
+        "redux-pc": ("rounding", lambda s: _reduced(s, redux_pc_code), ()),
+        "F-cart3": ("falsifier", lambda s: _reduced(s, cart3_code), ()),
+        "F-redux16": ("falsifier", lambda s: _reduced(s, redux16_code), ()),
+        "F-cart3-redux": ("falsifier", lambda s: _reduced(s, cart3_redux_code), ()),
         "F-reduce-1level": ("falsifier", lambda s: _sub(s, "for (int offset = 16; offset > 0; offset >>= 1) {",
                                                         "for (int offset = 16; offset > 8; offset >>= 1) {", 1), ()),
         "F-reduce-3level": ("falsifier", lambda s: _sub(s, "for (int offset = 16; offset > 0; offset >>= 1) {",

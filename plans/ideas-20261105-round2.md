@@ -672,3 +672,50 @@ issue, not the shuffle count. On the A100 the whole reduction is 4.5 %.
   `grad @ Wᵀ`. Ceiling about 0.25 ms (2 % on the A100).
 - **ZBL (not built).** The forward is already one Inductor kernel (47 µs) and the backward 27 µs; a hand kernel
   saves perhaps 30–40 µs.
+
+### External ideas, third set (5 November 2026)
+
+Assessed against the ledger and the round-5 falsifiers. RTX 5060 Ti w′ falsifiers (BUTTERFLY off as the base,
+7.37 ms): no reduction 0.675, dr reduced but not dsh 0.680, dsh but not dr 0.998, butterfly 0.965, two warps per edge
+0.954, four warps per edge 0.891. On the A100 no reduction is 0.955. Reducing one value costs almost nothing; the 16
+dsh components cost the 32 %, and the butterfly's quarter of the shuffles recovers only a ninth of it.
+
+1. **Producer/consumer warps in the A100 forward (MMA warps feed FP32 warps).** Parked. The forward is at the
+   168-register cap with 12 warps and 151 KB of shared memory. Fewer warps lost more than they saved (8 / 10 warps
+   1.160 / 1.109; pre-split W 1.362 because it cost a third of the warps). An exchange ring of w for 8 edges is
+   about 40 KB per stage. The tensor pipe is not the limit: the big·big product alone is 0.964. Dropping the W split
+   altogether is 0.862, but the split runs on the same issue slots as the FP32 consumer, so warp roles cannot hide
+   it. The 12 warps already interleave both pipes. First check, if reopened: Nsight barrier-stall share and pipe
+   utilisation of the forward. Without a large barrier share there is nothing to overlap.
+2. **Cartesian gradient before the w′ reduction.** Promoted. The falsifiers above make it the strongest 5060 Ti
+   lead: three reduced values instead of sixteen, with dr folded in through the unit vector, so dr's own reduction
+   goes too. Lab falsifiers `F-cart3`, plus `F-redux16` and `F-cart3-redux` for idea 5, are running. They time a
+   16×3 projection whose Jacobian is read from sh as a stand-in. A real Jacobian costs some tens of FMAs more per
+   lane and edge. Production would need the edge-SH backward to take a per-edge 3-vector from interaction 2 next to
+   interaction 1's dsh. It is rounding, not bitwise; gate and stress as usual.
+3. **Radial-manifold compression.** Closed today by `tools/radial_rank_lab.py`, before this proposal. That test is
+   the one proposed: OMAT-0, every species pair, a dense Chebyshev grid over [0.5, r_max). Errors are output-weighted
+   on w = aW and on dw/dr, with an SVD of the values and scaled slopes. Every interaction is full rank. Rank 56
+   still leaves 1.6e-5 relative w error against 3–6e-8 from float32 rounding, so rank ≤ 32 is far off (ledger
+   rad-low-rank: MH-1 rank 65 of 65). The six-dimensional space per piece is real. TABLE_W exploits it in the
+   backward. The forward cannot: a per-edge W·C read is about 30 KB against a's 256 B.
+4. **Pre-split constant weights in the CUTLASS atom GEMMs.** Low. The same trade in the forward (TC_PRESPLIT) lost
+   1.362, and the producer-side splits lost too (prec-presplit-epilogue, prec-producer-split). K = 128 GEMMs are near
+   their memory time, and B is half the split work. Bound first, if ever: an OpMultiplyAdd (1×TF32) build of the same
+   tile gives the ceiling of all split work; stop below 10 % of the CUTLASS GEMM time.
+5. **Integer warp reductions (redux.sync).** Raised from speculative to a lab falsifier, because the cost scales
+   with the number of reduced components. Fixed point: one redux.sync.max of the lanes' largest exponent, 2^25 head
+   room, 32-bit sums. That is deterministic, with about 2^-25 of the warp's largest partial per term, comparable to
+   FP32's error against Σ|g| (the gate decides). Timed as `F-redux16` and `F-cart3-redux`.
+6. **Path-specific precision in the forward.** Rejected. The bound is 0.964 even with every path on one TF32
+   product, and it is approximate arithmetic on top of the accepted NbCl5 stress exception.
+7. **Static receiver schedule instead of the work counter.** Low. About 2,500 atomics per call on uniform SrTiO3.
+   The counter's dynamic balance is what a static list would give up. Falsifier when idle: the same arithmetic with
+   a precomputed list; stop below 5 % of the forward.
+8. **Structure-aware plan selection at warm-up.** Not ours to adopt. Per-crystal tuning was ruled out by the owner
+   (10 October 2026); decision 66 opens per-GPU defaults only. Timing-noise selection would also make a run's plan,
+   and its rounding, irreproducible. Opt-in calibration exists (decision 55). This is an owner decision.
+
+Separately, the multi-warp falsifier (idea 1 of the second set) did not fail on the 5060 Ti: four warps per edge
+gave 0.891 with atomics. Its A100 bound is running. A deterministic version would combine the four partials in
+shared memory in a fixed order.

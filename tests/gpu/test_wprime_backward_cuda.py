@@ -302,12 +302,12 @@ for layout in ("ir_mul", "mul_ir"):
         name = f"butterfly-{layout}-{'table-w' if table_w else 'stored-w'}"
         wp.TABLE_W = table_w
         try:
-            wp.BUTTERFLY = False
+            wp.BUTTERFLY, wp.REDUX = False, False
             plain = wp.WPrime(table, weight, kernels)
             wp.BUTTERFLY = True
             new_w = wp.WPrime(table, weight, kernels)
         finally:
-            wp.TABLE_W = wp.BUTTERFLY = None
+            wp.TABLE_W = wp.BUTTERFLY = wp.REDUX = None
         assert new_w.kernel.butterfly and not plain.kernel.butterfly, name
         assert "__shfl_xor_sync" in new_w.kernel.source and "__shfl_xor_sync" not in plain.kernel.source, name
         base = run(X, Y, G, D, kernels, weight, fused, plain)
@@ -322,6 +322,43 @@ for layout in ("ir_mul", "mul_ir"):
         torch.cuda.synchronize()
         assert torch.equal(captured[2], new[2]) and torch.equal(captured[4], new[4]), name
         report[name] = {"bitwise": True}
+    # REDUX: the end-of-edge sums in fixed point (redux.sync): FP32 class against the shuffle tree, deterministic,
+    # and a NaN partial still gives NaN where the shuffle tree gives NaN.
+    for table_w in (False, True):
+        name = f"redux-{layout}-{'table-w' if table_w else 'stored-w'}"
+        wp.TABLE_W = table_w
+        try:
+            wp.REDUX = wp.BUTTERFLY = False
+            plain = wp.WPrime(table, weight, kernels)
+            wp.REDUX = True
+            new_w = wp.WPrime(table, weight, kernels)
+        finally:
+            wp.TABLE_W = wp.BUTTERFLY = wp.REDUX = None
+        assert new_w.kernel.redux and not plain.kernel.redux and not new_w.kernel.butterfly, name
+        assert "__reduce_add_sync" in new_w.kernel.source and "__reduce_add_sync" not in plain.kernel.source, name
+        base = run(X, Y, G, D, kernels, weight, fused, plain)
+        new = run(X, Y, G, D, kernels, weight, fused, new_w)
+        assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name  # the same forward
+        torch.testing.assert_close(new[4], base[4], rtol=1e-5, atol=2e-6 * float(base[4].abs().max()))  # dsh
+        torch.testing.assert_close(new[2], base[2], rtol=1e-5, atol=2e-6 * float(base[2].abs().max()))  # dL/dr
+        torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+        again = run(X, Y, G, D, kernels, weight, fused, new_w)
+        assert torch.equal(again[4], new[4]) and torch.equal(again[2], new[2]), name  # deterministic
+        bad = X.clone()
+        bad[0] = float("nan")
+        base_nan = run(bad, Y, G, D, kernels, weight, fused, plain)
+        new_nan = run(bad, Y, G, D, kernels, weight, fused, new_w)
+        assert bool(torch.isnan(base_nan[4]).any()), name
+        assert torch.equal(torch.isnan(new_nan[4]), torch.isnan(base_nan[4])), name
+        assert torch.equal(torch.isnan(new_nan[2]), torch.isnan(base_nan[2])), name
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            captured = run(X, Y, G, D, kernels, weight, fused, new_w)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(captured[2], new[2]) and torch.equal(captured[4], new[4]), name
+        report[name] = {"dsh": float((new[4] - base[4]).abs().max() / base[4].abs().max()),
+                        "dr": float((new[2] - base[2]).abs().max() / base[2].abs().max())}
 print(json.dumps(report))
 """
 
@@ -340,5 +377,5 @@ def test_wprime_backward_matches_the_chain():
                            "factored-ir_mul-table-w-scaled", "factored-mul_ir-table-w-scaled"} | {
                                f"{case}-{layout}" for case in ("horner", "horner-scalar", "horner-80")
                                for layout in ("ir_mul", "mul_ir")} | {
-                               f"butterfly-{layout}-{w}" for layout in ("ir_mul", "mul_ir")
-                               for w in ("stored-w", "table-w")}
+                               f"{case}-{layout}-{w}" for case in ("butterfly", "redux")
+                               for layout in ("ir_mul", "mul_ir") for w in ("stored-w", "table-w")}

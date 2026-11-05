@@ -115,6 +115,7 @@ def test_round2_defaults(monkeypatch):
         (wprime_backward, "HORNER", wprime_backward.horner_default, {"a100", "5060"}),
         (wprime_backward, "SCALAR_PATHS", wprime_backward.scalar_paths_default, {"a100"}),
         (wprime_backward, "BUTTERFLY", wprime_backward.butterfly_default, {"5060"}),
+        (wprime_backward, "REDUX", wprime_backward.redux_default, set()),
         (edge_outer_sum, "BACKWARD_WALK", walk, {"a100"}),
         (generic, "FUSED_FIRST_BACKWARD", generic.fused_first_backward, {"a100", "5060", "ada"}),
         (tabled_outer_sum, "TABLED_FORWARD", tabled_outer_sum.tabled_forward, {"a100", "5060", "ada"}),

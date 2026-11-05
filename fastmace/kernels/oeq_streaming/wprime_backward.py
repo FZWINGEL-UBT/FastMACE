@@ -124,6 +124,18 @@ MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> regist
 # RTX 4000 Ada 1.008 / 1.007 and 1.006 / 1.000 (off); A100-SXM4-80GB 1.001 / 0.999 and 1.002 / 1.002 (off).
 BUTTERFLY = None
 BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# Round 5 (5 November 2026, external idea "integer warp reductions"). REDUX: the end-of-edge sums of the EDGE_DIM
+# edge-gradient components and dr in fixed point through the hardware integer reduction (redux.sync.add.s32,
+# compute capability 8.0+): per component one redux.sync.max of the lanes' exponents sets a power-of-two scale with
+# 2^25 of headroom (32 lanes cannot overflow), the rounded partials are summed as integers, and lane 0 scales back.
+# Integer sums are exact and order-free, so dsh and dr are deterministic; each partial is rounded to 2^-25 of its
+# component's largest partial in the warp (FP32 class against the shuffle tree's 5 rounded levels): "rounding". A
+# NaN or infinity in any partial gives NaN. Float32 only; 32-lane cohorts. Kernel lab, Benchmark_loup, RTX 5060 Ti
+# (BUTTERFLY off as the base): 0.695 (dsh max|d|/max 1.8e-7, dr 3.7e-7), no reduction at all 0.679, butterfly 0.964.
+# None: on for REDUX_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice. Takes precedence
+# over BUTTERFLY.
+REDUX = None
+REDUX_GPUS = GPUModels(())
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -432,7 +444,23 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         {%- endfor %}
     }
 
-    {%- if butterfly %}
+    {%- if redux %}
+    // REDUX: each component's 32 partials summed in fixed point (redux.sync); lane 0 writes dsh[e, :] and dr[e].
+    #pragma unroll
+    for (int component = 0; component <= EDGE_DIM; ++component) {
+        const float v = float(component < EDGE_DIM ? edge_gradient[component] : radial_gradient);
+        unsigned ex = __reduce_max_sync(FULL_MASK, __float_as_uint(fabsf(v)) >> 23);
+        const bool finite = ex < 255u;
+        ex = ex < 30u ? 30u : (finite ? ex : 254u);
+        const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);
+        const int total = __reduce_add_sync(FULL_MASK, finite ? __float2int_rn(v * scale) : 0);
+        if (lane == 0) {
+            const float sum = finite ? float(total) * inverse : __int_as_float(0x7fffffff);
+            if (component < EDGE_DIM) dsh[edge_base + component] = scalar_t(sum);
+            else dr[e] = scalar_t(sum);
+        }
+    }
+    {%- elif butterfly %}
     // BUTTERFLY: reduce-scatter the edge gradient; lane c << SHIFT writes dsh[e, c], lane 0 dr[e].
     constexpr int SHIFT = {{ 5 - butterfly_steps }};
     #pragma unroll
@@ -503,7 +531,7 @@ def factored_paths(schedule, scale=False):
 
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
-           factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False):
+           factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -535,6 +563,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("table_w reads the q-major value table: it needs a slope vector of 2 or 4")
     if butterfly and not butterfly_supported(schedule):
         raise ValueError("butterfly needs a power-of-two edge dimension <= 32 and 32-lane cohorts")
+    if redux and not redux_supported(schedule, scalar):
+        raise ValueError("redux needs float32 and 32-lane cohorts")
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
@@ -544,8 +574,14 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             n_blocks=0 if blocks is None else len(blocks), block_ldg=block_ldg,
                                             factored=factored_paths(schedule, scale) if factored else None,
                                             horner=bool(horner), scalar_paths=bool(scalar_paths),
-                                            butterfly=bool(butterfly),
+                                            butterfly=bool(butterfly), redux=bool(redux),
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
+
+
+def redux_supported(schedule, scalar):
+    """Whether ``REDUX`` applies: float32 partials, 32-lane cohorts (redux.sync needs compute capability 8.0+,
+    FastMACE's floor for these kernels)."""
+    return scalar == "float" and int(schedule.launch_config.logical_cohort_width) == 32
 
 
 def butterfly_supported(schedule):
@@ -663,11 +699,13 @@ class WPrimeBackward:
         self.horner = bool(horner)  # the caller's table is power_table's (HORNER)
         self.scalar_paths = self.factored and scalar_paths_default(device)
         self.max_registers = max_registers_default(device)
-        self.butterfly = butterfly_default(device) and butterfly_supported(kernels.schedule)
+        self.redux = redux_default(device) and redux_supported(kernels.schedule, scalar)
+        self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and FACTORED_SCALE, horner=self.horner,
-                             scalar_paths=self.scalar_paths, butterfly=self.butterfly)
+                             scalar_paths=self.scalar_paths, butterfly=self.butterfly,
+                             redux=self.redux)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -966,6 +1004,11 @@ def horner_default(device):
 def scalar_paths_default(device):
     """``SCALAR_PATHS`` on ``device``: the constant when set, else on for ``SCALAR_PATHS_GPUS``."""
     return bool(SCALAR_PATHS) if SCALAR_PATHS is not None else _device_name(device) in SCALAR_PATHS_GPUS
+
+
+def redux_default(device):
+    """``REDUX`` on ``device``: the constant when set, else on for ``REDUX_GPUS``."""
+    return bool(REDUX) if REDUX is not None else _device_name(device) in REDUX_GPUS
 
 
 def butterfly_default(device):
