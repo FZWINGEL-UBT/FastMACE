@@ -32,6 +32,11 @@ if TYPE_CHECKING:
 # with the atom count: 256 Langevin steps up to 5,461 atoms, 27 steps at 50,000 atoms (0.57 GiB at 256). The numbers
 # and their order do not depend on the batch size.
 NOISE_BATCH_BYTES = 64 * 2**20
+# Round 6 (5 November 2026): after each refill, draw the next batch on a background thread into pinned memory
+# (``RandomStream.draw_ahead``), and copy it without blocking the host. The host's draw of 7.68 M normals stalled
+# the 5,000-atom OMAT-0 step for about 96 ms every 256 steps (A100-SXM4: 0.37 ms per step). Same generator, same
+# order: bitwise the same numbers. False: every refill draws on the host, as before.
+NOISE_DRAW_AHEAD = True
 
 
 def noise_steps(limit: int, numbers: int) -> int:
@@ -59,13 +64,47 @@ def allocate_noise(state: SimulationState, shape: tuple[int, ...]) -> None:
     rng.cursor = shape[0]
 
 
-def refill_noise(rng: RandomStream, draw: Callable[[int], np.ndarray]) -> None:
+def _draw_ahead(rng: RandomStream, draw: Callable[[np.random.Generator, int], np.ndarray],
+                used: torch.Tensor) -> None:
+    """Start the next batch's draw on a thread, into the pinned staging buffer the refill did not just copy from.
+
+    Two pinned buffers, allocated here on the host thread (the background thread makes no CUDA call, so it cannot
+    disturb a graph capture); each copy records an event, and a buffer is written again only after its copy
+    finished (256 steps earlier: no wait in practice)."""
+    staging = rng.staging
+    if staging is None or staging[0][0].shape != rng.batch.shape:
+        staging = rng.staging = [(torch.empty(rng.batch.shape, dtype=torch.float64, pin_memory=True),
+                                  torch.cuda.Event()) for _ in range(2)]
+    for buffer, event in staging:
+        if buffer.data_ptr() == used.data_ptr():
+            event.record()  # the copy just queued from it
+    buffer, event = next(pair for pair in staging if pair[0].data_ptr() != used.data_ptr())
+    event.synchronize()
+    out = buffer.numpy()
+
+    def into_buffer(generator, steps):
+        np.copyto(out, draw(generator, steps))
+        return buffer
+
+    rng.draw_ahead(into_buffer, rng.batch.shape[0])
+
+
+def refill_noise(rng: RandomStream, draw: Callable[[np.random.Generator, int], np.ndarray],
+                 ahead: bool = False) -> None:
     """Refill the used-up ``rng.batch``: the queued rows first (at its end, so the cursor runs into them), else
-    ``draw(steps)`` new steps from the generator, in its order."""
+    ``draw(generator, steps)`` new steps from the generator, in its order. ``ahead`` (``NOISE_DRAW_AHEAD`` on a
+    CUDA batch): the rows drawn ahead after the last refill if there are any, and the next batch's draw started
+    on a background thread."""
     size = rng.batch.shape[0]
     if rng.queued is None:
-        rng.batch.copy_(torch.from_numpy(draw(size)))
+        ahead = ahead and NOISE_DRAW_AHEAD and rng.batch.is_cuda
+        rows = rng.take_ahead(size) if ahead else None
+        if rows is None:
+            rows = torch.from_numpy(draw(rng.generator, size))
+        rng.batch.copy_(rows, non_blocking=rows.is_pinned())
         rng.cursor = 0
+        if ahead:
+            _draw_ahead(rng, draw, rows)
         return
     rows, rest = rng.queued[:size], rng.queued[size:]
     rng.queued = rest if len(rest) else None
@@ -185,7 +224,8 @@ class Langevin(Integrator):
     def prepare_step(self, state: SimulationState) -> None:
         rng = state.rng
         if rng.cursor == self.noise_batch:
-            refill_noise(rng, lambda steps: rng.generator.standard_normal(size=(steps, 2, self.natoms, 3)))
+            refill_noise(rng, lambda generator, steps: generator.standard_normal(size=(steps, 2, self.natoms, 3)),
+                         ahead=True)
         self.xi.copy_(rng.batch[rng.cursor, 0])
         self.eta.copy_(rng.batch[rng.cursor, 1])
         rng.cursor += 1
