@@ -2,7 +2,9 @@
 3xTF32 products launched one by one (M = 5,000 x (2l + 1) rows for l = 0 to 3, OMAT-0 on SrTiO3 10x10x10) against one
 launch over the concatenated rows (sum of M, the same K and N): what a grouped kernel with a perfect tile schedule
 could save per BlockLinear. Alternating A/B rounds in one process. Keep the idea at >= 15 us per force call
-(about 11 such groups per call).
+(about 11 such groups per call). Where the products run in CUTLASS, also the bound of idea 8 (PDL): the same four
+launches with programmatic stream serialization and no ``griddepcontrol.wait`` (unsafe, timing only); drop that idea
+below 3 us per group.
 
     python tools/bench/grouped_gemm_bound.py [--atoms 5000] [--output FILE]
 """
@@ -40,6 +42,38 @@ def replay_us(graph, reps):
     return s.elapsed_time(e) * 1000 / reps
 
 
+def pdl_mm(a, b, out):
+    """``tf32x3.mm_into`` launched with ``CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION`` (timing only)."""
+    import ctypes
+
+    import torch
+    from cuda.bindings import driver
+
+    from fastmace.kernels.cutlass import tf32x3
+    from fastmace.kernels.oeq_streaming.runtime import _check
+    kernels = tf32x3._kernels(a.device.index if a.device.index is not None else torch.cuda.current_device())
+    m, k = a.shape
+    n = b.shape[1]
+    _, lda = tf32x3._layout(a)
+    lb, ldb = tf32x3._layout(b)
+    _, ldo = tf32x3._layout(out)
+    key = ("r" + lb, tf32x3.TILE)
+    p, i = ctypes.c_void_p, ctypes.c_int
+    values = (m, n, k, a.data_ptr(), lda, b.data_ptr(), ldb, out.data_ptr(), ldo)
+    tile_m, tile_n = kernels.tile[tf32x3.TILE]
+    config = driver.CUlaunchConfig()
+    config.gridDimX, config.gridDimY, config.gridDimZ = -(-m // tile_m), -(-n // tile_n), 1
+    config.blockDimX, config.blockDimY, config.blockDimZ = kernels.threads[tf32x3.TILE], 1, 1
+    config.sharedMemBytes = kernels.shared[key]
+    config.hStream = driver.CUstream(torch.cuda.current_stream(a.device).cuda_stream)
+    attribute = driver.CUlaunchAttribute()
+    attribute.id = driver.CUlaunchAttributeID.CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION
+    attribute.value.programmaticStreamSerializationAllowed = 1
+    config.attrs = [attribute]
+    config.numAttrs = 1
+    _check(driver.cuLaunchKernelEx(config, kernels.functions[key], (values, (i, i, i, p, i, p, i, p, i)), 0))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--atoms", type=int, default=5000)
@@ -73,6 +107,13 @@ def main(argv=None):
             tf32x3_gemm._launch(a_all, b[0], out_all)
 
         graphs = {"separate": graph_of(separate), "joined": graph_of(joined)}
+        if tf32x3_gemm.backend(torch.device("cuda")) == "cutlass":
+            from fastmace.kernels.cutlass import tf32x3
+            if all(tf32x3.takes(m, k, n) for m in ms):
+                def chained():
+                    for ai, bi, oi in zip(a, b, out):
+                        pdl_mm(ai, bi, oi)
+                graphs["pdl"] = graph_of(chained)
         times = {name: [] for name in graphs}
         for r in range(args.rounds):
             order = list(graphs) if r % 2 == 0 else list(graphs)[::-1]
@@ -85,10 +126,11 @@ def main(argv=None):
             single[m] = round(sorted(replay_us(g, args.reps) for _ in range(5))[2], 2)
         row = dict(k=k, n=n, ms=ms, separate_us=round(med["separate"], 2), joined_us=round(med["joined"], 2),
                    saving_us=round(med["separate"] - med["joined"], 2), single_us=single)
+        if "pdl" in med:
+            row.update(pdl_us=round(med["pdl"], 2), pdl_saving_us=round(med["separate"] - med["pdl"], 2))
         rows.append(row)
         print(json.dumps(row), flush=True)
-    summary = dict(gpu=torch.cuda.get_device_name(), backend=tf32x3_gemm.backend(torch.device("cuda"))
-                   if hasattr(tf32x3_gemm, "backend") else None, rows=rows)
+    summary = dict(gpu=torch.cuda.get_device_name(), backend=tf32x3_gemm.backend(torch.device("cuda")), rows=rows)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(summary, indent=1, default=str))
