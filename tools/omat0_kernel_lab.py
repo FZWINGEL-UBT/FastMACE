@@ -146,6 +146,116 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
 
     by_piece = edge_order(lambda r, pair: pair.double() * 1e3 + r.double())  # within a pair, r orders the pieces
 
+    # Mirror pairs (H200 research answers, 5 November 2026: share w and w' between an edge and its reverse). The edges
+    # ordered as (lo <- hi, hi <- lo) pairs by their atoms (lo < hi), the receiver-sorted order kept within a key, so
+    # edge 2k and 2k + 1 are mirrors with the same table row (SYMMETRIC_PAIRS) and length. Reports how many edges have
+    # exactly one mirror and how many mirror lengths are bitwise equal.
+    def mirror_order(args):
+        import torch
+        args = list(args)
+        nodes = args[0].shape[0]
+        senders, receivers = args[3].long(), args[4].long()
+        lo, hi = torch.minimum(senders, receivers), torch.maximum(senders, receivers)
+        key = lo * nodes + hi
+        order = torch.sort(key, stable=True).indices
+        edges = key.shape[0]
+        sk = key[order]
+        paired = bool(edges % 2 == 0 and torch.equal(sk[0::2], sk[1::2])
+                      and (edges < 4 or bool((sk[2::2] != sk[1:-1:2]).all())))
+        valid = (senders >= 0) & (senders < nodes) & (receivers >= 0) & (receivers < nodes)
+        multiplicity = torch.bincount(torch.unique(key[valid], return_counts=True)[1])
+        print(f"mirror_order: invalid edges {int((~valid).sum())}, self edges {int((senders == receivers).sum())}, "
+              f"keys by multiplicity {multiplicity.tolist()}", flush=True)
+        r = args[8][order]
+        equal_r = float((r[0::2] == r[1::2]).float().mean()) if paired else float("nan")
+        print(f"mirror_order: {edges} edges, every edge paired: {paired}, bitwise-equal mirror lengths: "
+              f"{equal_r:.4f}", flush=True)
+        for i in (1, 2, 3, 4, 7, 8, 9, 17):  # sh, weights, senders, receivers, dsh, r, pair, dr
+            t = args[i]
+            if t.dim() >= 1 and t.shape[0] == edges:
+                args[i] = t[order].contiguous()
+        return args
+
+    def sender_order(args):
+        import torch
+        args = list(args)
+        edges = args[3].shape[0]
+        order = torch.sort(args[3].long(), stable=True).indices
+        for i in (1, 2, 3, 4, 7, 8, 9, 17):
+            t = args[i]
+            if t.dim() >= 1 and t.shape[0] == edges:
+                args[i] = t[order].contiguous()
+        return args
+
+    # The exact form of mirror order: the data stays in receiver order and warp k processes edge perm[k], perm the
+    # mirror order of the edges (built once per neighbour list). Outputs land at their own edges, so the result is
+    # the base kernel's up to the dx atomics' order.
+    def mirror_perm(args):
+        import torch
+        args = list(args)
+        nodes = args[0].shape[0]
+        senders, receivers = args[3].long(), args[4].long()
+        key = torch.minimum(senders, receivers) * nodes + torch.maximum(senders, receivers)
+        args.append(torch.sort(key, stable=True).indices.to(torch.int32).contiguous())
+        return args
+
+    def perm_source(s):
+        s, n = re.subn(r"(scalar_t\* dr)\) \{", r"\1,\n    const int32_t* __restrict__ edge_perm) {", s, count=1)
+        s, m = re.subn(r"const int64_t e =\s*int64_t\(blockIdx\.x\) \* \(blockDim\.x / LOGICAL_GROUP_SIZE\) "
+                       r"\+ logical_group;\s*if \(e >= edge_count\) return;",
+                       "const int64_t slot =\n        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + "
+                       "logical_group;\n    if (slot >= edge_count) return;\n    const int64_t e = edge_perm[slot];", s,
+                       count=1)
+        if not (n and m):
+            raise ValueError("perm_source: the kernel signature or edge index was not found")
+        return s
+
+    # The hybrid: the 4-byte per-edge arrays (senders, receivers, r, pair, and dr written) in mirror order, a cheap
+    # gather per call (a scatter back for dr), and only the 64-byte sh/dsh rows (and stored w) read through the
+    # permutation, so no edge scalar costs a whole sector. dsh exact; dr comes out in mirror order here.
+    def mirror_hybrid(args):
+        import torch
+        args = list(args)
+        nodes = args[0].shape[0]
+        senders, receivers = args[3].long(), args[4].long()
+        key = torch.minimum(senders, receivers) * nodes + torch.maximum(senders, receivers)
+        order = torch.sort(key, stable=True).indices
+        edges = order.shape[0]
+        for i in (3, 4, 8, 9, 17):  # senders, receivers, r, pair, dr
+            t = args[i]
+            if t.dim() >= 1 and t.shape[0] == edges:
+                args[i] = t[order].contiguous()
+        args.append(order.to(torch.int32).contiguous())
+        return args
+
+    def hybrid_source(s):
+        s = re.sub(r"(scalar_t\* dr)\) \{", r"\1,\n    const int32_t* __restrict__ edge_perm) {", s, count=1)
+        for old, new in (("const int64_t edge_base = e * EDGE_DIM;",
+                          "const int64_t row_edge = edge_perm[e];\n    const int64_t edge_base = row_edge * EDGE_DIM;"),
+                         ("const int64_t weight_base = e * WEIGHT_DIM;",
+                          "const int64_t weight_base = row_edge * WEIGHT_DIM;")):
+            if s.count(old) != 1:
+                raise ValueError(f"hybrid_source: {old!r} not found once")
+            s = s.replace(old, new)
+        return s
+
+    horner_block = (r"scalar_t gv\[PADDED_TERMS\];.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
+
+    def skip_table(condition):
+        """The value-table load and the dual Horner replaced by constants where ``condition`` holds (warp-uniform:
+        one warp per edge). Timing only."""
+        def transform(s):
+            def repl(m):
+                body = (m.group(0).replace("scalar_t radial_weight = gv[TERMS - 1];", "radial_weight = gv[TERMS - 1];")
+                        .replace("scalar_t radial_dt = scalar_t(0);", "radial_dt = scalar_t(0);"))
+                return (f"scalar_t radial_weight = t, radial_dt = sc;\n                if (!({condition})) {{\n"
+                        f"                {body}\n                }}")
+            out, n = re.subn(horner_block, repl, s, flags=re.S)
+            if not n:
+                raise ValueError("skip_table: the HORNER value-table block was not found")
+            return out
+        return transform
+
     # The tensor product's per-term arithmetic (OMAT-0 TP backward screen, 4 November 2026). The kernel is generated
     # from the model's schedule: its 10 paths, 40 outputs and 86 Clebsch-Gordan terms are unrolled with the
     # coefficients as literals, so a model-specialised backward can only save arithmetic (fewer operations per term,
@@ -429,6 +539,13 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-reduce-sh-only": ("falsifier", lambda s: re.sub(r"radial_gradient \+= __shfl_down_sync\([^;]*;", "",
                                                          s, count=1), ()),
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
+        "B-mirror-order": ("falsifier", lambda s: s, (), mirror_order),
+        "B-mirror-share": ("falsifier", skip_table("e & 1"), (), mirror_order),
+        "F-no-table-horner": ("falsifier", skip_table("true"), ()),
+        "F-half-table": ("falsifier", skip_table("e & 1"), ()),
+        "M-mirror-perm": ("rounding", perm_source, (), mirror_perm),
+        "M-mirror-hybrid": ("falsifier", hybrid_source, (), mirror_hybrid),
+        "B-sender-order": ("falsifier", lambda s: s, (), sender_order),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
         "pair-maxreg96": ("rounding", pair(), ("--maxrregcount=96",)),
@@ -519,7 +636,7 @@ def wprime_launcher(kernel, source, extra):
 
     def launch(args):
         (x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins, r_lo, bin_scale,
-         r_max, dr) = args
+         r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
         blocks = (edges * kernel.cohort + kernel.num_threads - 1) // kernel.num_threads
         p = ctypes.c_void_p
@@ -527,9 +644,9 @@ def wprime_launcher(kernel, source, extra):
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), weights.data_ptr(), senders.data_ptr(),
                   receivers.data_ptr(), *[d.data_ptr() for d in douts], dx.data_ptr(), dsh.data_ptr(), r.data_ptr(),
                   pair.data_ptr(), gprime.data_ptr(), starts.data_ptr(), scales.data_ptr(), bins.data_ptr(),
-                  r_lo, bin_scale, r_max, bins.shape[0], starts.shape[0], dr.data_ptr())
+                  r_lo, bin_scale, r_max, bins.shape[0], starts.shape[0], dr.data_ptr(), *[t.data_ptr() for t in perm])
         types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + len(douts))
-                 + (ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p))
+                 + (ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p) + (p,) * len(perm))
         stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
         _check(driver.cuLaunchKernel(function, blocks, 1, 1, kernel.num_threads, 1, 1, kernel.shared_memory, stream,
                                      (values, types), 0))

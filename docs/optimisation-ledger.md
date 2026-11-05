@@ -4271,3 +4271,12 @@ here.
 - Status: DEGREE_PARTS ADOPTED for the H200 and the A100-SXM4-80GB (decision 66); SEGMENT_GROUPED REJECTED (off); S tile, PDL, bulk-copy staging and sorted radial tables DROPPED at their bounds.
 - Measured: DEGREE_PARTS MD step b/a H200 0.9818 / 0.9845, A100-SXM4 0.9920 / 0.9932, RTX 5060 Ti 0.9980 / 1.0032 (off); gate passes on the H200 and an A100 PCIe; Benchmark_loup H200 5.504 ms per step. SEGMENT_GROUPED A100-SXM4 0.9987 / 1.0004, although the launch bound gave 26–52 µs per group of four. Forward bounds: F-s-tile 0.966 (H200), 0.951 (A100 PCIe); staging F-no-ash4 0.955 / 0.971; PDL ≤ 4.7 µs per group; sorted radial kernel 0.866 but the sort costs 155 µs against a 509 µs kernel (RTX 5060 Ti).
 - Sources: [H200 ideas](../results/h200-ideas-20261105/README.md).
+
+### research-answers: mirror-pair w′, pair-shared kernels, split-domain tables, wave-aware tile rule (5 November 2026)
+
+- Date/round: research answers to the H200 prompt (`30c0df85`, `382a85d4`, `7a7b3a76`).
+- What: kernel-lab variants B-mirror-order, B-mirror-share, F-half-table, F-no-table-horner, M-mirror-perm (exact), M-mirror-hybrid, B-sender-order; `tools/radial_degree_lab.py` (degrees 3–5 on [0.3, r_max) and [1.0, r_max)); `tools/bench/tile_rule_bench.py`.
+- Status: mirror sharing, pair-shared kernels, split-domain tables and the tile rule DROPPED at their stop rules. The w′ over edges physically stored in mirror order is OPEN (not built).
+- Measured: w′ kernel ratio, B-mirror-order H200 0.887–0.899, A100-SXM4 0.852 / 0.961 (two cards), RTX 5060 Ti 0.894; M-mirror-perm H200 0.947 / 0.953, A100 1.038 / 1.057, RTX 5060 Ti 0.852–0.855 (dsh, dL/dr bitwise); B-mirror-share adds nothing beyond the order. 0.56 % of the edges have no mirror. Degree 4 tables need about three times the pieces of degree 5 and still pad to 6 terms; degree 3 hits the piece cap. Tile rule ≤ 5.6 µs on the H200.
+- Open: mirror-ordered w′ inputs (gather sh per force call, scatter dsh and dL/dr back, permutation per neighbour-list rebuild): about 160 µs kernel gain minus about 35 µs of copies on the H200 (≈ 2 % of the step).
+- Sources: [research answers](../results/research-answers-20261105/README.md).

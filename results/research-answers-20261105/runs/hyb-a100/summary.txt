@@ -1,0 +1,14 @@
+exit=0
+Modal budget: metered this month $9.33 + still running $0.00 + this job's worst case $2.09 (A100-80GB, 2100 s + 300 s start) = $11.42, limit $30.00 (cap $30, reserve $0)
+wprime ptxas base                         {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas M-mirror-hybrid              {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas M-mirror-perm                {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas B-mirror-order               {'9.0': {'registers': None, 'spill_store_bytes': 0}}
+mirror_order: invalid edges 0, self edges 0, keys by multiplicity [0, 2098, 185831]
+mirror_order: 373760 edges, every edge paired: False, bitwise-equal mirror lengths: nan
+wprime   base                3148.8 us  ratio 1.000  regs 96 local 0  
+wprime   M-mirror-hybrid     3264.5 us  ratio 1.037  regs 96 local 0  
+wprime   M-mirror-perm       3329.0 us  ratio 1.057  regs 96 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 4.37e-07'}
+wprime   B-mirror-order      3026.9 us  ratio 0.961  regs 96 local 0  
+tail: cannot open '/home/fzwin/fm-runs/hyb-a100/out/shapes.log' for reading: No such file or directory
+grep: /home/fzwin/fm-runs/hyb-a100/out/tiles.log: No such file or directory
