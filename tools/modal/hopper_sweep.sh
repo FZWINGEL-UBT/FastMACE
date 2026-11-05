@@ -48,11 +48,14 @@ IFS=';' read -r -a abs <<< "${AB-triton|fastmace.kernels.triton.tf32x3_gemm:CUTL
 for entry in "${abs[@]}"; do
   [ -n "$entry" ] || continue
   name=${entry%%|*}; read -r -a bc <<< "${entry#*|}"
+  # An entry whose body starts with "--" passes its words to ab_rewrites.py as they are (e.g. "--b radial_tables=off");
+  # otherwise they are side b's module constants.
+  [ "${bc[0]:0:2}" = "--" ] || bc=(--b-constant "${bc[@]}")
   for order in ab ba; do
     pattern=$([ "$order" = ab ] && echo abab || echo abba)
     step "ab-$name-$order" python tools/ab_rewrites.py --output "$out/ab-$name-$order" --checkpoint "$ck" \
       --model omat0-medium --structures "$st@10x10x10" --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
-      --warmup 200 --block 256 --blocks 6 --order "$order" --pattern "$pattern" --b-constant "${bc[@]}"
+      --warmup 200 --block 256 --blocks 6 --order "$order" --pattern "$pattern" "${bc[@]}"
     grep -h -E "b/a" "$out/ab-$name-$order.log" | tail -n 1 >> "$log"
   done
 done
