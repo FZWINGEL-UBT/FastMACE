@@ -73,9 +73,11 @@ FIRST_TABLE_COLUMNS = False
 # kernels.triton.tabled_outer_sum): per edge dr and the edge attributes' gradient from the slots' gradient in one walk,
 # without grad_a [E, h c], its assembled copy and the separate table backward. Rounding (regrouped sums). Needs the
 # segmented first sum and float32. None: on for FUSED_FIRST_BACKWARD_GPUS (decision 66, after the MD-step A/Bs);
-# True / False: an A/B side's choice on every GPU.
+# True / False: an A/B side's choice on every GPU. MD step b/a (ab / ba), OMAT-0 medium, SrTiO3 10x10x10 and NbCl5:
+# RTX 5060 Ti 0.962 / 0.963 and 0.972 / 0.969; RTX 4000 Ada 0.962 / 0.963 and 0.979 / 0.975 (with TABLED_FORWARD:
+# 0.945 / 0.945, 0.948 / 0.955; 0.949 / 0.944, 0.978 / 0.968).
 FUSED_FIRST_BACKWARD = None
-FUSED_FIRST_BACKWARD_GPUS = GPUModels(())
+FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
 
 
 def fused_first_backward(device):

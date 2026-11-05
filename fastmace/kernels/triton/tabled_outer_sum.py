@@ -19,13 +19,27 @@ from functools import cache
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 CHUNK = 16  # edges per program (the walk's A100 optimum, tools/eos_backward_lab.py)
 WARPS = 1
 # Phase 2: the forward evaluates a = g(r) inside the segmented sum's walk (no [E, K] table output written and read
 # back) and the backward evaluates it again next to the derivative row (nothing of a saved). Rounding (its own
-# Clenshaw sums, the same recurrence). A module constant for the A/B.
-TABLED_FORWARD = False
+# Clenshaw sums, the same recurrence). None: on for TABLED_FORWARD_GPUS (decision 66, after the MD-step A/Bs); True /
+# False: an A/B side's choice on every GPU. MD step b/a (ab / ba) with FUSED_FIRST_BACKWARD against the default,
+# OMAT-0 medium, SrTiO3 10x10x10 and NbCl5: RTX 5060 Ti 0.945 / 0.945, 0.948 / 0.955; RTX 4000 Ada 0.949 / 0.944,
+# 0.978 / 0.968 (FUSED_FIRST_BACKWARD alone 0.962-0.979).
+TABLED_FORWARD = None
+TABLED_FORWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
+
+
+def tabled_forward(device):
+    """``TABLED_FORWARD`` on ``device``: the constant when set, else on for ``TABLED_FORWARD_GPUS``."""
+    if TABLED_FORWARD is not None:
+        return bool(TABLED_FORWARD)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in TABLED_FORWARD_GPUS
 
 
 @cache
@@ -262,7 +276,7 @@ class _TabledOuterSum(torch.autograd.Function):
         ctx.constants = (r_lo, bin_scale, r_max)
         ctx.inner, ctx.columns = inner, int(columns)
         ctx.shape, ctx.slots = r.shape, int(slots)
-        ctx.tabled = bool(TABLED_FORWARD)
+        ctx.tabled = tabled_forward(r.device) and r.dtype == torch.float32
         if ctx.tabled:  # nothing of a kept: the backward evaluates it again
             ctx.save_for_backward(coef, y, key, r, pair, dcoef, starts, scales, bins)
             return tabled_outer_sum_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y,
@@ -297,5 +311,5 @@ def tabled_outer_sum(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale
                                  float(r_max), int(columns), y, key, int(slots), int(inner))
 
 
-__all__ = ["CHUNK", "FORWARD_CHUNK", "TABLED_FORWARD", "WARPS", "tabled_outer_sum", "tabled_outer_sum_backward",
-           "tabled_outer_sum_forward"]
+__all__ = ["CHUNK", "FORWARD_CHUNK", "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "tabled_forward",
+           "tabled_outer_sum", "tabled_outer_sum_backward", "tabled_outer_sum_forward"]
