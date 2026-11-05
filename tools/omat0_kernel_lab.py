@@ -519,6 +519,35 @@ def _sh4(s):
                         ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
+CACHE_HINTS = r"""
+__device__ __forceinline__ float ld_x_el(const float* p) {  // x: kept in L1 (re-read by the next edges' senders)
+    float v;
+    asm("ld.global.nc.L1::evict_last.f32 %0, [%1];" : "=f"(v) : "l"(p));
+    return v;
+}
+__device__ __forceinline__ float4 ld_na4(const float4* p) {  // a and sh: read once, not allocated in L1
+    float4 v;
+    asm("ld.global.nc.L1::no_allocate.v4.f32 {%0, %1, %2, %3}, [%4];"
+        : "=f"(v.x), "=f"(v.y), "=f"(v.z), "=f"(v.w) : "l"(p));
+    return v;
+}
+"""
+
+
+def _hints(s, x=None, stream=False):
+    """Cache hints (round 4, after the x tile did not fit the A100's shared memory): ``x`` "ldg" (``__ldg``) or "el"
+    (L1 evict_last) on the sender-feature gathers; ``stream`` the float4 a / sh loads with L1::no_allocate, so L1
+    holds x. Bitwise (the same values)."""
+    s = _sub(s, 'extern "C" __global__', CACHE_HINTS + 'extern "C" __global__', 1)
+    if x == "ldg":
+        s = _sub(s, r"\(snd >= 0\) \? x\[([^\]]*)\]", r"(snd >= 0) ? __ldg(&x[\1])", regex=True)
+    elif x == "el":
+        s = _sub(s, r"\(snd >= 0\) \? x\[([^\]]*)\]", r"(snd >= 0) ? ld_x_el(&x[\1])", regex=True)
+    if stream:
+        s = _sub(s, "__ldg(reinterpret_cast<const float4*>(", "ld_na4(reinterpret_cast<const float4*>(")
+    return s
+
+
 def _xs(kernel):
     """The sender features x kept in a per-warp shared tile [B][NX][32] (after the plan's shared memory) instead of
     32 registers live across the product; each lane writes and reads its own column (no sync). Bitwise. Own launch
@@ -639,6 +668,11 @@ def forward_variants(kernel=None):
         "tc-a4+xs": ("exact", lambda s: _xs(kernel)(_tc_a4(s)), (), _a4_args),
         "simt-a4+sh4": ("exact", lambda s: _sh4(_simt_a4(s)), (), _a4_args),
         "sh4": ("exact", lambda s: _sh4(s), ()),
+        "x-ldg": ("exact", lambda s: _hints(s, "ldg"), ()),
+        "x-el": ("exact", lambda s: _hints(s, "el"), ()),
+        "tc-a4+x-el": ("exact", lambda s: _hints(_tc_a4(s), "el"), (), _a4_args),
+        "tc-a4-na": ("exact", lambda s: _hints(_tc_a4(s), stream=True), (), _a4_args),
+        "tc-a4-na+x-el": ("exact", lambda s: _hints(_tc_a4(s), "el", stream=True), (), _a4_args),
         # The TP's coefficient multiplies dropped (x e instead of x e c): how much its arithmetic weighs.
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
