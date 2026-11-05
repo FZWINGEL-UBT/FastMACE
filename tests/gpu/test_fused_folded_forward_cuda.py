@@ -180,6 +180,31 @@ for layout in ("ir_mul", "mul_ir"):
                         both_out = fused_folded_forward(a, zero, X, Y, *args, both.id)
                         assert torch.equal(both_out[0], skip_message) and torch.equal(both_out[1], skip_w)
                         report[name]["wfrag + vec a bitwise"] = True
+                # WGMMA (round 5, sm_90 only): the product on Hopper wgmma: w within the same 3xTF32 limit (another
+                # accumulation order), the message bitwise the streaming forward's on that w, the message-only kernel
+                # (store_w=False) bitwise the storing one's; with the zero-column skip and VEC_A where they apply.
+                if split == "mask" and torch.cuda.get_device_capability() == (9, 0):
+                    for used in sorted({k, k - 1}):
+                        source_w = weight if used == k else zero
+                        ff_module.TENSOR_CORES, ff_module.WGMMA = True, True
+                        ff_module.VEC_A, ff_module.VEC_SH = (True, True) if used % 32 == 0 else (None, None)
+                        try:
+                            wg = FusedFoldedForward(kernels, k, used=used)
+                            wg_msg = FusedFoldedForward(kernels, k, used=used, store_w=False)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.WGMMA = False, None
+                            ff_module.VEC_A, ff_module.VEC_SH = None, None
+                        assert wg.wgmma and "wgmma.mma_async" in wg.source, (layout, k, used)
+                        wg_message, wg_w = fused_folded_forward(a, source_w, X, Y, *args, wg.id)
+                        reference = a.double() @ source_w.double().t()
+                        wg_error = float(((wg_w.double() - reference).abs() / scale).max())
+                        assert wg_error <= tc_limit, (layout, k, used, wg_error, chain_error)
+                        assert torch.equal(wg_message, streaming_conv_forward(X, Y, wg_w, sender.int(), rows,
+                                                                              kernels.id)), (layout, k, used)
+                        from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message
+                        only = fused_folded_message(a, source_w, X, Y, *args, wg_msg.id)
+                        assert torch.equal(only, wg_message), (layout, k, used)
+                        report[name].setdefault("wgmma", {})[str(used)] = wg_error
         # VEC_SH on the FP32-SIMT kernel: bitwise.
         ff_module.VEC_SH = True
         try:

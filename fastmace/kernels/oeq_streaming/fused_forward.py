@@ -135,6 +135,22 @@ TC_TP_GPUS = GPUModels(())
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.022 / 1.024 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
+# warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
+# WGMMA_EDGES = 16 edges of their own chunk as the 64 rows of A (registers), the block's W slice is B (N = paths per
+# part x 32 channels <= 256), stored once per block as its high and low TF32 planes in 8-row x 16-byte core matrices
+# (no swizzle). Each warp keeps its own chunks, receivers and TP: it walks its edges 16 at a time, and the warpgroup
+# votes (bar.red.or) each round whether any of its warps still has work; a warp without work gives zero rows. The
+# product's D goes through the warp's redistribution tile [paths][16][RS] to w[g][b], then the TP runs per 8 edges
+# as in the mma.sync kernel. Not bitwise that kernel's w (the tensor cores accumulate in another order); the same
+# 3xTF32 error class. Microbenchmark on the H200 (tools/bench/gen_wgmma_tf32x3.py; Benchmark_loup's 373,760 edges x
+# 1,280 rows x K 64): mma.sync 1.082 ms, wgmma 0.554 ms (two warpgroups per block). None: on for WGMMA_GPUS (decision
+# 66); True / False: an A/B side's choice; compute capability 9.0 only (ignored elsewhere).
+WGMMA = None
+WGMMA_GPUS = GPUModels(())
+WGMMA_EDGES = 16  # edges per warp and wgmma round (the warpgroup's M = 64)
+WGMMA_WARPS = 8  # warps per block (two warpgroups), at most as many as fit
+WGMMA_BLOCKS_PER_SM = 1
 
 _REGISTRY = {}
 
@@ -181,6 +197,46 @@ def tc_tp_default(name=None):
     if on is None:
         on = name in TC_TP_GPUS
     return bool(on)
+
+
+def wgmma_default(capability, name=None):
+    """Whether the a.W product runs on wgmma (``WGMMA``; None: ``name`` in ``WGMMA_GPUS``): compute capability 9.0
+    only; built only where it applies (``FusedFoldedForward``: the TF32 product without prefetch or TC_TP)."""
+    if WGMMA is not None:
+        on = bool(WGMMA)
+    else:
+        on = name in WGMMA_GPUS
+    return on and tuple(capability) == (9, 0)
+
+
+def wgmma_helpers(widths, kp):
+    """Device helpers of the wgmma product: the shared-memory matrix descriptor of a core-matrix slice (no swizzle,
+    LBO 128 bytes between the two k core matrices, SBO between 8-row groups) and one ``wgmma_n{N}`` per width."""
+    out = [f"""__device__ __forceinline__ unsigned long long gmma_desc(unsigned addr) {{
+    return (unsigned long long)((addr & 0x3FFFFu) >> 4) | ((unsigned long long)(128 >> 4) << 16)
+        | ((unsigned long long)(({kp} * 32) >> 4) << 32);
+}}
+__device__ __forceinline__ int wg_any(int pred, int barrier) {{
+    int any;
+    asm volatile("{{\\n.reg .pred p, q;\\nsetp.ne.b32 q, %1, 0;\\nbar.red.or.pred p, %2, 128, q;\\n"
+                 "selp.b32 %0, 1, 0, p;\\n}}\\n" : "=r"(any) : "r"(pred), "r"(barrier) : "memory");
+    return any;
+}}
+"""]
+    for n in sorted(set(widths)):
+        regs = n // 2
+        d = ", ".join(f"%{i}" for i in range(regs))
+        outs = ", ".join(f'"+f"(d[{i}])' for i in range(regs))
+        out.append(f"""__device__ __forceinline__ void wgmma_n{n}(float* d, const unsigned (&a)[4],
+                                                unsigned long long desc, int scale) {{
+    asm volatile("{{\\n.reg .pred p;\\nsetp.ne.b32 p, %{regs + 5}, 0;\\n"
+                 "wgmma.mma_async.sync.aligned.m64n{n}k8.f32.tf32.tf32 {{{d}}}, {{%{regs}, %{regs + 1}, %{regs + 2}, "
+                 "%{regs + 3}}}, %{regs + 4}, p, 1, 1;\\n}}\\n"
+                 : {outs}
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "l"(desc), "r"(scale) : "memory");
+}}
+""")
+    return "".join(out)
 
 
 def tc_tp_applies(schedule):
@@ -590,6 +646,34 @@ def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefe
     return LaunchRule(parts, warps, max(1, -(-BLOCKS_PER_SM * sms // slices)), wbytes + warps * staging)
 
 
+def wgmma_staging_floats(k, edge_dim, paths_per_part):
+    """Floats of one warp's staging for the wgmma product: a [WGMMA_EDGES][KP + 4], sh [WGMMA_EDGES][edge_dim]
+    (rounded up to 4 floats) and the redistribution tile [paths per part][WGMMA_EDGES][TC_RSTRIDE]."""
+    sh = -(-WGMMA_EDGES * edge_dim // 4) * 4
+    return WGMMA_EDGES * (_kpad(k) + 4) + sh + paths_per_part * WGMMA_EDGES * TC_RSTRIDE
+
+
+def launch_rule_wgmma(paths, k, edge_dim, channels, shared_optin, sms):
+    """``launch_rule`` for the wgmma product: parts of at most 8 paths (N <= 256) whose two W planes and one
+    warpgroup's staging fit; warps a multiple of 4, at most ``WGMMA_WARPS``; ``WGMMA_BLOCKS_PER_SM`` blocks per SM."""
+    parts = max(1, -(-paths * BATCH // W_TILE_REGISTERS))
+    while parts <= paths:
+        per = -(-paths // parts)
+        if per * CHANNEL_BLOCK <= 256 and (8 * per * CHANNEL_BLOCK * _kpad(k)
+                                          + 16 * wgmma_staging_floats(k, edge_dim, per)) <= shared_optin:
+            break
+        parts += 1
+    else:
+        raise ValueError(f"fused_folded_forward: no wgmma W slice of {k}-wide rows fits {shared_optin} bytes")
+    per = -(-paths // parts)
+    parts = -(-paths // per)
+    staging = 4 * wgmma_staging_floats(k, edge_dim, per)
+    wbytes = 8 * per * CHANNEL_BLOCK * _kpad(k)
+    warps = min(WGMMA_WARPS, (shared_optin - wbytes) // staging // 4 * 4)
+    slices = (channels // CHANNEL_BLOCK) * parts
+    return LaunchRule(parts, warps, max(1, -(-WGMMA_BLOCKS_PER_SM * sms // slices)), wbytes + warps * staging)
+
+
 def balanced_parts(costs, parts):
     """Paths split into ``parts`` groups of equal size (the last may be smaller); the angular terms (``costs``)
     balanced greedily, heaviest first; each group sorted."""
@@ -639,7 +723,7 @@ def _node(layout, channels, start, component, dim):
 
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-           vec_sh=False, vec_a=False, wfrag=False, tctp=False):
+           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -650,7 +734,10 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     ``blocks`` (``block_map``'s input; ir_mul, message only): the message written per group, one output
     pointer each (``out0``, ``out1``, ...). ``prefetch`` (sm_80+, not fp16): the staging double-buffered with
     cp.async (``PREFETCH``; the launch rule must be ``launch_rule(..., prefetch=True)``'s). ``vec_sh``: sh staged
-    with float4 loads (``VEC_SH``; edge_dim % 4 == 0, sh 16-byte aligned)."""
+    with float4 loads (``VEC_SH``; edge_dim % 4 == 0, sh 16-byte aligned). ``wgmma``: the product on Hopper wgmma
+    (``WGMMA``; the TF32 product without prefetch, tctp or wfrag; the rule must be ``launch_rule_wgmma``'s)."""
+    if wgmma and (tc is not True or prefetch or tctp or wfrag):
+        raise ValueError("fused_folded_forward: wgmma needs the TF32 product without prefetch, tctp or wfrag")
     if vec_a and (tc not in (True, "presplit") or prefetch or (used if used is not None else k) % 32):
         raise ValueError("fused_folded_forward: vec_a needs the TF32 product without prefetch and used % 32 == 0")
     if wfrag and (tc is not True or prefetch or CHANNEL_BLOCK != 32):
@@ -685,12 +772,15 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp)}    }} break;"
+    flags = (tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp, wgmma)
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, *flags)}    }} break;"
                       for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
         raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
     helpers = (tc_helpers() + TC_FP16_HELPERS) if tc == "fp16" else tc_helpers() if tc else ""
     helpers += CP_ASYNC_HELPERS if prefetch else ""
+    if wgmma:
+        helpers += wgmma_helpers([len(part) * CHANNEL_BLOCK for part in parts], _kpad(used))
     if tctp:
         helpers += ("__device__ __forceinline__ void split_tp(float x, unsigned& hi, unsigned& lo) {\n"
                     + _TC_SPLITS[TC_TP_SPLIT] + "\n}\n")
@@ -698,6 +788,8 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
     x_slots = schedule.input_dim // C
     a_base = slice_floats(npp, ka, tc)
     a_stride = staging_floats(ka, schedule.edge_dim, tc, npp, prefetch, x_slots)
+    if wgmma:
+        a_base, a_stride = 2 * npp * CHANNEL_BLOCK * _kpad(ka), wgmma_staging_floats(ka, schedule.edge_dim, npp)
     a_offset = "A_BASE + warp * A_STRIDE"
     return f"""// fused_folded_forward (FastMACE opt-8): folded last layer + receiver-streaming forward, w stored.
 using int64_t = long long;
@@ -706,7 +798,7 @@ constexpr int K = {used};  // the folded inputs the k-loop reads
 constexpr int KA = {k};  // W's row stride (and a's, without VEC_A)
 constexpr int AS = {-(-k // 4) * 4 if vec_a else k};  // a's row stride
 constexpr int KP = {_kpad(used) if tc else used};  // the k-loop's padded length (tensor cores: steps of 8)
-constexpr int RS = {TC_RSTRIDE};
+constexpr int RS = {TC_RSTRIDE};{AW_LINE if wgmma else ""}
 constexpr int CB = {CHANNEL_BLOCK};
 constexpr int WS = {TC_PSTRIDE if tc == "presplit" else TC_STRIDE if tc else CHANNEL_BLOCK + 1};
 constexpr int ED = {schedule.edge_dim};
@@ -728,7 +820,7 @@ extern "C" __global__ void __launch_bounds__({rule.warps * 32}, 1) fused_folded_
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
-{pointers(a_offset, prefetch, x_slots)}
+{pointers(a_offset, prefetch, x_slots, wgmma)}
     const int cb = blockIdx.y;
     const int ch = cb * CB + lane;
     int* ctr = counters + blockIdx.y * gridDim.z + blockIdx.z;
@@ -754,9 +846,16 @@ __device__ __forceinline__ void cp_async_wait0() { asm volatile("cp.async.wait_g
 """
 
 
-def pointers(a_offset, prefetch, x_slots=0):
+AW_LINE = "\nconstexpr int AW = KP + 4;  // wgmma: a's staging row stride"
+
+
+def pointers(a_offset, prefetch, x_slots=0, wgmma=False):
     """The warp's staging pointers: a_s, sh_s and r_s; with ``prefetch`` the two buffers' base ``a_s0`` (a_s and sh_s
     are then set per batch) and SS, one buffer's floats."""
+    if wgmma:
+        return f"""    float* a_s = Ws + {a_offset};  // [WGMMA_EDGES][AW]
+    float* sh_s = a_s + {WGMMA_EDGES} * AW;  // [WGMMA_EDGES][ED]
+    float* r_s = sh_s + ({WGMMA_EDGES} * ED + 3) / 4 * 4;  // [paths][WGMMA_EDGES][RS]"""
     if prefetch == "x":
         return f"""    constexpr int SS = KP * B + B * ED;  // one staging buffer: a [KP][B], sh [B][ED]
     constexpr int NX = {x_slots};  // x values per edge and lane in the x tile
@@ -994,8 +1093,205 @@ def _part_tctp(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a, wfr
 """
 
 
+def _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a):
+    """``_part`` with the a.W product on Hopper wgmma (``WGMMA``, see the module constant): the warps of a warpgroup
+    walk their own chunks 16 edges at a time in lockstep rounds; per round one m64nNk8 product per k step and TF32
+    pass, then per 8 edges the mma.sync kernel's x loads, w store and TP."""
+    paths = schedule.paths
+    xkeys = sorted({(paths[pi].input_start, t.input_component, paths[pi].input_irrep_dim)
+                    for pi in part for o in paths[pi].outputs for t in o.terms})
+    xi = {key: i for i, key in enumerate(xkeys)}
+    nx = len(xkeys)
+    names = list(dict.fromkeys(o.accumulator.name for pi in part for o in paths[pi].outputs))
+    si = {n: i for i, n in enumerate(names)}
+    n = len(names)
+    npl = len(part)
+    nw = npl * CHANNEL_BLOCK  # the product's N
+    eb = WGMMA_EDGES
+    wst = ", ".join(str(paths[pi].weight_start) for pi in part)
+    xloads = "\n".join(f"                    xv[b][{i}] = (snd >= 0) ? x[(int64_t)snd * IN_DIM + "
+                       f"{_node(layout, C, s, c, d)}] : 0.f;" for (s, c, d), i in xi.items())
+    outs = "\n".join(f"                {_out(slots[name], C, layout, bmap)} = acc[{i}];" for name, i in si.items())
+    tp = []
+    for g, pi in enumerate(part):
+        p = paths[pi]
+        tp.append("                        {")
+        for j in range(p.edge_irrep_dim):
+            tp.append(f"                        const float e{j} = shb[b * ED + {p.edge_start + j}];")
+        for o in p.outputs:
+            terms = " + ".join(f"xv[b][{xi[(p.input_start, t.input_component, p.input_irrep_dim)]}]"
+                               f" * e{t.edge_component} * {_lit(t.coefficient)}" for t in o.terms) or "0.f"
+            tp.append(f"                        acc[{si[o.accumulator.name]}] = fmaf(w[{g}][b], {terms},"
+                      f" acc[{si[o.accumulator.name]}]);")
+        tp.append("                        }")
+    flush = f"""{{
+{outs}
+                #pragma unroll
+                for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
+                ++cur;
+            }}"""
+    if vec_a:  # rows of AS floats, K == KP (vec_a needs used % 32 == 0)
+        astage = f"""                for (int i = lane; i < {eb} * (KP / 4); i += 32) {{
+                    const int b = i / (KP / 4), q = i - b * (KP / 4);
+                    float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+                    if (b < nb16) v = __ldg(reinterpret_cast<const float4*>(a + (ew + b) * AS) + q);
+                    *reinterpret_cast<float4*>(&a_s[b * AW + 4 * q]) = v;
+                }}"""
+    else:
+        astage = f"""                for (int i = lane; i < {eb} * KP; i += 32) {{
+                    const int b = i / KP, k = i - b * KP;
+                    a_s[b * AW + k] = (b < nb16 && k < K) ? a[(ew + b) * AS + k] : 0.f;
+                }}"""
+    if vec_sh:
+        shstage = f"""                for (int i = lane; i < {eb} * ED / 4; i += 32)
+                    reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb16)
+                        ? __ldg(reinterpret_cast<const float4*>(sh + ew * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);"""
+    else:
+        shstage = (f"                for (int i = lane; i < {eb} * ED; i += 32)"
+                   " sh_s[i] = (i / ED < nb16) ? sh[ew * ED + i] : 0.f;")
+    halves = []
+    for s in range(eb // BATCH):
+        halves.append(f"""                if (nb16 > {BATCH * s}) {{  // the round's edges {BATCH * s} to {BATCH * s + 7}
+                    const int64_t e0 = ew + {BATCH * s};
+                    const int nb = nb16 - {BATCH * s} < B ? nb16 - {BATCH * s} : B;
+                    const float* shb = sh_s + {BATCH * s} * ED;
+                    float w[{npl}][B];
+                    #pragma unroll
+                    for (int g = 0; g < {npl}; ++g)
+                        #pragma unroll
+                        for (int b = 0; b < B; ++b) w[g][b] = r_s[(g * {eb} + {BATCH * s} + b) * RS + lane];
+                    float xv[B][{nx}];
+                    int rv[B];
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) {{
+                        rv[b] = (b < nb && !tail) ? receivers[e0 + b] : 0x7fffffff;
+                        int snd = (b < nb && !tail) ? senders[e0 + b] : -1;
+                        if (snd < 0 || snd >= N) snd = -1;
+{xloads}
+                    }}
+                    if (STORE_W) {{
+                        const int wst[{npl}] = {{{wst}}};
+                        #pragma unroll
+                        for (int b = 0; b < B; ++b)
+                            if (b < nb) {{
+                                #pragma unroll
+                                for (int g = 0; g < {npl}; ++g) {store}
+                            }}
+                    }}
+                    if (!tail) {{
+                        #pragma unroll
+                        for (int b = 0; b < B; ++b) {{
+                            if (b >= nb) break;
+                            while (cur < rv[b]) {flush}
+{chr(10).join(tp)}
+                        }}
+                    }}
+                }}""")
+    return f"""
+        {{
+            const int wst[{npl}] = {{{wst}}};
+            float* Bl = Ws + {nw} * KP;
+            for (int i = threadIdx.x; i < {nw} * KP; i += blockDim.x) {{
+                const int nn = i / KP, k = i - nn * KP, p = nn >> 5, l = nn & 31;
+                unsigned hi, lo;
+                split_tf32(k < K ? W[(int64_t)(wst[p] + cb * CB + l) * KA + k] : 0.f, hi, lo);
+                const int o = ((nn >> 3) * (KP / 4) + (k >> 2)) * 32 + (nn & 7) * 4 + (k & 3);
+                Ws[o] = __uint_as_float(hi);
+                Bl[o] = __uint_as_float(lo);
+            }}
+            asm volatile("fence.proxy.async.shared::cta;" ::: "memory");
+        }}
+        __syncthreads();
+        {{
+            const int wgb = 1 + (warp >> 2);  // the warpgroup's named barrier
+            const int gid = lane >> 2, tq = lane & 3;
+            const unsigned bh_addr = (unsigned)__cvta_generic_to_shared(Ws);
+            const unsigned bl_addr = bh_addr + {nw} * KP * 4;
+            bool have = false, done = false, tail = false;
+            int64_t r1 = 0, eend = 0, cur = 0, ew = 0;
+            float acc[{n}];
+            #pragma unroll
+            for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
+            while (true) {{
+                if (!done && (!have || ew >= eend)) {{
+                    if (have) while (cur < r1) {flush}
+                    have = false;
+                    while (true) {{
+                        int cc = 0;
+                        if (lane == 0) cc = atomicAdd(ctr, 1);
+                        cc = __shfl_sync(FULL, cc, 0);
+                        int64_t r0, ebeg;
+                        tail = cc >= receiver_chunks;
+                        if (!tail) {{
+                            r0 = (int64_t)cc * RC;
+                            r1 = r0 + RC < N ? r0 + RC : N;
+                            ebeg = row_ptr[r0] < 0 ? 0 : row_ptr[r0];
+                            eend = row_ptr[r1] < ebeg ? ebeg : row_ptr[r1];
+                            eend = eend > E ? E : eend;
+                        }} else {{
+                            r0 = r1 = N;
+                            ebeg = tail_begin + (cc - receiver_chunks) * TAIL;
+                            if (ebeg >= E || !STORE_W) {{
+                                done = true;
+                                break;
+                            }}
+                            eend = ebeg + TAIL < E ? ebeg + TAIL : E;
+                        }}
+                        cur = r0;
+                        if (ebeg < eend) {{
+                            have = true;
+                            ew = ebeg;
+                            break;
+                        }}
+                        while (cur < r1) {flush}
+                    }}
+                }}
+                if (!wg_any(!done, wgb)) break;
+                const int nb16 = done ? 0 : (int)((eend - ew) < {eb} ? (eend - ew) : {eb});
+                __syncwarp();
+{astage}
+{shstage}
+                __syncwarp();
+                {{
+                    float d[{nw // 2}];
+                    unsigned ah[KP / 8][4], al[KP / 8][4];
+                    #pragma unroll
+                    for (int ks = 0; ks < KP / 8; ++ks) {{  // A: edge gid (+8), k 8 ks + tq (+4)
+                        const float* ar = a_s + gid * AW + 8 * ks + tq;
+                        split_tf32(ar[0], ah[ks][0], al[ks][0]);
+                        split_tf32(ar[8 * AW], ah[ks][1], al[ks][1]);
+                        split_tf32(ar[4], ah[ks][2], al[ks][2]);
+                        split_tf32(ar[8 * AW + 4], ah[ks][3], al[ks][3]);
+                    }}
+                    asm volatile("wgmma.fence.sync.aligned;" ::: "memory");
+                    #pragma unroll
+                    for (int ks = 0; ks < KP / 8; ++ks) {{  // two 128-byte core matrices per k step
+                        wgmma_n{nw}(d, al[ks], gmma_desc(bh_addr + 256 * ks), ks > 0);
+                        wgmma_n{nw}(d, ah[ks], gmma_desc(bl_addr + 256 * ks), 1);
+                        wgmma_n{nw}(d, ah[ks], gmma_desc(bh_addr + 256 * ks), 1);
+                    }}
+                    asm volatile("wgmma.commit_group.sync.aligned;" ::: "memory");
+                    asm volatile("wgmma.wait_group.sync.aligned 0;" ::: "memory");
+                    #pragma unroll
+                    for (int j = 0; j < {nw // 8}; ++j) {{  // D: edge gid (+8), column 8 j + 2 tq (+1): path j / 4
+                        float* rp = r_s + ((j >> 2) * {eb} + gid) * RS + 8 * (j & 3) + 2 * tq;
+                        *reinterpret_cast<float2*>(rp) = make_float2(d[4 * j], d[4 * j + 1]);
+                        *reinterpret_cast<float2*>(rp + 8 * RS) = make_float2(d[4 * j + 2], d[4 * j + 3]);
+                    }}
+                }}
+                __syncwarp();
+{chr(10).join(halves)}
+                __syncwarp();
+                if (!done) ew += {eb};
+            }}
+        }}
+"""
+
+
 def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False, vec_a=False,
-          wfrag=False, tctp=False):
+          wfrag=False, tctp=False, wgmma=False):
+    if wgmma:
+        return _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a)
     if tctp:
         return _part_tctp(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a, wfrag)
     paths = schedule.paths
@@ -1221,16 +1517,24 @@ class FusedFoldedForward:
                      and tc_tp_applies(schedule))
         self.wfrag = (tc_wfrag_default(torch.cuda.get_device_name(device)) and self.tc is True and not self.prefetch
                       and CHANNEL_BLOCK == 32)
-        self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
-                                schedule.channels, int(props.shared_memory_per_block_optin),
-                                int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch,
-                                x_slots=schedule.input_dim // schedule.channels)
+        self.wgmma = (wgmma_default(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
+                      and self.tc is True and not self.prefetch and not self.tctp)
+        if self.wgmma:
+            self.wfrag = False
+            self.rule = launch_rule_wgmma(len(schedule.paths), self.used, schedule.edge_dim, schedule.channels,
+                                          int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
+        else:
+            self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
+                                    schedule.channels, int(props.shared_memory_per_block_optin),
+                                    int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch,
+                                    x_slots=schedule.input_dim // schedule.channels)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
-                             prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag, tctp=self.tctp)
-        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device))
+                             prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
+                             tctp=self.tctp, wgmma=self.wgmma)
+        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
         self._function = _check(driver.cuModuleGetFunction(self._module, b"fused_folded_forward"))
