@@ -131,11 +131,14 @@ BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 # Integer sums are exact and order-free, so dsh and dr are deterministic; each partial is rounded to 2^-25 of its
 # component's largest partial in the warp (FP32 class against the shuffle tree's 5 rounded levels): "rounding". A
 # NaN or infinity in any partial gives NaN. Float32 only; 32-lane cohorts. Kernel lab, Benchmark_loup, RTX 5060 Ti
-# (BUTTERFLY off as the base): 0.695 (dsh max|d|/max 1.8e-7, dr 3.7e-7), no reduction at all 0.679, butterfly 0.964.
+# (thermalised capture, the plan's register cap of 80, BUTTERFLY off as the base): 0.966, butterfly 0.984, no reduction
+# at all 0.954; dsh 1.4e-7 and dr 2.8e-7 of the max against the shuffle tree. MD-step A/Bs at b809e2bf against each
+# GPU's default (SrTiO3 / NbCl5, b/a in both orders): RTX 5060 Ti 0.998 / 0.999, 0.999 / 0.998 (on); RTX 4000 Ada
+# 1.009 / 1.008, 1.011 / 1.008 (off).
 # None: on for REDUX_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice. Takes precedence
 # over BUTTERFLY.
 REDUX = None
-REDUX_GPUS = GPUModels(())
+REDUX_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).

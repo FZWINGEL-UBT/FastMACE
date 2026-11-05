@@ -190,8 +190,10 @@ _HEAD_INDEX = re.compile(r"\[\n\s*num_atoms_arange, node_heads\n\s*\]")
 # plus 5.5 us of zero fills per force call (profile at 2a016fd4). With one graph this is a plain reduction. Forces and
 # stress are bitwise (the gradient of either sum is exactly 1 per atom); the float64 energy's summation order changes
 # (the atomics' order is unspecified anyway). None: on for GRAPH_SUM_GPUS (decision 66); True / False: an A/B side.
+# MD-step A/Bs (SrTiO3 / NbCl5, b/a in both orders): A100-SXM4 0.997 / 0.998, 0.992 / 0.998 (on); RTX 5060 Ti
+# 1.000 / 0.999, 0.998 / 0.998 (SrTiO3 a tie: off); RTX 4000 Ada 1.001 / 0.999, 0.999 / 0.996 (off).
 GRAPH_SUM = None
-GRAPH_SUM_GPUS = GPUModels(())
+GRAPH_SUM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 _GRAPH_SCATTER = re.compile(r"scatter_sum\(((?:[^()]|\([^()]*\))*data\[\"batch\"\](?:[^()]|\([^()]*\))*)\)")
 
 

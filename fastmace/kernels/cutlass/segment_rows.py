@@ -28,8 +28,10 @@ import torch
 
 from fastmace.kernels.gpu_models import GPUModels
 
+# MD-step A/Bs at 71372d0f (b/a, both build orders), A100-SXM4-80GB: SrTiO3 10x10x10 0.985 / 0.984, NbCl5 0.981 /
+# 0.988; the gate passes.
 SEGMENT_ROWS = None
-SEGMENT_ROWS_GPUS = GPUModels(())
+SEGMENT_ROWS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 
 _INDICES = {}  # (device index, rows, size, row stride, dim stride, ld) -> int32 row indices (built outside captures)
 

@@ -4,7 +4,10 @@ The A100 profile of Benchmark_loup (results/omat0-a100-profile-20261103) puts 65
 the radial r-gradient backward ``oeq_projected_backward_wprime`` (6.9 ms) and the generic fused forward
 ``fused_folded_forward`` (5.1 ms). This tool captures one force call's arguments of both from an eager call of the
 default plan (SrTiO3 10x10x10, 5,000 atoms), frees the engine, and times variants of the two kernels' rendered
-sources on those arguments, round-robin in one process (CUDA events, median per variant):
+sources on those arguments, round-robin in one process (CUDA events, median per variant). Since 5 November 2026 the
+capture follows --equilibrate-steps MD steps (default 300): the first steps from the ideal lattice have few distinct
+edge lengths, so the radial tables' reads stay in L2 and memory-bound kernels look compute-bound (the w' REDUX
+variant: 0.72 of the kernel there, about 0.99 in MD):
 
 - exact variants (cache hints, register caps, K = 64 without the zero cutoff column, unordered species pairs): their
   outputs are compared with the plan's kernel bit for bit (``dx`` of the backward is summed atomically, so it is
@@ -475,6 +478,8 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "qmajor-f2+ldcs-w": ("exact", lambda s: qmajor(hints(s, g=False), 2), (), qmajor_args(2)),
         "maxreg64": ("exact", lambda s: s, ("--maxrregcount=64",)),
         "maxreg80": ("exact", lambda s: s, ("--maxrregcount=80",)),
+        "maxreg-none": ("exact", lambda s: s, ("--maxrregcount=255",)),
+        "maxreg72": ("exact", lambda s: s, ("--maxrregcount=72",)),
         "ldcs-w": ("exact", lambda s: hints(s, g=False), ()),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
@@ -488,12 +493,23 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
     }
 
 
+def plan_options(kernel, extra):
+    """``extra`` with the plan kernel's own register cap (``WPrimeBackward.max_registers``, a per-GPU default) unless
+    the variant sets one. Lab runs before 5 November 2026 about 13:30 UTC compiled every variant without it: on the
+    RTX 5060 Ti (cap 80) their base was the uncapped kernel, 7.88 against the plan's 6.77 ms."""
+    cap = int(getattr(kernel, "max_registers", 0) or 0)
+    if cap and not any(str(o).startswith("--maxrregcount") for o in extra):
+        return (f"--maxrregcount={cap}",) + tuple(extra)
+    return tuple(extra)
+
+
 def wprime_launcher(kernel, source, extra):
     """A launch function for a variant of ``kernel`` (a WPrimeBackward) compiled from ``source``."""
     import torch
     from cuda.bindings import driver
 
     from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+    extra = plan_options(kernel, extra)
     cubin = compile_cubin(source, torch.cuda.get_device_capability(), extra)
     module = _check(driver.cuModuleLoadData(cubin))
     function = _check(driver.cuModuleGetFunction(module, b"oeq_projected_backward_wprime"))
@@ -983,7 +999,7 @@ def capture(args):
     from fastmace.planner import minimal
     from fastmace.planner.workload import Workload
 
-    captured, seen = {}, []
+    captured, seen, recording = {}, [], [True]
     edge_arg = {"forward": 3, "wprime": 1}  # sh [E, 16]
 
     def recorder(name, original):
@@ -991,7 +1007,8 @@ def capture(args):
             edges = a[edge_arg[name]].shape[0]
             capturing = torch.cuda.is_current_stream_capturing()
             seen.append((name, edges, capturing))
-            if not capturing and edges > (captured[name][1][edge_arg[name]].shape[0] if name in captured else -1):
+            largest = captured[name][1][edge_arg[name]].shape[0] if name in captured else -1
+            if recording[0] and not capturing and edges > largest:
                 captured[name] = (self, [t.clone() if isinstance(t, torch.Tensor)
                                          else [u.clone() for u in t] if isinstance(t, list) else t for t in a])
             return original(self, *a)
@@ -1020,6 +1037,15 @@ def capture(args):
         plan = planner.plan(field, base, integrator, Workload(max_temperature_K=300.0), planner.hardware())
         engine = planner.build(plan, field, base.copy(), temperature_K=300.0)
         engine.prepare()
+        if args.equilibrate_steps:  # thermal disorder first: the ideal lattice's edge lengths keep the tables in L2
+            recording[0] = False
+            for _ in range(args.equilibrate_steps):
+                engine.step()
+            engine.flush()
+            torch.cuda.synchronize()
+            recording[0] = True
+            captured.clear()  # prepare()'s warm-up calls ran on the ideal lattice
+            engine.invalidate_graphs("omat0_kernel_lab: eager call for the capture after equilibration")
         for attempt in range(3):
             if full():
                 break
@@ -1102,6 +1128,12 @@ def main(argv=None):
     p.add_argument("--variants", nargs="*", default=None, help="variant names (default: all)")
     p.add_argument("--min-edges", type=int, default=100000, help="the smallest edge count of a captured call")
     p.add_argument("--rounds", type=int, default=15)
+    p.add_argument("--flush-l2-mb", type=int, default=256,
+                   help="MB written before every timed launch (0: none, the warm L2 of lab runs before 5 November "
+                        "2026 about 13:00 UTC)")
+    p.add_argument("--equilibrate-steps", type=int, default=300,
+                   help="MD steps (300 K, 1 fs) before the captured eager call; 0: the first steps from the ideal "
+                        "lattice, as every lab run before 5 November 2026 about 12:40 UTC")
     p.add_argument("--warmup", type=int, default=3)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--ptxas-archs", nargs="*", default=[], metavar="MAJOR.MINOR",
@@ -1182,10 +1214,14 @@ def main(argv=None):
             if variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
         times = {v: [] for v in live}
+        flush = (torch.empty(int(args.flush_l2_mb) << 18, dtype=torch.float32, device="cuda")
+                 if args.flush_l2_mb else None)
         for _ in range(args.rounds):  # round-robin
             for variant in live:
                 b = built[variant]
                 reset(name, b["args"])
+                if flush is not None:  # a cold L2, as in a force call (the kernels before it evict the inputs)
+                    flush.fill_(0.0)
                 start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                 start.record()
                 b["launch"](b["args"])

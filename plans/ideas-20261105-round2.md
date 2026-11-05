@@ -719,3 +719,33 @@ dsh components cost the 32 %, and the butterfly's quarter of the shuffles recove
 Separately, the multi-warp falsifier (idea 1 of the second set) did not fail on the 5060 Ti: four warps per edge
 gave 0.891 with atomics. Its A100 bound is running. A deterministic version would combine the four partials in
 shared memory in a fixed order.
+
+### Correction: the lab's 5060 Ti w′ base lacked the register cap (5 November 2026, about 13:30 UTC)
+
+`tools/omat0_kernel_lab.py` compiled every w′ variant without the plan kernel's per-GPU `--maxrregcount`
+(`MAX_REGISTERS_GPUS`: 80 on the RTX 5060 Ti since round 2). On the 5060 Ti its "base" was therefore the uncapped
+kernel. On thermalised inputs that kernel takes 7.88 ms against the plan's 6.77 ms; a cap of 255 (242 registers)
+takes 9.17 ms. The cap is right; the lab was wrong. The A100 and the Ada have no cap, so their lab numbers stand.
+Two more lab fixes the same day:
+
+- the capture now follows 300 MD steps (`--equilibrate-steps`); before, it was the first steps from the ideal lattice;
+- every timed launch now follows a 256 MB L2 flush (`--flush-l2-mb`); this changed nothing measurable.
+
+Corrected 5060 Ti w′ numbers: plan kernel (cap 80, BUTTERFLY off) 6.78 ms. Relative to it:
+
+| Variant | Ratio |
+| --- | --- |
+| butterfly | 0.984 |
+| redux-pc | 0.966 |
+| no reduction (falsifier) | 0.954 |
+| four warps per edge | 1.131 |
+
+So the end-of-edge reduction is about 4.6 % of the kernel, not 32 %. Consequences:
+
+- the Cartesian projection (idea 2 of the third set) has at most a few percent of the kernel to win: closed;
+- several warps per edge loses on both GPUs: closed;
+- the REDUX MD A/Bs stand as measured: 5060 Ti 0.998 / 0.999 (SrTiO3) and 0.999 / 0.998 (NbCl5) against the
+  butterfly default; Ada 1.009 / 1.008 and 1.011 / 1.008.
+
+Every earlier 5060 Ti w′ lab ratio was taken against the uncapped base. That covers this round's butterfly, split
+and reduction falsifiers. The MD A/Bs, which decide defaults, are not affected.
