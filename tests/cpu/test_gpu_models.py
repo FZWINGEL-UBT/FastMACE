@@ -216,6 +216,9 @@ def test_segment_rows_default(monkeypatch):
         assert segment_rows.segment_rows_default(torch.device("cuda", 0)) is on, name
     monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", False)
     assert not segment_rows.segment_rows_default(torch.device("cuda", 0))
+    assert segment_rows.SEGMENT_GROUPED is None and not segment_rows.segment_grouped_default("cpu")
+    monkeypatch.setattr(segment_rows, "SEGMENT_GROUPED", True)
+    assert segment_rows.segment_grouped_default(torch.device("cuda", 0))
 
 
 def test_h200_defaults():
@@ -234,8 +237,10 @@ def test_h200_defaults():
                    wprime_backward.FACTORED_GPUS, wprime_backward.HORNER_GPUS, wprime_backward.SCALAR_PATHS_GPUS,
                    wprime_backward.BUTTERFLY_GPUS, energy.HEAD_SLICE_GPUS, energy.GRAPH_SUM_GPUS,
                    modules.FUSED_FIRST_BACKWARD_GPUS, modules.EDGE_SH_GPUS, radial.SYMMETRIC_PAIRS_GPUS,
-                   tabled_outer_sum.TABLED_FORWARD_GPUS):
+                   tabled_outer_sum.TABLED_FORWARD_GPUS, fused_forward.DEGREE_PARTS_GPUS):
         assert "NVIDIA H200" in models
+    assert "NVIDIA A100-SXM4-80GB" in fused_forward.DEGREE_PARTS_GPUS  # 0.9920 / 0.9932
+    assert "NVIDIA GeForce RTX 5060 Ti" not in fused_forward.DEGREE_PARTS_GPUS
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows

@@ -2,7 +2,8 @@
 from the [n, width] input and written into the joined output through CUTLASS's gathered entry. Values and input
 gradients against float64 within the 3xTF32 bound, zero columns where no block writes, zero gradient where no block
 reads, the shape-rule fallback (few rows), replay under a captured CUDA graph, and BlockLinear with a plan against
-BlockLinear without one."""
+BlockLinear without one. SEGMENT_GROUPED (H200 ideas plan, idea 6): every block in one launch, bitwise against the
+per-block launches, forward and input gradient, and under a captured graph."""
 
 import pytest
 import torch
@@ -121,3 +122,43 @@ def test_block_linear_with_plan():
     (gb,) = torch.autograd.grad(b, x, grad)
     for left, right in ((a.detach(), b.detach()), (ga, gb)):
         assert float((left - right).abs().max() / left.abs().max()) < 1e-5
+
+
+@pytest.mark.parametrize("case", sorted(CASES))
+@pytest.mark.parametrize("n", [1000, 7])
+def test_grouped_bitwise(case, n, monkeypatch):
+    _available()
+    _, _, _, weights, width_in, width_out, plan = _blocks(case)
+    weights_t = [w.t().contiguous() for w in weights]
+    x = torch.randn(n, width_in, device="cuda", generator=torch.Generator(device="cuda").manual_seed(2))
+    grad = torch.randn(n, width_out, device="cuda", generator=torch.Generator(device="cuda").manual_seed(3))
+    results = {}
+    for grouped in (False, True):
+        monkeypatch.setattr(sr, "SEGMENT_GROUPED", grouped)
+        xg = x.clone().requires_grad_()
+        y = sr.segment_rows(xg, weights, weights_t, plan, width_out)
+        (gx,) = torch.autograd.grad(y, xg, grad)
+        results[grouped] = (y.detach(), gx)
+    assert torch.equal(results[True][0], results[False][0])
+    assert torch.equal(results[True][1], results[False][1])
+    out = torch.empty(n, width_out, device="cuda")
+    if case == "partial":  # different block shapes: never one launch
+        assert not sr._grouped(x, weights, plan, out)
+    elif n == 1000:
+        assert sr._grouped(x, weights, plan, out)
+
+
+def test_grouped_graph_replay(monkeypatch):
+    _available()
+    monkeypatch.setattr(sr, "SEGMENT_GROUPED", True)
+    _, _, _, weights, width_in, width_out, plan = _blocks("omat0")
+    weights_t = [w.t().contiguous() for w in weights]
+    x = torch.randn(1000, width_in, device="cuda")
+    sr.segment_rows(x, weights, weights_t, plan, width_out)  # warm-up builds the cached indices and stacked weights
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        y = sr.segment_rows(x, weights, weights_t, plan, width_out)
+    x.copy_(torch.randn_like(x))
+    graph.replay()
+    monkeypatch.setattr(sr, "SEGMENT_GROUPED", False)
+    assert torch.equal(y, sr.segment_rows(x, weights, weights_t, plan, width_out))

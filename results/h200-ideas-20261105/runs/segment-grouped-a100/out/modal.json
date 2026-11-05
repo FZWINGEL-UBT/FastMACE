@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "A100-80GB",
+  "source_commit": "f8facf0870ce500ece0b6d2d3e3780ca8b72304b",
+  "command": "python -m pytest -p no:cacheprovider -q -rs tests/gpu/test_segment_rows_cuda.py > $OUT/test-segment-rows.log 2>&1; ALIAS='NVIDIA A100-SXM4-80GB' TESTS=0 GATE=0 LOUP=0 FORWARD_VARIANTS= WPRIME_VARIANTS= AB='grouped|fastmace.kernels.cutlass.segment_rows:SEGMENT_GROUPED=True' bash tools/modal/hopper_sweep.sh",
+  "nvidia_smi": "NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 203.85568499565125,
+  "estimated_gpu_cost_usd": 0.1415664479136467
+}

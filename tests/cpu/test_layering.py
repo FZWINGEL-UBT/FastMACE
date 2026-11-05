@@ -72,7 +72,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                               "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B"},
     "fastmace/integrators/langevin.py": {"NOISE_DRAW_AHEAD": "round 6 noise batch drawn ahead on a thread; A/B"},
     "fastmace/kernels/cutlass/segment_rows.py": {"SEGMENT_ROWS": "block linear rows read and written in place; "
-                                                                 "per GPU, A/B"},
+                                                                 "per GPU, A/B",
+                                                 "SEGMENT_GROUPED": "every block in one launch; per GPU, A/B"},
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.
@@ -118,7 +119,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "TC_WFRAG": "W slice in mma fragment order; per GPU, A/B",
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
-                                                        "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B"},
+                                                        "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",
+                                                        "DEGREE_PARTS": "path parts by input degree; per GPU, A/B"},
 }
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")

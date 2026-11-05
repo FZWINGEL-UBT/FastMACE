@@ -808,6 +808,36 @@ def _wfrag(s):
                                 split_tf32(wv.w, ah[3], al[3]);""")
 
 
+def _s_tile(s):
+    """Falsifier of the H200 ideas plan's idea 4 (an S tile: CG coefficient times edge harmonic summed per output and
+    input component once per edge, shared by the 32 channel lanes): each TP output becomes one product per distinct
+    input component, ``xv[b][i] * S``, with S read from shared memory at a distinct address per (output, input) pair
+    (outputs of a single term unchanged).
+    The S tile's own cooperative computation is not included (a lower bound of the per-lane TP cost)."""
+    line = re.compile(r"acc\[(\d+)\] = fmaf\(w\[(\d+)\]\[b\], (.*), acc\[\1\]\);")
+    term = re.compile(r"xv\[b\]\[(\d+)\] \* e\d+(?: \* -?0x[0-9a-f.]+p[-+]\d+f)?")
+    out, k = [], 0
+    for text in s.split("\n"):
+        m = line.search(text)
+        if m:
+            if m.group(1) == "0":
+                k = 0
+            found = term.findall(m.group(3))
+            inputs = sorted({int(i) for i in found})
+            if len(found) == 1:  # a single term reads its harmonic as before
+                out.append(text)
+                continue
+            if not inputs:
+                raise ValueError(f"s-tile: no terms in {text.strip()[:80]!r}")
+            parts = []
+            for i in inputs:
+                parts.append(f"xv[b][{i}] * sh_s[b * ED + {k}]")
+                k += 1
+            text = text[:m.start(3)] + " + ".join(parts) + text[m.end(3):]
+        out.append(text)
+    return "\n".join(out)
+
+
 def _xs(kernel):
     """The sender features x kept in a per-warp shared tile [B][NX][32] (after the plan's shared memory) instead of
     32 registers live across the product; each lane writes and reads its own column (no sync). Bitwise. Own launch
@@ -1056,6 +1086,15 @@ def forward_variants(kernel=None):
                                                         r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f",
                                                         "(snd >= 0) ? 0.5f : 0.f", regex=True),
                                                    "sh[e0 * ED + i]", "0.5f"), ()),
+        # H200 ideas plan (5 November 2026): the same bounds for the float4 staging (VEC_A, VEC_SH; idea 7).
+        "F-no-aload4": ("falsifier", lambda s: _sub(
+            s, "__ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"),
+            ()),
+        "F-no-shload4": ("falsifier", lambda s: _sub(
+            s, "__ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"), ()),
+        "F-no-ash4": ("falsifier", lambda s: _sub(_sub(
+            s, "__ldg(reinterpret_cast<const float4*>(a + (e0 + b) * AS) + q)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"),
+            "__ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)", "make_float4(0.5f, 0.5f, 0.5f, 0.5f)"), ()),
         "tc-a4": ("exact", _tc_a4, (), _a4_args),
         "simt-a4": ("exact", _simt_a4, (), _a4_args),
         "xs": ("exact", _xs(kernel), ()),
@@ -1071,6 +1110,8 @@ def forward_variants(kernel=None):
         "tc-a4-na+x-el": ("exact", lambda s: _hints(_tc_a4(s), "el", stream=True), (), _a4_args),
         # The TP's coefficient multiplies dropped (x e instead of x e c): how much its arithmetic weighs.
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
+        # H200 ideas plan, idea 4: the per-lane TP of an S tile (one product per output and input component).
+        "F-s-tile": ("falsifier", _s_tile, ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),

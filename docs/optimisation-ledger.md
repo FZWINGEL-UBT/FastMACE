@@ -4263,3 +4263,11 @@ here.
 - Measured: MD step b/a TABLE_PAIRS RTX 5060 Ti 1.0024 / 0.9998, A100-SXM4 1.0058 / 1.0062, H200 1.0008 / 1.0003; HOIST_SCALE 0.9985 / 0.9991, 1.0104 / 0.9988, 1.0057 / 1.0017. GPU test: TABLE_PAIRS bitwise dsh and dL/dr; HOIST_SCALE dL/dr error 2.11e-6 (unhoisted 2.17e-6).
 - Note: the plan's L1-wavefront model of the w′ table reads does not hold on any of the three GPUs.
 - Sources: [w′ pairs](../results/wprime-pairs-20261105/README.md).
+
+### h200-ideas: degree-pure path parts, S tile, grouped BlockLinear launch, PDL, sorted radial tables, bulk-copy staging (5 November 2026)
+
+- Date/round: H200 ideas plan, ideas 2, 3, 4, 6, 7 and 8 (`3ed00b73`, `891bf370`, `6ebc795d`, `101733bc`, `34c4bc1e`, `f8facf08`).
+- What: `fused_forward.DEGREE_PARTS` (path parts by input irrep dimension, so each part gathers only its own x rows; bitwise); `segment_rows.SEGMENT_GROUPED` (every BlockLinear block in one `species_into` launch; bitwise); lab bounds F-s-tile, F-no-aload4, F-no-shload4, F-no-ash4; `tools/bench/grouped_gemm_bound.py` (grouped and PDL bounds); `tools/bench/radial_sort_bench.py`.
+- Status: DEGREE_PARTS ADOPTED for the H200 and the A100-SXM4-80GB (decision 66); SEGMENT_GROUPED REJECTED (off); S tile, PDL, bulk-copy staging and sorted radial tables DROPPED at their bounds.
+- Measured: DEGREE_PARTS MD step b/a H200 0.9818 / 0.9845, A100-SXM4 0.9920 / 0.9932, RTX 5060 Ti 0.9980 / 1.0032 (off); gate passes on the H200 and an A100 PCIe; Benchmark_loup H200 5.504 ms per step. SEGMENT_GROUPED A100-SXM4 0.9987 / 1.0004, although the launch bound gave 26–52 µs per group of four. Forward bounds: F-s-tile 0.966 (H200), 0.951 (A100 PCIe); staging F-no-ash4 0.955 / 0.971; PDL ≤ 4.7 µs per group; sorted radial kernel 0.866 but the sort costs 155 µs against a 509 µs kernel (RTX 5060 Ti).
+- Sources: [H200 ideas](../results/h200-ideas-20261105/README.md).

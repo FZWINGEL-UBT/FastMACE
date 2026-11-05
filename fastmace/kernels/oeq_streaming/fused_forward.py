@@ -113,7 +113,16 @@ VEC_SH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", 
 VEC_A = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.047 / 1.046 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
-VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))  # every A100 (see VEC_SH_GPUS; TC_WFRAG_GPUS)
+VEC_A_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# Path parts by input degree (H200 ideas plan, idea 2; 5 November 2026): one part per input irrep dimension (OMAT-0:
+# the four scalar-input paths and the six vector-input paths) instead of balanced_parts' cost balance, so each part
+# gathers only its own x rows (four sender rows per edge and channel block instead of eight). Bitwise: every output
+# slot keeps its terms and edge order. Only where the groups' W slices and staging fit (launch_rule's groups); not
+# with WGMMA. None: on for DEGREE_PARTS_GPUS (decision 66); True / False: an A/B side's choice.
+DEGREE_PARTS = None
+# MD step b/a (b = on; OMAT-0 medium, SrTiO3 10x10x10, ab / ba, results/degree-parts-20261105): NVIDIA H200
+# 0.9818 / 0.9845, A100-SXM4-80GB 0.9920 / 0.9932.
+DEGREE_PARTS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Round 4: the tensor-core kernel's W slice stored in mma.sync fragment order, [paths][KP / 8][2 m-tiles][32 lanes][4],
 # so each lane loads its four W values of a fragment with one float4 shared load (consecutive 16 B per lane: no bank
 # conflicts) instead of four scalar loads at row stride TC_STRIDE. The same values reach the same mma: bitwise.
@@ -176,6 +185,19 @@ def vec_sh_default(edge_dim, name=None):
     if on is None:
         on = name in VEC_SH_GPUS
     return bool(on) and int(edge_dim) % 4 == 0
+
+
+def degree_parts_default(name=None):
+    """``DEGREE_PARTS`` (None: ``name`` in ``DEGREE_PARTS_GPUS``)."""
+    return bool(DEGREE_PARTS) if DEGREE_PARTS is not None else name in DEGREE_PARTS_GPUS
+
+
+def degree_parts(schedule):
+    """The paths grouped by input irrep dimension (each group sorted), or None for a single group."""
+    groups = {}
+    for i, p in enumerate(schedule.paths):
+        groups.setdefault(int(p.input_irrep_dim), []).append(i)
+    return [sorted(groups[d]) for d in sorted(groups)] if len(groups) > 1 else None
 
 
 def vec_a_default(name=None):
@@ -626,10 +648,20 @@ def staging_floats(k, edge_dim, tc=False, paths_per_part=0, prefetch=False, x_sl
     return (1 + bool(prefetch)) * BATCH * (k + edge_dim) + xs
 
 
-def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefetch=False, x_slots=0):
+def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefetch=False, x_slots=0, groups=None):
     """The kernel's parts, warps and grid for ``paths`` uvu paths of ``k``-wide folded inputs on a device with
     ``shared_optin`` bytes of opt-in shared memory per block and ``sms`` SMs (module docstring); ``tc``: the
-    tensor-core product's shared layout (``TENSOR_CORES``)."""
+    tensor-core product's shared layout (``TENSOR_CORES``). ``groups`` (``DEGREE_PARTS``): the parts given as path
+    groups; None when their largest W slice and ``MIN_WARPS`` warps' staging do not fit."""
+    if groups is not None:
+        per, parts = max(len(g) for g in groups), len(groups)
+        staging = 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
+        wbytes = 4 * slice_floats(per, k, tc)
+        if wbytes + MIN_WARPS * staging > shared_optin:
+            return None
+        warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
+        slices = (channels // CHANNEL_BLOCK) * parts
+        return LaunchRule(parts, warps, max(1, -(-BLOCKS_PER_SM * sms // slices)), wbytes + warps * staging)
     parts = max(1, -(-paths * BATCH // W_TILE_REGISTERS))
     while parts <= paths:
         per = -(-paths // parts)
@@ -726,7 +758,7 @@ def _node(layout, channels, start, component, dim):
 
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False):
+           vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -766,7 +798,9 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
              else "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];")
     C, layout, paths = schedule.channels, schedule.layout, schedule.paths
     costs = [sum(len(o.terms) for o in p.outputs) for p in paths]
-    parts = balanced_parts(costs, rule.parts)
+    parts = balanced_parts(costs, rule.parts) if groups is None else [sorted(g) for g in groups]
+    if len(parts) != rule.parts or sorted(i for g in parts for i in g) != list(range(len(paths))):
+        raise ValueError("fused_folded_forward: the path groups must cover every path once, one per rule part")
     owner = {}
     for q, part in enumerate(parts):
         for pi in part:
@@ -1661,21 +1695,26 @@ class FusedFoldedForward:
                       and CHANNEL_BLOCK == 32)
         self.wgmma = (wgmma_default(torch.cuda.get_device_capability(device), torch.cuda.get_device_name(device))
                       and self.tc is True and not self.prefetch and not self.tctp)
+        self.groups = None
         if self.wgmma:
             self.wfrag = False
             self.rule = launch_rule_wgmma(len(schedule.paths), self.used, schedule.edge_dim, schedule.channels,
                                           int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
         else:
-            self.rule = launch_rule(len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim,
-                                    schedule.channels, int(props.shared_memory_per_block_optin),
-                                    int(props.multi_processor_count), tc=self.tc, prefetch=self.prefetch,
-                                    x_slots=schedule.input_dim // schedule.channels)
+            shape = (len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim, schedule.channels,
+                     int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
+            options = dict(tc=self.tc, prefetch=self.prefetch, x_slots=schedule.input_dim // schedule.channels)
+            self.groups = degree_parts(schedule) if degree_parts_default(torch.cuda.get_device_name(device)) else None
+            self.rule = launch_rule(*shape, groups=self.groups, **options) if self.groups else None
+            if self.rule is None:
+                self.groups = None
+                self.rule = launch_rule(*shape, **options)
         self.output_dim, self.weight_dim = schedule.output_dim, kernels.weight_dim
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                              prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
-                             tctp=self.tctp, wgmma=self.wgmma)
+                             tctp=self.tctp, wgmma=self.wgmma, groups=self.groups)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
