@@ -46,6 +46,14 @@ def route(model):
         device = tensor.device if tensor is not None else torch.device("cpu")
         module.tf32x3 = True
         module.tf32x3_backend = backend(device)
+        if type(module).__name__ == "BlockLinear" and module.tf32x3_backend == "cutlass":
+            from fastmace.kernels.cutlass import segment_rows
+
+            if segment_rows.segment_rows_default(device):
+                count = len(module.block_ends)
+                module.segment_plan = segment_rows.plan_of(
+                    module.segments_in, module.segments_out, module.block_ends,
+                    [getattr(module, f"weight_{k}") for k in range(count)])
         names.append(name)
     return names
 

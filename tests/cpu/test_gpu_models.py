@@ -102,7 +102,8 @@ def test_factored_and_symmetric_pairs_defaults(monkeypatch):
 def test_round2_defaults(monkeypatch):
     """Round 2 (5 November 2026, decision 66): HORNER on the A100s and the RTX 5060 Ti, SCALAR_PATHS and
     BACKWARD_WALK on the A100s, 80 registers on the RTX 5060 Ti, the fused first interaction (FUSED_FIRST_BACKWARD,
-    TABLED_FORWARD) on all three measured models; off elsewhere; the constants override."""
+    TABLED_FORWARD) on all three measured models, BUTTERFLY (round 5) on the RTX 5060 Ti; off elsewhere; the constants
+    override."""
     from fastmace.kernels.triton import edge_outer_sum, tabled_outer_sum
     from fastmace.rewrites.generic import modules as generic
 
@@ -113,6 +114,7 @@ def test_round2_defaults(monkeypatch):
     checks = (
         (wprime_backward, "HORNER", wprime_backward.horner_default, {"a100", "5060"}),
         (wprime_backward, "SCALAR_PATHS", wprime_backward.scalar_paths_default, {"a100"}),
+        (wprime_backward, "BUTTERFLY", wprime_backward.butterfly_default, {"5060"}),
         (edge_outer_sum, "BACKWARD_WALK", walk, {"a100"}),
         (generic, "FUSED_FIRST_BACKWARD", generic.fused_first_backward, {"a100", "5060", "ada"}),
         (tabled_outer_sum, "TABLED_FORWARD", tabled_outer_sum.tabled_forward, {"a100", "5060", "ada"}),
@@ -173,3 +175,30 @@ def test_round5_edge_sh_default(monkeypatch):
     assert gm.edge_sh_default("NVIDIA L4")
     monkeypatch.setattr(gm, "EDGE_SH", False)
     assert not gm.edge_sh_default("NVIDIA A100 80GB PCIe")
+
+
+def test_energy_source_edit_defaults(monkeypatch):
+    """Round 5 (5 November 2026, decision 66): HEAD_SLICE on the RTX 5060 Ti, the RTX 4000 Ada and every A100;
+    GRAPH_SUM per its A/Bs; off on the CPU and other GPUs; the constants override."""
+    from fastmace.model import energy
+
+    class Model(torch.nn.Module):
+        def __init__(self, device):
+            super().__init__()
+            self.device_ = device
+
+        def parameters(self, recurse=True):
+            yield type("P", (), {"device": self.device_})()
+
+    names = {"a100": "NVIDIA A100 80GB PCIe", "5060": "NVIDIA GeForce RTX 5060 Ti",
+             "ada": "NVIDIA RTX 4000 Ada Generation", "a4000": "NVIDIA RTX A4000"}
+    for constant, default, on in (("HEAD_SLICE", energy.head_slice_default, {"a100", "5060", "ada"}),
+                                  ("GRAPH_SUM", energy.graph_sum_default, set())):
+        assert getattr(energy, constant) is None, constant
+        assert not default(Model(torch.device("cpu"))), constant
+        for key, name in names.items():
+            monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
+            assert default(Model(torch.device("cuda", 0))) is (key in on), (constant, name)
+        monkeypatch.setattr(energy, constant, True)
+        assert default(Model(torch.device("cpu"))), constant
+        monkeypatch.setattr(energy, constant, None)

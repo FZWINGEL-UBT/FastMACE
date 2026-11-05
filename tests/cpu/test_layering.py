@@ -69,6 +69,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # prototype was adopted, so neither is a config field (conductor, batch-2 trial merge).
     "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89"},
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted"},
+    "fastmace/kernels/cutlass/segment_rows.py": {"SEGMENT_ROWS": "block linear rows read and written in place; "
+                                                                 "per GPU, A/B"},
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.

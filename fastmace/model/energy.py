@@ -178,9 +178,10 @@ def source_digest(function):
 # A100 profile at 2a016fd4 (Benchmark_loup, OMAT-0 medium): about 98 us per force call in the sort, scan, histogram,
 # memsets, indexing backward and gathers on [5000, 1]. Bitwise: one value per row each way. None: on for
 # HEAD_SLICE_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice. Models with several
-# heads keep the advanced index.
+# heads keep the advanced index. MD-step A/Bs at 65bc1ee5 (SrTiO3 10x10x10 / NbCl5, B/A in both orders): RTX 5060 Ti
+# 0.996 / 0.998, 0.989 / 0.993; RTX 4000 Ada 0.999 / 0.997, 0.993 / 0.992; A100-SXM4 0.992 / 0.987, 0.975 / 0.979.
 HEAD_SLICE = None
-HEAD_SLICE_GPUS = GPUModels(())
+HEAD_SLICE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 _HEAD_INDEX = re.compile(r"\[\n\s*num_atoms_arange, node_heads\n\s*\]")
 
 

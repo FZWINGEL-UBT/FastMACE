@@ -119,9 +119,11 @@ MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> regist
 # bitwise equal. Needs EDGE_DIM a power of two <= 32 and 32-lane cohorts (``butterfly_supported``), else off.
 # Kernel lab, Benchmark_loup, the w' kernel against each GPU's default: RTX 5060 Ti 0.965 / 0.963 (no reduction at
 # all: 0.675); A100-SXM4-80GB 0.989 (no reduction 0.955).
-# None: on for BUTTERFLY_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice.
+# None: on for BUTTERFLY_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice. MD-step A/Bs
+# b/a (ab / ba), SrTiO3 10x10x10 and NbCl5, OMAT-0 medium, 1 fs: RTX 5060 Ti 0.997 / 0.993 and 0.998 / 0.999 (on);
+# RTX 4000 Ada 1.008 / 1.007 and 1.006 / 1.000 (off); A100-SXM4-80GB 1.001 / 0.999 and 1.002 / 1.002 (off).
 BUTTERFLY = None
-BUTTERFLY_GPUS = GPUModels(())
+BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).

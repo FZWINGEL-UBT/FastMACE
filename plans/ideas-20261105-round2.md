@@ -648,3 +648,27 @@ issue, not the shuffle count. On the A100 the whole reduction is 4.5 %.
 6. **A symbolic joint forward/VJP generator: not started.** The counted CG algebra (134 terms against 116 for
    nnz(M), about 4 % of the arithmetic) and the arithmetic bounds already measured (`F-tp-no-coef` 0.947–0.961) leave
    less than the 15 % threshold such a generator would need.
+
+### Interface items from the `2a016fd4` profile (5 November 2026)
+
+- **Head selection (`energy.HEAD_SLICE`, built, A/Bs running).** MACE's `values[num_atoms_arange, node_heads]`
+  becomes `values[:, 0]` for one-head models (source edit of the pinned forward). It removes the IndexBackward
+  radix sort, scan, histogram, memsets and gathers, about 98 µs per force call. Bitwise.
+- **One-graph energy sums (`energy.GRAPH_SUM`, built).** `scatter_sum(..., data["batch"], dim_size=1)` becomes
+  `sum(keepdim=True)`. Three single-address atomic scatters (37.9 µs + 5.5 µs of fills) become reductions. Forces
+  are bitwise; the float64 energy's order changes.
+- **Density sums (not built).** Two `[E, 1] → [5000, 1]` atomic scatters, 31–32 µs each. The edges are
+  receiver-sorted, so a CSR segment sum would take a few µs, but the row pointer is built inside
+  `streaming_message` and is not available to the density. Ceiling about 45 µs.
+- **GEMM layout glue (design).** `[N, 16·128]` viewed as `[N·16, 128]` makes each irrep block's rows the index
+  pattern `n·16 + base_l + m`. CUTLASS's gathered and scattered entry (`species_into`, one species) can read A
+  through that pattern and write D straight into the concatenated output. Attributed on the A100:
+  - pure A copies (`clone_slice_*tf32x3_mm`): about 160 µs;
+  - output concatenations (`cat_view`): about 135 µs;
+  - the other glue kernels fuse divisions and residual adds and would stay.
+
+  Only ungrouped 1:1 blocks qualify. Grouped products concatenate segments along K, which a row gather cannot
+  express, and `species_into` has no β (no accumulate). The backward needs the same gather and scatter for
+  `grad @ Wᵀ`. Ceiling about 0.25 ms (2 % on the A100).
+- **ZBL (not built).** The forward is already one Inductor kernel (47 µs) and the backward 27 µs; a hand kernel
+  saves perhaps 30–40 µs.

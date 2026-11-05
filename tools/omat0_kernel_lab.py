@@ -290,6 +290,8 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
 
     def no_reduce(s):
         """Falsifier: no cross-lane reduction; lane 0 writes its own partial sums (the outer bound)."""
+        if not re.search(reduction, s, flags=re.S):
+            raise ValueError("no-reduce: the shfl_down reduction is not in the source")
         return re.sub(reduction, lambda m: """if (lane == 0) {
         for (int component = 0; component < EDGE_DIM; ++component)
             dsh[edge_base + component] = scalar_t(edge_gradient[component]);
@@ -309,8 +311,12 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
     const int part = int(gid % {split});
     if (e >= edge_count / {split}) return;""", 1)
             s = _sub(s, """    for (int channel = lane; channel < CHANNEL_DIM;
-         channel += LOGICAL_GROUP_SIZE) {""", f"""    for (int channel = lane + part * LOGICAL_GROUP_SIZE; channel < CHANNEL_DIM;
+         channel += LOGICAL_GROUP_SIZE) {""", f"""    for (int channel = lane + part * LOGICAL_GROUP_SIZE;
+         channel < CHANNEL_DIM;
          channel += {split} * LOGICAL_GROUP_SIZE) {{""", 1)
+            if not re.search(reduction, s, flags=re.S):
+                raise ValueError("split: the shfl_down reduction is not in the source (BUTTERFLY on? pass "
+                                 "--constant fastmace.kernels.oeq_streaming.wprime_backward:BUTTERFLY=False)")
             return re.sub(reduction, lambda m: butterfly_code.replace(
                 "if ((lane & 1) == 0) dsh[edge_base + (lane >> 1)] = scalar_t(edge_gradient[0]);",
                 "if ((lane & 1) == 0) atomicAdd(dsh + edge_base + (lane >> 1), scalar_t(edge_gradient[0]));").replace(
@@ -332,7 +338,8 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-split4": ("falsifier", split_edge(4)[0], (), split_edge(4)[1]),
         "F-split1-atomic": ("falsifier", split_edge(1)[0], (), split_edge(1)[1]),
         "F-no-reduce": ("falsifier", no_reduce, ()),
-        "F-reduce-dr-only": ("falsifier", lambda s: re.sub(reduction, lambda m: """for (int offset = 16; offset > 0; offset >>= 1)
+        "F-reduce-dr-only": ("falsifier", lambda s: re.sub(reduction, lambda m: """
+    for (int offset = 16; offset > 0; offset >>= 1)
         radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
     if (lane == 0) {
         for (int component = 0; component < EDGE_DIM; ++component)
@@ -606,7 +613,8 @@ def _tc_a4(s):
     return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
                 """for (int i = lane; i < B * ED / 4; i += 32)
                     reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
-                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)
+                        : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
 def _simt_a4(s):
@@ -636,7 +644,8 @@ def _sh4(s):
     return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
                 """for (int i = lane; i < B * ED / 4; i += 32)
                     reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
-                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)
+                        : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
 CACHE_HINTS = r"""
