@@ -1,0 +1,102 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T23:03:15.251792+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "c675028aaeb4d74a20916b03be83136a4266c9f8",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 42.25933313700001,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          5616,
+          1280,
+          6
+        ],
+        "gprime_MB": 164.53125,
+        "species": 3,
+        "pieces": 624,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 1563.904047012329,
+          "min_us": 1561.5999698638916,
+          "max_us": 1603.2960414886475,
+          "ratio": 1.0
+        },
+        "restrict": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 1.87e-07"
+          },
+          "median_us": 1612.4160289764404,
+          "min_us": 1608.8000535964966,
+          "max_us": 1616.1600351333618,
+          "ratio": 1.0310197943772754
+        },
+        "sh-hoist": {
+          "kind": "exact",
+          "error": "variant pattern found 0 times: 'const scalar_t edge_value = sh[edge_index];'"
+        },
+        "F-no-atomics": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 1688.7680292129517,
+          "min_us": 1686.8159770965576,
+          "max_us": 1690.9760236740112,
+          "ratio": 1.0798412040937946
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "wprime": {
+      "base": {
+        "9.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "restrict": {
+        "9.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "sh-hoist": {
+        "error": "variant pattern found 0 times: 'const scalar_t edge_value = sh[edge_index];'"
+      },
+      "F-no-atomics": {
+        "9.0": {
+          "registers": 80,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

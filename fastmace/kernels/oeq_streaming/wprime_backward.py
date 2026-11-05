@@ -234,6 +234,9 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const int32_t receiver = receivers[e];
     if (sender < 0 || sender >= node_count
         || receiver < 0 || receiver >= node_count) {
+        // An edge with an out-of-range index contributes nothing: its dsh row and dr are written as zeros (the
+        // wrappers allocate dsh with empty_like, so a skipped row would hold garbage; kernel review, 5 November 2026).
+        for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);
         if (lane == 0) dr[e] = scalar_t(0);
         return;
     }

@@ -146,3 +146,43 @@ from a CPU-side SASS census of the H200 kernels. Each got a cheap falsifier on t
 Runs: `runs/ideas-r2-h200/` (`2472c0e0`: F-skew, FF-dout-one-row), `runs/ideas-r3-h200/` (`614f4779`:
 F-wfrag-no-wsplit), `runs/ideas-r4-h200/` (`7e4da9e9`: tc-wfrag-split), `runs/rtx5060ti/ideas-lab/`. Modal `third`
 stood at $9.90 metered before the last job.
+
+## Ideas session, third revision: w once per mirror pair, lane-parallel index loads (6 November 2026)
+
+The third revision proposed two ideas:
+
+- **Idea 14:** compute w = a·Wᵀ once per mirror pair. Both edges of a pair have the same length, so they have the
+  same radial input.
+- **Idea 15(a):** load a batch's receiver and sender indices with lanes 0..B−1 at once and broadcast them by
+  shuffle, so the x gathers stop waiting on a serial chain of index loads.
+
+One H200 job (Modal `third`, `d8c8fbc4`) ran the falsifiers. A second job at the same commit re-ran the
+dense-product bench, because the first job lost its output to an unescaped `$OUT`.
+
+| Check | H200 | Reading |
+| --- | ---: | --- |
+| Mirror lengths (`mirror_order`) | 185,831 pairs, 100 % bitwise-equal, largest \|dr\| 0; 2,098 edges unpaired | idea 14's premise holds |
+| Forward base (lab) | 1,673.4 µs | |
+| F-tp-stored-w (the TP reads w per edge, no a·W) | 932.1 µs (0.557) | the forward's floor with w given |
+| F-no-tp | 1,142.2 µs (0.683) | |
+| Pair product `[186,880, 64] @ [64, 1,280]`, CUTLASS 3xTF32 (`tools/bench/pair_w_bench.py`) | 750 µs (rel. err 3.4e-7) | FP32 1,001 µs; a copy of w alone 451 µs (4.24 TB/s) |
+| **x-lane-idx** (idea 15a, bitwise) | **1,617.2 µs (0.966)** | RTX 5060 Ti (H200 plan) 1.024 |
+
+- **Idea 14 is dead.**
+  - The pair-shared forward needs the pair product plus the stored-w forward: 750 + 932 = 1,682 µs, against
+    1,673 µs today.
+  - Writing and re-reading 957 MB of w costs what halving a·W saves.
+  - No ordering of the two steps gets under the HBM floor: copying w alone takes 451 µs.
+- **Idea 15(a) is adopted on the H200.**
+  - Switch: `fused_forward.LANE_INDICES` (None: `LANE_INDICES_GPUS`), applied as a transform of the rendered kernel
+    (`lane_indices`). Not with WGMMA.
+  - Correctness: bitwise on the SIMT and the tensor-core kernels (`tests/gpu/test_fused_folded_forward_cuda.py`,
+    passed on the RTX 5060 Ti).
+  - MD-step A/B (`37b6dd66`; OMAT-0 medium, SrTiO3 10×10×10; `hopper_sweep.sh` AB `laneidx`):
+    - **0.9897** (5.6688 → 5.6107 ms) in one build order;
+    - **0.9913** (5.6777 → 5.6281 ms) in the other.
+  - So under decision 66 it is the default for `NVIDIA H200` only.
+  - The RTX 5060 Ti lost in the lab (1.024) and stays off. The A100 is not measured.
+
+Runs: `runs/ideas-r5-h200/` (lab falsifiers, mirror check), `runs/ideas-r6-h200/` (pair product),
+`runs/laneidx-h200/` (MD A/B). Modal `third` stood at $11.57 metered before the A/B.

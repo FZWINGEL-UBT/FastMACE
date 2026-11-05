@@ -408,6 +408,34 @@ for layout in ("ir_mul", "mul_ir"):
     err_base = float((base[2].reshape(-1).double() - ref).abs().max()) / float(ref.abs().max())
     assert err <= 1e-5, (name, err)
     report[name] = {"dr error": err, "dr error (unhoisted)": err_base}
+
+# Kernel review (5 November 2026): an edge with an out-of-range sender writes a zero dsh row (dsh is allocated with
+# empty_like, filled with NaN here through the caching allocator first; its dr still carries the edge density's
+# gradient); every other edge's dsh row is bitwise that of the call with the valid sender.
+for layout in ("ir_mul", "mul_ir"):
+    kernels = StreamingKernels(problem, np.float32, layout=layout)
+    weight = torch.randn((problem.weight_numel, k), device="cuda", generator=g) / k ** 0.5
+    w_prime = wp.WPrime(table, weight, kernels)
+    X = torch.randn((nodes, irreps_in1.dim), device="cuda", generator=g)
+    Y = torch.randn((edges, irreps_in2.dim), device="cuda", generator=g)
+    G = torch.randn((nodes, irreps_out.dim), device="cuda", generator=g)
+    D = torch.randn((edges, 1), device="cuda", generator=g)
+    base = run(X, Y, G, D, kernels, weight, None, w_prime)
+    invalid = torch.zeros(edges, dtype=torch.bool, device="cuda")
+    invalid[3:edges - padding:41] = True
+    saved = sender.clone()
+    sender[invalid] = -1
+    try:
+        junk = torch.full((edges, irreps_in2.dim), float("nan"), device="cuda")
+        del junk
+        new = run(X, Y, G, D, kernels, weight, None, w_prime)
+    finally:
+        sender.copy_(saved)
+    name = f"invalid-sender-{layout}"
+    assert bool((new[4][invalid] == 0).all()), (name, "dsh", new[4][invalid].abs().max().item())
+    assert torch.equal(new[4][~invalid], base[4][~invalid]), (
+        name, "valid dsh", (new[4][~invalid] - base[4][~invalid]).abs().max().item())
+    report[name] = {"invalid edges": int(invalid.sum())}
 print(json.dumps(report))
 """
 
@@ -429,4 +457,5 @@ def test_wprime_backward_matches_the_chain():
                                f"{case}-{layout}-{w}" for case in ("butterfly", "redux")
                                for layout in ("ir_mul", "mul_ir") for w in ("stored-w", "table-w")} | {
                                f"{case}-{layout}" for case in ("table-pairs", "table-pairs-horner", "hoist-scale")
-                               for layout in ("ir_mul", "mul_ir")}
+                               for layout in ("ir_mul", "mul_ir")} | {
+                               f"invalid-sender-{layout}" for layout in ("ir_mul", "mul_ir")}
