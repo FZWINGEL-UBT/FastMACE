@@ -4204,3 +4204,14 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured: FastMACE 10–23× faster on NaCl, 6–12× on NbCl5.
 - Why: –
 - Sources: [phase-4](validation/phase-4.md).
+
+<a id="ext-h200-profile"></a>
+#### ext-h200-profile: OMAT-0 medium on the H200 (5 November 2026)
+- Switch: none
+- Engine: FM
+- Date/round: after round 6 (`0ab2bd9a`)
+- What: Benchmark_loup SrTiO3 10x10x10 (5,000 atoms) and the step breakdown on a Modal H200, float32 hybrid.
+- Status: MEASUREMENT.
+- Measured: Langevin 13.12 ms per step (2.62 µs per atom and step), NVE 13.32 ms (2.66 µs); torch peak 4,867 MiB. The H200 is in no decision-66 GPU set, so it runs the generic plan (A100-SXM4 with its plan: 10.91 ms, 2.18 µs).
+- Why: the per-GPU rewrites are keyed by exact device names; the H200 has not been screened.
+- Sources: [H200 profile](../results/omat0-h200-profile-0ab2bd9a/README.md).
