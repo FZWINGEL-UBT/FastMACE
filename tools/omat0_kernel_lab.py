@@ -299,6 +299,19 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
     return {
         "butterfly": ("rounding", butterfly, ()),
         "F-no-reduce": ("falsifier", no_reduce, ()),
+        "F-reduce-dr-only": ("falsifier", lambda s: re.sub(reduction, lambda m: """for (int offset = 16; offset > 0; offset >>= 1)
+        radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
+    if (lane == 0) {
+        for (int component = 0; component < EDGE_DIM; ++component)
+            dsh[edge_base + component] = scalar_t(edge_gradient[component]);
+        dr[e] = scalar_t(radial_gradient);
+    }""", s, count=1, flags=re.S), ()),
+        "F-reduce-1level": ("falsifier", lambda s: _sub(s, "for (int offset = 16; offset > 0; offset >>= 1) {",
+                                                        "for (int offset = 16; offset > 8; offset >>= 1) {", 1), ()),
+        "F-reduce-3level": ("falsifier", lambda s: _sub(s, "for (int offset = 16; offset > 0; offset >>= 1) {",
+                                                        "for (int offset = 16; offset > 2; offset >>= 1) {", 1), ()),
+        "F-reduce-sh-only": ("falsifier", lambda s: re.sub(r"radial_gradient \+= __shfl_down_sync\([^;]*;", "",
+                                                         s, count=1), ()),
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),

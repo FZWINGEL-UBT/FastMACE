@@ -111,6 +111,17 @@ SCALAR_PATHS = None
 SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
+# Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
+# butterfly reduce-scatter. At each step a lane swaps half of its remaining components with its xor partner, so after
+# log2(EDGE_DIM) steps lane c << (5 - log2 EDGE_DIM) holds component c and those lanes write dsh coalesced; dr keeps
+# its own 5 shuffles. For OMAT-0 (16 components) 21 shuffles per lane and edge instead of 85. Exact: every component
+# is summed over the same pairs in the same tree as the shfl_down reduction (a + b == b + a), so dsh and dr are
+# bitwise equal. Needs EDGE_DIM a power of two <= 32 and 32-lane cohorts (``butterfly_supported``), else off.
+# Kernel lab, Benchmark_loup, the w' kernel against each GPU's default: RTX 5060 Ti 0.965 / 0.963 (no reduction at
+# all: 0.675); A100-SXM4-80GB 0.989 (no reduction 0.955).
+# None: on for BUTTERFLY_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice.
+BUTTERFLY = None
+BUTTERFLY_GPUS = GPUModels(())
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -419,6 +430,31 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         {%- endfor %}
     }
 
+    {%- if butterfly %}
+    // BUTTERFLY: reduce-scatter the edge gradient; lane c << SHIFT writes dsh[e, c], lane 0 dr[e].
+    constexpr int SHIFT = {{ 5 - butterfly_steps }};
+    #pragma unroll
+    for (int step = 0; step < {{ butterfly_steps }}; ++step) {
+        const int half = (EDGE_DIM / 2) >> step, offset = 16 >> step;
+        const bool upper = (lane & offset) != 0;
+        #pragma unroll
+        for (int i = 0; i < EDGE_DIM / 2; ++i) {
+            if (i < half) {
+                const acc_t send = upper ? edge_gradient[i] : edge_gradient[i + half];
+                const acc_t keep = upper ? edge_gradient[i + half] : edge_gradient[i];
+                edge_gradient[i] = keep + __shfl_xor_sync(FULL_MASK, send, offset, 32);
+            }
+        }
+    }
+    #pragma unroll
+    for (int offset = (1 << SHIFT) >> 1; offset > 0; offset >>= 1)
+        edge_gradient[0] += __shfl_xor_sync(FULL_MASK, edge_gradient[0], offset, 32);
+    #pragma unroll
+    for (int offset = 16; offset > 0; offset >>= 1)
+        radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
+    if ((lane & ((1 << SHIFT) - 1)) == 0) dsh[edge_base + (lane >> SHIFT)] = scalar_t(edge_gradient[0]);
+    if (lane == 0) dr[e] = scalar_t(radial_gradient);
+    {%- else %}
     // Reduce within the logical 32-thread edge owner. Lane 0 writes dsh[e, :] and dr[e].
     for (int offset = 16; offset > 0; offset >>= 1) {
         for (int component = 0; component < EDGE_DIM; ++component)
@@ -432,6 +468,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
             dsh[edge_base + component] = scalar_t(edge_gradient[component]);
         dr[e] = scalar_t(radial_gradient);
     }
+    {%- endif %}
 }
 """
 
@@ -464,7 +501,7 @@ def factored_paths(schedule, scale=False):
 
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
-           factored=False, scale=False, horner=False, scalar_paths=False):
+           factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -474,7 +511,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     ``factored`` (``FACTORED``): each path's three trilinear sums regrouped (rounding). Kernel-lab options
     (round 2, 5 November 2026): ``horner`` (with ``table_w``): the value table in the power basis of t
     (``power_table``), w and its slope by dual Horner; ``scalar_paths`` (with ``factored``): l1 = 0 paths add
-    their edge gradient per term from w x0, without the v_j sums."""
+    their edge gradient per term from w x0, without the v_j sums. ``butterfly`` (``BUTTERFLY``, round 5): the
+    end-of-edge reduction as a butterfly reduce-scatter (exact; ``butterfly_supported``)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -493,6 +531,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("scalar_paths regroups the factored sums: it needs factored")
     if table_w and not vector:
         raise ValueError("table_w reads the q-major value table: it needs a slope vector of 2 or 4")
+    if butterfly and not butterfly_supported(schedule):
+        raise ValueError("butterfly needs a power-of-two edge dimension <= 32 and 32-lane cohorts")
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
@@ -501,7 +541,15 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             blocks=None if blocks is None else block_map(blocks, schedule.channels),
                                             n_blocks=0 if blocks is None else len(blocks), block_ldg=block_ldg,
                                             factored=factored_paths(schedule, scale) if factored else None,
-                                            horner=bool(horner), scalar_paths=bool(scalar_paths))
+                                            horner=bool(horner), scalar_paths=bool(scalar_paths),
+                                            butterfly=bool(butterfly),
+                                            butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
+
+
+def butterfly_supported(schedule):
+    """``BUTTERFLY`` applies: the edge dimension a power of two <= 32 and 32-lane cohorts."""
+    d = int(schedule.edge_dim)
+    return 0 < d <= 32 and d & (d - 1) == 0 and int(schedule.launch_config.logical_cohort_width) == 32
 
 
 def power_table(g, terms):
@@ -613,10 +661,11 @@ class WPrimeBackward:
         self.horner = bool(horner)  # the caller's table is power_table's (HORNER)
         self.scalar_paths = self.factored and scalar_paths_default(device)
         self.max_registers = max_registers_default(device)
+        self.butterfly = butterfly_default(device) and butterfly_supported(kernels.schedule)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and FACTORED_SCALE, horner=self.horner,
-                             scalar_paths=self.scalar_paths)
+                             scalar_paths=self.scalar_paths, butterfly=self.butterfly)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -915,6 +964,11 @@ def horner_default(device):
 def scalar_paths_default(device):
     """``SCALAR_PATHS`` on ``device``: the constant when set, else on for ``SCALAR_PATHS_GPUS``."""
     return bool(SCALAR_PATHS) if SCALAR_PATHS is not None else _device_name(device) in SCALAR_PATHS_GPUS
+
+
+def butterfly_default(device):
+    """``BUTTERFLY`` on ``device``: the constant when set, else on for ``BUTTERFLY_GPUS``."""
+    return bool(BUTTERFLY) if BUTTERFLY is not None else _device_name(device) in BUTTERFLY_GPUS
 
 
 def max_registers_default(device):

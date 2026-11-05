@@ -235,6 +235,7 @@ for layout in ("ir_mul", "mul_ir"):
         name = f"factored-{layout}-{'table-w' if table_w else 'stored-w'}{'-scaled' if scale else ''}"
         wp.TABLE_W = table_w
         try:
+            wp.FACTORED = False  # plain on every GPU (FACTORED is a per-GPU default)
             plain = wp.WPrime(table, weight, kernels)
             wp.FACTORED, wp.FACTORED_SCALE = True, scale
             try:
@@ -270,6 +271,7 @@ for layout in ("ir_mul", "mul_ir"):
         name = f"{horner_case}-{layout}"
         wp.TABLE_W = True
         try:
+            wp.HORNER, wp.SCALAR_PATHS, wp.MAX_REGISTERS = False, False, 0  # plain on every GPU (per-GPU defaults)
             plain = wp.WPrime(table, weight, kernels)
             wp.HORNER = True
             wp.FACTORED = True if horner_case == "horner-scalar" else None
@@ -294,6 +296,32 @@ for layout in ("ir_mul", "mul_ir"):
         err = float((dr_new.double() - ref).abs().max()) / float(ref.abs().max())
         assert err <= 1e-5, (name, err)
         report[name] = {"dr error": err}
+    # Round 5 (5 November 2026): BUTTERFLY, the end-of-edge reduction as a butterfly reduce-scatter. The same tree of
+    # pairwise sums, so dsh and dL/dr are bitwise those of the shfl_down reduction (dx: atomics' order).
+    for table_w in (False, True):
+        name = f"butterfly-{layout}-{'table-w' if table_w else 'stored-w'}"
+        wp.TABLE_W = table_w
+        try:
+            wp.BUTTERFLY = False
+            plain = wp.WPrime(table, weight, kernels)
+            wp.BUTTERFLY = True
+            new_w = wp.WPrime(table, weight, kernels)
+        finally:
+            wp.TABLE_W = wp.BUTTERFLY = None
+        assert new_w.kernel.butterfly and not plain.kernel.butterfly, name
+        assert "__shfl_xor_sync" in new_w.kernel.source and "__shfl_xor_sync" not in plain.kernel.source, name
+        base = run(X, Y, G, D, kernels, weight, fused, plain)
+        new = run(X, Y, G, D, kernels, weight, fused, new_w)
+        assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name  # the same forward
+        assert torch.equal(new[4], base[4]) and torch.equal(new[2], base[2]), name  # dsh, dL/dr bitwise
+        torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            captured = run(X, Y, G, D, kernels, weight, fused, new_w)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(captured[2], new[2]) and torch.equal(captured[4], new[4]), name
+        report[name] = {"bitwise": True}
 print(json.dumps(report))
 """
 
@@ -311,4 +339,6 @@ def test_wprime_backward_matches_the_chain():
                            "factored-ir_mul-table-w", "factored-mul_ir-stored-w", "factored-mul_ir-table-w",
                            "factored-ir_mul-table-w-scaled", "factored-mul_ir-table-w-scaled"} | {
                                f"{case}-{layout}" for case in ("horner", "horner-scalar", "horner-80")
-                               for layout in ("ir_mul", "mul_ir")}
+                               for layout in ("ir_mul", "mul_ir")} | {
+                               f"butterfly-{layout}-{w}" for layout in ("ir_mul", "mul_ir")
+                               for w in ("stored-w", "table-w")}
