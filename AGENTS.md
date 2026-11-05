@@ -139,8 +139,12 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
 
 - Every GPU result names the machine, GPU, environment, backend, precision,
   model label and the git commits of both FastMACE and the baseline.
-- Results and reports go to `docs/validation/` (markdown) and
-  `results/<run-id>/` (JSON). Large files stay out of git.
+- Results and reports go to `docs/validation/<topic>/` (markdown: `phases`,
+  `speed`, `capacity`, `tiled`, `omat0`, `comparisons`; add a row to that
+  folder's `README.md`) and `results/<run-id>/` (JSON). Large files stay out
+  of git. A changed default also updates `docs/current/defaults-by-gpu.md`
+  and the [optimisation ledger](docs/optimisation-ledger.md). The map of all
+  documents is [docs/README.md](docs/README.md).
 - After each completed task that produced results: update the docs, commit,
   push, and sync to the NAS checkout `/mnt/homes/zwingel/FastMACE`.
 - **NAS and workstations available again (owner, 30 October 2026):** the

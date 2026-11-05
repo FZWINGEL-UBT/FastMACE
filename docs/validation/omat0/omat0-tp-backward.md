@@ -1,6 +1,6 @@
 # A model-specialised tensor-product backward for OMAT-0 (4 November 2026)
 
-Question (conductor, after the Symmetrix-XL comparison in `omat0-a100-optimisations.md` §6): can a tensor-product
+Question (conductor, after the Symmetrix-XL comparison in [omat0-a100.md](../../current/omat0-a100.md) §6): can a tensor-product
 backward specialised to MACE-OMAT-0 medium's paths and irreps make the wprime backward
 (`fastmace::streaming_conv_wprime_backward`, kernel `oeq_projected_backward_wprime`, the largest kernel of the force
 call) faster than the vendored OpenEquivariance PR 223 schedule? Owner, the same day: keep improving the kernel until

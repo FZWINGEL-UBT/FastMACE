@@ -282,4 +282,7 @@ Reference: [Command line and TOML](reference/cli.md).
 
 The specification, design notes and validation records are kept in the
 [repository](https://github.com/FZWINGEL-UBT/FastMACE) and are not part of
-this site.
+this site; [docs/README.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/README.md)
+maps them, and
+[defaults by GPU](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/current/defaults-by-gpu.md)
+lists what runs by default on each GPU.
