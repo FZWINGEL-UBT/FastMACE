@@ -825,6 +825,25 @@ def _a4_args(args):
     return (padded, *rest)
 
 
+def _tc_split_accumulators(source, count):
+    """The 3xTF32 projection with the small products in their own accumulator(s): ``count`` 2: al*bh and ah*bl into
+    wacc1; 3: al*bh into wacc1, ah*bl into wacc2. Each is added to wacc before the redistribution."""
+    decl = re.search(r"float wacc\[(\d+)\]\[2\]\[4\];", source)
+    if decl is None:
+        raise ValueError("variant pattern found 0 times: float wacc[..][2][4];")
+    shape = f"[{decl.group(1)}][2][4]"
+    extra = ["wacc1"] + (["wacc2"] if count == 3 else [])
+    source = _sub(source, decl.group(0), decl.group(0) + "".join(f" float {a}{shape};" for a in extra))
+    source = _sub(source, "wacc[g][m][i] = 0.f;",
+                  "{ wacc[g][m][i] = 0.f;" + "".join(f" {a}[g][m][i] = 0.f;" for a in extra) + " }")
+    source = _sub(source, "mma_tf32(wacc[g][m], al, bh);", "mma_tf32(wacc1[g][m], al, bh);")
+    source = _sub(source, "mma_tf32(wacc[g][m], ah, bl);", f"mma_tf32({extra[-1]}[g][m], ah, bl);")
+    total = " + ".join(f"{a}[g][m][i]" for a in extra)
+    return _sub(source, "float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;",
+                f"#pragma unroll\n for (int i = 0; i < 4; ++i) wacc[g][m][i] += {total};\n"
+                "                            float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;")
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -869,6 +888,14 @@ def forward_variants(kernel=None):
                                                     "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
                                                     "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
+        # Round 5 (A100 stage bounds, 5 November 2026): one MMA pass costs 42 us, three dependent passes 1.09 ms, so
+        # the passes wait on each other. tc-mma-free: the MMA asm without volatile (the compiler may interleave the
+        # (g, m) chains; per accumulator the order is the same: bitwise). tc-2acc / tc-3acc: the small products into
+        # their own accumulator(s), added once per batch (shorter chains, more registers; rounding).
+        "tc-mma-free": ("exact", lambda s: _sub(s, 'asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32',
+                                                'asm("mma.sync.aligned.m16n8k8.row.col.f32.tf32'), ()),
+        "tc-2acc": ("rounding", lambda s: _tc_split_accumulators(s, 2), ()),
+        "tc-3acc": ("rounding", lambda s: _tc_split_accumulators(s, 3), ()),
         # Cheaper splits than rounding both parts; they need the rounded split in the capture
         # (--constant ...fused_forward:TC_SPLIT="'rna'"; "mask" is fused_forward.TC_SPLIT's default):
         # the high part by masking the low 13 mantissa bits (truncation), the low part the exact remainder, rounded to
@@ -1078,7 +1105,7 @@ def outputs_of(name, args):
     args = list(args)
     if name == "forward":  # out: one tensor, or a list of groups (wprime_backward.BLOCK_MESSAGE)
         args[7] = [torch.zeros_like(o) for o in args[7]] if isinstance(args[7], list) else torch.zeros_like(args[7])
-        args[8] = torch.empty_like(args[8])
+        args[8] = torch.zeros_like(args[8])  # zeros: the variants' cleared buffers (padding rows stay unwritten)
     else:
         args[6] = torch.zeros_like(args[6])  # dx: atomic adds
         args[7] = torch.empty_like(args[7])
