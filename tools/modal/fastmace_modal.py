@@ -18,6 +18,10 @@ Entry points (``modal run tools/modal/fastmace_modal.py::<name> ...``):
   from ``--repo``), ``--command`` (a shell command run from the source root; ``$OUT`` is the results
   directory), ``--gpu L4|A100|A100-80GB|H100|H200|RTX-PRO-6000``, ``--timeout-min``, ``--out`` (a local directory for the
   returned results).
+- ``sx_job``: as ``job``, in the Symmetrix-XL image (``sx_image``: Ubuntu 24.04, Python 3.12, the Symmetrix-XL
+  wheels for one architecture, ``SX_WHEEL_ARCH``; 5 November 2026, the Benchmark_loup comparison on the H200). Its
+  LAMMPS binary is built locally (``symmetrix_build.py lammps``, MPI off) and uploaded with ``put``.
+- ``put``: a local file or directory into the volume (``--src``, ``--dest``).
 
 Every job writes ``modal.json`` into its results: the GPU, driver, CUDA, image pip freeze hash, the source
 commit, the wall time and the estimated cost at Modal's list prices (``PRICE_PER_HOUR``, check them on
@@ -84,6 +88,22 @@ image = (
 )
 
 
+# Symmetrix-XL comparison image (5 November 2026). Ubuntu 24.04 matches the WSL build host of the uploaded LAMMPS
+# binary (glibc, libstdc++, libblas, libgomp); CUDA's runtime, cuBLAS and NVRTC come from the wheels' nvidia-* packages.
+# Defined only with FASTMACE_MODAL_SX=1 (set in the shell for sx_job, and in the image), so that ordinary jobs never
+# build this image.
+SX = os.environ.get("FASTMACE_MODAL_SX") == "1"
+SX_VERSION = "0.1.1"
+SX_WHEEL_ARCH = "sm90"
+sx_image = (
+    modal.Image.from_registry("ubuntu:24.04", add_python="3.12")
+    .apt_install("libblas3", "libgomp1", "zlib1g", "procps")
+    .pip_install(f"symmetrix-xl=={SX_VERSION}", f"symmetrix-xl-cuda13-{SX_WHEEL_ARCH}=={SX_VERSION}", "ase==3.27.0",
+                 "numpy")
+    .env({"PYTHONDONTWRITEBYTECODE": "1", "FASTMACE_MODAL_SX": "1"})
+) if SX else None
+
+
 def _environment(gpu, src, out):
     cache = f"/data/cache/{gpu}"
     env = dict(os.environ)
@@ -141,6 +161,14 @@ def _run(gpu, tarball: bytes, command: str, timeout_s: int) -> bytes:
 def run_job(gpu: str, tarball: bytes, command: str, timeout_s: int) -> bytes:
     """The command on the GPU this function was called with (``run_job.with_options(gpu=...)``)."""
     return _run(gpu, tarball, command, timeout_s)
+
+
+if SX:
+    @app.function(image=sx_image, gpu="H200", volumes={"/data": volume}, timeout=3 * 3600, retries=0,
+                  scaledown_window=2, cpu=JOB_CPU, memory=JOB_MEMORY_MIB)
+    def run_sx_job(gpu: str, tarball: bytes, command: str, timeout_s: int) -> bytes:
+        """The command in the Symmetrix-XL image on the GPU this function was called with."""
+        return _run(gpu, tarball, command, timeout_s)
 
 
 @app.function(image=image, volumes={"/data": volume}, timeout=LISTING_TIMEOUT_S, retries=0, scaledown_window=2,
@@ -241,6 +269,23 @@ def listing(limit_usd: str = "", owner_override: str = ""):
 
 
 @app.local_entrypoint()
+def put(src: str, dest: str, limit_usd: str = "", owner_override: str = ""):
+    """Copy a local file or directory into the volume at ``dest`` (an absolute volume path, e.g. /symmetrix)."""
+    path = Path(os.path.expanduser(src))
+
+    def launch():
+        with volume.batch_upload(force=True) as batch:
+            if path.is_dir():
+                batch.put_directory(str(path), dest)
+            else:
+                batch.put_file(str(path), dest)
+        print(volume_listing.remote())
+
+    _guarded(launch, commit="put", gpu=None, function_timeout_s=LISTING_TIMEOUT_S, cpu=LISTING_CPU,
+             memory_mib=LISTING_MEMORY_MIB, limit_usd=limit_usd, owner_override=owner_override)
+
+
+@app.local_entrypoint()
 def smoke(commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastMACE", gpu: str = "L4", timeout_min: int = 20,
           out: str = "~/fastmace-acceptance/modal-smoke", limit_usd: str = "", owner_override: str = ""):
     """nvidia-smi, torch's CUDA view and tests/gpu/test_smoke.py on the smallest GPU."""
@@ -261,7 +306,18 @@ def job(command: str, commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastMACE
     _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd, owner_override)
 
 
-def _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd="", owner_override=""):
+@app.local_entrypoint()
+def sx_job(command: str, commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastMACE", tarball: str = "",
+           gpu: str = "H200", timeout_min: int = 30, out: str = "~/fastmace-acceptance/modal-sx-job", limit_usd: str = "",
+           owner_override: str = ""):
+    """``job`` in the Symmetrix-XL image (``sx_image``); needs FASTMACE_MODAL_SX=1 in the environment."""
+    if not SX:
+        raise SystemExit("sx_job needs FASTMACE_MODAL_SX=1 (the Symmetrix-XL image is defined only then)")
+    _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd, owner_override,
+         function=globals()["run_sx_job"])
+
+
+def _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd="", owner_override="", function=None):
     if gpu not in GPUS:
         raise SystemExit(f"--gpu must be one of {GPUS}")
     timeout_s = int(timeout_min * 60)
@@ -273,7 +329,7 @@ def _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd="", ow
     else:
         sha, data = _archive(commit, os.path.expanduser(repo))
     print(f"source {sha}, {len(data) / 1e6:.1f} MB; gpu {gpu}; timeout {timeout_min} min")
-    function = run_job.with_options(gpu=gpu, timeout=timeout_s + GRACE_S, retries=0)
+    function = (function or run_job).with_options(gpu=gpu, timeout=timeout_s + GRACE_S, retries=0)
 
     def launch():
         return _receive(function.remote(gpu, data, command, timeout_s), Path(os.path.expanduser(out)))
