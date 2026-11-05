@@ -610,6 +610,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-tc-tp](#omat0-tc-tp) | The fused forward's tensor product as a second 3xTF32 mma (w x from the product's fragments, S = CG sh, edges as k) | `fused_forward.TC_TP` (off), `TC_TP_SPLIT` | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.276 (bound without TP 0.617), 5060 Ti 1.64; message 4-6e-7 rms of FP32 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 | [omat0-ff-hints](#omat0-ff-hints) | Cache hints in the fused forward (x evict_last / ldg, a and sh no_allocate) | none (lab) | FM | REJECTED | 2026-11-05 | A100-SXM4 x 1.021; with tc-a4 0.912–0.923 against 0.903 | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
 | [omat0-atom-order](#omat0-atom-order) | Morton atom order for the x gathers | none (lab, `results/round4-staging-20261105/orders`) | FM | REJECTED | 2026-11-05 | 5060 Ti forward 6,724 (repeat), 6,737 (Morton), 6,679 µs (shuffled) | [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| [omat0-edge-sh](#omat0-edge-sh) | Edge spherical harmonics (l <= 3) in one Triton kernel each way, analytic backward | `generic.modules.EDGE_SH`, `EDGE_SH_GPUS` | FM | DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66) | 2026-11-05 | MD step SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | [round 5](../results/round5-20261105/README.md) |
+| [omat0-species-gemm-a100-recheck](#omat0-species-gemm-a100-recheck) | The species GEMM on the A100 again at the 11.7 ms step | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-05 | SrTiO3 0.996 / 0.994 (Triton), 0.979 / 0.980 (CUTLASS); NbCl5 1.026 / 1.027, 1.053 / 1.058 | [round 5](../results/round5-20261105/README.md) |
+| [omat0-table-w-forward](#omat0-table-w-forward) | w from the value table inside the fused forward (the backward's TABLE_W) | none (lab `simt-slab-real`, `simt-slab3`) | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.333 (table cached: 0.988), 5060 Ti 1.356 | [round 5](../results/round5-20261105/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4009,6 +4012,38 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured: RTX 5060 Ti forward: ASE repeat order 6,724 µs, Morton 6,737, seeded shuffle 6,679.
 - Why: x (10 MB) stays in L2 in any order; the gathers cost latency, not DRAM traffic.
 - Sources: [round 4](../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026).
+
+<a id="omat0-edge-sh"></a>
+#### omat0-edge-sh: the edge spherical harmonics in one Triton kernel each way
+- Switch: `fastmace.rewrites.generic.modules.EDGE_SH` (None: on for `EDGE_SH_GPUS`; True / False: an A/B side), kernel `fastmace/kernels/triton/edge_sh.py` (`edge_sh3`), applied by `generic_streaming`
+- Engine: FM
+- Date/round: 5 November 2026, round 5 (`7da10b37`)
+- What: Inductor compiles e3nn's `SphericalHarmonics([0..3], normalize, component)` into a forward that writes about 16 per-edge intermediates for autograd (A100 profile at `5b6c5550`: 121 µs forward, about 107 µs backward for 373,760 edges). `edge_sh3` reads the vector and writes the 16 values in one coalesced store; its backward reads the vector and the 16 gradients and writes the vector gradient from the analytic derivative of e3nn's own polynomials through `normalize`'s clamp. Rounding: values 5.5e-7, gradient 1.35e-7 of float64 e3nn (Inductor's: 5.2e-7, 1.35e-7).
+- Status: DEFAULT on "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation" and every A100 (decision 66).
+- Measured: Benchmark_loup (OMAT-0 medium) MD step b/a in both orders (ab / ba), SrTiO3 10×10×10 and NbCl5: RTX 5060 Ti 0.985 / 0.961, 0.990 / 0.993; RTX 4000 Ada (leto) 0.989 / 0.987, 0.998 / 0.997; A100 80GB PCIe (Modal) 0.983 / 0.985, 0.995 / 0.988. The force gate passes everywhere, except the A100's known NbCl5 stress exception (1.58e-7). On the RTX 5060 Ti, the forward kernel alone takes 159 µs with 16 strided column stores, against 29 µs with one `[BLOCK, 16]` store.
+- Sources: [round 5](../results/round5-20261105/README.md); `tests/gpu/test_edge_sh_cuda.py`; `tools/edge_sh_lab.py`.
+
+<a id="omat0-species-gemm-a100-recheck"></a>
+#### omat0-species-gemm-a100-recheck: the species GEMM on the A100 at the current step
+- Switch: `fastmace.rewrites.generic.modules.SPECIES_GEMM`, `fastmace.kernels.triton.species_gemm.CUTLASS`
+- Engine: FM
+- Date/round: 5 November 2026, round 5 (`5b6c5550`)
+- What: the A100 step fell from 15.3 to 11.7 ms since [omat0-species-gemm](#omat0-species-gemm), so the skip's share grew; the profile's species selection kernel takes 137.5 µs.
+- Status: REJECTED.
+- Measured: MD step b/a (ab / ba): Triton species GEMM on the A100-SXM4-80GB: SrTiO3 0.996 / 0.994, NbCl5 1.026 / 1.027. CUTLASS gathered entry on the A100 80GB PCIe: SrTiO3 0.979 / 0.980, NbCl5 1.053 / 1.058.
+- Why: SrTiO3 has 3 species and gains; NbCl5 has 2 species and only 6 atoms per cell, where the grouped launch's row ordering and index arrays cost more than a third of the products saves.
+- Sources: [round 5](../results/round5-20261105/README.md).
+
+<a id="omat0-table-w-forward"></a>
+#### omat0-table-w-forward: w from the value table inside the fused forward
+- Switch: none (lab variants `simt-slab-real`, `simt-slab3`, `simt-ns-no-gemm`)
+- Engine: FM
+- Date/round: 5 November 2026, round 5 (`25e5f5f2`)
+- What: the backward's TABLE_W idea in the forward: w by 6 FMAs per weight from the value table (164 MB) instead of the 64-column 3xTF32 a·W product. The bound is the FP32-SIMT forward without the product, each edge reading a hashed 1,280 × 6 slab. `simt-slab-real` uses 5,340 slabs (the table's real footprint); `simt-slab3` uses 3 slabs (cache-resident).
+- Status: REJECTED.
+- Measured: kernel lab against the default forward: A100-SXM4-80GB `simt-slab-real` 1.333, `simt-slab3` 0.988, `simt-ns-no-gemm` 0.603, tensor-core forward without the product 0.477; RTX 5060 Ti 1.356, 0.820, 0.520.
+- Why: the slab gathers cost more than the tensor-core product they replace; even with the table in cache, the FP32 kernel only ties the tensor-core one.
+- Sources: [round 5](../results/round5-20261105/README.md).
 
 <a id="omat0-ff-vector-staging"></a>
 #### omat0-ff-vector-staging: vector staging and fragment-order W in the fused forward

@@ -1,0 +1,159 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T09:27:22.332030+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "25e5f5f2e983f911e6b0ce626419a21a1b490fe5",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 65.510373089,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 40,
+          "median_us": 3191.807985305786,
+          "min_us": 3128.3199787139893,
+          "max_us": 3949.568033218384,
+          "ratio": 1.0
+        },
+        "simt": {
+          "kind": "rounding",
+          "registers": 168,
+          "local_bytes": 40,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.58e+00",
+            "out1": "max|d|/max|a| = 1.17e+06",
+            "out2": "max|d|/max|a| = 2.41e+00",
+            "out3": "max|d|/max|a| = 8.35e+05",
+            "w": "bitwise"
+          },
+          "median_us": 4800.511837005615,
+          "min_us": 4725.759983062744,
+          "max_us": 5929.984092712402,
+          "ratio": 1.5040102221392586
+        },
+        "simt-ns-no-gemm": {
+          "kind": "falsifier",
+          "registers": 110,
+          "local_bytes": 40,
+          "median_us": 1923.0719804763794,
+          "min_us": 1889.2799615859985,
+          "max_us": 2307.0719242095947,
+          "ratio": 0.6025024028167354
+        },
+        "simt-slab3": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 104,
+          "median_us": 3153.9199352264404,
+          "min_us": 3109.8880767822266,
+          "max_us": 3792.896032333374,
+          "ratio": 0.988129596061614
+        },
+        "simt-slab-real": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 104,
+          "median_us": 4253.695964813232,
+          "min_us": 4206.592082977295,
+          "max_us": 5065.728187561035,
+          "ratio": 1.332691685839527
+        },
+        "F-tc-no-product": {
+          "kind": "falsifier",
+          "registers": 166,
+          "local_bytes": 40,
+          "median_us": 1522.6880311965942,
+          "min_us": 1501.1839866638184,
+          "max_us": 1852.4160385131836,
+          "ratio": 0.47706128883900123
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "8.0": {
+          "registers": 167,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "simt": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 166,
+          "spill_store_bytes": 0
+        }
+      },
+      "simt-ns-no-gemm": {
+        "8.0": {
+          "registers": 110,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 114,
+          "spill_store_bytes": 0
+        }
+      },
+      "simt-slab3": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 84
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 36
+        }
+      },
+      "simt-slab-real": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 84
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 36
+        }
+      },
+      "F-tc-no-product": {
+        "8.0": {
+          "registers": 166,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 156,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

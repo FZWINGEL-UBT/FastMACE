@@ -321,6 +321,56 @@ SPECIES_GEMM = None
 SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
+# Round 5 (5 November 2026): the edge spherical harmonics (e3nn, l <= 3, normalised, component) by
+# fastmace.kernels.triton.edge_sh.edge_sh3, one Triton kernel each way, instead of Inductor's compiled e3nn
+# polynomials, which save about 16 per-edge intermediates for autograd (A100 profile at 5b6c5550: about 230 µs of
+# edge geometry per force call). Rounding (the backward's sums regrouped; 5.5e-7 / 1.4e-7 of float64 e3nn).
+# Applied by generic_streaming (the model-level module; float32 CUDA vectors only, anything else falls through).
+# None: on for EDGE_SH_GPUS (decision 66; every A100 model through GPUModels); True / False: an A/B side's choice on
+# every GPU. Benchmark_loup (OMAT-0 medium) MD step b/a (ab / ba), SrTiO3 10x10x10 and NbCl5, gates pass (the A100's
+# NbCl5 stress exception as before): RTX 5060 Ti 0.985 / 0.961, 0.990 / 0.993; RTX 4000 Ada 0.989 / 0.987,
+# 0.998 / 0.997; A100 80GB PCIe 0.983 / 0.985, 0.995 / 0.988 (results/round5-20261105).
+EDGE_SH = None
+EDGE_SH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
+                          "NVIDIA A100 80GB PCIe"))
+
+
+def edge_sh_default(device=None):
+    """``EDGE_SH`` on ``device`` (a torch.device, a device name or None): the constant when set, else on for
+    ``EDGE_SH_GPUS``."""
+    if EDGE_SH is not None:
+        return bool(EDGE_SH)
+    if isinstance(device, torch.device):
+        if device.type != "cuda":
+            return False
+        device = torch.cuda.get_device_name(device)
+    return device is not None and device in EDGE_SH_GPUS
+
+
+class EdgeSH(torch.nn.Module):
+    """``o3.SphericalHarmonics([0, 1, 2, 3], normalize=True, normalization="component")`` for float32 CUDA
+    vectors through ``edge_sh3``; any other input through the original module."""
+
+    def __init__(self, original):
+        super().__init__()
+        self.original = original
+
+    def forward(self, x):
+        if x.is_cuda and x.dtype == torch.float32 and x.dim() == 2 and x.shape[1] == 3:
+            from fastmace.kernels.triton.edge_sh import edge_sh3
+            return edge_sh3(x)
+        return self.original(x)
+
+
+def edge_sh_replaceable(module):
+    """Whether ``module`` is e3nn's spherical harmonics that ``EdgeSH`` reproduces."""
+    if type(module).__name__ != "SphericalHarmonics" or not getattr(module, "normalize", False):
+        return False
+    if getattr(module, "normalization", None) != "component":
+        return False
+    return [int(l) for l in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
+
+
 class SpeciesSkip(torch.nn.Module):
     """Element-dependent skip connection restricted to the structure's species (``generic_species_skip``).
 

@@ -257,6 +257,10 @@ def apply_streaming(model, context):
         _prepare(interaction, kind)
         attach_streaming_kernels(interaction)
         changed.append(f"interactions.{index}")
+    sh = getattr(model, "spherical_harmonics", None)
+    if changed and gm.edge_sh_replaceable(sh) and gm.edge_sh_default(_device(model.interactions[0])):
+        model.spherical_harmonics = gm.EdgeSH(sh)  # EDGE_SH (round 5)
+        changed.append("spherical_harmonics")
     return changed
 
 
