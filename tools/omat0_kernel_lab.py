@@ -296,8 +296,41 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         dr[e] = scalar_t(radial_gradient);
     }""", s, count=1, flags=re.S)
 
+    def split_edge(split):
+        """Timing bound (5 November 2026, external review idea 1): ``split`` warps per edge, each a 1/split share of
+        the channels; the partial dsh and dr are added with atomics (the argument transform doubles the edge rows so
+        the launcher starts split times as many warps; dsh and dr come out in the first rows, not exact)."""
+        def transform(s):
+            s = _sub(s, """    const int64_t e =
+        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
+    if (e >= edge_count) return;""", f"""    const int64_t gid =
+        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
+    const int64_t e = gid / {split};
+    const int part = int(gid % {split});
+    if (e >= edge_count / {split}) return;""", 1)
+            s = _sub(s, """    for (int channel = lane; channel < CHANNEL_DIM;
+         channel += LOGICAL_GROUP_SIZE) {""", f"""    for (int channel = lane + part * LOGICAL_GROUP_SIZE; channel < CHANNEL_DIM;
+         channel += {split} * LOGICAL_GROUP_SIZE) {{""", 1)
+            return re.sub(reduction, lambda m: butterfly_code.replace(
+                "if ((lane & 1) == 0) dsh[edge_base + (lane >> 1)] = scalar_t(edge_gradient[0]);",
+                "if ((lane & 1) == 0) atomicAdd(dsh + edge_base + (lane >> 1), scalar_t(edge_gradient[0]));").replace(
+                "if (lane == 0) dr[e] = scalar_t(radial_gradient);",
+                "if (lane == 0) atomicAdd(dr + e, scalar_t(radial_gradient));"), s, count=1, flags=re.S)
+
+        def args(a):
+            import torch
+            a = list(a)
+            a[1] = torch.cat([a[1]] * split)  # sh: edge_count = split x edges, so split x the warps
+            a[7] = torch.zeros((a[1].shape[0], a[7].shape[1]), dtype=a[7].dtype, device=a[7].device)  # dsh
+            a[17] = torch.zeros(a[1].shape[0], dtype=a[17].dtype, device=a[17].device)  # dr
+            return a
+        return transform, args
+
     return {
         "butterfly": ("rounding", butterfly, ()),
+        "F-split2": ("falsifier", split_edge(2)[0], (), split_edge(2)[1]),
+        "F-split4": ("falsifier", split_edge(4)[0], (), split_edge(4)[1]),
+        "F-split1-atomic": ("falsifier", split_edge(1)[0], (), split_edge(1)[1]),
         "F-no-reduce": ("falsifier", no_reduce, ()),
         "F-reduce-dr-only": ("falsifier", lambda s: re.sub(reduction, lambda m: """for (int offset = 16; offset > 0; offset >>= 1)
         radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
