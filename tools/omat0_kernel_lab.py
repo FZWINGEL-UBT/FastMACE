@@ -210,6 +210,35 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
             raise ValueError("perm_source: the kernel signature or edge index was not found")
         return s
 
+    # The hybrid: the 4-byte per-edge arrays (senders, receivers, r, pair, and dr written) in mirror order, a cheap
+    # gather per call (a scatter back for dr), and only the 64-byte sh/dsh rows (and stored w) read through the
+    # permutation, so no edge scalar costs a whole sector. dsh exact; dr comes out in mirror order here.
+    def mirror_hybrid(args):
+        import torch
+        args = list(args)
+        nodes = args[0].shape[0]
+        senders, receivers = args[3].long(), args[4].long()
+        key = torch.minimum(senders, receivers) * nodes + torch.maximum(senders, receivers)
+        order = torch.sort(key, stable=True).indices
+        edges = order.shape[0]
+        for i in (3, 4, 8, 9, 17):  # senders, receivers, r, pair, dr
+            t = args[i]
+            if t.dim() >= 1 and t.shape[0] == edges:
+                args[i] = t[order].contiguous()
+        args.append(order.to(torch.int32).contiguous())
+        return args
+
+    def hybrid_source(s):
+        s = re.sub(r"(scalar_t\* dr)\) \{", r"\1,\n    const int32_t* __restrict__ edge_perm) {", s, count=1)
+        for old, new in (("const int64_t edge_base = e * EDGE_DIM;",
+                          "const int64_t row_edge = edge_perm[e];\n    const int64_t edge_base = row_edge * EDGE_DIM;"),
+                         ("const int64_t weight_base = e * WEIGHT_DIM;",
+                          "const int64_t weight_base = row_edge * WEIGHT_DIM;")):
+            if s.count(old) != 1:
+                raise ValueError(f"hybrid_source: {old!r} not found once")
+            s = s.replace(old, new)
+        return s
+
     horner_block = (r"scalar_t gv\[PADDED_TERMS\];.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
 
     def skip_table(condition):
@@ -515,6 +544,7 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-no-table-horner": ("falsifier", skip_table("true"), ()),
         "F-half-table": ("falsifier", skip_table("e & 1"), ()),
         "M-mirror-perm": ("rounding", perm_source, (), mirror_perm),
+        "M-mirror-hybrid": ("falsifier", hybrid_source, (), mirror_hybrid),
         "B-sender-order": ("falsifier", lambda s: s, (), sender_order),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
