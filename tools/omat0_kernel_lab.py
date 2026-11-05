@@ -977,8 +977,21 @@ def forward_launcher(kernel, source, extra):
                                               function))
     counters = torch.zeros((kernel.channels // CHANNEL_BLOCK) * rule.parts, dtype=torch.int32, device="cuda")
 
+    # VEC_A (the A100 default) reads a from rows padded to AS floats (fused_forward.a_columns); a variant rendered
+    # without it reads rows of KA floats. Give such a variant a compacted copy of the captured a, else it reads
+    # misaligned rows (5 November 2026: every A100 variant without VEC_A differed in all 5,000 rows).
+    ka = int(re.search(r"constexpr int KA = (\d+);", source).group(1))
+    vec_a = "reinterpret_cast<const float4*>(a + (e0 + b) * AS)" in source
+    compacted = {}
+
     def launch(args):
         a, weight, x, sh, senders, receivers, row_ptr, out, w = args
+        if not vec_a and a.shape[1] != ka:
+            key = (a.data_ptr(), a.shape[0])
+            if key not in compacted:
+                compacted.clear()
+                compacted[key] = a[:, :ka].contiguous()
+            a = compacted[key]
         counters.zero_()
         p = ctypes.c_void_p
         outs = [o.data_ptr() for o in out] if isinstance(out, list) else [out.data_ptr()]  # BLOCK_MESSAGE groups
