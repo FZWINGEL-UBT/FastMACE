@@ -213,7 +213,7 @@ def graph_sum_default(model):
 
 def graph_sum_edit(source):
     """``source`` with every ``scatter_sum`` over ``data["batch"]`` through ``graph_sum``."""
-    return _GRAPH_SCATTER.sub(r"_fastmace_graph_sum(\1)", source)
+    return _GRAPH_SCATTER.sub(r"_fastmace_batch_sum(\1)", source)
 
 
 def _on_gpus(model, gpus):
@@ -257,7 +257,8 @@ def compile_forward(source, namespace, filename):
     namespace = dict(namespace)
     namespace["_fastmace_node_e0"] = node_e0
     namespace["_fastmace_head_index"] = head_index
-    namespace["_fastmace_graph_sum"] = graph_sum
+    # Not "_fastmace_graph_sum": PolarMACE's graph-sums forward (fastmace.longrange.polar) owns that name.
+    namespace["_fastmace_batch_sum"] = graph_sum
     exec(compile(textwrap.dedent(source), filename, "exec"), namespace)
     return namespace["forward"]
 

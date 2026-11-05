@@ -439,7 +439,7 @@ def test_head_index_slices_one_head_only():
     assert energy.GRAPH_SUM is None and not energy.graph_sum_default(torch.nn.Linear(1, 1))
     edited = energy.graph_sum_edit('e = scatter_sum(\n    src=x, index=data["batch"], dim=0, dim_size=num_graphs\n)\n'
                                    'd = scatter_sum(src=y, index=edge_index[1], dim=0)\n')
-    assert edited.startswith("e = _fastmace_graph_sum(") and "d = scatter_sum(" in edited
+    assert edited.startswith("e = _fastmace_batch_sum(") and "d = scatter_sum(" in edited
     values = torch.arange(5.0, dtype=torch.float64)
     assert torch.equal(energy.graph_sum(values, torch.zeros(5, dtype=torch.long), dim=-1, dim_size=1),
                        values.sum().reshape(1))
