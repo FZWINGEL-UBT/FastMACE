@@ -466,6 +466,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-edge-sh](#omat0-edge-sh) | Edge spherical harmonics (l <= 3) in one Triton kernel each way, analytic backward | `generic.modules.EDGE_SH`, `EDGE_SH_GPUS` | FM | DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66) | 2026-11-05 | MD step SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-species-gemm-a100-recheck](#omat0-species-gemm-a100-recheck) | The species GEMM on the A100 again at the 11.7 ms step | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-05 | SrTiO3 0.996 / 0.994 (Triton), 0.979 / 0.980 (CUTLASS); NbCl5 1.026 / 1.027, 1.053 / 1.058 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-table-w-forward](#omat0-table-w-forward) | w from the value table inside the fused forward (the backward's TABLE_W) | none (lab `simt-slab-real`, `simt-slab3`) | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.333 (table cached: 0.988), 5060 Ti 1.356 | [round 5](../results/round5-20261105/README.md) |
+| [fusion-receiver-local](#fusion-receiver-local) | Receiver-local forward + backward of the last interaction (dout, sh, x on chip; no message store) | none (lab bounds `F-no-out`, `F-smem-*`) | FM | REJECTED as fusion; dout staging OPEN | 2026-11-06 | H200: F-no-out 0.994, w′ F-smem-dout 0.847, F-smem-all 0.863; 5060 Ti 1.015, 0.825, 0.923 | [fusion bound](../results/fusion-bound-20261106/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4153,6 +4154,17 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Why: the per-GPU rewrites are keyed by exact device names; the H200 has not been screened.
 - Sources: [H200 profile](../results/omat0-h200-profile-0ab2bd9a/README.md).
 
+
+<a id="fusion-receiver-local"></a>
+#### fusion-receiver-local: receiver-local forward + backward of the last interaction (bound)
+- Switch: none (lab bounds `F-no-out` in the forward; `F-smem-dout`, `F-smem-sh`, `F-smem-x`, `F-smem-dout-sh`, `F-smem-all` in w′)
+- Engine: FM
+- Date/round: 6 November 2026, architecture question after the kernel review
+- What: one kernel per receiver tile running the last interaction's forward, the node-local tail and the backward, so the messages are never stored and `dout`, sh and x stay on chip.
+- Status: REJECTED as a fusion; `dout` staging in w′ OPEN.
+- Measured: H200 (Modal, `1296069d`): forward F-no-out 0.994; w′ F-smem-dout 0.847, F-smem-sh 1.159, F-smem-x 1.252, F-smem-dout-sh 0.878, F-smem-all 0.863. RTX 5060 Ti: 1.015; 0.825, 0.987, 1.005, 0.866, 0.923.
+- Why: the message store and the sh/x reads cost nothing measurable; only the per-edge re-read of the receiver's 20 KB output gradient does (about 7.6 GB per call). That needs staging in w′, not fusion; the receiver-owned backward ([conv-receiver-backward](#conv-receiver-backward)) lost by serialising edges, so staging must keep one edge per warp. Next falsifier: real staging, stop below 5 % of w′ on the H200.
+- Sources: [fusion bound](../results/fusion-bound-20261106/README.md).
 
 ## Appendix: documentation defects (28 October 2026)
 
