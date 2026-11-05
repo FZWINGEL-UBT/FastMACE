@@ -320,12 +320,19 @@ def main(argv=None):
                 row["wgmma"][tile] = dict(us=round(us, 2), err=err, regs=kern.regs, ratio=round(us / cut_us, 3))
             except Exception as error:  # noqa: BLE001
                 row["wgmma"][tile] = dict(error=repr(error)[:300])
-        best = min((v["us"], t) for t, v in row["wgmma"].items() if "us" in v and v["err"] < 4 * cut_err + 1e-6)
-        row["best"] = dict(tile=best[1], us=best[0], ratio=round(best[0] / cut_us, 3))
+        good = [(v["us"], t) for t, v in row["wgmma"].items() if "us" in v and v["err"] < 4 * cut_err + 1e-6]
+        if good:
+            best = min(good)
+            row["best"] = dict(tile=best[1], us=best[0], ratio=round(best[0] / cut_us, 3))
+        else:
+            row["best"] = dict(tile=None, us=float("nan"), ratio=float("nan"))
         rows.append(row)
-        print(json.dumps({x: row[x] for x in ("m", "k", "n", "layout", "cutlass_us", "best")}), flush=True)
+        print(json.dumps({x: row[x] for x in ("m", "k", "n", "layout", "cutlass_us", "cutlass_err", "best")}), flush=True)
+        if not good:
+            print(json.dumps({t: {x: v.get(x) for x in ("us", "err", "error")} for t, v in row["wgmma"].items()}),
+                  flush=True)
     total_cut = sum(r["cutlass_us"] for r in rows)
-    total_best = sum(r["best"]["us"] for r in rows)
+    total_best = sum(r["best"]["us"] for r in rows if r["best"]["tile"])
     per_tile = {t: sum(r["wgmma"][t].get("us", float("inf")) for r in rows) for t in args.tiles}
     summary = dict(gpu=torch.cuda.get_device_name(), total_cutlass_us=round(total_cut, 1),
                    total_best_us=round(total_best, 1), per_tile_total_us={t: round(v, 1) for t, v in per_tile.items()})
