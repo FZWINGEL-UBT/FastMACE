@@ -4231,3 +4231,12 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Not adopted on the H200: backward walk, segment rows, tabled forward (ba order fails CUDA-graph recapture), radial-table 2 warps, column block 32, w rows 80, species-grouped GEMM, cross-step overlap, batch 4, producer/consumer split, full first interaction, cuBLASDx INT8 emulation (3x slower).
 - Open: a real SIMT slab forward (lab bound 0.838 against the skip-zero base); a wgmma product (no-product bound 0.527); the TABLED_FORWARD recapture error.
 - Sources: [H200 defaults](../results/h200-defaults-20261105/README.md).
+
+### h200-wgmma: Hopper wgmma products and the tabled forward on the H200 (5 November 2026)
+
+- Date/round: round 5 (`f38f5b0d`, `0017749a`, `8ff87b98`, `5ddec837`).
+- What: the fused forward's a·W product on `wgmma.mma_async` m64nNk8 3xTF32 (`fused_forward.WGMMA`, and `WGMMA_PIPELINED` overlapping it with the TP); hand-written wgmma node GEMMs (`tools/bench/wgmma_gemm_bench.py`); `TABLED_FORWARD` on the H200 after the recapture fix (`_listed` with `assume_constant_result`).
+- Status: tabled forward ADOPTED (H200, decision 66); wgmma forward, pipelined wgmma forward and wgmma GEMM REJECTED (off / bench only).
+- Measured: tabled forward MD step 0.984 / 0.987. The wgmma product alone is 1.95x faster than mma.sync, but the forward's MD step is 1.024 / 1.025 and the pipelined one 1.035 / 1.033 (one block of 8 warps per SM). The wgmma GEMM is 1.19x slower over 24 shapes, up to 2.0x at M 25,000–35,000, against CUTLASS's sm80 tf32x3. Gate: NbCl5 stress ratio 2.12 and 2.22 for the wgmma kernels.
+- Not done: a wgmma w′ backward (same structure, would lose the same way); a CUTLASS 3 TMA warp-specialised 3xTF32 GEMM.
+- Sources: [H200 wgmma](../results/h200-wgmma-20261105/README.md).
