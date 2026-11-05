@@ -436,8 +436,10 @@ def _ns_slab(s):
     """No store, and w from a 6-term slab with float2 loads instead of the a.W product (wprime_backward.TABLE_W in the
     forward): w[g][b] = sum_k a_k G_k, the a row's first 6 values standing in for the Chebyshev basis and W's own
     buffer for the table (three groups by edge index: an L2-resident timing bound, not the real values)."""
-    s = _sub(s, "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;", 1)
+    return _ns_slab_body(_sub(s, "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;", 1))
 
+
+def _ns_slab_body(s):
     def slab(m):
         npl = int(m.group(1))
         return m.group(0) + f"""
@@ -459,6 +461,32 @@ def _ns_slab(s):
     s = _sub(s, r"float w\[(\d+)\]\[B\];\s*#pragma unroll\s*for \(int g = 0; g < \d+; \+\+g\)\s*#pragma unroll\s*"
                 r"for \(int b = 0; b < B; \+\+b\) w\[g\]\[b\] = 0\.f;", slab, regex=True)
     return _sub(s, "for (int k = 0; k < K; ++k) {", "for (int k = 0; k < 0; ++k) {")
+
+
+SLAB_GROUPS = 5340  # round 5: the value table's slabs (164 MB of 1,280 x 6 floats, Benchmark_loup interaction 2)
+
+
+def _slab_real(kernel, groups):
+    """Round 5 (5 November 2026): ``NS-slab`` on the FP32-SIMT kernel with ``groups`` slabs of 1,280 x 6 floats
+    (``_slab_args`` passes a buffer of that size as W), each edge on a hashed slab: the forward evaluating w from
+    the value table (wprime_backward.TABLE_W) with the table's real footprint, a timing bound."""
+    def transform(s):
+        s = _tc_rerender(kernel, False, f"simt-slab{groups}")(s)
+        s = s.replace("constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;")
+        s = _ns_slab_body(s)
+        return _sub(s, "const int grp = (int)((e0 + b) % 3);",
+                    f"const int grp = (int)(((unsigned)(e0 + b) * 2654435761u) % {groups}u);")
+    return transform
+
+
+def _slab_args(groups):
+    def transform(args):
+        import torch
+        a, weight, *rest = args
+        big = torch.full((groups * 1280 * 6 + weight.numel(),), 0.01, dtype=weight.dtype, device=weight.device)
+        big[:weight.numel()] = weight.reshape(-1)
+        return (a, big, *rest)
+    return transform
 
 
 A4_STRIDE = 68  # tc-a4: a's padded row stride (a multiple of 4 floats: 16-byte rows)
@@ -640,6 +668,11 @@ def forward_variants(kernel=None):
                                                    "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;",
                                                    1), ()),
         "NS-slab": ("falsifier", _ns_slab, ()),
+        "simt-slab3": ("falsifier", _slab_real(kernel, 3), (), _slab_args(3)),
+        "simt-slab-real": ("falsifier", _slab_real(kernel, SLAB_GROUPS), (), _slab_args(SLAB_GROUPS)),
+        "simt-ns-no-gemm": ("falsifier", lambda s: _sub(_tc_rerender(kernel, False, "simt-ns-no-gemm")(s).replace(
+            "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;"), "for (int k = 0; k < K; ++k) {",
+            "for (int k = 0; k < 0; ++k) {"), ()),
         "F-gemm-only": ("falsifier", lambda s: _sub(_sub(s, tp, r"if (false) {\1", regex=True),
                                                     "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;",
                                                     1), ()),
