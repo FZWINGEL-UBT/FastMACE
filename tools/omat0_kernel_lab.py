@@ -505,10 +505,10 @@ def forward_variants(kernel=None):
         "tc-presplit": ("exact", _tc_presplit(kernel), ()),
         # Exponent-shifted 3xFP16 m16n8k16 (round 2, 5 November 2026): rounded 22-bit split, 2x the TF32 MMA rate.
         "tc-rerender": ("exact", _tc_rerender(kernel, True, "tc-rerender"), ()),  # the re-render check: bitwise
-        "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),
+        "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),  # the FP32-SIMT product: a third opinion
         # Fewer warps per block: the launch bound allows more registers (the A100 kernel spills 40 bytes at 168).
         "tc-warps8": ("exact", _tc_rerender(kernel, True, "tc-warps8", warps=8), ()),
-        "tc-warps10": ("exact", _tc_rerender(kernel, True, "tc-warps10", warps=10), ()),  # the FP32-SIMT product: a third opinion
+        "tc-warps10": ("exact", _tc_rerender(kernel, True, "tc-warps10", warps=10), ()),
         "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
         "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),
                                                             "mma_f16(cross, al, bh);", ""),

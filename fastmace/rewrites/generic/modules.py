@@ -31,6 +31,8 @@ from types import MappingProxyType
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 # Class name -> (variant, sha256 of inspect.getsource(<class>.forward) in mace-torch 0.3.16);
 # generic_interaction_forward reproduces each of them.
 GENERIC_INTERACTIONS: Mapping[str, tuple[str, str]] = MappingProxyType({
@@ -67,6 +69,21 @@ FIRST_FULL_ROWS = False
 # gradient as it is, without the zero-padded copy (OMAT-0 A100 profile, 4 November 2026: 0.11 ms per force call).
 # Bitwise: the dropped column's gradient is zero. A module constant for the A/B.
 FIRST_TABLE_COLUMNS = False
+# The tabled first interaction's table and outer sums with one fused backward (round 2, 5 November 2026;
+# kernels.triton.tabled_outer_sum): per edge dr and the edge attributes' gradient from the slots' gradient in one walk,
+# without grad_a [E, h c], its assembled copy and the separate table backward. Rounding (regrouped sums). Needs the
+# segmented first sum and float32. None: on for FUSED_FIRST_BACKWARD_GPUS (decision 66, after the MD-step A/Bs);
+# True / False: an A/B side's choice on every GPU.
+FUSED_FIRST_BACKWARD = None
+FUSED_FIRST_BACKWARD_GPUS = GPUModels(())
+
+
+def fused_first_backward(device):
+    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``FUSED_FIRST_BACKWARD_GPUS``."""
+    if FUSED_FIRST_BACKWARD is not None:
+        return bool(FUSED_FIRST_BACKWARD)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
 
 
 def _first_inputs(augmented, last):
@@ -95,6 +112,25 @@ def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edg
     keeps the lengths instead of the table's ``[E, h c + 1]`` output and evaluates the table again (MH-1's
     ``modules.first_table_region``); the reassociation's backward needs nothing else of the region, so the compiled
     backward rebuilds only the table."""
+    table, reassociation = self.radial_table, self.first_reassociation
+    if (not FIRST_FULL_ROWS and reassociation.segmented and table.coef.dtype == torch.float32
+            and edge_feats.dtype == torch.float32 and fused_first_backward(table.coef.device)):
+        from fastmace.kernels.triton.tabled_outer_sum import tabled_outer_sum
+
+        weight = fc_last_weight(self.radial_last)
+        width = weight.shape[-1]
+        pair = table.pair(node_attrs, edge_index)
+        density = []
+
+        def summed_fn(key, slots):
+            summed, edge_density = tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts,
+                                                    table.scales, table.bins, table.r_lo, table.bin_scale,
+                                                    table.r_max, width, edge_attrs.contiguous(), key, slots)
+            density.append(edge_density)
+            return summed, width
+
+        message = reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, summed_fn=summed_fn)
+        return message, density[0]
     columns = fc_last_weight(self.radial_last).shape[-1] if FIRST_TABLE_COLUMNS and not FIRST_FULL_ROWS else -1
     augmented, edge_density = self.radial_table(edge_feats, node_attrs, edge_index, columns=columns)
     rows, weight = _first_inputs(augmented, self.radial_last)

@@ -264,6 +264,36 @@ for layout in ("ir_mul", "mul_ir"):
         report[name] = {"dr error": err, "dr error (unfactored)": err_base,
                         "dsh max rel": float((new[4] - base[4]).abs().max() / base[4].abs().max()),
                         "dx max rel": float((new[3] - base[3]).abs().max() / base[3].abs().max())}
+    # Round 2 (5 November 2026): HORNER (the value table in the power basis), with SCALAR_PATHS (l1 = 0 paths without
+    # the v_j sums, FACTORED) and with MAX_REGISTERS 80. dL/dr against the float64 reference, the rest against TABLE_W.
+    for horner_case in ("horner", "horner-scalar", "horner-80"):
+        name = f"{horner_case}-{layout}"
+        wp.TABLE_W = True
+        try:
+            plain = wp.WPrime(table, weight, kernels)
+            wp.HORNER = True
+            wp.FACTORED = True if horner_case == "horner-scalar" else None
+            wp.SCALAR_PATHS = horner_case == "horner-scalar"
+            wp.MAX_REGISTERS = 80 if horner_case == "horner-80" else 0
+            try:
+                new_w = wp.WPrime(table, weight, kernels)
+            finally:
+                wp.HORNER = wp.FACTORED = wp.SCALAR_PATHS = wp.MAX_REGISTERS = None
+        finally:
+            wp.TABLE_W = None
+        assert new_w.horner and new_w.kernel.horner and not plain.horner, name
+        assert new_w.kernel.scalar_paths == (horner_case == "horner-scalar"), name
+        assert ("maxrregcount=80" in new_w.kernel.source) == (horner_case == "horner-80"), name
+        base = run(X, Y, G, D, kernels, weight, fused, plain)
+        new = run(X, Y, G, D, kernels, weight, fused, new_w)
+        assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name  # the same forward
+        torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+        torch.testing.assert_close(new[4], base[4], rtol=1e-5, atol=2e-6 * float(base[4].abs().max()))  # dsh
+        dr_new = new[2].reshape(-1)
+        assert bool((dr_new[outside] == 0).all()), name
+        err = float((dr_new.double() - ref).abs().max()) / float(ref.abs().max())
+        assert err <= 1e-5, (name, err)
+        report[name] = {"dr error": err}
 print(json.dumps(report))
 """
 
@@ -279,4 +309,6 @@ def test_wprime_backward_matches_the_chain():
     assert set(report) == {"ir_mul-cublas", "ir_mul-fused", "mul_ir-cublas", "mul_ir-fused", "slope-vector-2",
                            "slope-vector-4", "table-w-cublas", "table-w-fused", "factored-ir_mul-stored-w",
                            "factored-ir_mul-table-w", "factored-mul_ir-stored-w", "factored-mul_ir-table-w",
-                           "factored-ir_mul-table-w-scaled", "factored-mul_ir-table-w-scaled"}
+                           "factored-ir_mul-table-w-scaled", "factored-mul_ir-table-w-scaled"} | {
+                               f"{case}-{layout}" for case in ("horner", "horner-scalar", "horner-80")
+                               for layout in ("ir_mul", "mul_ir")}

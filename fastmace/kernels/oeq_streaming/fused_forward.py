@@ -139,7 +139,7 @@ __device__ __forceinline__ void mma_tf32(float (&d)[4], const unsigned (&a)[4], 
 # batch; m16n8k16 MMAs, C = big*big + 2^-11 (big*small + small*big). Power-of-two scales keep both operands in FP16's
 # normal range: one per block slice for W, one per edge for a (its row maximum), undone on w. FP16 and TF32 both
 # carry 11 significant bits: the 22-bit split matches 3xTF32 with both parts rounded to nearest ("round").
-TC_FP16_HELPERS = """// 3xFP16 (tc="fp16"): x = big + 2^-11 small, both FP16 (round to nearest); pairs packed low k first.
+TC_FP16_HELPERS = """// 3xFP16 (tc="fp16"): x = big + 2^-11 small, both FP16 (rounded to nearest); low k packed first.
 __device__ __forceinline__ void split_f16x2(float x0, float x1, unsigned& hi, unsigned& lo) {
     asm("cvt.rn.f16x2.f32 %0, %1, %2;" : "=r"(hi) : "f"(x1), "f"(x0));
     float b0, b1;

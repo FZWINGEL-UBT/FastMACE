@@ -276,7 +276,8 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 {%- if factored %}
                 // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
                 // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
-                {%- set scalar_path = scalar_paths and path.input_irrep_dim == 1 and factored[path_index].alpha == 1.0 %}
+                {%- set scalar_path = scalar_paths and path.input_irrep_dim == 1
+                                      and factored[path_index].alpha == 1.0 %}
                 {%- for i in factored[path_index].inputs %}
                 acc_t u_{{ i }} = acc_t(0);
                 {%- endfor %}
@@ -1039,5 +1040,6 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "derivative_table", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "power_table", "prepare_block_messages",
            "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
-           "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table", "wprime_arguments",
+           "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table",
+           "wprime_arguments",
            "wprime_reference"]
