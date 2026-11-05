@@ -175,12 +175,83 @@ class RandomStream:
     ``queued`` (host, float64) holds drawn rows that come before the generator's next draw but are not in the
     batch yet: those of a restart written with another batch size (CAP-T06 caps the batch's bytes). Refills
     take them first; ``None`` when there are none.
+
+    Draw-ahead (round 6, 5 November 2026; ``fastmace.integrators.langevin.NOISE_DRAW_AHEAD``): after a refill the
+    integrator may start drawing the next batch on a background thread (``draw_ahead``), so the next refill only
+    takes the rows (``take_ahead``). The thread advances the generator; anything else that reads or sets
+    ``generator`` first waits for it and puts the generator back to its state before the draw, dropping the rows.
+    So a restart, an event snapshot or a provenance record sees exactly the stream without draw-ahead, and the
+    numbers and their order never change: the next refill draws the same rows again on the host.
     """
 
-    generator: np.random.Generator
+    _generator: np.random.Generator
     batch: torch.Tensor | None = None
     cursor: int = 0
     queued: np.ndarray | None = None
+    _ahead: tuple | None = None  # (thread, generator state before the draw, result holder, steps)
+    staging: list | None = None  # the draw-ahead's two pinned host buffers and their copy events (integrators)
+
+    def __init__(self, generator, batch=None, cursor=0, queued=None):
+        self._generator, self.batch, self.cursor, self.queued = generator, batch, cursor, queued
+        self._ahead = self.staging = None
+
+    @property
+    def generator(self) -> np.random.Generator:
+        """The generator, after any draw-ahead was undone (``cancel_ahead``)."""
+        self.cancel_ahead()
+        return self._generator
+
+    @generator.setter
+    def generator(self, value: np.random.Generator) -> None:
+        self.cancel_ahead()
+        self._generator = value
+
+    def __getstate__(self):
+        self.cancel_ahead()
+        return {**self.__dict__, "_ahead": None, "staging": None}
+
+    def draw_ahead(self, draw: Callable[[np.random.Generator, int], Any], steps: int) -> None:
+        """Start drawing ``steps`` rows with ``draw(generator, steps)`` on a background thread (not with queued
+        rows, which come first, nor while one runs)."""
+        import threading
+
+        if self._ahead is not None or self.queued is not None:
+            return
+        holder: dict[str, Any] = {}
+        generator = self._generator
+
+        def work():
+            try:
+                holder["rows"] = draw(generator, steps)
+            except BaseException as error:  # noqa: BLE001 - re-drawn on the host, which raises it there
+                holder["error"] = error
+
+        saved = generator.bit_generator.state
+        thread = threading.Thread(target=work, name="fastmace-noise-ahead", daemon=True)
+        self._ahead = (thread, saved, holder, int(steps))
+        thread.start()
+
+    def take_ahead(self, steps: int):
+        """The drawn-ahead rows (the generator stays past them), or None (nothing drawn ahead, another size or
+        a failed draw: the generator is put back)."""
+        if self._ahead is None:
+            return None
+        thread, saved, holder, drawn = self._ahead
+        self._ahead = None
+        thread.join()
+        if "rows" in holder and drawn == steps:
+            return holder["rows"]
+        self._generator.bit_generator.state = saved
+        return None
+
+    def cancel_ahead(self) -> None:
+        """Wait for a draw-ahead and undo it: the generator back to its state before the draw, the rows dropped."""
+        if self._ahead is None:
+            return
+        thread, saved, _, _ = self._ahead
+        self._ahead = None
+        thread.join()
+        self._generator.bit_generator.state = saved
 
     def queue(self, rows: np.ndarray) -> None:
         """Put drawn rows before the ones already queued (they were drawn earlier)."""

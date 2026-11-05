@@ -808,3 +808,34 @@ of 4 steps, SrTiO3 10x10x10, OMAT-0 medium): RTX 5060 Ti skin 0.5: 44 rebuilds, 
 A100-SXM4: skin 0.5: 44 rebuilds, -0.46 ms each (noise), t_step 11.644 ms; skin 1.0: 13 rebuilds, +0.36 ms each,
 t_step 11.586 ms. The profile's 11.35 ms per rebuild runs beside the force call (`overlap_rebuild`): a rebuild adds
 nothing measurable on the A100, so neither a cheaper rebuild nor a larger skin can gain anything there. Closed.
+
+## Round 6: skipping work around the big kernels (5 November 2026)
+
+Two answers to `plans/research-prompt-20261105-skip-work.md` (ChatGPT, Claude). ChatGPT ranked a GPU cell list first
+(rejected: `rebuild_cost.py` above finds no added time per rebuild on the A100) and angular-product reuse in the forward
+(open: needs a SASS check whether ptxas already shares the products). Claude ranked (1) folding interaction 1's linear
+chain, (2) the Langevin noise refill, (3) hoisting species-only and output-only kernels (about 0.2 ms), (4) small items.
+
+**Noise draw-ahead (`langevin.NOISE_DRAW_AHEAD`, default on, 349f03e3).** The 5,000-atom batch refill (7.68 M normals,
+61 MB) blocked the host for about 96 ms every 256 steps: the rebuild-cost blocks above (A100-SXM4) are 45 ms each and
+141 ms at steps 256, 512 and 768. After each refill the next batch is now drawn on a background thread into one of two
+pinned buffers (allocated on the host thread; the thread makes no CUDA call, so it cannot disturb a capture) and copied
+without blocking. Reading or setting `RandomStream.generator` (restart, event snapshot, provenance record) undoes a
+pending draw-ahead, so the stream, restart files and every number are unchanged (GPU test
+`test_drawn_ahead_noise_is_the_same_stream`: Langevin and BAOAB rows bitwise ASE's, with mid-run generator reads).
+A100 80GB PCIe (Modal), blocks of 256 steps, side b without draw-ahead: SrTiO3 10x10x10 b/a 1.0298 / 1.0276 (a 12.41 /
+12.47 ms), NbCl5 1.0412 / 1.0410. Host-only and bitwise, so on for every GPU
+(`results/round5-20261105/runs/a100pcie-noise-draw-ahead-ab/`).
+
+**Interaction-1 linear fold (`species.FOLD_FIRST_DENSITY_LINEAR`, 4fea81e0).** With the generic fold, a density first
+interaction's `linear` is composed into its species skip (`compose_species_skip`; the 1 / (d + 1) row scale between
+them commutes) and replaced by the identity. Rounding class; the fold's self-check covers the composed skip. RTX 5060 Ti
+(fold_product_linear on for both sides): SrTiO3 b/a 0.9525 (pairs 0.949-0.953). A100-SXM4 (Modal): SrTiO3 0.9784 /
+0.9772 (a 11.15 ms, b 10.91 ms: 2.18 us per atom and step), NbCl5 0.9542 / 0.9561; force gate passes for NaCl and
+SrTiO3, NbCl5 stress 1.569e-7 (ratio 2.34) is the A100's accepted exception at the same value as the default
+(`results/round5-20261105/runs/a100-fold-first-linear-gate-ab/`). RTX 4000 Ada (leto): SrTiO3 0.9536 / 0.9545,
+NbCl5 0.9197 / 0.9197, gate passes for all three (`rtx4000ada-fold-first-linear-gate-ab/`). **Default** (f1c5dcbc)
+wherever the generic fold is on (decision 66: Ada and A100-SXM4, both measured).
+
+GPU memory against Symmetrix-XL (RTX 5060 Ti, `results/vram-compare-rtx5060ti-20261105/`): on the 5,000-atom cell
+FastMACE takes 1,381 MiB at 24.4 ms per step, Symmetrix-XL under LAMMPS 767 MiB at 50.8 ms.
