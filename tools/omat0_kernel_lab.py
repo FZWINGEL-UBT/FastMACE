@@ -1150,6 +1150,15 @@ def compare(name, base, other):
             same = bool(torch.equal(a, b))
             scale = float(a.abs().max()) or 1.0
             result[key] = "bitwise" if same else f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}"
+            if name == "forward" and key != "w" and not same and a.dim() >= 1:  # where: which rows, how many edges
+                bad = ((a - b).abs().reshape(a.shape[0], -1).amax(1) > 1e-4 * scale).nonzero().flatten()
+                if bad.numel():
+                    row_ptr = base[6]
+                    degree = (row_ptr[1:] - row_ptr[:-1]).long()
+                    rows = bad[bad < degree.numel()]
+                    result[key] += (f" in {bad.numel()}/{a.shape[0]} rows ({int(bad.min())}..{int(bad.max())}; "
+                                    f"{degree.numel()} CSR rows; degrees of the bad rows "
+                                    f"{sorted(set(degree[rows].tolist()))[:8]})")
     return result
 
 
