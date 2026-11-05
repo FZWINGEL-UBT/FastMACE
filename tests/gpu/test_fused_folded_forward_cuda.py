@@ -235,7 +235,7 @@ for layout in ("ir_mul", "mul_ir"):
         # SH_LDS4 (kernel review, 5 November 2026): the TP's sh reads as float4 shared loads, bitwise the VEC_SH
         # kernel's, on the SIMT kernel and with the tensor-core product.
         for tc_on in ((False, True) if torch.cuda.get_device_capability() >= (8, 0) else (False,)):
-            ff_module.TENSOR_CORES, ff_module.VEC_SH = tc_on, True
+            ff_module.TENSOR_CORES, ff_module.VEC_SH, ff_module.SH_LDS4 = tc_on, True, False
             try:
                 plain = FusedFoldedForward(kernels, k)
                 ff_module.SH_LDS4 = True

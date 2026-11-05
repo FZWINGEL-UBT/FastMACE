@@ -168,9 +168,11 @@ WGMMA_PIPELINED = False
 # ED / 4 float4 loads instead of one scalar shared load per component. Bitwise (the same values, the same products).
 # Needs the float4 staging (VEC_SH: sh_s 16-byte aligned, edge_dim % 4 == 0). None: on for SH_LDS4_GPUS (decision
 # 66); True / False: an A/B side's choice. Kernel lab (OMAT-0 medium, Benchmark_loup): fused forward 0.972 on the RTX
-# 5060 Ti (results/kernel-review-20261105).
+# 5060 Ti, 0.989 on the H200, 0.993 on the A100-SXM4-80GB. MD step b/a (b = on; SrTiO3 10x10x10, ab / ba,
+# results/kernel-review-20261105): RTX 5060 Ti 0.9932 / 0.9902 (on); H200 1.0014 / 1.0027, A100-SXM4-80GB 1.0008 /
+# 0.9949 (off).
 SH_LDS4 = None
-SH_LDS4_GPUS = GPUModels(())
+SH_LDS4_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 _REGISTRY = {}
 
 

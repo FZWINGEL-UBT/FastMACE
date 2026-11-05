@@ -47,6 +47,7 @@ measured slower: the cell says which).
 | zero-column skip in the fused forward, degree-5 tables (`fused_forward.SKIP_ZERO_COLUMN_GPUS`) | – (1.000) | on | on | exact | Ada 0.981, A100-SXM4-80GB 0.986 (vs degree 5 alone; both vs degree 10 0.896 / 0.895); A100 PCIe 4.61 → 3.31 µs/atom/step with the SXM4 set | owner 4 Nov | `results/omat0-kernel-lab-20261103` |
 | tensor-core fused forward (`TENSOR_CORES_GPUS`) | – (slower: TF32 = 2× FP32) | – (slower) | on | precision (TF32 products) | A100-SXM4-80GB 0.933 / 0.933; loup 3.17 → 2.92 (NVE), 3.12 → 2.90 µs/atom/step (Langevin); energy error 1.39 meV vs 0.73 (floor 10 meV) | owner 4 Nov | [omat0-a100](omat0-a100.md) §3.5 |
 | `VEC_SH` (`VEC_SH_GPUS`), `VEC_A` and `TC_WFRAG` (A100) | VEC_SH on | – | all three on | bitwise | 5060 Ti VEC_SH SrTiO3 10×10×10 0.977 / 0.977, NbCl5 0.984 / 0.984; A100-SXM4-80GB VEC_SH + VEC_A 0.973 / 0.976, 0.976 / 0.981; + TC_WFRAG 0.960 / 0.954, 0.970 / 0.969. `PREFETCH` and `TC_TP` rejected (sets empty) | A100 round 4, 5 Nov | [round-4 notes](../../plans/ideas-20261105-round2.md#round-4-the-fused-forwards-staging-5-november-2026) |
+| `SH_LDS4` (`SH_LDS4_GPUS`; needs VEC_SH): the TP's sh reads as float4 shared loads | on | – (VEC_SH off) | – (A100-SXM4-80GB 1.0008 / 0.9949) | bitwise | 5060 Ti SrTiO3 10×10×10 0.9932 / 0.9902; H200 1.0014 / 1.0027 (off) | d66, 6 Nov | [kernel review](../validation/kernel-review-20261105.md) |
 | fused first-interaction backward (`FUSED_FIRST_BACKWARD_GPUS`) + tabled forward (`TABLED_FORWARD_GPUS`) | on | on | on | rounding | backward alone SrTiO3 / NbCl5: 5060 Ti 0.962 / 0.963, 0.972 / 0.969; Ada 0.962 / 0.963, 0.979 / 0.975; A100-SXM4-80GB 0.969 / 0.966, 0.983 / 0.984. Both: 5060 Ti 0.945 / 0.945, 0.948 / 0.955; Ada 0.949 / 0.944, 0.978 / 0.968; A100 0.966 / 0.962, 0.970 / 0.982 | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
 | run-walking `edge_outer_sum` backward (`edge_outer_sum.BACKWARD_WALK_GPUS`) | – (kernel 0.94, near DRAM floor) | – (kernel 1.03–1.11) | on | rounding | A100-SXM4-80GB SrTiO3 0.995 / 0.987, NbCl5 0.995 / 0.996 (kernel 0.802) | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
 | `EDGE_SH` Triton edge spherical harmonics (`EDGE_SH_GPUS`) | on | on | on | rounding (5.5e-7 / 1.4e-7 of float64 e3nn) | SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | A100 round 5, 5 Nov | `results/round5-20261105` |
@@ -72,7 +73,9 @@ faster): planner `DECISION_66_GENERIC_RADIAL_TABLES_GPUS` 2.030 / 2.027, `GENERI
 `FUSED_FIRST_BACKWARD` 1.051 / 1.052, `EDGE_SH` 1.019 / 1.018; tabled `TABLED_FORWARD` (b = on, after the recapture
 fix) 0.9838 / 0.9871; energy `HEAD_SLICE` 1.016 / 1.017, `GRAPH_SUM` 1.005 / 1.004; radial `SYMMETRIC_PAIRS` 1.005 /
 1.004, radial-table forward 8 warps (`WARPS_GPUS`; b = on) 0.9946 / 0.9950. Off there: `BACKWARD_WALK`,
-`SEGMENT_ROWS`, `SPECIES_GEMM`, CUTLASS tile 32x64, `TABLE_PAIRS`, `HOIST_SCALE`, `WGMMA`, `SEGMENT_GROUPED`.
+`SEGMENT_ROWS`, `SPECIES_GEMM` (also with `species_gemm.CUTLASS`: 1.0141 / 1.0175), CUTLASS tile 32x64, `TABLE_PAIRS`,
+`HOIST_SCALE`, `WGMMA`, `SEGMENT_GROUPED`, `SH_LDS4` (1.0014 / 1.0027), tabled kernels at 2 warps (forward 1.0147 /
+1.0168, backward 1.0270 / 1.0295).
 Sources: [h200-defaults](../../results/h200-defaults-20261105/README.md), [hopper sweep](../../results/hopper-sweep-h200-20261105/README.md),
 [h200-ideas](../../results/h200-ideas-20261105/README.md), [h200-wgmma](../../results/h200-wgmma-20261105/README.md),
 [wprime-pairs](../../results/wprime-pairs-20261105/README.md).

@@ -466,6 +466,14 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-edge-sh](#omat0-edge-sh) | Edge spherical harmonics (l <= 3) in one Triton kernel each way, analytic backward | `generic.modules.EDGE_SH`, `EDGE_SH_GPUS` | FM | DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66) | 2026-11-05 | MD step SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-species-gemm-a100-recheck](#omat0-species-gemm-a100-recheck) | The species GEMM on the A100 again at the 11.7 ms step | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-05 | SrTiO3 0.996 / 0.994 (Triton), 0.979 / 0.980 (CUTLASS); NbCl5 1.026 / 1.027, 1.053 / 1.058 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-table-w-forward](#omat0-table-w-forward) | w from the value table inside the fused forward (the backward's TABLE_W) | none (lab `simt-slab-real`, `simt-slab3`) | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.333 (table cached: 0.988), 5060 Ti 1.356 | [round 5](../results/round5-20261105/README.md) |
+| [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-redistribute](#kr-redistribute) | Fused forward: vectorised C-fragment redistribution | none (lab bound `F-tc-no-redistribute`) | FM | REJECTED (bound) | 2026-11-06 | H200 bound 0.998 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-wprime-restrict](#kr-wprime-restrict) | w′: `__restrict__` on every pointer argument | lab `restrict` | FM | REJECTED | 2026-11-06 | lab 5060 Ti 1.016, H200 1.031 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-wprime-vector-atomics](#kr-wprime-vector-atomics) | w′: float4 dx atomics (sm_90) | none (lab bound `F-no-atomics`) | FM | REJECTED (bound) | 2026-11-06 | no atomics: H200 1.080, 5060 Ti 0.979 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-tabled-warps](#kr-tabled-warps) | Tabled outer-sum kernels at 2 warps on the H200 | `tabled_outer_sum.FORWARD_WARPS`, `WARPS` | FM | REJECTED | 2026-11-06 | H200 forward 1.0147 / 1.0168, backward 1.0270 / 1.0295 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-species-cutlass-h200](#kr-species-cutlass-h200) | Species GEMM on the CUTLASS backend on the H200 | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-06 | H200 1.0141 / 1.0175 | [kernel review](validation/kernel-review-20261105.md) |
+| [kr-wprime-dsh-zero](#kr-wprime-dsh-zero) | w′: zero dsh rows for edges with out-of-range indices (bug fix) | none | FM | FIXED (`e5280113`) | 2026-11-06 | bitwise for valid edges; latent in production | [kernel review](validation/kernel-review-20261105.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4153,6 +4161,78 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Why: the per-GPU rewrites are keyed by exact device names; the H200 has not been screened.
 - Sources: [H200 profile](../results/omat0-h200-profile-0ab2bd9a/README.md).
 
+
+<a id="kr-sh-lds4"></a>
+#### kr-sh-lds4: the fused forward's TP reads sh as float4 shared loads
+- Switch: `fused_forward.SH_LDS4` (None: `SH_LDS4_GPUS`); needs VEC_SH, not with TC_TP or WGMMA
+- Engine: FM
+- Date/round: 6 November 2026, kernel review (`5b4431fe`)
+- What: the TP read each of an edge's 16 sh components with its own scalar LDS. It now reads 4 float4 loads per edge from the VEC_SH staging tile, which is already 16-byte aligned. The values and products are the same, so the result is bitwise.
+- Status: DEFAULT on the RTX 5060 Ti (decision 66).
+- Measured: lab forward RTX 5060 Ti 0.972, H200 0.989, A100-SXM4-80GB 0.993, all bitwise. MD step b/a (SrTiO3 10×10×10, ab / ba): RTX 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4-80GB 1.0008 / 0.9949. GPU test bitwise on the SIMT and tensor-core kernels.
+- Sources: [kernel review](validation/kernel-review-20261105.md); `results/kernel-review-20261105/`.
+
+<a id="kr-x-nodep"></a>
+#### kr-x-nodep: the x gathers' load-to-load dependency
+- Switch: none; lab bound `F-x-nodep` (x at hashed sender indices, no senders load)
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- Status: REJECTED (bound).
+- Measured: RTX 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 (the hash loses the senders' locality; 8 B spill) against 0.900.
+- Why: the gathers cost their L2 traffic, not their dependency, so a register prefetch has nothing to hide. cp.async prefetch was rejected earlier ([omat0-ff-prefetch](#omat0-ff-prefetch)).
+- Sources: [kernel review](validation/kernel-review-20261105.md) §1.
+
+<a id="kr-redistribute"></a>
+#### kr-redistribute: the tensor-core forward's C-fragment redistribution
+- Switch: none; lab bound `F-tc-no-redistribute`
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- Status: REJECTED (bound): H200 0.998.
+- Sources: [kernel review](validation/kernel-review-20261105.md) §1.
+
+<a id="kr-wprime-restrict"></a>
+#### kr-wprime-restrict: `__restrict__` on the w′ kernel's pointers
+- Switch: none; lab `restrict` (exact: dsh and dr bitwise, dx to the atomics' order)
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- Status: REJECTED: RTX 5060 Ti 1.016, H200 1.031 (96 registers in both).
+- Sources: [kernel review](validation/kernel-review-20261105.md) §2.
+
+<a id="kr-wprime-vector-atomics"></a>
+#### kr-wprime-vector-atomics: float4 dx atomics in the w′ backward
+- Switch: none; lab bound `F-no-atomics`
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- Status: REJECTED (bound).
+- Measured: without atomics, RTX 5060 Ti 0.979 and H200 1.080 (the explore run measured 1.089).
+- Why: the atomics are not on the H200's critical path, so vectorising them cannot pay there.
+- Sources: [kernel review](validation/kernel-review-20261105.md) §2.
+
+<a id="kr-tabled-warps"></a>
+#### kr-tabled-warps: the tabled outer-sum kernels at 2 warps
+- Switch: `tabled_outer_sum.FORWARD_WARPS`, `WARPS` (1)
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- Status: REJECTED: H200 MD step forward 1.0147 / 1.0168, backward 1.0270 / 1.0295.
+- Sources: [kernel review](validation/kernel-review-20261105.md) §4.
+
+<a id="kr-species-cutlass-h200"></a>
+#### kr-species-cutlass-h200: the species GEMM on CUTLASS on the H200
+- Switch: `generic.modules.SPECIES_GEMM` with `species_gemm.CUTLASS`
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- Status: REJECTED: H200 MD step 1.0141 / 1.0175. The Triton species GEMM lost on the H200 earlier (1.0130 / 1.0139).
+- Sources: [kernel review](validation/kernel-review-20261105.md) §3.
+
+<a id="kr-wprime-dsh-zero"></a>
+#### kr-wprime-dsh-zero: dsh of edges with out-of-range indices
+- Switch: none (bug fix, `e5280113`)
+- Engine: FM
+- Date/round: 6 November 2026, kernel review
+- What: the w′ kernel returned early for such edges and left their `dsh` rows unwritten (`torch.empty_like`). It now writes zeros. Every valid edge is bitwise unchanged.
+- Status: FIXED. Latent: the engine's padding edges use valid indices beyond the cutoff.
+- Measured: GPU case `invalid-sender-*` (35 edges): garbage up to 3.44 before the fix, zeros after.
+- Sources: [kernel review](validation/kernel-review-20261105.md) §2.
 
 ## Appendix: documentation defects (28 October 2026)
 
