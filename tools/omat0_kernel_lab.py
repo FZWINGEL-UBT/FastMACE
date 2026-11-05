@@ -371,9 +371,11 @@ def _tc_rerender(kernel, tc, name):
         if not kernel.tc:
             raise ValueError(f"{name} needs the tensor-core kernel (--constant ...:TENSOR_CORES=True)")
         props = torch.cuda.get_device_properties(0)
-        rule = ff.launch_rule(kernel.paths, kernel.used, kernel.schedule.edge_dim, kernel.channels,
-                              int(props.shared_memory_per_block_optin), int(props.multi_processor_count), tc=tc)
-        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc, blocks=kernel.blocks)
+        rule = ff.launch_rule(kernel.paths, kernel.used if tc else kernel.k, kernel.schedule.edge_dim,
+                              kernel.channels, int(props.shared_memory_per_block_optin),
+                              int(props.multi_processor_count), tc=tc)
+        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=tc,
+                           blocks=kernel.blocks)
         _RULES[source] = rule
         print(f"{name} rule {rule} (plan {kernel.rule})", flush=True)
         return source
@@ -479,6 +481,8 @@ def forward_variants(kernel=None):
                                                         "for (int k0 = 0; k0 < 0; k0 += 8) {"), ()),
         "tc-presplit": ("exact", _tc_presplit(kernel), ()),
         # Exponent-shifted 3xFP16 m16n8k16 (round 2, 5 November 2026): rounded 22-bit split, 2x the TF32 MMA rate.
+        "tc-rerender": ("exact", _tc_rerender(kernel, True, "tc-rerender"), ()),  # the re-render check: bitwise
+        "simt": ("rounding", _tc_rerender(kernel, False, "simt"), ()),  # the FP32-SIMT product: a third opinion
         "tc-fp16": ("rounding", _tc_rerender(kernel, "fp16", "tc-fp16"), ()),
         "tc-fp16-1pass": ("falsifier", lambda s: _sub(_sub(_tc_rerender(kernel, "fp16", "tc-fp16-1pass")(s),
                                                             "mma_f16(cross, al, bh);", ""),
@@ -510,10 +514,11 @@ def forward_launcher(kernel, source, extra):
         a, weight, x, sh, senders, receivers, row_ptr, out, w = args
         counters.zero_()
         p = ctypes.c_void_p
+        outs = [o.data_ptr() for o in out] if isinstance(out, list) else [out.data_ptr()]  # BLOCK_MESSAGE groups
         values = (x.shape[0], sh.shape[0], a.data_ptr(), weight.data_ptr(), x.data_ptr(), sh.data_ptr(),
-                  senders.data_ptr(), receivers.data_ptr(), row_ptr.data_ptr(), counters.data_ptr(), out.data_ptr(),
+                  senders.data_ptr(), receivers.data_ptr(), row_ptr.data_ptr(), counters.data_ptr(), *outs,
                   w.data_ptr())
-        types = (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p, p)
+        types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
         stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
         _check(driver.cuLaunchKernel(function, rule.blocks_per_slice, kernel.channels // CHANNEL_BLOCK,
                                      rule.parts, rule.warps * 32, 1, 1, rule.shared_bytes, stream,
@@ -622,7 +627,7 @@ def outputs_of(name, args):
     import torch
     args = list(args)
     if name == "forward":  # out: one tensor, or a list of groups (wprime_backward.BLOCK_MESSAGE)
-        args[7] = [torch.empty_like(o) for o in args[7]] if isinstance(args[7], list) else torch.empty_like(args[7])
+        args[7] = [torch.zeros_like(o) for o in args[7]] if isinstance(args[7], list) else torch.zeros_like(args[7])
         args[8] = torch.empty_like(args[8])
     else:
         args[6] = torch.zeros_like(args[6])  # dx: atomic adds
