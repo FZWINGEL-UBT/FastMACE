@@ -371,6 +371,12 @@ def _product_selfcheck(original, rewritten, context):
 
 # --------------------------------------------------------------------------- generic_fold_product_linear
 
+# Round 6 (5 November 2026, research report idea 1, minimal variant): with the generic fold, also compose a density
+# first interaction's ``linear`` into its species skip (``modules.compose_species_skip``; the 1 / (d + 1) row scale
+# between them commutes) and leave the identity in its place: one 128 x 128 per-l GEMM less forward and backward
+# (A100 profile: 0.25 ms). Rounding, as the fold. Prototype for an A/B: False keeps the round-5 fold.
+FOLD_FIRST_DENSITY_LINEAR = False
+
 
 def _generic_product_support(model):
     from fastmace.model.capabilities import generic_fold_product_support
@@ -402,6 +408,7 @@ def fold_generic_product(model):
     generic_species_skip."""
     import torch
 
+    from fastmace.model.capabilities import GENERIC_INTERACTIONS
     from fastmace.rewrites.generic.modules import SpeciesSkip
     from fastmace.rewrites.linear.modules import BlockLinear
 
@@ -424,6 +431,13 @@ def fold_generic_product(model):
             setattr(owner, attribute, folded)
             names.append(next(n for n, mod in model.named_modules() if mod is folded))
         model.products[0].linear = torch.nn.Identity()
+        first = model.interactions[0]
+        if (FOLD_FIRST_DENSITY_LINEAR and GENERIC_INTERACTIONS.get(type(first).__name__) == "density"
+                and isinstance(first.linear, BlockLinear) and isinstance(first.skip_tp, SpeciesSkip)):
+            # skip_tp(linear(m) / (d + 1)) = (skip_tp o linear)(m) / (d + 1): both linear, the row scale commutes
+            first.skip_tp = m.compose_species_skip(first.linear, first.skip_tp)
+            first.linear = torch.nn.Identity()
+            names += ["interactions.0.linear", "interactions.0.skip_tp"]
     return ["products.0.linear", *names]
 
 
