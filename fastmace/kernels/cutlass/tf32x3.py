@@ -23,6 +23,9 @@ import torch
 
 CUBIN = Path(__file__).with_name("tf32x3_sm80.cubin")
 CAPABILITY = (8, 0)
+# One cubin per compute capability, built from the same source (5 November 2026: sm_90 for the H100 and H200; the
+# mainloop is the same mma.sync code, so every element's sum is the same as on the A100).
+CUBINS = {CAPABILITY: CUBIN, (9, 0): Path(__file__).with_name("tf32x3_sm90.cubin")}
 ALIGNMENT = 4  # elements: 128-bit loads
 # The output tile: "64x64" (four warps), or "32x64" / "64x32" (two warps, twice the blocks; 4 November 2026, for
 # Benchmark_loup's 5,000-row products of 128 columns, 158 blocks of 64x64 on the A100's 108 SMs). The same
@@ -44,7 +47,7 @@ class _Kernels:
         with torch.cuda.device(index):
             torch.zeros(1, device=f"cuda:{index}")  # a runtime call: the device's primary context is current
             self.context = _check(driver.cuCtxGetCurrent())
-            self.module = _check(driver.cuModuleLoadData(CUBIN.read_bytes()))
+            self.module = _check(driver.cuModuleLoadData(_cubin(index).read_bytes()))
             self.functions = {(layout, tile): _check(driver.cuModuleGetFunction(
                 self.module, f"fm_tf32x3_{layout}_{tile}".encode())) for layout in ("rr", "rc") for tile in _TILES}
             pointer, size = _check(driver.cuModuleGetGlobal(self.module, b"fm_tf32x3_info"))
@@ -72,17 +75,24 @@ def available(device, family=False) -> bool:
     """Whether the CUTLASS kernels run on ``device``: CUDA, compute capability 8.0 (``family``: any 8.x, where the
     sm_80 cubin also runs; for tests), the cubin present and loadable."""
     device = torch.device(device)
-    if device.type != "cuda" or not CUBIN.is_file():
+    if device.type != "cuda":
         return False
     index = torch.cuda.current_device() if device.index is None else device.index
     capability = tuple(torch.cuda.get_device_capability(index))
-    if capability != CAPABILITY and not (family and capability[0] == CAPABILITY[0]):
+    if capability not in CUBINS and not (family and capability[0] == CAPABILITY[0]):
+        return False
+    if not _cubin(index).is_file():
         return False
     try:
         _kernels(index)
     except (ImportError, RuntimeError):
         return False
     return True
+
+
+def _cubin(index):
+    """The cubin for device ``index``: its capability's own, else the sm_80 one (8.x family, for tests)."""
+    return CUBINS.get(tuple(torch.cuda.get_device_capability(index)), CUBIN)
 
 
 def _kernels(index):
@@ -194,5 +204,5 @@ def species_into(a, lda, gather, w, out, scatter, counts, size, grid_rows):
                                  kernels.species_shared, stream, (values, types), 0))
 
 
-__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "LONG_K", "MIN_TILES", "TILE", "available", "eligible", "fit",
+__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "CUBINS", "LONG_K", "MIN_TILES", "TILE", "available", "eligible", "fit",
            "mm_into", "species_into", "takes"]
