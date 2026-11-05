@@ -1,6 +1,6 @@
 """Config objects (plan task 1a-T01; SPEC §3.2, §5, §6).
 
-The defaults are checked against ``docs/design/switch-map.md``: every map row that names
+The defaults are checked against ``docs/current/switch-map.md``: every map row that names
 a ``fastmace.config`` field gives that field's default, and every field has a row. The
 ``auto`` fields are checked against ``AUTO_RULES``, the resolution rules that the fixed
 planner (plan task 1a-T15) implements.
@@ -19,7 +19,7 @@ import pytest
 from fastmace import config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SWITCH_MAP = REPO_ROOT / "docs" / "design" / "switch-map.md"
+SWITCH_MAP = REPO_ROOT / "docs" / "current" / "switch-map.md"
 
 CLASSES = (
     config.RewriteConfig,

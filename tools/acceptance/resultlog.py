@@ -1,7 +1,7 @@
 """A pytest plugin that keeps per-test results when an acceptance run is stopped (3b-T10).
 
 Phase 3's partial local acceptance tier lost its junit file: stopping the job's shell ended pytest before
-``pytest_sessionfinish`` wrote it (docs/validation/phase-3.md, open finding 7). This plugin does two things:
+``pytest_sessionfinish`` wrote it (docs/validation/phases/phase-3.md, open finding 7). This plugin does two things:
 
 - ``--result-log PATH`` appends one JSON line per finished test phase that decides the outcome (node id,
   outcome, phase, duration, UTC time, the failure text's last line), flushed and fsynced at once, so even a

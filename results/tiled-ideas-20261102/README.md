@@ -79,7 +79,7 @@ Host state, aliased, lanes off, wavefront auto (off: the host has room). Order r
 | 16,384 (`--no-budget`) | 343 | 7.89 GiB | 79.4, 79.2 s |
 | Default budget from 4,096 (goes to 16,384) | 343 | 7.89 GiB | 79.4, 79.1 s |
 
-The cap changes the steady call by about 1 %, as at 1M (`docs/validation/tiled-1m-speed.md`). The 110.8 s of the
+The cap changes the steady call by about 1 %, as at 1M (`docs/validation/tiled/tiled-1m-speed.md`). The 110.8 s of the
 "lanes auto" arm above came from that arm's other settings and source (`c988f5ff`), not from R = 16,384. The total
 energy differs by 0.46 eV (1e-8 relative) between the two tilings: float32 summation order. Records:
 `rtx4000ada-leto/leto-cap-ab-*`.

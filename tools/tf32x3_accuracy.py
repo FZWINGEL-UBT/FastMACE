@@ -9,7 +9,7 @@ records every GEMM the record reroutes during one more evaluation (forward produ
 
 Each product's tf32x3 result (the launch's own output) and cuBLAS IEEE's product of the same float32 operands are
 compared with a float64 product: max relative (max |c - c64| / max |c64|), relative Frobenius and the
-cancellation-scaled error max |c - c64| / sum_k |a_ik b_kj| (``docs/validation/opt-T01-tensor-cores.md`` §6-§7),
+cancellation-scaled error max |c - c64| / sum_k |a_ik b_kj| (``docs/validation/speed/opt-T01-tensor-cores.md`` §6-§7),
 plus how much the real operands cancel (the median and largest sum |a b| / |c64|). The cancellation-scaled error
 counts only outputs whose sum |a b| is at least ``SCALE_FLOOR`` (2^-103: below it one float32 unit roundoff of the
 sum is subnormal, and both modes lose digits to underflow, not to the split); the unfiltered value and the sum

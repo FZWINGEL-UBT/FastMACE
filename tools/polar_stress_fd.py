@@ -27,7 +27,7 @@ set is not differentiable), so finite differences of the frozen energy test the 
 without the cutoff's steps. FastMACE paths run eager with it (compile_mode none). ``--scan`` records
 E(e_xx) at ``--scan-points`` strains in +-``--scan-max``, with the number of included k-vectors.
 
-Usage (the local GPU through tools/ci/local_gpu.py run; docs/validation/3b-T08.md has the commands):
+Usage (the local GPU through tools/ci/local_gpu.py run; docs/validation/phases/3b-T08.md has the commands):
 
   python tools/polar_stress_fd.py --path reference --dtype float64 --structure NbCl5 --repeat 3 3 3 \\
       --output results/RUN/reference-f64-NbCl5.json [--frozen-kset] [--scan]

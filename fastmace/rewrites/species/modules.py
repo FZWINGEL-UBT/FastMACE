@@ -1,4 +1,4 @@
-"""Modules of the species family (OPT-T08, docs/design/opt-T08-linear-audit.md).
+"""Modules of the species family (OPT-T08, docs/design/speed/opt-T08-linear-audit.md).
 
 - ``OneHotPassthrough``: the node embedding of a model whose embedding is read only through
   species tables. It hands the one-hot ``node_attrs`` on unchanged.

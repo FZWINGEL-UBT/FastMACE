@@ -84,7 +84,7 @@ def residual(x):
 
 x0 = np.array([1.0, 1.0, 0.6, 0.97, 0.65, 0.66, 1.04, 1.17])
 # gate_epilogue without the segments is on in every default point, so it is not separable from the node scale:
-# fixed at the probe's 1.04 (12.3 kB per atom of about 300, docs/validation/region-norm.md).
+# fixed at the probe's 1.04 (12.3 kB per atom of about 300, docs/validation/capacity/region-norm.md).
 lo = [0.3, 0.3, 0.05, 0.3, 0.1, 0.1, 1.0399, 0.9]
 hi = [2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0401, 2.0]
 fit = least_squares(residual, x0, bounds=(lo, hi))

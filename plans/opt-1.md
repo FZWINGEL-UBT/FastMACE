@@ -95,7 +95,7 @@ accuracy.
 
    For each: which GPUs (sm_89, sm_120), whether it works inside CUDA-graph
    capture and torch.compile, and its documented accuracy.
-   The external research report (`docs/design/2026-10-20-megakernel-research.md`)
+   The external research report (`docs/design/research/2026-10-20-megakernel-research.md`)
    says cuBLAS BF16×9 is limited to compute capabilities 10.0 and 10.3, so
    unavailable on both our GPUs. Verify it against the cuBLAS documentation.
    If it holds, 3×TF32 (Triton `tf32x3`, CUTLASS) is the candidate.
@@ -114,7 +114,7 @@ accuracy.
 
    So step 2 runs narrowly: real shapes, forward and input gradient, against
    cuBLAS SIMT and a Triton ieee control. If tf32x3 is slower everywhere,
-   OPT-T01 closes there: the rejection goes in `docs/rewrites.md`, CUTLASS is
+   OPT-T01 closes there: the rejection goes in `docs/optimisation-ledger.md`, CUTLASS is
    skipped, and OPT-T02 and OPT-T03 move up.
 2. **Micro-benchmark (local, then murphy).**
    - Shapes: export the production GEMM shapes and strides from the compiled
@@ -128,7 +128,7 @@ accuracy.
 3. **Model-level screen.** Switch the mode on for the force call. Measure the
    float32-against-float64 force error (the 2× rule), the step time A/B for
    NaCl, NaNbO3 and NbCl5, and the step breakdown.
-4. **Decide and report:** `docs/validation/opt-T01-tensor-cores.md`. If it passes
+4. **Decide and report:** `docs/validation/speed/opt-T01-tensor-cores.md`. If it passes
    and gains, propose it as an option (`ForceField(..., matmul="fp32-tc")` or
    similar) and bring the default question to the owner.
 
@@ -165,7 +165,7 @@ recommendation.
 - **Long-term direction, not in this round: a heterogeneous persistent megakernel**
   (owner, 23 October 2026: "yes record it").
   - **What:** one persistent force kernel that schedules CUDA-core and tensor-core work itself.
-  - **Record:** `docs/design/2026-10-23-heterogeneous-megakernel.md`.
+  - **Record:** `docs/design/research/2026-10-23-heterogeneous-megakernel.md`.
   - **Gate:** a one-day single-SM co-execution probe on sm_89, sm_120 and sm_80. The SIMT side must keep ≥ 90 % of
     its rate while the MMA side adds useful throughput. Nothing starts before that passes.
   - **OPT-T05** is its smaller, existing version.
@@ -236,7 +236,7 @@ code.
   | local | −3.6 to −4.0 % | −14.6 to −14.9 % |
   | murphy | −3.7 to −4.1 % | −13.5 to −13.6 % |
 
-  The plans differ only in `gated_rows` and `segment_gemm`, and the trajectories pass. The summary is `docs/validation/opt-1.md` (merged from `fastmace/opt-1-report`).
+  The plans differ only in `gated_rows` and `segment_gemm`, and the trajectories pass. The summary is `docs/validation/speed/opt-1.md` (merged from `fastmace/opt-1-report`).
 - **Merged after the freeze, test-side and library fixes found by the acceptance:**
   - 2-T15d: the fallback memory test counts OPT-T06's resident template;
   - opt-T07b: the worker tests read past cuEquivariance's stdout line on WSL;

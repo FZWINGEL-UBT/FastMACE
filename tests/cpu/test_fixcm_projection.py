@@ -12,7 +12,7 @@ The exact property checked here: with ``"mass_weighted"``, a run from a state at
 without ``fixcm`` minus its centre-of-mass motion, step by step, with the same random numbers and a
 translation-invariant force field. So it samples the fixcm-off canonical distribution of the internal
 motion: 3N - 3 degrees of freedom at the target, per species too. The bias of ``"ase"`` is measured in
-``docs/validation/3-T22-fixcm.md``.
+``docs/validation/phases/3-T22-fixcm.md``.
 """
 
 from __future__ import annotations
@@ -171,7 +171,7 @@ def test_redraw_all_and_the_mass_weighted_thermostat_share_one_convention():
     """``redraw_all`` (3-T09) draws Σ m v² = (3N − 3) kT at zero momentum, which is what ``"mass_weighted"``
     holds (above: it is the run without fixcm minus its centre of mass). ASE's projection holds 3N kT, so
     with it every accepted ``redraw_all`` block lowers the kinetic energy by (N − 1)/N (3-T12's addendum;
-    measured in docs/validation/3-T22-fixcm.md)."""
+    measured in docs/validation/phases/3-T22-fixcm.md)."""
     from fastmace.mc import momenta
 
     atoms = licscl()

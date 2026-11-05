@@ -1,7 +1,7 @@
 # 2-T14 raw results (murphy, 20 October 2026)
 
 Raw files of plan task 2-T14, "Find the flaky test". The report is
-[docs/validation/2-T14-flaky-test.md](../../docs/validation/2-T14-flaky-test.md). Everything
+[docs/validation/phases/2-T14-flaky-test.md](../../docs/validation/phases/2-T14-flaky-test.md). Everything
 ran on murphy's CPUs in the NAS environment `mace_cueq_latest`, from `PYTHONPATH` copies under
 `/mnt/homes/zwingel/fastmace-2-T14/` (deleted after the merge).
 

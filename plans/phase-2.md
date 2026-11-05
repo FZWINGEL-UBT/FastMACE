@@ -778,7 +778,7 @@ of 1b-T23 (`tools/`, `fastmace/bench/`).
   - the same-process A/B gain is beyond the local noise floor (T12) on MH-1
     and one generic model;
   - the gain holds on murphy when murphy is idle.
-- Each screen is recorded in `docs/rewrites.md`, adopted or not (SPEC
+- Each screen is recorded in `docs/optimisation-ledger.md`, adopted or not (SPEC
   §6.2).
 - The conductor gives screens free GPU slots only; they never hold up the
   critical path.
@@ -868,7 +868,7 @@ cache for now ("shorten first"). The ASE-equivalence acceptance reference
 drops from 18,000 to 4,000 steps (heat 2,000 + cool 2,000, 16 bins kept),
 and its final-T check becomes "below half the peak". The limits tighten from
 0.1 K and 0.01 meV/atom to 1e-6 K and 1e-7 meV/atom (SPEC §12.2 amendment).
-Evidence is in `docs/validation/2-T14e-reference-reuse.md`: same-seed
+Evidence is in `docs/validation/phases/2-T14e-reference-reuse.md`: same-seed
 trajectories agree to 1e-10 K, and a Lennard-Jones stand-in shows the same
 detection power at 4,000 steps as at 18,000. One MH-1 run of the new
 schedule on murphy comes before the test change.
@@ -906,7 +906,7 @@ diff after 2-T23's timed runs.
 - The no-regression A/B against the tag `fastmace-1b`, judged against each
   machine's own noise floor.
 - The full and acceptance GPU tiers green on both runners (T18).
-- Report: `docs/validation/phase-2.md`, with pass or fail per item, run IDs,
+- Report: `docs/validation/phases/phase-2.md`, with pass or fail per item, run IDs,
   hardware, environments and open findings.
 
 ## Order and parallelism
@@ -1171,7 +1171,7 @@ notes folder of the conductor's session (`2-T0x-…md`).
 - **Speed screens land "off"** (T20 Q2). A passing screen is merged with
   default "off". Turning it on (`auto`) is the owner's decision after
   murphy confirms the gain, so acceptance 8 (default plans unchanged) holds.
-  T20 may create `docs/rewrites.md` with the research engine's rejected
+  T20 may create `docs/optimisation-ledger.md` with the research engine's rejected
   screens (SPEC §6.2).
 - **Hybrid on murphy** (T18 Q6). Allowed: ResearchModule's AGENTS.md gives
   murphy the same setup as leto, and the hybrid default passed the
@@ -1414,7 +1414,7 @@ notes folder of the conductor's session (`2-T0x-…md`).
   because it happens at planning time.
 
 - **2-T12 merged** (docs and results only; report
-  `docs/validation/2-T12-local-noise-floor.md`). The local RTX 5060 Ti's
+  `docs/validation/phases/2-T12-local-noise-floor.md`). The local RTX 5060 Ti's
   floor for a 12-block same-process A/B is **1.1 % on NaCl and 0.4 % on
   NbCl5**, and 0.7 % on both in 4-block windows (murphy: 0.16 %). It applies
   to `tools/ab_step_time.py`, `tools/ab_fastmace.py` and

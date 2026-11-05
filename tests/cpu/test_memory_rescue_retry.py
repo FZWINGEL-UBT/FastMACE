@@ -94,7 +94,7 @@ def test_the_rescue_turns_on_one_record_per_rebuild_in_its_order(monkeypatch, st
 
 
 def test_the_rescue_turns_gate_epilogue_off_after_the_node_segments(monkeypatch, stubbed):
-    """docs/validation/region-norm.md: gate_epilogue (decision 66's default) is the rung the rescue turns off, after
+    """docs/validation/capacity/region-norm.md: gate_epilogue (decision 66's default) is the rung the rescue turns off, after
     recompute_node_segments and before recompute_node_region; the caller's explicit "on" is kept."""
     requires = {"recompute_conv_weights": ("wprime_backward",), "recompute_first_table": (),
                 "recompute_node_segments": ("gated_rows",), "gate_epilogue": ("segment_gemm",),
@@ -122,7 +122,7 @@ def test_the_rescue_turns_gate_epilogue_off_after_the_node_segments(monkeypatch,
 
 
 def test_the_region_s_rebuild_turns_gate_epilogue_back_on(monkeypatch, stubbed):
-    """docs/validation/region-norm.md: inside recompute_node_region's chunks gate_epilogue keeps 0.5 kB per atom, so
+    """docs/validation/capacity/region-norm.md: inside recompute_node_region's chunks gate_epilogue keeps 0.5 kB per atom, so
     the rebuild that turns the region on gives it back, when an earlier rebuild of the rescue had turned it off."""
     requires = {"recompute_node_region": ("recompute_node_segments",)}
     monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires.get(name, ())))

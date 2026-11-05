@@ -1,6 +1,6 @@
 # Generic fold of `products.0.linear` (4–5 November 2026)
 
-Report: `docs/validation/generic-fold-product.md`. Model MACE-OMAT-0 medium (checkpoint sha256 d4b14be9…), float32
+Report: `docs/validation/omat0/generic-fold-product.md`. Model MACE-OMAT-0 medium (checkpoint sha256 d4b14be9…), float32
 default plan with `fold_product_linear=on` on side b. Source `df0d088f` (branch `fastmace/generic-fold-product`).
 Script: `tools/modal/fold_product_ab.sh` (force gate on NaCl, NbCl5, SrTiO3 3×3×3; MD-step A/Bs on SrTiO3 10×10×10
 and NbCl5, abab and abba).

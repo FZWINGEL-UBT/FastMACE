@@ -2,7 +2,7 @@
 
 Under WSL2 the driver reserves a kernel's local memory (its stack frame) for every thread the GPU can hold, keeps
 the reservation for the process's lifetime and does not give it back when the stack limit is lowered
-(docs/validation/capacity-T03.md). This tool builds the default plan's ``fm.Simulation`` for one supercell, runs two
+(docs/validation/capacity/capacity-T03.md). This tool builds the default plan's ``fm.Simulation`` for one supercell, runs two
 steps, then lists
 
 - FastMACE's NVRTC kernels (``fastmace.kernels.oeq_streaming``: the streaming convolution, the fused folded forward,

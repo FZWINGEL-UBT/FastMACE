@@ -25,7 +25,7 @@ On POLAR-1-L the build was the larger (5-T03's memory history: 3.9 GB on an A100
 
 The activations and rewrite terms are multiplied by ``SAFETY``, one factor for every model and GPU,
 fitted on the 19 labels (SPEC §9.3 rule 12 as amended 23 October 2026; fit and residuals in
-``docs/validation/5-T03.md``).
+``docs/validation/phases/5-T03.md``).
 
 The graph tier's variants share one graph pool (``engine/graph.py``), so the largest variant counts once.
 
@@ -58,12 +58,12 @@ MARGIN = 0.9
 # rescue turns on one record per rebuild in this order. Last, recompute_node_region (about 1.23x the separate
 # segments' force call): only when the plan does not fit with recompute_node_segments on (ninth list item 2).
 #
-# gate_epilogue is a rung the other way round (docs/validation/region-norm.md): decision 66 turns it on for speed
+# gate_epilogue is a rung the other way round (docs/validation/capacity/region-norm.md): decision 66 turns it on for speed
 # (speed-def E2, 1.00-1.05x), and it keeps more for the backward, so the rescue turns it off. It keeps 12 kB per atom
 # more without the node segments and 36 kB with the separate segments, so it comes after recompute_node_segments:
 # there it frees about 9 kB per atom for each percent of step time, recompute_node_region about 5.
 #
-# A generic model (MACE-MP-0 class) has two rungs: generic_recompute_conv_weights (docs/validation/omat0-capacity.md),
+# A generic model (MACE-MP-0 class) has two rungs: generic_recompute_conv_weights (docs/validation/omat0/omat0-capacity.md),
 # its per-edge weights are not kept, on the chunked folded path; then, with radial tables,
 # generic_recompute_first_table (docs/validation/omat0-capacity-2.md), the tables' outputs are evaluated again in the
 # backward. Both float32 only (RESCUE_FLOAT32_ONLY).
@@ -76,7 +76,7 @@ RESCUE_OFF = ("gate_epilogue",)
 # Records whose term depends on another enabled record, in priority order: (record, other record, the term's name in
 # ``fastmace.rewrites.memory``, "" for none). The first whose other record is enabled replaces the record's own term.
 # Inside recompute_node_region's chunks gate_epilogue's extra buffers are rebuilt per chunk (0.5 kB per atom); with
-# the separate segments they stay live at the peak (docs/validation/region-norm.md).
+# the separate segments they stay live at the peak (docs/validation/capacity/region-norm.md).
 CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
                  ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"),
                  ("generic_recompute_first_table", "generic_recompute_conv_weights",
@@ -87,12 +87,12 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # slack: reserved / allocated 1.07-1.44 over the matrix, stable within 1.5 % across sizes for one crystal and stage,
 # the same on Linux and WSL2), so each stage scales the kept activations by its own factor, named by the deepest rung
 # taken (``rescue_stage``): the upper envelope over the rescue matrix of what keeps every point at or above its
-# measured peak (docs/validation/estimate-band.md). Relative to the default plan, whose reserve SAFETY's fit covers.
+# measured peak (docs/validation/capacity/estimate-band.md). Relative to the default plan, whose reserve SAFETY's fit covers.
 # Cells of at least 15,000 atoms (the rescue is never planned below; there the build's fixed transient sets the
 # peak). Below 1 where the stage's reserve is under the default plan's share of SAFETY's overstatement; gate_epilogue's
 # rung at 1 (turning the epilogue off frees live memory that the pool's packing keeps reserved on SrTiO3 and NaNbO3).
 # generic_recompute_conv_weights: MACE-OMAT-0 medium's rescue matrix, SrTiO3, NaCl and NaNbO3 (RTX A4000, RTX 4000
-# Ada; docs/validation/omat0-capacity.md). The envelope of cells of at least 15,000 atoms is 0.975 (with SrTiO3 and
+# Ada; docs/validation/omat0/omat0-capacity.md). The envelope of cells of at least 15,000 atoms is 0.975 (with SrTiO3 and
 # NaCl only, NaNbO3 held out came out at 0.980-1.014); 1 keeps the smaller cells (3,645-7,680 atoms) at their peak too.
 RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("generic_recompute_conv_weights", 1.0),
                   ("generic_recompute_first_table", 1.0),
@@ -124,9 +124,9 @@ def rescue_value(name: str) -> str:
 # times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
-# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.25]),
+# 19 labels' GPU peaks (docs/validation/phases/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.25]),
 # with the edges counted in the structure (``counted_edges``): the lowest that keeps every case at or above its
-# measured peak (docs/validation/estimate-refit.md). Below 1 because the run term is stock-structured: it counts
+# measured peak (docs/validation/capacity/estimate-refit.md). Below 1 because the run term is stock-structured: it counts
 # what stock MACE keeps per edge, while the fused paths (OEq's convolution, the folded MH-1 backward) keep less.
 # Per-path structural terms are a known limitation (plans/phase-5.md).
 SAFETY = 0.97
@@ -152,7 +152,7 @@ class MemoryTerm:
     for a stock tensor it does not materialise. ``edge_keep`` and ``node_keep``: the fractions of the remaining
     per-edge and per-node activations (the estimate's activations and the additive terms of that side) the rewrite
     keeps, for the memory-rescue records, whose savings were measured as fractions of the peak's per-edge or
-    per-node part (docs/validation/estimate-band.md); 1 for the others."""
+    per-node part (docs/validation/capacity/estimate-band.md); 1 for the others."""
 
     edge_bytes: float = 0.0
     node_bytes: float = 0.0
@@ -230,7 +230,7 @@ def model_edges(natoms: int, volume_A3: float, r_max_A: float, bucket_fraction: 
 def counted_edges(atoms, r_max_A: float, bucket_fraction: float) -> int:
     """The edges the model reads: both directions of every pair within ``r_max`` in ``atoms`` (counted, with the
     cell's periodicity), plus one edge bucket of padding. The uniform-density count (``model_edges``) is 1.2-1.4x
-    a crystal's (NbCl5 33.0 against 26.3 per atom at 6 Å, NaCl 43.6 against 32.0; docs/validation/estimate-refit.md).
+    a crystal's (NbCl5 33.0 against 26.3 per atom at 6 Å, NaCl 43.6 against 32.0; docs/validation/capacity/estimate-refit.md).
     About 7 s on one CPU core at 137,000 atoms."""
     from ase.neighborlist import neighbor_list
 
@@ -306,7 +306,7 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     # The memory-rescue records' fractions apply to what remains of their own side (SAFETY times the per-edge or the
     # per-node activations and additive terms), so the estimate's overstatement shrinks with the peak instead of
     # staying as an absolute excess, and a record that frees per-edge tensors saves nothing per atom
-    # (docs/validation/estimate-band.md).
+    # (docs/validation/capacity/estimate-band.md).
     remaining_edge, remaining_node = SAFETY * (edge_activations + additive_edge), SAFETY * (node_activations
                                                                                             + additive_node)
     rewrites, kept_edge, kept_node = [], remaining_edge, remaining_node
@@ -387,7 +387,7 @@ def short_by_far(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
     return bool(free_bytes) and estimate_.needed / overstatement > MARGIN * free_bytes
 
 
-# The near-limit memory probe (EngineConfig.memory_probe; planner.memory_probe, docs/validation/estimate-probe.md):
+# The near-limit memory probe (EngineConfig.memory_probe; planner.memory_probe, docs/validation/capacity/estimate-probe.md):
 # a stage's estimate corrected by what a small replica of the structure measured with that stage's rewrites. Its
 # term's name in the run's terms.
 PROBE_TERM = "memory probe"
@@ -395,7 +395,7 @@ PROBE_TERM = "memory probe"
 # the rest only.
 FIXED_TERMS = ("weights (pristine and execution copy)", "rewrites' buffers", "workspace")
 # On the corrected estimate: the replica's measured scale moved by up to 5 % between 15-26k atoms and the larger cells
-# of the rescue matrix (graph-pool packing; docs/validation/estimate-probe.md), so the corrected estimate keeps 5 %.
+# of the rescue matrix (graph-pool packing; docs/validation/capacity/estimate-probe.md), so the corrected estimate keeps 5 %.
 PROBE_HEADROOM = 1.05
 
 
@@ -481,7 +481,7 @@ def polar_streaming_backward_term(dims, dtype: str) -> tuple[str, MemoryTerm]:
     the convolution backward's weight gradient stays allocated into the long-range backward (memory history,
     POLAR-1-L NbCl5 3x3x3 on the RTX 5060 Ti, 24 October 2026: three ``[E, W]`` buffers live against MH-1's
     two; 5-T03 rerun). Per model edge, as the stock per-edge terms (the edge estimate is already above the
-    edges a crystal uses, docs/validation/5-T03.md)."""
+    edges a crystal uses, docs/validation/phases/5-T03.md)."""
     width = DTYPE_BYTES[dtype]
     w_max = max((block.weight_numel for block in dims.interactions), default=0)
     return POLAR_STREAMING_BACKWARD, MemoryTerm(w_max * width, 0.0)

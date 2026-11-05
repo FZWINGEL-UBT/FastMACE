@@ -6,7 +6,7 @@ independent adjacent pointwise kernels of the forward and backward as one kernel
 hybrid float32, local RTX 5060 Ti) the force graph has 211 kernels instead of 264 and 128 µs of gaps
 instead of 157 µs (``results/opt3-T04-graph-gaps/``).
 
-- **Rounding, not exact** (measured, ``docs/validation/opt3-T04.md``). Reductions are left out on purpose (a
+- **Rounding, not exact** (measured, ``docs/validation/speed/opt3-T04.md``). Reductions are left out on purpose (a
   combo could tile them differently), and in the reproducible mode positions, momenta and forces stay bitwise
   equal over 200 NaCl steps; but the potential energy differs by 2.1e-6 eV (of 1474 eV), so the combined
   pointwise code is not bit-for-bit the separate kernels' on the energy path.

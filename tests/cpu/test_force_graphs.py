@@ -2,7 +2,7 @@
 
 A force graph (B, ACB, ACPB) keeps one set of activations in the graph pool. A capture at a larger padded edge size
 beside it needs a second set, and on the 16 GB card that capture was the first allocation to fail
-(docs/validation/capacity-16gb.md). ``"one"`` releases the captured graphs and their pool before a new force
+(docs/validation/capacity/capacity-16gb.md). ``"one"`` releases the captured graphs and their pool before a new force
 variant is captured, so one force graph lives at a time; ``"fit"`` does that only when the new variant would not fit
 the free device memory, estimated from the bytes per edge the earlier force captures added; ``"keep"`` is the
 earlier behaviour. After a release the padded edge size never drops below the captured one (padding is exact), so

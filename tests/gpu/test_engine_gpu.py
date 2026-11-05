@@ -539,7 +539,7 @@ def kernel_sequence(kinds):
     the edge indices), and the choice differs between processes and engines: the research engine's B
     graph of MH-1 NaCl had 242 nodes in one run and 239 in the next. On murphy (RTX 4000 Ada) a GPU
     shared with another process makes cuEq pick the transposed variant for one forward polynomial,
-    in either engine, which adds 12 nodes (2-T08c: docs/validation/2-T08c-stage-b-kernels.md). Each
+    in either engine, which adds 12 nodes (2-T08c: docs/validation/phases/2-T08c-stage-b-kernels.md). Each
     such launch (or split group) counts as one node of its operation here, and the index grouping of a
     transposed variant (its kernels, sort and memory nodes) is left out; everything else must match by
     name.

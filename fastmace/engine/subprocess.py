@@ -31,7 +31,7 @@ the error and in ``metadata.json``, after an error.
 
 **The persistent worker (OPT-T07, ``RunnerConfig.persistent``, the default on POSIX).** The setup
 child does not exit: it stays as the worker for the ``Simulation``'s lifetime, keeping its compiled
-engine, and serves every later ``run()`` as a call (docs/design/opt-T07-persistent-worker.md). The
+engine, and serves every later ``run()`` as a call (docs/design/speed/opt-T07-persistent-worker.md). The
 calls are the same requests in the same stage directories, and each still ends with the canonical
 restart write, so the worker is §10.6's uninterrupted run with the same restart points, and a fresh
 child per call (``persistent=False``, and always on Windows) the interrupted one: bit for bit equal
@@ -356,7 +356,7 @@ class SubprocessRunner:
 
     def restart_worker(self) -> None:
         """End the worker; the next call starts a fresh child from the last hand-off (a plan revision
-        decided in the parent, docs/design/opt-T07-persistent-worker.md)."""
+        decided in the parent, docs/design/speed/opt-T07-persistent-worker.md)."""
         self._stop_worker(CLOSE_GRACE_S)
 
     def close(self) -> None:

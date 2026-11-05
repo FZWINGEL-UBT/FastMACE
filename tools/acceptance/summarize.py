@@ -1,4 +1,4 @@
-"""Summaries and verdicts of a phase 1a acceptance run (plan task 1a-T19), for docs/validation/phase-1a.md.
+"""Summaries and verdicts of a phase 1a acceptance run (plan task 1a-T19), for docs/validation/phases/phase-1a.md.
 
     python3 tools/acceptance/summarize.py RUN_ROOT [--output results/<run id>/summary.json]
 
@@ -6,7 +6,7 @@ Reads the jobs' metadata.json files under RUN_ROOT (from run.py) and derives:
 
 - speed: FastMACE's median step time over the baseline's, per A/B process and structure, whatever
   the build order; the pass rule is |ratio - 1| <= max(3 %, noise floor), with the noise floor of
-  docs/validation/1a-noise-floor.md for the number of blocks (both are reported), and a row is valid
+  docs/validation/phases/1a-noise-floor.md for the number of blocks (both are reported), and a row is valid
   only if nothing compiled during its timed blocks (``compile_during_timing``; conductor's condition 1
   for sharing Inductor's custom-pass slot);
 - controls: setup time and peak memory per engine from the single-engine processes (reported, not
@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 
 SPEED_LIMIT = 0.03
-# docs/validation/1a-noise-floor.md: largest |B/A - 1| of two identical engines in one process.
+# docs/validation/phases/1a-noise-floor.md: largest |B/A - 1| of two identical engines in one process.
 NOISE_FLOOR = {12: 0.0016, 4: 0.0032}
 FORCE_TOLERANCE = 1e-5  # eV/A: the gate's force floor (SPEC §12.3)
 
@@ -221,7 +221,7 @@ def _slug(name):
 
 
 def markdown(summary):
-    """The tables of docs/validation/phase-1a.md."""
+    """The tables of docs/validation/phases/phase-1a.md."""
     lines = ["| Job | Model | Ensemble | Structure | Atoms | Baseline (ms) | FastMACE (ms) | FastMACE/baseline "
              "| Pair ratios | Criterion | Pass |",
              "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |"]

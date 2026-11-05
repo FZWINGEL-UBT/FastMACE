@@ -4,7 +4,7 @@ CUTLASS's ``OpMultiplyAddFastF32`` splits each float32 operand into a TF32 big a
 tensor-core products (big * big + big * small + small * big) in FP32, the same split as Triton's ``tf32x3``, but
 with a CUTLASS sm_80 mainloop: 40.8 TFLOPS at 4096³ on an A100 against cuBLAS IEEE's 19.0 and Triton's 16.8, and
 the summed MH-1 GEMM time per force call 0.75 (NaCl) and 0.55 (NbCl5) of cuBLAS IEEE's
-(``docs/validation/opt-T01-tensor-cores.md`` §5; ``docs/validation/cutlass-tf32x3.md``).
+(``docs/validation/speed/opt-T01-tensor-cores.md`` §5; ``docs/validation/omat0/cutlass-tf32x3.md``).
 
 The kernels come from ``tf32x3_sm80.cu``, built offline into ``tf32x3_sm80.cubin`` (``tools/build_cutlass_tf32x3.sh``;
 the build record is ``tf32x3_sm80.build.txt``). An sm_80 cubin loads only on compute capability 8.x, and the tile
@@ -129,7 +129,7 @@ def takes(m, k, n) -> bool:
 
 # Without split-K a product with few 64x64 output tiles and a long K leaves most SMs idle: on the A100 (108 SMs,
 # CUDA-graph timings) 16 tiles at K 512 and 2048 took 1.2-2.3x cuBLAS IEEE's time, while every product with 16
-# tiles at K <= 256 or with 160 tiles or more took 0.54-1.00x (docs/validation/cutlass-tf32x3.md). Those stay on
+# tiles at K <= 256 or with 160 tiles or more took 0.54-1.00x (docs/validation/omat0/cutlass-tf32x3.md). Those stay on
 # cuBLAS IEEE (an MD step's products have atom rows, so many tiles; a weight gradient's K is the atom count).
 MIN_TILES = 54  # half the A100's SMs
 LONG_K = 256

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# segment_gemm tile order (docs/validation/segment-gemm-order.md) on the Modal A100 (sm_80, 40 MB L2): the bitwise
+# segment_gemm tile order (docs/validation/speed/segment-gemm-order.md) on the Modal A100 (sm_80, 40 MB L2): the bitwise
 # GPU tests, the kernel probe at 9,216 and 51,840 atoms, and same-process A/Bs (tools/ab_rewrites.py, a = TILE_ORDER
 # "rows", b = the default "auto", both build orders), MH-1 hybrid float32 NVT 300 K. As
 # results/segment-gemm-order-20261030/ada.sh.

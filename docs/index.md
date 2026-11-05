@@ -12,7 +12,7 @@ Measured by us on an RTX 5060 Ti, float32, 216 to 1,944 atom cells: 3.8 to
 than Symmetrix-XL in LAMMPS; 3 to 22 times faster than MACE's ASE
 calculator. MH-1 on 216-atom NaCl: 2.90 ms per 1 fs step. The margin is
 largest on small cells; we claim nothing beyond the measured sizes and GPUs
-([TorchSim comparison](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/torchsim-comparison-20261025.md),
+([TorchSim comparison](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/comparisons/torchsim-comparison-20261025.md),
 [positioning](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/design/2026-10-positioning.md)).
 
 ## One run
@@ -277,7 +277,7 @@ Reference: [Command line and TOML](reference/cli.md).
       and TOML key with its default, and the
       [API reference](api/index.md), generated from the code.
     - **Project:** [benchmarks](benchmarks.md),
-      [rewrite screens](rewrites.md), [licences](licences.md) and
+      [rewrite screens](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/optimisation-ledger.md#screen-table), [licences](licences.md) and
       [development](development.md).
 
 The specification, design notes and validation records are kept in the

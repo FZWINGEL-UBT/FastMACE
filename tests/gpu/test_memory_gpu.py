@@ -5,7 +5,7 @@ the planner's default plan (hybrid float32 where the OpenEquivariance runtime is
 NVT on the graph tier, in a fresh process. The plan's ``predicted_memory_bytes`` must not be below
 ``torch.cuda.max_memory_allocated`` over the build, the capture and 100 steps; the plan's ``memory`` decision is
 rule 12's, and on a free GPU it fits. The ratio is recorded (``FASTMACE_RESULTS``); the 19-label validation is
-``docs/validation/5-T03.md`` (``tools/memory_peaks.py``).
+``docs/validation/phases/5-T03.md`` (``tools/memory_peaks.py``).
 """
 
 import importlib.util

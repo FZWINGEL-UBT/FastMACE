@@ -25,7 +25,7 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
 
 ## State on 18 October 2026
 
-- **Phase 0:** done (`docs/validation/phase-0.md`).
+- **Phase 0:** done (`docs/validation/phases/phase-0.md`).
 - **Phase 1a:** 14 of 20 tasks are merged: T00–T10, T14, T16 and T18.
   Their decisions are in `plans/phase-1a.md`, in every "Conductor decisions
   after …" section. Read them all before briefing anyone.

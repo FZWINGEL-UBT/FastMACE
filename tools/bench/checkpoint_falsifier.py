@@ -1,7 +1,7 @@
 """Interaction-boundary checkpointing falsifier (plans/capacity.md CAP-T08, the conductor's item B).
 
 The force call keeps every interaction's node-feature intermediates for the backward (174.5 kB per atom saved,
-docs/validation/capacity-T08-inventory.md). The candidate keeps only the node state between interactions: each
+docs/validation/capacity/capacity-T08-inventory.md). The candidate keeps only the node state between interactions: each
 interaction and its product block run under ``torch.utils.checkpoint`` (non-reentrant, no RNG stash), so their
 intermediates are rebuilt in the backward. In the eager tier (``compile_mode=none``) this tool builds the default
 plan's ``fm.Simulation`` for one supercell, then times force calls of the engine's force field (forward and the force

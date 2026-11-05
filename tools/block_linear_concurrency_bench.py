@@ -1,4 +1,4 @@
-"""Concurrent per-l products of one block linear (plan opt-1, OPT-T03 micro-bench; docs/design/opt-T03-small-m.md).
+"""Concurrent per-l products of one block linear (plan opt-1, OPT-T03 micro-bench; docs/design/speed/opt-T03-small-m.md).
 
 One MH-1 block linear (512x0e + 512x1o + 512x2e + 512x3o in and out) has four independent products
 ``rows_l @ W_l`` with ``rows_l`` of shape ``[atoms (2l + 1), 512]``. For NaCl (216 atoms) and NbCl5 (1,944)

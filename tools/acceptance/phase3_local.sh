@@ -6,7 +6,7 @@
 # SRC is the pinned copy (git archive of the 3-T21 head, with .source_commit); its fastmace/ equals the freeze's.
 # Run every call under the GPU reservation: python3 SRC/tools/ci/local_gpu.py run --purpose "3-T21 JOB" -- bash ...
 # Outputs: ~/fastmace-acceptance/3-T21-local-<date>/<job>/ and <job>.log beside it.
-# Jobs (docs/validation/phase-3-runbook.md):
+# Jobs (docs/validation/phases/phase-3-runbook.md):
 #   timed (quiet PC): regression3 (item 10), events (item 1, swap-back), mc-cost (item 2), rule9
 #   untimed: acceptance-tier, slow-tier, protocol (item 9, the short protocol), delta-e (item 3)
 # Scope (owner, 22 October 2026): item 1 without the superset rows, items 2 and rule 9 one block per case,

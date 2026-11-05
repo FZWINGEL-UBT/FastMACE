@@ -180,7 +180,7 @@ asks the conductor for that GPU.
 
 - Spec: §5, §7.1, §7.2, §7.6, §9.2, §9.5, §10.6.
 - Source: `docs/design/interfaces.md` (its open questions 2 and 3),
-  `docs/design/switch-map.md` (open question 7), `fastmace/state.py`
+  `docs/current/switch-map.md` (open question 7), `fastmace/state.py`
   (`FIELDS_ADDED_IN_1B`), the 1a decision sections of `plans/phase-1a.md`.
 - Files:
   - `docs/design/contracts-1b.md`: one page, the public objects and who
@@ -300,7 +300,7 @@ asks the conductor for that GPU.
     (k-space).
   - GPU: on NbCl5 3×3×3, the float32 production energy of POLAR-1-S and
     OMOL-0 XL against float64 (1a: 45–102 meV/atom off), recorded in
-    `docs/validation/1b-T03-energy.md`;
+    `docs/validation/phases/1b-T03-energy.md`;
   - GPU: MH-1 `matpes_r2scan` energy change against 1a, which owner
     decision D2 needs;
   - GPU: step time against main before the task, in a same-process A/B with
@@ -477,7 +477,7 @@ asks the conductor for that GPU.
   - GPU (§12.2): Langevin on NaCl over 9 ps with the same seed as ASE: the
     same T and E_pot in every 50 K bin, |ΔPE| < 0.01 meV/atom;
   - GPU: BAOAB, both variants against their references on NaCl.
-- Done when: the results are in `docs/validation/1b-T09-integrators.md`;
+- Done when: the results are in `docs/validation/phases/1b-T09-integrators.md`;
   T13 enters them in the reference record.
 
 #### 1b-T10 Schema-versioned provenance (M) — after T01
@@ -516,7 +516,7 @@ asks the conductor for that GPU.
   - its breakdowns in `results/generic-rewrites-rtx5060ti-20261015/breakdown-mp0-medium`;
   - `studies/other_models/probes/model_step_time.py`;
   - 1a-T19's murphy runs (`results/1a-T19-speed-murphy-20261018/`).
-- Files: `docs/validation/1b-T11-mp0-setup.md`; a fix only in the file that
+- Files: `docs/validation/phases/1b-T11-mp0-setup.md`; a fix only in the file that
   causes the gap, agreed with that file's 1b owner through the conductor.
 - Method:
   - speed: compare kernel sequences of the B graph (node counts,
@@ -946,7 +946,7 @@ asks the conductor for that GPU.
 - Compatibility (6): ResearchModule's adapter tests against 1b's main, and
   one `main.py --engine fastmace` smoke run on leto from the NAS copy.
   ResearchModule is only read; the run uses its NAS tree.
-- Report: `docs/validation/phase-1b.md` with run IDs, machines, GPUs,
+- Report: `docs/validation/phases/phase-1b.md` with run IDs, machines, GPUs,
   environments, backend, precision, model labels, both commits and every
   number; JSON in `results/<run-id>/`.
 - If coraline is idle during 1b, the conductor runs 1a's open soft-lock
@@ -1470,7 +1470,7 @@ points here.
 
 ### After 1b-T23 (19 October 2026)
 
-- The acceptance report is `docs/validation/phase-1b.md` (merged). It
+- The acceptance report is `docs/validation/phases/phase-1b.md` (merged). It
   passes the gate with energy on all 19 labels, the in-library gate (19
   NVT, 18 NPT), the full GPU tier on murphy and the RTX 5060 Ti (176 each),
   restart, `doctor`/`md`, and compatibility with `main.py`.
@@ -1610,7 +1610,7 @@ below is kept as the record.
 
 ## 1a open findings
 
-| Finding (`docs/validation/phase-1a.md`) | Disposition |
+| Finding (`docs/validation/phases/phase-1a.md`) | Disposition |
 | --- | --- |
 | MP-0 medium 1.4–1.6 % slower than the research engine | **1b task T11** (parity diagnosis; fix only if it restores the research engine's numerics), else a screen after 1b |
 | Setup 4–33 s longer (self-checks, per-process OEq build) | **1b task T11** measures the stages and T15 reports them. Speed-ups go **after 1b**: cached qualification keyed by checkpoint hash and software versions (general, not shape-keyed), and the persistent OEq extension cache of 1a's decision after wave 0. Phase 6 removes the build with prebuilt OEq wheels |

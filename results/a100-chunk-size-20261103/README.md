@@ -4,7 +4,7 @@ Modal, NVIDIA A100-SXM4-80GB, driver 610.57.04, source 5c6cf6a1, `tools/modal/a1
 $0.83. MACE-OMAT-0 medium, SrTiO3 10×10×10 (5,000 atoms), float32, skin 0.5 Å, 1 fs, both build orders.
 
 Side a is the A100 default then (radial tables on, chunked backward off); side b adds the chunked backward. The study
-is cited from `docs/validation/generic-wprime.md`.
+is cited from `docs/validation/omat0/generic-wprime.md`.
 
 | Side b | Step a (ms) | Step b (ms) | b/a, ab | b/a, ba |
 |---|---|---|---:|---:|

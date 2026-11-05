@@ -30,4 +30,4 @@ weights are under the Academic Software License (non-commercial); MP-0 and MPA-0
 ## RTX 5060 Ti (local reference GPU)
 
 The timed acceptance numbers are in the phase reports, for example the phase 5 regression A/B: MH-1 NaCl 2.87 ms,
-NbCl5 21.0–21.3 ms (`docs/validation/phase-5.md`). A full table on this GPU is still to be measured.
+NbCl5 21.0–21.3 ms (`docs/validation/phases/phase-5.md`). A full table on this GPU is still to be measured.

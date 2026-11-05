@@ -6,7 +6,7 @@
 # SRC is the pinned copy (git archive of the 3b-T10 head, with .source_commit); its fastmace/ equals the freeze's.
 # Run every call under the GPU reservation: python3 SRC/tools/ci/local_gpu.py run --purpose "3b-T10 JOB" -- bash ...
 # Outputs: ~/fastmace-acceptance/3b-T10-local-<date>/<job>/ and <job>.log beside it. Runbook, pass rules and job
-# table: docs/validation/phase-3b-runbook.md.
+# table: docs/validation/phases/phase-3b-runbook.md.
 # Jobs:
 #   timed (quiet PC, first, alone): regression (item 5, NVT A/B), regression-npt (item 5, NPT, one side per process),
 #     d3-cost (item 3)
