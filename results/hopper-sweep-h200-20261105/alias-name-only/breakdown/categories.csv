@@ -1,0 +1,14 @@
+category,ms_per_force_call,share_of_kernel_time,kernels_per_call,gemm_tflops,gemm_share_of_fp32_peak,est_achieved_occupancy_pct
+Interaction 2: convolution backward (streaming),3.0553,0.2402,3,,,42.9
+"Radial networks: folded last layer, forward GEMM",1.9834,0.1559,1,30.875,0.461,13.0
+"Radial networks: folded last layer, input gradient",1.6370,0.1287,1,,,25.0
+Atom-level linear layers (GEMM),1.3843,0.1088,42,30.378,0.454,16.6
+Radial networks: other GEMMs,1.1516,0.0905,14,22.944,0.343,16.2
+Interaction 2: convolution forward (streaming),1.1459,0.0901,1,,,44.0
+"Atom-level elementwise (gates, products, residuals, readouts)",0.7511,0.0590,82,,,79.0
+"Radial networks: elementwise (norms, activations)",0.6582,0.0517,12,,,100.0
+Interaction 1: reassociated edge sums,0.2991,0.0235,3,,,49.1
+"Edge elementwise (geometry, radial basis, gathers, scatters)",0.2676,0.0210,8,,,41.5
+Other,0.1872,0.0147,9,,,23.2
+Atom-level cuEq tensor products (symmetric contraction),0.1698,0.0133,5,,,44.8
+Copies and fills,0.0289,0.0023,9,,,63.5

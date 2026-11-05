@@ -1,0 +1,36 @@
+{
+ "tool": "loup_md",
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "atoms": 5000,
+ "ensemble": "nve",
+ "skin": 0.5,
+ "warmup": 5,
+ "steps": 20,
+ "blocks": 1,
+ "requested": {},
+ "constants": {},
+ "gpu": "NVIDIA A100-SXM4-80GB",
+ "fastmace": "1.0.0",
+ "setup_s": 26.092349342000034,
+ "block_s": [
+  0.2600365600000032
+ ],
+ "us_per_atom_step": [
+  2.600365600000032
+ ],
+ "median_us_per_atom_step": 2.600365600000032,
+ "ms_per_step": 13.00182800000016,
+ "rewrites_on": [
+  "block_linear",
+  "fused_folded_backward",
+  "grouped_launch",
+  "grouped_linear",
+  "merged_residual",
+  "reassociate_first",
+  "segmented_first_sum",
+  "single_graph_strain",
+  "species_skip",
+  "streaming_conv"
+ ],
+ "max_memory_allocated_mib": 4805.7666015625
+}

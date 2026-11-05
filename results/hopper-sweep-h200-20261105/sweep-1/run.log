@@ -1,0 +1,81 @@
+2026-11-05T15:28:40Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; alias NVIDIA H200=NVIDIA A100-SXM4-80GB; source b03fc94e5f9913ba5db833cdfd914628b2fa8cd0
+2026-11-05T15:28:40Z start tests
+2026-11-05T15:28:53Z end tests exit=0 12 passed in 2.47s
+2026-11-05T15:28:53Z start gate
+2026-11-05T15:35:00Z end gate exit=0 SrTiO3 summary {"energy": {"production_max_abs": 0.003674879959631923, "ase_f32_max_abs": 0.0003868923714536423, "ratio": 9.498455464046929, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.020329353375928e-05, "ase_f32_max_abs": 2.9487968468799863e-05
+NaCl summary {"energy": {"production_max_abs": 0.0003244992509760575, "ase_f32_max_abs": 0.0001594572975389181, "ratio": 2.0350228931783962, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.488016854791276e-06, "ase_f32_max_abs": 5.022402991827768e-06, "ratio": 0.6944916328830687, "floor": 1e-05, "limit": 1.0044805983655536e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 4.830617817211391e-08, "ase_f32_max_abs": 4.7576912536387295e-08, "ratio": 1.015328141252732, "floor": 1e-07, "limit": 1e-07, "passed": true, "gated": true}, "passed": true}
+NbCl5 summary {"energy": {"production_max_abs": 0.0009829504689738398, "ase_f32_max_abs": 0.00022743809330613693, "ratio": 4.321837448974591, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 8.042483425274582e-05, "ase_f32_max_abs": 8.233218288555832e-05, "ratio": 0.9768334985668519, "floor": 1e-05, "limit": 0.00016466436577111665, "passed": true, "gated": true}, "stress": {"production_max_abs": 1.2952818700777413e-07, "ase_f32_max_abs": 6.322542807357667e-08, "ratio": 2.0486723610165143, "floor": 1e-07, "limit": 1.2645085614715335e-07, "passed": false, "gated": true}, "passed": false}
+SrTiO3 summary {"energy": {"production_max_abs": 0.003674879959631923, "ase_f32_max_abs": 0.0003868923714536423, "ratio": 9.498455464046929, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 3.020329353375928e-05, "ase_f32_max_abs": 2.9487968468799863e-05, "ratio": 1.0242582009580035, "floor": 1e-05, "limit": 5.897593693759973e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 2.5190043013989527e-07, "ase_f32_max_abs": 2.871799661963159e-07, "ratio": 0.8771518204292023, "floor": 1e-07, "limit": 5.743599323926318e-07, "passed": true, "gated": true}, "passed": true}
+2026-11-05T15:35:00Z start loup-1
+2026-11-05T15:36:04Z end loup-1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 1.1315530199999557, "ms_per_step": 5.657765099999779, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_product_linear", "fused_folded_backward", "fused_f
+2026-11-05T15:36:04Z start loup-2
+2026-11-05T15:36:51Z end loup-2 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "atoms": 5000, "ensemble": "langevin", "requested": {}, "constants": {}, "median_us_per_atom_step": 1.1322979099998065, "ms_per_step": 5.6614895499990325, "rewrites_on": ["block_linear", "chunked_conv_backward", "fold_product_linear", "fused_folded_backward", "fused_
+2026-11-05T15:36:51Z start lab-forward
+2026-11-05T15:38:08Z end lab-forward exit=0 forward  simt                2392.6 us  ratio 1.340  regs 168 local 0  {'out0': 'max|d|/max|a| = 1.14e-06', 'out1': 'max|d|/max|a| = 2.05e-06', 'out2': 'max|d|/max|a| = 1.45e-06', 'out3': 'max|d|/max|a| = 1.17e-06', 'w': 'bitwise'}
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-warps8 rule LaunchRule(parts=2, warps=8, blocks_per_slice=33, shared_bytes=117760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-warps8                    {'9.0': {'registers': 199, 'spill_store_bytes': 0}}
+tc-warps10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=33, shared_bytes=134400) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-warps10                   {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-prefetch                  {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch-x rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=230912) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-prefetch-x                {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-prefetch-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=33, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-prefetch-w10              {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-presplit rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=192000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-presplit                  {'9.0': {'registers': 168, 'spill_store_bytes': 32}}
+forward ptxas tc-hybrid16                  {'9.0': {'registers': 168, 'spill_store_bytes': 8}}
+tc-fp16 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas tc-fp16                      {'9.0': {'registers': 168, 'spill_store_bytes': 144}}
+simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward ptxas simt                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+tc-warps8 rule LaunchRule(parts=2, warps=8, blocks_per_slice=33, shared_bytes=117760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+tc-warps10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=33, shared_bytes=134400) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+tc-prefetch rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+tc-prefetch-x rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=230912) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+tc-prefetch-w10 rule LaunchRule(parts=2, warps=10, blocks_per_slice=33, shared_bytes=160000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+tc-presplit rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=192000) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+tc-fp16 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=151040))
+forward  base                1786.0 us  ratio 1.000  regs 168 local 0  
+forward  tc-warps8           1921.5 us  ratio 1.076  regs 199 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-warps10          1930.6 us  ratio 1.081  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch         2131.5 us  ratio 1.193  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch-x       2372.4 us  ratio 1.328  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-prefetch-w10     2259.9 us  ratio 1.265  regs 168 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-presplit         2316.4 us  ratio 1.297  regs 168 local 32  {'out0': 'max|d|/max|a| = 1.01e+00 in 4999/5000 rows (1..4999; 5000 CSR rows; degrees of the bad rows [62, 63, 64, 65, 66, 67, 71, 72])', 'out1': 'max|d|/max|a| = 2.63e
+forward  tc-hybrid16         2155.8 us  ratio 1.207  regs 168 local 8  {'out0': 'max|d|/max|a| = 6.26e-07', 'out1': 'max|d|/max|a| = 1.42e-06', 'out2': 'max|d|/max|a| = 8.07e-07', 'out3': 'max|d|/max|a| = 7.54e-07', 'w': 'bitwise'}
+forward  tc-fp16             3038.1 us  ratio 1.701  regs 168 local 80  {'out0': 'max|d|/max|a| = 9.80e-07', 'out1': 'max|d|/max|a| = 1.54e-06', 'out2': 'max|d|/max|a| = 1.13e-06', 'out3': 'max|d|/max|a| = 9.17e-07', 'w': 'bitwise'}
+forward  simt                2392.6 us  ratio 1.340  regs 168 local 0  {'out0': 'max|d|/max|a| = 1.14e-06', 'out1': 'max|d|/max|a| = 2.05e-06', 'out2': 'max|d|/max|a| = 1.45e-06', 'out3': 'max|d|/max|a| = 1.17e-06', 'w': 'bitwise'}
+2026-11-05T15:38:08Z start lab-wprime
+2026-11-05T15:39:01Z end lab-wprime exit=0 wprime   pair                1802.7 us  ratio 1.126  regs 128 local 0  {'dsh': 'max|d|/max|a| = 1.39e-04', 'dr': 'max|d|/max|a| = 4.09e-02', 'dx': 'max|d|/max|a| = 2.11e-04'}
+wprime ptxas base                         {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas maxreg-none                  {'9.0': {'registers': 254, 'spill_store_bytes': 0}}
+wprime ptxas maxreg80                     {'9.0': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas maxreg72                     {'9.0': {'registers': 72, 'spill_store_bytes': 104}}
+wprime ptxas redux                        {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas butterfly                    {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas F-split2                     {'9.0': {'registers': 128, 'spill_store_bytes': 0}}
+wprime ptxas pair                         {'9.0': {'registers': 128, 'spill_store_bytes': 0}}
+wprime   base                1601.6 us  ratio 1.000  regs 96 local 0  
+wprime   maxreg-none         2303.9 us  ratio 1.439  regs 254 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   maxreg80            2004.6 us  ratio 1.252  regs 80 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   maxreg72            1734.9 us  ratio 1.083  regs 72 local 64  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 2.18e-07'}
+wprime   redux               1808.0 us  ratio 1.129  regs 96 local 0  {'dsh': 'max|d|/max|a| = 2.44e-07', 'dr': 'max|d|/max|a| = 2.40e-07', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   butterfly           1562.1 us  ratio 0.975  regs 96 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.56e-07'}
+wprime   F-split2            2001.6 us  ratio 1.250  regs 128 local 0  
+wprime   pair                1802.7 us  ratio 1.126  regs 128 local 0  {'dsh': 'max|d|/max|a| = 1.39e-04', 'dr': 'max|d|/max|a| = 4.09e-02', 'dx': 'max|d|/max|a| = 2.11e-04'}
+2026-11-05T15:39:01Z start ab-triton-ab
+2026-11-05T15:40:47Z end ab-triton-ab exit=0 SrTiO3 a 5.8389 ms b 6.6129 ms b/a 1.1326 valid
+SrTiO3 a 5.8389 ms b 6.6129 ms b/a 1.1326 valid
+2026-11-05T15:40:47Z start ab-triton-ba
+2026-11-05T15:42:08Z end ab-triton-ba exit=0 SrTiO3 b 6.6065 ms a 5.8508 ms b/a 1.1292 valid
+SrTiO3 b 6.6065 ms a 5.8508 ms b/a 1.1292 valid
+2026-11-05T15:42:08Z start ab-tile32x64-ab
+2026-11-05T15:43:22Z end ab-tile32x64-ab exit=0 SrTiO3 a 5.8442 ms b 5.8958 ms b/a 1.0088 valid
+SrTiO3 a 5.8442 ms b 5.8958 ms b/a 1.0088 valid
+2026-11-05T15:43:22Z start ab-tile32x64-ba
+2026-11-05T15:44:36Z end ab-tile32x64-ba exit=0 SrTiO3 b 5.8882 ms a 5.8559 ms b/a 1.0055 valid
+SrTiO3 b 5.8882 ms a 5.8559 ms b/a 1.0055 valid
+2026-11-05T15:44:36Z done
