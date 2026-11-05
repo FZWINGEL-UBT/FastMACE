@@ -127,7 +127,7 @@ class CSVR(Integrator):
     def prepare_step(self, state: SimulationState) -> None:
         rng = state.rng
         if rng.cursor == self.noise_batch:
-            refill_noise(rng, lambda steps: self._draw(rng.generator, steps))
+            refill_noise(rng, self._draw)
         self.noise.copy_(rng.batch[rng.cursor])
         rng.cursor += 1
 

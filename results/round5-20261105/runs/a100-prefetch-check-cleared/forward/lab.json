@@ -1,0 +1,187 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T12:15:51.371158+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "c544221a59036bdba392a6139d44fffd7b1fa5cf",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 66.431466477,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 40,
+          "median_us": 3181.567907333374,
+          "min_us": 3136.512041091919,
+          "max_us": 3871.74391746521,
+          "ratio": 1.0
+        },
+        "tc-prefetch": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 56,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.39e+00",
+            "out1": "max|d|/max|a| = 6.35e+00",
+            "out2": "max|d|/max|a| = 2.36e+00",
+            "out3": "max|d|/max|a| = 5.60e+00",
+            "w": "max|d|/max|a| = 1.00e+00"
+          },
+          "median_us": 3989.504098892212,
+          "min_us": 3971.07195854187,
+          "max_us": 4859.903812408447,
+          "ratio": 1.2539427776149554
+        },
+        "tc-rerender": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 40,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "max|d|/max|a| = 1.00e+00"
+          },
+          "median_us": 3178.4958839416504,
+          "min_us": 3136.512041091919,
+          "max_us": 3870.7199096679688,
+          "ratio": 0.9990344309845964
+        },
+        "simt": {
+          "kind": "rounding",
+          "registers": 168,
+          "local_bytes": 40,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.39e+00",
+            "out1": "max|d|/max|a| = 6.35e+00",
+            "out2": "max|d|/max|a| = 2.36e+00",
+            "out3": "max|d|/max|a| = 5.60e+00",
+            "w": "max|d|/max|a| = 1.00e+00"
+          },
+          "median_us": 4797.440052032471,
+          "min_us": 4737.023830413818,
+          "max_us": 5832.704067230225,
+          "ratio": 1.5078854802924628
+        },
+        "tc-prefetch-w10": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 56,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.39e+00",
+            "out1": "max|d|/max|a| = 6.35e+00",
+            "out2": "max|d|/max|a| = 2.36e+00",
+            "out3": "max|d|/max|a| = 5.60e+00",
+            "w": "max|d|/max|a| = 1.00e+00"
+          },
+          "median_us": 3983.3600521087646,
+          "min_us": 3942.3999786376953,
+          "max_us": 4855.807781219482,
+          "ratio": 1.252011639584148
+        },
+        "simt-prefetch": {
+          "kind": "exact",
+          "registers": 166,
+          "local_bytes": 40,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.39e+00",
+            "out1": "max|d|/max|a| = 6.35e+00",
+            "out2": "max|d|/max|a| = 2.36e+00",
+            "out3": "max|d|/max|a| = 5.60e+00",
+            "w": "max|d|/max|a| = 1.00e+00"
+          },
+          "median_us": 4825.088024139404,
+          "min_us": 4761.600017547607,
+          "max_us": 5882.880210876465,
+          "ratio": 1.5165755264936476
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "8.0": {
+          "registers": 167,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-prefetch": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 12
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-rerender": {
+        "8.0": {
+          "registers": null,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": null,
+          "spill_store_bytes": 0
+        }
+      },
+      "simt": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 166,
+          "spill_store_bytes": 0
+        }
+      },
+      "tc-prefetch-w10": {
+        "8.0": {
+          "registers": null,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": null,
+          "spill_store_bytes": 0
+        }
+      },
+      "simt-prefetch": {
+        "8.0": {
+          "registers": 166,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

@@ -127,3 +127,41 @@ def test_captured_half_steps_replay_the_eager_steps(name):
     assert not torch.equal(state.positions, eager_field.x0)
     if dyn.variable_cell:
         assert not torch.equal(state.cell, torch.tensor(atoms().cell.array, device="cuda"))
+
+
+# ------------------------------------------------------------- noise draw-ahead (round 6)
+
+@pytest.mark.parametrize("draw_ahead", [True, False])
+@pytest.mark.parametrize("which", ["langevin", "baoab"])
+def test_drawn_ahead_noise_is_the_same_stream(monkeypatch, draw_ahead, which):
+    """With NOISE_DRAW_AHEAD the batches after the first are drawn on a background thread into pinned buffers:
+    the rows per step are still ASE's stream, bit for bit, also when the generator is read mid-run (a provenance
+    record or a restart puts it back to before the draw-ahead, and the next refill draws the same rows again)."""
+    from fastmace.integrators import langevin
+
+    monkeypatch.setattr(langevin, "NOISE_DRAW_AHEAD", draw_ahead)
+    seed, batch, steps = 20261105, 7, 60
+    state = SimulationState.from_atoms(atoms(), "cuda", seed, compute_stress=which == "baoab")
+    if which == "langevin":
+        dyn = Langevin(state, IntegratorConfig(ensemble="nvt", timestep_fs=2.0, friction=0.02, noise_batch=batch,
+                                               fixcm_projection="ase"))
+    else:
+        dyn = LangevinBAOAB(state, IntegratorConfig(ensemble="npt", timestep_fs=2.0, friction=0.02,
+                                                    pressure_GPa=0.3, barostat_tau_fs=400.0, cell_mode="hydrostatic",
+                                                    noise_batch=batch))
+    width = state.rng.batch.shape[1:]
+    reference = np.random.default_rng(seed)
+    for step in range(steps):
+        dyn.prepare_step(state)
+        row = state.rng.batch[state.rng.cursor - 1].cpu().numpy()
+        if which == "langevin":
+            expected = reference.standard_normal(size=tuple(width))
+        else:
+            expected = reference.normal(size=tuple(width))
+        np.testing.assert_array_equal(row, expected)
+        if step in (10, 30):  # read the generator mid-batch (a record, a restart): the draw-ahead is undone
+            state.rng.generator.bit_generator.state
+            assert state.rng._ahead is None
+        if step == 40 and draw_ahead:
+            assert state.rng._ahead is not None  # the next batch is being drawn ahead
+    torch.cuda.synchronize()

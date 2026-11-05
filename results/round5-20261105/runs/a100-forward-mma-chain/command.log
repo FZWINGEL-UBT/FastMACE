@@ -1,0 +1,11 @@
+forward ptxas base                         {'8.0': {'registers': 167, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas tc-mma-free                  {'8.0': {'registers': 167, 'spill_store_bytes': 0}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas tc-2acc                      {'8.0': {'registers': 168, 'spill_store_bytes': 164}, '8.9': {'registers': 168, 'spill_store_bytes': 52}}
+forward ptxas tc-3acc                      {'8.0': {'registers': 168, 'spill_store_bytes': 440}, '8.9': {'registers': 168, 'spill_store_bytes': 392}}
+forward ptxas F-tc-1pass                   {'8.0': {'registers': 168, 'spill_store_bytes': 8}, '8.9': {'registers': 168, 'spill_store_bytes': 0}}
+forward  base                3190.8 us  ratio 1.000  regs 167 local 40  
+forward  tc-mma-free         3187.7 us  ratio 0.999  regs 167 local 40  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  tc-2acc             4166.7 us  ratio 1.306  regs 168 local 144  {'out0': 'max|d|/max|a| = 8.71e-07', 'out1': 'max|d|/max|a| = 1.60e-06', 'out2': 'max|d|/max|a| = 1.21e-06', 'out3': 'max|d|/max|a| = 9.17e-07', 'w': 'bitwise'}
+forward  tc-3acc             4797.4 us  ratio 1.504  regs 168 local 280  {'out0': 'max|d|/max|a| = 8.71e-07', 'out1': 'max|d|/max|a| = 1.60e-06', 'out2': 'max|d|/max|a| = 1.21e-06', 'out3': 'max|d|/max|a| = 9.17e-07', 'w': 'bitwise'}
+forward  F-tc-1pass          2166.8 us  ratio 0.679  regs 168 local 48  
+grep: /tmp/fastmace-out/wprime.log: No such file or directory

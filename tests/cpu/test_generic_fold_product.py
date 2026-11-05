@@ -45,11 +45,28 @@ def test_fold_matches_the_stock_density_model():
     assert isinstance(second.skip_tp, SpeciesSkip) and len(second.skip_tp._reference) == 2
     assert isinstance(second.linear_up, BlockLinear) and len(second.linear_up._reference) == 2
     assert isinstance(rewritten.readouts[0].linear, BlockLinear)
+    first = rewritten.interactions[0]  # FOLD_FIRST_DENSITY_LINEAR (round 6): linear composed into the species skip
+    assert isinstance(first.linear, torch.nn.Identity)
+    assert isinstance(first.skip_tp, SpeciesSkip) and len(first.skip_tp._reference) == 2
     energy_and_forces(model, batch)  # throwaway evaluation (docs/development.md)
     energy, forces = energy_and_forces(model, batch)
     new_energy, new_forces = energy_and_forces(rewritten, batch)
     assert relative(new_energy, energy) <= 1e-10 and relative(new_forces, forces) <= 1e-10
     assert relative(_stress(rewritten, batch), _stress(model, batch)) <= 1e-10
+
+
+def test_first_density_linear_fold_can_be_switched_off(monkeypatch):
+    from fastmace.rewrites import species
+
+    monkeypatch.setattr(species, "FOLD_FIRST_DENSITY_LINEAR", False)
+    model, batch = tiny_cueq("density")
+    rewritten, applied = _rewrite(model, batch)
+    assert all(entry.result.passed for entry in applied)
+    assert isinstance(rewritten.interactions[0].linear, BlockLinear)
+    assert isinstance(rewritten.products[0].linear, torch.nn.Identity)
+    energy, forces = energy_and_forces(model, batch)
+    new_energy, new_forces = energy_and_forces(rewritten, batch)
+    assert relative(new_energy, energy) <= 1e-10 and relative(new_forces, forces) <= 1e-10
 
 
 def test_fold_without_species_skip_is_not_applied():

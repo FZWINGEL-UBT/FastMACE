@@ -248,7 +248,8 @@ class LangevinBAOAB(Integrator):
         rng = state.rng
         if rng.cursor == self.noise_batch:
             # rng.normal(size=(N, 3)) then rng.normal() or rng.normal(size=(3, 3)) per step, as ASE.
-            refill_noise(rng, lambda steps: rng.generator.normal(size=(steps, rng.batch.shape[1])))
+            columns = rng.batch.shape[1]
+            refill_noise(rng, lambda generator, steps: generator.normal(size=(steps, columns)), ahead=True)
         row = rng.batch[rng.cursor]
         self.xi.copy_(row[:3 * self.natoms].view(self.natoms, 3))
         if self.cell_numbers:

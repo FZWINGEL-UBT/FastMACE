@@ -1,0 +1,140 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-05T12:11:38.827389+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "6c2f2967c1fc61c147f5a7cda500252d83b8bcf8",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 79.79820409999999,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=151040)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 40,
+          "median_us": 3246.079921722412,
+          "min_us": 3230.720043182373,
+          "max_us": 3915.776014328003,
+          "ratio": 1.0
+        },
+        "F-tc-no-product": {
+          "kind": "falsifier",
+          "registers": 166,
+          "local_bytes": 40,
+          "median_us": 1536.0000133514404,
+          "min_us": 1531.9039821624756,
+          "max_us": 1816.5760040283203,
+          "ratio": 0.47318613539755944
+        },
+        "F-no-tp": {
+          "kind": "falsifier",
+          "registers": 124,
+          "local_bytes": 24,
+          "median_us": 1990.656018257141,
+          "min_us": 1985.535979270935,
+          "max_us": 2374.6559619903564,
+          "ratio": 0.6132492317690297
+        },
+        "F-tc-no-mma": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 40,
+          "median_us": 2154.49595451355,
+          "min_us": 2143.2321071624756,
+          "max_us": 2566.1439895629883,
+          "ratio": 0.6637223994689405
+        },
+        "F-tc-no-wsplit": {
+          "kind": "falsifier",
+          "error": "variant pattern found 0 times: 'split_tf32(wp[0], ah[0], al[0]);'"
+        },
+        "F-tc-1pass": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 48,
+          "median_us": 2196.4800357818604,
+          "min_us": 2188.2879734039307,
+          "max_us": 2625.5359649658203,
+          "ratio": 0.6766561787598808
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "8.0": {
+          "registers": 167,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-tc-no-product": {
+        "8.0": {
+          "registers": 166,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 156,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-no-tp": {
+        "8.0": {
+          "registers": 124,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 128,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-tc-no-mma": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        },
+        "8.9": {
+          "registers": 166,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-tc-no-wsplit": {
+        "error": "variant pattern found 0 times: 'split_tf32(wp[0], ah[0], al[0]);'"
+      },
+      "F-tc-1pass": {
+        "8.0": {
+          "registers": 168,
+          "spill_store_bytes": 8
+        },
+        "8.9": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

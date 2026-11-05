@@ -4,7 +4,10 @@ The A100 profile of Benchmark_loup (results/omat0-a100-profile-20261103) puts 65
 the radial r-gradient backward ``oeq_projected_backward_wprime`` (6.9 ms) and the generic fused forward
 ``fused_folded_forward`` (5.1 ms). This tool captures one force call's arguments of both from an eager call of the
 default plan (SrTiO3 10x10x10, 5,000 atoms), frees the engine, and times variants of the two kernels' rendered
-sources on those arguments, round-robin in one process (CUDA events, median per variant):
+sources on those arguments, round-robin in one process (CUDA events, median per variant). Since 5 November 2026 the
+capture follows --equilibrate-steps MD steps (default 300): the first steps from the ideal lattice have few distinct
+edge lengths, so the radial tables' reads stay in L2 and memory-bound kernels look compute-bound (the w' REDUX
+variant: 0.72 of the kernel there, about 0.99 in MD):
 
 - exact variants (cache hints, register caps, K = 64 without the zero cutoff column, unordered species pairs): their
   outputs are compared with the plan's kernel bit for bit (``dx`` of the backward is summed atomically, so it is
@@ -288,17 +291,143 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         return re.sub(reduction, lambda m: butterfly_code, s, count=1, flags=re.S) if re.search(
             reduction, s, flags=re.S) else _sub(s, reduction, "", 1, regex=True)
 
+    # Round 5 follow-ups (5 November 2026, external ideas 2 and 5). F-cart3: each lane projects its 16 dsh partials
+    # (and dr) onto three Cartesian components with a 16x3 Jacobian before the reduction, then 3 values are reduced
+    # (the Jacobian is a stand-in read from sh: timing only). F-redux16: the 17 sums as fixed point through the
+    # hardware integer reduction (redux.sync.add.s32), with one redux.sync.max for the warp's exponent; deterministic,
+    # about 2^-25 of the warp's largest partial per term. F-cart3-redux: both.
+    jacobian = """acc_t g3[3] = {acc_t(0), acc_t(0), acc_t(0)};
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) {
+        #pragma unroll
+        for (int k = 0; k < 3; ++k)
+            g3[k] += edge_gradient[c] * acc_t(sh[edge_base + ((c + k + 1) & (EDGE_DIM - 1))]);
+    }
+    #pragma unroll
+    for (int k = 0; k < 3; ++k) g3[k] += radial_gradient * acc_t(sh[edge_base + 1 + k]);
+"""
+    cart3_code = jacobian + """    #pragma unroll
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        #pragma unroll
+        for (int k = 0; k < 3; ++k) g3[k] += __shfl_xor_sync(FULL_MASK, g3[k], offset, 32);
+    }
+    if (lane < 3) dsh[edge_base + lane] = scalar_t(lane == 0 ? g3[0] : (lane == 1 ? g3[1] : g3[2]));
+    if (lane == 0) dr[e] = scalar_t(0);"""
+
+    def redux(values, count, store):
+        return f"""float big = 0.f;
+    #pragma unroll
+    for (int c = 0; c < {count}; ++c) big = fmaxf(big, fabsf(float({values}[c])));
+    unsigned ex = __reduce_max_sync(FULL_MASK, __float_as_uint(big) >> 23);
+    ex = ex < 30u ? 30u : ex;
+    const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);
+    #pragma unroll
+    for (int c = 0; c < {count}; ++c) {{
+        const int total = __reduce_add_sync(FULL_MASK, __float2int_rn(float({values}[c]) * scale));
+        if (lane == 0) {store} = scalar_t(float(total) * inverse);
+    }}"""
+
+    redux16_code = """acc_t all[EDGE_DIM + 1];
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) all[c] = edge_gradient[c];
+    all[EDGE_DIM] = radial_gradient;
+    """ + redux("all", "EDGE_DIM + 1", "(c < EDGE_DIM ? dsh[edge_base + c] : dr[e])")
+    cart3_redux_code = jacobian + "    " + redux("g3", 3, "dsh[edge_base + c]") + """
+    if (lane == 0) dr[e] = scalar_t(0);"""
+
+    def redux_per_component(values, count, store):
+        """Fixed point with each component's own exponent (one redux.sync.max per component): small components keep
+        their bits next to large ones."""
+        return f"""#pragma unroll
+    for (int c = 0; c < {count}; ++c) {{
+        const float v = float({values}[c]);
+        unsigned ex = __reduce_max_sync(FULL_MASK, __float_as_uint(fabsf(v)) >> 23);
+        ex = ex < 30u ? 30u : ex;
+        const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);
+        const int total = __reduce_add_sync(FULL_MASK, __float2int_rn(v * scale));
+        if (lane == 0) {store} = scalar_t(float(total) * inverse);
+    }}"""
+
+    redux_pc_code = """acc_t all[EDGE_DIM + 1];
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) all[c] = edge_gradient[c];
+    all[EDGE_DIM] = radial_gradient;
+    """ + redux_per_component("all", "EDGE_DIM + 1", "(c < EDGE_DIM ? dsh[edge_base + c] : dr[e])")
+
+    def _reduced(s, code):
+        if not re.search(reduction, s, flags=re.S):
+            raise ValueError("the shfl_down reduction is not in the source (BUTTERFLY=False?)")
+        return re.sub(reduction, lambda m: code, s, count=1, flags=re.S)
+
     def no_reduce(s):
         """Falsifier: no cross-lane reduction; lane 0 writes its own partial sums (the outer bound)."""
+        if not re.search(reduction, s, flags=re.S):
+            raise ValueError("no-reduce: the shfl_down reduction is not in the source")
         return re.sub(reduction, lambda m: """if (lane == 0) {
         for (int component = 0; component < EDGE_DIM; ++component)
             dsh[edge_base + component] = scalar_t(edge_gradient[component]);
         dr[e] = scalar_t(radial_gradient);
     }""", s, count=1, flags=re.S)
 
+    def split_edge(split):
+        """Timing bound (5 November 2026, external review idea 1): ``split`` warps per edge, each a 1/split share of
+        the channels; the partial dsh and dr are added with atomics (the argument transform doubles the edge rows so
+        the launcher starts split times as many warps; dsh and dr come out in the first rows, not exact)."""
+        def transform(s):
+            s = _sub(s, """    const int64_t e =
+        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
+    if (e >= edge_count) return;""", f"""    const int64_t gid =
+        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
+    const int64_t e = gid / {split};
+    const int part = int(gid % {split});
+    if (e >= edge_count / {split}) return;""", 1)
+            s = _sub(s, """    for (int channel = lane; channel < CHANNEL_DIM;
+         channel += LOGICAL_GROUP_SIZE) {""", f"""    for (int channel = lane + part * LOGICAL_GROUP_SIZE;
+         channel < CHANNEL_DIM;
+         channel += {split} * LOGICAL_GROUP_SIZE) {{""", 1)
+            if not re.search(reduction, s, flags=re.S):
+                raise ValueError("split: the shfl_down reduction is not in the source (BUTTERFLY on? pass "
+                                 "--constant fastmace.kernels.oeq_streaming.wprime_backward:BUTTERFLY=False)")
+            return re.sub(reduction, lambda m: butterfly_code.replace(
+                "if ((lane & 1) == 0) dsh[edge_base + (lane >> 1)] = scalar_t(edge_gradient[0]);",
+                "if ((lane & 1) == 0) atomicAdd(dsh + edge_base + (lane >> 1), scalar_t(edge_gradient[0]));").replace(
+                "if (lane == 0) dr[e] = scalar_t(radial_gradient);",
+                "if (lane == 0) atomicAdd(dr + e, scalar_t(radial_gradient));"), s, count=1, flags=re.S)
+
+        def args(a):
+            import torch
+            a = list(a)
+            a[1] = torch.cat([a[1]] * split)  # sh: edge_count = split x edges, so split x the warps
+            a[7] = torch.zeros((a[1].shape[0], a[7].shape[1]), dtype=a[7].dtype, device=a[7].device)  # dsh
+            a[17] = torch.zeros(a[1].shape[0], dtype=a[17].dtype, device=a[17].device)  # dr
+            return a
+        return transform, args
+
     return {
         "butterfly": ("rounding", butterfly, ()),
+        "F-split2": ("falsifier", split_edge(2)[0], (), split_edge(2)[1]),
+        "F-split4": ("falsifier", split_edge(4)[0], (), split_edge(4)[1]),
+        "F-split1-atomic": ("falsifier", split_edge(1)[0], (), split_edge(1)[1]),
         "F-no-reduce": ("falsifier", no_reduce, ()),
+        "F-reduce-dr-only": ("falsifier", lambda s: re.sub(reduction, lambda m: """
+    for (int offset = 16; offset > 0; offset >>= 1)
+        radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
+    if (lane == 0) {
+        for (int component = 0; component < EDGE_DIM; ++component)
+            dsh[edge_base + component] = scalar_t(edge_gradient[component]);
+        dr[e] = scalar_t(radial_gradient);
+    }""", s, count=1, flags=re.S), ()),
+        "redux": ("rounding", lambda s: _reduced(s, redux16_code), ()),
+        "redux-pc": ("rounding", lambda s: _reduced(s, redux_pc_code), ()),
+        "F-cart3": ("falsifier", lambda s: _reduced(s, cart3_code), ()),
+        "F-redux16": ("falsifier", lambda s: _reduced(s, redux16_code), ()),
+        "F-cart3-redux": ("falsifier", lambda s: _reduced(s, cart3_redux_code), ()),
+        "F-reduce-1level": ("falsifier", lambda s: _sub(s, "for (int offset = 16; offset > 0; offset >>= 1) {",
+                                                        "for (int offset = 16; offset > 8; offset >>= 1) {", 1), ()),
+        "F-reduce-3level": ("falsifier", lambda s: _sub(s, "for (int offset = 16; offset > 0; offset >>= 1) {",
+                                                        "for (int offset = 16; offset > 2; offset >>= 1) {", 1), ()),
+        "F-reduce-sh-only": ("falsifier", lambda s: re.sub(r"radial_gradient \+= __shfl_down_sync\([^;]*;", "",
+                                                         s, count=1), ()),
         "B-piece-sorted": ("falsifier", lambda s: s, (), by_piece),
         "pair": ("rounding", pair(), ()),
         "pair-maxreg128": ("rounding", pair(), ("--maxrregcount=128",)),
@@ -349,6 +478,8 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "qmajor-f2+ldcs-w": ("exact", lambda s: qmajor(hints(s, g=False), 2), (), qmajor_args(2)),
         "maxreg64": ("exact", lambda s: s, ("--maxrregcount=64",)),
         "maxreg80": ("exact", lambda s: s, ("--maxrregcount=80",)),
+        "maxreg-none": ("exact", lambda s: s, ("--maxrregcount=255",)),
+        "maxreg72": ("exact", lambda s: s, ("--maxrregcount=72",)),
         "ldcs-w": ("exact", lambda s: hints(s, g=False), ()),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
@@ -362,12 +493,23 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
     }
 
 
+def plan_options(kernel, extra):
+    """``extra`` with the plan kernel's own register cap (``WPrimeBackward.max_registers``, a per-GPU default) unless
+    the variant sets one. Lab runs before 5 November 2026 about 13:30 UTC compiled every variant without it: on the
+    RTX 5060 Ti (cap 80) their base was the uncapped kernel, 7.88 against the plan's 6.77 ms."""
+    cap = int(getattr(kernel, "max_registers", 0) or 0)
+    if cap and not any(str(o).startswith("--maxrregcount") for o in extra):
+        return (f"--maxrregcount={cap}",) + tuple(extra)
+    return tuple(extra)
+
+
 def wprime_launcher(kernel, source, extra):
     """A launch function for a variant of ``kernel`` (a WPrimeBackward) compiled from ``source``."""
     import torch
     from cuda.bindings import driver
 
     from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+    extra = plan_options(kernel, extra)
     cubin = compile_cubin(source, torch.cuda.get_device_capability(), extra)
     module = _check(driver.cuModuleLoadData(cubin))
     function = _check(driver.cuModuleGetFunction(module, b"oeq_projected_backward_wprime"))
@@ -560,7 +702,8 @@ def _tc_a4(s):
     return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
                 """for (int i = lane; i < B * ED / 4; i += 32)
                     reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
-                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)
+                        : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
 def _simt_a4(s):
@@ -590,7 +733,8 @@ def _sh4(s):
     return _sub(s, "for (int i = lane; i < B * ED; i += 32) sh_s[i] = (i / ED < nb) ? sh[e0 * ED + i] : 0.f;",
                 """for (int i = lane; i < B * ED / 4; i += 32)
                     reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
-                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i) : make_float4(0.f, 0.f, 0.f, 0.f);""")
+                        ? __ldg(reinterpret_cast<const float4*>(sh + e0 * ED) + i)
+                        : make_float4(0.f, 0.f, 0.f, 0.f);""")
 
 
 CACHE_HINTS = r"""
@@ -681,6 +825,119 @@ def _a4_args(args):
     return (padded, *rest)
 
 
+def _tc_split_accumulators(source, count):
+    """The 3xTF32 projection with the small products in their own accumulator(s): ``count`` 2: al*bh and ah*bl into
+    wacc1; 3: al*bh into wacc1, ah*bl into wacc2. Each is added to wacc before the redistribution."""
+    decl = re.search(r"float wacc\[(\d+)\]\[2\]\[4\];", source)
+    if decl is None:
+        raise ValueError("variant pattern found 0 times: float wacc[..][2][4];")
+    shape = f"[{decl.group(1)}][2][4]"
+    extra = ["wacc1"] + (["wacc2"] if count == 3 else [])
+    source = _sub(source, decl.group(0), decl.group(0) + "".join(f" float {a}{shape};" for a in extra))
+    source = _sub(source, "wacc[g][m][i] = 0.f;",
+                  "{ wacc[g][m][i] = 0.f;" + "".join(f" {a}[g][m][i] = 0.f;" for a in extra) + " }")
+    source = _sub(source, "mma_tf32(wacc[g][m], al, bh);", "mma_tf32(wacc1[g][m], al, bh);")
+    source = _sub(source, "mma_tf32(wacc[g][m], ah, bl);", f"mma_tf32({extra[-1]}[g][m], ah, bl);")
+    total = " + ".join(f"{a}[g][m][i]" for a in extra)
+    return _sub(source, "float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;",
+                f"#pragma unroll\n for (int i = 0; i < 4; ++i) wacc[g][m][i] += {total};\n"
+                "                            float* rp = r_s + (g * B + 2 * tq) * RS + m * 16 + gid;")
+
+
+HYBRID16_HELPERS = """// TF32 + FP16 hybrid (round 5 lab): x = hi + lo as for 3xTF32; the small products in FP16 m16n8k16.
+__device__ __forceinline__ unsigned pack_h2(float k_low, float k_high) {
+    unsigned r;
+    asm("cvt.rn.f16x2.f32 %0, %1, %2;" : "=r"(r) : "f"(k_high), "f"(k_low));
+    return r;
+}
+__device__ __forceinline__ void mma_f16(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, "
+                 "{%8, %9}, {%0, %1, %2, %3};"
+                 : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
+}
+"""
+
+HYBRID16_LOOP = """#pragma unroll 1
+                    for (int k0 = 0; k0 < KP; k0 += 16) {  // two TF32 k-steps: the k16 FP16 MMA's slots
+                        // slot 2tq <- k0 + 8s + tq, slot 2tq + 1 <- k0 + 8s + tq + 4 (the same in A and B: exact)
+                        unsigned bs[2][2], bh16[2], bl16[2];
+                        #pragma unroll
+                        for (int s = 0; s < 2; ++s) {
+                            float hi[2], lo[2];
+                            #pragma unroll
+                            for (int j = 0; j < 2; ++j) {
+                                const float v = a_s[gid * KP + ((((k0 >> 2) + 2 * s + j) ^ gid) << 2) + tq];
+                                hi[j] = __uint_as_float(__float_as_uint(v) & 0xffffe000u);
+                                lo[j] = (v - hi[j]) * 2048.f;
+                                bs[s][j] = __float_as_uint(hi[j] * 2048.f);  // TF32-exact: the main product x 2^11
+                            }
+                            bh16[s] = pack_h2(hi[0], hi[1]);
+                            bl16[s] = pack_h2(lo[0], lo[1]);
+                        }
+                        #pragma unroll
+                        for (int g = 0; g < NPL_H; ++g)
+                            #pragma unroll
+                            for (int m = 0; m < 2; ++m) {
+                                const float4 w0 = reinterpret_cast<const float4*>(Ws)[
+                                    ((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 32 + lane];
+                                const float4 w1 = reinterpret_cast<const float4*>(Ws)[
+                                    ((g * (KP / 8) + (k0 >> 3) + 1) * 2 + m) * 32 + lane];
+                                const float wv[2][4] = {{w0.x, w0.y, w0.z, w0.w}, {w1.x, w1.y, w1.z, w1.w}};
+                                float wh[2][4], wl[2][4];
+                                unsigned ah[2][4];
+                                #pragma unroll
+                                for (int s = 0; s < 2; ++s)
+                                    #pragma unroll
+                                    for (int i = 0; i < 4; ++i) {
+                                        ah[s][i] = __float_as_uint(wv[s][i]) & 0xffffe000u;
+                                        wh[s][i] = __uint_as_float(ah[s][i]);
+                                        wl[s][i] = (wv[s][i] - wh[s][i]) * 2048.f;
+                                    }
+                                // A rows gid (x, z) and gid + 8 (y, w); k slots as in B
+                                const unsigned alo[4] = {pack_h2(wl[0][0], wl[0][2]), pack_h2(wl[0][1], wl[0][3]),
+                                                         pack_h2(wl[1][0], wl[1][2]), pack_h2(wl[1][1], wl[1][3])};
+                                const unsigned ahi[4] = {pack_h2(wh[0][0], wh[0][2]), pack_h2(wh[0][1], wh[0][3]),
+                                                         pack_h2(wh[1][0], wh[1][2]), pack_h2(wh[1][1], wh[1][3])};
+                                mma_f16(wacc[g][m], alo, bh16);  // 2^11 W_lo a_hi
+                                mma_f16(wacc[g][m], ahi, bl16);  // 2^11 W_hi a_lo
+                                mma_tf32(wacc[g][m], ah[0], bs[0]);  // 2^11 W_hi a_hi
+                                mma_tf32(wacc[g][m], ah[1], bs[1]);
+                            }
+                    }
+"""
+
+
+def _tc_hybrid16(source):
+    """The 3xTF32 projection as TF32 big*big plus FP16 m16n8k16 for both small products (lab, round 5): 4 MMAs per
+    16 k instead of 6, the FP16 MMA at twice the TF32 rate. Every product carries 2^11 (exact), undone on the store.
+    Needs TC_WFRAG's float4 W fragments and VEC_A's staging (the A100 default)."""
+    start = "#pragma unroll 2\n                    for (int k0 = 0; k0 < KP; k0 += 8) {"
+    end = "                    #pragma unroll\n                    for (int g = 0; g < "
+    npl = re.search(r"float wacc\[(\d+)\]\[2\]\[4\];", source)
+    if npl is None or start not in source or "const float4 wv = reinterpret_cast<const float4*>(Ws)[" not in source:
+        raise ValueError("variant pattern found 0 times: the TC_WFRAG product loop")
+    kp = int(re.search(r"constexpr int KP = (\d+);", source).group(1))
+    if kp % 16:
+        raise ValueError(f"tc-hybrid16 needs KP % 16 == 0 (KP = {kp}; SKIP_ZERO_COLUMN gives 64 for OMAT-0)")
+    loop = HYBRID16_LOOP.replace("NPL_H", npl.group(1))
+    out, pos = [], 0
+    while True:
+        i = source.find(start, pos)
+        if i < 0:
+            break
+        j = source.index(end, i)
+        out += [source[pos:i], loop]
+        pos = j
+    source = "".join(out) + source[pos:]
+    for k, v in (("rp[0] = wacc[g][m][0];", "rp[0] = wacc[g][m][0] * 0x1p-11f;"),
+                 ("rp[RS] = wacc[g][m][1];", "rp[RS] = wacc[g][m][1] * 0x1p-11f;"),
+                 ("rp[8] = wacc[g][m][2];", "rp[8] = wacc[g][m][2] * 0x1p-11f;"),
+                 ("rp[RS + 8] = wacc[g][m][3];", "rp[RS + 8] = wacc[g][m][3] * 0x1p-11f;")):
+        source = _sub(source, k, v)
+    return _after_constants(source, HYBRID16_HELPERS)
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -725,6 +982,16 @@ def forward_variants(kernel=None):
                                                     "mma_tf32(wacc[g][m], ah, bh);", "wacc[g][m][0] += __uint_as_float("
                                                     "ah[0] ^ ah[1] ^ ah[2] ^ ah[3] ^ bh[0] ^ bh[1]);"), ()),
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
+        # Round 5 (A100 stage bounds, 5 November 2026): one MMA pass costs 42 us, three dependent passes 1.09 ms, so
+        # the passes wait on each other. tc-mma-free: the MMA asm without volatile (the compiler may interleave the
+        # (g, m) chains; per accumulator the order is the same: bitwise). tc-2acc / tc-3acc: the small products into
+        # their own accumulator(s), added once per batch (shorter chains, more registers; rounding).
+        "tc-mma-free": ("exact", lambda s: _sub(s, 'asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32',
+                                                'asm("mma.sync.aligned.m16n8k8.row.col.f32.tf32'), ()),
+        "tc-2acc": ("rounding", lambda s: _tc_split_accumulators(s, 2), ()),
+        "tc-3acc": ("rounding", lambda s: _tc_split_accumulators(s, 3), ()),
+        # TF32 + FP16 hybrid (round 5): W_hi a_hi in TF32, both small products in FP16 m16n8k16 (4 MMAs per 16 k).
+        "tc-hybrid16": ("rounding", _tc_hybrid16, ()),
         # Cheaper splits than rounding both parts; they need the rounded split in the capture
         # (--constant ...fused_forward:TC_SPLIT="'rna'"; "mask" is fused_forward.TC_SPLIT's default):
         # the high part by masking the low 13 mantissa bits (truncation), the low part the exact remainder, rounded to
@@ -806,8 +1073,21 @@ def forward_launcher(kernel, source, extra):
                                               function))
     counters = torch.zeros((kernel.channels // CHANNEL_BLOCK) * rule.parts, dtype=torch.int32, device="cuda")
 
+    # VEC_A (the A100 default) reads a from rows padded to AS floats (fused_forward.a_columns); a variant rendered
+    # without it reads rows of KA floats. Give such a variant a compacted copy of the captured a, else it reads
+    # misaligned rows (5 November 2026: every A100 variant without VEC_A differed in all 5,000 rows).
+    ka = int(re.search(r"constexpr int KA = (\d+);", source).group(1))
+    vec_a = "reinterpret_cast<const float4*>(a + (e0 + b) * AS)" in source
+    compacted = {}
+
     def launch(args):
         a, weight, x, sh, senders, receivers, row_ptr, out, w = args
+        if not vec_a and a.shape[1] != ka:
+            key = (a.data_ptr(), a.shape[0])
+            if key not in compacted:
+                compacted.clear()
+                compacted[key] = a[:, :ka].contiguous()
+            a = compacted[key]
         counters.zero_()
         p = ctypes.c_void_p
         outs = [o.data_ptr() for o in out] if isinstance(out, list) else [out.data_ptr()]  # BLOCK_MESSAGE groups
@@ -855,7 +1135,7 @@ def capture(args):
     from fastmace.planner import minimal
     from fastmace.planner.workload import Workload
 
-    captured, seen = {}, []
+    captured, seen, recording = {}, [], [True]
     edge_arg = {"forward": 3, "wprime": 1}  # sh [E, 16]
 
     def recorder(name, original):
@@ -863,7 +1143,8 @@ def capture(args):
             edges = a[edge_arg[name]].shape[0]
             capturing = torch.cuda.is_current_stream_capturing()
             seen.append((name, edges, capturing))
-            if not capturing and edges > (captured[name][1][edge_arg[name]].shape[0] if name in captured else -1):
+            largest = captured[name][1][edge_arg[name]].shape[0] if name in captured else -1
+            if recording[0] and not capturing and edges > largest:
                 captured[name] = (self, [t.clone() if isinstance(t, torch.Tensor)
                                          else [u.clone() for u in t] if isinstance(t, list) else t for t in a])
             return original(self, *a)
@@ -892,6 +1173,15 @@ def capture(args):
         plan = planner.plan(field, base, integrator, Workload(max_temperature_K=300.0), planner.hardware())
         engine = planner.build(plan, field, base.copy(), temperature_K=300.0)
         engine.prepare()
+        if args.equilibrate_steps:  # thermal disorder first: the ideal lattice's edge lengths keep the tables in L2
+            recording[0] = False
+            for _ in range(args.equilibrate_steps):
+                engine.step()
+            engine.flush()
+            torch.cuda.synchronize()
+            recording[0] = True
+            captured.clear()  # prepare()'s warm-up calls ran on the ideal lattice
+            engine.invalidate_graphs("omat0_kernel_lab: eager call for the capture after equilibration")
         for attempt in range(3):
             if full():
                 break
@@ -924,12 +1214,25 @@ def outputs_of(name, args):
     args = list(args)
     if name == "forward":  # out: one tensor, or a list of groups (wprime_backward.BLOCK_MESSAGE)
         args[7] = [torch.zeros_like(o) for o in args[7]] if isinstance(args[7], list) else torch.zeros_like(args[7])
-        args[8] = torch.empty_like(args[8])
+        args[8] = torch.zeros_like(args[8])  # zeros: the variants' cleared buffers (padding rows stay unwritten)
     else:
         args[6] = torch.zeros_like(args[6])  # dx: atomic adds
         args[7] = torch.empty_like(args[7])
         args[17] = torch.empty_like(args[17])
     return args
+
+
+def poison(name, args):
+    """Zero every output a variant writes, as the base's fresh buffers are (the variants share buffers: a variant
+    that writes nothing then shows zeros, not the previous variant's values; the forward leaves rows without edges
+    unwritten, as production's zero fill expects). wprime's dx is zeroed by ``reset`` before each launch."""
+    if name == "forward":
+        for o in (args[7] if isinstance(args[7], list) else [args[7]]):
+            o.zero_()
+        args[8].zero_()
+    else:
+        args[7].zero_()
+        args[17].zero_()
 
 
 def reset(name, args):
@@ -956,6 +1259,15 @@ def compare(name, base, other):
             same = bool(torch.equal(a, b))
             scale = float(a.abs().max()) or 1.0
             result[key] = "bitwise" if same else f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}"
+            if name == "forward" and key != "w" and not same and a.dim() >= 1:  # where: which rows, how many edges
+                bad = ((a - b).abs().reshape(a.shape[0], -1).amax(1) > 1e-4 * scale).nonzero().flatten()
+                if bad.numel():
+                    row_ptr = base[6]
+                    degree = (row_ptr[1:] - row_ptr[:-1]).long()
+                    rows = bad[bad < degree.numel()]
+                    result[key] += (f" in {bad.numel()}/{a.shape[0]} rows ({int(bad.min())}..{int(bad.max())}; "
+                                    f"{degree.numel()} CSR rows; degrees of the bad rows "
+                                    f"{sorted(set(degree[rows].tolist()))[:8]})")
     return result
 
 
@@ -974,6 +1286,12 @@ def main(argv=None):
     p.add_argument("--variants", nargs="*", default=None, help="variant names (default: all)")
     p.add_argument("--min-edges", type=int, default=100000, help="the smallest edge count of a captured call")
     p.add_argument("--rounds", type=int, default=15)
+    p.add_argument("--flush-l2-mb", type=int, default=256,
+                   help="MB written before every timed launch (0: none, the warm L2 of lab runs before 5 November "
+                        "2026 about 13:00 UTC)")
+    p.add_argument("--equilibrate-steps", type=int, default=300,
+                   help="MD steps (300 K, 1 fs) before the captured eager call; 0: the first steps from the ideal "
+                        "lattice, as every lab run before 5 November 2026 about 12:40 UTC")
     p.add_argument("--warmup", type=int, default=3)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--ptxas-archs", nargs="*", default=[], metavar="MAJOR.MINOR",
@@ -1047,6 +1365,8 @@ def main(argv=None):
         live = [v for v in names if "launch" in built[v]]
         for variant in live:  # base first: the reference of the comparisons
             b = built[variant]
+            if variant != "base":  # the variants share buffers: cleared first, so a stale output cannot pass as theirs
+                poison(name, b["args"])
             for _ in range(args.warmup):
                 reset(name, b["args"])
                 b["launch"](b["args"])
@@ -1054,10 +1374,14 @@ def main(argv=None):
             if variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
         times = {v: [] for v in live}
+        flush = (torch.empty(int(args.flush_l2_mb) << 18, dtype=torch.float32, device="cuda")
+                 if args.flush_l2_mb else None)
         for _ in range(args.rounds):  # round-robin
             for variant in live:
                 b = built[variant]
                 reset(name, b["args"])
+                if flush is not None:  # a cold L2, as in a force call (the kernels before it evict the inputs)
+                    flush.fill_(0.0)
                 start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                 start.record()
                 b["launch"](b["args"])
