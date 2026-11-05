@@ -29,10 +29,11 @@ WARPS = 1
 # False: an A/B side's choice on every GPU. MD step b/a (ab / ba) with FUSED_FIRST_BACKWARD against the default,
 # OMAT-0 medium, SrTiO3 10x10x10 and NbCl5: RTX 5060 Ti 0.945 / 0.945, 0.948 / 0.955; RTX 4000 Ada 0.949 / 0.944,
 # 0.978 / 0.968 (FUSED_FIRST_BACKWARD alone 0.962-0.979); A100-SXM4-80GB 0.966 / 0.962, 0.970 / 0.982 (alone
-# 0.966-0.984; every A100 model).
+# 0.966-0.984; every A100 model); NVIDIA H200 (5 November 2026, after the recapture fix, SrTiO3, TABLED_FORWARD
+# alone against the H200 defaults) 0.984 / 0.987.
 TABLED_FORWARD = None
 TABLED_FORWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                 "NVIDIA A100-SXM4-80GB"))
+                                 "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
 

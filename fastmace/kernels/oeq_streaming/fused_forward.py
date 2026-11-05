@@ -151,6 +151,9 @@ WGMMA_GPUS = GPUModels(())
 WGMMA_EDGES = 16  # edges per warp and wgmma round (the warpgroup's M = 64)
 WGMMA_WARPS = 8  # warps per block (two warpgroups), at most as many as fit
 WGMMA_BLOCKS_PER_SM = 1
+# Software pipelining of the wgmma kernel: each round's product is issued before the previous round's TP and
+# waited for after it, so the tensor cores work during the TP (the TP's receiver cursor lags one round behind).
+WGMMA_PIPELINED = False
 
 _REGISTRY = {}
 
@@ -1187,6 +1190,8 @@ def _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a):
                         }}
                     }}
                 }}""")
+    if WGMMA_PIPELINED:
+        return _wgmma_pipelined(names, slots, C, layout, bmap, nw, npl, wst, eb, astage, shstage, halves, flush)
     return f"""
         {{
             const int wst[{npl}] = {{{wst}}};
@@ -1284,6 +1289,143 @@ def _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a):
                 __syncwarp();
                 if (!done) ew += {eb};
             }}
+        }}
+"""
+
+
+def _wgmma_pipelined(names, slots, C, layout, bmap, nw, npl, wst, eb, astage, shstage, halves, flush):
+    """The pipelined loop of ``_part_wgmma`` (``WGMMA_PIPELINED``). The issuing side walks chunks as before; each
+    issued round records its edges and, when it opens a chunk, the chunk's receivers. The TP side runs one round
+    behind with its own cursor (``cur``, ``r1b``): a round that opens a chunk first flushes the previous one. Empty
+    chunks write their zero rows directly, so they never touch the lagging accumulators."""
+    zouts = "\n".join(f"                            {_out(slots[name], C, layout, bmap)} = 0.f;" for name in names)
+    back = "\n".join(halves).replace("const int64_t e0 = ew + ", "const int64_t e0 = pew + ")
+    back = back.replace("nb16", "pnb").replace("!tail", "!ptail")
+    return f"""
+        {{
+            const int wst[{npl}] = {{{wst}}};
+            float* Bl = Ws + {nw} * KP;
+            for (int i = threadIdx.x; i < {nw} * KP; i += blockDim.x) {{
+                const int nn = i / KP, k = i - nn * KP, p = nn >> 5, l = nn & 31;
+                unsigned hi, lo;
+                split_tf32(k < K ? W[(int64_t)(wst[p] + cb * CB + l) * KA + k] : 0.f, hi, lo);
+                const int o = ((nn >> 3) * (KP / 4) + (k >> 2)) * 32 + (nn & 7) * 4 + (k & 3);
+                Ws[o] = __uint_as_float(hi);
+                Bl[o] = __uint_as_float(lo);
+            }}
+            asm volatile("fence.proxy.async.shared::cta;" ::: "memory");
+        }}
+        __syncthreads();
+        {{
+            const int wgb = 1 + (warp >> 2);  // the warpgroup's named barrier
+            const int gid = lane >> 2, tq = lane & 3;
+            const unsigned bh_addr = (unsigned)__cvta_generic_to_shared(Ws);
+            const unsigned bl_addr = bh_addr + {nw} * KP * 4;
+            bool have = false, done = false, tail = false, fresh = false;
+            int64_t r1 = 0, eend = 0, ew = 0, fr0 = 0, fr1 = 0;
+            // the TP side: its cursor and chunk end, and the pending (issued, not yet multiplied out) round
+            int64_t cur = 0, r1b = 0, pew = 0, pr0 = 0, pr1 = 0;
+            bool pend = false, pnew = false, ptail = false;
+            int pnb = 0;
+            float acc[{len(names)}];
+            #pragma unroll
+            for (int i = 0; i < {len(names)}; ++i) acc[i] = 0.f;
+            float d[{nw // 2}];
+            unsigned ah[KP / 8][4], al[KP / 8][4];
+            while (true) {{
+                if (!done && (!have || ew >= eend)) {{
+                    have = false;
+                    while (true) {{
+                        int cc = 0;
+                        if (lane == 0) cc = atomicAdd(ctr, 1);
+                        cc = __shfl_sync(FULL, cc, 0);
+                        int64_t r0, ebeg;
+                        tail = cc >= receiver_chunks;
+                        if (!tail) {{
+                            r0 = (int64_t)cc * RC;
+                            r1 = r0 + RC < N ? r0 + RC : N;
+                            ebeg = row_ptr[r0] < 0 ? 0 : row_ptr[r0];
+                            eend = row_ptr[r1] < ebeg ? ebeg : row_ptr[r1];
+                            eend = eend > E ? E : eend;
+                        }} else {{
+                            r0 = r1 = N;
+                            ebeg = tail_begin + (cc - receiver_chunks) * TAIL;
+                            if (ebeg >= E || !STORE_W) {{
+                                done = true;
+                                break;
+                            }}
+                            eend = ebeg + TAIL < E ? ebeg + TAIL : E;
+                        }}
+                        if (ebeg < eend) {{
+                            have = true;
+                            ew = ebeg;
+                            fresh = true;
+                            fr0 = r0;
+                            fr1 = r1;
+                            break;
+                        }}
+                        for (int64_t cur = r0; cur < r1; ++cur) {{  // an empty chunk: zero rows
+{zouts}
+                        }}
+                    }}
+                }}
+                const bool issue = wg_any(!done, wgb);
+                const int nb16 = done ? 0 : (int)((eend - ew) < {eb} ? (eend - ew) : {eb});
+                if (issue) {{
+                    __syncwarp();
+{astage}
+                    __syncwarp();
+                    #pragma unroll
+                    for (int ks = 0; ks < KP / 8; ++ks) {{  // A: edge gid (+8), k 8 ks + tq (+4)
+                        const float* ar = a_s + gid * AW + 8 * ks + tq;
+                        split_tf32(ar[0], ah[ks][0], al[ks][0]);
+                        split_tf32(ar[8 * AW], ah[ks][1], al[ks][1]);
+                        split_tf32(ar[4], ah[ks][2], al[ks][2]);
+                        split_tf32(ar[8 * AW + 4], ah[ks][3], al[ks][3]);
+                    }}
+                    asm volatile("wgmma.fence.sync.aligned;" ::: "memory");
+                    #pragma unroll
+                    for (int ks = 0; ks < KP / 8; ++ks) {{  // two 128-byte core matrices per k step
+                        wgmma_n{nw}(d, al[ks], gmma_desc(bh_addr + 256 * ks), ks > 0);
+                        wgmma_n{nw}(d, ah[ks], gmma_desc(bl_addr + 256 * ks), 1);
+                        wgmma_n{nw}(d, ah[ks], gmma_desc(bh_addr + 256 * ks), 1);
+                    }}
+                    asm volatile("wgmma.commit_group.sync.aligned;" ::: "memory");
+                }}
+                if (pend) {{  // the previous round's TP while the tensor cores multiply this one
+                    if (pnew) {{
+                        while (cur < r1b) {flush}
+                        cur = pr0;
+                        r1b = pr1;
+                    }}
+{back}
+                }}
+                if (!issue) break;
+                __syncwarp();
+                asm volatile("wgmma.wait_group.sync.aligned 0;" ::: "memory");
+                #pragma unroll
+                for (int ks = 0; ks < KP / 8; ++ks)  // the A fragments stay live until the product is done
+                    asm volatile("" :: "r"(ah[ks][0]), "r"(ah[ks][1]), "r"(ah[ks][2]), "r"(ah[ks][3]),
+                                 "r"(al[ks][0]), "r"(al[ks][1]), "r"(al[ks][2]), "r"(al[ks][3]));
+                #pragma unroll
+                for (int j = 0; j < {nw // 8}; ++j) {{  // D: edge gid (+8), column 8 j + 2 tq (+1): path j / 4
+                    float* rp = r_s + ((j >> 2) * {eb} + gid) * RS + 8 * (j & 3) + 2 * tq;
+                    *reinterpret_cast<float2*>(rp) = make_float2(d[4 * j], d[4 * j + 1]);
+                    *reinterpret_cast<float2*>(rp + 8 * RS) = make_float2(d[4 * j + 2], d[4 * j + 3]);
+                }}
+{shstage}
+                __syncwarp();
+                pend = nb16 > 0;
+                pew = ew;
+                pnb = nb16;
+                ptail = tail;
+                pnew = fresh;
+                pr0 = fr0;
+                pr1 = fr1;
+                fresh = false;
+                if (!done) ew += {eb};
+            }}
+            while (cur < r1b) {flush}
         }}
 """
 
