@@ -14,7 +14,7 @@ interaction or radial network:
   ``fastmace.rewrites.fusion``: the residual products, gate and linear_2 on per-segment rows);
 - ``FirstInteractionReassociation.segmented`` (segmented_first_sum).
 
-The research engine's screen options that were not carried over (docs/design/switch-map.md
+The research engine's screen options that were not carried over (docs/current/switch-map.md
 section 7: ``CONTIGUOUS_FOLDED_WEIGHT``, ``JOINT_FUSED_BACKWARD``, ``STREAMING_MUL_IR``,
 ``STREAMING_RECEIVER_BACKWARD``) are fixed at their research-engine value, off.
 """

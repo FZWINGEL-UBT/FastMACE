@@ -125,7 +125,7 @@ def test_records_have_the_spec_fields():
     assert registry.names() == tuple(GENERIC_FIELDS)
     for name, field in GENERIC_FIELDS.items():
         rewrite_ = registry[name]
-        assert registry.config_field(name) == field  # docs/design/switch-map.md
+        assert registry.config_field(name) == field  # docs/current/switch-map.md
         requires = {"generic_segmented_first_sum": ("generic_reassociate",),
                     "generic_chunked_conv_backward": ("generic_streaming", "generic_fused_radial_backward"),
                     "generic_recompute_conv_weights": ("generic_chunked_conv_backward",),

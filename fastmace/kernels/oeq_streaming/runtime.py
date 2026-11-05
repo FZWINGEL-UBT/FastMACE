@@ -233,7 +233,7 @@ def l2_chunk_edges(device, weight_dim, itemsize):
     """Edges per chunk of ``chunked_conv_backward``: a chunk's weight gradient fills a quarter of the L2, rounded
     down to a multiple of 128 edges (at least 128). The quarter leaves room for the weights and sender features
     that stream through the L2 beside it; on the RTX 5060 Ti (32 MiB, Q = 1280) that is 1,536 edges, the best of
-    the OPT6-T01 screen (docs/validation/opt6-T01.md).
+    the OPT6-T01 screen (docs/validation/speed/opt6-T01.md).
 
     Float64 weights (f64-T03): the chunk holds ``UNCHUNKED_L2_MULTIPLE`` L2s instead. Float64 is bound by its matrix
     products, not by the L2, and the input gradient's product per chunk runs on cuBLAS's emulation only when the
@@ -290,7 +290,7 @@ def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: t
     ``chunk_edges``: each chunk's weight gradient goes into one of two chunk-sized slots, and the folded layer's
     input gradient reads it at once, from the L2, on a side stream while the next chunk's backward runs (one
     stream left the small input-gradient grids exposed: NbCl5 2.83 against 2.10 ms at 1,536 edges,
-    docs/validation/opt6-T01.md). Smaller cells run the two kernels once over all edges, as without the rewrite.
+    docs/validation/speed/opt6-T01.md). Smaller cells run the two kernels once over all edges, as without the rewrite.
     Every edge's values are those of ``streaming_conv_backward`` followed by ``folded_linear_input_grad`` (the
     same kernels, the same reduction order); only the order of the atomic sender-gradient additions differs, as
     between any two runs.

@@ -15,7 +15,7 @@ fresh process, so no FastMACE patch reaches the ASE references:
   bitwise between engines (cuEq's run-time kernel choice), so each pair must agree far more closely
   than the two variants differ from each other.
 
-Results go to ``FASTMACE_RESULTS`` when set (``docs/validation/1b-T09-integrators.md``).
+Results go to ``FASTMACE_RESULTS`` when set (``docs/validation/phases/1b-T09-integrators.md``).
 """
 
 import importlib.util

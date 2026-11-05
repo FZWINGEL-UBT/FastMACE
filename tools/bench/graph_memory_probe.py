@@ -2,7 +2,7 @@
 
 Under WSL2 a FastMACE run holds 2-7 GiB of device memory outside PyTorch's caching allocator
 (``total - free - reserved``) while its CUDA graphs live, against 0.3 GiB on native Linux for the same points
-(docs/validation/capacity-T03.md). This probe isolates the cause with plain PyTorch, one case per fresh process:
+(docs/validation/capacity/capacity-T03.md). This probe isolates the cause with plain PyTorch, one case per fresh process:
 
 - ``eager``: a large intermediate computed eagerly, then freed;
 - ``graph``: the same computation captured as a CUDA graph (its intermediates in the graph's private pool), then

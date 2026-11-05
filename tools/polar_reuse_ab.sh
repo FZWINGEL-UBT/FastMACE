@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PolarMACE with the MH-1 and OMAT-0 label-gated rewrites (task polar-T01, docs/validation/polar-reuse.md): the
+# PolarMACE with the MH-1 and OMAT-0 label-gated rewrites (task polar-T01, docs/validation/polar/polar-reuse.md): the
 # force gate with the candidate set on (NaCl, NbCl5 3x3x3), then same-process MD-step A/Bs in both build orders.
 # Side a is the default plan; each b adds explicit "on" fields: the fused forward + wprime pair (decision 66
 # for MH-1 and OMAT-0), wprime alone, the gate epilogue, and all three; or an OMAT-0 kernel switch as a module

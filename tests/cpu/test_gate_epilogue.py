@@ -207,7 +207,7 @@ def test_planner_refuses_it_in_float64_without_segment_gemm_and_with_tf32x3():
 
 
 def test_the_unpadded_kernel_is_chosen_by_the_launch_s_atoms_per_sm(monkeypatch):
-    """docs/validation/gated-unpadded.md: the unpadded kernel from UNPADDED_ATOMS_PER_SM atoms per SM in the launch (a
+    """docs/validation/speed/gated-unpadded.md: the unpadded kernel from UNPADDED_ATOMS_PER_SM atoms per SM in the launch (a
     call's atoms or a tile's), only on UNPADDED_GPUS (decision 66); "on" and "off" are an A/B side's choice."""
     from fastmace.kernels.triton import gated_products as gp
 

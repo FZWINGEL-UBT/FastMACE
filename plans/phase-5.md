@@ -364,15 +364,15 @@ does not change the step time while `overlap_rebuild` is on.
 | --- | --- | --- | --- | --- |
 | 5-T01 Contracts | S–M | no | — | `planner/rules.py` (new), `planner/plan.py`, `config.py` (`AdaptationConfig`, `CalibrationConfig`), `errors.py` (`Reason` checks), `simulation.py` (`PlannerOptions` fields), `docs/design/metadata-schema.md`, `provenance.py` (schema), `pyproject.toml` (marker), `docs/design/planner-5.md` |
 | 5-T02 Rule conformance and precedence suite | M | no | T01 | `tests/cpu/test_rules_*.py`, `planner/minimal.py`, `planner/fixed.py` (reason texts and numbers only) |
-| 5-T03 Rule 12: memory estimate and action | M–L | yes (untimed peaks) | T01; D1 for the action | `planner/memory.py` (new), `planner/minimal.py`, `rewrites/registry.py` (memory terms), `neighbors/adaptive.py`, `docs/validation/5-T03.md` |
+| 5-T03 Rule 12: memory estimate and action | M–L | yes (untimed peaks) | T01; D1 for the action | `planner/memory.py` (new), `planner/minimal.py`, `rewrites/registry.py` (memory terms), `neighbors/adaptive.py`, `docs/validation/phases/5-T03.md` |
 | 5-T04 Rule 15 in the planner | S | no | T01 | `planner/warnings.py` (new), `planner/minimal.py`, `report.py` |
 | 5-T05 `str(plan)` | S–M | no | T01 | `planner/plan.py`, `provenance.py` (plan text), `tests/cpu/test_plan_text.py`, golden files |
 | 5-T06 Runtime monitor | M | smoke | T01 | `planner/adapt.py` (new), `engine/graph.py` (re-capture time), `simulation.py` (segment hook), `provenance.py` (counters), `report.py` |
-| 5-T07 Tier switch between segments | L | yes (timed) | T06; D2, D3 | `planner/adapt.py`, `simulation.py`, `planner/minimal.py` (revision for the compiled tier), `engine/subprocess.py`, `report.py`, `docs/validation/5-T07.md` |
+| 5-T07 Tier switch between segments | L | yes (timed) | T06; D2, D3 | `planner/adapt.py`, `simulation.py`, `planner/minimal.py` (revision for the compiled tier), `engine/subprocess.py`, `report.py`, `docs/validation/phases/5-T07.md` |
 | 5-T08 Mid-run fallbacks | M–L | yes | T07; D4 | `planner/fallback.py`, `simulation.py` |
 | 5-T09 Calibration | M–L | yes (timed smoke) | T01, T05; D5 | `planner/calibrate.py` (new), `planner/minimal.py`, `simulation.py`, `quick.py`, `cli/run.py`, `report.py` |
 | 5-T10 Two-stage `auto` as rules (only under D6 (b)) | L | no | T02; D6 | `planner/fixed.py`, `tools/plan_corpus.py` |
-| 5-T11 Acceptance runbook and report | M | yes | all | `docs/validation/phase-5-runbook.md`, `docs/validation/phase-5.md`, `tools/plan_corpus.py` (new), `tools/acceptance/phase5_local.sh`, `tests/_support/tiers.py` |
+| 5-T11 Acceptance runbook and report | M | yes | all | `docs/validation/phases/phase-5-runbook.md`, `docs/validation/phases/phase-5.md`, `tools/plan_corpus.py` (new), `tools/acceptance/phase5_local.sh`, `tests/_support/tiers.py` |
 
 **5-T01 Contracts.**
 - `planner/rules.py`: the table of §9.3 as data (choice 1), with
@@ -435,7 +435,7 @@ does not change the step time while `overlap_rebuild` is on.
   The large models (OMOL-0 XL, POLAR-1-L) run on the Colab A100 (40 GB);
   the rest local, after phase 4's acceptance has drained. Pass: the
   estimate is never below the peak, and at most 1.5× above it.
-  `docs/validation/5-T03.md`.
+  `docs/validation/phases/5-T03.md`.
 - **Tests:** CPU: the formula on the tiny model against its measured
   peak; the action per D1 with injected free memory; an explicit `"on"`
   kept and warned.
@@ -497,7 +497,7 @@ does not change the step time while `overlap_rebuild` is on.
   - **timed (local, quiet PC):** on the storm, the switched run is faster
     than the unswitched one (effect expected large: one block each); on the
     NaCl and NbCl5 anneal profiles the trigger never fires.
-- `docs/validation/5-T07.md`.
+- `docs/validation/phases/5-T07.md`.
 
 **5-T08 Mid-run fallbacks.**
 - `Simulation.run` catches D4's failures, returns to the last committed
@@ -530,8 +530,8 @@ does not change the step time while `overlap_rebuild` is on.
   shows the choices identical for every label × `main.py` configuration.
 
 **5-T11 Acceptance (decision 39 as amended).** Outline below; the runbook
-`docs/validation/phase-5-runbook.md` comes first and is accepted before the
-freeze. Report `docs/validation/phase-5.md`; the owner tags `fastmace-5`.
+`docs/validation/phases/phase-5-runbook.md` comes first and is accepted before the
+freeze. Report `docs/validation/phases/phase-5.md`; the owner tags `fastmace-5`.
 
 ## Order and parallelism
 
@@ -641,7 +641,7 @@ conformance test in the same branch.
   8. rule 12: T03's validation cited, rerun only if `planner/memory.py` or
      a memory term changed since. Round 4's defaults (decisions 57–59)
      change memory terms, so the runbook cites the dated rerun section of
-     `docs/validation/5-T03.md` (24 October 2026), not the original run;
+     `docs/validation/phases/5-T03.md` (24 October 2026), not the original run;
   9. calibration (D5 (a) or (b)): the NaCl smoke, its record and setup
      cost; its choice is judged only on the reference GPU;
   10. `str(plan)`: the golden texts, and one real plan per item 6–9

@@ -1,7 +1,7 @@
 """The generic family: rewrites for MACE-MP-0, the density family and MACE-OFF's later blocks (SPEC §6.2).
 
 ``RECORDS`` holds seven registry records (``fastmace.rewrites.registry``), each a dict of the §6.1
-fields plus the ``RewriteConfig`` field that switches it (docs/design/switch-map.md):
+fields plus the ``RewriteConfig`` field that switches it (docs/current/switch-map.md):
 
 - ``generic_species_skip`` (``species_skip``): every generic skip connection restricted to the
   structure's species (``SpeciesSkip``); exact, fixed species superset;
@@ -20,7 +20,7 @@ fields plus the ``RewriteConfig`` field that switches it (docs/design/switch-map
   (``rewrites.mh1.modules.streaming_message`` with the last radial layer's input ``[h c, c]`` and its weight
   ``[W, 0]``), so its backward runs in L2-sized edge chunks and the per-edge weight gradient, the largest tensor
   of a generic force call (``[E, W]``: 5.1 kB per edge in MACE-OMAT-0 medium), is never formed in full
-  (docs/validation/omat0-capacity.md). Rounding class: ``(h c) W`` against ``(h W) c``. Stage 2 keeps it to the
+  (docs/validation/omat0/omat0-capacity.md). Rounding class: ``(h c) W`` against ``(h W) c``. Stage 2 keeps it to the
   GPUs its same-process A/Bs measured (``planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS``);
 - ``generic_recompute_conv_weights`` (``recompute_conv_weights``): the per-edge weights of that path are not kept
   (``kernels.oeq_streaming.folded_recompute_convolution``): the forward builds them on chip without storing them

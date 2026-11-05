@@ -2,7 +2,7 @@
 
 Owner idea (2 November 2026): use the tensor cores beside the CUDA cores, not inside one tile but at the same time
 in different tiles. Status: plan only, nothing built. It builds on the wavefront schedule
-(`fastmace/omat0-wavefront`, `docs/validation/tiled-wavefront.md`), which already knows which tile sweeps are
+(`fastmace/omat0-wavefront`, `docs/validation/tiled/tiled-wavefront.md`), which already knows which tile sweeps are
 independent.
 
 ## 1. The idea in one paragraph

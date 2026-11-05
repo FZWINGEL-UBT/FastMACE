@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# segment_gemm tile order (C1 side finding, docs/validation/segment-gemm-order.md): a row tile's column tiles run
+# segment_gemm tile order (C1 side finding, docs/validation/speed/segment-gemm-order.md): a row tile's column tiles run
 # together when A exceeds the L2 (tile_rule.columns_together). Local RTX 5060 Ti (sm_120, WSL2):
 #   python3 tools/ci/local_gpu.py run --purpose "fm sgo JOB" -- env FM=<pinned branch copy> \
 #     bash results/segment-gemm-order-20261030/local.sh ROOT JOB...

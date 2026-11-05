@@ -6,7 +6,7 @@ owner through the conductor, after an outside review pointed at Symmetrix-XL's t
 ## 1. The idea and why it fits FastMACE now
 
 **Where the memory goes today.** At the float32 MH-1 limit (NbCl5, 51,840 atoms, RTX 5060 Ti), the force call's graph
-pool holds 11.5 GiB live, about 240 kB per atom ([capacity-ledger.md](../validation/capacity-ledger.md)). Almost all
+pool holds 11.5 GiB live, about 240 kB per atom ([capacity-ledger.md](../validation/capacity/capacity-ledger.md)). Almost all
 of it is per-atom activations kept for the backward or alive in it:
 
 - the symmetric contraction's inputs;
@@ -15,7 +15,7 @@ of it is per-atom activations kept for the backward or alive in it:
 - the gate activations;
 - the linear inputs.
 
-See [capacity-T08-inventory.md](../validation/capacity-T08-inventory.md). After CAP-T07 and CAP-T09 the per-edge state
+See [capacity-T08-inventory.md](../validation/capacity/capacity-T08-inventory.md). After CAP-T07 and CAP-T09 the per-edge state
 is small. So every lever left for capacity is a per-atom lever:
 
 - recompute_node_segments (CAP-T08 chunks, in another session) chunks the node-local segments. It reaches about
@@ -37,7 +37,7 @@ does not try to match Symmetrix-XL's headline numbers: different model, differen
 
 ## 2. The schedule on MH-1
 
-MH-1 (`mh1-r2scan`) is a two-interaction `ScaleShiftMACE` with these irreps (from [opt-T08-linear-audit.md](opt-T08-linear-audit.md)):
+MH-1 (`mh1-r2scan`) is a two-interaction `ScaleShiftMACE` with these irreps (from [opt-T08-linear-audit.md](speed/opt-T08-linear-audit.md)):
 
 - node features 512x0e into interaction 0;
 - **512x0e+512x1o (2,048 floats) between the interactions**;

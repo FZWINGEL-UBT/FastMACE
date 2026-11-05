@@ -1,4 +1,4 @@
-"""PolarMACE with the MH-1 and OMAT-0 optimisations (docs/validation/polar-reuse.md, task polar-T01).
+"""PolarMACE with the MH-1 and OMAT-0 optimisations (docs/validation/polar/polar-reuse.md, task polar-T01).
 
 MACE-POLAR-1 runs MH-1's interaction class, so the MH-1 rewrite package is meant to carry over. These
 tests check that on a tiny PolarMACE on the CPU, float64 (float32 for the radial tables), with the
@@ -138,7 +138,7 @@ def _plan(label, hardware=None, **configs):
 
 DECISION_66_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB")
 ADA = "NVIDIA RTX 4000 Ada Generation"
-# Decision 66 for POLAR-1 (owner, 5 November 2026; docs/validation/polar-reuse.md section 4): measured GPUs only.
+# Decision 66 for POLAR-1 (owner, 5 November 2026; docs/validation/polar/polar-reuse.md section 4): measured GPUs only.
 POLAR_WPRIME = ("fused_folded_forward", "wprime_backward")  # models with a second interaction (M, L)
 POLAR_MEASURED = {"wprime": (ADA,), "gate_epilogue": (ADA,)}
 

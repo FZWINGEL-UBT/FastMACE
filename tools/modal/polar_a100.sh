@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# POLAR-1-M on the A100-SXM4-80GB (polar-T01, docs/validation/polar-reuse.md): the force gate with MH-1's A100
+# POLAR-1-M on the A100-SXM4-80GB (polar-T01, docs/validation/polar/polar-reuse.md): the force gate with MH-1's A100
 # label-gated set (wprime_backward, fused_folded_forward, tf32x3_gemms) and the round-5 switches, then MD-step
 # A/Bs in both build orders (tools/polar_reuse_ab.sh). Exits 3 on any other card.
 # Usage (from WSL, Modal client venv; the checkpoint in the volume's /models):

@@ -5,7 +5,7 @@
 2. The build's peak allocation above the list's own buffers is below 64 B per pair.
 
 The comparison against the layout before cap-nlist (stored candidate shifts, int64 candidate indices) and MD
-trajectories bitwise equal with it were recorded at commit 787e44df (docs/validation/capacity-nlist.md).
+trajectories bitwise equal with it were recorded at commit 787e44df (docs/validation/capacity/capacity-nlist.md).
 """
 
 import numpy as np

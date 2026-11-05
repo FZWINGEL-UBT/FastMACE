@@ -15,7 +15,7 @@ expected displacement per rebuild interval, with no per-GPU or per-crystal table
 - **The target interval.** The skin is the one that makes this interval ``TARGET_REBUILD_STEPS``
   steps, and at least the floor (phase 1a's 0.3 Å): skin = max(floor, 2 n* d). At 300 K and 0.5 fs
   the floor holds for the ionic crystals of the test set (NaCl, NbCl5, NaNbO3), and NaCl's measured
-  rebuild interval there (about 25 steps, docs/validation/1a-noise-floor.md) matches the model's 24.
+  rebuild interval there (about 25 steps, docs/validation/phases/1a-noise-floor.md) matches the model's 24.
 - **Displacement moves** (§10.4) add 2 delta_max: the displaced atom still has the MD budget of
   skin / 2 and moves at most delta_max on top, so a trial rarely needs a rebuild (§8.5 step 4).
 
@@ -48,7 +48,7 @@ TARGET_REBUILD_STEPS = 16
 DEFAULT_HEADROOM = 1.15
 # Rule 11 for optimisers (4-T05): the skin in optimiser steps of the largest length, maxstep. The rebuild test
 # fires once an atom has moved skin / 2, so 3 maxsteps keep at least 1.5 full steps between rebuilds in a
-# relaxation's first, largest steps. Measured on MH-1 NaCl and NbCl5 quench frames (docs/validation/4-T05.md):
+# relaxation's first, largest steps. Measured on MH-1 NaCl and NbCl5 quench frames (docs/validation/phases/4-T05.md):
 # 0.6 A halves the rebuilds of 0.3 A and the re-captures with them, and 1.0 A gains nothing more.
 OPTIMIZER_SKIN_STEPS = 3.0
 

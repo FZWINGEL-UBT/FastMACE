@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OPT5-T08: Fused single-kernel SIMT + 3xFP16 NVRTC GEMM (Path B) and row/col-normalized standalone 3xFP16 (Path A).
 
-Design doc: docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md
+Design doc: docs/design/research/2026-10-26-fp16x3-and-hybrid-gemm.md
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Exact layout removals of the layout audit (plans/opt-3.md OPT3-T05; docs/design/opt3-T05-layout-audit.md).
+"""Exact layout removals of the layout audit (plans/opt-3.md OPT3-T05; docs/design/speed/opt3-T05-layout-audit.md).
 
 - ``direct_node_feats``: without LAMMPS, the folded MH-1 forward keeps ``linear_up``'s output and the node
   attributes as they are, instead of joining them for ``handle_lammps`` and slicing them out again (the

@@ -1056,7 +1056,7 @@ class MinimalPlanner:
             field = registry.config_field(name)
             why = (f"on: rule 12's memory rescue turned it off, and {other} (turned on after it) keeps its extra "
                    f"memory within its chunks, so it is on again and the estimate still fits "
-                   f"(docs/validation/region-norm.md)")
+                   f"(docs/validation/capacity/region-norm.md)")
             book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
             book.decide(f"RewriteConfig.{field}", "on", Reason(why, rule=12, code="rule-12-memory-rescue"))
         for name, saved in rescued:
@@ -1088,7 +1088,7 @@ class MinimalPlanner:
             book.decide(f"RewriteConfig.{field}", "off", Reason(why, rule=12, code="rule-12-memory-drop"))
         text = found.text(free)
         if memory.probe_corrected(found):
-            text += f"; {memory.PROBE_TERM}: corrected by a replica's measured peak (docs/validation/estimate-probe.md)"
+            text += f"; {memory.PROBE_TERM}: corrected by a replica's measured peak (docs/validation/capacity/estimate-probe.md)"
         if memory.fits(found, free):
             how = "fits" if free else "not checked"
             why = text if free else f"{text}; no GPU memory to compare (device {self.engine.device})"

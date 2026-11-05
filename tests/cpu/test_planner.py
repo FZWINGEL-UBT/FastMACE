@@ -238,12 +238,12 @@ FASTMACE_ONLY_DEFAULTS = {
     # Decision 66, 31 October 2026 (speed-def E2): MH-1 on DECISION_66_GATE_EPILOGUE_GPUS (this file's GPU is one),
     # with segment_gemm (float32, not reproducible).
     "gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
-    # Decision 66, 3 November 2026 (docs/validation/cutlass-tf32x3.md): MH-1 and OMAT-0 medium on
+    # Decision 66, 3 November 2026 (docs/validation/omat0/cutlass-tf32x3.md): MH-1 and OMAT-0 medium on
     # DECISION_66_TF32X3_GPUS (not this file's GPU), float32, not reproducible.
     "tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
-# (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
+# (docs/design/speed/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
 MH1_LABELS = ("mh1-omat", "mh1-mp", "mh1-r2scan")
 # The generic MACE family (decision 57): every interaction MP-0's residual or the density family's (MACE-OFF's
 # plain first interaction, MH-1, POLAR-1 and OMOL-0 are other families).
@@ -1069,7 +1069,7 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
 
 
 def test_decision_66_generic_wprime_and_fused_forward_for_omat0():
-    """Decision 66 (owner, 3 November 2026; docs/validation/generic-wprime.md): the generic fused forward and
+    """Decision 66 (owner, 3 November 2026; docs/validation/omat0/generic-wprime.md): the generic fused forward and
     wprime_backward are on together for OMAT-0 medium on the measured GPUs, by exact name. On the A100-SXM4-80GB,
     where the generic chunked path is off, chunked_conv_backward stays on as their carrier (wprime_backward's
     backward never chunks) and goes off with them in float64 plans and when wprime_backward is turned off."""

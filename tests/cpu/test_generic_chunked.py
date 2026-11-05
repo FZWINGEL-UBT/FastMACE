@@ -1,4 +1,4 @@
-"""The generic chunked streaming backward (``generic_chunked_conv_backward``; docs/validation/omat0-capacity.md).
+"""The generic chunked streaming backward (``generic_chunked_conv_backward``; docs/validation/omat0/omat0-capacity.md).
 
 - The record: the generic family's, on ``RewriteConfig.chunked_conv_backward``, after ``generic_streaming`` and
   ``generic_fused_radial_backward``; rounding class (``(h c) W`` against ``(h W) c``); not deterministic (the

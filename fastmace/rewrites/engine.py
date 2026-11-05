@@ -556,7 +556,7 @@ PROCESS_RECORDS = {
     "single_graph_strain": _record("single_graph_strain", _apply_strain, _selfcheck_strain, "rounding", "auto",
                                    STRAIN_SOURCE, ("single_graph",)),
 }
-# Where each is switched (docs/design/switch-map.md); None: always on for the graph engine.
+# Where each is switched (docs/current/switch-map.md); None: always on for the graph engine.
 CONFIG_FIELDS = {
     "capture_safe_mask_head": None,
     "first_derivative_only": "EngineConfig.first_derivative_only",

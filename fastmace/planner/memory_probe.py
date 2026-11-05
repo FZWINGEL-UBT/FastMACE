@@ -1,8 +1,8 @@
-"""The near-limit memory probe (``EngineConfig.memory_probe``; docs/validation/estimate-probe.md).
+"""The near-limit memory probe (``EngineConfig.memory_probe``; docs/validation/capacity/estimate-probe.md).
 
 Rule 12's estimate stays at or above the measured peak at every stage of the memory rescue, but by up to 1.25
 times: the caching allocator's reserve above the live peak (the graph pool's packing) differs between crystals by
-that much at one stage, and no term predicts it (docs/validation/estimate-band.md). Within one crystal and stage it
+that much at one stage, and no term predicts it (docs/validation/capacity/estimate-band.md). Within one crystal and stage it
 is stable across sizes, so a small replica of the structure measures it:
 
 - **when** (``stages_to_probe``): ``"near-limit"`` (``"auto"``'s resolution for MD on CUDA) probes only where rule
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from fastmace.planner.plan import MemoryProbeRecord, Plan
 
 # The replica's size: at 15,000 atoms and more the reserve's ratio to the live peak was stable across sizes in the
-# rescue matrix; below it the build's fixed transient sets the peak (docs/validation/estimate-band.md).
+# rescue matrix; below it the build's fixed transient sets the peak (docs/validation/capacity/estimate-band.md).
 REPLICA_ATOMS = (15_000, 20_000)
 # MD steps a probe runs after its build: the captures and the first padded-size growth are in them.
 PROBE_STEPS = 20

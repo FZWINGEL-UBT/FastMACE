@@ -17,7 +17,7 @@ results (5a202d2) and 3-T20 (c3bf93f; items 1–3 pass) are merged too. **Freeze
 3-T21:** main c3bf93f, whose `fastmace/` equals cd43463. 3-T16b is merged in
 ResearchModule (3cc4207f, `main.py --profile swap-anneal`). 3-T18 (coraline, when the
 workstations are back) doesn't block acceptance. **3-T21's acceptance report is merged
-(7dfa54c, `docs/validation/phase-3.md`):** every item passes on the frozen code, with
+(7dfa54c, `docs/validation/phases/phase-3.md`):** every item passes on the frozen code, with
 test-side corrections only. The GPU slow tier's appendix follows before the owner's
 `fastmace-3` tag (checkpoint 3). 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
@@ -512,7 +512,7 @@ GPU:
 - one Modal L4 confirmation under the guard.
 
 Done when rule 11 decides skin and headroom, and the 1500 K numbers are in
-`docs/validation/3-T05.md`.
+`docs/validation/phases/3-T05.md`.
 
 #### 3-T06 Compiled MD tier (L, GPU: local) — after T01
 
@@ -699,7 +699,7 @@ the fallback).
   - models: MH-1 `matpes_r2scan`, the MH-1 `omol` head (all-electron E0),
     and OMOL-0 XL where it fits;
   - structures: NaCl, NbCl5 and NaNbO3, at 300 K and 1500 K snapshots;
-  - output: tables in `docs/validation/3-T11.md`.
+  - output: tables in `docs/validation/phases/3-T11.md`.
 
 Files: `planner/selfcheck.py` (owner), `planner/minimal.py` (the precision
 dimension; after T06 and T09), `planner/fallback.py` (after T06).
@@ -846,7 +846,7 @@ A default change is the owner's decision (checkpoint 2b below). Worker: 3-T03's 
     `fixcm_projection="ase"`;
   - new tests for the MD default, the 3N − 3 temperature and the resume of an older record.
 - **Docs:** `docs/design/fixcm-projection.md`, `docs/design/contracts-3.md`, and a validation note
-  `docs/validation/3-T22c.md`.
+  `docs/validation/phases/3-T22c.md`.
 - **GPU:** one short reservation. Run the fused-projection fast tier with the default plan, plus a
   per-species temperature check on NaCl and Li/Cs under the default: every species at the target, over
   3N − 3.
@@ -870,7 +870,7 @@ Worker: 3-T03's session. Merge order: after 3-T06b where both edit the same test
   - The compiled tier is chosen only under rule 4 or with `mode="compiled"`.
   - `RULE_9_HOST_CALLBACKS` and the decision code `host-callbacks-compiled` go or change meaning.
 - **Tests:** flip the rule-9 tests. `fastmace.ase` observers keep graph.
-- **Docs:** `docs/validation/3-T06.md`, `docs/design/contracts-3.md`, and every doc that says observers
+- **Docs:** `docs/validation/phases/3-T06.md`, `docs/design/contracts-3.md`, and every doc that says observers
   or callbacks choose the compiled tier.
 - **GPU:** none. The timing is 3-T06's, and 3-T21 measures the Ada leg.
 
@@ -887,7 +887,7 @@ Worker: 3-T06's session.
   displacement with and without a trial rebuild).
 - **Item 3:** the ΔE table from T11.
 
-Files: `tools/` and `bench/` (new entry points), and `docs/validation/3-T20.md`.
+Files: `tools/` and `bench/` (new entry points), and `docs/validation/phases/3-T20.md`.
 
 #### 3-T21 Acceptance runs and report (L, GPU, conductor-scheduled) — after all except T16b and T18
 
@@ -911,7 +911,7 @@ Files: `tools/` and `bench/` (new entry points), and `docs/validation/3-T20.md`.
   - Timing items repeat only as much as the size of the effect needs: item 1
     uses the 4 main swap-back runs, items 2 and rule 9 one block per case.
 - **The no-regression A/B** against main at the freeze.
-- **Report:** `docs/validation/phase-3.md`, with pass or fail per item, run
+- **Report:** `docs/validation/phases/phase-3.md`, with pass or fail per item, run
   IDs, hardware, environments, costs (Modal) and open findings.
 
 ## Order and parallelism
@@ -990,7 +990,7 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
   within noise, because `overlap_rebuild` already runs rebuilds on a side
   stream. MD-only plans keep 0.3 Å. The rule serves MC and species-change
   workloads, displacement trials and plans without `overlap_rebuild`
-  (`docs/validation/3-T05.md`).
+  (`docs/validation/phases/3-T05.md`).
 
 ## Conductor answers to the prestart reports (22 October 2026)
 
@@ -1153,7 +1153,7 @@ changes.**
 2. **The bitwise test:** use the same `compile_mode` on both sides.
    - With `compile_mode="none"`, the two must be bitwise equal.
    - With Inductor on both sides, test it too. If they differ only by
-     rounding, record it in `docs/validation/3-T06.md`, and I judge item 8 at
+     rounding, record it in `docs/validation/phases/3-T06.md`, and I judge item 8 at
      float64 rounding.
 3. **The rule 9 threshold** is a module constant (10) in `planner/minimal.py`,
    cited in the decision.
@@ -1456,7 +1456,7 @@ the total stays inside the $27 limit.
 ## Open findings from merged tasks (for 3-T21's report)
 
 Recorded by the conductor at each merge; 3-T21 carries the ones still open into
-`docs/validation/phase-3.md`.
+`docs/validation/phases/phase-3.md`.
 
 - **GPU runs refused by the workers' permission checks, waiting for the
   owner** (22 October 2026):

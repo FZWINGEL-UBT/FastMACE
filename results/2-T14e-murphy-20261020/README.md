@@ -1,7 +1,7 @@
 # 2-T14e raw results (murphy, 20 October 2026)
 
 Raw files of plan task 2-T14e, which measured reference work in the GPU tiers. The report is
-[docs/validation/2-T14e-reference-reuse.md](../../docs/validation/2-T14e-reference-reuse.md).
+[docs/validation/phases/2-T14e-reference-reuse.md](../../docs/validation/phases/2-T14e-reference-reuse.md).
 murphy RTX 4000 Ada, shared with processes of our own account (untimed), FastMACE `main` e24d48e.
 
 | Path | What it is |

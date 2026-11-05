@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 3b-T08 on the local RTX 5060 Ti (WSL): tools/polar_stress_fd.py, POLAR-1-S, one local GPU reservation
 # (<= 15 min) per job, in sequence. Usage: tools/validation/3b_t08_local.sh RUN_ID [JOB...]
-# Results: results/RUN_ID/<job>.json and .log. docs/validation/3b-T08.md has the findings.
+# Results: results/RUN_ID/<job>.json and .log. docs/validation/phases/3b-T08.md has the findings.
 set -uo pipefail
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$repo"

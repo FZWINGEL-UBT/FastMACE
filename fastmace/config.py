@@ -2,7 +2,7 @@
 
 The research engine sets its options as module globals (``gpu_langevin.FOLD_RADIAL_CUTOFF =
 True``) from ``workflow.GPUEngine``. Here each option is a field of a frozen dataclass, and
-``docs/design/switch-map.md`` maps every research-engine global and ``main.py`` flag to its
+``docs/current/switch-map.md`` maps every research-engine global and ``main.py`` flag to its
 field or records why it was not carried over. The defaults are ``main.py``'s defaults of
 17 October 2026.
 
@@ -326,7 +326,7 @@ class EngineConfig:
     # edge earlier force captures added). After a release the padded size never drops below the captured one.
     # "auto": the planner's rule (fit on CUDA, keep elsewhere).
     force_graphs: Literal["auto", "keep", "fit", "one"] = "auto"
-    # The memory probe (planner.memory_probe, docs/validation/estimate-probe.md): rule 12's estimate of a stage
+    # The memory probe (planner.memory_probe, docs/validation/capacity/estimate-probe.md): rule 12's estimate of a stage
     # corrected by what a 15-20k-atom replica of the structure measured with that stage's rewrites, each stage in a
     # fresh child (30-60 s with a warm compiler cache). "near-limit": only where rule 12's choice is ambiguous (its
     # estimate within the rescue's spread of the free memory, or the next-cheaper stage might fit); "always": the

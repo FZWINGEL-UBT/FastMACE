@@ -16,7 +16,7 @@ Entry points (``modal run tools/modal/fastmace_modal.py::<name> ...``):
 - ``smoke``: ``nvidia-smi``, the image's ``pip freeze``, torch's CUDA view, ``tests/gpu/test_smoke.py``.
 - ``job``: ``--tarball`` (a ``git archive`` of a commit, with ``.source_commit``) or ``--commit`` (archived
   from ``--repo``), ``--command`` (a shell command run from the source root; ``$OUT`` is the results
-  directory), ``--gpu L4|A100|A100-80GB|H100|RTX-PRO-6000``, ``--timeout-min``, ``--out`` (a local directory for the
+  directory), ``--gpu L4|A100|A100-80GB|H100|H200|RTX-PRO-6000``, ``--timeout-min``, ``--out`` (a local directory for the
   returned results).
 
 Every job writes ``modal.json`` into its results: the GPU, driver, CUDA, image pip freeze hash, the source
@@ -59,9 +59,9 @@ if modal.is_local():
 
 APP_NAME = "fastmace"
 VOLUME_NAME = "fastmace-data"
-GPUS = ("L4", "A100", "A100-80GB", "H100", "RTX-PRO-6000")
+GPUS = ("L4", "A100", "A100-80GB", "H100", "H200", "RTX-PRO-6000")
 # USD per GPU-hour at Modal's list prices of October 2026 (GPU only; CPU and memory are billed on top, a few %).
-PRICE_PER_HOUR = {"L4": 0.80, "A100": 2.10, "A100-80GB": 2.50, "H100": 3.95, "RTX-PRO-6000": 3.03}
+PRICE_PER_HOUR = {"L4": 0.80, "A100": 2.10, "A100-80GB": 2.50, "H100": 3.95, "H200": 4.54, "RTX-PRO-6000": 3.03}
 TORCH_INDEX = "https://download.pytorch.org/whl/cu130"
 # Hard container limits (cores, MiB): the budget's worst case is computed at these limits.
 JOB_CPU, JOB_MEMORY_MIB = (4.0, 8.0), (16384, 32768)

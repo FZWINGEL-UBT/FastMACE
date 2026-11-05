@@ -74,4 +74,4 @@ Run it under the local reservation: `python3 tools/ci/local_gpu.py run --purpose
 
 ## Results
 
-See the "6-T04" section of [docs/validation/6-T04.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/6-T04.md).
+See the "6-T04" section of [docs/validation/phases/6-T04.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/phases/6-T04.md).

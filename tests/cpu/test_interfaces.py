@@ -143,7 +143,10 @@ def test_state_fields_of_phase_1a():
     fields = {f.name for f in dataclasses.fields(SimulationState)}
     assert {"positions", "velocities", "masses", "cell", "species", "forces", "energy", "stress",
             "rng", "step"} <= fields
-    assert {"generator", "batch", "cursor"} <= {f.name for f in dataclasses.fields(RandomStream)}
+    # Round 6 (NOISE_DRAW_AHEAD) keeps the generator in `_generator` behind a `generator` property that first
+    # joins the draw-ahead thread.
+    assert {"_generator", "batch", "cursor"} <= {f.name for f in dataclasses.fields(RandomStream)}
+    assert isinstance(RandomStream.generator, property)
     # 1b-T05 added the §10.6 fields and 3-T08 the MC state: nothing is listed as missing.
     import fastmace.state as state
 

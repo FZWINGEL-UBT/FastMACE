@@ -41,7 +41,7 @@ def _check_one_segment(grad, wt, gated, gates, dgated, dgates, atoms, dim, mul):
     value at most 1e-6. Not an element-wise rtol/atol: dgate sums D products of K-long float32 sums, and where they
     cancel (a value of 0.3 out of terms of order 10-100) float32 rounding exceeds atol = 1e-5 for any summation
     order. On the RTX A4000 cuBLAS's own float32 product misses that by up to 2.4e-5, while both it and the kernels
-    stay within 4e-7 of the largest value (docs/validation/gated-unpadded.md)."""
+    stay within 4e-7 of the largest value (docs/validation/speed/gated-unpadded.md)."""
     drows = (grad.double().view(atoms * dim, mul) @ wt.double()).view(atoms, dim, mul)
     want = {"dgated": (drows * gates.double()[:, None, :]).reshape(atoms * dim, mul),
             "dgate": (drows * gated.double().view(atoms, dim, mul)).sum(1)}
@@ -119,7 +119,7 @@ def test_stacked_tile_has_no_register_spills(dim):
 
 @pytest.mark.parametrize("side", ["on", "off"])
 def test_unpadded_kernel_matches_the_chain_and_is_deterministic(monkeypatch, side):
-    """docs/validation/gated-unpadded.md: the unpadded kernel (whole atoms packed atom-major, the m-sum by a 0/1
+    """docs/validation/speed/gated-unpadded.md: the unpadded kernel (whole atoms packed atom-major, the m-sum by a 0/1
     selection tl.dot) against the chain to rounding, deterministic, with a partial atom tile."""
     from fastmace.kernels.triton import gated_products as gp
 
@@ -140,7 +140,7 @@ def test_unpadded_kernel_matches_the_chain_and_is_deterministic(monkeypatch, sid
 def test_unpadded_kernel_on_one_segment(dim):
     """The unpadded launch alone against drows: dgated and dgate. Its tile (64 rows x 128 columns, 4 warps) spills
     registers on the RTX A4000 (sm_86; 30-314 spills); the measured speed-ups include that
-    (docs/validation/gated-unpadded.md), so spills are not asserted here."""
+    (docs/validation/speed/gated-unpadded.md), so spills are not asserted here."""
     from fastmace.kernels.triton import gated_products as gp
 
     atoms, mul = 301, MUL

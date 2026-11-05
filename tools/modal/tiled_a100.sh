@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tiled capacity path (docs/validation/capacity-tiled-t1t2.md) on a Modal A100-80GB: NbCl5 cells growing until one
+# Tiled capacity path (docs/validation/capacity/capacity-tiled-t1t2.md) on a Modal A100-80GB: NbCl5 cells growing until one
 # fails or is invalid (tiled_capacity.py checks the edges per atom and the forces of every point). The neighbour
 # list is built on the host (matscipy, O(N)): the GPU screen is O(N^2), about 200 s at 1.73M atoms on an RTX 4000
 # Ada, which would be most of the budget at several million atoms. MH-1 float32 hybrid, R = 4,096.

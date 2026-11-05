@@ -1,4 +1,4 @@
-"""The species family of optimisation round 1 (OPT-T08; docs/design/opt-T08-linear-audit.md).
+"""The species family of optimisation round 1 (OPT-T08; docs/design/speed/opt-T08-linear-audit.md).
 
 - ``species_tables`` (C1): the species-only atom-level products become per-species tables. These
   are the node embedding, every interaction's source and target embedding, and the first

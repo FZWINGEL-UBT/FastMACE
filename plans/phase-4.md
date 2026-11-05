@@ -234,12 +234,12 @@ PolarMACE would need").
 | 4-T05 GPU LBFGS and the optimiser driver | L | yes | T01 | `optimize/lbfgs.py`, `optimize/driver.py`, `engine/graph.py`, `simulation.py` (`optimizer=`, `relax`), `planner/minimal.py` (rules 10, 11) |
 | 4-T06 GPU FIRE | M | yes | T01; wiring after T05 | `optimize/fire.py` |
 | 4-T07 Variable-cell relaxations | M–L | yes | T05, T06 | `optimize/cell.py`, `engine/graph.py`, `planner/minimal.py` |
-| 4-T08 Annealing-benchmark minima | M | yes | T05, D3 | `tools/validation/anneal_minima.py`, `docs/validation/4-T08.md` |
+| 4-T08 Annealing-benchmark minima | M | yes | T05, D3 | `tools/validation/anneal_minima.py`, `docs/validation/phases/4-T08.md` |
 | 4-T09 Protocol relaxations, `fastmace relax` | S–M | smoke | T05, T07, 3b-T07; D4 for the default | `protocols/quench.py`, `protocols/runner.py`, `protocols/profiles.py`, `cli/relax.py`, `cli/__main__.py` |
 | 4-T10 Front ends | M | yes (§7.7 A/B) | T02, T03; T07 and D5 for the optimisers | `ase/md.py`, `ase/optimize.py`, `quick.py`, `cli/md.py`, `cli/init.py`, `report.py` |
 | 4-T11 Frozen k-set in `check_stress_fix` | S | yes (POLAR-1-S) | — | `reference/calculators.py`, `reference/records.py`, `tools/force_stress_gate.py` |
 | 4-T12 PolarMACE stress-gate rule | S | yes | T11, D6 | `reference/records.py`, `planner/selfcheck.py` |
-| 4-T13 Acceptance runbook and report | M | yes | all | `docs/validation/phase-4-runbook.md`, `docs/validation/phase-4.md` |
+| 4-T13 Acceptance runbook and report | M | yes | all | `docs/validation/phases/phase-4-runbook.md`, `docs/validation/phases/phase-4.md` |
 
 **4-T01 Contracts.**
 - `Integrator` gains:
@@ -382,7 +382,7 @@ PolarMACE would need").
 - The ASE side took about 1.1 h on 13 October. It runs locally, or on Modal
   if the local GPU is needed for timing.
 - Quench time GPU against ASE, one block (decision 39).
-- Report `docs/validation/4-T08.md`. It is an acceptance item.
+- Report `docs/validation/phases/4-T08.md`. It is an acceptance item.
 
 **4-T09 Protocol relaxations and `fastmace relax`.**
 - The optimizer names in `[relax]` and `[quench]`: `"LBFGS"` and `"FIRE"`
@@ -431,7 +431,7 @@ PolarMACE would need").
   - GPU: POLAR-1-S on the 3b-T08 NbCl5 gate configuration passes at
     h = 1e-4 (3b-T08: 8.3e-9 eV/Å³ frozen against 4.36e-4 live); NaCl
     unchanged.
-- A short addendum to `docs/validation/3b-T08.md` instead of a new document.
+- A short addendum to `docs/validation/phases/3b-T08.md` instead of a new document.
 
 **4-T12 PolarMACE stress-gate rule (D6).**
 - Under (a): the PolarMACE stress floor in the reference record, read by
@@ -464,8 +464,8 @@ PolarMACE would need").
   tests corrected at acceptance, the GPU slow tier, and the items' own runs.
 - The GPU slow tier at this freeze also stands in for phase 3b's, which was
   dropped (owner, 23 October 2026).
-- The runbook `docs/validation/phase-4-runbook.md` comes first and is
-  accepted before the freeze. Report `docs/validation/phase-4.md`; the owner
+- The runbook `docs/validation/phases/phase-4-runbook.md` comes first and is
+  accepted before the freeze. Report `docs/validation/phases/phase-4.md`; the owner
   tags `fastmace-4`.
 
 ## Order and parallelism
@@ -571,7 +571,7 @@ Wave 4   T13 acceptance
       Simulation the same optimisers are fm.optimize.LBFGS and FIRE, and FrechetCellFilter is
       fm.optimize.FrechetCell."
 - **4-T03 and 4-T03b** (branches `fastmace/4-T03-rebased`, `fastmace/4-T03b`;
-  [docs/validation/4-T03.md](../docs/validation/4-T03.md), [4-T03b.md](../docs/validation/4-T03b.md)):
+  [docs/validation/phases/4-T03.md](../docs/validation/phases/4-T03.md), [4-T03b.md](../docs/validation/phases/4-T03b.md)):
   - The task's "the chain updates are device scalar operations, unrolled at capture" now reads
     **"fused"**: on CUDA with Triton, each chain half and MTK's 3 × 3 exp/exprel run as one Triton
     program each, bitwise the PyTorch stage (4-T03b, accepted by the conductor on 23 October 2026).

@@ -9,7 +9,7 @@ float64, eager and compiled:
 - in float32 the energy is closer to the float64 model's than the stock float32 sum.
 
 The measurements on released models (POLAR-1-S and OMOL-0 XL on NbCl5, MH-1's change, the step
-time) are ``tools/energy64_gpu.py``'s; results in docs/validation/1b-T03-energy.md.
+time) are ``tools/energy64_gpu.py``'s; results in docs/validation/phases/1b-T03-energy.md.
 """
 
 import copy
