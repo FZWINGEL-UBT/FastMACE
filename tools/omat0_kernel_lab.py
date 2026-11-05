@@ -753,6 +753,32 @@ def _tc_presplit(kernel):
     return transform
 
 
+def _tc_wfrag_split(kernel):
+    """The plan's wfrag kernel re-rendered with its W slice stored split (fused_forward.TC_WFRAG_SPLIT): bitwise, its
+    own launch rule (the presplit slice size), the plan's parts, staging and flags otherwise."""
+    def transform(s):
+        import torch
+
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        if not getattr(kernel, "wfrag", False):
+            raise ValueError("tc-wfrag-split needs the plan's wfrag kernel (TC_WFRAG)")
+        props = torch.cuda.get_device_properties(0)
+        shape = (kernel.paths, kernel.used, kernel.schedule.edge_dim, kernel.channels,
+                 int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
+        options = dict(tc="presplit", prefetch=False, x_slots=kernel.schedule.input_dim // kernel.schedule.channels)
+        groups = kernel.groups
+        rule = ff.launch_rule(*shape, groups=groups, **options) if groups else None
+        if rule is None:
+            groups, rule = None, ff.launch_rule(*shape, **options)
+        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc="presplit",
+                           blocks=kernel.blocks, prefetch=False, vec_sh=kernel.vec_sh, vec_a=kernel.vec_a, wfrag=True,
+                           groups=groups)
+        _RULES[source] = rule
+        print(f"tc-wfrag-split rule {rule} (plan {kernel.rule})", flush=True)
+        return source
+    return transform
+
+
 def _ns_slab(s):
     """No store, and w from a 6-term slab with float2 loads instead of the a.W product (wprime_backward.TABLE_W in the
     forward): w[g][b] = sum_k a_k G_k, the a row's first 6 values standing in for the Chebyshev basis and W's own
@@ -1152,6 +1178,7 @@ def forward_variants(kernel=None):
         "F-tc-no-wsplit": ("falsifier", _tc_no_wsplit, ()),
         # Ideas session census (5 November 2026): the W split in the wfrag kernel (TC_WFRAG), each fragment value
         # used unsplit. Bounds a pre-split fragment-order W slice (two float4 per lane, no split instructions).
+        "tc-wfrag-split": ("exact", _tc_wfrag_split(kernel), ()),
         "F-wfrag-no-wsplit": ("falsifier", lambda s: _sub(s, r"split_tf32\(wv\.([xyzw]), ah\[(\d)\], al\[\d\]\);",
                                                           r"ah[\2] = __float_as_uint(wv.\1); al[\2] = ah[\2];",
                                                           regex=True), ()),
