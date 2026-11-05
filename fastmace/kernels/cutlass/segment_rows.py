@@ -168,7 +168,7 @@ def _backward(ctx, grad):
     saved = ctx.saved_tensors
     weights, weights_t = list(saved[:ctx.count]), list(saved[ctx.count:])
     grad_x = segment_rows(grad.contiguous(), weights_t, weights, reversed_plan(ctx.plan), ctx.width_in)
-    return grad_x, None, None, None, None
+    return grad_x, [None] * ctx.count, [None] * ctx.count, None, None
 
 
 segment_rows.register_autograd(_backward, setup_context=_setup_context)
