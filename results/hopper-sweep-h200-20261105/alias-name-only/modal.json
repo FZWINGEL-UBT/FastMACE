@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "c03f791eb7d1ce9152dbded2df8768d66d5e8f91",
+  "command": "export PYTHONPATH=$PWD/tools/bench/gpu_alias:$PYTHONPATH FASTMACE_GPU_ALIAS=\"NVIDIA H200=NVIDIA A100-SXM4-80GB\"; python tools/force_stress_gate.py --output $OUT/gate --engine fastmace --model omat0-medium --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --structures-root $FASTMACE_STRUCTURES --structures NaCl NbCl5 results/loup-a100-20261103/SrTiO3.cif@3x3x3 > $OUT/gate.log 2>&1; echo \"gate exit=$?\" >> $OUT/gate.log; bash tools/modal/omat0_a100_profile.sh; python tools/bench/vram_compare.py fastmace --structure results/loup-a100-20261103/SrTiO3.cif@10x10x10 --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --output $OUT/vram.json > $OUT/vram.log 2>&1",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 559.5495569705963,
+  "estimated_gpu_cost_usd": 0.7056541635129187
+}

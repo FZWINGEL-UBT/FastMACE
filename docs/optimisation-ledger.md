@@ -4229,3 +4229,9 @@ here.
 | 43 | Benchmark_MACE README stale | `ResearchModule:Experiments/Benchmark_MACE_GPU_OPTIMIZATIONS/README.md` | cuEquivariance benchmark "pending" because of cuEq 0.1.0 / MACE 0.3.14; all stacks moved to MACE 0.3.16 | Mark superseded. |
 | 44 | cuEq baselines fused or not | older ResearchModule reports | All `--backend cueq` runs before 16 October were unfused (`cuda:0`), the GPU-benchmark scripts (device `cuda`) fused; reports quoting cuEq baselines do not say which | Label per report where known. |
 | 45 | Hardware label (checked, resolved) | [opt-5](validation/speed/opt-5.md) §3.11 | Places an RTX A4000 (sm_86) on coraline; the slice flagged this because AGENTS.md names the A4000 only for trillian. `ResearchModule:LT/studies/hybrid_oeq/coraline.md` records coraline as an RTX A4000, so the label is right | None needed; AGENTS.md could name coraline's GPU. |
+
+### ext-sx-h200-loup: Symmetrix-XL 0.1.1 on the H200, Benchmark_loup (5 November 2026)
+
+- Measured: Symmetrix-XL (LAMMPS, float32, sm_90 JIT artifact) NVE 14.60 ms per step (2.92 µs per atom and step), Langevin 14.86 ms (2.97 µs). FastMACE on the H200 under the A100-SXM4 plan: Langevin 5.66 ms (1.13 µs), 2.63x faster; under its generic plan 13.12 ms, 1.13x faster.
+- Why: an external reference point for the H200 numbers; same protocol as `tools/bench/loup_md.py` (`tools/bench/sx_loup.py`).
+- Sources: [Symmetrix-XL on the H200](../results/symmetrix-xl-h200-loup-20261105/README.md).

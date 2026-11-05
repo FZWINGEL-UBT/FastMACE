@@ -8,11 +8,14 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 src=$here/fastmace/kernels/cutlass
 cutlass=${CUTLASS:?set CUTLASS to a CUTLASS v4.8.1 checkout}
 nvcc=${NVCC:-nvcc}
-"$nvcc" -cubin -arch=sm_80 -O3 -std=c++17 -DNDEBUG --expt-relaxed-constexpr -I"$cutlass/include" \
-  -o "$src/tf32x3_sm80.cubin" "$src/tf32x3_sm80.cu"
+for sm in 80 90; do  # sm_90 (H100, H200) since 5 November 2026; the same source
+  "$nvcc" -cubin -arch=sm_$sm -O3 -std=c++17 -DNDEBUG --expt-relaxed-constexpr -I"$cutlass/include" \
+    -o "$src/tf32x3_sm$sm.cubin" "$src/tf32x3_sm80.cu"
+done
 {
   echo "nvcc: $("$nvcc" --version | tail -n 2 | tr '\n' ' ')"
   echo "cutlass: $(git -C "$cutlass" rev-parse HEAD 2>/dev/null || echo unknown)"
   echo "sha256: $(sha256sum "$src/tf32x3_sm80.cubin" | cut -d' ' -f1)"
+  echo "sha256 sm_90: $(sha256sum "$src/tf32x3_sm90.cubin" | cut -d' ' -f1)"
 } > "$src/tf32x3_sm80.build.txt"
 cat "$src/tf32x3_sm80.build.txt"

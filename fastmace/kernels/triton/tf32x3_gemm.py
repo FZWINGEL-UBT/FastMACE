@@ -75,9 +75,9 @@ def uses_tf32x3_tile(k: int, n: int) -> bool:
     return int(k) >= tile_rule.BLOCK_K and int(n) >= tile_rule.BLOCK_K
 
 
-# The compute capabilities whose products run on the CUTLASS backend (fastmace.kernels.cutlass.tf32x3, the A100's
-# 8.0) where its kernels load: there by its shape rule, else on cuBLAS IEEE. () puts Triton everywhere (A/B).
-CUTLASS_CAPABILITIES = ((8, 0),)
+# The compute capabilities whose products run on the CUTLASS backend (fastmace.kernels.cutlass.tf32x3: the A100's
+# 8.0, and 9.0 for the H100 and H200 since 5 November 2026) where its kernels load: there by its shape rule, else on cuBLAS IEEE. () puts Triton everywhere (A/B).
+CUTLASS_CAPABILITIES = ((8, 0), (9, 0))
 _CUTLASS_ON = {}  # device index -> whether the CUTLASS kernels load there
 
 

@@ -1,0 +1,57 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+calls seen (kernel, edges, capturing): [('forward', 40, False), ('forward', 720, False), ('forward', 370000, False), ('forward', 373760, False), ('forward', 373760, True), ('wprime', 720, False), ('wprime', 370000, False), ('wprime', 373760, False), ('wprime', 373760, True)]
+wprime ptxas base                         {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas maxreg-none                  {'9.0': {'registers': 254, 'spill_store_bytes': 0}}
+wprime ptxas maxreg80                     {'9.0': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas maxreg72                     {'9.0': {'registers': 72, 'spill_store_bytes': 104}}
+wprime ptxas redux                        {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas butterfly                    {'9.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas F-split2                     {'9.0': {'registers': 128, 'spill_store_bytes': 0}}
+wprime ptxas pair                         {'9.0': {'registers': 128, 'spill_store_bytes': 0}}
+wprime   base                1601.6 us  ratio 1.000  regs 96 local 0  
+wprime   maxreg-none         2303.9 us  ratio 1.439  regs 254 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   maxreg80            2004.6 us  ratio 1.252  regs 80 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   maxreg72            1734.9 us  ratio 1.083  regs 72 local 64  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 2.18e-07'}
+wprime   redux               1808.0 us  ratio 1.129  regs 96 local 0  {'dsh': 'max|d|/max|a| = 2.44e-07', 'dr': 'max|d|/max|a| = 2.40e-07', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   butterfly           1562.1 us  ratio 0.975  regs 96 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.56e-07'}
+wprime   F-split2            2001.6 us  ratio 1.250  regs 128 local 0  
+wprime   pair                1802.7 us  ratio 1.126  regs 128 local 0  {'dsh': 'max|d|/max|a| = 1.39e-04', 'dr': 'max|d|/max|a| = 4.09e-02', 'dx': 'max|d|/max|a| = 2.11e-04'}
