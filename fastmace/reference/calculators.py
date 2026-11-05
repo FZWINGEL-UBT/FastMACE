@@ -118,7 +118,7 @@ class ReferenceCalculator:
                 polar.set_float64_energy(model, True)
         self._float64_forward = None
         if self.float64_energy and not self.is_polar:
-            self._float64_forward = energy64.float64_forward(model)  # called as a function, never stored
+            self._float64_forward = energy64.float64_forward(model, head_slice=False)  # MACE's own indexing
         self.e0_table = None
         if self.float64_energy:
             import torch

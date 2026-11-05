@@ -596,3 +596,55 @@ Left from the profile, by size:
   gathers), because the readouts run in eager frames between compiled graphs.
 - **The interaction-1 outer sum's 61 MB zero fill (32 µs) and its atomics:** they disappear if each program owns
   whole receivers.
+
+### Round 5, continued: the profile at `2a016fd4` and the w′ reduction (5 November 2026)
+
+Profile with EDGE_SH: `results/omat0-a100-profile-2a016fd4/` (Modal A100-SXM4-80GB). Benchmark_loup NVE 2.35, 2.51,
+2.44 µs per atom and step (three fresh processes; the spread is the card's, the median is close to `5b6c5550`'s
+2.38 on the PCIe card). The eager force call is 11.43 ms in 217 kernels. The edge spherical harmonics now take
+13.9 µs forward and 27.9 µs backward, against about 228 µs in Inductor. What is left of the edge glue (the
+normalisation's backward and the force scatter 54 µs, ZBL 47 + 27 µs and two 32 µs scatters, the vectors 10 µs) is
+about 0.22 ms, 2 % of the call. That is the ceiling of the review's force-epilogue fusion (priority 2); a fused
+ZBL kernel each way is the part of it worth building (about 0.1 ms).
+
+**The w′ backward's end-of-edge reduction.** Every lane shuffles all 16 edge-gradient components and dr down 5
+levels: 85 SHFL, 85 WARPSYNC and 170 FADD, about half of the kernel's static SASS (sm_120: 1,448 instructions
+with it, 752 without). Kernel lab (`results/round5-20261105/runs/`):
+
+| Variant | RTX 5060 Ti | A100-SXM4-80GB |
+|---|---|---|
+| default | 7,370 µs | 3,050 µs |
+| butterfly reduce-scatter (`BUTTERFLY`; 21 shuffles; dsh and dr bitwise) | 0.965 / 0.963 | 0.989 |
+| no reduction at all (falsifier) | 0.675 | 0.955 |
+| dr reduced, dsh not (falsifier) | 0.680 | |
+| dsh reduced, dr not (falsifier) | 0.998 | |
+
+On the RTX 5060 Ti the reduction of the 16 components costs a third of the kernel. The butterfly removes two
+thirds of its instructions (992 static) but only a tenth of its time. So the cost is the tail's latency or
+issue, not the shuffle count. On the A100 the whole reduction is 4.5 %.
+
+### The external review's six ideas (5 November 2026), assessed
+
+1. **Several warps per edge (channels split across 2 or 4 warps): bounded.** Registers per thread come from the
+   per-edge state, not from the number of channels a lane handles: 16 edge-gradient accumulators, the Chebyshev
+   and slope terms, and the input-gradient slots of one channel, reused across the loop. Splitting the channels does
+   not shrink it. It multiplies the per-edge preamble and adds a cross-warp reduction, and on the A100 lowering the
+   registers (MAX_REGISTERS 80) made the kernel slower (1.059). Lab bound `F-split2` / `F-split4` (partials added
+   with atomics): see the table below.
+2. **W as packed scaled FP16 hi/lo pairs: not built.** Storage stays 32 bits per coefficient, as in TC_WFRAG's FP32
+   slice, so the shared-memory footprint gains nothing. Decoding takes two conversions plus a rescale, or a second
+   accumulator for the 2^11-scaled low products, against the split's three instructions now. The split's ceiling
+   was 14 % of the forward before TC_WFRAG (`F-tc-no-wsplit` 0.862); it is re-measured on the current default below.
+3. **One program per receiver/species run (no atomics, no zero fill): small.** The forward's zero fill is 31 µs, and
+   its atomics write the same 61 MB that plain stores would. With about 25 edges per slot and 32-edge programs, most
+   runs straddle at most one boundary. The ceiling is about 30–60 µs, 0.3–0.5 % of the step, below the review's
+   0.1–0.25 ms. Kept on the list (above: "whole receivers"), after ZBL.
+4. **The backward split into path-group kernels: not built.** It has the same premise as 1: fewer registers buy
+   occupancy. On the A100 they did not (MAX_REGISTERS 80: 1.059). The receiver-owned and path-grouping
+   attempts (ledger `conv-receiver-backward`, `conv-path-grouping`) lost to the per-edge kernel.
+5. **Cartesian edge gradients inside the w′ kernel: small.** After EDGE_SH the SH backward is 28 µs, and the dsh
+   tensor (24 MB) is written once and read once. Interaction 1's dsh must be contracted as well, so both
+   kernels would need the Jacobian. Ceiling about 50 µs (0.4 %).
+6. **A symbolic joint forward/VJP generator: not started.** The counted CG algebra (134 terms against 116 for
+   nnz(M), about 4 % of the arithmetic) and the arithmetic bounds already measured (`F-tp-no-coef` 0.947–0.961) leave
+   less than the 15 % threshold such a generator would need.

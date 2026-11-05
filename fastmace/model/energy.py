@@ -37,9 +37,11 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import re
 import textwrap
 
 from fastmace.errors import FastMACEError
+from fastmace.kernels.gpu_models import GPUModels
 
 # Batch key of the per-atom float64 E0 (n_atoms,); the force field fills it once per structure.
 NODE_E0_KEY = "fastmace_node_e0"
@@ -170,6 +172,43 @@ def source_digest(function):
     return hashlib.sha256(inspect.getsource(function).encode()).hexdigest()
 
 
+# Round 5 (5 November 2026). HEAD_SLICE: MACE selects each node's head with ``values[num_atoms_arange, node_heads]``
+# (E0, the embedding readout, every readout). For a one-head model that is ``values[:, 0]``: the same values, but the
+# advanced index's backward (``IndexBackward0``) zero-fills and radix-sorts the indices, while the slice's is a copy.
+# A100 profile at 2a016fd4 (Benchmark_loup, OMAT-0 medium): about 98 us per force call in the sort, scan, histogram,
+# memsets, indexing backward and gathers on [5000, 1]. Bitwise: one value per row each way. None: on for
+# HEAD_SLICE_GPUS (decision 66, after the MD-step A/Bs); True / False: an A/B side's choice. Models with several
+# heads keep the advanced index.
+HEAD_SLICE = None
+HEAD_SLICE_GPUS = GPUModels(())
+_HEAD_INDEX = re.compile(r"\[\n\s*num_atoms_arange, node_heads\n\s*\]")
+
+
+def head_index(model, arange, heads):
+    """The head-selection index of ``model``: ``(:, 0)`` for one head, else ``(arange, heads)`` (MACE's)."""
+    if len(getattr(model, "heads", None) or ()) == 1:
+        return (slice(None), 0)
+    return (arange, heads)
+
+
+def head_slice_default(model):
+    """``HEAD_SLICE`` for ``model``: the constant when set, else on when its parameters are on a ``HEAD_SLICE_GPUS``
+    device."""
+    if HEAD_SLICE is not None:
+        return bool(HEAD_SLICE)
+    import torch
+
+    parameter = next(iter(model.parameters()), None)
+    if parameter is None or parameter.device.type != "cuda":
+        return False
+    return torch.cuda.get_device_name(parameter.device) in HEAD_SLICE_GPUS
+
+
+def head_slice_edit(source):
+    """``source`` with every ``[\n num_atoms_arange, node_heads\n ]`` index through ``head_index``."""
+    return _HEAD_INDEX.sub("[_fastmace_head_index(self, num_atoms_arange, node_heads)]", source)
+
+
 def apply_edits(source, edits, what):
     """Replace each ``(old, new)`` block of ``edits`` in ``source``; each must occur exactly once."""
     for old, new in edits:
@@ -183,6 +222,7 @@ def compile_forward(source, namespace, filename):
     """Compile a rewritten ``forward`` source in ``namespace`` (a copy of its module's) and return it."""
     namespace = dict(namespace)
     namespace["_fastmace_node_e0"] = node_e0
+    namespace["_fastmace_head_index"] = head_index
     exec(compile(textwrap.dedent(source), filename, "exec"), namespace)
     return namespace["forward"]
 
@@ -190,8 +230,9 @@ def compile_forward(source, namespace, filename):
 _FORWARDS: dict = {}
 
 
-def float64_forward(model):
+def float64_forward(model, head_slice=None):
     """MACE's forward of ``model``'s class with the float64 reduction, as a plain function (cached).
+    ``head_slice`` (default ``head_slice_default(model)``): the head selection as ``head_index`` (``HEAD_SLICE``).
 
     ``MACE`` and ``ScaleShiftMACE`` only; PolarMACE takes it through ``fastmace.longrange.polar``.
     Raises ``EnergyReductionError`` for any other class or an unqualified source.
@@ -201,8 +242,10 @@ def float64_forward(model):
         raise EnergyReductionError("PolarMACE: the float64 reduction goes through fastmace.longrange.polar")
     if name is None:
         raise EnergyReductionError(f"{type(model).__name__}: no float64 energy reduction for this model class")
-    if name in _FORWARDS:
-        return _FORWARDS[name]
+    head_slice = head_slice_default(model) if head_slice is None else bool(head_slice)
+    key = (name, head_slice) if head_slice else name
+    if key in _FORWARDS:
+        return _FORWARDS[key]
     import mace.modules.models as models
 
     original = getattr(models, name).forward
@@ -212,8 +255,10 @@ def float64_forward(model):
         raise EnergyReductionError(f"{qualified}: source sha256 {digest[:12]} is not the qualified "
                                    f"{SOURCE_HASHES[qualified][:12]}; the float64 energy reduction does not apply")
     source = apply_edits(inspect.getsource(original), EDITS[name], qualified)
-    _FORWARDS[name] = compile_forward(source, vars(models), f"<fastmace float64-energy {name}.forward>")
-    return _FORWARDS[name]
+    if head_slice:
+        source = head_slice_edit(source)
+    _FORWARDS[key] = compile_forward(source, vars(models), f"<fastmace float64-energy {name}.forward>")
+    return _FORWARDS[key]
 
 
 def install(model):
