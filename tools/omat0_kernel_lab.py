@@ -548,6 +548,31 @@ def _hints(s, x=None, stream=False):
     return s
 
 
+def _wfrag(s):
+    """The tensor-core W slice stored in mma.sync fragment order, [npl][KP / 8][2][32 lanes][4], so each lane loads its
+    four W values of a (path, k-step, m-tile) with one float4 shared load (conflict-free: consecutive 16 B per lane)
+    instead of four scalar loads. The same values reach the same mma: bitwise. Needs CB == 32 (two m-tiles)."""
+    if "constexpr int CB = 32;" not in s:
+        raise ValueError("wfrag needs CB == 32")
+    s = _sub(s, r"""                Ws\[\(p \* KP \+ k\) \* WS \+ l\] = (k < K \? W\[[^;]*\] : 0\.f);""",
+             r"""                const int fm = l >> 4, fr = l & 15, fk = k & 7;
+                Ws[((p * (KP / 8) + (k >> 3)) * 2 + fm) * 128 + ((fr & 7) * 4 + (fk & 3)) * 4
+                   + (fr >> 3) + 2 * (fk >> 2)] = \1;""", regex=True)
+    return _sub(s, """                                const float* wp = Ws + (g * KP + k0 + tq) * WS + m * 16 + gid;
+                                unsigned ah[4], al[4];
+                                split_tf32(wp[0], ah[0], al[0]);
+                                split_tf32(wp[8], ah[1], al[1]);
+                                split_tf32(wp[4 * WS], ah[2], al[2]);
+                                split_tf32(wp[4 * WS + 8], ah[3], al[3]);""",
+                """                                const float4 wv = reinterpret_cast<const float4*>(Ws)[
+                                    ((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 32 + lane];
+                                unsigned ah[4], al[4];
+                                split_tf32(wv.x, ah[0], al[0]);
+                                split_tf32(wv.y, ah[1], al[1]);
+                                split_tf32(wv.z, ah[2], al[2]);
+                                split_tf32(wv.w, ah[3], al[3]);""")
+
+
 def _xs(kernel):
     """The sender features x kept in a per-warp shared tile [B][NX][32] (after the plan's shared memory) instead of
     32 registers live across the product; each lane writes and reads its own column (no sync). Bitwise. Own launch
@@ -668,6 +693,8 @@ def forward_variants(kernel=None):
         "tc-a4+xs": ("exact", lambda s: _xs(kernel)(_tc_a4(s)), (), _a4_args),
         "simt-a4+sh4": ("exact", lambda s: _sh4(_simt_a4(s)), (), _a4_args),
         "sh4": ("exact", lambda s: _sh4(s), ()),
+        "tc-wfrag": ("exact", _wfrag, ()),
+        "tc-a4+wfrag": ("exact", lambda s: _wfrag(_tc_a4(s)), (), _a4_args),
         "x-ldg": ("exact", lambda s: _hints(s, "ldg"), ()),
         "x-el": ("exact", lambda s: _hints(s, "el"), ()),
         "tc-a4+x-el": ("exact", lambda s: _hints(_tc_a4(s), "el"), (), _a4_args),
