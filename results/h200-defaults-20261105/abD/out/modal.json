@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "27d27f21e3e1ab6a72d5c0f72516cff36c592f52",
+  "command": "ALIAS='NVIDIA H200' TESTS=0 GATE=0 LOUP=0 FORWARD_VARIANTS='base xs tc-a4+xs' WPRIME_VARIANTS= AB='wtr80|fastmace.kernels.oeq_streaming.fused_forward:W_TILE_REGISTERS=80;speciesgemm|fastmace.rewrites.generic.modules:SPECIES_GEMM=True fastmace.kernels.triton.species_gemm:CUTLASS=True;batch4|fastmace.kernels.oeq_streaming.fused_forward:BATCH=4' bash tools/modal/hopper_sweep.sh; python tools/pc_microbench.py --nbatch 2831 --output $OUT/pc.json > $OUT/pc.log 2>&1; python tools/megakernel_probe.py --output $OUT/mk --label H200 > $OUT/mk.log 2>&1",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 575.318888425827,
+  "estimated_gpu_cost_usd": 0.7255410426259041
+}

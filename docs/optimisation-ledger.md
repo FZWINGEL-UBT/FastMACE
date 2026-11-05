@@ -4221,3 +4221,13 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured: Symmetrix-XL (LAMMPS, float32, sm_90 JIT artifact) NVE 14.60 ms per step (2.92 µs per atom and step), Langevin 14.86 ms (2.97 µs). FastMACE on the H200 under the A100-SXM4 plan: Langevin 5.66 ms (1.13 µs), 2.63x faster; under its generic plan 13.12 ms, 1.13x faster.
 - Why: an external reference point for the H200 numbers; same protocol as `tools/bench/loup_md.py` (`tools/bench/sx_loup.py`).
 - Sources: [Symmetrix-XL on the H200](../results/symmetrix-xl-h200-loup-20261105/README.md).
+
+### h200-defaults: decision-66 defaults for the NVIDIA H200 (5 November 2026)
+
+- Date/round: round 5 (`27d27f21`, `02a81e13`, `62556704`).
+- What: the H200 joins 21 decision-66 sets whose MD-step A/Bs won in both build orders (radial tables 2.03, w′ backward 1.77, factored 1.16, table w 1.14, tensor cores 1.11, skip-zero 1.09, ..., butterfly and radial-table 8 warps on).
+- Status: ADOPTED (H200 only).
+- Measured: Benchmark_loup Langevin 5.73–5.78 ms per step (1.15 µs per atom and step), from 13.12 ms on the generic plan and 5.66 ms under the A100 alias; gate passes (NbCl5 stress ratio 1.93). Symmetrix-XL 14.86 ms on the same GPU.
+- Not adopted on the H200: backward walk, segment rows, tabled forward (ba order fails CUDA-graph recapture), radial-table 2 warps, column block 32, w rows 80, species-grouped GEMM, cross-step overlap, batch 4, producer/consumer split, full first interaction, cuBLASDx INT8 emulation (3x slower).
+- Open: a real SIMT slab forward (lab bound 0.838 against the skip-zero base); a wgmma product (no-product bound 0.527); the TABLED_FORWARD recapture error.
+- Sources: [H200 defaults](../results/h200-defaults-20261105/README.md).
