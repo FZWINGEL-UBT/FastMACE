@@ -561,6 +561,10 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
                                                     "const float2 v = make_float2(t, t * t);"), ()),
         "FF-no-xload": ("falsifier", lambda s: _sub(rerender(factored=True)(s), r"x\[input_base\s*\+", "sh[edge_base +",
                                                     regex=True), ()),
+        # Ideas session idea 12 (5 November 2026): receiver-staged dout. Bound: every edge reads receiver 0's dout
+        # row, which then stays in L1.
+        "FF-dout-one-row": ("falsifier", lambda s: _sub(
+            s, "const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;", "const int64_t output_base = 0;"), ()),
         "FF-no-dout": ("falsifier", lambda s: _sub(rerender(factored=True)(s),
                                                    r"const scalar_t output_gradient = [^;]*;",
                                                    "const scalar_t output_gradient = radial_weight;", regex=True), ()),
@@ -1229,10 +1233,25 @@ def forward_variants(kernel=None):
         "F-tp-no-coef": ("falsifier", lambda s: _sub(s, r" \* -?0x[0-9a-f.]+p[-+]\d+f", "", regex=True), ()),
         # H200 ideas plan, idea 4: the per-lane TP of an S tile (one product per output and input component).
         "F-s-tile": ("falsifier", _s_tile, ()),
+        # Ideas session idea 10 (5 November 2026): de-phase the forward's warps. The chunk loop has no block barrier,
+        # so warps that start out of phase stay so unless something locks them; odd warps (or warp % 4) start late by
+        # a sleep. Bitwise: only the start time changes.
+        "F-skew-100ns": ("exact", lambda s: _skew(s, "(warp & 1) * 100"), ()),
+        "F-skew-300ns": ("exact", lambda s: _skew(s, "(warp & 1) * 300"), ()),
+        "F-skew-1us": ("exact", lambda s: _skew(s, "(warp & 1) * 1000"), ()),
+        "F-skew-4us": ("exact", lambda s: _skew(s, "(warp & 1) * 4000"), ()),
+        "F-skew-16us": ("exact", lambda s: _skew(s, "(warp & 1) * 16000"), ()),
+        "F-skew4-4us": ("exact", lambda s: _skew(s, "(warp & 3) * 4000"), ()),
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),
     }
+
+
+def _skew(source, nanoseconds):
+    """The forward's warps start their chunk loop after ``__nanosleep(nanoseconds)`` (an expression of ``warp``)."""
+    anchor = "const int gid = lane >> 2, tq = lane & 3;"
+    return _sub(source, anchor, f"{anchor}\n        if ({nanoseconds}) __nanosleep({nanoseconds});")
 
 
 def forward_launcher(kernel, source, extra):
