@@ -75,9 +75,12 @@ FIRST_TABLE_COLUMNS = False
 # segmented first sum and float32. None: on for FUSED_FIRST_BACKWARD_GPUS (decision 66, after the MD-step A/Bs);
 # True / False: an A/B side's choice on every GPU. MD step b/a (ab / ba), OMAT-0 medium, SrTiO3 10x10x10 and NbCl5:
 # RTX 5060 Ti 0.962 / 0.963 and 0.972 / 0.969; RTX 4000 Ada 0.962 / 0.963 and 0.979 / 0.975 (with TABLED_FORWARD:
-# 0.945 / 0.945, 0.948 / 0.955; 0.949 / 0.944, 0.978 / 0.968).
+# 0.945 / 0.945, 0.948 / 0.955; 0.949 / 0.944, 0.978 / 0.968); A100-SXM4-80GB 0.969 / 0.966 and 0.983 / 0.984
+# (0.966 / 0.962, 0.970 / 0.982), its NbCl5 stress error 1.55-1.60e-7, under the default plan's accepted 1.8e-7
+# (docs/validation/omat0-a100-optimisations.md).
 FUSED_FIRST_BACKWARD = None
-FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
+FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                       "NVIDIA A100-SXM4-80GB"))
 
 
 def fused_first_backward(device):
