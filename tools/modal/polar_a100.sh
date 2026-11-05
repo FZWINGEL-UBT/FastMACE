@@ -11,5 +11,5 @@ C="fastmace.rewrites.generic.modules:EDGE_SH=True fastmace.kernels.oeq_streaming
 C="$C fastmace.rewrites.generic.modules:FUSED_FIRST_BACKWARD=True"
 MODEL=polar1-m CKPT=MACE-POLAR-1-M.model GATE_REWRITES="wprime_backward=on fused_folded_forward=on tf32x3_gemms=on" \
   GATE_CONSTANTS="$C" BASE="wprime_backward=on fused_folded_forward=on tf32x3_gemms=on" \
-  SETS="pair pairtf epilogue species edgesh tablew fusedfirst" bash tools/polar_reuse_ab.sh
+  SETS="${SETS:-pairtf species tablew edgesh fusedfirst}" bash tools/polar_reuse_ab.sh
 grep -h -E "end |done" "$OUT/run.log"
