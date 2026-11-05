@@ -321,6 +321,47 @@ SPECIES_GEMM = None
 SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
+# Round 5 (5 November 2026): the edge spherical harmonics (e3nn, l <= 3, normalised, component) by
+# fastmace.kernels.triton.edge_sh.edge_sh3, one Triton kernel each way, instead of Inductor's compiled e3nn
+# polynomials, which save about 16 per-edge intermediates for autograd (A100 profile at 5b6c5550: about 230 µs of
+# edge geometry per force call). Rounding (the backward's sums regrouped; 5.5e-7 / 1.4e-7 of float64 e3nn).
+# None: on for EDGE_SH_GPUS (decision 66, empty: not measured yet); True / False: an A/B side's choice on every GPU.
+# Applied by generic_streaming (the model-level module, float32 CUDA only).
+EDGE_SH = None
+EDGE_SH_GPUS = GPUModels(())
+
+
+def edge_sh_default(device):
+    """``EDGE_SH`` on ``device``: the constant when set, else on for ``EDGE_SH_GPUS``."""
+    if EDGE_SH is not None:
+        return bool(EDGE_SH)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in EDGE_SH_GPUS
+
+
+class EdgeSH(torch.nn.Module):
+    """``o3.SphericalHarmonics([0, 1, 2, 3], normalize=True, normalization="component")`` for float32 CUDA
+    vectors through ``edge_sh3``; any other input through the original module."""
+
+    def __init__(self, original):
+        super().__init__()
+        self.original = original
+
+    def forward(self, x):
+        if x.is_cuda and x.dtype == torch.float32 and x.dim() == 2 and x.shape[1] == 3:
+            from fastmace.kernels.triton.edge_sh import edge_sh3
+            return edge_sh3(x)
+        return self.original(x)
+
+
+def edge_sh_replaceable(module):
+    """Whether ``module`` is e3nn's spherical harmonics that ``EdgeSH`` reproduces."""
+    if type(module).__name__ != "SphericalHarmonics" or not getattr(module, "normalize", False):
+        return False
+    if getattr(module, "normalization", None) != "component":
+        return False
+    return [int(l) for l in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
+
+
 class SpeciesSkip(torch.nn.Module):
     """Element-dependent skip connection restricted to the structure's species (``generic_species_skip``).
 
