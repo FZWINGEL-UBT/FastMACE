@@ -32,7 +32,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 - `TileConfig.compiled_graphs` (default off; `tiled_capacity.py --compiled-graphs`): compiled tile bodies captured
   in CUDA graphs per slot and sweep. Steady tiled call 0.90 at 40k and 0.961 at 214k atoms (RTX 5060 Ti), 1.000 at
   1M (RTX 4000 Ada); the private pools cost memory, so 1M runs out of memory with it on the 16 GB RTX A4000
-  (docs/validation/tiled-1m-speed.md, "CUDA graphs for compiled tiles").
+  (docs/validation/tiled/tiled-1m-speed.md, "CUDA graphs for compiled tiles").
 - The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
   records:
   - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming
@@ -48,7 +48,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   - Rule 12 has a term for each and a rescue stage calibrated on SrTiO3, NaCl and NaNbO3.
   - MACE-OMAT-0 medium's default-plan limit rose 3.2–4.1 times: SrTiO3 16,875 → 69,120 and NaCl 39,304 → 125,000
     atoms on the 20 GB RTX 4000 Ada, SrTiO3 13,720 → 53,240 on the 16 GB RTX 5060 Ti
-    (docs/validation/omat0-capacity.md).
+    (docs/validation/omat0/omat0-capacity.md).
 
 ### Fixed
 
@@ -68,21 +68,21 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
   On leeloo (20 GB, NbCl5 and SrTiO3, s0 to the region) the estimate is 1.02–1.07 times the measured peak where it
   probed, against 1.01–1.24 before. It costs 38–43 s per stage (51–93 s for the region) with a warm cache
-  (docs/validation/estimate-probe.md).
+  (docs/validation/capacity/estimate-probe.md).
 
 - The memory rescue turns `gate_epilogue` off (`planner.memory.MEMORY_RESCUE`, `RESCUE_OFF`): decision 66 turns it
   on for speed on the RTX 5060 Ti and RTX 4000 Ada, and it keeps more at the force call's peak, 12 kB per atom
   without the node segments, 36 kB with the separate segments and 0.5 kB inside `recompute_node_region`'s chunks.
   Rule 12 now counts that term (`planner.memory.CONTEXT_TERMS` picks it). Rule 12 for a cell that cannot fit and the
   out-of-memory rebuild turn it off after `recompute_node_segments` and before `recompute_node_region`, and on
-  again once `recompute_node_region` is on, where the estimate still fits (docs/validation/region-norm.md).
+  again once `recompute_node_region` is on, where the estimate still fits (docs/validation/capacity/region-norm.md).
 - `RewriteConfig.recompute_first_table` (capacity idea rebuild-`a`, exact, deterministic): the first interaction's
   radial table and reassociated message run under one non-reentrant checkpoint, so the force call keeps the edge
   lengths instead of the table's output (260 bytes per edge for MH-1 float32), and the backward evaluates the table
   again. MH-1 float32 on a 20 GB RTX 4000 Ada: NbCl5 114,048 to 119,232 atoms, NaCl 108,800 to 115,200, at 1.02-1.04
   times the step time. Off; rule 12 turns it on only when the plan does not fit with `recompute_conv_weights` on,
   before `recompute_node_segments` (`planner.memory.MEMORY_RESCUE`), and the out-of-memory rebuild follows the same
-  order (`docs/validation/rebuild-a.md`).
+  order (`docs/validation/capacity/rebuild-a.md`).
 - `RewriteConfig.recompute_node_region` (ninth list item 2, rounding, deterministic): `recompute_node_segments`'
   chain and product block of each interaction as one checkpoint region in 4 atom chunks, so the backward rebuilds one
   chunk at a time. Each interaction's message normalization runs inside the chunks too, so the divided message is
@@ -90,7 +90,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   force call. MH-1 float32 on a 16 GB RTX 5060 Ti: NbCl5 82,944 to 114,048 atoms, NaCl 70,400 to 115,200. Off; the
   last memory-rescue record (rule 12 or the out-of-memory rebuild, only when the plan does not fit with
   `recompute_node_segments` on). The combined region no longer breaks the compiled graph
-  (docs/validation/chunked-region.md, docs/validation/region-norm.md).
+  (docs/validation/capacity/chunked-region.md, docs/validation/capacity/region-norm.md).
 - `RewriteConfig.recompute_conv_weights` (plans/capacity.md CAP-T07 and CAP-T07b, rounding): the per-edge
   tensor-product weights are not kept for the backward (1,280 floats per edge for MH-1, about a third of a large
   cell's force-call memory). With `fused_folded_forward` the forward builds them on chip without storing them and the
@@ -124,7 +124,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   runs in `linear_2`'s input-gradient GEMM (`fastmace.kernels.triton.gated_products`), one atom-tiled Triton kernel
   per gated segment where the shape rule picks Triton, without the `drows` round trip. Rounding-class,
   deterministic. Needs `segment_gemm`; refused in float64 and beside `tf32x3_gemms`:
-  `docs/validation/opt10-gate-epilogue.md`.
+  `docs/validation/speed/opt10-gate-epilogue.md`.
 - `RewriteConfig.wprime_backward` (opt-9 OPT9-T03, float32; **on by default for MH-1 on the measured GPUs**, owner
   decision 66): the second MH-1 interaction's radial distance gradient inside the streaming convolution's backward,
   each edge's weight gradient dotted with `w'(r)` from per-piece derivative tables; the weight gradient is never
@@ -132,7 +132,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   deterministic; needs `radial_tables` and `chunked_conv_backward`. "auto" turns it on in float32 MH-1 plans that
   are not reproducible on "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada
   Generation" (exact device names): MD step 0.81-0.89 of the default on the A100, 0.94-0.97 on the RTX 5060 Ti,
-  0.93-0.96 on the RTX 4000 Ada; off on every other GPU (`docs/validation/opt9-T03.md`).
+  0.93-0.96 on the RTX 4000 Ada; off on every other GPU (`docs/validation/speed/opt9-T03.md`).
 - `fm.md(initial_velocities=...)` (and the `fastmace run` key `initial_velocities`), opt-in: a
   structure at rest starts with seeded Maxwell-Boltzmann velocities at the run's starting target
   (`"maxwell_boltzmann"`) or at a given temperature in K; `"keep"` (default) leaves it at rest as before. Drawn
@@ -151,8 +151,8 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 - `RewriteConfig.fused_folded_forward` (opt-8 OPT8-T02, float32; **on by default for MH-1**, owner decision 64): one
   generated kernel builds MH-1's per-edge weights from the folded radial layer's input and the streaming message, and stores the weights for
   the unchanged chunked backward. Exact (weights and message bitwise the cuBLAS + streaming chain's on the
-  RTX 5060 Ti). Needs `chunked_conv_backward`; refused in float64 plans: `docs/validation/opt8-T02.md`.
-- Float64 package (owner decision 63, `docs/validation/f64-T01.md`): `EngineConfig.fp64_emulation` (cuBLAS's float64
+  RTX 5060 Ti). Needs `chunked_conv_backward`; refused in float64 plans: `docs/validation/speed/opt8-T02.md`.
+- Float64 package (owner decision 63, `docs/validation/speed/f64-T01.md`): `EngineConfig.fp64_emulation` (cuBLAS's float64
   emulation on INT8 tensor cores where the measured float64 rate is below 1/8 of float32), float64 radial tables,
   and the rounding-class rewrites in float64 plans that are not reproducible. MH-1 float64 MD step 0.57 (NaCl),
   0.42 (NbCl5), 0.49 (NaNbO3) of stock on the RTX 5060 Ti; forces within 4e-14 eV/Å of stock.
@@ -162,11 +162,11 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   `[E, 1280]` weight gradient never reaches DRAM. Exact (values per edge unchanged; only the order of the
   existing atomic sender sums changes). **On by default** (owner decision 60) with the hybrid streaming
   convolution; cells whose weights fit four L2s keep the unchunked backward. NbCl5 −2.8 to −3.3 %, NaNbO3
-  −3.1 to −3.6 % per MD step, NaCl +0.8 % (RTX 5060 Ti): `docs/validation/opt6-T02.md`.
+  −3.1 to −3.6 % per MD step, NaCl +0.8 % (RTX 5060 Ti): `docs/validation/speed/opt6-T02.md`.
 - Exactness class `certified` (SPEC §6.1, owner decision 61), and its first record,
   `RewriteConfig.radial_tables` (opt-6 OPT6-T05, opt-in): per species pair, MH-1's radial chain from the edge
   length to the folded layer's input and the edge density as Chebyshev tables fitted and certified at setup
-  against float64; float32 plans only: `docs/validation/opt6-T05.md`. **On by default** (owner decision 62)
+  against float64; float32 plans only: `docs/validation/speed/opt6-T05.md`. **On by default** (owner decision 62)
   in float32 plans that are not reproducible: NaCl −10 %, NbCl5 −8 %, NaNbO3 −19 % per MD step (RTX 5060 Ti).
 
 ### Fixed
@@ -220,19 +220,19 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   per edge, -36 % host memory); the list reuse's skin check by chunks (no whole-system float64 host copies).
 - Tiled padded slots: a tile whose edge bucket has no slot runs in a neighbouring bucket's slot that fits (MD drift
   across a bucket's edge compiled a new slot). `wavefront="auto"` runs from 4 grid layers where the plain host state
-  does not fit the host at all (before: from 12 layers only). docs/validation/tiled-1m-speed.md, "MD at 1M".
+  does not fit the host at all (before: from 12 layers only). docs/validation/tiled/tiled-1m-speed.md, "MD at 1M".
 - Tiled call, sweep 2: the streaming convolution builds the message of a tile's receiver rows only
   (`streaming_message(rows=)`, when the launch covers them exactly, `StreamingKernels.rows_fit`), so the halo rows'
   zeros and their slice backward are gone; residual radial tables neither store nor read the edge density
   (`radial_table(density=False)`, bit for bit the same gradient). 1M-atom SrTiO3 call on the RTX 4000 Ada
-  0.985 (sweep 2 0.978), GPU peak -0.18 GiB (docs/validation/tiled-1m-speed.md, "Trims").
+  0.985 (sweep 2 0.978), GPU peak -0.18 GiB (docs/validation/tiled/tiled-1m-speed.md, "Trims").
 - `gate_epilogue`'s input-gradient kernel packs each launch's atoms without padding their D = 3, 5, 7 rows to 4, 8, 8
   (`kernels.triton.gated_products`, the unpadded kernel): whole atoms per 64-row tile, the gate read per row, the
   m-sum by a second `tl.dot` with a 0/1 selection matrix (deterministic, rounding class). It runs for launches of at
   least 96 atoms per SM (`UNPADDED_ATOMS_PER_SM`; a call's atoms, or a tile's in the tiled path) on the RTX 5060 Ti
   and the RTX 4000 Ada (decision 66, `UNPADDED_GPUS`): kernel 1.24-1.30 times faster at large launches; whole step
   0.947-0.951 at NbCl5 21,600 atoms and 0.964 on the region path at 43,200 (Ada), 0.956-0.959 at 14,400 (5060 Ti); a
-  14.9M-atom tiled call 0.978 (Ada) (docs/validation/gated-unpadded.md).
+  14.9M-atom tiled call 0.978 (Ada) (docs/validation/speed/gated-unpadded.md).
 - Rule 12's memory estimate:
   - it counts the structure's edges (`planner.memory.counted_edges`) instead of assuming uniform density, which was
     1.26–1.36 times too many for NbCl5 and NaCl;
@@ -241,7 +241,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   - `SAFETY` goes from 0.90 to 0.97.
   The estimate now stays within 1.08–1.39 times the measured peak at every stage of the rescue ladder, where it was
   2.3–2.6 times with every record on. Rule 12 plans only the rungs a cell needs: on 20 GB, NbCl5 at 121,824 atoms
-  fits with `gate_epilogue` back on, where all rungs were planned with it off (docs/validation/estimate-refit.md).
+  fits with `gate_epilogue` back on, where all rungs were planned with it off (docs/validation/capacity/estimate-refit.md).
 - Rule 12's memory estimate per side and per stage of the memory rescue:
   - each rescue record keeps a fraction of its own side only (`planner.memory.MemoryTerm.edge_keep`, `node_keep`):
     `recompute_conv_weights` and `recompute_first_table` of the per-edge activations, `recompute_node_segments`,
@@ -255,10 +255,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   - held-out NaNbO3 0.996–1.25.
 
   What remains is the caching allocator's reserve, 1.07–1.44 times the live peak by stage and crystal
-  (docs/validation/estimate-band.md).
+  (docs/validation/capacity/estimate-band.md).
 - `gate_epilogue` is on by default for MH-1 on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, by exact device
   name, `planner.fixed.DECISION_66_GATE_EPILOGUE_GPUS`), where `segment_gemm` is on and `tf32x3_gemms` is off: MD
-  steps 1.2-4.7 % faster on NbCl5 and NaNbO3, NaCl neutral (docs/validation/speed-def.md). Off elsewhere; the A100
+  steps 1.2-4.7 % faster on NbCl5 and NaNbO3, NaCl neutral (docs/validation/speed/speed-def.md). Off elsewhere; the A100
   was not measured. An explicit value is kept.
 - `tools/bench/capacity_scan.py check_point`: no drift tolerance. The list at step 0 must have exactly the small
   copy's edges per atom, and after the MD steps the live count must equal a fresh ASE rebuild at the current
@@ -267,29 +267,29 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   every component of the gated segment, so each weight tile is loaded once per K block (fifth list, item E). With
   `gate_epilogue` on, step time is 0.1-2.5 % lower than with the old kernel; `gate_epilogue` on is now 1.2-4.7 %
   faster than off on NbCl5 and NaNbO3 on the RTX 5060 Ti and the RTX 4000 Ada (neutral on NaCl). It stays opt-in
-  until the default is decided: docs/validation/speed-def.md.
+  until the default is decided: docs/validation/speed/speed-def.md.
 - Measured, not adopted: `edge_outer_sum`'s backward storing `grad_y` once per edge block (item F, exact, neutral on
   both GPUs) and the first interaction's reassociation through `segment_gemm`'s joined products (item D, 0.25 %
-  slower on the RTX 4000 Ada at NaNbO3 8,640 atoms); docs/validation/speed-def.md. No code change.
+  slower on the RTX 4000 Ada at NaNbO3 8,640 atoms); docs/validation/speed/speed-def.md. No code change.
 - `segment_gemm` uses 128-row tiles with 8 warps on the RTX 4000 Ada (decision 66,
   `tile_rule.LARGE_TILE_GPUS`; bitwise equal): MH-1 float32 step 0.986-0.995 times on NbCl5 and NaNbO3. The
   28 October screen that called them neutral had measured the default against itself; the RTX 5060 Ti and the
-  A100 keep 64-row tiles (docs/validation/ab-constants-audit-20261030.md).
+  A100 keep 64-row tiles (docs/validation/speed/ab-constants-audit-20261030.md).
 - `segment_gemm` runs a row tile's column tiles next to each other when the product's A is larger than the
   L2, on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, `tile_rule.COLUMN_ORDER_GPUS`): bitwise equal, A is
   read from DRAM about once instead of once per column tile. MH-1 float32 step at NbCl5 9,216 atoms 0.94 times
   (RTX 5060 Ti) and 0.92 times (RTX 4000 Ada); the A100-SXM4-80GB measured no gain and keeps the old order
-  (docs/validation/segment-gemm-order.md).
+  (docs/validation/speed/segment-gemm-order.md).
 - `tools/ab_rewrites.py` sets each side's `--a-constant` / `--b-constant` before every step, not only in its build:
-  graphs captured again in warm-up had read the other side's value (docs/validation/ab-constants-audit-20261030.md).
+  graphs captured again in warm-up had read the other side's value (docs/validation/speed/ab-constants-audit-20261030.md).
 - Measured, not adopted: `segment_gemm`'s irrep size D as a compile-time constant (bitwise equal, step time
-  unchanged, more compiled variants; docs/validation/speed-small.md). No code change.
+  unchanged, more compiled variants; docs/validation/speed/speed-small.md). No code change.
 
 - The drawn-ahead Langevin/BAOAB/CSVR noise batch holds at most 64 MiB (CAP-T06): `IntegratorConfig.noise_batch`
   is still the most steps, but above about 5,500 atoms the batch is shorter (26 steps at 51,840 atoms, 0.53 GiB
   less at the peak). The random numbers and their order are unchanged. A restart written with another batch size,
   including every restart from before this change, resumes bitwise.
-- Setup across compositions (fixes F1, F2, F3, F5; `docs/validation/setup-fixes.md`):
+- Setup across compositions (fixes F1, F2, F3, F5; `docs/validation/capacity/setup-fixes.md`):
   - The converted-model templates belong to the `LoadedModel`, so every `ForceField` of one `fm.load` result
     shares them.
   - The OEq kernel ids come from the kernel's content, and radial-table pieces are padded to a bucket of 16.
@@ -309,7 +309,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   for MH-1 on the RTX 5060 Ti (planner rule
   `on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus`,
   `planner.fixed.DECISION_66_GROUPED_LAUNCH_GPUS`): NaCl MD step 0.971 / 0.975 in both build orders, NbCl5 and
-  NaNbO3 neutral (`docs/validation/decision66-grouped-launch.md`). Off for MH-1 on every other GPU (the RTX 4000
+  NaNbO3 neutral (`docs/validation/speed/decision66-grouped-launch.md`). Off for MH-1 on every other GPU (the RTX 4000
   Ada measured slower); the generic family keeps it everywhere.
 - `LangevinBAOAB.fixcm` is `False` and only `False`: BAOAB, as ASE's, never removed the total momentum, so the
   record no longer claims a fixed centre of mass. `fixcm=True` is refused; restarts recorded with it resume
@@ -321,7 +321,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ## [1.0.0] - 2026-10-25
 
-First stable release (SPEC section 16, phase 6). Acceptance: `docs/validation/phase-6.md`. Qualified stack as
+First stable release (SPEC section 16, phase 6). Acceptance: `docs/validation/phases/phase-6.md`. Qualified stack as
 in 0.1.0 (torch 2.14.1+cu130 only, owner decision D3); Linux x86_64, NVIDIA GPUs.
 
 ### Added

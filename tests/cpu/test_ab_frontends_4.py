@@ -1,7 +1,7 @@
 """``tools/ab_frontends.py --integrator``: the phase 4 ``fastmace.ase`` classes against ``Simulation`` and
 ``fm.md`` in one process (plan task 4-T10; SPEC §7.7's acceptance, the A/B harness on the CPU).
 
-The GPU timing itself is a run of the tool (``docs/validation/4-T10.md``); here each integrator's three
+The GPU timing itself is a run of the tool (``docs/validation/phases/4-T10.md``); here each integrator's three
 sides build on a tiny model, get the same plan and gate, and the ``fm.md`` and shim sides advance alike.
 """
 

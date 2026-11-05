@@ -99,7 +99,7 @@ they start with `Experiments/`.
   where `workflow.GPUEngine.__init__` (around line 671) sets them; the CLI
   defaults in `workflow.parse_args`; `workflow.adapt_options_to_model` (the
   per-family `auto` resolution).
-- Files: `docs/design/switch-map.md` (a table: research-engine global or
+- Files: `docs/current/switch-map.md` (a table: research-engine global or
   flag → config class and field → default today → `auto` resolution rule →
   catalogue entry of §6.2 or "engine"/"integrator"/"never"), and
   `fastmace/config.py` (frozen dataclasses: `RewriteConfig`, `EngineConfig`,
@@ -419,7 +419,7 @@ they start with `Experiments/`.
   baseline (`studies/annealing/README.md` measures).
 - Machines: RTX 5060 Ti (WSL) and murphy or leto, sequentially, one job per
   GPU, idle check first.
-- Report: `docs/validation/phase-1a.md` with run IDs, machines,
+- Report: `docs/validation/phases/phase-1a.md` with run IDs, machines,
   environments, both commits and every number; JSON in
   `results/<run-id>/`.
 
@@ -486,7 +486,7 @@ From the T00, T01 and T02 reports. Later tasks follow these.
   rule.
 - **Switch map (T01) accepted.** On its open questions:
   1. `GENERIC_DENSITY_FIRST` is not carried over: no gain, it stays among
-     the rejected screens in `docs/rewrites.md` (phase 6).
+     the rejected screens in `docs/optimisation-ledger.md` (phase 6).
   2. Two-stage `auto`: T15 reproduces `parse_args` followed by
      `adapt_options_to_model` exactly, including `--fold-cutoff off` turning
      off reassociation, the fused backward and streaming for the generic
@@ -530,7 +530,7 @@ within the baseline's own run-to-run scatter (3.3e-7).
   generic, but its first block (`RealAgnosticInteractionBlock`) is not in
   `GENERIC_INTERACTIONS`. T08 checks whether the rewrite applies at all
   there. T15 reproduces the verdict either way, and the result goes into
-  `docs/rewrites.md`.
+  `docs/optimisation-ledger.md`.
 - **E0 rule (T03 Q3)** is recorded in SPEC §4.3.
 - **Exceptions (T05 Q1).** `CheckpointTrustError`, `HybridUnavailableError`,
   `BackendError`, `NaiveCueqError` and `ModelLicenceWarning` move to
@@ -568,7 +568,7 @@ within the baseline's own run-to-run scatter (3.3e-7).
 
 T14, T16 and T18 are merged (main 7545581). Wave 1 is complete.
 
-- **Noise floor (T18, `docs/validation/1a-noise-floor.md`).** Two copies of
+- **Noise floor (T18, `docs/validation/phases/1a-noise-floor.md`).** Two copies of
   the research engine in one process on murphy agree within 0.32% with the
   4-block protocol and within 0.16% with 12 blocks, about ten times below
   the 3% criterion, and they do not interfere. T19 therefore uses
@@ -696,7 +696,7 @@ From the worker reports:
 - **MACE-OFF (T08):** its first block is not generic, so reassociation never
   applies there; `rewrite_support`'s "ok" verdict is too optimistic. T15
   takes the per-record `applies_to` result, which is correct, so the
-  verdict does no harm. `docs/rewrites.md` records it in phase 6.
+  verdict does no harm. `docs/optimisation-ledger.md` records it in phase 6.
 - **Reassociation probe tolerance (T07):** coefficients within a path are
   compared at 1e-12 (float64) or 1e-5 (float32), because cuEq's CPU kernel
   differs by up to 1e-15. Accepted.
@@ -704,7 +704,7 @@ From the worker reports:
   float64 agreement to 1.4e-15 on the RTX 5060 Ti, but recorded no
   results. T08's murphy agreement used a stand-in for T07's modules. The
   conductor runs the full GPU suite on the merged tree and T08's agreement
-  probe on murphy, and records both in `docs/validation/1a-T07-T08-gpu.md`.
+  probe on murphy, and records both in `docs/validation/phases/1a-T07-T08-gpu.md`.
   Until then T07/T08 are "merged, GPU confirmation pending".
 
 Second outside review (18 October 2026, at `944de8e`). Both defects were
@@ -735,7 +735,7 @@ reproduced and fixed, with regression tests:
 
 ## Conductor decisions after T07b and T12 (18 October 2026)
 
-- **T07/T08 confirmed on the GPU** (`docs/validation/1a-T07-T08-gpu.md`). The
+- **T07/T08 confirmed on the GPU** (`docs/validation/phases/1a-T07-T08-gpu.md`). The
   full GPU suite passes in one process: 187 passed, 2 skipped (the OEq-only
   kernel tests).
 - **T07b: the conv-fusion leak.** `loading.load(backend="cueq")` left MACE's
@@ -793,7 +793,7 @@ the host calls `rebuild` and `use_edges`. Verified:
 ## Conductor decisions after T13 (18 October 2026)
 
 T13 (`fastmace/engine/graph.py`, `GraphEngine`) is merged. Verified
-(`docs/validation/1a-T13-engine.md`): over 500 steps of MH-1 NaCl 3×3×3 at
+(`docs/validation/phases/1a-T13-engine.md`): over 500 steps of MH-1 NaCl 3×3×3 at
 300 K, FastMACE's trajectory differs from the research engine's by
 2.5–2.9e-13 Å (plain cuEq float64 NVT), ≤ 8.9e-15 Å (NPT BAOAB) and
 8.4–8.7e-8 Å (hybrid FP32). That is within the research engine's own
@@ -825,7 +825,7 @@ The whole GPU suite passes in one process (216 passed).
 ## Conductor decisions after T15 (18 October 2026)
 
 T15 (`fastmace/planner/fixed.py`, `FixedPlanner`) is merged
-(`docs/validation/1a-T15-planner.md`). For every one of the 19 labels and
+(`docs/validation/phases/1a-T15-planner.md`). For every one of the 19 labels and
 31 `main.py` argument sets, the plan equals the research engine's own
 `parse_args` + `adapt_options_to_model`, refusals included, and
 `auto_options_off` equals the baseline's dict. Plan → build → `run(500)` on
@@ -871,7 +871,7 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
 
 - **Run summaries (T17 Q1).** T19 copies T17's summaries from WSL
   `~/runs/1a-T17-20261018/` into `results/1a-T17-workflow-20261018/` here and
-  cites them in `docs/validation/phase-1a.md`. ResearchModule's README
+  cites them in `docs/validation/phases/phase-1a.md`. ResearchModule's README
   already describes the comparison.
 - **A FastMACE checkout without a recorded commit is refused (T17 Q2):**
   accepted. Runs use `/mnt/d/Margraf/FastMACE` itself or the NAS copy with
@@ -883,7 +883,7 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   ResearchModule's `studies/other_models/README.md` finds the model usable
   (POLAR-1-S: NaCl; OMOL-0 XL: NaCl, NbCl5; POLAR-1-M/L as listed there).
   Elsewhere the result is "model-limited", shown by the same failure in the
-  float64 reference. T19 records this in `docs/validation/phase-1a.md`.
+  float64 reference. T19 records this in `docs/validation/phases/phase-1a.md`.
 - **POLAR stress: a gate-reference bug, not an engine bug (resolved).** The
   POLAR-1 stress failures (NaCl 4.6e-5 eV/Å³) occurred identically in
   FastMACE and in the research engine. The gate's fresh reference processes
@@ -967,13 +967,13 @@ FastMACE has its own engine:
 - Measure with `fastmace.bench.ab`, FastMACE against itself (option off
   against on) in alternating blocks in one process, on an idle GPU, with
   12 blocks. A gain counts only if it clearly exceeds the noise floor of
-  `docs/validation/1a-noise-floor.md` (0.16–0.32%).
+  `docs/validation/phases/1a-noise-floor.md` (0.16–0.32%).
 - It must pass the force/stress gate (energy included once 1b adds it) for
   the 19 labels, plus the per-module self-check at the §6.4 thresholds.
 - Adopted rewrites start as opt-in records; they become `auto` defaults
   when the gain holds on the three crystals and two GPU architectures.
   Every screen, including those with no gain, is logged in
-  `docs/rewrites.md`.
+  `docs/optimisation-ledger.md`.
 
 Candidates:
 1. **Folded species embedding (T07, 17 October 2026).** Fold the species

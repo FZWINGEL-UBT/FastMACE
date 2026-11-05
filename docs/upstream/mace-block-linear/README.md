@@ -46,7 +46,7 @@ supercells, same-process A/B.
 
 Both passed the force-gate check (float32 force error against float64 at most 2x that of the stock
 float32 calculator) and the CUDA-graph replay gate. FastMACE carries them as registry records
-`block_linear`, `grouped_linear` (`fastmace/rewrites/linear/`), default on; see `docs/rewrites.md`.
+`block_linear`, `grouped_linear` (`fastmace/rewrites/linear/`), default on; see `docs/optimisation-ledger.md`.
 
 The **merged residual** (one product per output segment over `linear_1(message)` and
 `linear_res(linear_up(x))` of the MH-1-class `RealAgnosticResidualNonLinearInteractionBlock`) is **not**

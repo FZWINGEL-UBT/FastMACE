@@ -1,7 +1,7 @@
 # Conversation records
 
 Records of the AI conversations behind FastMACE and its research engine, kept for provenance (who proposed what;
-see `docs/validation/omat0-a100-optimisations.md`).
+see `docs/current/omat0-a100.md`).
 
 - `gemini-research-chats.md`: the owner's Google Gemini research chats (October 2026), added 4 November 2026.
 - `agent_transcripts/`: local working directory with all extracted transcripts from both Linux and Windows machines.
@@ -79,7 +79,7 @@ To read a transcript:
 | OMP | `omp/--D--Margraf--/2026-11-05T09-25-18-008Z_01a1ab06-e438-743d-8eea-701a4395947b.jsonl` | 0.8 MB | 2026-11-05 | can you look at all session histories for codex, claude code, omp, antigravity that have worked... |
 | OMP | `omp/--G--Margraf-ResearchModule--/2026-10-25T23-18-44-021Z_01a1755b-f835-779e-82ba-5cd205476767.jsonl` | 13.9 MB | 2026-10-26 | Test / Audit of FastMACE optimization rounds and kernel numerics |
 | OMP | `omp/--G--Margraf-ResearchModule--/2026-10-25T23-18-44-021Z_01a1755b-f835-779e-82ba-5cd205476767/AuditEngineWorkflow.jsonl` | 1.2 MB | 2026-10-26 | Target: D:/Margraf/FastMACE/docs/validation, docs/design |
-| OMP | `omp/--G--Margraf-ResearchModule--/2026-10-25T23-18-44-021Z_01a1755b-f835-779e-82ba-5cd205476767/AuditFastMACEOptRounds.jsonl` | 1.3 MB | 2026-10-26 | Target: D:/Margraf/FastMACE/docs/rewrites.md, docs/validation |
+| OMP | `omp/--G--Margraf-ResearchModule--/2026-10-25T23-18-44-021Z_01a1755b-f835-779e-82ba-5cd205476767/AuditFastMACEOptRounds.jsonl` | 1.3 MB | 2026-10-26 | Target: D:/Margraf/FastMACE/docs/optimisation-ledger.md, docs/validation |
 | OMP | `omp/--G--Margraf-ResearchModule--/2026-10-25T23-18-44-021Z_01a1755b-f835-779e-82ba-5cd205476767/AuditKernelNumeric.jsonl` | 1.6 MB | 2026-10-26 | Target: D:/Margraf/FastMACE/docs/design and docs/validation |
 | OMP | `omp/--G--Margraf-ResearchModule--/2026-10-25T23-18-44-021Z_01a1755b-f835-779e-82ba-5cd205476767/AuditResearchEngineOpts.jsonl` | 1.4 MB | 2026-10-26 | Target: G:/Margraf/ResearchModule/Experiments/Langevin_Thermostat |
 | OMP | `omp/--G--Margraf-ResearchModule--/2026-10-26T22-26-42-826Z_01a17a52-b40a-727d-be5e-a59783145617.jsonl` | 3.9 MB | 2026-10-27 | Look at all the recent optimization rounds. Do you have any new ideas on how to optimize furth... |

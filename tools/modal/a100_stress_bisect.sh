@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A100-SXM4-80GB: which default of the A100 plan pushes OMAT-0 medium's NbCl5 stress over the gate's limit
-# (docs/validation/omat0-tp-backward.md section 3.1: 1.79e-7 eV/A^3 against 1.16e-7), and the full gate of the new
+# (docs/validation/omat0/omat0-tp-backward.md section 3.1: 1.79e-7 eV/A^3 against 1.16e-7), and the full gate of the new
 # FACTORED + SYMMETRIC_PAIRS defaults, 4 November 2026. NbCl5 (OMAT-0) with one A100 default off at a time; the
 # default twice (run-to-run scatter: OEq atomic sums, and the float32 yardstick's own scatter).
 # Usage (from WSL, Modal client venv):

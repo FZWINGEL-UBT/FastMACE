@@ -1,7 +1,7 @@
 # Optimisation round 3 (remaining kernel ideas)
 
 The owner decided this round on 21 October 2026, after OPT-T10
-(`docs/design/opt-T10-step-breakdown.md`). Their words: "Go ahead and try all
+(`docs/design/speed/opt-T10-step-breakdown.md`). Their words: "Go ahead and try all
 kernel opportunities".
 
 **Baseline:** main `62aa6d4`, with the round-2 defaults on.
@@ -32,8 +32,8 @@ The rules are as in round 2 (`plans/opt-2.md`). In addition:
 
 | Task | Result | Decision |
 | --- | --- | --- |
-| OPT3-T01 fused gate + residual VJP | the gate's kernels are already fused at DRAM bandwidth; a fused backward could remove 0.6–1.1 % of NbCl5 at best (`docs/design/opt3-T01-gate-vjp-analysis.md`) | not built |
-| OPT3-T02 symmetric contraction | 2.5–5.4 % of the step, kernels at 72–96 % of memory speed-of-light; every option's ceiling below 3 % (`docs/design/opt3-T02-symmetric-contraction.md`) | screened, not built |
-| OPT3-T03 `fused_integrator` | exact (stage level byte-identical, reproducible trajectories bitwise); NaCl −2.4 % (sm_120) and −1.9 to −2.0 % (L4), NbCl5 −0.3 to −0.7 % / neutral (`docs/validation/opt3-T03.md`) | **default on** (owner, "Yes"; SPEC fourteenth amendment), also in reproducible plans |
-| OPT3-T04 `combo_kernels` | rounding; NaCl −0.9 to −1.8 %, NbCl5 +1.9 to +2.7 % on both GPUs (`docs/validation/opt3-T04.md`) | rejected, opt-in record kept |
-| OPT3-T05 layout records `direct_node_feats`, `folded_constants` | exact; NaCl −0.5 to −0.8 % (sm_120), neutral on the L4; `lm_major_outer_sum` reverted (`docs/validation/opt3-T05-layout-audit.md`) | opt-in, no gain above noise |
+| OPT3-T01 fused gate + residual VJP | the gate's kernels are already fused at DRAM bandwidth; a fused backward could remove 0.6–1.1 % of NbCl5 at best (`docs/design/speed/opt3-T01-gate-vjp-analysis.md`) | not built |
+| OPT3-T02 symmetric contraction | 2.5–5.4 % of the step, kernels at 72–96 % of memory speed-of-light; every option's ceiling below 3 % (`docs/design/speed/opt3-T02-symmetric-contraction.md`) | screened, not built |
+| OPT3-T03 `fused_integrator` | exact (stage level byte-identical, reproducible trajectories bitwise); NaCl −2.4 % (sm_120) and −1.9 to −2.0 % (L4), NbCl5 −0.3 to −0.7 % / neutral (`docs/validation/speed/opt3-T03.md`) | **default on** (owner, "Yes"; SPEC fourteenth amendment), also in reproducible plans |
+| OPT3-T04 `combo_kernels` | rounding; NaCl −0.9 to −1.8 %, NbCl5 +1.9 to +2.7 % on both GPUs (`docs/validation/speed/opt3-T04.md`) | rejected, opt-in record kept |
+| OPT3-T05 layout records `direct_node_feats`, `folded_constants` | exact; NaCl −0.5 to −0.8 % (sm_120), neutral on the L4; `lm_major_outer_sum` reverted (`docs/validation/speed/opt3-T05-layout-audit.md`) | opt-in, no gain above noise |

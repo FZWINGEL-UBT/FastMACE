@@ -12,7 +12,7 @@
 //   fm_tf32x3_rc_64x64(M, N, K, A, lda, B, ldb, C, ldc): B column-major (the transpose of a row-major [N, K]).
 // Alignment 4 (128-bit loads): lda, ldb, ldc multiples of 4 and every pointer 16-byte aligned; the caller checks.
 // Tile 64x64x16, warp 32x32x16, 4 stages: the winner on 83 of the 92 MACE shapes on an A100
-// (docs/validation/opt-T01-tensor-cores.md §5). No split-K: deterministic.
+// (docs/validation/speed/opt-T01-tensor-cores.md §5). No split-K: deterministic.
 // fm_tf32x3_{rr,rc}_32x64 and _64x32 (4 November 2026): the same with a 32x64 or 64x32 tile (two warps of 32x32x16),
 // grids of ceil(M / 32) x ceil(N / 64) or ceil(M / 64) x ceil(N / 32) blocks of fm_tf32x3_info[5] threads with
 // fm_tf32x3_info[6..9] bytes (rr, rc for 32x64; rr, rc for 64x32): twice the blocks for the A100's 108 SMs on

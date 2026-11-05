@@ -88,7 +88,7 @@ def _polar1s_checkpoint():
 def test_polar1s_stress_check_passes_on_the_gate_configuration(structure):
     """4-T11: the self-test holds the unstrained cell's k-set. On 3b-T08's NbCl5 3x3x3 gate configuration a
     Bragg pair sits 2.8e-5 outside the k-space cutoff and enters at e_xx = +1e-4; the live finite differences
-    were 4.36e-4 eV/A^3 off, the frozen ones 8.3e-9 (docs/validation/3b-T08.md). NaCl 3x3x3, where nothing
+    were 4.36e-4 eV/A^3 off, the frozen ones 8.3e-9 (docs/validation/phases/3b-T08.md). NaCl 3x3x3, where nothing
     crosses, stays as 1a-T19 measured it (<= 8.1e-9).
 
     Runs in a fresh interpreter (6-T11): in one slow-tier process on the 16 GiB RTX 5060 Ti the float64

@@ -2,7 +2,7 @@
 
 Plan task 3-T22, 22 October 2026. Found by 3-T12
 (`side-session-notes/…/3-T12-finding-fixcm-unequal-masses.md`). The measurements are in
-[validation/3-T22-fixcm.md](../validation/3-T22-fixcm.md).
+[validation/phases/3-T22-fixcm.md](../validation/phases/3-T22-fixcm.md).
 
 `IntegratorConfig.fixcm_projection` chooses how `fixcm` removes the centre-of-mass part of the
 Langevin noise:

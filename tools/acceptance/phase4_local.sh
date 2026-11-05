@@ -7,7 +7,7 @@
 # Run every call under the GPU reservation:
 #   python3 SRC/tools/ci/local_gpu.py run --wait-minutes 600 --purpose "4-T13 JOB" -- bash SRC/tools/acceptance/...
 # Outputs: ~/fastmace-acceptance/4-T13-local-<date>/<job>/ and <job>.log beside it. Runbook, pass rules and job
-# table: docs/validation/phase-4-runbook.md.
+# table: docs/validation/phases/phase-4-runbook.md.
 # Jobs:
 #   timed (quiet PC, first, alone): regression (item 5, NVT A/B), regression-npt (item 5, NPT, one side per process),
 #     ase-speed (recorded: stock ASE against fastmace.ase, and each new integrator's step time)

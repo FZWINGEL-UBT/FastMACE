@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The 128-row tile rerun (docs/validation/ab-constants-audit-20261030.md): segment_gemm's Triton products with 128 rows
+# The 128-row tile rerun (docs/validation/speed/ab-constants-audit-20261030.md): segment_gemm's Triton products with 128 rows
 # and 8 warps against 64 and 4, with the fixed A/B tool (constants set before every step), on the old row order
 # ("rows": main before the tile order) and on the tile order's rule ("auto"). MH-1 hybrid float32 NVT 300 K.
 #   bash tiles128.sh ROOT FM ENV CHECKPOINT STRUCTURES_ROOT

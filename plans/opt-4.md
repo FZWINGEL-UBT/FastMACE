@@ -39,7 +39,7 @@ checkpoint (`mace-mh-1.model`).
 - **The force graph is the same graph.** Kernel counts per part are equal to OPT-T10's within one kernel, and
   so are the gaps.
   - Phases 3–5 added nothing to the step's kernels. The phase 3, 3b and 4 acceptances each measured "no
-    regression" with same-process A/Bs (`docs/validation/phase-3.md` §10, `phase-3b.md`, `phase-4.md` §5).
+    regression" with same-process A/Bs (`docs/validation/phases/phase-3.md` §10, `phase-3b.md`, `phase-4.md` §5).
   - Phase 5 changes the planner (rule 12, monitor, tier switch, calibration).
 - **`fused_integrator` is the one real change.** It was adopted at the end of round 3 (OPT3-T03), after the
   round-3 baseline was measured. It cut the ACP stage by 0.09–0.13 ms on every cell, about 3 % of NaCl's step.
@@ -81,7 +81,7 @@ linears, as OPT-T10 did.
 | FP32-accurate tensor cores (Triton `tf32x3`, cuBLAS BF16×9) | 1, OPT-T01 | rejected on sm_89, sm_120 and (Triton `tf32x3`) the A100 | 3×TF32 cannot beat SIMT FP32 on sm_89 and sm_120; Triton's `tf32x3` won 0 of 92 shapes on the A100 (§4); BF16×9 only on compute capability 10.0/10.3 |
 | Tensor-core work beside SIMT on two streams | 1, OPT-T01b | rejected | 0.77–0.85× |
 | BF16×6 (Triton) | 1, OPT-T01 §6 | rejected on G4 and L4; the A100 would need a CUTLASS-class kernel | |
-| **CUTLASS 3×TF32 on the A100** | 1, OPT-T01 §5, §7 | **not built** (owner, 24 October 2026, after OPT4-T03) | 0.75× (NaCl) and 0.55× (NbCl5) of cuBLAS GEMM time, but 7–14× worse than IEEE under synthetic cancellation. OPT4-T03 stage 1 passed the force gate and NVE drift with Triton's `tf32x3` (`docs/validation/opt4-T03.md`). The A100 is Colab-only for FastMACE, so stage 2 waits until it becomes a production target; it can start from the opt-in record `tf32x3_gemms` |
+| **CUTLASS 3×TF32 on the A100** | 1, OPT-T01 §5, §7 | **not built** (owner, 24 October 2026, after OPT4-T03) | 0.75× (NaCl) and 0.55× (NbCl5) of cuBLAS GEMM time, but 7–14× worse than IEEE under synthetic cancellation. OPT4-T03 stage 1 passed the force gate and NVE drift with Triton's `tf32x3` (`docs/validation/speed/opt4-T03.md`). The A100 is Colab-only for FastMACE, so stage 2 waits until it becomes a production target; it can start from the opt-in record `tf32x3_gemms` |
 | `gated_rows` (stage A) | 1, OPT-T02 | **adopted** | |
 | `segment_gemm` (stage B) | 1, OPT-T02 | **adopted** | |
 | Gate in the GEMM prologue (stage C) | 1, OPT-T02 | rejected | NbCl5 +1.6 to +2.0 % |
@@ -105,7 +105,7 @@ linears, as OPT-T10 did.
 | `direct_node_feats`, `folded_constants` | 3, OPT3-T05 | opt-in | exact; NaCl −0.5 to −0.8 % on sm_120, neutral on the L4. Making them defaults is still the owner's call |
 | `lm_major_outer_sum` | 3, OPT3-T05 | rejected, reverted | |
 | **Heterogeneous megakernel: single-SM co-execution probe** | design note, 23 October | **never run** | the one-day gate before any megakernel work |
-| Research-engine screens of 10–16 October | `docs/rewrites.md` | rejected | not to be repeated without new evidence |
+| Research-engine screens of 10–16 October | `docs/optimisation-ledger.md` | rejected | not to be repeated without new evidence |
 
 ## 3. Candidates, ranked
 
@@ -136,7 +136,7 @@ CUDA-graph replays, median of 7 blocks of 50):
 - A kernel at the `fill_` rate plus about 10 % leaves 0.38 ms (NbCl5) and 0.57 ms (NaNbO3) to gain.
 
 **Not proposed:**
-- the rejected ideas in §2 and in `docs/rewrites.md`;
+- the rejected ideas in §2 and in `docs/optimisation-ledger.md`;
 - `combo_kernels` restricted to small cells: a size rule for a 1–2 % NaCl gain;
 - a second radial MLP fusion attempt (OPT2-T02's cause stands);
 - stand-alone edge padding: the 2 % edge buckets were screened on 15 October.
@@ -175,7 +175,7 @@ CUDA-graph replays, median of 7 blocks of 50):
   - Never kill processes by pattern, only your own PIDs.
 - **Git.** Never force-push. Commits end with the `Co-Authored-By` line (AGENTS.md).
 - **Records.** Every screen, including the ones cut by their first measurement, gets a row in
-  `docs/rewrites.md` and a report under `docs/validation/opt4-T<nn>*.md` with run IDs, hardware and
+  `docs/optimisation-ledger.md` and a report under `docs/validation/opt4-T<nn>*.md` with run IDs, hardware and
   environment.
 
 ## 5. Tasks
@@ -183,13 +183,13 @@ CUDA-graph replays, median of 7 blocks of 50):
 | Task | Candidate | Worker | Branch | GPU | Done when |
 | --- | --- | --- | --- | --- | --- |
 | OPT4-T01 | 1, radial last-layer forward kernel | one worker | `fastmace/opt4-T01` | microbenchmark, gate and A/B local; L4 A/B | the record and its tests are pushed with the gate and both-order A/Bs, or the cut is recorded |
-| OPT4-T02 | 2, POLAR-1's small kernels and the float64 scatter | one worker | `fastmace/opt4-T02` | module profile and A/B local (POLAR-1-S NaCl and NbCl5); POLAR-1 gate (S, M; L on the Colab A100) | as above, with the POLAR labels through the gate. **Done 24 October 2026:** `fx_e3nn_linear` (PolarMACE's forward compiles) and `polar_graph_sums`; POLAR-1-S A/B b/a NaCl 0.763/0.759 and NbCl5 0.823/0.823 on sm_120, 0.818/0.811 and 0.840/0.837 on the L4; gate passed for S, M and L. Default on for POLAR-1-S, -M and -L by owner decision 58 (L after its local NbCl5 gate) (`docs/validation/opt4-T02.md`) |
-| OPT4-T03 | 3, A100 3×TF32, stage 1 (accuracy through Triton `tf32x3`) | one worker | `fastmace/opt4-T03` | gate locally (TF32 is available on sm_120); NVE drift and OMOL-0 on the Colab A100 | a report with the gate and drift verdict. Stage 2 (CUTLASS) only after a pass **and** the owner's go. **Done:** stage 1 passed (`docs/validation/opt4-T03.md`); stage 2 not built (owner, 24 October 2026); the record `tf32x3_gemms` stays opt-in |
-| OPT4-T04 | 4, `grouped_launch` on generic MACE | one worker (small) | `fastmace/opt4-T04` | gate and A/B local; L4 A/B if it gains | the A/B verdict; any applicability change pushed with tests. **Done 24 October 2026:** gate passed; NaCl b/a 0.946–0.955 on sm_120 (five generic labels), 0.957–0.959 on the L4; NbCl5 neutral. Default on for the generic MACE family by owner decision 57 (`docs/validation/opt4-T04.md`) |
+| OPT4-T02 | 2, POLAR-1's small kernels and the float64 scatter | one worker | `fastmace/opt4-T02` | module profile and A/B local (POLAR-1-S NaCl and NbCl5); POLAR-1 gate (S, M; L on the Colab A100) | as above, with the POLAR labels through the gate. **Done 24 October 2026:** `fx_e3nn_linear` (PolarMACE's forward compiles) and `polar_graph_sums`; POLAR-1-S A/B b/a NaCl 0.763/0.759 and NbCl5 0.823/0.823 on sm_120, 0.818/0.811 and 0.840/0.837 on the L4; gate passed for S, M and L. Default on for POLAR-1-S, -M and -L by owner decision 58 (L after its local NbCl5 gate) (`docs/validation/speed/opt4-T02.md`) |
+| OPT4-T03 | 3, A100 3×TF32, stage 1 (accuracy through Triton `tf32x3`) | one worker | `fastmace/opt4-T03` | gate locally (TF32 is available on sm_120); NVE drift and OMOL-0 on the Colab A100 | a report with the gate and drift verdict. Stage 2 (CUTLASS) only after a pass **and** the owner's go. **Done:** stage 1 passed (`docs/validation/speed/opt4-T03.md`); stage 2 not built (owner, 24 October 2026); the record `tf32x3_gemms` stays opt-in |
+| OPT4-T04 | 4, `grouped_launch` on generic MACE | one worker (small) | `fastmace/opt4-T04` | gate and A/B local; L4 A/B if it gains | the A/B verdict; any applicability change pushed with tests. **Done 24 October 2026:** gate passed; NaCl b/a 0.946–0.955 on sm_120 (five generic labels), 0.957–0.959 on the L4; NbCl5 neutral. Default on for the generic MACE family by owner decision 57 (`docs/validation/speed/opt4-T04.md`) |
 | OPT4-T05 | 5, setup and capture time | one worker | `fastmace/opt4-T05` | untimed local runs (cold and warm caches) | the breakdown, and any change ≥ 5 s warm / ≥ 15 s cold built as an option, or none. **Done:** `dynamic_edges` on graph-tier MD plans, 7–9 s warm / 16–22 s cold per start, exact; on by default (owner decision 59, T05b); the Inductor and Triton caches moved under `FASTMACE_CACHE` (T05b, SPEC §14) |
 | OPT4-T06 | 6, OEq forward (reserve) | the first worker free | `fastmace/opt4-T06` | ncu on NbCl5 | the ncu verdict; build only with a shape-rule lever |
-| OPT4-T07 | 7, megakernel probe | one worker | `fastmace/opt4-T07` | local, Colab L4 and A100 (untimed microbenchmark) | the pass/fail table; `docs/design/2026-10-23-heterogeneous-megakernel.md` updated |
-| OPT4-T08 | owner's request (24 October): per-stage precision sensitivity, measurement only | one worker | `opt4-T08-precision-screen` | untimed local runs, MH-1 (NaCl, NbCl5, NaNbO3) and omat0-medium (NaCl, NbCl5) | **done 24 October:** no stage with a real share passes the gate alone in bf16, fp16 or TF32; only ZBL (fp16 storage) and MH-1's interaction-0 symmetric-contraction backward (TF32) pass. `docs/validation/opt4-T08-precision-sensitivity.md` |
+| OPT4-T07 | 7, megakernel probe | one worker | `fastmace/opt4-T07` | local, Colab L4 and A100 (untimed microbenchmark) | the pass/fail table; `docs/design/research/2026-10-23-heterogeneous-megakernel.md` updated |
+| OPT4-T08 | owner's request (24 October): per-stage precision sensitivity, measurement only | one worker | `opt4-T08-precision-screen` | untimed local runs, MH-1 (NaCl, NbCl5, NaNbO3) and omat0-medium (NaCl, NbCl5) | **done 24 October:** no stage with a real share passes the gate alone in bf16, fp16 or TF32; only ZBL (fp16 storage) and MH-1's interaction-0 symmetric-contraction backward (TF32) pass. `docs/validation/speed/opt4-T08-precision-sensitivity.md` |
 | OPT4-REP | round report and default proposals | the conductor | `fastmace/opt4-report` | – | `docs/validation/opt-4.md`; the owner's default decisions recorded |
 
 **Order and parallelism** (at most five workers at once; GPU work queues through the reservation):
@@ -203,7 +203,7 @@ Day 2  L4 A/Bs (Colab, in parallel)   T06 if a worker is free   report and the o
 
 - **Timed A/Bs** (T01, T02, T04, any T05 option) take turns on the quiet local GPU. The conductor sets their
   order. Untimed work (microbenchmarks, gates, profiles, the probe) uses short reservations or Colab.
-- **File overlaps:** `docs/rewrites.md` and `docs/design/switch-map.md` (all tasks), and `model/compile.py`
+- **File overlaps:** `docs/optimisation-ledger.md` and `docs/current/switch-map.md` (all tasks), and `model/compile.py`
   (T02, T05). The conductor merges in task order and resolves them.
   - T01 touches the radial path (`fastmace/kernels/triton/`, `rewrites/fusion`).
   - T02 touches `longrange/polar.py`, `model/compile.py` and possibly the POLAR rewrites.

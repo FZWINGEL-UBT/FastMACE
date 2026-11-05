@@ -1,4 +1,4 @@
-"""The fusion family of optimisation round 1 (``plans/opt-1.md``, OPT-T02; ``docs/design/opt-T02-fusion.md``).
+"""The fusion family of optimisation round 1 (``plans/opt-1.md``, OPT-T02; ``docs/design/speed/opt-T02-fusion.md``).
 
 ``RECORDS`` holds ``gated_rows``, ``segment_gemm``, ``gate_epilogue`` and ``grouped_launch``:
 
@@ -25,7 +25,7 @@
   registers, without writing ``drows``. The forward is ``segment_gemm``'s. ``rounding`` (the K- and m-sums in
   another order), deterministic. Opt-in; float32 only (the planner); not beside ``tf32x3_gemms``.
 
-- ``grouped_launch`` (OPT-T03 candidate 2, ``docs/design/opt-T03-small-m.md``): in every block linear
+- ``grouped_launch`` (OPT-T03 candidate 2, ``docs/design/speed/opt-T03-small-m.md``): in every block linear
   (``BlockLinear``, ``ResidualBlockLinear``, also inside the ``gated_rows`` chains), the products that the
   shared shape rule calls small run together in one Triton launch (``fastmace.kernels.triton.grouped_gemm``),
   forward and input gradient; the others keep cuBLAS. ``rounding`` (another GEMM), deterministic. The record's

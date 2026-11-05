@@ -1,4 +1,4 @@
-"""Micro-benchmark of the split-K product (plan task OPT2-T05; docs/design/opt2-T05-split-k.md).
+"""Micro-benchmark of the split-K product (plan task OPT2-T05; docs/design/speed/opt2-T05-split-k.md).
 
 For each shape ``[m, k] @ [k, n]`` (float32, CUDA), the time of one cuBLAS product (``a @ b``) against
 ``fastmace.rewrites.linear.modules.split_k_mm`` with 2, 4 and 8 parts and with the shape rule's choice

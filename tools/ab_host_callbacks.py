@@ -1,7 +1,7 @@
 """Rule 9 measured: the graph tier against the compiled tier with frequent host callbacks (plan task 3-T06).
 
 SPEC §9.3 rule 9 first planned the compiled tier for frequent host callbacks, because they break graph
-replays up. This tool measured that (3-T06; ``docs/validation/3-T06.md``), and decision 38 amended the
+replays up. This tool measured that (3-T06; ``docs/validation/phases/3-T06.md``), and decision 38 amended the
 rule: host callbacks keep the graph tier. It works on one model and structure, in one process: it
 builds ``fm.Simulation(mode="graph")`` and ``fm.Simulation(mode="compiled")`` from the same seed,
 warms both up, and then, for each callback interval k, times blocks round-robin (graph, compiled,

@@ -14,7 +14,7 @@
    noise stream), with ``FixAtoms`` on 10 atoms and ``fixcm=False`` on both sides: |ΔT| < 1e-6 K and
    |ΔPE| < 1e-7 meV/atom in every 50 K bin, temperatures over 3(N - n_fixed) degrees of freedom (decision 45).
 
-Results go to ``FASTMACE_RESULTS`` when set (``docs/validation/4-T04.md``).
+Results go to ``FASTMACE_RESULTS`` when set (``docs/validation/phases/4-T04.md``).
 """
 
 import importlib.util

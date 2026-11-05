@@ -1,6 +1,6 @@
 """Gathered-row segment GEMM against cuBLAS + the copies it would remove (plan opt-1, OPT-T02 stage B pre-check).
 
-Stage B (docs/design/opt-T02-BC-go-no-go.md) would replace each per-l product of a block linear and the
+Stage B (docs/design/speed/opt-T02-BC-go-no-go.md) would replace each per-l product of a block linear and the
 copy that feeds or follows it by one Triton GEMM that reads its A rows straight from the wide ir_mul
 tensor, ``A[(n, m), k] = X[n, offset + m * mul + k]`` (with an optional per-atom scale, the density
 division), and writes its C rows straight into a strided destination, ``C[(n, m), j] -> Y[n, offset' + m *

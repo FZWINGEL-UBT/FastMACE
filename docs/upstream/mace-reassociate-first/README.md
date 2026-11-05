@@ -49,8 +49,8 @@ models with `joint_embedding`).
 MD-step times, float32 hybrid, CUDA graphs, 3x3x3 cells. All passed the force and graph-replay gates.
 FastMACE: records `reassociate_first` (MH-1 family, `fastmace/rewrites/mh1/`) and `generic_reassociate`
 (`fastmace/rewrites/generic/`); float64 agreement 1.3e-16 to 3.2e-15 eV/Å on `mp0-medium`
-(`docs/validation/1a-T08-generic-rewrites.md`). Its edge-sum cost after the rewrite is 0.06 ms (NaCl) to
-0.5 ms (NbCl5) per force call (`docs/validation/2-T20a-step-breakdown.md`).
+(`docs/validation/phases/1a-T08-generic-rewrites.md`). Its edge-sum cost after the rewrite is 0.06 ms (NaCl) to
+0.5 ms (NbCl5) per force call (`docs/validation/phases/2-T20a-step-breakdown.md`).
 
 **Honest expectation for this patch:** it is the plain PyTorch form (an `index_add_` of outer products,
 autograd backward). Our measurements say most of the gain needs a fused backward of the edge sum; this

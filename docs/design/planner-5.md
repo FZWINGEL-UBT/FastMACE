@@ -407,7 +407,7 @@ after another and would pay it per crystal, so it stays off by default: for unfa
   cuBLAS workspaces. Deviations from the
   file list: `model/capabilities.py`, `planner/fallback.py`, `planner/plan.py` and `planner/fixed.py`
   (`Hardware.sms`), and `rewrites/fusion/__init__.py` (the `segment_gemm` self-check frees each
-  interaction's tensors; `docs/validation/5-T03.md`).
+  interaction's tensors; `docs/validation/phases/5-T03.md`).
   The fit on 60 measured cases (14 labels × NaCl/NbCl5 × NVT/NPT on the RTX 5060 Ti and the A100, plus 4
   plain-cuEq cases) sets:
   - the run term stock-structured (what stock MACE keeps per edge and per node);

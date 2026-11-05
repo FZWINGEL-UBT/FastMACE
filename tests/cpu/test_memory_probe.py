@@ -1,5 +1,5 @@
 """The near-limit memory probe (``EngineConfig.memory_probe``; ``fastmace.planner.memory_probe``;
-docs/validation/estimate-probe.md).
+docs/validation/capacity/estimate-probe.md).
 
 - When: "near-limit" probes the chosen stage where its estimate is within ``PROBE_SPREAD`` of decision 51's limit,
   and the next-cheaper stage where it might fit; "always" both; "off" and plans without a memory choice nothing.

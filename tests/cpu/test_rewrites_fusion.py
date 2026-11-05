@@ -1,4 +1,4 @@
-"""The fusion family (plans/opt-1.md, OPT-T02 stage A; docs/design/opt-T02-fusion.md): ``gated_rows``.
+"""The fusion family (plans/opt-1.md, OPT-T02 stage A; docs/design/speed/opt-T02-fusion.md): ``gated_rows``.
 
 On tiny MH-1-class cuEquivariance models (built with cuEq's CPU ``naive`` method, as
 tests/cpu/test_rewrites_mh1.py does), float64, eager: the chain on rows equals the stock chain

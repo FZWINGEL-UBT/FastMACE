@@ -8,7 +8,7 @@ TorchScript. Dynamo cannot trace TorchScript: each such Linear is a graph break.
 makes dynamo skip the whole frame ("graph break in a for/while loop"), which is what happens to PolarMACE's
 forward (the readouts with ``o3.Linear`` in the interaction and charge-update loops): the forward body runs
 eagerly, its submodules compile as 31 separate graphs, and on POLAR-1-S NaCl 0.9 ms of the 3.6 ms force
-call (538 of 1,226 kernels) are eager kernels and their eager autograd nodes (``docs/validation/opt4-T02.md``).
+call (538 of 1,226 kernels) are eager kernels and their eager autograd nodes (``docs/validation/speed/opt4-T02.md``).
 
 - **What it does.** For every ``o3.Linear`` whose ``_compiled_main`` is TorchScript, e3nn's own code
   generator (``_codegen_linear``) is run again on the module's irreps, instructions and weight sharing, and

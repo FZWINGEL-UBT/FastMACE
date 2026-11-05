@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The 128-row tile rerun (docs/validation/ab-constants-audit-20261030.md) on the Modal A100: 128 rows and 8 warps
+# The 128-row tile rerun (docs/validation/speed/ab-constants-audit-20261030.md) on the Modal A100: 128 rows and 8 warps
 # against 64 and 4 in segment_gemm's Triton products, on the row-first order and on the tile order's rule, with the
 # fixed A/B tool (results/segment-gemm-order-20261030/tiles128.sh).
 # Usage (from WSL, Modal client venv; MODAL_IMAGE_BUILDER_VERSION=2025.06; the guard in fastmace_modal.py):

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Two sweep-2 lanes on a large GPU (3 November 2026; docs/validation/tiled-concurrent-tiles.md measured 1.09x per
+# Two sweep-2 lanes on a large GPU (3 November 2026; docs/validation/tiled/tiled-concurrent-tiles.md measured 1.09x per
 # sweep-2 pair on the RTX 4000 Ada, where TileConfig.lanes "auto" is on; at 149M its second workspace did not fit
 # the 20 GB card). 1M SrTiO3, OMAT-0 medium, the large-cell path (host state aliased, wavefront on, R 8,192),
 # compiled, both sides under cudaMallocAsync; lanes off, on, on, off, one process each.

@@ -11,7 +11,7 @@ the IEEE Triton GEMMs:
   (``FirstInteractionReassociation``).
 
 The edge-level radial networks keep their GEMMs. No global TF32 flag is set. The record is ``rounding``, and
-not IEEE-equivalent under cancellation (``docs/validation/opt-T01-tensor-cores.md`` §7); ``deterministic`` (one
+not IEEE-equivalent under cancellation (``docs/validation/speed/opt-T01-tensor-cores.md`` §7); ``deterministic`` (one
 fixed tile, no atomics). It is applied last of the module records, after the species family has built its
 composed block linears. Opt-in only (``RewriteConfig.tf32x3_gemms``): the planner refuses it off float32 and
 below compute capability 8.0; making it a default would need the owner's capability rule (``plans/opt-4.md`` §4).

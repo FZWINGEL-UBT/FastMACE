@@ -33,7 +33,7 @@ from fastmace.kernels.gpu_models import GPUModels
 
 _REGISTRY = {}
 # The w-rebuilding backward's launch for recompute_conv_weights: one path part, four edges per batch (the fastest of
-# the shapes timed in docs/validation/capacity-T08-inventory.md section 2).
+# the shapes timed in docs/validation/capacity/capacity-T08-inventory.md section 2).
 REBUILD_PARTS = 1
 REBUILD_BATCH = 4
 # The stored per-edge weights are read once: load them with the streaming cache hint (``__ldcs``, evict-first), so
@@ -87,7 +87,7 @@ BLOCK_LDG_GPUS = GPUModels(())
 # True: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i (3 operations per term), then the weight gradient
 # sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j. Rounding (the same sums regrouped); every wprime kernel built while
 # it is set. A module constant for the A/B: OMAT-0 medium, Benchmark_loup MD step b/a in both orders, RTX 4000 Ada
-# 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940 (wprime kernel 0.90 / 0.73; docs/validation/omat0-tp-backward.md).
+# 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940 (wprime kernel 0.90 / 0.73; docs/validation/omat0/omat0-tp-backward.md).
 # None: on for FACTORED_GPUS (owner, 4 November 2026, decision 66; every A100 model, GPUModels); True / False: an A/B
 # side's choice on every GPU. RTX 5060 Ti since round 2 (5 November 2026), with plain loads, HORNER and 80 registers:
 # MD step b/a SrTiO3 0.979 / 0.982, NbCl5 0.986 / 0.989 (gate 12/12).

@@ -13,7 +13,7 @@ class reordered to one force call per step) and the time constants are taken fro
 500-step block, over all 4,000 steps (the runbook uses no shortened horizon): |ΔT| < 1e-6 K and
 |ΔPE| < 1e-7 meV/atom. Volume and the final position and cell differences are recorded.
 
-Results go to ``FASTMACE_RESULTS`` when set (``docs/validation/phase-4.md``).
+Results go to ``FASTMACE_RESULTS`` when set (``docs/validation/phases/phase-4.md``).
 """
 
 import importlib.util

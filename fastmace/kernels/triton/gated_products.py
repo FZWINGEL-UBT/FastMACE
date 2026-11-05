@@ -15,10 +15,10 @@ written, there are no atomics, and the m-sum needs no partial tensor. Segments t
 scalars' product, the CPU and other dtypes keep the stock operations.
 
 Not bitwise the stock backward: the K-sums run in ``tl.dot`` with another tile shape, and the m-sum is in another
-order (7-8e-7 relative on the RTX 4000 Ada, docs/validation/opt10-T01.md). Deterministic. The weights get no
+order (7-8e-7 relative on the RTX 4000 Ada, docs/validation/speed/opt10-T01.md). Deterministic. The weights get no
 gradient (MD forces only).
 
-**Unpadded rows** (``unpadded``; docs/validation/gated-unpadded.md). The tile above pads each atom's D rows to a power
+**Unpadded rows** (``unpadded``; docs/validation/speed/gated-unpadded.md). The tile above pads each atom's D rows to a power
 of two DP, so 1, 3 and 1 of every 4, 8 and 8 rows of ``tl.dot`` are masked (D = 3, 5, 7). The unpadded kernel packs
 ``UNPADDED_ROWS // D`` whole atoms atom-major into one tile (at most D - 1 rows masked, no atom across tiles), reads
 the gate through each row's atom and sums ``dgate`` over an atom's rows with a second ``tl.dot`` by a 0/1 selection
@@ -41,7 +41,7 @@ from fastmace.kernels.triton import tile_rule
 # x columns x K, warps, stages. One fixed configuration for every crystal and GPU (SPEC §9.1); OPT10-T01's tile had
 # 32 atoms x 64 columns x 32, which ROWS = 128 keeps for D = 3 (32 atoms x 4 rows).
 ROWS, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 128, 64, 32, 4, 3
-# The unpadded kernel's tile (docs/validation/gated-unpadded.md: the best of 16 on the RTX 4000 Ada, the RTX A4000 and
+# The unpadded kernel's tile (docs/validation/speed/gated-unpadded.md: the best of 16 on the RTX 4000 Ada, the RTX A4000 and
 # the RTX 5060 Ti at 21,600 and 25,920 atoms; 128-row tiles exceed the shared memory).
 UNPADDED_ROWS, UNPADDED_BLOCK_N, UNPADDED_BLOCK_K, UNPADDED_WARPS, UNPADDED_STAGES = 64, 128, 32, 4, 3
 # The unpadded kernel from this many atoms per SM in the launch (the call's atoms, or a tile's in the tiled path).
@@ -50,7 +50,7 @@ UNPADDED_ATOMS_PER_SM = 96
 # every GPU.
 UNPADDED = "auto"
 # Decision 66: a default only where same-process whole-step A/Bs in both build orders gained at least 3 %
-# (docs/validation/gated-unpadded.md). RTX 4000 Ada: NbCl5 21,600 atoms 0.947 / 0.951. RTX 5060 Ti: NbCl5 14,400
+# (docs/validation/speed/gated-unpadded.md). RTX 4000 Ada: NbCl5 21,600 atoms 0.947 / 0.951. RTX 5060 Ti: NbCl5 14,400
 # atoms 0.959 / 0.956 (two 21,600-atom sides do not fit its 16 GB). The RTX A4000 keeps gate_epilogue off by default;
 # the A100 is not measured.
 UNPADDED_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")

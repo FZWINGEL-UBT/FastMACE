@@ -158,7 +158,7 @@ def test_edges_and_capacity_follow_density_and_cutoff():
 
 
 def test_rule_12_counts_the_edges_in_the_structure():
-    """docs/validation/estimate-refit.md: the uniform-density count is 1.2-1.4x a crystal's; rule 12 counts the pairs
+    """docs/validation/capacity/estimate-refit.md: the uniform-density count is 1.2-1.4x a crystal's; rule 12 counts the pairs
     within r_max (both directions, periodic) and adds the edge bucket."""
     from ase.neighborlist import neighbor_list
 
@@ -181,7 +181,7 @@ def _sides(dims, edges, nodes, terms=()):
 
 
 def test_rescue_terms_keep_a_fraction_of_their_own_side():
-    """docs/validation/estimate-band.md: a memory-rescue record keeps a fraction of the remaining per-edge
+    """docs/validation/capacity/estimate-band.md: a memory-rescue record keeps a fraction of the remaining per-edge
     activations (``edge_keep``) or of the remaining per-node activations (``node_keep``; SAFETY times the
     activations and the additive terms of that side), never of the other side's: the edge-side rungs recompute
     per-edge tensors, the node-side rungs per-node ones, so a crystal with more edges per atom saves more from the
@@ -202,7 +202,7 @@ def test_rescue_terms_keep_a_fraction_of_their_own_side():
 
 
 def test_the_rescue_stage_sets_the_allocator_reserve():
-    """docs/validation/estimate-band.md: the caching allocator reserves more than the live peak, by a ratio that is
+    """docs/validation/capacity/estimate-band.md: the caching allocator reserves more than the live peak, by a ratio that is
     stable across sizes for one stage of the memory rescue but differs between stages (graph-pool packing). The
     deepest rung taken names the stage (``rescue_stage``); its ``RESCUE_RESERVE`` factor multiplies the kept
     remainder and shows as the "allocator reserve" term. The default plan (no rung) keeps SAFETY's fit unchanged."""
@@ -621,7 +621,7 @@ def test_rule_12_turns_on_recompute_node_segments_only_after_recompute_conv_weig
 
 
 def test_gate_epilogue_s_term_depends_on_the_node_segments():
-    """docs/validation/region-norm.md: gate_epilogue keeps 12.3 kB per atom more without the node segments, 36.3 with
+    """docs/validation/capacity/region-norm.md: gate_epilogue keeps 12.3 kB per atom more without the node segments, 36.3 with
     the separate segments and 0.5 inside recompute_node_region's chunks (memory.CONTEXT_TERMS)."""
     from fastmace.planner.minimal import _rewrite_registry
 
@@ -642,10 +642,10 @@ def test_gate_epilogue_s_term_depends_on_the_node_segments():
 
 @pytest.mark.rule(12)
 def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments(monkeypatch):
-    """docs/validation/region-norm.md: gate_epilogue (on by decision 66 on this file's GPU) stays on while the plan
+    """docs/validation/capacity/region-norm.md: gate_epilogue (on by decision 66 on this file's GPU) stays on while the plan
     fits, and while it fits with recompute_node_segments on; otherwise rule 12 turns it off, the memory rescue's
     fourth rung, with its own reason. The caller's explicit "on" is kept. The stages' allocator reserve is neutral
-    here: fitted on MH-1's widths (the rung lowers its estimate by 3.5-4.5 %, docs/validation/estimate-band.md), it
+    here: fitted on MH-1's widths (the rung lowers its estimate by 3.5-4.5 %, docs/validation/capacity/estimate-band.md), it
     would outweigh the rung on the tiny model, whose kept remainder is mostly per edge."""
     monkeypatch.setattr(memory, "RESCUE_RESERVE", tuple((name, 1.0) for name, _ in memory.RESCUE_RESERVE))
     assert memory.RESCUE_OFF == ("gate_epilogue",) and memory.rescue_value("gate_epilogue") == "off"
@@ -668,7 +668,7 @@ def test_rule_12_turns_gate_epilogue_off_only_after_recompute_node_segments(monk
 
 @pytest.mark.rule(12)
 def test_rule_12_gives_gate_epilogue_back_with_the_chunked_region(monkeypatch):
-    """docs/validation/region-norm.md: when the rescue ends with recompute_node_region on, gate_epilogue keeps 0.5 kB
+    """docs/validation/capacity/region-norm.md: when the rescue ends with recompute_node_region on, gate_epilogue keeps 0.5 kB
     per atom inside its chunks, so rule 12 turns it on again where the estimate still fits with it. The tiny model
     saves too little for rule 12 to take the rungs itself (``short_by_far``), so the overstatement is set to 1, and
     reassociate_first is set on, so that decision 51 drops nothing first. The stages' allocator reserve is neutral,

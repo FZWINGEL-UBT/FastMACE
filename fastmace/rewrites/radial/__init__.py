@@ -68,7 +68,7 @@ PIECE_BUCKET = 16
 # radius). Each edge then reads the (min, max) row, so a step touches fewer distinct rows (OMAT-0 SrTiO3: 6 of 9 pairs;
 # kernel lab, 3 November 2026). Bitwise: the rows read are equal. With wprime_backward.FACTORED, Benchmark_loup MD
 # step b/a (b = FACTORED + SYMMETRIC_PAIRS, a = FACTORED): RTX 4000 Ada 0.996 / 0.995, A100-SXM4-80GB 0.998 / 0.990
-# (docs/validation/omat0-tp-backward.md section 4). None: on for SYMMETRIC_PAIRS_GPUS (owner, 4 November 2026,
+# (docs/validation/omat0/omat0-tp-backward.md section 4). None: on for SYMMETRIC_PAIRS_GPUS (owner, 4 November 2026,
 # decision 66; every A100 model); True / False: an A/B side's choice on every GPU.
 SYMMETRIC_PAIRS = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.005 / 1.004 (b = off; OMAT-0 medium,
@@ -1180,7 +1180,7 @@ def _generic_selfcheck(original, rewritten, context):
     chain of the same weights at random lengths of ``[R_PHYSICAL, r_max)`` (w level, density, r-gradient), held to
     the float32 limit. The reference is float64, not the float32 network: a certified table is the more accurate of
     the two, and the float32 network's own error can exceed the limit (MACE-OMAT-0 medium near its cutoff: 5.5e-5 of
-    the largest weight, against the table's 4e-8; docs/validation/generic-radial-tables.md)."""
+    the largest weight, against the table's 4e-8; docs/validation/omat0/generic-radial-tables.md)."""
     import torch
 
     cases, failures, dtype = CaseErrors(), [], None
@@ -1297,7 +1297,7 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="certified", default="auto", deterministic=True,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck,
         memory=memory_terms.radial_tables),
-    # The generic family's tables (conductor, 2 November 2026; docs/validation/generic-radial-tables.md): certified
+    # The generic family's tables (conductor, 2 November 2026; docs/validation/omat0/generic-radial-tables.md): certified
     # (decision 61), float32 plans only; "auto" on only on the measured GPUs (decision 66, owner 2 November 2026).
     "generic_radial_tables": dict(
         name="generic_radial_tables", config_field="radial_tables", applies_to=_generic_support,

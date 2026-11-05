@@ -4,7 +4,7 @@ The default float32 plan (MinimalPlanner, hybrid) with ``recompute_conv_weights`
 one region layout per process (``--region separate`` or ``combined``, ``--chunks`` for the combined region's atom
 chunks). After the build, its first-step captures and two steps, the engine's force field is called eagerly (the
 compiled model, forward and force backward): the peak is the caching allocator's peak above what was allocated
-before the call, as in docs/validation/capacity-T08-chunks.md; the time is the median of ``--calls`` calls.
+before the call, as in docs/validation/capacity/capacity-T08-chunks.md; the time is the median of ``--calls`` calls.
     python region_probe.py --checkpoint PATH --structure NbCl5@5x5x12 --region combined --chunks 4 --output DIR
 """
 

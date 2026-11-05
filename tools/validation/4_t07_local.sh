@@ -2,7 +2,7 @@
 # 4-T07 on the local RTX 5060 Ti (WSL): variable-cell relaxations, tools/bench/optimizer_frames.py with
 # --cell-filter frechet, ASE on fm.calc against the GPU, one local GPU reservation (<= 20 min) per job, in
 # sequence. Usage: tools/validation/4_t07_local.sh RUN_ID [JOB...] (an ase-* job before its gpu-* job).
-# Results: results/RUN_ID/<job>.json, .npz and .log. docs/validation/4-T07.md has the findings.
+# Results: results/RUN_ID/<job>.json, .npz and .log. docs/validation/phases/4-T07.md has the findings.
 set -uo pipefail
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$repo"

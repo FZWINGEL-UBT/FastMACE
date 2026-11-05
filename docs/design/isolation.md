@@ -7,7 +7,7 @@ acceptance 5. Code audited at `main` 8c6e22e: `model/forces.py`,
 `engine/constraints.py`, `kernels/oeq_streaming/runtime.py` and every
 module-level object of the package. Tests: `tests/cpu/test_isolation.py` and
 `tests/gpu/test_isolation_gpu.py`; results in
-[docs/validation/2-T08-isolation.md](../validation/2-T08-isolation.md).
+[docs/validation/phases/2-T08-isolation.md](../validation/phases/2-T08-isolation.md).
 
 SPEC §8.7 asks that several force fields and engines live in one process and
 are used in any order, A → B → A, each giving what a fresh instance gives.

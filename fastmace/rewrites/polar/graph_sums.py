@@ -4,7 +4,7 @@ MACE 0.3.16's ``PolarMACE.forward`` takes the Fukui normalisations and the predi
 ``scatter_sum(x.double(), batch, dim_size=num_graphs)[batch]`` and the barycentre as ``scatter_mean`` and
 ``barycenter[batch]``. With one graph each sum adds every atom into one row (``scatter_add_``, atomics on CUDA)
 and the gather back is an index whose backward is a serial, sort-based ``index_put``: on POLAR-1-S NbCl5
-(1,944 atoms) 2.3 ms of the 25 ms force call, in 56 kernels (``docs/validation/opt4-T02.md``).
+(1,944 atoms) 2.3 ms of the 25 ms force call, in 56 kernels (``docs/validation/speed/opt4-T02.md``).
 
 The record sets the instance's ``graph_sums`` flag; ``fastmace.longrange.polar`` then builds the forward with
 ``GRAPH_SUM_EDITS`` (a source rewrite, SPEC §6.3 "Source rewrites", composable with PR 1762 and the float64

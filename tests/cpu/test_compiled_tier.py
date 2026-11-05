@@ -238,7 +238,7 @@ def test_compiled_equals_graph_bitwise_on_the_cpu(loaded, npt):
 def test_compiled_equals_graph_to_rounding_with_inductor_on_the_cpu(loaded):
     """Inductor on both sides (3-T06 conductor answer 2): static edge shapes against dynamic ones (the graph
     side asks for ``dynamic_edges=False``, off by default since decision 59). The differences are recorded in
-    ``docs/validation/3-T06.md``; they must stay at float64 rounding."""
+    ``docs/validation/phases/3-T06.md``; they must stay at float64 rounding."""
     pytest.importorskip("torch._inductor")
     torch._dynamo.reset()
     try:

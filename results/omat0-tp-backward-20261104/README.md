@@ -1,6 +1,6 @@
 # OMAT-0 tensor-product backward screen (4 November 2026)
 
-Report: `docs/validation/omat0-tp-backward.md`. Model MACE-OMAT-0 medium (checkpoint sha256 d4b14be9…), float32 default
+Report: `docs/validation/omat0/omat0-tp-backward.md`. Model MACE-OMAT-0 medium (checkpoint sha256 d4b14be9…), float32 default
 plan, Benchmark_loup SrTiO3 10×10×10 (5,000 atoms, 373,760 edges). Branch `fastmace/omat0-tp-backward`, from
 `fastmace/omat0-strided-tables` at 4b70e3f2.
 

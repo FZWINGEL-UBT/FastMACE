@@ -132,7 +132,7 @@ hi·hi + hi·lo + lo·hi. W and a are split into high and low parts on the fly i
 - `TC_PRESPLIT` split W once per block as float2 and lost (1.362): it doubled the slice's shared memory, which
   dropped the block from 12 to 8 warps and raised registers from 168 to 194.
 
-**The idea:** exponent-shifted 3×FP16 (`docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md`). big = fp16(x),
+**The idea:** exponent-shifted 3×FP16 (`docs/design/research/2026-10-26-fp16x3-and-hybrid-gemm.md`). big = fp16(x),
 small = fp16((x − big)·2¹¹), C = big·big + 2⁻¹¹(big·small + small·big), on m16n8k16 MMAs.
 - **W is a weight.** Split it once at plan setup, with power-of-two row scales, into two FP16 planes. Each element
   then takes the same 4 bytes as today's FP32 slice, so this gets the no-W-split saving without `TC_PRESPLIT`'s
@@ -359,7 +359,7 @@ default plan at that commit. Modal A100-SXM4-80GB (profile `second`), leto's RTX
 | + TABLED_FORWARD | A100-SXM4-80GB | 0.966 / 0.962 | 0.970 / 0.982 | A100 exception only | **on** |
 
 "A100 exception only": OMAT-0 NbCl5 stress misses the 2× float32 limit as the A100 default plan already does (the
-accepted exception, `docs/validation/omat0-a100-optimisations.md`): 1.55–1.60e-7 eV/Å³ against the default's 1.8e-7.
+accepted exception, `docs/current/omat0-a100.md`): 1.55–1.60e-7 eV/Å³ against the default's 1.8e-7.
 Every other check passes.
 
 The first fused A/Bs (`b70bcad9`) gave 0.997–1.004 everywhere: the fused branch sat in `first_table_region`, which

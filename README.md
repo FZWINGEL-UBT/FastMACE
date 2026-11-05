@@ -18,7 +18,7 @@ print(run.summary)
 ## Why FastMACE
 
 Measured by us on an RTX 5060 Ti, float32, 216 to 1,944 atom cells
-([TorchSim comparison](docs/validation/torchsim-comparison-20261025.md),
+([TorchSim comparison](docs/validation/comparisons/torchsim-comparison-20261025.md),
 [positioning](docs/design/2026-10-positioning.md)):
 
 - 3.8 to 10 times faster per step than TorchSim 0.6.2, and 1.1 to 2 times

@@ -471,9 +471,9 @@ class Rewrite:
 | `radial_tables` (per-species-pair Chebyshev tables for the radial chain r → `[h c, c]` and the edge density, fitted at setup; optimisation round 6, OPT6-T04/T05) | certified (§6.1; deterministic) | factored folded MH-1 class, float32 | stub ceiling per force call NbCl5 −7.2 %, NaNbO3 −16 %, NaCl −10 % (sm_120) | default on by owner decision 62 (float32, not reproducible, with `fold_cutoff`); class by owner decision 61, 27 October 2026 |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
-| `generic_chunked_conv_backward` (interaction 2's streaming convolution on MH-1's folded path, `[W, 0]` on `[h c, c]`, so the backward runs in L2-sized chunks and the `[E, weight_numel]` weight gradient is never formed; OMAT-0 capacity, 2 November 2026) | rounding (`(h c) Wᵀ` instead of `(h Wᵀ) c`; atomic sums as `streaming_conv`) | generic residual/density family with `streaming_conv` | OMAT-0 MD step −4.7 to −8.4 % (RTX 4000 Ada), −2.8 to −5.1 % (RTX 5060 Ti); RTX A4000 (6 MB L2) 3–4× slower; capacity SrTiO3 4.1×, NaCl 3.2× (Ada) | default on only on "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation" (decision 66, `planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS`); `docs/validation/omat0-capacity.md` |
+| `generic_chunked_conv_backward` (interaction 2's streaming convolution on MH-1's folded path, `[W, 0]` on `[h c, c]`, so the backward runs in L2-sized chunks and the `[E, weight_numel]` weight gradient is never formed; OMAT-0 capacity, 2 November 2026) | rounding (`(h c) Wᵀ` instead of `(h Wᵀ) c`; atomic sums as `streaming_conv`) | generic residual/density family with `streaming_conv` | OMAT-0 MD step −4.7 to −8.4 % (RTX 4000 Ada), −2.8 to −5.1 % (RTX 5060 Ti); RTX A4000 (6 MB L2) 3–4× slower; capacity SrTiO3 4.1×, NaCl 3.2× (Ada) | default on only on "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation" (decision 66, `planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS`); `docs/validation/omat0/omat0-capacity.md` |
 | `generic_recompute_conv_weights` (no stored weights: the forward builds them on chip, the backward rebuilds each chunk's weights with one GEMM into a slot) | rounding (cuBLAS chunk GEMM vs the on-chip product) | with `generic_chunked_conv_backward`, float32 only | step +4.5 to +9 % (Ada), +11 to +15 % (RTX 5060 Ti) over the chunked path; frees `weight_numel` floats per edge | off; rule 12 rescue rung after MH-1's `recompute_conv_weights` (decision 67); float64 plans refused |
-| `generic_radial_tables` (MH-1's certified radial tables, decision 61, for the generic family: one table per interaction, per species pair where the embedding is species-dependent, r → `[h c, c, density]`; OMAT-0 capacity, 2 November 2026) | certified (§6.1; deterministic) | generic residual/density family with `generic_fused_radial_backward`, float32, not `reproducible=True` | OMAT-0 step 0.82–0.86× (whole system), 0.86–0.91× (tiled) on the RTX 4000 Ada and RTX 5060 Ti; forces within 3.5e-5 eV/Å of float32; NVE drift unchanged | default on only on "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation" (owner, 2 November 2026, decision 66); float64 resolves to off; `docs/validation/generic-radial-tables.md` |
+| `generic_radial_tables` (MH-1's certified radial tables, decision 61, for the generic family: one table per interaction, per species pair where the embedding is species-dependent, r → `[h c, c, density]`; OMAT-0 capacity, 2 November 2026) | certified (§6.1; deterministic) | generic residual/density family with `generic_fused_radial_backward`, float32, not `reproducible=True` | OMAT-0 step 0.82–0.86× (whole system), 0.86–0.91× (tiled) on the RTX 4000 Ada and RTX 5060 Ti; forces within 3.5e-5 eV/Å of float32; NVE drift unchanged | default on only on "NVIDIA GeForce RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation" (owner, 2 November 2026, decision 66); float64 resolves to off; `docs/validation/omat0/generic-radial-tables.md` |
 | `polar_uvu` (PR 1711) | rounding (GEMM form) | PolarMACE | 4–5× faster with the MH-1 rewrites (step time ÷ 4–5) | — |
 | `pipelined`, `async_output` | exact (bit-identical) | engine features (§8.1) | −3.0% NaCl (pipelined); asynchronous output bit-identical | — |
 | `unfuse_full_addmm`, `first_derivative_only`, expandable segments allocator | exact | engine | avoids 2 × 32 MB copies per step | torch ≥ 2.14 |
@@ -494,7 +494,7 @@ Never enable:
 - spin restriction (changes the model, worse).
 
 The experiment's markdown files record the rejected screens (no gain or wrong
-answers); copy their summary into `docs/rewrites.md` so the work is not
+answers); copy their summary into `docs/optimisation-ledger.md` so the work is not
 repeated. Among them (16 October 2026): OpenEquivariance 0.7's own symmetric
 contraction, loaded with MH-1's basis and weights, is exact but 27–79× slower
 than cuEquivariance's fused `uniform_1d` kernel even compiled
@@ -2613,7 +2613,7 @@ Open decisions for the owner:
    plan; ASE's own optimisers on `fm.calc` are not refused. 4-T07's divergence
    on POLAR-1-S NbCl5 comes from the model's own surface (forces up to
    120 eV/Å in the float64 reference, about 70× MH-1's), not from the k-set
-   or the stress (`docs/validation/4-T12b.md`). PolarMACE NPT is not refused
+   or the stress (`docs/validation/phases/4-T12b.md`). PolarMACE NPT is not refused
    and stays experimental. Lifting the refusal needs a converged reference
    cell relaxation on a sane structure, NaCl first; freezing the k-set per
    rebuild and a smooth cutoff were not chosen.
@@ -2665,7 +2665,7 @@ Open decisions for the owner:
    plans keep the stock products; an explicit `on` or `off` overrides the
    rule for any family. Same-process A/Bs on NaCl gained 4.5–5.4 % on the
    RTX 5060 Ti (five labels, both orders) and 4.1–4.3 % on the L4 (OMAT-0);
-   NbCl5 was neutral (`docs/validation/opt4-T04.md`).
+   NbCl5 was neutral (`docs/validation/speed/opt4-T04.md`).
 
 58. Decided (user, 24 October 2026, optimisation round 4, OPT4-T02: "Yes",
    answering "both T02 records on by default for POLAR-1-S and -M; POLAR-1-L
@@ -2682,7 +2682,7 @@ Open decisions for the owner:
    Same-process A/Bs on POLAR-1-S, both records against the default: NaCl
    −24 % and NbCl5 −18 % on the RTX 5060 Ti, −19 % and −16 % on the L4; the
    force gate passed for S and M on NaCl and NbCl5 2×2×2
-   (`docs/validation/opt4-T02.md`). POLAR-1-L met the owner's condition the
+   (`docs/validation/speed/opt4-T02.md`). POLAR-1-L met the owner's condition the
    same day: its local NbCl5 2×2×2 gate passed (energy, force and stress
    ratios 0.88, 0.96, 0.75), and it is a qualified checkpoint too.
 59. Decided (user, 24 October 2026, optimisation round 4, OPT4-T05: "Yes",
@@ -2696,7 +2696,7 @@ Open decisions for the owner:
    and AOT-autograd cache entries. `reproducible=True` trajectories are bitwise
    equal with it off. A start is 7–9 s shorter warm and 16–22 s shorter cold
    (RTX 5060 Ti, MH-1 NaCl and NbCl5, OMAT-0 NaCl;
-   `docs/validation/opt4-T05.md`). Plans that compile nothing (eager,
+   `docs/validation/speed/opt4-T05.md`). Plans that compile nothing (eager,
    reference, `compile_mode="none"`) turn it off with a reason; an explicit
    `False` restores the second compile.
 62. Decided (user, 27 October 2026, optimisation round 6, OPT6-T05: "yes
@@ -2708,7 +2708,7 @@ Open decisions for the owner:
    Measured: certificates 0.15–0.30, force gate passed, 20 ps NVE drift
    unchanged, full-step b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 on the RTX
    5060 Ti; on the RTX 4000 Ada (sm_89, leto) NaCl 0.914, NbCl5 0.904,
-   NaNbO3 0.832 in both build orders (`docs/validation/opt6-T05.md`).
+   NaNbO3 0.832 in both build orders (`docs/validation/speed/opt6-T05.md`).
 63. Decided (user, 27 October 2026, f64-T01: "do that", to the float64
    package): float64 plans that are not reproducible take (a) the hybrid
    backend where the planner allows it (already the minimal planner's rule),
@@ -2722,7 +2722,7 @@ Open decisions for the owner:
    Reproducible plans keep native products and MACE's code. Measured: MD step
    0.57 (NaCl), 0.42 (NbCl5), 0.49 (NaNbO3) of stock float64 on the RTX 5060 Ti;
    forces within 4e-14 eV/Å, stress within 1e-16 eV/Å³; 20 ps NVE drift equal
-   to stock to seven digits (`docs/validation/f64-T01.md`).
+   to stock to seven digits (`docs/validation/speed/f64-T01.md`).
 64. Decided (user, 27 October 2026, optimisation round 8, OPT8-T02: "Make it
    default for mh-1"): `RewriteConfig.fused_folded_forward` is on by default
    for MH-1 (the label-table labels of the `mh-1` checkpoint: `mh1-r2scan`,
@@ -2733,7 +2733,7 @@ Open decisions for the owner:
    XL 3.5 % slower (1.035). Measured on MH-1: exact, force gate passed, 20 ps
    NVE drift unchanged; b/a in both build orders NaNbO3 0.928, NbCl5 0.967,
    NaCl 0.996 on the RTX 5060 Ti and NaNbO3 0.958, NbCl5 0.982, NaCl 0.981 on
-   the RTX 4000 Ada (murphy) (`docs/validation/opt8-T02.md`).
+   the RTX 4000 Ada (murphy) (`docs/validation/speed/opt8-T02.md`).
 65. Decided (user, 28 October 2026, ideas-20261027: "Make all 3 default on
    gpu where we measured a speed up but if slowdown or nothing measured dont
    enable it"): in float64 MH-1 plans that are not reproducible, three float64
@@ -2792,20 +2792,20 @@ Open decisions for the owner:
    default on gpus where its faster overall"): `grouped_launch` for MH-1 on
    "NVIDIA GeForce RTX 5060 Ti" (`planner.fixed.DECISION_66_GROUPED_LAUNCH_GPUS`;
    NaCl 0.971 / 0.975, NbCl5 and NaNbO3 neutral, same-process both orders on
-   main `30ff3b7c`; `docs/validation/decision66-grouped-launch.md`). Second
+   main `30ff3b7c`; `docs/validation/speed/decision66-grouped-launch.md`). Second
    (owner, 29 October 2026): `wprime_backward` (OPT9) for MH-1 in float32
    plans that are not reproducible on "NVIDIA A100-SXM4-80GB", "NVIDIA GeForce
    RTX 5060 Ti" and "NVIDIA RTX 4000 Ada Generation"
    (`planner.fixed.DECISION_66_WPRIME_GPUS`; MD step b/a in both orders 0.81-0.89
    on the A100, 0.94-0.97 on the RTX 5060 Ti, 0.93-0.96 on the RTX 4000 Ada,
-   every block pair below 1; `docs/validation/opt9-T03.md`). Third (conductor,
+   every block pair below 1; `docs/validation/speed/opt9-T03.md`). Third (conductor,
    2 November 2026, under the owner's OMAT-0 capacity request):
    `generic_chunked_conv_backward` for the generic family on "NVIDIA GeForce RTX
    5060 Ti" and "NVIDIA RTX 4000 Ada Generation"
    (`planner.fixed.DECISION_66_GENERIC_CHUNKED_GPUS`; OMAT-0 MD step b/a in both
    orders 0.916-0.953 on the RTX 4000 Ada, 0.949-0.972 on the RTX 5060 Ti; off on
    the RTX A4000, slower there, and on the A100, not measured;
-   `docs/validation/omat0-capacity.md`).
+   `docs/validation/omat0/omat0-capacity.md`).
 67. Decided (user, 29 October 2026, on the capacity scan, CAP-T02 in
    `plans/capacity.md`: "It should only do this if memory would not be
    enough"): rule 12 turns off `streaming_conv` and the records that require it
@@ -2822,7 +2822,7 @@ Open decisions for the owner:
    path off from about 13k atoms. That raised the peak, slowed the step and, under
    WSL2, let OEq's own convolution kernels reserve several GiB of stack memory.
    Turning the fused path off never lowers the estimate now, so rule 12 keeps it.
-   `tests/cpu/test_memory_fit.py` holds the fit; `docs/validation/capacity-T02.md`
+   `tests/cpu/test_memory_fit.py` holds the fit; `docs/validation/capacity/capacity-T02.md`
    the measurements.
 
 ---
@@ -3146,7 +3146,7 @@ automatic default and the `fallback="refuse"` opt-out.
 meV/atom instead of 0.1 K and 0.01 meV/atom. The two runs share ASE's noise
 stream and are the same trajectory to rounding (1b-T09: 3.5e-10 K and
 3.8e-11 meV/atom), so length adds no power and the limits do the catching
-(`docs/validation/2-T14e-reference-reuse.md`). The BAOAB pairs share the
+(`docs/validation/phases/2-T14e-reference-reuse.md`). The BAOAB pairs share the
 energy limit, now 1e-7 meV/atom (1b-T09 measured 1.1e-11); their other
 criteria are unchanged.
 
@@ -3176,7 +3176,7 @@ plan equality. The combined acceptance's 19-label gate decides per model; a
 model that fails gets the rewrite switched off. Also added:
 `EngineConfig.model_template_cache` (OPT-T06, on: later plans copy the
 converted model). Rejected in the same round and recorded in
-`docs/rewrites.md`:
+`docs/optimisation-ledger.md`:
 - FP32-accurate tensor cores (OPT-T01) and their overlap (OPT-T01b);
 - OPT-T03's streams;
 - OPT-T02 stage C.
@@ -3224,7 +3224,7 @@ The rest of round 3 changed no default: OPT3-T01 (fused gate VJP) and
 OPT3-T02 (symmetric contraction) were screened and not built, OPT3-T04's
 `combo_kernels` was rejected (NbCl5 slower), and OPT3-T05's layout records
 stay opt-in (no gain above noise). Details in `plans/opt-3.md` and
-`docs/rewrites.md`.
+`docs/optimisation-ledger.md`.
 
 **Draft 0.12, fifteenth amendment (24 October 2026, owner decision 57, "Go
 ahead and do it as you recommended"; optimisation round 4, OPT4-T04):** one
@@ -3279,7 +3279,7 @@ the `[oeq]` and `[full]` dependency markers to include it. The torch 2.14.1+cu13
 OpenEquivariance 0.7.0, Linux x86_64 and manylinux_2_28 constraints stay unchanged.
 Acceptance is a fresh Python 3.13 installation with the prebuilt extension,
 hybrid NaCl MD and no g++/Ninja/nvcc invocation. A C compiler for Triton's
-launcher remains a requirement. Results: `docs/validation/6-T15.md`.
+launcher remains a requirement. Results: `docs/validation/phases/6-T15.md`.
 
 **Optimisation round 6 (27 October 2026, owner decisions 60 and 61; `plans/opt-6.md`):**
 - **Decision 60 (owner: "yes"), `RewriteConfig.chunked_conv_backward` on by
@@ -3287,7 +3287,7 @@ launcher remains a requirement. Results: `docs/validation/6-T15.md`.
   rule `on_with_streaming_conv_and_fused_folded_backward`). Exact class. The op
   keeps cells whose per-edge weights fit `UNCHUNKED_L2_MULTIPLE` (4) L2s on the
   unchunked backward. Same-process A/B on the RTX 5060 Ti: NbCl5 0.973 / 0.967,
-  NaNbO3 0.969 / 0.964, NaCl 1.008 / 1.009 (`docs/validation/opt6-T02.md`).
+  NaNbO3 0.969 / 0.964, NaCl 1.008 / 1.009 (`docs/validation/speed/opt6-T02.md`).
 - **Decision 61 (owner: "think about a good class"), the `certified` exactness
   class** (§6.1): an approximation with a setup-time certificate that its float32
   error is at most that of the float32 computation it replaces, values and first
@@ -3303,11 +3303,11 @@ graphs, else off; "near-limit", "always", "off"): when the chosen stage or the n
 stage band of the free memory, rule 12 measures it in a child on a 15-20k-atom replica of the structure's repeat
 unit and re-plans with the measured scale plus 5 % headroom. The ladder and the probe are recorded in the plan,
 the report and `metadata.json` (§13 keys `plan.memory_ladder`, `plan.memory_probe`); resumes reuse the scales and
-never probe. See `docs/validation/estimate-band.md` and `docs/validation/estimate-probe.md`.
+never probe. See `docs/validation/capacity/estimate-band.md` and `docs/validation/capacity/estimate-probe.md`.
 
-**Generic radial tables on by default (2 November 2026, owner: "Yes make it default"; conductor):** §6.2 amended. `generic_radial_tables` is default on for the generic family on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, same-process A/Bs in both orders on both GPUs), float32 only and not in reproducible plans; float64 models resolve "auto" to off, an explicit "on" there is refused. Off on every other GPU (the A100 was not measured). See `docs/validation/generic-radial-tables.md`.
+**Generic radial tables on by default (2 November 2026, owner: "Yes make it default"; conductor):** §6.2 amended. `generic_radial_tables` is default on for the generic family on the RTX 5060 Ti and the RTX 4000 Ada (decision 66, same-process A/Bs in both orders on both GPUs), float32 only and not in reproducible plans; float64 models resolve "auto" to off, an explicit "on" there is refused. Off on every other GPU (the A100 was not measured). See `docs/validation/omat0/generic-radial-tables.md`.
 
-**Generic radial tables on the A100 80GB cards (3 November 2026, owner: "Yes go ahead"; conductor):** decision 66's list for `generic_radial_tables` adds "NVIDIA A100 80GB PCIe" (SrTiO3 5,000 atoms, MD step b/a 0.902 / 0.901) and "NVIDIA A100-SXM4-80GB" (NaCl 8,000 atoms, 0.917 / 0.917), one structure each, after MargrafGroup's Benchmark_loup ran FastMACE on the PCIe card without them. `generic_chunked_conv_backward` stays off there (1.12 with the tables). See `docs/validation/loup-a100.md`.
+**Generic radial tables on the A100 80GB cards (3 November 2026, owner: "Yes go ahead"; conductor):** decision 66's list for `generic_radial_tables` adds "NVIDIA A100 80GB PCIe" (SrTiO3 5,000 atoms, MD step b/a 0.902 / 0.901) and "NVIDIA A100-SXM4-80GB" (NaCl 8,000 atoms, 0.917 / 0.917), one structure each, after MargrafGroup's Benchmark_loup ran FastMACE on the PCIe card without them. `generic_chunked_conv_backward` stays off there (1.12 with the tables). See `docs/validation/omat0/loup-a100.md`.
 
 **The tensor-core fused forward on the A100s, and the A100 80GB PCIe in decision 66 (4 November 2026, owner: "Yes
 to both"; conductor):** the fused folded forward's a.W product runs in 3xTF32 on tensor cores
@@ -3325,9 +3325,9 @@ wprime set (`DECISION_66_GENERIC_WPRIME_GPUS`, with chunked_conv_backward as its
 `SKIP_ZERO_COLUMN_GPUS`: Benchmark_loup there 4.61 -> 3.31 µs/atom/step. See
 `results/omat0-kernel-lab-20261103/README.md` sections 9, 11 and 13.
 
-**Factored wprime backward and mirror species pairs per GPU (4 November 2026, owner: "Turn them on and investigate the failure"; conductor):** decision 66 lists for `wprime_backward.FACTORED` (`FACTORED_GPUS`) and `radial.SYMMETRIC_PAIRS` (`SYMMETRIC_PAIRS_GPUS`): "NVIDIA RTX 4000 Ada Generation" and every A100. FACTORED regroups the wprime backward's trilinear sums (rounding), SYMMETRIC_PAIRS lets mirror species pairs read one table row (bitwise). Benchmark_loup MD step b/a, both orders: FACTORED Ada 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940; SYMMETRIC_PAIRS on top Ada 0.996 / 0.995, A100 0.998 / 0.990. The RTX 5060 Ti was not measured and keeps both off. Force gates pass on the Ada and, with the new defaults, on the A100 for OMAT-0 SrTiO3 and NaCl and MH-1 NaCl, NaNbO3 and NbCl5. The A100 default plan fails OMAT-0 NbCl5 stress with or without them (1.8e-7 eV/Å³ against 1.2–1.5e-7); a bisection traces it to `tf32x3_gemms` and the tensor-core forward together, each alone passing. The owner accepted the excess and kept both (5 November 2026, "keep it its fine"): an accepted exception of the A100 gate, not a reason to switch either off. See `docs/validation/omat0-tp-backward.md`.
+**Factored wprime backward and mirror species pairs per GPU (4 November 2026, owner: "Turn them on and investigate the failure"; conductor):** decision 66 lists for `wprime_backward.FACTORED` (`FACTORED_GPUS`) and `radial.SYMMETRIC_PAIRS` (`SYMMETRIC_PAIRS_GPUS`): "NVIDIA RTX 4000 Ada Generation" and every A100. FACTORED regroups the wprime backward's trilinear sums (rounding), SYMMETRIC_PAIRS lets mirror species pairs read one table row (bitwise). Benchmark_loup MD step b/a, both orders: FACTORED Ada 0.983 / 0.980, A100-SXM4-80GB 0.938 / 0.940; SYMMETRIC_PAIRS on top Ada 0.996 / 0.995, A100 0.998 / 0.990. The RTX 5060 Ti was not measured and keeps both off. Force gates pass on the Ada and, with the new defaults, on the A100 for OMAT-0 SrTiO3 and NaCl and MH-1 NaCl, NaNbO3 and NbCl5. The A100 default plan fails OMAT-0 NbCl5 stress with or without them (1.8e-7 eV/Å³ against 1.2–1.5e-7); a bisection traces it to `tf32x3_gemms` and the tensor-core forward together, each alone passing. The owner accepted the excess and kept both (5 November 2026, "keep it its fine"): an accepted exception of the A100 gate, not a reason to switch either off. See `docs/validation/omat0/omat0-tp-backward.md`.
 
-**The C3 fold for the generic family (5 November 2026, owner: "Yes, port it", then "go ahead"; conductor):** §6.2 and decision 66 amended. Record `generic_fold_product_linear` (field `fold_product_linear`, rounding) folds `products.0.linear` into interaction 1's `linear_up`, `SpeciesSkip` and readout 0's linear on generic models whose first product has no skip term (the density family, MACE-OMAT-0); it needs `block_linear` and `generic_species_skip`. "auto" is on only on `DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`: "NVIDIA RTX 4000 Ada Generation" and every A100. OMAT-0 medium MD step b/a, both orders: Ada 0.9986 / 0.9960 (SrTiO3 5,000 atoms), 0.9911 / 0.9849 (NbCl5 1,944 atoms); A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828. The RTX 5060 Ti was not measured. See `docs/validation/generic-fold-product.md`.
+**The C3 fold for the generic family (5 November 2026, owner: "Yes, port it", then "go ahead"; conductor):** §6.2 and decision 66 amended. Record `generic_fold_product_linear` (field `fold_product_linear`, rounding) folds `products.0.linear` into interaction 1's `linear_up`, `SpeciesSkip` and readout 0's linear on generic models whose first product has no skip term (the density family, MACE-OMAT-0); it needs `block_linear` and `generic_species_skip`. "auto" is on only on `DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`: "NVIDIA RTX 4000 Ada Generation" and every A100. OMAT-0 medium MD step b/a, both orders: Ada 0.9986 / 0.9960 (SrTiO3 5,000 atoms), 0.9911 / 0.9849 (NbCl5 1,944 atoms); A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828. The RTX 5060 Ti was not measured. See `docs/validation/omat0/generic-fold-product.md`.
 
 **Radial tables of degree 5 and the skipped zero column (4 November 2026, owner: "Yes"; conductor):** the float32
 radial tables (MH-1's and the generic family's) are fitted with Chebyshev degree 5 instead of 10
@@ -3349,9 +3349,9 @@ in the rescue ladder after MH-1's `recompute_conv_weights`, with its own allocat
 apply only to MH-1's class. Calibrated on SrTiO3 and NaCl (RTX A4000), NaNbO3 held out (RTX 4000 Ada):
 estimate/reserved 1.00-1.11. OMAT-0 medium limits, default plan, before → after: RTX 4000 Ada SrTiO3 16,875 →
 69,120, NaCl 39,304 → 125,000; RTX 5060 Ti SrTiO3 13,720 → 53,240, NaCl about 27,000 → 85,184. See
-`docs/validation/omat0-capacity.md`. The host batch no longer runs MACE's own neighbour search (its edges were
+`docs/validation/omat0/omat0-capacity.md`. The host batch no longer runs MACE's own neighbour search (its edges were
 replaced unread; every force field, batches otherwise bitwise MACE's own), which lets the tiled path reach 57.0M
-OMAT-0 SrTiO3 atoms on 20 GB with 251 GiB of host memory (`docs/validation/tiled-omat.md`).
+OMAT-0 SrTiO3 atoms on 20 GB with 251 GiB of host memory (`docs/validation/tiled/tiled-omat.md`).
 
 **Decision 67 (29 October 2026, owner: "It should only do this if memory would not be enough"):** rule 12
 (§9.3) turns off the streaming convolution and its dependants only when the plan would not fit with them on and
@@ -3366,4 +3366,4 @@ names the GPU models where same-process A/Bs measured a whole-step speed-up (exa
 **Template ownership (30 October 2026, setup fix F3, conductor):** §7.1 amended. The converted-model templates
 belong to the `LoadedModel`, not to each `ForceField`, so a new composition from the same `fm.load` result copies
 the conversion instead of loading and converting again (about 3.1 s per composition after the first). Isolation
-between plans is unchanged. See `docs/validation/setup-fixes.md`.
+between plans is unchanged. See `docs/validation/capacity/setup-fixes.md`.
