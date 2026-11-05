@@ -20,7 +20,11 @@ note "Modal $(nvidia-smi --query-gpu=name,driver_version,memory.total,compute_ca
 pip freeze 2>/dev/null | grep -i symmetrix >> "$log"
 cu13=$(python -c "import nvidia, os; print(os.path.join(list(nvidia.__path__)[0], 'cu13', 'lib'))")
 shim=/tmp/sx-shim; mkdir -p "$shim"
-ln -sf "$cu13/libnvrtc.so.13" "$shim/libnvrtc.so"  # Symmetrix-XL dlopens an unversioned libnvrtc.so
+# Symmetrix-XL dlopens unversioned libnvrtc.so and libcudart.so (the wheels ship only the .so.13 names).
+for lib in nvrtc cudart cublas cublasLt; do
+  [ -e "$cu13/lib$lib.so.13" ] && ln -sf "$cu13/lib$lib.so.13" "$shim/lib$lib.so"
+done
+ls -l "$shim" >> "$log"
 export LD_LIBRARY_PATH=$shim:$cu13:${LD_LIBRARY_PATH:-} SYMMETRIX_JIT_CACHE=/tmp/sx-jit
 chmod +x "$lmp"
 ldd "$lmp" > "$out/ldd.txt" 2>&1
