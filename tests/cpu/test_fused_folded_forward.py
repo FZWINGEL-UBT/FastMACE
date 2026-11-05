@@ -164,11 +164,11 @@ def test_wgmma_switch_launch_rule_and_source(monkeypatch):
         from fastmace.kernels.oeq_streaming.runtime import compile_cubin
         for layout in ("ir_mul", "mul_ir"):
             assert compile_cubin(ff.render(_schedule(layout), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
-        monkeypatch.setattr(ff, "WGMMA_PIPELINED", True)
-        assert compile_cubin(ff.render(_schedule(), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
             assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule_wgmma(2, 64, 4, 64, **SM90), used=64,
                                            tc=True, vec_a=True, vec_sh=True, wgmma=True, store_w=False), (9, 0),
                                  suffix="a")
+        monkeypatch.setattr(ff, "WGMMA_PIPELINED", True)
+        assert compile_cubin(ff.render(_schedule(), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
 
 
 def test_render_refuses_unsupported_problems():

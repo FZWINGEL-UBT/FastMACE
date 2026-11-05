@@ -69,7 +69,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # prototype was adopted, so neither is a config field (conductor, batch-2 trial merge).
     "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89"},
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted",
-                                              "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of interaction 1's linear; A/B"},
+                                              "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B"},
     "fastmace/integrators/langevin.py": {"NOISE_DRAW_AHEAD": "round 6 noise batch drawn ahead on a thread; A/B"},
     "fastmace/kernels/cutlass/segment_rows.py": {"SEGMENT_ROWS": "block linear rows read and written in place; "
                                                                  "per GPU, A/B"},

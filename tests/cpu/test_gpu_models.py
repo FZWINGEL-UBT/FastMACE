@@ -220,8 +220,9 @@ def test_segment_rows_default(monkeypatch):
 
 def test_h200_defaults():
     """The H200's decision-66 sets (5 November 2026, results/h200-defaults-20261105): every switch its MD-step A/Bs
-    won in both build orders, by exact name; the backward walk (1.0000 / 1.0001) stays off."""
-    from fastmace.kernels.triton import edge_outer_sum
+    won in both build orders, by exact name; the backward walk (1.0000 / 1.0001) stays off. The tabled forward joined
+    after its recapture fix (0.984 / 0.987, results/h200-wgmma-20261105); the wgmma product stays off."""
+    from fastmace.kernels.triton import edge_outer_sum, tabled_outer_sum
     from fastmace.model import energy
     from fastmace.rewrites.generic import modules
 
@@ -232,9 +233,11 @@ def test_h200_defaults():
                    fused_forward.TC_WFRAG_GPUS, wprime_backward.TABLE_W_GPUS, wprime_backward.BLOCK_MESSAGE_GPUS,
                    wprime_backward.FACTORED_GPUS, wprime_backward.HORNER_GPUS, wprime_backward.SCALAR_PATHS_GPUS,
                    wprime_backward.BUTTERFLY_GPUS, energy.HEAD_SLICE_GPUS, energy.GRAPH_SUM_GPUS,
-                   modules.FUSED_FIRST_BACKWARD_GPUS, modules.EDGE_SH_GPUS, radial.SYMMETRIC_PAIRS_GPUS):
+                   modules.FUSED_FIRST_BACKWARD_GPUS, modules.EDGE_SH_GPUS, radial.SYMMETRIC_PAIRS_GPUS,
+                   tabled_outer_sum.TABLED_FORWARD_GPUS):
         assert "NVIDIA H200" in models
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
+    assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows
     assert "NVIDIA H200" not in segment_rows.SEGMENT_ROWS_GPUS  # 1.0006 / 1.0000: no gain
     assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
