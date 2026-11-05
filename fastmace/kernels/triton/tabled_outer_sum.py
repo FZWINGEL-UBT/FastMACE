@@ -37,12 +37,27 @@ FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FO
 FORWARD_WARPS = 1
 
 
+@torch.compiler.assume_constant_result
+def _listed(index: int) -> bool:
+    """Whether CUDA device ``index`` is one of ``TABLED_FORWARD_GPUS``. A compile-time constant for Dynamo: the
+    device name cannot change within a process. Traced as a plain call, ``torch.cuda.get_device_name`` (it returns a
+    str) broke the graph inside ``_TabledOuterSum.forward``; Dynamo then compiled that forward as a frame of its own,
+    and its tracer state (``AutogradFunctionContextVariable``) kept the eager call's ctx, with the saved edge lengths
+    and their autograd graph, in a reference cycle. That graph held the positions' AccumulateGrad of the eager force
+    call (the engine's initial forces, default stream) until the next garbage collection, so a CUDA-graph capture
+    before it failed ("stale reference to the default stream"; ab_rewrites --order ba with a None side built second,
+    H200, 5 November 2026)."""
+    return torch.cuda.get_device_name(index) in TABLED_FORWARD_GPUS
+
+
 def tabled_forward(device):
     """``TABLED_FORWARD`` on ``device``: the constant when set, else on for ``TABLED_FORWARD_GPUS``."""
     if TABLED_FORWARD is not None:
         return bool(TABLED_FORWARD)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in TABLED_FORWARD_GPUS
+    if device.type != "cuda":
+        return False
+    return _listed(device.index if device.index is not None else torch.cuda.current_device())
 
 
 @cache
