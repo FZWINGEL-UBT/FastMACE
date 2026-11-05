@@ -475,7 +475,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [kr-tabled-warps](#kr-tabled-warps) | Tabled outer-sum kernels at 2 warps on the H200 | `tabled_outer_sum.FORWARD_WARPS`, `WARPS` | FM | REJECTED | 2026-11-06 | H200 forward 1.0147 / 1.0168, backward 1.0270 / 1.0295 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-species-cutlass-h200](#kr-species-cutlass-h200) | Species GEMM on the CUTLASS backend on the H200 | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-06 | H200 1.0141 / 1.0175 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-wprime-dsh-zero](#kr-wprime-dsh-zero) | w′: zero dsh rows for edges with out-of-range indices (bug fix) | none | FM | FIXED (`e5280113`) | 2026-11-06 | bitwise for valid edges; latent in production | [kernel review](validation/kernel-review-20261105.md) |
-| [fusion-receiver-local](#fusion-receiver-local) | Receiver-local forward + backward of the last interaction (dout, sh, x on chip; no message store) | none (lab bounds `F-no-out`, `F-smem-*`) | FM | REJECTED as fusion; dout staging OPEN | 2026-11-06 | H200: F-no-out 0.994, w′ F-smem-dout 0.847, F-smem-all 0.863; 5060 Ti 1.015, 0.825, 0.923 | [fusion bound](../results/fusion-bound-20261106/README.md) |
+| [fusion-receiver-local](#fusion-receiver-local) | Receiver-local forward + backward of the last interaction (dout, sh, x on chip; no message store) | none (lab bounds `F-no-out`, `F-smem-*`) | FM | REJECTED (fusion and dout staging) | 2026-11-06 | H200: F-no-out 0.994, w′ F-smem-dout 0.847 (bound), real staging 1.935–1.986, staged layout without fill 1.131; 5060 Ti 1.015, 0.825, 1.464–2.323, 1.373 | [fusion bound](../results/fusion-bound-20261106/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4260,9 +4260,9 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Engine: FM
 - Date/round: 6 November 2026, architecture question after the kernel review
 - What: one kernel per receiver tile running the last interaction's forward, the node-local tail and the backward, so the messages are never stored and `dout`, sh and x stay on chip.
-- Status: REJECTED as a fusion; `dout` staging in w′ OPEN.
+- Status: REJECTED, both the fusion and the `dout` staging in w′ (exact lab variants `stage-dout`, `stage-dout-r0`, `F-stage-dout-nofill`, commit `32aca599`).
 - Measured: H200 (Modal, `1296069d`): forward F-no-out 0.994; w′ F-smem-dout 0.847, F-smem-sh 1.159, F-smem-x 1.252, F-smem-dout-sh 0.878, F-smem-all 0.863. RTX 5060 Ti: 1.015; 0.825, 0.987, 1.005, 0.866, 0.923.
-- Why: the message store and the sh/x reads cost nothing measurable; only the per-edge re-read of the receiver's 20 KB output gradient does (about 7.6 GB per call). That needs staging in w′, not fusion; the receiver-owned backward ([conv-receiver-backward](#conv-receiver-backward)) lost by serialising edges, so staging must keep one edge per warp. Next falsifier: real staging, stop below 5 % of w′ on the H200.
+- Why: the message store and the sh/x reads cost nothing measurable; only the per-edge re-read of the receiver's 20 KB output gradient does (about 7.6 GB per call). That needs staging in w′, not fusion; the receiver-owned backward ([conv-receiver-backward](#conv-receiver-backward)) lost by serialising edges, so staging must keep one edge per warp. The real staging (4-warp blocks, 20–40 KB static shared memory, a barrier per block) measured H200 1.935–1.986 (dsh, dr bitwise), and its read layout alone 1.131: occupancy and the exposed fill, against a stop rule of < 5 % gain. The conductor's FF-dout-one-row (1.001) had already shown the bytes are free.
 - Sources: [fusion bound](../results/fusion-bound-20261106/README.md).
 
 ## Appendix: documentation defects (28 October 2026)

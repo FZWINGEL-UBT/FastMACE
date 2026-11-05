@@ -31,5 +31,28 @@ shared array instead of global memory (values garbage), the forward drops its me
   ([conv-receiver-backward](../../docs/optimisation-ledger.md#conv-receiver-backward)) lost by serialising a receiver's
   edges in one block, so a staging design must keep the edge parallelism. The staging itself (20 KB per receiver, the
   block's shared memory and occupancy) is not in this bound.
-- Next falsifier, if pursued: a w′ variant with real staging (cooperative copy of the block's receivers' `dout` into
-  shared memory, then the same per-warp edge loop); stop below 5 % of w′ on the H200.
+- The conductor's FF-dout-one-row falsifier (ideas round 2, H200, `2472c0e0`: every edge reads receiver 0's row,
+  fully cache-resident) gave 1.001, so the bytes cost nothing; F-smem-dout's gain is load latency or issue (and
+  possibly its 80 instead of 96 registers on the H200), which only a real staging could show.
+
+## Staging measured (commit `32aca599`): stopped
+
+Exact lab variants: the block's (4 warps, 4 receiver-sorted edges) first and last receivers' `dout` rows copied to a
+static shared array once, `__syncthreads`, then one generic pointer per `dout` block chosen per warp (shared row if the
+warp's receiver was staged, global row otherwise). `F-stage-dout-nofill` reads the same layout with real per-receiver
+offsets but skips the copy and the barrier.
+
+| Variant | H200 (`h200-stage/`, about $0.32) | RTX 5060 Ti (`rtx5060ti-stage/`, 9 rounds) |
+| --- | ---: | ---: |
+| w′ base | 1,565 µs | 6,591 µs |
+| F-smem-dout (4 KB array) | 0.848 | 0.821 |
+| stage-dout (2 rows, 40 KB) | **1.986** (dsh, dr bitwise) | 2.323 |
+| stage-dout-r0 (1 row, 20 KB) | **1.935** (dsh, dr bitwise) | 1.464 |
+| F-stage-dout-nofill | **1.131** | 1.373 |
+
+A first version selected the source per read (three-way ternary) and spilled 40–248 bytes on the RTX 5060 Ti
+(2.479 / 1.415 / 1.605); the numbers above use the per-warp pointers. The 20–40 KB of shared memory per 4-warp block
+cuts the resident blocks, and the copy plus barrier exposes the fill latency on every 4 edges. Even without the fill
+the realistic layout is slower than base. **Stop rule (< 5 % of w′ on the H200) not met: dout staging is rejected.**
+A design with larger blocks would need more warps per block than the 96-register cap allows on the H200 (about 21
+resident warps per SM).
