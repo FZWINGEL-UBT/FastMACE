@@ -216,3 +216,23 @@ def test_segment_rows_default(monkeypatch):
         assert segment_rows.segment_rows_default(torch.device("cuda", 0)) is on, name
     monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", False)
     assert not segment_rows.segment_rows_default(torch.device("cuda", 0))
+
+
+def test_h200_defaults():
+    """The H200's decision-66 sets (5 November 2026, results/h200-defaults-20261105): every switch its MD-step A/Bs
+    won in both build orders, by exact name; the backward walk (1.0000 / 1.0001) stays off."""
+    from fastmace.kernels.triton import edge_outer_sum
+    from fastmace.model import energy
+    from fastmace.rewrites.generic import modules
+
+    for models in (fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS, fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS,
+                   fixed.DECISION_66_TF32X3_OMAT0_GPUS, fixed.DECISION_66_GENERIC_WPRIME_GPUS,
+                   fused_forward.TENSOR_CORES_GPUS, fused_forward.VEC_SH_GPUS, fused_forward.VEC_A_GPUS,
+                   fused_forward.TC_WFRAG_GPUS, wprime_backward.TABLE_W_GPUS, wprime_backward.BLOCK_MESSAGE_GPUS,
+                   wprime_backward.FACTORED_GPUS, wprime_backward.HORNER_GPUS, wprime_backward.SCALAR_PATHS_GPUS,
+                   wprime_backward.BUTTERFLY_GPUS, energy.HEAD_SLICE_GPUS, energy.GRAPH_SUM_GPUS,
+                   modules.FUSED_FIRST_BACKWARD_GPUS, modules.EDGE_SH_GPUS, radial.SYMMETRIC_PAIRS_GPUS):
+        assert "NVIDIA H200" in models
+    assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
+    assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
+    assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured

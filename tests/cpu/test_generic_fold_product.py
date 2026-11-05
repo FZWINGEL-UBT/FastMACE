@@ -127,7 +127,8 @@ def test_the_planner_keeps_the_generic_fold_to_measured_gpus(monkeypatch):
     from fastmace.planner import fixed
 
     # Decision 66 (5 November 2026): "auto" on for the generic family on the measured GPUs only.
-    assert fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS == ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB")
+    assert fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS == ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
+                                                     "NVIDIA H200")
     assert "NVIDIA A100 80GB PCIe" in fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS  # every A100 model
     assert GPU.name not in fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS
     unmeasured = plan_for("omat0-medium")

@@ -79,8 +79,10 @@ FIRST_TABLE_COLUMNS = False
 # (0.966 / 0.962, 0.970 / 0.982), its NbCl5 stress error 1.55-1.60e-7, under the default plan's accepted 1.8e-7
 # (docs/validation/omat0-a100-optimisations.md).
 FUSED_FIRST_BACKWARD = None
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.051 / 1.052 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
-                                       "NVIDIA A100-SXM4-80GB"))
+                                       "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 
 
 def fused_first_backward(device):
@@ -331,8 +333,10 @@ SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generati
 # NbCl5 stress exception as before): RTX 5060 Ti 0.985 / 0.961, 0.990 / 0.993; RTX 4000 Ada 0.989 / 0.987,
 # 0.998 / 0.997; A100 80GB PCIe 0.983 / 0.985, 0.995 / 0.988 (results/round5-20261105).
 EDGE_SH = None
+# NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.019 / 1.018 (b = off; OMAT-0 medium,
+# SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 EDGE_SH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
-                          "NVIDIA A100 80GB PCIe"))
+                          "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 
 
 def edge_sh_default(device=None):
