@@ -4280,3 +4280,11 @@ here.
 - Measured: w′ kernel ratio, B-mirror-order H200 0.887–0.899, A100-SXM4 0.852 / 0.961 (two cards), RTX 5060 Ti 0.894; M-mirror-perm H200 0.947 / 0.953, A100 1.038 / 1.057, RTX 5060 Ti 0.852–0.855 (dsh, dL/dr bitwise); B-mirror-share adds nothing beyond the order. 0.56 % of the edges have no mirror. Degree 4 tables need about three times the pieces of degree 5 and still pad to 6 terms; degree 3 hits the piece cap. Tile rule ≤ 5.6 µs on the H200.
 - Open: mirror-ordered w′ inputs (gather sh per force call, scatter dsh and dL/dr back, permutation per neighbour-list rebuild): about 160 µs kernel gain minus about 35 µs of copies on the H200 (≈ 2 % of the step).
 - Sources: [research answers](../results/research-answers-20261105/README.md).
+
+### ideas-r2: de-phased forward warps, receiver-staged dout, the W split stored once (6 November 2026)
+
+- Date/round: the ideas session's revised H200 plan, ideas 10–13 (`2472c0e0`, `614f4779`, `7e4da9e9`).
+- What: lab falsifiers F-skew (bitwise), FF-dout-one-row, F-wfrag-no-wsplit; `fused_forward.TC_WFRAG_SPLIT` (the wfrag W slice stored split, two float4 per lane, bitwise; lab `tc-wfrag-split`).
+- Status: de-phasing and receiver-staged dout DROPPED at their bounds; TC_WFRAG_SPLIT REJECTED (off); W-stationary wgmma and 16-edge batches dead on register counts.
+- Measured (H200 kernel lab, OMAT-0 medium, SrTiO3 10×10×10): F-skew 1.094–1.114; FF-dout-one-row 1.001; F-wfrag-no-wsplit 0.853; TC_WFRAG_SPLIT 1.070 with the plan's launch rule (12 warps, 224 KB shared). The forward is limited by shared-memory loads, not by the split's ALU work.
+- Sources: [research answers](../results/research-answers-20261105/README.md#ideas-session-revised-h200-plan-6-november-2026).
