@@ -150,7 +150,13 @@ def test_wgmma_switch_launch_rule_and_source(monkeypatch):
     assert "wgmma.mma_async.sync.aligned.m64n64k8.f32.tf32.tf32" in source and "bar.red.or.pred" in source
     assert "constexpr int AW = KP + 4;" in source
     assert "wgmma_n64(d, al[ks], gmma_desc(bh_addr + 256 * ks), ks > 0);" in source
-    assert "mma.sync" not in source
+    kernel = source.split('extern "C"')[-1]
+    assert "mma_tf32(" not in kernel
+    monkeypatch.setattr(ff, "WGMMA_PIPELINED", True)
+    piped = ff.render(_schedule(), 9, small, tc=True, wgmma=True)
+    assert piped != source and "if (pend) {" in piped and "const int64_t e0 = pew + 0;" in piped
+    assert "mma_tf32(" not in piped.split('extern "C"')[-1]
+    monkeypatch.setattr(ff, "WGMMA_PIPELINED", False)
     with pytest.raises(ValueError, match="wgmma"):
         ff.render(_schedule(), 9, small, tc=False, wgmma=True)
     from fastmace.kernels import nvrtc_available
@@ -158,6 +164,8 @@ def test_wgmma_switch_launch_rule_and_source(monkeypatch):
         from fastmace.kernels.oeq_streaming.runtime import compile_cubin
         for layout in ("ir_mul", "mul_ir"):
             assert compile_cubin(ff.render(_schedule(layout), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
+        monkeypatch.setattr(ff, "WGMMA_PIPELINED", True)
+        assert compile_cubin(ff.render(_schedule(), 9, small, tc=True, wgmma=True), (9, 0), suffix="a")
             assert compile_cubin(ff.render(_schedule(layout), 65, ff.launch_rule_wgmma(2, 64, 4, 64, **SM90), used=64,
                                            tc=True, vec_a=True, vec_sh=True, wgmma=True, store_w=False), (9, 0),
                                  suffix="a")
