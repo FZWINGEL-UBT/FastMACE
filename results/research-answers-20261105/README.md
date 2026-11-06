@@ -537,3 +537,56 @@ the stalls by SASS line; base, part 0 only, part 1 only):
 None reaches the plan's 0.97 bar. The persistent grid loses the hardware's block balancing.
 
 Runs: `runs/round9/` (`r9-lab-h200`, `r9-ncu`, `wp9-h200`, `wp9-a100`, `x9-h200`, `x9-a100`, `ord-h200`, `ord-a100`, `sxm9-b`).
+
+### Round 11: x gathers after the k-loop (`X_LATE`), adopted; stage-ahead rejected (6 November 2026)
+
+**`X_LATE` (idea 27) is default on the H200 and the A100-SXM4.**
+
+- **What it does:** with W_GROUP the x gathers and their index shuffles sat in the staging, so x and the receivers
+  stayed live in registers through the whole k-loop, although only the TP reads them. X_LATE moves them to just
+  before the C-write barrier, after the k-loop. That frees about 6 registers and shortens the k-loop's waits.
+- **`K_PIPE`** loads the next k-step's a values and first W fragment one k-step ahead.
+- **Accuracy:** bitwise (GPU test, both switches and together; and in the lab on both GPUs).
+- **Built as** `fused_forward.X_LATE` / `K_PIPE` (`X_LATE_GPUS`, `K_PIPE_GPUS`): text transforms of the W_GROUP
+  render, with checked pattern counts. Where the patterns do not apply (no W_GROUP; K_PIPE without VEC_A; A_SPLIT),
+  the kernel is built without them.
+- **Lab** (round-11 variants from `tools/lab_round11.py`, written by the ideas session; base = the plan):
+
+  | Variant | H200 | A100-SXM4 |
+  | --- | ---: | ---: |
+  | xlate | 0.970, 0.961 (two jobs) | 0.961 |
+  | xlate-kp | 0.977 | 0.958 |
+  | xlate-kpk4 (unrolled by 4) | 0.983 | 0.986 |
+  | xmid (gathers before the last two k-steps) | 0.998 | spills on sm_80, not run |
+  | xmid-kp | 0.994 | spills on sm_80, not run |
+
+- **MD-step A/Bs** (SrTiO3 10×10×10, commit `d74ca073`, b = switch on):
+
+  | GPU | Switch | b/a, order ab | b/a, order ba |
+  | --- | --- | ---: | ---: |
+  | H200 | X_LATE | 0.9884 | 0.9882 |
+  | H200 | X_LATE + K_PIPE | 0.9934 | 0.9927 |
+  | A100-SXM4 | X_LATE | 0.9937 | 0.9937 |
+  | A100-SXM4 | X_LATE + K_PIPE | 0.9910 | 0.9920 |
+
+  X_LATE + K_PIPE is faster on the A100-SXM4 than X_LATE alone by this table; K_PIPE on top of X_LATE has its
+  own A/B (below, when run). K_PIPE stays off; on the H200 it is slower than X_LATE alone.
+- **CPU suite** on leto at `fc0d7531`: 5150 passed, 202 skipped.
+- **Commit:** `fc0d7531` (branch `fastmace/round11-lab`).
+
+**Stage-ahead (idea 26) is rejected.** It copies the next batch's a, sh and indices by cp.async while the current
+batch computes, with two sh buffers and two index halves per warp (+13,824 B of shared memory). On the H200 it is
+bitwise but slower, and it spills:
+
+| Variant (H200, base 1608.1 µs) | Spill | Ratio |
+| --- | ---: | ---: |
+| stage-ahead | 24 B | 1.033 |
+| stage-ahead-noidx (a and sh only) | 48 B | 1.012 |
+| stage-ahead-xlate-kpk4 | 48 B | 1.032 |
+| stage-ahead-xmid-kp | 48 B | 1.034 |
+
+The first stage-ahead job died with CUDA_ERROR_ILLEGAL_ADDRESS. The transforms had dropped the source text that the
+lab's launcher reads to recognise VEC_A's padded a rows, so the lab passed a compacted a and the kernel read past it.
+`tools/lab_round11.py` now refuses any variant that loses that text.
+
+Runs: `runs/round11/` (`r11-h200` (the crash), `r11-a100`, `r11b-h200`, `r11c-h200`, `ab27-h200-a`, `ab27-a100-a`).

@@ -1,0 +1,22 @@
+2026-11-06T06:22:30Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; alias NVIDIA H200=NVIDIA H200; source daa8e9d193b18bc15e3556d430dc3e86d982bff2
+2026-11-06T06:22:30Z start lab-forward
+2026-11-06T06:23:50Z end lab-forward exit=1 
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas xlate                        {'9.0': {'registers': 162, 'spill_store_bytes': 0}}
+forward ptxas xlate-kp                     {'9.0': {'registers': 163, 'spill_store_bytes': 0}}
+forward ptxas xlate-kpk4                   {'9.0': {'registers': 164, 'spill_store_bytes': 0}}
+forward ptxas xmid                         {'9.0': {'registers': 164, 'spill_store_bytes': 0}}
+forward ptxas xmid-kp                      {'9.0': {'registers': 161, 'spill_store_bytes': 0}}
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas stage-ahead                  {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas stage-ahead-noidx            {'9.0': {'registers': 167, 'spill_store_bytes': 0}}
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas stage-ahead-xlate-kpk4       {'9.0': {'registers': 167, 'spill_store_bytes': 0}}
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas stage-ahead-xmid-kp          {'9.0': {'registers': 164, 'spill_store_bytes': 0}}
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+stage-ahead rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=188928) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+2026-11-06T06:23:50Z done
