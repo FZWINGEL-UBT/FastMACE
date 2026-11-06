@@ -31,9 +31,15 @@ sh buffer would have to go into r_s's padding, a form that is not built.
 - ``stage-ahead-noidx``: a and sh only (the indices loaded and shuffled as today);
 - ``stage-ahead-xlate-kpk4`` and ``stage-ahead-xmid-kp``: 26 with 27's two best.
 
+The lab's forward_launcher tells padded rows of a (VEC_A) from the source text ``_R11_VEC_A``; every variant keeps
+it (checked). The first version's stage-ahead forms lost it, so the lab gave them a compacted a with KA-float rows
+while they read AS-float rows: reads past its end, CUDA_ERROR_ILLEGAL_ADDRESS on the H200 (6 November 2026). Since
+then their copies keep the staging's text (a copy past the batch reads nothing and names the array's start).
+
 CPU check (no GPU, no torch): ``python -I lab_round11.py RENDER.cu OUTDIR`` writes every variant that applies to
-RENDER into OUTDIR and says why the others do not apply. On round 9's H200 render (``base.cu``) the outputs are byte
-for byte the ``r11_*.cu`` of this folder and the ``r10_sa4*.cu`` of ``h200-ideas-round10-cpu/``.
+RENDER into OUTDIR and says why the others do not apply. On round 9's H200 render (``base.cu``) the idea-27 outputs
+are byte for byte the ``r11_*.cu`` of this folder; the stage-ahead outputs differ from ``r10_sa4*.cu``
+(``h200-ideas-round10-cpu/``) and ``r11_sa4_*.cu`` only in the copies' source expressions.
 """
 import dataclasses
 import re
@@ -46,6 +52,24 @@ def _r11_sub(source, old, new, count=None):
     if not found or (count is not None and found != count):
         raise ValueError(f"round-11 variant pattern found {found} times: {old[:80]!r}")
     return source.replace(old, new)
+
+
+# The lab's forward_launcher reads a variant's source for this text to tell rows of a padded to AS floats (VEC_A)
+# from rows of KA floats; without it the lab passes a compacted copy of a (KA floats per row), and a kernel that
+# reads AS-float rows then reads past its end (the first stage-ahead, 6 November 2026: CUDA_ERROR_ILLEGAL_ADDRESS
+# on the H200). Every variant must keep the text if the render has it.
+_R11_VEC_A = "reinterpret_cast<const float4*>(a + (e0 + b) * AS)"
+
+
+def _r11_guard(transform):
+    """``transform``, refusing a result that lost the render's VEC_A text (``_R11_VEC_A``)."""
+    def guarded(s):
+        out = transform(s)
+        if _R11_VEC_A in s and _R11_VEC_A not in out:
+            raise ValueError("round-11 variant lost the text the lab's forward_launcher reads as VEC_A "
+                             f"({_R11_VEC_A}); the lab would pass a compacted a")
+        return out
+    return guarded
 
 
 # ------------------------------------------------------------------------------------- idea 27: the k-loop's chains
@@ -206,25 +230,28 @@ _R11_SH_NEXT = "(xb + (par ^ 1) * (B * ED))"
 
 
 def _r11_copies(e1, nb1, shb, ind):
-    """cp.async of a batch's a tile (into a_s, swizzled as today's staging) and its sh (into ``shb``)."""
+    """cp.async of a batch's a tile (into a_s, swizzled as today's staging) and its sh (into ``shb``). A copy past the
+    batch reads nothing (src-size 0) and names the array's start as its source. With ``e1 = "e0"`` the a source is
+    the staging's own text, ``_R11_VEC_A``, which the lab's ``forward_launcher`` reads as VEC_A."""
     return (f"{ind}for (int i = lane; i < B * (KP / 4); i += 32) {{\n"
             f"{ind}    const int b = i / (KP / 4), q = i - b * (KP / 4);\n"
             f"{ind}    cp_async16(&a_s[b * KP + ((q ^ b) << 2)],\n"
-            f"{ind}               reinterpret_cast<const float4*>(a + ({e1} + (b < {nb1} ? b : 0)) * AS) + q, "
-            f"b < {nb1});\n"
+            f"{ind}               b < {nb1} ? reinterpret_cast<const float4*>(a + ({e1} + b) * AS) + q\n"
+            f"{ind}                         : reinterpret_cast<const float4*>(a), b < {nb1});\n"
             f"{ind}}}\n"
             f"{ind}for (int i = lane; i < B * ED / 4; i += 32)\n"
-            f"{ind}    cp_async16({shb} + 4 * i, reinterpret_cast<const float4*>(sh + {e1} * ED) + "
-            f"(4 * i / ED < {nb1} ? i : 0),\n"
-            f"{ind}               4 * i / ED < {nb1});\n")
+            f"{ind}    cp_async16({shb} + 4 * i,\n"
+            f"{ind}               4 * i / ED < {nb1} ? reinterpret_cast<const float4*>(sh + {e1} * ED) + i\n"
+            f"{ind}                                 : reinterpret_cast<const float4*>(sh), 4 * i / ED < {nb1});\n")
 
 
 def _r11_idx_copy(e1, nb1, dst, ind):
-    """cp.async of a batch's receivers (lanes 0..B-1) and senders (lanes B..2B-1) into ``dst``."""
+    """cp.async of a batch's receivers (lanes 0..B-1) and senders (lanes B..2B-1) into ``dst``; past the batch, or in
+    a tail chunk, nothing is read (src-size 0, the receivers' start as the source)."""
     return (f"{ind}if (lane < 2 * B) {{\n"
             f"{ind}    const int j = lane & (B - 1);\n"
-            f"{ind}    cp_async4({dst} + lane, (lane < B ? receivers : senders) + {e1} + (j < {nb1} ? j : 0),\n"
-            f"{ind}              j < {nb1} && !tail);\n"
+            f"{ind}    const bool on = j < {nb1} && !tail;\n"
+            f"{ind}    cp_async4({dst} + lane, on ? (lane < B ? receivers : senders) + {e1} + j : receivers, on);\n"
             f"{ind}}}\n")
 
 
@@ -236,11 +263,10 @@ def _r11_stage_new(idx):
          "                    sh_s = xb + par * (B * ED);\n")
     if idx:
         s += "                    idx_s = ib + par * (2 * B);\n"
-    s += ("                    if (!staged) {\n"
-          "                    const int64_t es = nb > 0 ? e0 : 0;\n"
-          + _r11_copies("es", "nb", "sh_s", ind))
+    s += ("                    if (!staged) {  // nb == 0 (done): zero-filled, nothing read\n"
+          + _r11_copies("e0", "nb", "sh_s", ind))
     if idx:
-        s += _r11_idx_copy("es", "nb", "idx_s", ind)
+        s += _r11_idx_copy("e0", "nb", "idx_s", ind)
     s += (f"{ind}cp_async_commit();\n"
           "                    }\n"
           "                    staged = false;\n"
@@ -358,18 +384,18 @@ def _r11_chain(*steps):
 def round11_variants(kernel=None, rules=None):
     """name -> (kind, source transform, extra NVRTC options) for the lab's ``forward_variants``. ``kernel`` (the
     plan's FusedFoldedForward) and the lab's ``_RULES`` are needed by the stage-ahead variants only, when they run."""
-    return {
-        "xlate": ("exact", _r11_xlate, ()),
-        "xlate-kp": ("exact", _r11_chain(_r11_kpipe, _r11_xlate), ()),
-        "xlate-kpk4": ("exact", _r11_chain(_r11_kpipe, _r11_ku4, _r11_xlate), ()),
-        "xmid": ("exact", _r11_xmid, ()),
-        "xmid-kp": ("exact", _r11_chain(_r11_kpipe, _r11_xmid), ()),
-        "stage-ahead": ("exact", _r11_stage_ahead(kernel, rules, True), ()),
-        "stage-ahead-noidx": ("exact", _r11_stage_ahead(kernel, rules, False), ()),
-        "stage-ahead-xlate-kpk4": ("exact", _r11_stage_ahead(kernel, rules, True,
-                                                             _r11_chain(_r11_xlate, _r11_kpipe, _r11_ku4)), ()),
-        "stage-ahead-xmid-kp": ("exact", _r11_stage_ahead(kernel, rules, True, _r11_chain(_r11_kpipe, _r11_xmid)), ()),
+    variants = {
+        "xlate": _r11_xlate,
+        "xlate-kp": _r11_chain(_r11_kpipe, _r11_xlate),
+        "xlate-kpk4": _r11_chain(_r11_kpipe, _r11_ku4, _r11_xlate),
+        "xmid": _r11_xmid,
+        "xmid-kp": _r11_chain(_r11_kpipe, _r11_xmid),
+        "stage-ahead": _r11_stage_ahead(kernel, rules, True),
+        "stage-ahead-noidx": _r11_stage_ahead(kernel, rules, False),
+        "stage-ahead-xlate-kpk4": _r11_stage_ahead(kernel, rules, True, _r11_chain(_r11_xlate, _r11_kpipe, _r11_ku4)),
+        "stage-ahead-xmid-kp": _r11_stage_ahead(kernel, rules, True, _r11_chain(_r11_kpipe, _r11_xmid)),
     }
+    return {name: ("exact", _r11_guard(transform), ()) for name, transform in variants.items()}
 
 
 def _r11_main(argv):
