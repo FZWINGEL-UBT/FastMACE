@@ -97,11 +97,20 @@ image = (
 # Defined only with FASTMACE_MODAL_SX=1 (set in the shell for sx_job, and in the image), so that ordinary jobs never
 # build this image.
 SX = os.environ.get("FASTMACE_MODAL_SX") == "1"
-SX_VERSION = "0.1.1"
+# FASTMACE_SX_VERSION selects the release (0.1.1 for the 5 November runs, 0.1.2 since 6 November). The image also
+# carries Nsight Systems' CLI (NVIDIA's Ubuntu 24.04 CUDA repository) for per-kernel profiles of the LAMMPS run.
+SX_VERSION = os.environ.get("FASTMACE_SX_VERSION", "0.1.2")
 SX_WHEEL_ARCH = "sm90"
 sx_image = (
     modal.Image.from_registry("ubuntu:24.04", add_python="3.12")
-    .apt_install("libblas3", "libgomp1", "zlib1g", "procps")
+    .apt_install("libblas3", "libgomp1", "zlib1g", "procps", "wget", "gnupg", "ca-certificates")
+    .run_commands(
+        "wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb"
+        " && dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb && apt-get update"
+        " && apt-get install -y --no-install-recommends"
+        " $(apt-cache search --names-only '^nsight-systems-20[0-9.]*$' | cut -d' ' -f1 | sort -V | tail -n 1)"
+        " && ln -sf $(ls -d /opt/nvidia/nsight-systems/*/bin/nsys | sort -V | tail -n 1) /usr/local/bin/nsys"
+        " && nsys --version")
     .pip_install(f"symmetrix-xl=={SX_VERSION}", f"symmetrix-xl-cuda13-{SX_WHEEL_ARCH}=={SX_VERSION}", "ase==3.27.0",
                  "numpy")
     .env({"PYTHONDONTWRITEBYTECODE": "1", "FASTMACE_MODAL_SX": "1"})

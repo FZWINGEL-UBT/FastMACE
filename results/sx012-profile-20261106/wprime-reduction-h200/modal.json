@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "d599cc7085c8fabc2b2443891197a2276dc2b60b",
+  "command": "python tools/omat0_kernel_lab.py --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --kernels wprime --rounds 15 --ptxas-archs 9.0 --constant fastmace.kernels.oeq_streaming.wprime_backward:BUTTERFLY=False --variants base butterfly F-no-reduce F-cart3 F-redux16 F-cart3-redux redux --output $OUT/lab-wprime > $OUT/lab-wprime.log 2>&1",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 100.64256453514099,
+  "estimated_gpu_cost_usd": 0.12692145638598334
+}

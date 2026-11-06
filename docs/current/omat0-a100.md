@@ -391,6 +391,14 @@ streamed whole-system mode and a tiled capacity mode. They are built in opposite
 [loup-a100.md](../validation/omat0/loup-a100.md) and `RM:LT/studies/symmetrix_xl/README.md`. They were measured before the 4 November kernels
 and are not repeated here.
 
+**Version 0.1.2 on the H200 (6 November 2026,
+[sx012-profile-20261106](../../results/sx012-profile-20261106/README.md)).** On Benchmark_loup, Symmetrix-XL 0.1.2
+takes 14.5–14.7 ms per Langevin step against FastMACE's 5.72 ms, so FastMACE is 2.54x faster. Its Nsight profile puts
+6.4 ms in interaction 1 and 3.9 ms in the interaction 2 backward, both much slower than ours. Its interaction 2
+forward (952 µs: one thread per receiver and channel, w from cubic Hermite splines, no tensor cores) beats our
+3xTF32 forward (1,623 µs). The same idea in our forward, with each edge reading its real slab of our value table,
+was 21 % slower than production on the H200 (kernel-lab bound `simt-slab-edges`), so we did not take it.
+
 ```mermaid
 flowchart LR
   subgraph SX["Symmetrix-XL"]
