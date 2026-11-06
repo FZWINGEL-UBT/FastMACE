@@ -162,7 +162,7 @@ W_GROUP = None
 # Only the TABLE_W block message (``_WPrimeBlockConvolution``) of a model whose radial rows are symmetric in the pair,
 # with the skin list; ignored elsewhere. None: on for OWNER_PASS_GPUS (decision 66); True / False: an A/B side's choice.
 OWNER_PASS = None
-OWNER_PASS_GPUS = GPUModels(())
+OWNER_PASS_GPUS = GPUModels(("NVIDIA H200",))  # gate trial only
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
