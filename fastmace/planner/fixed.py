@@ -421,6 +421,23 @@ DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.068 / 1.069 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe", "NVIDIA H200"))
+# MACE-OFF and POLAR-1 on the A100 (branch fastmace/off-polar-alex, 6 November 2026; owner: "bring all mace off and
+# mace polar models up to current speeds ... fastest speed on a100"): MD step b/a in both build orders, NHR@FAU Alex
+# NVIDIA A100-SXM4-80GB, b = tf32x3_gemms on (results/off-polar-alex-20261106). OFF: water_216 (648 atoms); force
+# gates on the organic set pass (paracetamol stress 1.95-1.99 of 2 for OFF23 medium and large). OFF23-small is not
+# here: its gate fails (paracetamol forces 2.19, default 1.36); it takes grouped_launch instead.
+DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
+    "off23-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9677 / 0.9657
+    "off23-large": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9667 / 0.9634
+    "off23b-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9795 / 0.9760
+    "off24-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9797 / 0.9805
+})
+# grouped_launch outside the generic family (decision 57) where measured (exact): OFF23-small on the A100-SXM4-80GB
+# 0.9889 / 0.9953 (water_216; results/off-polar-alex-20261106). OFF23-large loses (1.0083 / 1.0092); the other OFF
+# models win too (0.988-0.995) but take tf32x3_gemms, which reroutes the same products and is faster.
+DECISION_66_GROUPED_LAUNCH_MODEL_GPUS = MappingProxyType({
+    "off23-small": GPUModels(("NVIDIA A100-SXM4-80GB",)),
+})
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
@@ -1286,6 +1303,9 @@ class FixedPlanner:
             name = getattr(hardware, "name", None)
             if _mh1(model_label) and name in DECISION_66_GROUPED_LAUNCH_GPUS:
                 v["_why"]["grouped_launch"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            elif name in DECISION_66_GROUPED_LAUNCH_MODEL_GPUS.get(model_label, ()):
+                v["_why"]["grouped_launch"] += (f"; stage 2: on, {model_label} measured on this GPU, decision 66 "
+                                                f"({name})")
             else:
                 reason = (f"not the generic MACE family, decision 57 (interactions "
                           f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
@@ -1297,8 +1317,11 @@ class FixedPlanner:
         if v["tf32x3_gemms"] and "tf32x3_gemms" not in explicit:
             # Decision 66: measured faster for these models on these GPU models only, matched by exact name.
             name = getattr(hardware, "name", None)
-            measured = _mh1(model_label) or model_label in DECISION_66_TF32X3_LABELS
-            if name in DECISION_66_TF32X3_OMAT0_GPUS and model_label in DECISION_66_TF32X3_LABELS:
+            measured = (_mh1(model_label) or model_label in DECISION_66_TF32X3_LABELS
+                        or model_label in DECISION_66_TF32X3_MODEL_GPUS)
+            if model_label in DECISION_66_TF32X3_MODEL_GPUS:
+                gpus = DECISION_66_TF32X3_MODEL_GPUS[model_label]
+            elif name in DECISION_66_TF32X3_OMAT0_GPUS and model_label in DECISION_66_TF32X3_LABELS:
                 gpus = DECISION_66_TF32X3_GPUS + DECISION_66_TF32X3_OMAT0_GPUS
             else:
                 gpus = DECISION_66_TF32X3_GPUS

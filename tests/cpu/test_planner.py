@@ -1159,3 +1159,30 @@ def test_decision_65_explicit_requests_override(monkeypatch):
     assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == "dynamic"
     with pytest.raises(PlanRefused, match="w-tables|needs float64"):
         float64_plan(monkeypatch, ADA, dtype="float32", rewrites=RewriteConfig(w_tables="on"))
+
+
+def test_decision_66_mace_off_on_the_a100():
+    """MACE-OFF on the A100 (fastmace/off-polar-alex, 6 November 2026): tf32x3_gemms is on for OFF23 medium and
+    large, OFF23b medium and OFF24 medium (their force gates pass); OFF23-small fails its gate and takes
+    grouped_launch instead (exact). Every A100 model; never on another GPU."""
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+    def plan(hardware, label, **configs):
+        return planner(engine=EngineConfig(), **configs).plan(traits(label), nacl(), IntegratorConfig(), hardware,
+                                                              model_label=label)
+
+    for hardware in (a100_80, A100):
+        for label in ("off23-medium", "off23-large", "off23b-medium", "off24-medium"):
+            p = plan(hardware, label)
+            assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("on", "off"), (label, hardware.name)
+            assert f"{label} on a measured GPU, decision 66 ({hardware.name})" in \
+                decision(p, "RewriteConfig.tf32x3_gemms")[2]
+        p = plan(hardware, "off23-small")
+        assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("off", "on"), hardware.name
+        assert dict(p.auto_options_off)["tf32x3_gemms"] == "not a measured model, decision 66 (label off23-small)"
+    for hardware in (GPU, ADA, L4):
+        for label in ("off23-small", "off23-medium", "off24-medium"):
+            p = plan(hardware, label)
+            assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("off", "off"), (label, hardware.name)
+    p = plan(a100_80, "off23-medium", precision=PrecisionConfig(dtype="float64"))
+    assert p.rewrites.tf32x3_gemms == "off"
