@@ -76,6 +76,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                  "SEGMENT_GROUPED": "every block in one launch; per GPU, A/B"},
     "fastmace/kernels/cutlass/linear_div.py": {"LINEAR_DIV": "idea 31: linear / (d + 1) in the epilogue; per GPU, A/B"},
     "fastmace/kernels/cutlass/first_div.py": {"FIRST_DIV": "idea 31: first-interaction blocks / (d + 1); per GPU, A/B"},
+    "fastmace/kernels/cutlass/skip_select.py": {"SKIP_SELECT": "idea 31: species-skip selection in the epilogue; A/B"},
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.

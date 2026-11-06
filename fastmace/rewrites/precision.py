@@ -51,6 +51,11 @@ def route(model):
 
             module.first_div = (module.tf32x3_backend == "cutlass"
                                 and first_div.first_div_default(torch.cuda.get_device_name(device)))
+        if type(module).__name__ == "SpeciesSkip":  # idea 31: kernels.cutlass.skip_select
+            from fastmace.kernels.cutlass import skip_select
+
+            module.skip_select = (module.tf32x3_backend == "cutlass"
+                                  and skip_select.skip_select_default(torch.cuda.get_device_name(device)))
         if type(module).__name__ == "BlockLinear" and module.tf32x3_backend == "cutlass":
             from fastmace.kernels.cutlass import linear_div, segment_rows
 

@@ -325,6 +325,12 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         message = divided if divided is not None else self.linear(message) / (density + 1)
     if kind == "density":
         message = self.skip_tp(message, node_attrs)
+        if getattr(self.skip_tp, "skip_select", False):  # idea 31: the epilogue stored the joined [n, width] tensor
+            from fastmace.rewrites.linear.modules import reshape_view
+
+            view = reshape_view(self.reshape, message)
+            if view is not None:
+                return view, None
         return self.reshape(message), None
     sc = self.truncate_ghosts(sc, n_real)
     if divided is not None:  # the epilogue's output is reshape_irreps' [n, irreps, mul] tensor already
@@ -449,6 +455,7 @@ class SpeciesSkip(torch.nn.Module):
             self.register_buffer(f"wt{index}", weight.transpose(1, 2).contiguous(), persistent=False)
             self.pairs.append((i, j))
         self.tf32x3 = False  # tf32x3_gemms: the products as 3xTF32 (OPT4-T03)
+        self.skip_select = False  # idea 31 (kernels.cutlass.skip_select), set by precision.route
         # SPECIES_GEMM None: the device's default, fixed when the module is built on it
         self.species_gemm_gpu = (columns.is_cuda and torch.cuda.get_device_name(columns.device) in SPECIES_GEMM_GPUS)
 
@@ -459,6 +466,36 @@ class SpeciesSkip(torch.nn.Module):
             return block.reshape(x.shape[0], dim // mul, mul)
         return block.reshape(x.shape[0], mul, dim // mul).transpose(1, 2)
 
+    def _select_layout(self):
+        """Whether ``kernels.cutlass.skip_select`` can join the products: ir_mul, one product per output block, the
+        blocks side by side from column 0 (static: no graph break)."""
+        if self.layout != "ir_mul" or sorted(j for _, j in self.pairs) != list(range(len(self.segments_out))):
+            return False
+        offset = 0
+        for start, _, dim in self.segments_out:
+            if start != offset:
+                return False
+            offset += dim
+        return True
+
+    def _selected(self, x1, blocks_in, onehot):
+        """The skip through ``tf32x3_skip_select`` (each product's own-species columns stored into the joined
+        output by the epilogue), or None where it does not apply."""
+        from fastmace.kernels.cutlass import skip_select
+
+        atoms = onehot.shape[0]
+        lefts, weights, offsets = [], [], []
+        for index, (i, j) in enumerate(self.pairs):
+            xi = blocks_in[i] if blocks_in is not None else self._view(x1, self.segments_in[i])
+            lefts.append(xi.reshape(atoms * xi.shape[1], -1))
+            weights.append(getattr(self, f"w{index}"))
+            offsets.append(self.segments_out[j][0])
+        width = self.segments_out[-1][0] + self.segments_out[-1][2]
+        if not skip_select.applies(lefts, weights, onehot, offsets, width):
+            return None
+        kind = onehot.argmax(dim=1).to(torch.int32)
+        return skip_select.tf32x3_skip_select(lefts, weights, onehot, kind, offsets, width)
+
     def forward(self, x1, x2):
         onehot = x2[:, self.columns]  # [atoms, species]
         atoms, species = onehot.shape
@@ -467,6 +504,10 @@ class SpeciesSkip(torch.nn.Module):
         x1 = x1[0] if blocks_in is not None else x1
         on = self.species_gemm_gpu if SPECIES_GEMM is None else SPECIES_GEMM
         grouped = on and x1.is_cuda and x1.dtype == torch.float32
+        if not grouped and self.tf32x3 and self.skip_select and self._select_layout():
+            selected = self._selected(x1, blocks_in, onehot)
+            if selected is not None:
+                return selected
         if grouped:
             from fastmace.kernels.triton.species_gemm import species_mm, species_plan
             kind = onehot.argmax(dim=1)
