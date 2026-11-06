@@ -46,6 +46,11 @@ def route(model):
         device = tensor.device if tensor is not None else torch.device("cpu")
         module.tf32x3 = True
         module.tf32x3_backend = backend(device)
+        if type(module).__name__ == "FirstInteractionReassociation":  # idea 31: kernels.cutlass.first_div
+            from fastmace.kernels.cutlass import first_div
+
+            module.first_div = (module.tf32x3_backend == "cutlass"
+                                and first_div.first_div_default(torch.cuda.get_device_name(device)))
         if type(module).__name__ == "BlockLinear" and module.tf32x3_backend == "cutlass":
             from fastmace.kernels.cutlass import linear_div, segment_rows
 
