@@ -164,7 +164,7 @@ Every `*_GPUS` set was compared with `docs/current/defaults-by-gpu.md`, the ledg
 | Item | Finding | Verdict |
 | --- | --- | --- |
 | H200 coverage | `defaults-by-gpu.md` had no H200 entry, while 23 H200 sets were on in code. | Fixed: an H200 section with every b/a. |
-| H200 precision switches | `fused_forward.TENSOR_CORES` (3xTF32 a·W) and the planner's `TF32X3_OMAT0_GPUS` include the NVIDIA H200 on measurements (1.107 / 1.105, 1.068 / 1.069) and a passing gate. On the A100 the owner approved both precision changes explicitly; no H200 approval is recorded. | **Owner decision needed.** Not changed. |
+| H200 precision switches | `fused_forward.TENSOR_CORES` (3xTF32 a·W) and the planner's `TF32X3_OMAT0_GPUS` include the NVIDIA H200 on measurements (1.107 / 1.105, 1.068 / 1.069) and a passing gate. On the A100 the owner approved both precision changes explicitly; no H200 approval was recorded. | **Approved** by the owner on 6 November 2026 (faster and the gate passes; kept on). |
 | DEGREE_PARTS | The comment cited `results/degree-parts-20261105`, which does not exist. | Fixed: cites `results/h200-ideas-20261105` (idea 2). |
 | TABLED_FORWARD on the H200 | `results/h200-defaults-20261105` says it stays off; the code has it on. | Consistent: the later run after the recapture fix (`results/h200-wgmma-20261105`) measured 0.9838 / 0.9871. The ba JSON's inner ratio 1.0131 is the same measurement indexed by build slot (1 / 0.9871). |
 | SKIP_ZERO_COLUMN on Ada and A100 | Single figures (0.981, 0.986), not both build orders. | Bitwise, and the H200's both-order A/B is large (1.092 / 1.090). No action. |

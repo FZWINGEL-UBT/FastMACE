@@ -81,9 +81,24 @@ Sources: [h200-defaults](../../results/h200-defaults-20261105/README.md), [hoppe
 [wprime-pairs](../../results/wprime-pairs-20261105/README.md).
 
 Two of these change precision: `TENSOR_CORES` (3xTF32 a·W product) and `TF32X3_OMAT0_GPUS` (CUTLASS 3xTF32 GEMMs).
-On the A100 the owner approved both explicitly (3 and 4 November 2026). For the H200 the code cites the
-measurements and the passing gate (NaCl, NbCl5, SrTiO3), but no owner approval is recorded (kernel review,
-[kernel-review-20261105](../validation/kernel-review-20261105.md)).
+On the A100 the owner approved both explicitly (3 and 4 November 2026).
+
+**H200 approval (owner, 6 November 2026):** "go ahead and make them default if they are faster and accurate."
+Both pass that test, so both stay on:
+- Speed (MD step, both build orders): `TENSOR_CORES` 1.107 / 1.105, `TF32X3_OMAT0` 1.068 / 1.069.
+- Accuracy: the force/stress gate with every H200 default on passes. The ratios to the float32 calculator's error
+  (limit 2) are:
+
+  | | NaCl | NbCl5 | SrTiO3 |
+  | --- | ---: | ---: | ---: |
+  | Force | 0.74 | 0.97 | 0.99 |
+  | Stress | 1.02 | 1.93 | 0.93 |
+
+  NbCl5 stress has the least headroom ([h200-defaults](../../results/h200-defaults-20261105/README.md)).
+- This closes the kernel review's open item ([kernel-review-20261105](../validation/kernel-review-20261105.md)).
+
+`LANE_INDICES` (idea 15a, bitwise) joined the H200 set on 6 November 2026: MD step 0.9897 / 0.9913 (b = on)
+([ledger: ideas-r3](../optimisation-ledger.md#ideas-r3)).
 
 ### Tiled (capacity) mode
 
