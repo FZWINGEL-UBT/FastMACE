@@ -1,0 +1,111 @@
+LAMMPS (30 Sep 2026)
+KOKKOS mode with Kokkos version 5.2.1 is enabled
+  using double precision
+  using view layout = legacy
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (39.05 39.05 39.05)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  5000 atoms
+  read_data CPU = 0.022 seconds
+Loading MACEKokkos model from '/data/symmetrix-0.1.2/mace-omat-0-medium.json' ... (h1_affine_mode m0_composite) success
+Symmetrix streamed_edges requested='direct' resolved='direct'
+Activated Execution JIT device artifact 'jit-r1-gen11-f32-6fdf3e63624a0e45'
+Symmetrix execution profile='speed'
+  mapping LAMMPS type 1 (O) to MACEKokkos type 7
+  mapping LAMMPS type 2 (Sr) to MACEKokkos type 37
+  mapping LAMMPS type 3 (Ti) to MACEKokkos type 21
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+- KOKKOS package: https://doi.org/10.1145/3731599.3767498
+The log file lists these citations in BibTeX format.
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.5
+  ghost atom cutoff = 6.5
+  binsize = 6.5, bins = 7 7 7
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair symmetrix/mace/float32/kk, perpetual
+      attributes: full, newton on, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.43 | 3.43 | 3.43 Mbytes
+   Step          Temp          PotEng         TotEng    
+         0   0             -39947.752     -39947.752    
+         5   2.5076282e-11 -39947.752     -39947.752    
+Loop time of 0.0722438 on 1 procs for 5 steps with 5000 atoms
+
+Performance: 5.980 ns/day, 4.014 hours/ns, 69.210 timesteps/s, 346.051 katom-step/s
+96.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.07058    | 0.07058    | 0.07058    |   0.0 | 97.70
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.00041252 | 0.00041252 | 0.00041252 |   0.0 |  0.57
+Output  | 0.00015226 | 0.00015226 | 0.00015226 |   0.0 |  0.21
+Modify  | 0.00068945 | 0.00068945 | 0.00068945 |   0.0 |  0.95
+Other   |            | 0.0004097  |            |       |  0.57
+
+Nlocal:           5000 ave        5000 max        5000 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           7585 ave        7585 max        7585 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:       514000 ave      514000 max      514000 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 514000
+Ave neighs/atom = 102.8
+Neighbor list builds = 0
+Dangerous builds = 0
+   Step          Temp          PotEng         TotEng    
+         5   2.5076282e-11 -39947.752     -39947.752    
+        20   7.317279e-11  -39947.753     -39947.753    
+        25   6.9551326e-11 -39947.753     -39947.753    
+Loop time of 0.285364 on 1 procs for 20 steps with 5000 atoms
+
+Performance: 6.055 ns/day, 3.963 hours/ns, 70.086 timesteps/s, 350.430 katom-step/s
+101.6% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.28282    | 0.28282    | 0.28282    |   0.0 | 99.11
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.0011663  | 0.0011663  | 0.0011663  |   0.0 |  0.41
+Output  | 0.00029276 | 0.00029276 | 0.00029276 |   0.0 |  0.10
+Modify  | 0.00013163 | 0.00013163 | 0.00013163 |   0.0 |  0.05
+Other   |            | 0.0009502  |            |       |  0.33
+
+Nlocal:           5000 ave        5000 max        5000 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           7585 ave        7585 max        7585 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:       514000 ave      514000 max      514000 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 514000
+Ave neighs/atom = 102.8
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:16
+
+--- stderr ---

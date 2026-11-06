@@ -475,6 +475,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [kr-species-cutlass-h200](#kr-species-cutlass-h200) | Species GEMM on the CUTLASS backend on the H200 | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-06 | H200 1.0141 / 1.0175 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-wprime-dsh-zero](#kr-wprime-dsh-zero) | w′: zero dsh rows for edges with out-of-range indices (bug fix) | none | FM | FIXED (`e5280113`) | 2026-11-06 | bitwise for valid edges; latent in production | [kernel review](validation/kernel-review-20261105.md) |
 | [fusion-receiver-local](#fusion-receiver-local) | Receiver-local forward + backward of the last interaction (dout, sh, x on chip; no message store) | none (lab bounds `F-no-out`, `F-smem-*`) | FM | REJECTED as fusion; dout staging OPEN | 2026-11-06 | H200: F-no-out 0.994, w′ F-smem-dout 0.847, F-smem-all 0.863; 5060 Ti 1.015, 0.825, 0.923 | [fusion bound](../results/fusion-bound-20261106/README.md) |
+| [sx-forward-table-w](#sx-forward-table-w) | Symmetrix-XL-style interaction 2 forward: w per edge from the value table instead of the a·W tensor-core product | none (lab bound `simt-slab-edges`) | FM | REJECTED (bound) | 2026-11-06 | H200 1.207 with the real slabs (511, 15.7 MB), L1 best case 0.901; 5060 Ti 1.238 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
+| [sx-wprime-reduction](#sx-wprime-reduction) | w′: Symmetrix-XL's Cartesian Jacobian before the reduction, or a cheaper reduction | none (lab bounds `F-no-reduce`, `F-cart3`, `F-redux16`) | FM | REJECTED (bound) | 2026-11-06 | H200 no reduction at all 0.964; F-cart3 1.081; redux 1.135 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
+| [h200-butterfly-off](#h200-butterfly-off) | w′ `BUTTERFLY` off again on the H200 | `wprime_backward.BUTTERFLY_GPUS` | FM | ADOPTED (H200 removed; branch `fastmace/sx012-profile-20261106`) | 2026-11-06 | H200 MD b/a 0.9659 / 0.9677 (b = off), w′ kernel 0.88 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4245,6 +4248,38 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured: H200 (Modal, `1296069d`): forward F-no-out 0.994; w′ F-smem-dout 0.847, F-smem-sh 1.159, F-smem-x 1.252, F-smem-dout-sh 0.878, F-smem-all 0.863. RTX 5060 Ti: 1.015; 0.825, 0.987, 1.005, 0.866, 0.923.
 - Why: the message store and the sh/x reads cost nothing measurable; only the per-edge re-read of the receiver's 20 KB output gradient does (about 7.6 GB per call). That needs staging in w′, not fusion; the receiver-owned backward ([conv-receiver-backward](#conv-receiver-backward)) lost by serialising edges, so staging must keep one edge per warp. Next falsifier: real staging, stop below 5 % of w′ on the H200.
 - Sources: [fusion bound](../results/fusion-bound-20261106/README.md).
+
+<a id="sx-forward-table-w"></a>
+#### sx-forward-table-w: w from the value table in the interaction 2 forward, as Symmetrix-XL does (bound)
+- Switch: none (lab bound `simt-slab-edges` in `tools/omat0_kernel_lab.py`, commit `918b21f3`)
+- Engine: FM
+- Date/round: 6 November 2026, after profiling Symmetrix-XL 0.1.2 on the H200
+- What: Symmetrix-XL's interaction 2 forward (952 µs on the H200, against our 1,623 µs) evaluates w per path and channel from cubic Hermite splines, one thread per receiver and channel, without tensor cores. The bound replaces our a·W product by reads of each edge's real slab of the value table (`wprime_backward.TABLE_W`, 1,280 x 6 floats per slab, pair x piece as in w′).
+- Status: REJECTED (bound).
+- Measured (H200, Modal profile `third`): base 1,686 µs; simt-rerender 1.420; simt-slab3 (L1-resident) 0.901; simt-slab-real (164 MB hashed) 1.144; simt-slab-edges 1.207 (511 of 5,616 slabs touched, 15.7 MB). RTX 5060 Ti: 1.238 (746 slabs, 22.9 MB).
+- Why: the touched table fits L2, but every edge reads 30 KB of slab (11.5 GB per call), more than the 3xTF32 product costs. Even the L1 case saves only 10 %, below what a rewrite would need.
+- Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="h200-butterfly-off"></a>
+#### h200-butterfly-off: the w′ butterfly reduction off again on the H200
+- Switch: `wprime_backward.BUTTERFLY_GPUS` (the H200 removed)
+- Engine: FM
+- Date/round: 6 November 2026, from the reduction bounds of the Symmetrix-XL comparison
+- What: the lab's `butterfly` variant was 1.145 against the base without it on the H200, which contradicted the 5 November MD A/B that made it an H200 default.
+- Status: ADOPTED: the H200 removed from `BUTTERFLY_GPUS` (decision 66).
+- Measured (H200, `d599cc70`, profile `fourth`): w′ kernel on 1,830.7 / 1,828.2 µs, off 1,612.4 / 1,613.4 µs; MD step b/a 0.9659 (ab) / 0.9677 (ba), b = off. The 5 November A/B (0.994 / 0.994 for on) was taken at an earlier commit; which later change reversed it was not isolated.
+- Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="sx-wprime-reduction"></a>
+#### sx-wprime-reduction: the w′ backward's reduction on the H200 (bound)
+- Switch: none (lab bounds `F-no-reduce`, `F-cart3`, `F-redux16`, `F-cart3-redux`, `redux`)
+- Engine: FM
+- Date/round: 6 November 2026, after profiling Symmetrix-XL 0.1.2 on the H200
+- What: whether the w′ backward's cross-lane reduction leaves room, and whether Symmetrix-XL's reverse order (Cartesian Jacobian before the reduction) helps.
+- Status: REJECTED (bound).
+- Measured (H200, `d599cc70`, base with `BUTTERFLY=False` 1,634 µs): F-no-reduce 0.964; F-cart3 1.081; F-redux16 1.135; F-cart3-redux 1.156; redux 1.135; butterfly 1.145.
+- Why: removing the reduction completely saves 3.6 %. The lab's butterfly result conflicts with the H200 MD A/B behind the `BUTTERFLY` default; see the recheck in the source.
+- Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
 
 ## Appendix: documentation defects (28 October 2026)
 

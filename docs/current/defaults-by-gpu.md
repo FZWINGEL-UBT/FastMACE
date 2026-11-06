@@ -67,12 +67,12 @@ The tables above have no H200 column. The H200 (Modal, sm_90) is in these sets, 
 build orders on OMAT-0 medium, Benchmark_loup (b = switch off unless noted, so b/a above 1 means the switch is
 faster): planner `DECISION_66_GENERIC_RADIAL_TABLES_GPUS` 2.030 / 2.027, `GENERIC_WPRIME` 1.771 / 1.768,
 `TF32X3_OMAT0_GPUS` 1.068 / 1.069, `GENERIC_FOLD_PRODUCT` 1.033 / 1.032; w′ `FACTORED` 1.160 / 1.159, `TABLE_W`
-1.142 / 1.141, `BLOCK_MESSAGE` 1.066 / 1.065, `HORNER` 1.046 / 1.046, `SCALAR_PATHS` 1.030 / 1.030, `BUTTERFLY`
-(b = on) 0.994 / 0.994; fused forward `TENSOR_CORES` 1.107 / 1.105, `SKIP_ZERO_COLUMN` 1.092 / 1.090, `VEC_A` 1.047 /
+1.142 / 1.141, `BLOCK_MESSAGE` 1.066 / 1.065, `HORNER` 1.046 / 1.046, `SCALAR_PATHS` 1.030 / 1.030; fused forward `TENSOR_CORES` 1.107 / 1.105, `SKIP_ZERO_COLUMN` 1.092 / 1.090, `VEC_A` 1.047 /
 1.046, `TC_WFRAG` 1.022 / 1.024, `VEC_SH` 1.003 / 1.003, `DEGREE_PARTS` (b = on) 0.9818 / 0.9845; generic
 `FUSED_FIRST_BACKWARD` 1.051 / 1.052, `EDGE_SH` 1.019 / 1.018; tabled `TABLED_FORWARD` (b = on, after the recapture
 fix) 0.9838 / 0.9871; energy `HEAD_SLICE` 1.016 / 1.017, `GRAPH_SUM` 1.005 / 1.004; radial `SYMMETRIC_PAIRS` 1.005 /
-1.004, radial-table forward 8 warps (`WARPS_GPUS`; b = on) 0.9946 / 0.9950. Off there: `BACKWARD_WALK`,
+1.004, radial-table forward 8 warps (`WARPS_GPUS`; b = on) 0.9946 / 0.9950. Off there: `BUTTERFLY` (on from 5 November at b/a 0.994 / 0.994, b = on; off from 6 November, when the A/B at
+`d599cc70` gave 0.9659 / 0.9677 with b = off, [sx012 profile](../../results/sx012-profile-20261106/README.md)), `BACKWARD_WALK`,
 `SEGMENT_ROWS`, `SPECIES_GEMM` (also with `species_gemm.CUTLASS`: 1.0141 / 1.0175), CUTLASS tile 32x64, `TABLE_PAIRS`,
 `HOIST_SCALE`, `WGMMA`, `SEGMENT_GROUPED`, `SH_LDS4` (1.0014 / 1.0027), tabled kernels at 2 warps (forward 1.0147 /
 1.0168, backward 1.0270 / 1.0295).

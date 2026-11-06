@@ -1,0 +1,60 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+calls seen (kernel, edges, capturing): [('forward', 40, False), ('forward', 720, False), ('forward', 370000, False), ('forward', 373760, False), ('forward', 373760, True), ('wprime', 720, False), ('wprime', 370000, False), ('wprime', 373760, False), ('wprime', 373760, True)]
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+simt-rerender rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas simt-rerender                {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+simt-slab3 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas simt-slab3                   {'9.0': {'registers': 168, 'spill_store_bytes': 32}}
+simt-slab5340 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas simt-slab-real               {'9.0': {'registers': 168, 'spill_store_bytes': 32}}
+slab-edges rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas simt-slab-edges              {'9.0': {'registers': 168, 'spill_store_bytes': 56}}
+simt-rerender rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+simt-slab3 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+simt-slab5340 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+slab-edges rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+slab-edges: 5616 slabs, 173 MB table, 511 slabs touched by 373760 edges (15.7 MB)
+forward  base                1685.8 us  ratio 1.000  regs 168 local 0  
+forward  simt-rerender       2393.8 us  ratio 1.420  regs 168 local 0  {'out0': 'max|d|/max|a| = 1.14e-06', 'out1': 'max|d|/max|a| = 1.93e-06', 'out2': 'max|d|/max|a| = 1.45e-06', 'out3': 'max|d|/max|a| = 1.35e-06', 'w': 'bitwise'}
+forward  simt-slab3          1519.1 us  ratio 0.901  regs 168 local 32  
+forward  simt-slab-real      1928.3 us  ratio 1.144  regs 168 local 32  
+forward  simt-slab-edges     2034.1 us  ratio 1.207  regs 168 local 56  
