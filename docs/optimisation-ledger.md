@@ -487,6 +487,8 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [sx-forward-table-w](#sx-forward-table-w) | Symmetrix-XL-style interaction 2 forward: w per edge from the value table instead of the a·W tensor-core product | none (lab bound `simt-slab-edges`) | FM | REJECTED (bound) | 2026-11-06 | H200 1.207 with the real slabs (511, 15.7 MB), L1 best case 0.901; 5060 Ti 1.238 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [sx-wprime-reduction](#sx-wprime-reduction) | w′: Symmetrix-XL's Cartesian Jacobian before the reduction, or a cheaper reduction | none (lab bounds `F-no-reduce`, `F-cart3`, `F-redux16`) | FM | REJECTED (bound) | 2026-11-06 | H200 no reduction at all 0.964; F-cart3 1.081; redux 1.135 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [h200-butterfly-off](#h200-butterfly-off) | w′ `BUTTERFLY` off again on the H200 | `wprime_backward.BUTTERFLY_GPUS` | FM | ADOPTED (H200 removed; branch `fastmace/sx012-profile-20261106`) | 2026-11-06 | H200 MD b/a 0.9659 / 0.9677 (b = off), w′ kernel 0.88 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
+| [cx-n1-cartesian-wprime](#cx-n1-cartesian-wprime) | w′: Cartesian harmonic adjoints (node converter, then dx and the edge-vector gradient from harmonic polynomials) | none (`tools/lab_cartesian.py`) | FM | REJECTED (bound) | 2026-11-06 | H200 lab 1.060 / 1.062 with converter (kernel 1.022, 56 vs 96 registers) | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
+| [cx-n2-fp64-adjoint](#cx-n2-fp64-adjoint) | w′: receiver-tiled FP64 tensor-core matrix adjoints | none (`tools/lab_cartesian.py` skeleton bound) | FM | REJECTED (bound) | 2026-11-06 | H200 optimistic floor 2.38x the default kernel | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4438,6 +4440,28 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured (H200, `d599cc70`, base with `BUTTERFLY=False` 1,634 µs): F-no-reduce 0.964; F-cart3 1.081; F-redux16 1.135; F-cart3-redux 1.156; redux 1.135; butterfly 1.145.
 - Why: removing the reduction completely saves 3.6 %. The lab's butterfly result conflicts with the H200 MD A/B behind the `BUTTERFLY` default; see the recheck in the source.
 - Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="cx-n1-cartesian-wprime"></a>
+#### cx-n1-cartesian-wprime: Cartesian harmonic adjoints for the w′ backward (H200, bound)
+- Switch: none (lab variants `N1-stage`, `N1-nostage`, `N1-convert` in `tools/lab_cartesian.py`)
+- Engine: FM
+- Date/round: 6 November 2026, Codex report [codex-ideas-20261106](../plans/codex-ideas-20261106.md) "Second pass", N1
+- What: per path, the scalar contraction with the receiver adjoint written as a Cartesian expression in a harmonic polynomial of the edge direction; a node kernel converts the adjoint rows to the polynomial coefficients once per force call, the w′ kernel then gives dx and the three edge-vector derivatives directly. Not F-cart3 (which projected the existing derivatives).
+- Status: REJECTED (bound; stop rule 0.95).
+- Measured (H200, `47e8b56a`, profile `fourth`, OMAT-0 medium SrTiO3 10x10x10, base the default w′ with `STAGE_DOUT` 1,401 / 1,400 µs): staged kernel + converter 1.060 / 1.062; kernel alone 1.022 / 1.022 (56 registers vs 96); converter 57 µs; unstaged against the unstaged default 0.961. Correct at float32 rounding: edge-vector gradient 8.2e-7 / 8.8e-7 of the max against the default's dsh and dL/dr, dx 1.9e-7.
+- Why: fewer registers do not pay for the larger hot loop once `STAGE_DOUT` is on, and the conversion costs another 4 %.
+- Sources: [cartesian backward](../results/cartesian-backward-20261106/README.md).
+
+<a id="cx-n2-fp64-adjoint"></a>
+#### cx-n2-fp64-adjoint: receiver-tiled FP64 matrix adjoints for the w′ backward (H200, bound)
+- Switch: none (lab bounds `N2-skel`, `N2-noU` in `tools/lab_cartesian.py`)
+- Engine: FM
+- Date/round: 6 November 2026, Codex report [codex-ideas-20261106](../plans/codex-ideas-20261106.md) "Second pass", N2
+- What: per receiver tile of 16 edges, U = S @ dout and M = (w x) @ doutᵀ on FP64 `mma.sync`, then the small moments contracted with the geometry derivatives.
+- Status: REJECTED (bound).
+- Measured (H200, `47e8b56a`): the report's skeleton with U consumed on chip, one vector path over all 23,360 tiles, 555 µs (0.397 of the default kernel); six vector paths give an optimistic floor of 3.33 ms, 2.38x the whole default kernel, before scalar paths, S preparation, the receiver gather, radial tables, geometry and atomics.
+- Why: the weighted-x staging and FP32-to-FP64 conversion dominate these small shapes; the matrix part alone is far above the whole kernel.
+- Sources: [cartesian backward](../results/cartesian-backward-20261106/README.md).
 
 ## Appendix: documentation defects (28 October 2026)
 
