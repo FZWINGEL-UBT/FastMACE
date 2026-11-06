@@ -1,0 +1,78 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+{"gpu": "NVIDIA H200", "capability": [9, 0], "sms": 132, "backend": "cutlass", "today_tile": "64x64"}
+CUTLASS products per force call: 33 launches, 24 shapes (setup 52 s)
+ 35000  128  384 rr x 1  today    66.4 (66.4/67.1) err 2.4e-07 | 1-pass 24.6 [64x192x32 pingpong cluster1] err 5.8e-04 -> x3/today 1.109 | K3 41.3 err 2.0e-06 | K2 32.0 | split 44.0
+ 35000  384  128 rc x 1  today    66.4 (66.8/66.4) err 1.5e-07 | 1-pass 22.0 [64x64x32 pingpong cluster1] err 3.2e-04 -> x3/today 0.993 | K3 51.8 err 2.5e-06 | K2 36.4 | split 129.2
+ 25000  128  384 rr x 2  today    48.6 (49.3/48.6) err 2.2e-07 | 1-pass 17.5 [64x192x32 pingpong cluster1] err 5.6e-04 -> x3/today 1.077 | K3 29.7 err 2.0e-06 | K2 23.2 | split 30.0
+ 25000  384  128 rr x 1  today    44.8 (44.8/44.9) err 1.3e-07 | 1-pass 15.6 [64x128x32 pingpong cluster1] err 3.1e-04 -> x3/today 1.043 | K3 35.5 err 2.6e-06 | K2 25.9 | split 94.7
+ 25000  384  128 rc x 1  today    45.4 (45.6/45.4) err 1.6e-07 | 1-pass 14.1 [64x128x32 pingpong cluster1] err 3.2e-04 -> x3/today 0.931 | K3 35.7 err 2.6e-06 | K2 26.0 | split 94.6
+ 35000  256  128 rr x 1  today    45.1 (45.8/45.1) err 2.1e-07 | 1-pass 17.1 [64x128x32 pingpong cluster1] err 3.9e-04 -> x3/today 1.137 | K3 36.2 err 2.5e-06 | K2 27.2 | split 88.7
+ 35000  128  256 rr x 1  today    46.1 (46.2/46.1) err 2.3e-07 | 1-pass 18.4 [64x128x32 pingpong cluster1] err 5.6e-04 -> x3/today 1.199 | K3 31.1 err 1.9e-06 | K2 24.6 | split 43.9
+ 35000  192  128 rr x 1  today    35.5 (35.6/35.5) err 1.8e-07 | 1-pass 12.7 [64x128x32 pingpong cluster1] err 4.5e-04 -> x3/today 1.074 | K3 29.1 err 2.5e-06 | K2 22.0 | split 67.1
+ 35000  128  192 rc x 1  today    36.1 (36.1/36.1) err 2.1e-07 | 1-pass 14.1 [64x192x32 pingpong cluster1] err 5.5e-04 -> x3/today 1.169 | K3 27.1 err 1.9e-06 | K2 21.0 | split 43.8
+ 15000  128  384 rr x 2  today    30.1 (30.1/30.1) err 2.1e-07 | 1-pass 11.3 [64x192x32 pingpong cluster1] err 5.5e-04 -> x3/today 1.13 | K3 18.5 err 2.0e-06 | K2 14.6 | split 18.1
+ 15000  384  128 rr x 1  today    29.9 (29.9/30.0) err 1.7e-07 | 1-pass 8.7 [128x128x32 cooperative cluster1] err 3.2e-04 -> x3/today 0.873 | K3 24.0 err 2.5e-06 | K2 17.6 | split 57.3
+ 15000  384  128 rc x 1  today    36.3 (36.5/36.3) err 1.4e-07 | 1-pass 8.8 [128x128x32 cooperative cluster1] err 3.2e-04 -> x3/today 0.723 | K3 24.1 err 2.4e-06 | K2 16.8 | split 57.3
+ 25000  192  128 rr x 1  today    24.0 (24.1/24.0) err 1.7e-07 | 1-pass 8.8 [64x128x32 pingpong cluster1] err 4.4e-04 -> x3/today 1.096 | K3 21.2 err 2.7e-06 | K2 14.5 | split 47.7
+ 25000  128  192 rc x 1  today    26.0 (26.0/26.0) err 2.2e-07 | 1-pass 9.6 [64x192x32 pingpong cluster1] err 5.6e-04 -> x3/today 1.114 | K3 18.7 err 1.9e-06 | K2 12.2 | split 29.7
+ 15000  192  128 rr x 1  today    16.7 (16.7/16.8) err 1.8e-07 | 1-pass 6.8 [64x128x32 pingpong cluster1] err 4.6e-04 -> x3/today 1.221 | K3 11.1 err 2.4e-06 | K2 8.7 | split 26.6
+ 15000  128  192 rc x 1  today    17.8 (17.8/17.8) err 2.0e-07 | 1-pass 7.7 [64x192x32 pingpong cluster1] err 4.9e-04 -> x3/today 1.308 | K3 10.3 err 1.8e-06 | K2 8.9 | split 18.5
+  5000  128  384 rr x 2  today    12.4 (12.4/12.4) err 1.9e-07 | 1-pass 6.1 [64x128x32 pingpong cluster1] err 5.0e-04 -> x3/today 1.479 | K3 8.4 err 1.8e-06 | K2 7.0 | split 8.9
+ 15000  128  128 rr x 2  today    12.4 (12.4/12.4) err 2.6e-07 | 1-pass 6.0 [64x128x32 pingpong cluster1] err 5.0e-04 -> x3/today 1.445 | K3 8.7 err 1.9e-06 | K2 7.5 | split 18.9
+  5000  384  128 rc x 2  today    16.1 (16.1/16.2) err 1.5e-07 | 1-pass 5.9 [64x128x32 pingpong cluster1] err 3.0e-04 -> x3/today 1.092 | K3 9.5 err 2.4e-06 | K2 7.6 | split 18.3
+  5000  256  128 rr x 1  today    11.7 (11.7/11.7) err 1.4e-07 | 1-pass 5.2 [64x128x32 pingpong cluster1] err 3.6e-04 -> x3/today 1.328 | K3 7.9 err 2.4e-06 | K2 6.3 | split 13.4
+  5000  128  256 rr x 1  today     9.6 (9.6/9.7) err 2.0e-07 | 1-pass 5.8 [128x128x32 cooperative cluster1] err 4.8e-04 -> x3/today 1.802 | K3 7.9 err 1.7e-06 | K2 6.8 | split 8.9
+  5000  192  128 rr x 1  today     9.5 (9.5/9.6) err 1.6e-07 | 1-pass 4.8 [64x128x32 pingpong cluster1] err 4.0e-04 -> x3/today 1.516 | K3 6.8 err 2.3e-06 | K2 5.8 | split 11.2
+  5000  128  192 rc x 1  today     7.5 (7.5/7.5) err 1.8e-07 | 1-pass 4.9 [128x64x32 cooperative cluster1] err 4.9e-04 -> x3/today 1.958 | K3 6.2 err 1.8e-06 | K2 5.5 | split 8.9
+  5000  128  128 rr x 5  today     7.3 (7.3/7.3) err 2.1e-07 | 1-pass 4.6 [64x128x32 pingpong cluster1] err 4.9e-04 -> x3/today 1.872 | K3 5.8 err 2.3e-06 | K2 5.1 | split 8.9
+{
+ "today_us": 381.920000910759,
+ "x3_us": 410.00640392303467,
+ "k3_us": 256.36959969997406,
+ "k3_split_us": 664.2543911933899,
+ "k2_us": 194.52640265226364,
+ "all_shapes_today_us": 851.1024035513401,
+ "ratio_x3": 1.0735400160905384,
+ "ratio_k3": 0.6712651840401479,
+ "ratio_k3_with_split": 1.7392500775276296,
+ "ratio_k2": 0.509338087003507,
+ "threshold": 0.6,
+ "verdict": "stop"
+}

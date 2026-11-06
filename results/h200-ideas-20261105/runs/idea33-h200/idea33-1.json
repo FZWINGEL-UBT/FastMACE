@@ -1,0 +1,4434 @@
+{
+ "gpu": "NVIDIA H200",
+ "capability": [
+  9,
+  0
+ ],
+ "sms": 132,
+ "torch": "2.14.1+cu130",
+ "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/cache/H200/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: reused')",
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "model": "omat0-medium",
+ "today_tile": "64x64",
+ "backend": "cutlass",
+ "build": "nvcc: Cuda compilation tools, release 13.3, V13.3.33 Build cuda_13.3.r13.3/compiler.37862127_0 \ncutlass: 2c85f497547eb441f0fe80bfb0fb2e6f9add1719 (v4.8.1)\narch: sm_90a\nglibc symbols: GLIBC_2.2.5 GLIBC_2.3 GLIBC_2.3.2 GLIBC_2.3.3 GLIBC_2.3.4 GLIBC_2.4 GLIBC_2.14 GLIBC_2.17 GLIBC_2.25 GLIBC_2.32 GLIBC_2.33 GLIBC_2.34 GLIBC_2.35 GLIBC_2.36 \nsha256: f617c7be56bdfaa489c270912658a935f0e941cd9e53ce330feb2a9d6b532317\n",
+ "setup_s": 52.143215187,
+ "natoms": 5000,
+ "cutlass_launches_per_force_call": 33,
+ "other_tf32x3_mm_launches": [
+  {
+   "m": 5000,
+   "k": 1,
+   "n": 16,
+   "layout": "rc",
+   "calls": 1
+  },
+  {
+   "m": 5000,
+   "k": 1,
+   "n": 128,
+   "layout": "rc",
+   "calls": 1
+  },
+  {
+   "m": 5000,
+   "k": 16,
+   "n": 1,
+   "layout": "rr",
+   "calls": 1
+  },
+  {
+   "m": 5000,
+   "k": 16,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1
+  },
+  {
+   "m": 5000,
+   "k": 89,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1
+  },
+  {
+   "m": 5000,
+   "k": 128,
+   "n": 1,
+   "layout": "rr",
+   "calls": 1
+  },
+  {
+   "m": 5000,
+   "k": 128,
+   "n": 16,
+   "layout": "rr",
+   "calls": 1
+  }
+ ],
+ "wgmma_configs": [
+  "128x128x32 cooperative cluster1",
+  "128x64x32 cooperative cluster1",
+  "64x128x32 pingpong cluster1",
+  "64x64x32 pingpong cluster1",
+  "128x192x32 cooperative cluster1",
+  "128x128x32 cooperative cluster2x1",
+  "64x192x32 pingpong cluster1"
+ ],
+ "shapes": [
+  {
+   "m": 35000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 66.44480228424072,
+   "today_us_runs": [
+    66.44480228424072,
+    67.07199811935425
+   ],
+   "today_error": 2.352673128871171e-07,
+   "today_us_per_force_call": 66.44480228424072,
+   "single_best": "64x192x32 pingpong cluster1",
+   "single_us": 24.55199956893921,
+   "x3_us": 73.65599870681763,
+   "ratio_x3": 1.108529127556562,
+   "presplit_k3_best": "64x192x32 pingpong cluster1",
+   "presplit_k3_us": 41.30080044269562,
+   "ratio_k3": 0.6215806055982693,
+   "ratio_k3_with_split": 1.2835676650410832,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 32.02719986438751,
+   "ratio_k2": 0.4820121177783033,
+   "split_a_us": 43.98559927940369,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 26.025599241256714,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 28.327998518943787,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 24.643200635910034,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 29.77760136127472,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 26.2688010931015,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 25.87360143661499,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005767477000924901,
+     "us": 24.55199956893921,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 43.300798535346985,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 46.30559980869293,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 42.89279878139496,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 55.3551971912384,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 47.50880002975464,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 44.8527991771698,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9626956312640077e-06,
+     "us": 41.30080044269562,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 36.9951993227005,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 36.5664005279541,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 32.02719986438751,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 42.41600036621094,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 36.19360029697418,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 35.47680079936981,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003200883832079418,
+     "us": 32.34559893608093,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 35000,
+   "k": 384,
+   "n": 128,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 66.43199920654297,
+   "today_us_runs": [
+    66.84319972991943,
+    66.43199920654297
+   ],
+   "today_error": 1.4664143648447438e-07,
+   "today_us_per_force_call": 66.43199920654297,
+   "single_best": "64x64x32 pingpong cluster1",
+   "single_us": 21.980799734592438,
+   "x3_us": 65.94239920377731,
+   "ratio_x3": 0.992630057673811,
+   "presplit_k3_best": "64x64x32 pingpong cluster1",
+   "presplit_k3_us": 51.849597692489624,
+   "ratio_k3": 0.7804913040669548,
+   "ratio_k3_with_split": 2.7255538587978583,
+   "presplit_k2_best": "64x64x32 pingpong cluster1",
+   "presplit_k2_us": 36.35840117931366,
+   "ratio_k2": 0.5473025291060739,
+   "split_a_us": 129.21439409255981,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 26.252800226211548,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 23.48960041999817,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 22.45279997587204,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 21.980799734592438,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 31.0479998588562,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 26.084798574447632,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031983271573755336,
+     "us": 35.81919968128204,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 59.465599060058594,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 53.04639935493469,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 54.05120253562927,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 51.849597692489624,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 81.80000185966492,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 59.32639837265015,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.501263014664804e-06,
+     "us": 105.29600381851196,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 42.41439998149872,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 38.32800090312958,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 37.76000142097473,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 36.35840117931366,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 56.10719919204712,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 42.638400197029114,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016609829676116403,
+     "us": 69.27679777145386,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 25000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 2,
+   "today_us": 48.64639937877655,
+   "today_us_runs": [
+    49.25119876861572,
+    48.64639937877655
+   ],
+   "today_error": 2.198481311306718e-07,
+   "today_us_per_force_call": 97.2927987575531,
+   "single_best": "64x192x32 pingpong cluster1",
+   "single_us": 17.45920032262802,
+   "x3_us": 52.377600967884064,
+   "ratio_x3": 1.0767004677993777,
+   "presplit_k3_best": "64x192x32 pingpong cluster1",
+   "presplit_k3_us": 29.740801453590393,
+   "ratio_k3": 0.6113669630925596,
+   "ratio_k3_with_split": 1.2271411980489153,
+   "presplit_k2_best": "64x192x32 pingpong cluster1",
+   "presplit_k2_us": 23.16640019416809,
+   "ratio_k2": 0.47622024425255055,
+   "split_a_us": 29.955199360847473,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 19.912000000476837,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 20.875200629234314,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 18.273599445819855,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 21.81120067834854,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 17.790399491786957,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 19.976000487804413,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005610759696389315,
+     "us": 17.45920032262802,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 32.150399684906006,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 33.664000034332275,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 30.449599027633667,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 39.01279866695404,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 29.85439896583557,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 33.04800093173981,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.978522283945297e-06,
+     "us": 29.740801453590393,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 26.356801390647888,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 26.342400908470154,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 23.27360063791275,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 31.21599853038788,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 24.160000681877136,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 26.531198620796204,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003138601224739261,
+     "us": 23.16640019416809,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 25000,
+   "k": 384,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 44.82879936695099,
+   "today_us_runs": [
+    44.82879936695099,
+    44.85920071601868
+   ],
+   "today_error": 1.3004536046096153e-07,
+   "today_us_per_force_call": 44.82879936695099,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 15.583999454975128,
+   "x3_us": 46.751998364925385,
+   "ratio_x3": 1.0429009704728391,
+   "presplit_k3_best": "128x64x32 cooperative cluster1",
+   "presplit_k3_us": 35.523200035095215,
+   "ratio_k3": 0.7924191710850031,
+   "ratio_k3_with_split": 2.9054180052199006,
+   "presplit_k2_best": "64x64x32 pingpong cluster1",
+   "presplit_k2_us": 25.883200764656067,
+   "ratio_k2": 0.5773788531070468,
+   "split_a_us": 94.72320079803467,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 17.537599802017212,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 15.71040004491806,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 15.583999454975128,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 15.825599431991577,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 22.360000014305115,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 17.43199974298477,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003100360073506263,
+     "us": 23.96160066127777,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 40.25599956512451,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 35.523200035095215,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 36.24480068683624,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 36.636799573898315,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 55.83040118217468,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 39.772799611091614,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5857526372364746e-06,
+     "us": 69.55680251121521,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 29.95840013027191,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 26.24959945678711,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 26.14400088787079,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 25.883200764656067,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 39.241600036621094,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 29.526400566101074,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016452287540118663,
+     "us": 46.29279971122742,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 25000,
+   "k": 384,
+   "n": 128,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 45.3904002904892,
+   "today_us_runs": [
+    45.62239944934845,
+    45.3904002904892
+   ],
+   "today_error": 1.576379444676274e-07,
+   "today_us_per_force_call": 45.3904002904892,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 14.08960074186325,
+   "x3_us": 42.26880222558975,
+   "ratio_x3": 0.9312277916713256,
+   "presplit_k3_best": "128x64x32 cooperative cluster1",
+   "presplit_k3_us": 35.67839860916138,
+   "ratio_k3": 0.7860340155809816,
+   "ratio_k3_with_split": 2.870985840180727,
+   "presplit_k2_best": "64x64x32 pingpong cluster1",
+   "presplit_k2_us": 25.990399718284607,
+   "ratio_k2": 0.5725968388018482,
+   "split_a_us": 94.63679790496826,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 16.840000450611115,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 14.486399292945862,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 14.08960074186325,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 15.192000567913055,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 22.033600509166718,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 16.491200029850006,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003164267579158755,
+     "us": 24.087999761104584,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 40.91520011425018,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 35.67839860916138,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 36.19999885559082,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 36.6703987121582,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 55.745601654052734,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 40.04960060119629,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5742977653756247e-06,
+     "us": 70.3167974948883,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 30.39200007915497,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 26.335999369621277,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 26.22080147266388,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 25.990399718284607,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 37.68160045146942,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 29.798400402069092,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001689054588449251,
+     "us": 40.31679928302765,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 35000,
+   "k": 256,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 45.12160122394562,
+   "today_us_runs": [
+    45.846399664878845,
+    45.12160122394562
+   ],
+   "today_error": 2.073560928910506e-07,
+   "today_us_per_force_call": 45.12160122394562,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 17.100800573825836,
+   "x3_us": 51.30240172147751,
+   "ratio_x3": 1.1369809654328444,
+   "presplit_k3_best": "64x64x32 pingpong cluster1",
+   "presplit_k3_us": 36.188799142837524,
+   "ratio_k3": 0.8020282561167723,
+   "ratio_k3_with_split": 2.768270529963844,
+   "presplit_k2_best": "64x64x32 pingpong cluster1",
+   "presplit_k2_us": 27.185600996017456,
+   "ratio_k2": 0.6024963711081758,
+   "split_a_us": 88.71999979019165,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 19.61279958486557,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 17.504000663757324,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 17.100800573825836,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 17.337599396705627,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 23.600000143051147,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 19.625599682331085,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00038690838687951035,
+     "us": 25.225600600242615,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 42.28320121765137,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 38.56959939002991,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 37.884798645973206,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 36.188799142837524,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 54.30240035057068,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 42.4560010433197,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.5234969155181885e-06,
+     "us": 68.15040111541748,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 31.95039927959442,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 28.455999493598938,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 27.689599990844727,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 27.185600996017456,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 37.61599957942963,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 31.585600972175598,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002099446470387796,
+     "us": 45.3247994184494,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 35000,
+   "k": 128,
+   "n": 256,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 46.142399311065674,
+   "today_us_runs": [
+    46.163201332092285,
+    46.142399311065674
+   ],
+   "today_error": 2.270937219922503e-07,
+   "today_us_per_force_call": 46.142399311065674,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 18.44319999217987,
+   "x3_us": 55.32959997653961,
+   "ratio_x3": 1.1991053955287214,
+   "presplit_k3_best": "64x128x32 pingpong cluster1",
+   "presplit_k3_us": 31.083199381828308,
+   "ratio_k3": 0.6736363918200948,
+   "ratio_k3_with_split": 1.6240161030096585,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 24.59840029478073,
+   "ratio_k2": 0.5330975558716048,
+   "split_a_us": 43.852800130844116,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 19.414399564266205,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 20.444799959659576,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 18.44319999217987,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 20.201599597930908,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 24.433599412441254,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 19.755199551582336,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005568990746061579,
+     "us": 28.035199642181396,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 32.8575998544693,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 33.62239897251129,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 31.083199381828308,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 35.11359989643097,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 46.40800058841705,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 34.54720079898834,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8988142743714689e-06,
+     "us": 67.94400215148926,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 26.395198702812195,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 25.939199328422546,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 24.59840029478073,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 28.302401304244995,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 35.58720052242279,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 27.622398734092712,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00031856834345540797,
+     "us": 47.61919975280762,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 35000,
+   "k": 192,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 35.499200224876404,
+   "today_us_runs": [
+    35.5567991733551,
+    35.499200224876404
+   ],
+   "today_error": 1.8052908157742577e-07,
+   "today_us_per_force_call": 35.499200224876404,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 12.705600261688232,
+   "x3_us": 38.1168007850647,
+   "ratio_x3": 1.0737368882568228,
+   "presplit_k3_best": "64x64x32 pingpong cluster1",
+   "presplit_k3_us": 29.076799750328064,
+   "ratio_k3": 0.8190832347246014,
+   "ratio_k3_with_split": 2.7078920426426274,
+   "presplit_k2_best": "64x64x32 pingpong cluster1",
+   "presplit_k2_us": 22.017599642276764,
+   "ratio_k2": 0.6202280474715518,
+   "split_a_us": 67.05120205879211,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 14.753599464893341,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 13.660800457000732,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 12.705600261688232,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 14.166399836540222,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 19.809600710868835,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 15.043200552463531,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004493461083902112,
+     "us": 20.17119973897934,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 34.195199608802795,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 30.508801341056824,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 30.33120036125183,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 29.076799750328064,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 41.257598996162415,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 34.05280113220215,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4948375920209143e-06,
+     "us": 43.060800433158875,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 26.129600405693054,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 23.37760031223297,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 22.675199806690216,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 22.017599642276764,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 30.742400884628296,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 26.123198866844177,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024152513357353743,
+     "us": 31.4767986536026,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 35000,
+   "k": 128,
+   "n": 192,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 36.12160086631775,
+   "today_us_runs": [
+    36.137598752975464,
+    36.12160086631775
+   ],
+   "today_error": 2.1294286282867214e-07,
+   "today_us_per_force_call": 36.12160086631775,
+   "single_best": "64x192x32 pingpong cluster1",
+   "single_us": 14.075200259685516,
+   "x3_us": 42.22560077905655,
+   "ratio_x3": 1.1689847561111442,
+   "presplit_k3_best": "64x192x32 pingpong cluster1",
+   "presplit_k3_us": 27.09279954433441,
+   "ratio_k3": 0.7500442642230065,
+   "ratio_k3_with_split": 1.9614191712186348,
+   "presplit_k2_best": "64x192x32 pingpong cluster1",
+   "presplit_k2_us": 21.01919949054718,
+   "ratio_k2": 0.581901105887777,
+   "split_a_us": 43.75680088996887,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 17.977599799633026,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 16.2992000579834,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 19.6943998336792,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 15.936000645160675,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 16.249600052833557,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 18.745599687099457,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005470890027890843,
+     "us": 14.075200259685516,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 31.993600726127625,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 28.5535991191864,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 47.041600942611694,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 28.828799724578857,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 31.787198781967163,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 34.84640121459961,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9188032635154698e-06,
+     "us": 27.09279954433441,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 25.34399926662445,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 21.716800332069397,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 32.45919942855835,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 23.41119945049286,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 24.958400428295135,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 27.556800842285156,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00028325730039583833,
+     "us": 21.01919949054718,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 15000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 2,
+   "today_us": 30.108800530433655,
+   "today_us_runs": [
+    30.134400725364685,
+    30.108800530433655
+   ],
+   "today_error": 2.1181529238580812e-07,
+   "today_us_per_force_call": 60.21760106086731,
+   "single_best": "64x192x32 pingpong cluster1",
+   "single_us": 11.342400312423706,
+   "x3_us": 34.02720093727112,
+   "ratio_x3": 1.1301413652422583,
+   "presplit_k3_best": "64x192x32 pingpong cluster1",
+   "presplit_k3_us": 18.488000333309174,
+   "ratio_k3": 0.614039749428799,
+   "ratio_k3_with_split": 1.216601138868221,
+   "presplit_k2_best": "64x192x32 pingpong cluster1",
+   "presplit_k2_us": 14.609600603580475,
+   "ratio_k2": 0.4852269219032238,
+   "split_a_us": 18.142400681972504,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 12.120000272989273,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 13.638399541378021,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 12.481600046157837,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 12.971200048923492,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 11.883199959993362,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 12.676799297332764,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005463864379285302,
+     "us": 11.342400312423706,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 20.188799500465393,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 22.592000663280487,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 20.19200026988983,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 24.41439926624298,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 19.368000328540802,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 21.241599321365356,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.008016834013428e-06,
+     "us": 18.488000333309174,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 16.15840047597885,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 17.30400025844574,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 15.700800716876984,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 19.601599872112274,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 15.883199870586395,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 16.913600265979767,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000285619660178544,
+     "us": 14.609600603580475,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 15000,
+   "k": 384,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 29.878398776054382,
+   "today_us_runs": [
+    29.878398776054382,
+    30.01759946346283
+   ],
+   "today_error": 1.7150701868274555e-07,
+   "today_us_per_force_call": 29.878398776054382,
+   "single_best": "128x128x32 cooperative cluster1",
+   "single_us": 8.699200302362442,
+   "x3_us": 26.097600907087326,
+   "ratio_x3": 0.8734604924010478,
+   "presplit_k3_best": "128x64x32 cooperative cluster1",
+   "presplit_k3_us": 24.031999707221985,
+   "ratio_k3": 0.8043268947358079,
+   "ratio_k3_with_split": 2.7219128730090696,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 17.550399899482727,
+   "ratio_k2": 0.5873942586758781,
+   "split_a_us": 57.29439854621887,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 8.699200302362442,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 9.356799721717834,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 8.793599903583527,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 9.52799990773201,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 12.39200010895729,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 9.604799747467041,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0003207716310864056,
+     "us": 16.361600160598755,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 24.171200394630432,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 24.031999707221985,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 24.15039986371994,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 24.979199469089508,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 30.606400966644287,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 24.457600712776184,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.4920642357486473e-06,
+     "us": 40.87679982185364,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 17.723199725151062,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 17.927999794483185,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 17.550399899482727,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 18.07679980993271,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 21.801599860191345,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 18.160000443458557,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00017601255176127848,
+     "us": 27.47040092945099,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 15000,
+   "k": 384,
+   "n": 128,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 36.347201466560364,
+   "today_us_runs": [
+    36.51359975337982,
+    36.347201466560364
+   ],
+   "today_error": 1.4095688274062846e-07,
+   "today_us_per_force_call": 36.347201466560364,
+   "single_best": "128x128x32 cooperative cluster1",
+   "single_us": 8.76000002026558,
+   "x3_us": 26.280000060796738,
+   "ratio_x3": 0.7230267806167826,
+   "presplit_k3_best": "128x128x32 cooperative cluster1",
+   "presplit_k3_us": 24.105599522590637,
+   "ratio_k3": 0.6632037282091148,
+   "ratio_k3_with_split": 2.23863183443031,
+   "presplit_k2_best": "128x64x32 cooperative cluster1",
+   "presplit_k2_us": 16.843199729919434,
+   "ratio_k2": 0.46339742952192,
+   "split_a_us": 57.26240277290344,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 8.76000002026558,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 9.36639979481697,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 8.905600011348724,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 9.63359996676445,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 12.495999783277512,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 9.627199918031693,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00032256482191721984,
+     "us": 16.96159988641739,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 24.105599522590637,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 24.166400730609894,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 25.116801261901855,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 25.15999972820282,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 30.209600925445557,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 24.22560006380081,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.432316278989849e-06,
+     "us": 42.420798540115356,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 16.884799301624298,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 16.843199729919434,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 16.857600212097168,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 17.56480038166046,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 21.119999885559082,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 17.371200025081635,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00018009609424126334,
+     "us": 29.03839945793152,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 25000,
+   "k": 192,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 24.04640018939972,
+   "today_us_runs": [
+    24.07519966363907,
+    24.04640018939972
+   ],
+   "today_error": 1.7483261379085226e-07,
+   "today_us_per_force_call": 24.04640018939972,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 8.78560021519661,
+   "x3_us": 26.35680064558983,
+   "ratio_x3": 1.0960809284546713,
+   "presplit_k3_best": "64x64x32 pingpong cluster1",
+   "presplit_k3_us": 21.158400177955627,
+   "ratio_k3": 0.879898862669798,
+   "ratio_k3_with_split": 2.863264322469494,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 14.4896000623703,
+   "ratio_k2": 0.6025683656698725,
+   "split_a_us": 47.69279956817627,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 10.26879996061325,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 9.470400214195251,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 8.78560021519661,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 9.548799693584442,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 14.262400567531586,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 11.20000034570694,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00043683648544043917,
+     "us": 14.001600444316864,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 24.1007998585701,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 21.348799765110016,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 21.28479927778244,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 21.158400177955627,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 31.09920024871826,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 24.030399322509766,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.686629386708762e-06,
+     "us": 30.19840121269226,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 15.755200386047363,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 14.956800639629364,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 14.4896000623703,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 14.910399913787842,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 21.41599953174591,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 16.390399634838104,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00025476734388682855,
+     "us": 24.374400079250336,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 25000,
+   "k": 128,
+   "n": 192,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 25.992000102996826,
+   "today_us_runs": [
+    26.023998856544495,
+    25.992000102996826
+   ],
+   "today_error": 2.160301635781919e-07,
+   "today_us_per_force_call": 25.992000102996826,
+   "single_best": "64x192x32 pingpong cluster1",
+   "single_us": 9.649600088596344,
+   "x3_us": 28.948800265789032,
+   "ratio_x3": 1.1137580852214328,
+   "presplit_k3_best": "64x192x32 pingpong cluster1",
+   "presplit_k3_us": 18.73279958963394,
+   "ratio_k3": 0.7207140472223255,
+   "ratio_k3_with_split": 1.8620498865557955,
+   "presplit_k2_best": "64x192x32 pingpong cluster1",
+   "presplit_k2_us": 12.249600142240524,
+   "ratio_k2": 0.471283475442437,
+   "split_a_us": 29.66560125350952,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 12.273599952459335,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 11.847999691963196,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 13.814400136470795,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 11.255999654531479,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 11.902400106191635,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 13.723200559616089,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00055786094460077,
+     "us": 9.649600088596344,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 21.06879949569702,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 21.39360010623932,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 26.523199677467346,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 21.41759991645813,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 22.249600291252136,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 25.856000185012817,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.9268523901393467e-06,
+     "us": 18.73279958963394,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 16.737599670886993,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 15.824000537395477,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 22.686399519443512,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 17.003199458122253,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 15.936000645160675,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 19.075199961662292,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027697734861163845,
+     "us": 12.249600142240524,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 15000,
+   "k": 192,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 16.708800196647644,
+   "today_us_runs": [
+    16.708800196647644,
+    16.820800304412842
+   ],
+   "today_error": 1.8096341457155038e-07,
+   "today_us_per_force_call": 16.708800196647644,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 6.801600009202957,
+   "x3_us": 20.40480002760887,
+   "ratio_x3": 1.2212007916464744,
+   "presplit_k3_best": "128x128x32 cooperative cluster1",
+   "presplit_k3_us": 11.054400354623795,
+   "ratio_k3": 0.6615915101337848,
+   "ratio_k3_with_split": 2.254141500386245,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 8.681599795818329,
+   "ratio_k2": 0.5195824771164691,
+   "split_a_us": 26.609599590301514,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 6.9439999759197235,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 7.275199890136719,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 6.801600009202957,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 7.390400022268295,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 8.804800361394882,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 7.268799841403961,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004561948759707771,
+     "us": 10.264000296592712,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 11.054400354623795,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 11.876799911260605,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 11.852800101041794,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 13.769599795341492,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 16.385599970817566,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 11.81119978427887,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.409086886005493e-06,
+     "us": 20.4912006855011,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 8.872000128030777,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 9.374400228261948,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 8.681599795818329,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 10.089600086212158,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 12.296000123023987,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 9.540800005197525,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00024193452344907886,
+     "us": 15.825599431991577,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 15000,
+   "k": 128,
+   "n": 192,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 17.761600017547607,
+   "today_us_runs": [
+    17.772799730300903,
+    17.761600017547607
+   ],
+   "today_error": 2.0191011825400206e-07,
+   "today_us_per_force_call": 17.761600017547607,
+   "single_best": "64x192x32 pingpong cluster1",
+   "single_us": 7.742399722337723,
+   "x3_us": 23.22719916701317,
+   "ratio_x3": 1.3077199770328019,
+   "presplit_k3_best": "64x192x32 pingpong cluster1",
+   "presplit_k3_us": 10.254400223493576,
+   "ratio_k3": 0.5773353872040087,
+   "ratio_k3_with_split": 1.616521071833906,
+   "presplit_k2_best": "64x192x32 pingpong cluster1",
+   "presplit_k2_us": 8.868800103664398,
+   "ratio_k2": 0.4993243905336484,
+   "split_a_us": 18.457600474357605,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 9.190399944782257,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 8.383999764919281,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 10.05920022726059,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 8.558399975299835,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 7.7615998685359955,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 10.385599732398987,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004949015425783782,
+     "us": 7.742399722337723,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 14.14559930562973,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 12.622399628162384,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 18.23360025882721,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 13.113600015640259,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 11.20000034570694,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 17.134399712085724,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8222545051675704e-06,
+     "us": 10.254400223493576,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 12.065599858760834,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 10.420800000429153,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 14.524799585342407,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 10.684800148010254,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 9.42080020904541,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 13.944000005722046,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002793323885255841,
+     "us": 8.868800103664398,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 2,
+   "today_us": 12.412799894809723,
+   "today_us_runs": [
+    12.412799894809723,
+    12.443199753761292
+   ],
+   "today_error": 1.9388401477770488e-07,
+   "today_us_per_force_call": 24.825599789619446,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 6.118400022387505,
+   "x3_us": 18.355200067162514,
+   "ratio_x3": 1.4787316498059024,
+   "presplit_k3_best": "64x128x32 pingpong cluster1",
+   "presplit_k3_us": 8.41120034456253,
+   "ratio_k3": 0.6776231322378429,
+   "ratio_k3_with_split": 1.393916019384667,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 7.036799937486649,
+   "ratio_k2": 0.5668986849960427,
+   "split_a_us": 8.89120027422905,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 6.228800117969513,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 6.526400148868561,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 6.118400022387505,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 6.822399795055389,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 7.129599899053574,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 6.572800129652023,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004988351843217047,
+     "us": 6.9888003170490265,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 8.563199639320374,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 9.340800344944,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 8.41120034456253,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 9.560000151395798,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 10.420800000429153,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 9.540800005197525,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.780427735317085e-06,
+     "us": 9.862399846315384,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 7.462400197982788,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 8.003199845552444,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 7.036799937486649,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 8.27839970588684,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 8.832000195980072,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 8.038400113582611,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002653970555258082,
+     "us": 8.436799794435501,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 15000,
+   "k": 128,
+   "n": 128,
+   "layout": "rr",
+   "calls": 2,
+   "today_us": 12.406399846076965,
+   "today_us_runs": [
+    12.406399846076965,
+    12.430399656295776
+   ],
+   "today_error": 2.5992194709098567e-07,
+   "today_us_per_force_call": 24.81279969215393,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 5.974400043487549,
+   "x3_us": 17.923200130462646,
+   "ratio_x3": 1.4446737452307852,
+   "presplit_k3_best": "128x128x32 cooperative cluster1",
+   "presplit_k3_us": 8.711999654769897,
+   "ratio_k3": 0.7022181908416182,
+   "ratio_k3_with_split": 2.2224658693212924,
+   "presplit_k2_best": "128x128x32 cooperative cluster1",
+   "presplit_k2_us": 7.462400197982788,
+   "ratio_k2": 0.601496025484176,
+   "split_a_us": 18.860800564289093,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 6.351999938488007,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 6.5007999539375305,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 5.974400043487549,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 6.800000369548798,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 7.689599692821503,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 6.775999814271927,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0005030196129982136,
+     "us": 8.048000186681747,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 8.711999654769897,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 9.294400364160538,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 8.830399811267853,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 9.520000219345093,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 12.583999335765839,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 9.52799990773201,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8639047486073221e-06,
+     "us": 17.103999853134155,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 7.462400197982788,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 7.992000132799149,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 7.553599774837494,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 8.036799728870392,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 9.976000338792801,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 8.209600299596786,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002861998058416279,
+     "us": 11.975999921560287,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 384,
+   "n": 128,
+   "layout": "rc",
+   "calls": 2,
+   "today_us": 16.13920032978058,
+   "today_us_runs": [
+    16.13920032978058,
+    16.18400067090988
+   ],
+   "today_error": 1.4738590021631853e-07,
+   "today_us_per_force_call": 32.27840065956116,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 5.876800045371056,
+   "x3_us": 17.630400136113167,
+   "ratio_x3": 1.092396139577063,
+   "presplit_k3_best": "128x64x32 cooperative cluster1",
+   "presplit_k3_us": 9.513600170612335,
+   "ratio_k3": 0.5894715956315091,
+   "ratio_k3_with_split": 1.7234063415615086,
+   "presplit_k2_best": "128x64x32 cooperative cluster1",
+   "presplit_k2_us": 7.635200023651123,
+   "ratio_k2": 0.47308415953933003,
+   "split_a_us": 18.300800025463104,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 7.862400263547897,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 6.179200112819672,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 5.876800045371056,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 6.251200288534164,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 9.945599734783173,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 8.350399881601334,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00029805872308465,
+     "us": 8.699200302362442,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 14.673599600791931,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 9.513600170612335,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 10.195200145244598,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 12.852799892425537,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 20.24960070848465,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 15.033599734306335,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.410126080350454e-06,
+     "us": 19.69600021839142,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 11.238399893045425,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 7.635200023651123,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 7.72320032119751,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 8.86240005493164,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 15.09920060634613,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 11.575999855995178,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00016493643328177422,
+     "us": 13.868799805641174,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 256,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 11.689600348472595,
+   "today_us_runs": [
+    11.736000329256058,
+    11.689600348472595
+   ],
+   "today_error": 1.4335742729294475e-07,
+   "today_us_per_force_call": 11.689600348472595,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 5.17599992454052,
+   "x3_us": 15.52799977362156,
+   "ratio_x3": 1.3283601928829416,
+   "presplit_k3_best": "64x128x32 pingpong cluster1",
+   "presplit_k3_us": 7.863999903202057,
+   "ratio_k3": 0.6727347102358033,
+   "ratio_k3_with_split": 1.817957800610293,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 6.340800225734711,
+   "ratio_k2": 0.5424308818704159,
+   "split_a_us": 13.387200236320496,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 6.681600213050842,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 5.262399837374687,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 5.17599992454052,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 5.697600170969963,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 8.20000022649765,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 6.992000341415405,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000356401194684387,
+     "us": 6.976000219583511,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 11.287999898195267,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 8.235199749469757,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 7.863999903202057,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 9.10239964723587,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 15.02079963684082,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 11.459200084209442,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.3788133449246674e-06,
+     "us": 13.05599957704544,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 8.94239991903305,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 6.398399919271469,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 6.340800225734711,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 7.48319998383522,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 11.612799763679504,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 9.257599711418152,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0001953645101838515,
+     "us": 9.1839998960495,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 128,
+   "n": 256,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 9.625600278377533,
+   "today_us_runs": [
+    9.625600278377533,
+    9.68639999628067
+   ],
+   "today_error": 2.0396657839620426e-07,
+   "today_us_per_force_call": 9.625600278377533,
+   "single_best": "128x128x32 cooperative cluster1",
+   "single_us": 5.782400071620941,
+   "x3_us": 17.347200214862823,
+   "ratio_x3": 1.802194119137765,
+   "presplit_k3_best": "64x64x32 pingpong cluster1",
+   "presplit_k3_us": 7.8703999519348145,
+   "ratio_k3": 0.8176528968914788,
+   "ratio_k3_with_split": 1.7400265587925998,
+   "presplit_k2_best": "64x64x32 pingpong cluster1",
+   "presplit_k2_us": 6.777600198984146,
+   "ratio_k2": 0.7041223407343237,
+   "split_a_us": 8.878400176763535,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 5.782400071620941,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 6.243199855089188,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 5.828800052404404,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 5.78560009598732,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 6.785599887371063,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 6.012799963355064,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004812396923097337,
+     "us": 7.134400308132172,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 8.118399977684021,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 9.015999734401703,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 8.1727996468544,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 7.8703999519348145,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 10.2463997900486,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 8.27839970588684,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.7150356661870015e-06,
+     "us": 11.998400092124939,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 6.907200068235397,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 7.651200145483017,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 6.800000369548798,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 6.777600198984146,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 8.564800024032593,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 7.115200161933899,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.000270119672330816,
+     "us": 9.76480022072792,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 192,
+   "n": 128,
+   "layout": "rr",
+   "calls": 1,
+   "today_us": 9.547200053930283,
+   "today_us_runs": [
+    9.547200053930283,
+    9.561599791049957
+   ],
+   "today_error": 1.6481188942178723e-07,
+   "today_us_per_force_call": 9.547200053930283,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 4.823999851942062,
+   "x3_us": 14.471999555826187,
+   "ratio_x3": 1.5158370489857411,
+   "presplit_k3_best": "128x64x32 cooperative cluster1",
+   "presplit_k3_us": 6.774400174617767,
+   "ratio_k3": 0.7095693120863179,
+   "ratio_k3_with_split": 1.8788335602329789,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 5.78560009598732,
+   "ratio_k2": 0.6059996714539956,
+   "split_a_us": 11.163199692964554,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 6.044799834489822,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 4.878399893641472,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 4.823999851942062,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 5.2191998809576035,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 7.382400333881378,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 6.286399811506271,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004041162568271436,
+     "us": 6.044799834489822,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 9.521599858999252,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 6.774400174617767,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 6.960000097751617,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 7.644800096750259,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 12.494400143623352,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 9.736000001430511,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.332555987815953e-06,
+     "us": 10.45759990811348,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 7.798399776220322,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 5.8159999549388885,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 5.78560009598732,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 6.243199855089188,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 9.967999905347824,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 8.035200089216232,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00022514928098222486,
+     "us": 7.614400237798691,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 128,
+   "n": 192,
+   "layout": "rc",
+   "calls": 1,
+   "today_us": 7.473599910736084,
+   "today_us_runs": [
+    7.487999647855759,
+    7.473599910736084
+   ],
+   "today_error": 1.832104397941675e-07,
+   "today_us_per_force_call": 7.473599910736084,
+   "single_best": "128x64x32 cooperative cluster1",
+   "single_us": 4.878399893641472,
+   "x3_us": 14.635199680924416,
+   "ratio_x3": 1.9582530314340814,
+   "presplit_k3_best": "128x64x32 cooperative cluster1",
+   "presplit_k3_us": 6.228800117969513,
+   "ratio_k3": 0.8334404025323361,
+   "ratio_k3_with_split": 2.0207664400069545,
+   "presplit_k2_best": "128x64x32 cooperative cluster1",
+   "presplit_k2_us": 5.54560013115406,
+   "ratio_k2": 0.7420252886681309,
+   "split_a_us": 8.873599767684937,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 5.744000151753426,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 4.878399893641472,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 6.220800057053566,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 4.9536000937223434,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 6.596799939870834,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 5.995199829339981,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004850654360966239,
+     "us": 5.206400156021118,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 8.09279978275299,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 6.228800117969513,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 9.697599709033966,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 6.4319998025894165,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 10.023999959230423,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 8.807999640703201,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 1.8151548490666069e-06,
+     "us": 6.887999922037125,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 6.862399727106094,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 5.54560013115406,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 7.947199791669846,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 5.688000097870827,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 8.30560028553009,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 7.4799999594688416,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.00027459395468936587,
+     "us": 6.072000041604042,
+     "timing": "graph"
+    }
+   }
+  },
+  {
+   "m": 5000,
+   "k": 128,
+   "n": 128,
+   "layout": "rr",
+   "calls": 5,
+   "today_us": 7.32479989528656,
+   "today_us_runs": [
+    7.32479989528656,
+    7.326400279998779
+   ],
+   "today_error": 2.1432394127001182e-07,
+   "today_us_per_force_call": 36.6239994764328,
+   "single_best": "64x128x32 pingpong cluster1",
+   "single_us": 4.5712001621723175,
+   "x3_us": 13.713600486516953,
+   "ratio_x3": 1.8722150342074908,
+   "presplit_k3_best": "64x128x32 pingpong cluster1",
+   "presplit_k3_us": 5.780800059437752,
+   "ratio_k3": 0.7892092810832474,
+   "ratio_k3_with_split": 2.0043688041516887,
+   "presplit_k2_best": "64x128x32 pingpong cluster1",
+   "presplit_k2_us": 5.14880008995533,
+   "ratio_k2": 0.702927064706373,
+   "split_a_us": 8.900800347328186,
+   "single": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 5.559999868273735,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 4.699200019240379,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 4.5712001621723175,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 4.814400151371956,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 6.5647996962070465,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 5.721599981188774,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0004853966483766948,
+     "us": 5.433600023388863,
+     "timing": "graph"
+    }
+   },
+   "presplit_k3": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 7.798399776220322,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 5.828800052404404,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 5.780800059437752,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 6.5456002950668335,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 9.940800070762634,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 8.01279991865158,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 2.2615570250304965e-06,
+     "us": 8.619199693202972,
+     "timing": "graph"
+    }
+   },
+   "presplit_k2": {
+    "128x128x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 6.66240006685257,
+     "timing": "graph"
+    },
+    "128x64x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 5.198400095105171,
+     "timing": "graph"
+    },
+    "64x128x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 5.14880008995533,
+     "timing": "graph"
+    },
+    "64x64x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 5.508799850940704,
+     "timing": "graph"
+    },
+    "128x192x32 cooperative cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 8.22720006108284,
+     "timing": "graph"
+    },
+    "128x128x32 cooperative cluster2x1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 6.942400336265564,
+     "timing": "graph"
+    },
+    "64x192x32 pingpong cluster1": {
+     "status": 0,
+     "run_code": 0,
+     "error": 0.0002776812706247617,
+     "us": 6.931199878454208,
+     "timing": "graph"
+    }
+   }
+  }
+ ],
+ "six": [
+  {
+   "m": 25000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 2
+  },
+  {
+   "m": 35000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 1
+  },
+  {
+   "m": 35000,
+   "k": 384,
+   "n": 128,
+   "layout": "rc",
+   "calls": 1
+  },
+  {
+   "m": 15000,
+   "k": 128,
+   "n": 384,
+   "layout": "rr",
+   "calls": 2
+  },
+  {
+   "m": 35000,
+   "k": 128,
+   "n": 256,
+   "layout": "rr",
+   "calls": 1
+  },
+  {
+   "m": 25000,
+   "k": 384,
+   "n": 128,
+   "layout": "rc",
+   "calls": 1
+  }
+ ],
+ "six_total": {
+  "today_us": 381.920000910759,
+  "x3_us": 410.00640392303467,
+  "k3_us": 256.36959969997406,
+  "k3_split_us": 664.2543911933899,
+  "k2_us": 194.52640265226364,
+  "all_shapes_today_us": 851.1024035513401,
+  "ratio_x3": 1.0735400160905384,
+  "ratio_k3": 0.6712651840401479,
+  "ratio_k3_with_split": 1.7392500775276296,
+  "ratio_k2": 0.509338087003507,
+  "threshold": 0.6,
+  "verdict": "stop"
+ }
+}
