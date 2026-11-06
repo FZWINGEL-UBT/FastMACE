@@ -47,7 +47,9 @@ def route(model):
         module.tf32x3 = True
         module.tf32x3_backend = backend(device)
         if type(module).__name__ == "BlockLinear" and module.tf32x3_backend == "cutlass":
-            from fastmace.kernels.cutlass import segment_rows
+            from fastmace.kernels.cutlass import linear_div, segment_rows
+
+            module.linear_div = linear_div.linear_div_default(torch.cuda.get_device_name(device))
 
             if segment_rows.segment_rows_default(device):
                 count = len(module.block_ends)

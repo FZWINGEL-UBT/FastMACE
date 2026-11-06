@@ -1,0 +1,30 @@
+  import pynvml  # type: ignore[import]
+  value = original(*args, **kwargs)
+  from openequivariance._torch.TensorProduct import TensorProduct
+  value = original(*args, **kwargs)
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+  value = original(*args, **kwargs)
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+side a: epilogue launches 0
+side b: epilogue launches 28
+side a2: epilogue launches 0
+a2 vs a: bitwise False worst max_abs 4.341e-05
+  call0.energy: max_abs 4.530e-06
+  call0.forces: max_abs 2.682e-06
+  call1.energy: max_abs 3.219e-05
+  call1.forces: max_abs 3.099e-06
+  md.positions: max_abs 1.521e-07
+  md.momenta: max_abs 3.515e-06
+  md.forces: max_abs 4.341e-05
+  md.energy: max_abs 1.764e-05
+  md.kinetic: max_abs 8.530e-09
+b vs a: bitwise False worst max_abs 4.461e-05
+  call0.energy: max_abs 1.192e-06
+  call0.forces: max_abs 3.725e-06
+  call1.energy: max_abs 1.740e-05
+  call1.forces: max_abs 3.338e-06
+  md.positions: max_abs 1.313e-07
+  md.momenta: max_abs 3.794e-06
+  md.forces: max_abs 4.461e-05
+  md.energy: max_abs 4.292e-05
+  md.kinetic: max_abs 1.142e-07

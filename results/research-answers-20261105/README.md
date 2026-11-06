@@ -666,3 +666,32 @@ Ported as `fastmace/kernels/oeq_streaming/kloop_rewrites.py` (`apply_a_ld128`, `
 - **Ideas 32 and 30–33 (revision 14):** 32's locality bound is f = 0.08 / 0.14 / 0.22 / 0.33 / 0.42 for Morton tiles
   of 8 / 16 / 32 / 64 / 128 rows (SrTiO3 10x10x10, 6 Å). Only 32 rows fit in shared memory beside W, where f is
   below the 0.25 stop line, so 32 is stopped. 30, 31 and 33 are in progress (owner approval, 6 November 2026).
+
+
+### Revision 14: GEMM epilogue (`LINEAR_DIV`) adopted; ideas 30, 32, 33, 36 measured (6 November 2026)
+
+The owner approved revision 14's ideas 30–33 on 6 November 2026 (lifting the brief's exclusions of the wgmma a·W
+product, producer/consumer warps and a native sm_90 3xTF32 GEMM). Each ran its cheap bound first.
+
+- **31, GEMM epilogues (`LINEAR_DIV`, adopted):**
+  - CPU analysis (`results/h200-ideas-20261105/idea31-glue.md`): ≈ 253 µs per force call absorbable bitwise into
+    epilogues (157 µs) and output slices (96 µs).
+  - First family built: interaction 2's `linear` with the division by (density + 1) in a CUTLASS 3xTF32 epilogue
+    that writes straight into its slice of the [atoms, 2048] tensor (`fastmace/kernels/cutlass/linear_div.py`).
+    Inductor's cat and division kernels go. The divisions copy Inductor's `div.full.f32`. Bitwise at kernel level
+    on the H200 and A100-SXM4 (`tests/gpu/test_linear_div_cuda.py`).
+  - MD step (SrTiO3 10x10x10, both build orders): H200 **0.9912 / 0.9934**, A100-SXM4-80GB **0.9896 / 0.9891**.
+    Default on both (decision 66). More families follow (B9–B11, F2–F5, SpeciesSkip).
+- **30, warp-specialized wgmma forward (H200; in progress):** a producer warpgroup issues the wgmma 3xTF32
+  product, consumer warps run today's TP, and an mbarrier ring connects them. Lab, part 1: 0.80 of today's part.
+  Both parts: whole forward **0.859** (1,292 against 1,505 µs). Messages max rel 2.9e-7 (rounding class).
+  Production port, gate and MD A/B pending (`results/h200-ideas-20261105/idea30-full.md`, branch
+  `fastmace/idea30-ws`).
+- **32, w shared by mirror pairs in a tile:** stopped. f = 0.22 at the 32-row Morton tiles that fit beside W, below
+  the 0.25 line.
+- **33, native sm_90 TF32 wgmma GEMM:** stopped. Three passes take 1.07× today's 3xTF32 GEMMs on the six largest
+  shapes (CUTLASS 4.8.1, best of seven configs per shape; 1.15× over all 24). A single pass is ≈ 3× faster, but it
+  is bound by memory traffic, and three passes triple the traffic (`results/h200-ideas-20261105/idea33-bound.md`,
+  branch `fastmace/idea33-bound`).
+- **36, w′ register cap on the H200:** closed. Lab at `31c394b4`: maxreg80 1.255 (no spills), maxreg72 1.078,
+  maxreg64 1.234 against 96 registers (1,646 µs). More warps make it slower.

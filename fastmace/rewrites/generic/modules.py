@@ -278,14 +278,24 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         sc = self.truncate_ghosts(sc, n_real)
         message = self.linear(message) / self.avg_num_neighbors
         return self.reshape(message), sc
+    divided = None
     if getattr(self, "density_before_linear", False):  # GENERIC_DENSITY_FIRST (not carried over); bias-free linear
         message = self.linear(message / (density + 1))
     else:
-        message = self.linear(message) / (density + 1)
+        # idea 31 (kernels.cutlass.linear_div): the division and the join in the products' epilogue, bitwise
+        divide = getattr(self.linear, "divided", None)
+        divided = divide(message, density) if divide is not None else None
+        message = divided if divided is not None else self.linear(message) / (density + 1)
     if kind == "density":
         message = self.skip_tp(message, node_attrs)
         return self.reshape(message), None
     sc = self.truncate_ghosts(sc, n_real)
+    if divided is not None:  # the epilogue's output is reshape_irreps' [n, irreps, mul] tensor already
+        from fastmace.rewrites.linear.modules import reshape_view
+
+        view = reshape_view(self.reshape, message)
+        if view is not None:
+            return view, sc
     return self.reshape(message), sc
 
 
