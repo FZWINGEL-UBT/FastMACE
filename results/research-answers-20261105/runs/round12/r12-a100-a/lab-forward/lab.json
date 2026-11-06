@@ -1,0 +1,210 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-06T07:45:56.465478+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "54488d00cc962d0df88bdabe7e664a35ba5dcf73",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 59.189192589,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=162816)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 159,
+          "local_bytes": 48,
+          "median_us": 2757.5039863586426,
+          "min_us": 2732.032060623169,
+          "max_us": 3333.695888519287,
+          "ratio": 1.0
+        },
+        "iii": {
+          "kind": "exact",
+          "registers": 160,
+          "local_bytes": 24,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 2963.615894317627,
+          "min_us": 2954.5600414276123,
+          "max_us": 3591.0398960113525,
+          "ratio": 1.0747458241143508
+        },
+        "iii-nf": {
+          "kind": "exact",
+          "registers": 160,
+          "local_bytes": 24,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 2838.560104370117,
+          "min_us": 2828.06396484375,
+          "max_us": 3438.6239051818848,
+          "ratio": 1.0293947419160439
+        },
+        "iii-u1": {
+          "kind": "exact",
+          "registers": 157,
+          "local_bytes": 24,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 2994.719982147217,
+          "min_us": 2985.856056213379,
+          "max_us": 3636.2879276275635,
+          "ratio": 1.0860256220705684
+        },
+        "iii-br": {
+          "kind": "exact",
+          "registers": 162,
+          "local_bytes": 24,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 3007.64799118042,
+          "min_us": 3003.4239292144775,
+          "max_us": 3628.511905670166,
+          "ratio": 1.0907139231925822
+        },
+        "fold": {
+          "kind": "rounding",
+          "registers": 161,
+          "local_bytes": 64,
+          "compare": {
+            "out0": "max|d|/max|a| = 3.27e-07",
+            "out1": "max|d|/max|a| = 6.45e-07",
+            "out2": "max|d|/max|a| = 2.82e-07",
+            "out3": "max|d|/max|a| = 3.44e-07",
+            "w": "bitwise"
+          },
+          "median_us": 2621.9840049743652,
+          "min_us": 2611.5200519561768,
+          "max_us": 3175.5518913269043,
+          "ratio": 0.9508541122498122
+        },
+        "iii-fold": {
+          "kind": "rounding",
+          "registers": 158,
+          "local_bytes": 48,
+          "compare": {
+            "out0": "max|d|/max|a| = 3.27e-07",
+            "out1": "max|d|/max|a| = 6.45e-07",
+            "out2": "max|d|/max|a| = 2.82e-07",
+            "out3": "max|d|/max|a| = 3.44e-07",
+            "w": "bitwise"
+          },
+          "median_us": 2878.3679008483887,
+          "min_us": 2869.2800998687744,
+          "max_us": 3479.2640209198,
+          "ratio": 1.043830911972443
+        },
+        "iii-nf-fold": {
+          "kind": "rounding",
+          "registers": 168,
+          "local_bytes": 64,
+          "compare": {
+            "out0": "max|d|/max|a| = 3.27e-07",
+            "out1": "max|d|/max|a| = 6.45e-07",
+            "out2": "max|d|/max|a| = 2.82e-07",
+            "out3": "max|d|/max|a| = 3.44e-07",
+            "w": "bitwise"
+          },
+          "median_us": 2807.584047317505,
+          "min_us": 2803.040027618408,
+          "max_us": 3398.0159759521484,
+          "ratio": 1.018161373911555
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "9.0": {
+          "registers": 158,
+          "spill_store_bytes": 0
+        }
+      },
+      "iii": {
+        "9.0": {
+          "registers": 157,
+          "spill_store_bytes": 0
+        }
+      },
+      "iii-nf": {
+        "9.0": {
+          "registers": 167,
+          "spill_store_bytes": 0
+        }
+      },
+      "iii-u1": {
+        "9.0": {
+          "registers": 155,
+          "spill_store_bytes": 0
+        }
+      },
+      "iii-br": {
+        "9.0": {
+          "registers": 160,
+          "spill_store_bytes": 0
+        }
+      },
+      "fold": {
+        "9.0": {
+          "registers": 150,
+          "spill_store_bytes": 0
+        }
+      },
+      "iii-fold": {
+        "9.0": {
+          "registers": 158,
+          "spill_store_bytes": 0
+        }
+      },
+      "iii-nf-fold": {
+        "9.0": {
+          "registers": 163,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  },
+  "profiled": {
+    "forward": []
+  }
+}

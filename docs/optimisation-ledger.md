@@ -471,6 +471,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r8](#ideas-r8) | A100 at 12 warps (`WFRAG_REGION`) with `W_GROUP`; `A_SPLIT`; ncu stall reasons (idea 18) | `fused_forward.WFRAG_REGION_GPUS`, `W_GROUP_GPUS`, `A_SPLIT` | FM | WFRAG_REGION + W_GROUP DEFAULT on the A100-SXM4; A_SPLIT REJECTED; idea 18 CLOSED | 2026-11-06 | A100 MD 0.9718 / 0.9734 (both), WFRAG_REGION alone 0.9871 / 0.9887; A100 loup 2.169 µs/atom/step; A_SPLIT H200 1.0311 / 1.0346; H200 no_instruction stalls 0.18 of 5.40 cycles | [research answers](../results/research-answers-20261105/README.md#round-8-a100-at-12-warps-a_split-ncu-stall-reasons-6-november-2026) |501-6-november-2026) |
 | [ideas-r9](#ideas-r9) | 14 and 16 warps (idea 22(ii)), part phases (25), x-load bounds, atom order, persistent w′ (23) | none (lab variants `wg14`, `wg16`, `F-x-row0`, `F-part0-only`, `wp-persist*`) | FM | 22(ii), 23, 25 CLOSED; nothing adopted | 2026-11-06 | H200 wg14 1.029, wg16 1.017 (128 regs, spills); F-no-xload-wg16 0.900 vs wg12 0.905; F-x-row0 H200 0.977, A100-SXM4 0.988; Morton = repeat; best w′ variant H200 0.987, A100 1.113 | [research answers](../results/research-answers-20261105/README.md#round-9-more-warps-part-phases-x-load-bounds-a-persistent-w-6-november-2026) |
 | [ideas-r11](#ideas-r11) | x gathers after the k-loop (idea 27, `X_LATE`), a/W one k-step ahead (`K_PIPE`), staging one batch ahead (idea 26) | `fused_forward.X_LATE_GPUS`, `K_PIPE_GPUS` | FM | X_LATE DEFAULT on the H200 and A100-SXM4; K_PIPE off; 26 REJECTED | 2026-11-06 | MD X_LATE H200 0.9884 / 0.9882, A100-SXM4 0.9937 / 0.9937; stage-ahead lab H200 1.012–1.034 | [research answers](../results/research-answers-20261105/README.md#round-11-x-gathers-after-the-k-loop-x_late-adopted-stage-ahead-rejected-6-november-2026) |
+| [ideas-r12](#ideas-r12) | CG factors folded into W (idea 24, `CG_FOLD`), TP inside the next k-loop (22(iii)) | `fused_forward.CG_FOLD_GPUS`, `cg_fold.py` | FM | CG_FOLD DEFAULT on the H200 and A100-SXM4; 22(iii) REJECTED | 2026-11-06 | MD CG_FOLD H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898; lab 22(iii) 1.03–1.21 | [research answers](../results/research-answers-20261105/README.md#round-12-cg-factors-folded-into-w-cg_fold-adopted-tp-in-the-next-k-loop-rejected-6-november-2026) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4328,6 +4329,15 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
+
+<a id="ideas-r12"></a>
+### ideas-r12: CG factors folded into W, adopted; TP in the next k-loop rejected (6 November 2026)
+
+- **`CG_FOLD` (idea 24):** one CG factor per part-1 path moves into W as the block fills its slice, and part 0
+  computes w x0 first, so the TP needs fewer FP32 products. Rounding class (messages max rel 3–7e-7). Lab H200
+  0.969, A100-SXM4 0.951. MD step H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898. On the gate it gives the
+  default's result: it fails only NbCl5 stress, as the default does in the same job on both GPUs. Default on both.
+- **22(iii):** the TP of batch n inside batch n+1's k-loop. Bitwise but 1.03–1.21 in every form. Rejected.
 
 <a id="ideas-r11"></a>
 ### ideas-r11: x gathers after the k-loop, adopted; stage-ahead rejected (6 November 2026)

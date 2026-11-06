@@ -591,3 +591,42 @@ lab's launcher reads to recognise VEC_A's padded a rows, so the lab passed a com
 `tools/lab_round11.py` now refuses any variant that loses that text.
 
 Runs: `runs/round11/` (`r11-h200` (the crash), `r11-a100`, `r11b-h200`, `r11c-h200`, `ab27-h200-a`, `ab27-a100-a`, `kp-a100-c`).
+
+
+### Round 12: CG factors folded into W (`CG_FOLD`), adopted; TP in the next k-loop rejected (6 November 2026)
+
+Ideas session revision 12 (`tools/lab_round12.py`), kernel lab at `54488d00` (OMAT-0 medium forward kernel, SrTiO3,
+15 rounds, L2 flush 256 MB; Modal H200 on profile `fourth`, Modal A100-SXM4-80GB on `third`). Runs in
+`runs/round12/`.
+
+| Variant | What it does | H200 (base 1541.6 µs) | A100-SXM4 (base 2757.5 µs) | Messages |
+| --- | --- | --- | --- | --- |
+| `iii` | 22(iii): the TP of batch n inside batch n+1's k-loop | 1.109 | 1.075 | bitwise |
+| `iii-nf` | the same, with a no-flush fast path | 1.068 | 1.029 | bitwise |
+| `iii-u1` | the same, unroll 1 | 1.164 | 1.086 | bitwise |
+| `iii-br` | the same, branch form | 1.214 | 1.091 | bitwise |
+| `fold` | 24: CG factors folded into W (part 1: one factor per path; part 0: w x0 first) | **0.969** (154 regs) | **0.951** (64 B local) | max rel 3–7e-7 |
+| `iii-fold` | both | 1.093 | 1.044 | max rel 3–7e-7 |
+| `iii-nf-fold` | both, no-flush path | 1.039 | 1.018 | max rel 3–7e-7 |
+
+- **22(iii) rejected:** every form is slower on both GPUs.
+- **`CG_FOLD` (idea 24):** ported as `fastmace/kernels/oeq_streaming/cg_fold.py` and switched by
+  `fused_forward.CG_FOLD` / `CG_FOLD_GPUS`. It applies only to the message kernel (STORE_W false, as in the MD path)
+  with the two DEGREE_PARTS parts, and builds without it elsewhere. Check script: `tools/modal/cg_fold_check.sh`, at
+  `361a8e33`.
+  - **MD step (SrTiO3 10x10x10, b = CG_FOLD):** H200 0.9938 / 0.9959; A100-SXM4-80GB 0.9877 / 0.9898 (both build orders).
+  - **Force/stress gate (OMAT-0 medium; SrTiO3 3x3x3, NaCl, NbCl5; default and CG_FOLD in the same job):**
+
+    | GPU | Plan | SrTiO3 F / S ratio | NaCl F / S | NbCl5 F / S |
+    | --- | --- | --- | --- | --- |
+    | H200 | default | 0.95 / 0.97 | 0.74 / 1.00 | 0.97 / **2.10 (fail)** |
+    | H200 | CG_FOLD | 0.99 / 0.93 | 0.78 / 0.92 | 0.98 / **2.06 (fail)** |
+    | A100-SXM4 | default | 1.04 / 1.21 | 0.76 / 1.16 | 1.03 / **2.42 (fail)** |
+    | A100-SXM4 | CG_FOLD | 1.06 / 1.25 | 0.75 / 1.13 | 0.99 / **2.38 (fail)** |
+
+    CG_FOLD gives the default's result: NbCl5 stress fails for both, at about 1.3–1.5e-7 eV/Å³ against a limit of
+    about 1.3e-7. That is near the gate's absolute floor of 1e-7 and is the A100's accepted exception. **New:** the
+    H200 default also failed NbCl5 stress in this job (2.10). Its earlier margin was small, and the float32 ASE
+    reference value moves between jobs (6.3–6.5e-8). CG_FOLD changes none of this, so it was adopted
+    ("make them default if they are faster and accurate").
+  - **Default since this commit on the H200 and A100-SXM4-80GB** (decision 66).
