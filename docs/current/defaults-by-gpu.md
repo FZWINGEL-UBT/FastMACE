@@ -38,11 +38,28 @@ POLAR-1 runs MH-1's interaction class, so it takes MH-1's class-level defaults (
 | Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `wprime_backward` + `fused_folded_forward` (`POLAR_DECISION_66_WPRIME_GPUS`), M and L only | – (not measured) | on | – (not measured) | rounding | Ada POLAR-1-M NaCl 0.963 / 0.965, NbCl5 0.970 / 0.971; with `gate_epilogue` 0.966 / 0.966, 0.957 / 0.958; force gate passes | owner 5 Nov (d66) | [polar-reuse](../validation/polar/polar-reuse.md) |
-| `gate_epilogue` (`POLAR_DECISION_66_GATE_EPILOGUE_GPUS`) | – (not measured) | on | – | rounding | Ada POLAR-1-S NbCl5 0.994 / 0.993, NaCl 0.998 / 1.001; POLAR-1-M NbCl5 0.989 / 0.989, NaCl 1.002 / 0.999 | owner 5 Nov (d66) | [polar-reuse](../validation/polar/polar-reuse.md) |
+| `gate_epilogue` (`POLAR_DECISION_66_GATE_EPILOGUE_GPUS`) | – (not measured) | on | – (A100-SXM4-80GB tie: S 0.9996–1.0005, M 0.9987–1.0005) | rounding | Ada POLAR-1-S NbCl5 0.994 / 0.993, NaCl 0.998 / 1.001; POLAR-1-M NbCl5 0.989 / 0.989, NaCl 1.002 / 0.999 | owner 5 Nov (d66) | [polar-reuse](../validation/polar/polar-reuse.md) |
+| `tf32x3_gemms` (`DECISION_66_TF32X3_MODEL_GPUS`, S, M and L) | – | – | on | precision change | A100-SXM4-80GB S NaCl 0.940 / 0.938, NbCl5 0.847 / 0.847; M 0.931 / 0.930, 0.842 / 0.843; L 0.906 / 0.907, 0.792 / 0.793; force gates pass | off-polar-alex, 6 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| `wprime_backward` + `fused_folded_forward` on the A100 (`POLAR_DECISION_66_WPRIME_LABEL_GPUS`), M only | – | (row above) | on, M | rounding | A100-SXM4-80GB on top of `tf32x3_gemms`: M NaCl 0.976 / 0.977, NbCl5 0.920 / 0.920 (gate passes). L stays off: NaCl 0.956 / 0.957 but NbCl5 1.003 / 1.002 (mixed-cell rule) | off-polar-alex, 6 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
 
 POLAR-1-S (one interaction, reassociated) never takes `wprime_backward`, `fused_folded_forward` or `w_tables`: off
-with that reason, refused when asked for. `tf32x3_gemms`, `grouped_launch` and the round-5 switches (EDGE_SH, TABLE_W,
-FUSED_FIRST_BACKWARD for MH-1's class) are off for POLAR-1 until measured.
+with that reason, refused when asked for. `grouped_launch` and the round-5 switches (EDGE_SH, TABLE_W,
+FUSED_FIRST_BACKWARD for MH-1's class) stay off for POLAR-1: on the A100-SXM4-80GB EDGE_SH is a tie (S, M, L within
+0.4 %) and FUSED_FIRST_BACKWARD is slower (S NaCl 1.006 / 1.006, M NaCl 1.005 / 1.004).
+
+### MACE-OFF (`off23-small`, `off23-medium`, `off23-large`, `off23b-medium`, `off24-medium`) plans
+
+MACE-OFF's first interaction is the stock `RealAgnosticInteractionBlock`, so the generic family's records act on the
+later interactions only. Measured on NHR@FAU Alex, A100-SXM4-80GB, water box of 648 atoms (6 November 2026):
+
+| Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `tf32x3_gemms` (`DECISION_66_TF32X3_MODEL_GPUS`): OFF23-medium, OFF23-large, OFF23b-medium, OFF24-medium | – | – | on | precision change | 0.968 / 0.966, 0.967 / 0.963, 0.980 / 0.976, 0.980 / 0.981; force gates pass. OFF23-small 0.974 / 0.977 but its gate fails (paracetamol forces 2.19), so off | off-polar-alex, 6 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| `grouped_launch` (`DECISION_66_GROUPED_LAUNCH_MODEL_GPUS`): OFF23-small | – | – | on | exact | 0.989 / 0.995; OFF23-large slower (1.008 / 1.009); the other OFF models take `tf32x3_gemms`, which excludes it | off-polar-alex, 6 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+
+Measured and left as they are: EDGE_SH (on; off is 0.3–1 % slower), HEAD_SLICE (on; off is a tie or slower),
+GRAPH_SUM (on; off is up to 0.5 % faster on OFF23-small and -medium, a tie elsewhere: left on, flagged), the species
+GEMM (slower, 1.009–1.020), the chunked fused forward (slower on the medium models, 1.12–1.14).
 
 ### OMAT-0 and the generic family
 
