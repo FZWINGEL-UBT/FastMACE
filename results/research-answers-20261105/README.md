@@ -371,3 +371,66 @@ with `F-`, which marks a bound.
   - `tools/modal/ncu_forward.sh` now passes `--clock-control none`. The rerun is pending.
 
 Runs: `runs/owner-pass/`, `runs/drift-451143be/`, `runs/lab-bcdeb501/`.
+
+### Round 8: A100 at 12 warps, A_SPLIT, ncu stall reasons (6 November 2026)
+
+**`WFRAG_REGION` (idea 21) is default on the A100-SXM4, and with it `W_GROUP`.**
+
+- **What it does:** with TC_WFRAG the W slice is read only in fragment order. So its shared region needs
+  `CHANNEL_BLOCK` floats per (path, k), not `TC_STRIDE`. The smaller region lets the launch rule fit 12 warps on the
+  A100-SXM4 instead of 11, and W_GROUP needs an even count.
+- **Accuracy:** bitwise (GPU test).
+- **MD-step A/Bs** (SrTiO3 10×10×10, b = switch on, commit `8aa8c0e7`):
+
+  | GPU | Switch | b/a, order ab | b/a, order ba |
+  | --- | --- | ---: | ---: |
+  | A100-SXM4 | WFRAG_REGION | 0.9871 | 0.9887 |
+  | A100-SXM4 | WFRAG_REGION + W_GROUP | 0.9718 | 0.9734 |
+  | H200 | WFRAG_REGION | 1.0014 | 1.0010 |
+  | H200 | WFRAG_REGION + W_GROUP (already on) | 0.9997 | 1.0004 |
+
+- **On the H200 it is a tie.** The H200 plan has 12 warps already, limited by registers (168 × 384 threads), so the
+  freed shared memory buys nothing. It stays off there.
+- **Commit:** `ff4d1a89` (branch `fastmace/a-split`).
+- **A100-SXM4 gate at `ff4d1a89`:**
+  - Energy and forces pass. Ratios to the float32 calculator's error: forces NaCl 0.74, NbCl5 0.99, SrTiO3 1.05.
+  - NbCl5 stress is 1.59e-7 eV/Å³ against a limit of 1.23e-7 (ratio 2.60). This is the plan's accepted failure from
+    3xTF32 and the tensor-core forward (`docs/current/defaults-by-gpu.md`). Rounds 4 and 5 measured 1.57e-7 there,
+    and both switches are bitwise.
+- **A100-SXM4 Benchmark_loup** (Langevin, SrTiO3 10×10×10): **10.85 ms per step, 2.169 µs per atom and step**.
+
+**`A_SPLIT` is rejected.**
+
+- **Idea:** with W_GROUP each warp of a pair splits both batches' a into TF32 parts, so every a value is split twice.
+  A_SPLIT splits it once, at staging, into the a tile (high parts) and a per-warp low-part tile. On the H200 that
+  costs 24 KB more shared memory, which fits.
+- **Accuracy:** bitwise (GPU test).
+- **H200 MD-step A/B:** 1.0311 / 1.0346, slower.
+- **Why:** each k-step now loads two shared values per a fragment instead of one plus a split. The forward is not
+  ALU-bound there (next item), so trading ALU work for shared loads loses. The switch stays in the code, off
+  everywhere.
+
+**ncu stall reasons of the H200 forward** (base and F-skew-100ns, `--clock-control none`, commit `6868f0d1`):
+
+- **Occupancy and issue:**
+  - 12 warps per SM (18.75 % theoretical occupancy, limited by registers and shared memory), 2.91 active warps per
+    scheduler.
+  - One or more eligible warps in 53.9 % of cycles. 5.40 warp cycles per issued instruction.
+- **Stalls per issued instruction:**
+
+  | Stall | Cycles |
+  | --- | ---: |
+  | math pipe throttle | 0.50 |
+  | long scoreboard | 0.37 |
+  | short scoreboard | 0.26 |
+  | barrier | 0.23 |
+  | no instruction | 0.18 |
+  | MIO throttle | 0.07 |
+
+- **Idea 18 (a compact, rolled TP against instruction-fetch stalls) is closed.** `no_instruction` is only 0.18 of
+  the 5.40 cycles (≈ 3 %), so its bound is about 3 % of the forward, before its own costs.
+- **F-skew-100ns** changes nothing (0.999).
+- **The largest stall is the math pipe** (HMMA and FP32). ncu counts 127.6 M fused and 197.3 M non-fused FP32
+  instructions. Most of the non-fused ones are the 3xTF32 splits (`x − hi`), which cannot fuse.
+
+Runs: `runs/round8/` (`rg-h200`, `rg-a100`, `as-h200`, `r11-ncu`, `gate-a100-ff4d1a89`).
