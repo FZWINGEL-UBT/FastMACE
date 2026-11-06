@@ -127,8 +127,10 @@ SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 ESTRIN = None
 # NVIDIA A100-SXM4-80GB (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9961 / 0.9963 (OMAT-0
 # medium, SrTiO3 10x10x10, abab / abba); force/stress gate as the default's (worst max-error ratio 1.011, energy).
+# Off there all the same: with FOLD_ALPHA it gains nothing (FOLD_ALPHA + ESTRIN vs neither 1.0002 / 1.0028), and
+# FOLD_ALPHA alone beats ESTRIN alone (b = FOLD_ALPHA on, ESTRIN off vs ESTRIN on: 0.9967 / 0.9902).
 # NVIDIA H200: 1.0030 / 1.0012, off.
-ESTRIN_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+ESTRIN_GPUS = GPUModels(())
 # Idea 34 (plans/h200-ideas-20261105.md, 6 November 2026). FOLD_ALPHA (with FACTORED and TABLE_W): FACTORED_SCALE's
 # per-path magnitude alpha folded into the w' value table's rows at build (float64), so the kernel's terms carry the
 # ratio c / alpha and no per-path multiply is left; scaled paths stay on SCALAR_PATHS. Rounding. None: on for
@@ -136,7 +138,9 @@ ESTRIN_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 FOLD_ALPHA = None
 # NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9963 / 0.9954 (OMAT-0 medium, SrTiO3
 # 10x10x10, abab / abba); force/stress gate as the default's (SrTiO3 stress 2.74e-7 vs 2.44e-7, within the limit).
-FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200",))
+# NVIDIA A100-SXM4-80GB (same day): 0.9911 / 0.9863 and 0.9895 / 0.9893 (two cards); vs ESTRIN 0.9967 / 0.9902;
+# gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
+FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a

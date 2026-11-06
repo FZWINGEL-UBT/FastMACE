@@ -268,11 +268,12 @@ def test_h200_defaults():
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(wprime_backward.STAGE_DOUT_GPUS)
     # Idea 31 step 3 (6 November 2026): SKIP_SELECT on both, MD H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(skip_select.SKIP_SELECT_GPUS)
-    # Idea 39 (6 November 2026): ESTRIN on the A100-SXM4 only, MD 0.9961 / 0.9963, gate as the default; H200 1.0030 / 1.0012
-    assert "NVIDIA A100-SXM4-80GB" in wprime_backward.ESTRIN_GPUS
+    # Idea 39 (6 November 2026): ESTRIN off everywhere: A100-SXM4 0.9961 / 0.9963 alone, but FOLD_ALPHA alone is faster
+    # (0.9967 / 0.9902 vs ESTRIN) and the two together gain nothing; H200 1.0030 / 1.0012
+    assert "NVIDIA A100-SXM4-80GB" not in wprime_backward.ESTRIN_GPUS
     assert "NVIDIA H200" not in wprime_backward.ESTRIN_GPUS
-    # Idea 34 (6 November 2026): FOLD_ALPHA on the H200, MD 0.9963 / 0.9954, gate as the default
-    assert "NVIDIA H200" in wprime_backward.FOLD_ALPHA_GPUS
+    # Idea 34 (6 November 2026): FOLD_ALPHA on both, MD H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893; gates as the default
+    assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(wprime_backward.FOLD_ALPHA_GPUS)
     # Idea 40 (6 November 2026): POWER_BACKWARD on the H200 only, MD 0.9954 / 0.9957, gate as the default; A100 a tie
     from fastmace.kernels.triton import tabled_outer_sum as tos
     assert "NVIDIA H200" in tos.POWER_BACKWARD_GPUS
