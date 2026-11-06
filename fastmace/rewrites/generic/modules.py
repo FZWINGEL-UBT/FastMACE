@@ -83,6 +83,9 @@ FUSED_FIRST_BACKWARD = None
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
                                        "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# The device check above as a Dynamo constant (``_fused_first_listed``) instead of a traced get_device_name, which
+# broke interaction 1's graph (6 November 2026). False: the old call, for the A/B.
+FUSED_FIRST_CONSTANT_NAME = True
 
 
 def fused_first_backward(device):
@@ -90,7 +93,19 @@ def fused_first_backward(device):
     if FUSED_FIRST_BACKWARD is not None:
         return bool(FUSED_FIRST_BACKWARD)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
+    if device.type != "cuda":
+        return False
+    if not FUSED_FIRST_CONSTANT_NAME:  # the A/B side with the graph break
+        return torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
+    return _fused_first_listed(device.index if device.index is not None else torch.cuda.current_device())
+
+
+@torch.compiler.assume_constant_result
+def _fused_first_listed(index: int) -> bool:
+    """Whether CUDA device ``index`` is one of ``FUSED_FIRST_BACKWARD_GPUS``: a compile-time constant for Dynamo (as
+    ``tabled_outer_sum._listed``). Traced as a plain call, ``torch.cuda.get_device_name`` broke interaction 1's graph
+    inside ``fused_first_applies`` on every backend (found by idea 31's Inductor dump, 6 November 2026)."""
+    return torch.cuda.get_device_name(index) in FUSED_FIRST_BACKWARD_GPUS
 
 
 def _first_inputs(augmented, last):

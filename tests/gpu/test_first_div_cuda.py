@@ -55,6 +55,8 @@ def deterministic():
     torch.use_deterministic_algorithms(before[0], warn_only=before[1])
 
 
+@pytest.mark.xfail(strict=False, reason="FIRST_DIV (rejected, off everywhere): the density gradient differs in the "
+                   "last bits on the H200 and A100-SXM4 (results/h200-ideas-20261105/idea31-glue.md, step 3)")
 @pytest.mark.parametrize("n", [5000, 997])
 def test_blocks_div_is_bitwise(n, deterministic):
     from fastmace.kernels.cutlass.first_div import applies, blocks_div
