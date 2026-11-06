@@ -390,9 +390,10 @@ def _long_range_geometry(node_positions, volume):
 
 
 # A/B constant (off-polar-alex, 6 November 2026): for one graph, the [k, atoms] cosines and sines masked by the
-# k-vectors' column instead of a [k, atoms] comparison, and built once per call (the feature projection's geometry and the Coulomb energy share them
-# when they get the same k-vectors and positions). The forward is unchanged bit for bit; the backward rounds
-# differently (the two uses' gradients meet before the cosine's derivative). tests/cpu/test_polar_shared_geometry.py.
+# k-vectors' column instead of a [k, atoms] comparison, and built once per call (the feature projection's geometry
+# and the Coulomb energy share them when they get the same k-vectors and positions). The forward is unchanged bit
+# for bit; the backward rounds differently (the two uses' gradients meet before the cosine's derivative).
+# tests/cpu/test_polar_shared_geometry.py.
 SHARED_GEOMETRY = False
 
 

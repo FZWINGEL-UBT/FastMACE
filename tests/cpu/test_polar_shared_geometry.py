@@ -3,9 +3,9 @@
 POLAR-1's long-range part builds the [k-vectors, atoms] cosines and sines twice per call (the feature
 projection's ``precompute_geometry`` and the Coulomb energy) and multiplies each by a [k, atoms] graph mask
 that is the k-vectors' own column for one structure (A100 profile, results/off-polar-alex-20261106: about 1.9 ms
-of POLAR-1-S's 11.3 ms NbCl5 step in these matrices). With the constant on, one graph masks by that column and the Coulomb energy reuses
-the call's cosines and sines when it gets the same k-vectors and positions. Rounding only through the backward
-(the two uses' gradients meet before the cosine's derivative instead of after).
+of POLAR-1-S's 11.3 ms NbCl5 step in these matrices). With the constant on, one graph masks by that column and
+the Coulomb energy reuses the call's cosines and sines when it gets the same k-vectors and positions. Rounding only
+through the backward (the two uses' gradients meet before the cosine's derivative instead of after).
 """
 
 import copy
