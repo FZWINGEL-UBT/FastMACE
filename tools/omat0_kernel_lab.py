@@ -733,9 +733,10 @@ def wprime_launcher(kernel, source, extra):
     registers = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))
     spills = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
                                               function))
-    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)(?: cohort=(\d+))?", source)
+    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)(?: cohort=(\d+))?(?: tiles=(1))?", source)
     threads = int(lab.group(1)) if lab else kernel.num_threads
     cohort = int(lab.group(3)) if lab and lab.group(3) else kernel.cohort  # threads per edge (idea 37: 128)
+    tiled = bool(lab and lab.group(4))  # idea 38: one block per receiver tile, the starts the last argument
     persistent = 0
     if lab and lab.group(2) == "1":
         per_sm = _check(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(function, threads, kernel.shared_memory))
@@ -747,6 +748,8 @@ def wprime_launcher(kernel, source, extra):
          r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
         blocks = (edges * cohort + threads - 1) // threads
+        if tiled:
+            blocks = perm[-1].numel() - 1
         if persistent:  # idea 23: as many blocks as fit on every SM, each looping over the edges
             blocks = min(blocks, persistent)
         p = ctypes.c_void_p

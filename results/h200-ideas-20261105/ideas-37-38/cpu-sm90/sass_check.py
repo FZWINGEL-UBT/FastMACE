@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "/mnt/d/Margraf/fm-wp3738/tools")
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "tools"))
 import lab_ideas3738 as lab  # noqa: E402
 from cuda.bindings import nvrtc  # noqa: E402
 
@@ -43,7 +43,7 @@ table = lab.ideas3738_variants()
 variants = {"base": (render, ()), "maxreg72": (render, ("--maxrregcount=72",)),
             "old-FF-dout-one-row": (render.replace("const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;",
                                                    "const int64_t output_base = 0;"), ())}
-for name, (kind, transform, extra) in table.items():
+for name, (kind, transform, extra, *_) in table.items():
     variants[name] = (transform(render), extra)
 results = {}
 for name, (source, extra) in variants.items():
