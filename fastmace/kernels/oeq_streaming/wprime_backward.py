@@ -121,6 +121,11 @@ SCALAR_PATHS = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.030 / 1.030 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# Idea 39 (plans/h200-ideas-20261105.md, 6 November 2026). ESTRIN (with HORNER, six terms): w and its slope by
+# Estrin's scheme (pairs of terms, chains three FMAs deep) instead of dual Horner (five deep). Rounding. None: on for
+# ESTRIN_GPUS; True / False: an A/B side's choice.
+ESTRIN = None
+ESTRIN_GPUS = GPUModels(())
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
@@ -305,6 +310,10 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
     const bool inside = r < r_max;
     const scalar_t sc = scales[piece];
+    {%- if estrin %}
+    // ESTRIN: the powers of t shared by every weight of the edge.
+    const scalar_t t2 = t * t, t4 = t2 * t2, two_t = t + t, four_t = two_t + two_t;
+    {%- endif %}
     {%- else %}
     scalar_t cheb[PADDED_TERMS];
     cheb[0] = scalar_t(1);
@@ -366,7 +375,15 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     #pragma unroll
                     for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
                 }
-                {%- if horner %}
+                {%- if horner and estrin %}
+                // ESTRIN: w = (g0 + g1 t) + t^2 (g2 + g3 t) + t^4 (g4 + g5 t);
+                // dw/dt = (g1 + 2 g2 t) + t^2 (3 g3 + 4 g4 t) + t^4 (5 g5).
+                const scalar_t radial_weight =
+                    fmaf(fmaf(fmaf(gv[5], t, gv[4]), t2, fmaf(gv[3], t, gv[2])), t2, fmaf(gv[1], t, gv[0]));
+                const scalar_t radial_dt =
+                    fmaf(fmaf(gv[5] * scalar_t(5), t2, fmaf(gv[4], four_t, gv[3] * scalar_t(3))), t2,
+                         fmaf(gv[2], two_t, gv[1]));
+                {%- elif horner %}
                 scalar_t radial_weight = gv[TERMS - 1];
                 scalar_t radial_dt = scalar_t(0);
                 #pragma unroll
@@ -629,7 +646,7 @@ def factored_paths(schedule, scale=False):
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
-           table_pairs=False, hoist_scale=False, stage_dout=False):
+           table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -671,6 +688,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("table_pairs interleaves TABLE_W's value table by float2: it needs table_w and vector 2")
     if hoist_scale and not horner:
         raise ValueError("hoist_scale moves HORNER's piece scale: it needs horner")
+    if estrin and not (horner and int(terms) == 6 and scalar == "float"):
+        raise ValueError("estrin evaluates HORNER's six-term power basis in float32: it needs horner and terms 6")
     if stage_dout and not stage_dout_supported(schedule, scalar, blocks):
         raise ValueError("stage_dout needs float32, 32-lane cohorts, a chunk of 1..32 edges and a dout row within "
                          "48 KB")
@@ -687,6 +706,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             butterfly=bool(butterfly), redux=bool(redux),
                                             table_pairs=bool(table_pairs), hoist_scale=bool(hoist_scale),
                                             stage_dout=bool(stage_dout), stage_chunk=int(STAGE_DOUT_CHUNK),
+                                            estrin=bool(estrin),
                                             stage_rows=stage_rows, stage_offsets=stage_offsets,
                                             stage_total=stage_total,
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
@@ -852,12 +872,13 @@ class WPrimeBackward:
         self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
         self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
+        self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and FACTORED_SCALE, horner=self.horner,
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
-                             stage_dout=self.stage_dout)
+                             stage_dout=self.stage_dout, estrin=self.estrin)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1170,6 +1191,11 @@ def hoist_scale_default(device):
     return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
 
 
+def estrin_default(device):
+    """``ESTRIN`` on ``device``: the constant when set, else on for ``ESTRIN_GPUS``."""
+    return bool(ESTRIN) if ESTRIN is not None else _device_name(device) in ESTRIN_GPUS
+
+
 def stage_dout_default(device):
     """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS``."""
     return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
@@ -1311,10 +1337,10 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
            "SCALAR_PATHS_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
-           "derivative_table", "factored_default", "factored_paths", "horner_default", "max_registers_default",
+           "derivative_table", "estrin_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
            "render", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
