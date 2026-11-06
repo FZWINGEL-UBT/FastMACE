@@ -520,6 +520,13 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         return transform, args
 
     return {
+        # Idea 23 (H200 ideas revision 9): one-warp blocks, a persistent grid, and with the next edge's indices
+        # prefetched. dx's atomics come in another order ("rounding"); dsh and dr per edge as the plan.
+        "wp-blk32": ("rounding", _wp_launch(32), ()),
+        "wp-persist": ("rounding", _wp_launch(32, True), ()),
+        "wp-persist-pf": ("rounding", _then(_wp_launch(32, True), _wp_prefetch), ()),
+        "wp-persist128": ("rounding", _wp_launch(128, True), ()),
+        "wp-persist128-pf": ("rounding", _then(_wp_launch(128, True), _wp_prefetch), ()),
         "butterfly": ("rounding", butterfly, ()),
         "F-split2": ("falsifier", split_edge(2)[0], (), split_edge(2)[1]),
         "F-split4": ("falsifier", split_edge(4)[0], (), split_edge(4)[1]),
@@ -723,12 +730,21 @@ def wprime_launcher(kernel, source, extra):
     registers = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))
     spills = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
                                               function))
+    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)", source)
+    threads = int(lab.group(1)) if lab else kernel.num_threads
+    persistent = 0
+    if lab and lab.group(2) == "1":
+        per_sm = _check(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(function, threads, kernel.shared_memory))
+        persistent = int(per_sm) * int(torch.cuda.get_device_properties(0).multi_processor_count)
+        print(f"wprime persistent grid: {per_sm} blocks of {threads} threads per SM, {persistent} blocks", flush=True)
 
     def launch(args):
         (x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins, r_lo, bin_scale,
          r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (edges * kernel.cohort + kernel.num_threads - 1) // kernel.num_threads
+        blocks = (edges * kernel.cohort + threads - 1) // threads
+        if persistent:  # idea 23: as many blocks as fit on every SM, each looping over the edges
+            blocks = min(blocks, persistent)
         p = ctypes.c_void_p
         douts = list(dout) if isinstance(dout, (list, tuple)) else [dout]  # BLOCK_MESSAGE: one pointer per group
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), weights.data_ptr(), senders.data_ptr(),
@@ -738,9 +754,56 @@ def wprime_launcher(kernel, source, extra):
         types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + len(douts))
                  + (ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int, p) + (p,) * len(perm))
         stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
-        _check(driver.cuLaunchKernel(function, blocks, 1, 1, kernel.num_threads, 1, 1, kernel.shared_memory, stream,
+        _check(driver.cuLaunchKernel(function, blocks, 1, 1, threads, 1, 1, kernel.shared_memory, stream,
                                      (values, types), 0))
     return launch, dict(registers=int(registers), local_bytes=int(spills))
+
+
+_WP_INDEX = """    const int64_t e =
+        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
+    if (e >= edge_count) return;
+"""
+
+_WP_STRIDE = """    const int64_t e_stride = int64_t(gridDim.x) * (blockDim.x / LOGICAL_GROUP_SIZE);
+"""
+_WP_LOOP = ("    for (int64_t e = int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;"
+            " e < edge_count;\n         e += e_stride) {\n")
+
+
+def _wp_launch(threads, persistent=False):
+    """Idea 23: the w\u2032 launched with ``threads`` per block; ``persistent``: a grid of as many blocks as fit, each
+    logical group looping over the edges with a grid stride (one edge per warp, so a warp's lanes leave together)."""
+    def transform(s):
+        if persistent:
+            s = _sub(s, _WP_INDEX, _WP_STRIDE + _WP_LOOP, 1)
+            head, kernel = s.split("const int64_t e_stride", 1)
+            kernel = kernel.replace("        return;\n", "        continue;\n")
+            kernel = kernel.rstrip()
+            assert kernel.endswith("}"), kernel[-80:]
+            s = head + "const int64_t e_stride" + kernel[:-1] + "    }  // lab edge loop\n}\n"
+        return s + f"\n// lab launch threads={threads} persistent={int(persistent)}\n"
+    return transform
+
+
+def _wp_prefetch(s):
+    """Idea 23's ``wp-persist-pf``: each warp loads the next edge's sender, receiver, length and pair before it
+    computes the current one (on the persistent loop of ``_wp_launch(..., True)``)."""
+    s = _sub(s, _WP_LOOP, """    int64_t e0 = int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
+    int32_t nx_s = 0, nx_r = 0, nx_p = 0;
+    scalar_t nx_l = scalar_t(0);
+    if (e0 < edge_count) { nx_s = senders[e0]; nx_r = receivers[e0]; nx_l = lengths[e0]; nx_p = pairs[e0]; }
+    for (int64_t e = e0; e < edge_count; e += e_stride) {
+    const int32_t cur_s = nx_s, cur_r = nx_r, cur_p = nx_p;
+    const scalar_t cur_l = nx_l;
+    {
+        const int64_t en = e + e_stride;
+        if (en < edge_count) { nx_s = senders[en]; nx_r = receivers[en]; nx_l = lengths[en]; nx_p = pairs[en]; }
+    }
+""", 1)
+    s = _sub(s, "const int32_t sender = senders[e];", "const int32_t sender = cur_s;", 1)
+    s = _sub(s, "const int32_t receiver = receivers[e];", "const int32_t receiver = cur_r;", 1)
+    s = _sub(s, "const scalar_t r = lengths[e];", "const scalar_t r = cur_l;", 1)
+    return _sub(s, "int64_t(pairs[e])", "int64_t(cur_p)", 1)
 
 
 # --------------------------------------------------------------------------------------------------- fused forward
