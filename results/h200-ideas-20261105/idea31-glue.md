@@ -267,6 +267,81 @@ All four runs are valid (no compile while timed, no other GPU process). The H200
 (`idea31/a100-pcie-wrong-gpu/`). Run directories: `idea31/h200/`, `idea31/a100/`, `idea31/local-rtx5060ti/`. Job:
 `tools/modal/idea31_check.sh`.
 
+## Step 3 (6 November 2026): interaction 1 (FIRST_DIV) and the species-skip products (SKIP_SELECT)
+
+Branch `fastmace/idea31-more`, from main `5dc5d799` (LINEAR_DIV default on the H200 and A100-SXM4). Both new switches
+are `None` with empty GPU lists (off everywhere). The A/B side b sets the new switch on top of LINEAR_DIV's default, so
+a = today's default. Job: `tools/modal/idea31_check.sh` (`CONST`, `NAME`, `GPU_TESTS`). Model, cell and protocol are
+as in step 2.
+
+### FIRST_DIV (`a8f5f6e8`): F2–F5, #28's cat slice, #31–38's divisions, and B9–B11
+
+- **What:** the op `fastmace::tf32x3_blocks_div(lefts, rights, density)` (`kernels/cutlass/first_div.py`). It computes
+  `FirstInteractionReassociation`'s per-degree products with the remap-div epilogue straight into one flat buffer
+  (blocks one after another, [M_l, 128] each). `forward` returns views, so the copies feeding F6–F9, #28's cat slice
+  and the #31–38 divisions are gone.
+- **B9–B11:** covered by the op's own backward, not a separate switch. The backward does the following:
+  - computes the quotients per block, tied to the gradient (`other + grad[:1]*0.0`) so the partitioner keeps them in
+    the backward;
+  - forms ∂density as one reduction over the joined grads times the joined quotients, with the product directly
+    before the sum, as in today's #141;
+  - computes `tf32x3_mm(grad / (d+1), right.t())` per block.
+- **Bitwise (`tests/gpu/test_first_div_cuda.py`):**
+  - **Passed:** the output and every left-factor gradient on the H200 and A100-SXM4.
+  - **Failed:** the **density gradient differs** in the last bits on both GPUs (n = 5000: 3684 of 5000 rows, n = 997:
+    765 rows, |Δ| ≤ 4e-6). The cause is likely a different reduction split or contraction in the joined ∂density
+    reduction on sm_80/sm_90.
+  - Locally (sm_120, with `torch.use_deterministic_algorithms`), the density gradient is bitwise equal too.
+- **MD A/B (side b = FIRST_DIV=True):**
+
+| GPU (Modal) | b/a, order ab | b/a, order ba | a (ms) | b (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| NVIDIA H200 (profile fourth) | **1.0305** | **1.0330** | 5.478 / 5.466 | 5.645 / 5.646 |
+| NVIDIA A100-SXM4-80GB (profile third) | **1.0349** | **1.0337** | 10.284 / 10.307 | 10.643 / 10.655 |
+
+  b vs a end to end is at the run-to-run floor (forces 3.3–3.4e-6, md.forces 8.7e-5 on the H200, as a2 vs a).
+- **Verdict: rejected** (3–3.5% slower on both GPUs, and the density gradient is not bitwise). Not investigated
+  further. Likely causes:
+  - the density must exist before the products;
+  - extra backward kernels (per-block quotients and grad/(d+1));
+  - a changed split of the interaction-1 graph.
+- **Pre-existing graph break (not from this branch):** `fused_first_backward` calls `torch.cuda.get_device_name` inside
+  the trace (`rewrites/generic/modules.py:93`). This splits the interaction-1 graph on every backend and is worth
+  hoisting to build time.
+- Run files: `idea31/firstdiv-h200/`, `idea31/firstdiv-a100/`.
+
+### SKIP_SELECT (`6718aa2a`): the species-skip products (select epilogue, 64×192 tile)
+
+- **Kernel:** `fm_tf32x3_remap_select_{rr,rc}_64x64` in `tf32x3_sm80.cu`. It is the remap mainloop with a `Select`
+  template parameter: element (r, j) is stored only if `kind[atom] == j / select_columns`, at column
+  `j % select_columns`. The product with all species' weights runs as one GEMM. The epilogue keeps each atom's own
+  species and writes straight into the reshaped [n, width] layout.
+  - Both cubins were rebuilt (sm_80 `13e99898…`, sm_90 `91ca0924…`).
+  - The SASS of every existing entry is unchanged.
+- **Op:** `fastmace::tf32x3_skip_select` (`kernels/cutlass/skip_select.py`), called from `SpeciesSkip` where the layout
+  allows it. In interaction 1 the message is returned as a `reshape_view`. This removes #40/#62's
+  `cat_index_mul_sum` and the `cat_slice_view` copy (#41). The backward is
+  `tf32x3_mm((g ⊗ onehot).reshape(m, S·cols), weight.t())`.
+- **Bitwise (`tests/gpu/test_skip_select_cuda.py`):** (5000, l 0..3, 2048), (997, l 0..3, 2048) and (5000, l 0, 512),
+  compiled `SpeciesSkip` off vs on. The output and gradients are compared as int32 bits. **Passed on the H200 and the
+  A100-SXM4-80GB** (with LINEAR_DIV's and the tile tests; the only failures in those jobs are FIRST_DIV's two
+  density-grad cases above). It also passed locally.
+- **End to end:** b vs a is at the floor (H200: forces 3.8e-6, md.forces 8.8e-5; A100: 3.6e-6, 8.4e-5).
+- **MD A/B (side b = SKIP_SELECT=True on top of LINEAR_DIV):**
+
+| GPU (Modal) | b/a, order ab | b/a, order ba | a (ms) | b (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| NVIDIA H200 (profile fourth) | **0.9876** | **0.9919** | 5.551 / 5.540 | 5.483 / 5.496 |
+| NVIDIA A100-SXM4-80GB (profile third) | **0.9843** | **0.9858** | 10.437 / 10.377 | 10.273 / 10.229 |
+
+  All four runs are valid. The H200 gains 45–69 µs per step and the A100 148–164 µs.
+  - The first A100 attempt got an A100 80GB PCIe and stopped with WRONG-GPU
+    (`idea31/skipselect-a100-pcie-wrong-gpu/`); the retry ran on the SXM4.
+  - Run files: `idea31/skipselect-h200/`, `idea31/skipselect-a100/`.
+- **Status:** a candidate default for the H200 and A100-SXM4 (decision 66). `SKIP_SELECT_GPUS` stays empty on this
+  branch, for the coordinator to set.
+- **Modal cost of step 3:** about $2.1 (profile third at $20.43, fourth at $14.45 metered this month).
+
 ## Next step (one GPU)
 
 1. **Read the generated code.** Dump Inductor's output code (`TORCH_LOGS=output_code`) for Benchmark_loup on the H200.
