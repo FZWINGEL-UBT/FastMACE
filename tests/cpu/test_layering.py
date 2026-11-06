@@ -102,7 +102,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                              "FUSED_FIRST_CONSTANT_NAME": "device check as a Dynamo constant; A/B",
                                              "EDGE_SH": "Triton edge spherical harmonics; per GPU, A/B",
                                              "STOCK_FIRST_SKIP": "MACE-OFF first block's species skip; A/B"},
-    "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B"},
+    "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B",
+                                   "FUSED_FOURIER": "k-space sums without dense cos/sin; A/B"},
     "fastmace/rewrites/linear/__init__.py": {"E3NN_BLOCK_LINEAR": "e3nn Linears as BlockLinear (POLAR); A/B"},
     "fastmace/kernels/triton/skinny_linear.py": {"RADIAL_TF32X3": "radial last layer as 3xTF32; per GPU, A/B"},
     # OMAT-0 kernel lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py): bitwise A/B switches, off by default.

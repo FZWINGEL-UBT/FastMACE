@@ -114,6 +114,8 @@ SOURCE_HASHES = {
         "800cb31cce6b7409ad272fec88c82a80f2c84aa1b184ba35e7a7a0f505c41674",
     "graph_longrange.features:GTOElectrostaticFeatures._pbc_precompute_geometry":
         "d88aa4542016e95d72dd134497f604e6d5f842e82cfdaf4cba5070d59e798427",
+    "graph_longrange.features:GTOElectrostaticFeatures._pbc_forward_dynamic":
+        "7208bb5d0bffd26d46f5ffb0a689771c76056615e08df7f1545bd09eaf2d7b32",
     "graph_longrange.energy:GTOElectrostaticEnergy.forward":
         "cad95d2a9d5d3977a2631e790f450bf3e7b0fd177f68beb7a1b355e5dac6c3a7",
     "graph_longrange.energy:GTOElectrostaticEnergy._pbc_energy_batch":
@@ -396,13 +398,91 @@ def _long_range_geometry(node_positions, volume):
 # tests/cpu/test_polar_shared_geometry.py.
 SHARED_GEOMETRY = False
 
+# A/B constant (off-polar-alex, 6 November 2026): for one graph, the k-space sums through
+# fastmace.kernels.triton.fourier (the phases recomputed in tiles; no [k, atoms] cosines, sines or their dense
+# gradients), the structure factor in the Coulomb energy and the field features' density and projection.
+# Rounding. tests/cpu/test_polar_fused_fourier.py.
+FUSED_FOURIER = False
 
-def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call=None):
+
+def _fourier_mask(k_vector_batch, node_positions, call):
+    """The kept k-vectors as a [k] 0/1 column when ``FUSED_FOURIER`` takes this call (one graph), else None."""
+    if not (FUSED_FOURIER and call is not None and call.data is not None and "ptr" in call.data
+            and call.data["ptr"].shape[0] == 2):
+        return None
+    return (k_vector_batch == 0).to(dtype=node_positions.dtype)
+
+
+def _fused_density(source_feats, k_vectors, node_positions, mask, density_basis_fs, volume_per_k):
+    """graph_longrange.features.assemble_fourier_series_batch with the structure factor fused."""
+    import torch
+
+    from fastmace.kernels.triton.fourier import structure_factor
+
+    n_nodes, n_sigma, m_dim = source_feats.size(0), density_basis_fs.size(1), density_basis_fs.size(2)
+    sm_dim = n_sigma * m_dim
+    coeff_cos, coeff_sin = structure_factor(k_vectors, node_positions, mask, source_feats.reshape(n_nodes, sm_dim))
+    density_basis_r = density_basis_fs[..., 0].reshape(density_basis_fs.size(0), sm_dim)
+    density_basis_i = density_basis_fs[..., 1].reshape(density_basis_fs.size(0), sm_dim)
+    rho_real = (density_basis_r * coeff_cos).sum(dim=-1) + (density_basis_i * coeff_sin).sum(dim=-1)
+    rho_imag = (density_basis_i * coeff_cos).sum(dim=-1) - (density_basis_r * coeff_sin).sum(dim=-1)
+    density = torch.stack([rho_real, rho_imag], dim=-1)
+    return (2 * math.pi) ** 3 * density / volume_per_k.unsqueeze(-1)
+
+
+def _fused_projection(potential, feature_basis_fs, k_vectors, node_positions, mask, k_factor_proj):
+    """graph_longrange.features.project_to_features_batch with the projection fused."""
+    from fastmace.kernels.triton.fourier import fourier_project
+
+    n_k, n_sigma, m_dim = feature_basis_fs.size(0), feature_basis_fs.size(1), feature_basis_fs.size(2)
+    sm_dim = n_sigma * m_dim
+    proj_basis_r = feature_basis_fs[..., 0].reshape(n_k, sm_dim)
+    proj_basis_i = feature_basis_fs[..., 1].reshape(n_k, sm_dim)
+    a = potential[:, 0].unsqueeze(-1) * proj_basis_r + potential[:, 1].unsqueeze(-1) * proj_basis_i
+    b = potential[:, 0].unsqueeze(-1) * proj_basis_i - potential[:, 1].unsqueeze(-1) * proj_basis_r
+    if k_factor_proj is not None:
+        a = a * k_factor_proj.unsqueeze(-1)
+        b = b * k_factor_proj.unsqueeze(-1)
+    projections = 2.0 * fourier_project(k_vectors, node_positions, mask, a, b)  # [atoms, sm]
+    return projections.reshape(node_positions.size(0), n_sigma, m_dim) / (2 * math.pi) ** 3
+
+
+def pbc_forward_dynamic(self, original, source_feats, cache):
+    """GTOElectrostaticFeatures._pbc_forward_dynamic with the fused k-space sums (``cache["fourier_mask"]``, full
+    PBC); ``original`` otherwise."""
+    from graph_longrange.features import CORRECTION_MODE_MIXED, CORRECTION_MODE_PBC, apply_coulomb_kernel_batch
+
+    mask = cache.get("fourier_mask")
+    if mask is None or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC:
+        return original(self, source_feats, cache)
+    density = _fused_density(source_feats, cache["k_vectors"], cache["node_positions"], mask,
+                             cache["density_basis_fs"], cache["volume_per_k"])
+    potential = apply_coulomb_kernel_batch(k_norm2=cache["k_norm2"], density=density,
+                                           k_factor_coulomb=cache["k_factor_coulomb"])
+    features_si = _fused_projection(potential, cache["feature_basis_fs"], cache["k_vectors"],
+                                    cache["node_positions"], mask, cache["k_factor_proj"])
+    features_flat = self._permute_output_channels(features_si.reshape(features_si.size(0), -1))
+    source_feats_lm = source_feats.squeeze(-2) if source_feats.dim() == 3 else source_feats
+    si_terms = self.self_interaction_terms(source_feats_lm)
+    if not self.include_self_interaction:
+        features_flat = features_flat - si_terms
+    return features_flat
+
+
+def _pbc_geometry_factors(k_norm2, k0_mask, volume):
+    """(None, None, volume per k, Coulomb factor): ``_pbc_geometry``'s factors without the cosines and sines."""
     import torch
 
     volume_per_k = volume.reshape(-1)[:1].expand(k_norm2.shape)
     k0 = k0_mask > 0.0
     k_factor_coulomb = torch.where(k0, 0.0, 1.0 / torch.where(k0, 1.0, k_norm2))
+    return None, None, volume_per_k, k_factor_coulomb
+
+
+def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call=None):
+    import torch
+
+    _, _, volume_per_k, k_factor_coulomb = _pbc_geometry_factors(k_norm2, k0_mask, volume)
     single = (SHARED_GEOMETRY and call is not None and call.data is not None and "ptr" in call.data
               and call.data["ptr"].shape[0] == 2)
     if single:
@@ -430,11 +510,18 @@ def precompute_geometry_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, n
     from graph_longrange.features import CORRECTION_MODE_PBC
 
     node_positions, volume = _long_range_geometry(node_positions, volume)
-    cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
-        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume,
-        _ACTIVE[-1] if _ACTIVE else None)
+    call = _ACTIVE[-1] if _ACTIVE else None
+    mask = _fourier_mask(k_vector_batch, node_positions, call)
+    if mask is None:
+        cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
+            k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call)
+        fused = {}
+    else:  # the fused sums recompute the phases: no cosines and sines
+        cosines = sines = None
+        _, _, volume_per_k, k_factor_coulomb = _pbc_geometry_factors(k_norm2, k0_mask, volume)
+        fused = {"fourier_mask": mask}
     k_factor_proj = torch.where(k0_mask > 0.0, 0.5, 1.0).to(k_norm2.dtype)
-    return {"mode": "pbc", "k_vectors": k_vectors, "k_norm2": k_norm2, "k_vector_batch": k_vector_batch,
+    return {**fused, "mode": "pbc", "k_vectors": k_vectors, "k_norm2": k_norm2, "k_vector_batch": k_vector_batch,
             "k0_mask": k0_mask, "volume_per_k": volume_per_k, "k_factor_coulomb": k_factor_coulomb,
             "k_factor_proj": k_factor_proj, "volumes": volume.reshape(-1), "batch": batch,
             "node_positions": node_positions, "pbc": pbc, "cosines": cosines, "sines": sines,
@@ -456,12 +543,18 @@ def coulomb_energy_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, source
     from graph_longrange.features import apply_coulomb_kernel_batch, assemble_fourier_series_batch
 
     node_positions, volume = _long_range_geometry(node_positions, volume)
-    cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
-        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume,
-        _ACTIVE[-1] if _ACTIVE else None)
-    density = assemble_fourier_series_batch(source_feats=source_feats, cosines=cosines, sines=sines,
-                                            density_basis_fs=self.density_basis(k_vectors, k_norm2, k0_mask),
-                                            volume_per_k=volume_per_k)
+    call = _ACTIVE[-1] if _ACTIVE else None
+    mask = _fourier_mask(k_vector_batch, node_positions, call)
+    if mask is None:
+        cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
+            k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call)
+        density = assemble_fourier_series_batch(source_feats=source_feats, cosines=cosines, sines=sines,
+                                                density_basis_fs=self.density_basis(k_vectors, k_norm2, k0_mask),
+                                                volume_per_k=volume_per_k)
+    else:
+        _, _, volume_per_k, k_factor_coulomb = _pbc_geometry_factors(k_norm2, k0_mask, volume)
+        density = _fused_density(source_feats, k_vectors, node_positions, mask,
+                                 self.density_basis(k_vectors, k_norm2, k0_mask), volume_per_k)
     potential = apply_coulomb_kernel_batch(k_norm2=k_norm2, density=density, k_factor_coulomb=k_factor_coulomb)
     per_k = 2.0 * torch.sum(density * potential, dim=-1)
     energy = 0.5 * volume.reshape(-1) * per_k.sum().reshape(1) / (2 * math.pi) ** 6
@@ -934,6 +1027,7 @@ def install():
     original_internal = gto_utils.GTOInternalFieldtoFeaturesBlock.forward
     original_radial = gto_utils.RadialIntegralDirect.forward
     original_moduli = gto_utils.GTOBasis._prepare_k_moduli
+    original_dynamic = features.GTOElectrostaticFeatures._pbc_forward_dynamic
     rewritten = {}  # (PR 1762, float64 energy, strain path, graph sums) -> forward, built on first use
 
     def model_forward(holder):
@@ -999,6 +1093,11 @@ def install():
     def moduli(self, *args, **kwargs):
         return (prepare_k_moduli if _ACTIVE else original_moduli)(self, *args, **kwargs)
 
+    def dynamic(self, source_feats, cache):
+        if not _ACTIVE:
+            return original_dynamic(self, source_feats, cache)
+        return pbc_forward_dynamic(self, original_dynamic, source_feats, cache)
+
     replacements = (
         (gto_utils.RadialIntegralDirect, "forward", radial),
         (gto_utils.GTOBasis, "_prepare_k_moduli", moduli),
@@ -1009,6 +1108,7 @@ def install():
         (extensions, "compute_k_vectors_flat", k_vectors),
         (extensions, "_permute_to_e3nn_convention", permute),
         (features.GTOElectrostaticFeatures, "precompute_geometry", geometry),
+        (features.GTOElectrostaticFeatures, "_pbc_forward_dynamic", dynamic),
         (energy.GTOElectrostaticEnergy, "forward", coulomb),
     )
     targets = ["e3nn.o3._irreps:Irrep.__len__"]
