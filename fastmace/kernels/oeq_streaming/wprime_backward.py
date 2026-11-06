@@ -134,7 +134,9 @@ ESTRIN_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 # ratio c / alpha and no per-path multiply is left; scaled paths stay on SCALAR_PATHS. Rounding. None: on for
 # FOLD_ALPHA_GPUS; True / False: an A/B side's choice.
 FOLD_ALPHA = None
-FOLD_ALPHA_GPUS = GPUModels(())
+# NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9963 / 0.9954 (OMAT-0 medium, SrTiO3
+# 10x10x10, abab / abba); force/stress gate as the default's (SrTiO3 stress 2.74e-7 vs 2.44e-7, within the limit).
+FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200",))
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
