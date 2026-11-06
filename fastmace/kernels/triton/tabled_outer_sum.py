@@ -39,7 +39,10 @@ TABLED_FORWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 
 # x (the table's ``pcoef``, converted in float64 at build), six row loads instead of six value and five derivative
 # rows. Rounding. None: on for POWER_BACKWARD_GPUS; True / False: an A/B side's choice.
 POWER_BACKWARD = None
-POWER_BACKWARD_GPUS = GPUModels(())
+# NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9954 / 0.9957 (OMAT-0 medium, SrTiO3
+# 10x10x10, abab / abba); force/stress gate as the default's (worst max-error ratio 1.016, forces).
+# NVIDIA A100-SXM4-80GB: 1.0020 / 0.9977, a tie, off.
+POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200",))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
 
