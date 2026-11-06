@@ -213,6 +213,17 @@ def first_div_applies(self, kind, n_real):
                for (_, mul, dim), degree in zip(skip.segments_in, reassociation.ls))
 
 
+def _density_sum(edge_density: torch.Tensor, receivers: torch.Tensor, num_nodes: int) -> torch.Tensor:
+    """``scatter_sum(edge_density, receivers, dim=0, dim_size=num_nodes)``, through the segmented
+    ``kernels.triton.receiver_sum`` where it applies (idea 5(b))."""
+    from mace.tools.scatter import scatter_sum
+
+    from fastmace.kernels.triton import receiver_sum as rs
+    if rs.applies(edge_density, receivers):
+        return rs.receiver_sum(edge_density, receivers, num_nodes)
+    return scatter_sum(src=edge_density, index=receivers, dim=0, dim_size=num_nodes)
+
+
 def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
                                 cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False):
     """RealAgnosticResidual / Density / DensityResidual InteractionBlock.forward (mace-torch 0.3.16)
@@ -259,8 +270,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         # idea 31 (kernels.cutlass.first_div): the density first, the blocks divided in the epilogue, kept apart
         message, table_density, early_density = fused_first_message(
             self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=n_real,
-            density_of=lambda edge_density: scatter_sum(src=edge_density, index=edge_index[1], dim=0,
-                                                        dim_size=num_nodes))
+            density_of=lambda edge_density: _density_sum(edge_density, edge_index[1], num_nodes))
     elif tabled and reassociation is not None and fused_first_applies(self, edge_feats):
         message, table_density = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
                                                      rows=n_real)
@@ -292,8 +302,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
             if cutoff is not None:
                 edge_density = edge_density * cutoff
-        density = scatter_sum(src=edge_density, index=edge_index[1], dim=0,
-                              dim_size=num_nodes if n_real is None else n_real)  # every receiver is real
+        density = _density_sum(edge_density, edge_index[1],
+                               num_nodes if n_real is None else n_real)  # every receiver is real
     if message is not None:
         pass
     elif reassociation is not None:
