@@ -272,7 +272,8 @@ def test_h200_defaults():
     # (0.9967 / 0.9902 vs ESTRIN) and the two together gain nothing; H200 1.0030 / 1.0012
     assert "NVIDIA A100-SXM4-80GB" not in wprime_backward.ESTRIN_GPUS
     assert "NVIDIA H200" not in wprime_backward.ESTRIN_GPUS
-    # Idea 34 (6 November 2026): FOLD_ALPHA on both, MD H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893; gates as the default
+    # Idea 34 (6 November 2026): FOLD_ALPHA on both, MD H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893;
+    # gates as the default
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(wprime_backward.FOLD_ALPHA_GPUS)
     # Idea 40 (6 November 2026): POWER_BACKWARD on the H200 only, MD 0.9954 / 0.9957, gate as the default; A100 a tie
     from fastmace.kernels.triton import tabled_outer_sum as tos

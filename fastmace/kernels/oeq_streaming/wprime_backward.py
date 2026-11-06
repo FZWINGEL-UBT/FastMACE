@@ -138,7 +138,8 @@ ESTRIN_GPUS = GPUModels(())
 FOLD_ALPHA = None
 # NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9963 / 0.9954 (OMAT-0 medium, SrTiO3
 # 10x10x10, abab / abba); force/stress gate as the default's (SrTiO3 stress 2.74e-7 vs 2.44e-7, within the limit).
-# NVIDIA A100-SXM4-80GB (same day): 0.9911 / 0.9863 and 0.9895 / 0.9893 (two cards); vs ESTRIN 0.9967 / 0.9902, 0.9884 / 0.9907;
+# NVIDIA A100-SXM4-80GB (same day): 0.9911 / 0.9863 and 0.9895 / 0.9893 (two cards); vs ESTRIN 0.9967 / 0.9902,
+# 0.9884 / 0.9907;
 # gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
 FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 MAX_REGISTERS = None
