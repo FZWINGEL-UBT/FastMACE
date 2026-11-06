@@ -389,16 +389,36 @@ def _long_range_geometry(node_positions, volume):
     return call.data["positions"], call.volume
 
 
-def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume):
+# A/B constant (off-polar-alex, 6 November 2026): for one graph, the [k, atoms] cosines and sines masked by the
+# k-vectors' column instead of a [k, atoms] comparison, and built once per call (the feature projection's geometry and the Coulomb energy share them
+# when they get the same k-vectors and positions). The forward is unchanged bit for bit; the backward rounds
+# differently (the two uses' gradients meet before the cosine's derivative). tests/cpu/test_polar_shared_geometry.py.
+SHARED_GEOMETRY = False
+
+
+def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call=None):
     import torch
 
+    volume_per_k = volume.reshape(-1)[:1].expand(k_norm2.shape)
+    k0 = k0_mask > 0.0
+    k_factor_coulomb = torch.where(k0, 0.0, 1.0 / torch.where(k0, 1.0, k_norm2))
+    single = (SHARED_GEOMETRY and call is not None and call.data is not None and "ptr" in call.data
+              and call.data["ptr"].shape[0] == 2)
+    if single:
+        kept = getattr(call, "pbc_geometry", None)
+        if kept is not None and kept[0] is k_vectors and kept[1] is node_positions:
+            return kept[2], kept[3], volume_per_k, k_factor_coulomb
+        inner_products = torch.matmul(k_vectors, node_positions.t())
+        # One graph (batch all 0): the [k, atoms] mask is the k-vectors' own column (the fixed k-set marks the ones
+        # outside the cutoff with another batch index), the same values without the [k, atoms] comparison.
+        mask_k = (k_vector_batch == 0).to(dtype=inner_products.dtype)[:, None]
+        cosines, sines = torch.cos(inner_products) * mask_k, torch.sin(inner_products) * mask_k
+        call.pbc_geometry = (k_vectors, node_positions, cosines, sines)
+        return cosines, sines, volume_per_k, k_factor_coulomb
     inner_products = torch.matmul(k_vectors, node_positions.t())
     mask_f = (k_vector_batch[:, None] == batch[None, :]).to(dtype=inner_products.dtype)
     cosines = torch.cos(inner_products) * mask_f
     sines = torch.sin(inner_products) * mask_f
-    volume_per_k = volume.reshape(-1)[:1].expand(k_norm2.shape)
-    k0 = k0_mask > 0.0
-    k_factor_coulomb = torch.where(k0, 0.0, 1.0 / torch.where(k0, 1.0, k_norm2))
     return cosines, sines, volume_per_k, k_factor_coulomb
 
 
@@ -410,7 +430,8 @@ def precompute_geometry_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, n
 
     node_positions, volume = _long_range_geometry(node_positions, volume)
     cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
-        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume)
+        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume,
+        _ACTIVE[-1] if _ACTIVE else None)
     k_factor_proj = torch.where(k0_mask > 0.0, 0.5, 1.0).to(k_norm2.dtype)
     return {"mode": "pbc", "k_vectors": k_vectors, "k_norm2": k_norm2, "k_vector_batch": k_vector_batch,
             "k0_mask": k0_mask, "volume_per_k": volume_per_k, "k_factor_coulomb": k_factor_coulomb,
@@ -435,7 +456,8 @@ def coulomb_energy_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, source
 
     node_positions, volume = _long_range_geometry(node_positions, volume)
     cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
-        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume)
+        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume,
+        _ACTIVE[-1] if _ACTIVE else None)
     density = assemble_fourier_series_batch(source_feats=source_feats, cosines=cosines, sines=sines,
                                             density_basis_fs=self.density_basis(k_vectors, k_norm2, k0_mask),
                                             volume_per_k=volume_per_k)

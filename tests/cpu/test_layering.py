@@ -101,6 +101,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                              "FUSED_FIRST_CONSTANT_NAME": "device check as a Dynamo constant; A/B",
                                              "EDGE_SH": "Triton edge spherical harmonics; per GPU, A/B",
                                              "STOCK_FIRST_SKIP": "MACE-OFF first block's species skip; A/B"},
+    "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B"},
     # OMAT-0 kernel lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py): bitwise A/B switches, off by default.
     "fastmace/rewrites/radial/__init__.py": {"SYMMETRIC_PAIRS": "mirror pairs read one table row; per GPU, A/B"},
     "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B",
