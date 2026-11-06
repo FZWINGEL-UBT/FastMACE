@@ -434,3 +434,106 @@ Runs: `runs/owner-pass/`, `runs/drift-451143be/`, `runs/lab-bcdeb501/`.
   instructions. Most of the non-fused ones are the 3xTF32 splits (`x − hi`), which cannot fuse.
 
 Runs: `runs/round8/` (`rg-h200`, `rg-a100`, `as-h200`, `r11-ncu`, `gate-a100-ff4d1a89`).
+
+### Round 9: more warps, part phases, x-load bounds, a persistent w′ (6 November 2026)
+
+**Nothing adopted.** The round tested the H200 ideas plan's revision 9 (ideas 22, 23 and 25) with lab bounds on Modal.
+Lab variants are in `tools/omat0_kernel_lab.py` (branch `fastmace/round9-lab`, commits `98851d50`, `ab76a9d5`,
+`50ebcdf9`, `e97fd7e6`). The forward lab runs on SrTiO3 10×10×10, OMAT-0 medium, the GPU's own plan.
+
+**More warps per SM (idea 22(ii)) do not pay, even without the x loads.**
+
+| Variant (H200, base 1600.5 µs, 168 registers) | Registers | Spill stores | Ratio |
+| --- | ---: | ---: | ---: |
+| `wg12`: W_GROUP + fragment-sized region, 12 warps (bitwise) | 168 | 0 | 0.994 |
+| `wg14` (bitwise) | 128 | 20 B | 1.029 |
+| `wg16` (bitwise) | 128 | 52 B | 1.017 |
+| `F-no-xload` (plan render) | 165 | 0 | 0.904 |
+| `F-no-xload-wg12` | 165 | 0 | 0.905 |
+| `F-no-xload-wg14` | 128 | 24 B | 0.915 |
+| `F-no-xload-wg16` | 128 | 24 B | 0.900 |
+| `F-l1-28` (shared request padded to 224 KB: 28 KB of L1; bitwise) | 168 | 0 | 0.995 |
+
+- At 14 and 16 warps ptxas caps the kernel at 128 registers and spills. Without the x loads the extra warps still
+  gain nothing over 12 (0.915 and 0.900 against 0.905). Idea 22(ii) is closed.
+- Less L1 costs nothing (F-l1-28 0.995), so a larger carve-out is free if a later idea needs it.
+
+**The x loads cost about 2–3 % on the H200, not 10 %.** F-no-xload replaces x by a constant, which lets the compiler
+fold the TP's x products, so it overstates the loads. Two bounds keep x opaque: `F-x-row0` (every edge reads node 0's
+row, an L1 hit) and `F-x-rcv` (each edge reads its receiver's row).
+
+| GPU | Base | F-no-xload | F-x-row0 | F-x-rcv |
+| --- | ---: | ---: | ---: | ---: |
+| H200 | 1606.4 µs | 0.905 | 0.977 | 1.071 |
+| A100-SXM4 | 3321.9 µs | 0.768 | 0.844 | 0.941 |
+
+- F-x-row0 and F-x-rcv spill 24 B on both GPUs.
+- **Atom order and the lab's L2 flush change nothing** (`tools/modal/order_lab.sh`, base and F-x-row0, 5 rounds):
+
+  | GPU | Order | Base, flush 256 MB | Base, no flush | F-x-row0, flush / no flush |
+  | --- | --- | ---: | ---: | ---: |
+  | H200 | repeat | 1600.2 | 1613.9 | 0.982 / 0.985 |
+  | H200 | Morton | 1582.7 | 1611.6 | 0.982 / 0.983 |
+  | H200 | random | 1583.4 | 1612.6 | 0.982 / 0.988 |
+  | A100 PCIe (SXM4 plan) | repeat | 2863.1 | 2886.7 | 0.977 / 0.975 |
+  | A100 PCIe (SXM4 plan) | Morton | 2886.7 | 2919.4 | 0.975 / 0.971 |
+  | A100 PCIe (SXM4 plan) | random | 2872.3 | 2900.0 | 0.974 / 0.974 |
+
+  Round 4's Morton rejection (5060 Ti) holds on the H200 and the A100 PCIe: x stays in L2 in any order.
+- **Modal's `A100-80GB` is either card.** This job and the w′ job ran on an A100 80GB PCIe with the SXM4 plan by
+  alias. On it F-x-row0 is 0.977, against 0.844 on the SXM4 job, whose base was also slower (3,322 against 2,863 µs).
+  A rerun on an SXM4 (after two PCIe draws) gave base 3,425.7 µs, F-x-row0 0.988 and F-no-xload 0.897. So the
+  first SXM4 job's 0.844 came from that one machine, and the x gathers cost about 1–2 % on the A100 as well. Modal's
+  SXM4 hosts also ran the forward slower than its PCIe hosts in the lab (3,322 and 3,426 against 2,863–2,919 µs), so
+  absolute A100 lab times from Modal are only comparable within one job.
+
+**Part phases (idea 25).** One part's blocks only (the others return at once):
+
+| Variant (H200) | Registers | µs | HMMA time (plan estimate) |
+| --- | ---: | ---: | ---: |
+| F-part0-only | 132 | 625.9 | ≈ 432 |
+| F-part1-only | 168 | 1026.8 | ≈ 650 |
+
+Both parts run far above their tensor time (+194 and +377 µs). By the plan's own rule ("if both run equally far
+above, 22 is the better route") idea 25 is not built.
+
+**ncu on the H200 forward** (pass 3 of `tools/modal/ncu_forward.sh`, `STALLS=1`: every stall reason, the pipes and
+the stalls by SASS line; base, part 0 only, part 1 only):
+
+- Stalls per issued instruction:
+
+  | Stall | Base | Part 0 | Part 1 |
+  | --- | ---: | ---: | ---: |
+  | wait (fixed latency) | 1.44 | 1.43 | 1.23 |
+  | selected | 1.00 | 1.00 | 1.00 |
+  | not selected | 0.91 | 0.79 | 1.06 |
+  | math pipe throttle | 0.50 | 0.69 | 0.57 |
+  | dispatch | 0.41 | 0.50 | 0.41 |
+  | long scoreboard | 0.37 | 0.34 | 0.15 |
+  | short scoreboard | 0.26 | 0.25 | 0.15 |
+  | barrier | 0.23 | 0.25 | 0.19 |
+  | no instruction | 0.18 | 0.09 | 0.20 |
+  | MIO throttle | 0.07 | 0.04 | 0.06 |
+
+- Pipes (percent of peak while active): tensor 38.1, ALU 29.3, FMA 24.5, LSU 24.2.
+- Stall samples by opcode (base): HMMA 25.2 %, LOP3 10.7 % (the 3xTF32 splits), LDS 8.4 %, FMUL 6.5 %, STS 5.4 %,
+  LEA 5.4 %, FADD 5.3 %, SHFL 4.5 %, FFMA 4.1 %. The two hottest lines are `B2R.RESULT` after W_GROUP's
+  `bar.red.or` vote (3.5 % together), then the receivers' `SHFL.IDX` (3.0 %).
+- The largest single cost is "wait", the fixed-latency dependency stall: the HMMA and split chains within a warp.
+  Not selected (0.91) means another warp issued instead, which more warps cannot raise further.
+- Files: `runs/round9/r9-ncu/` (`stall-summary.txt`, `ncu-stalls.csv`, `ncu-source-sass.csv.gz`).
+
+**A persistent w′ (idea 23) is closed.** One-warp blocks, a persistent grid and the next edge's indices prefetched
+(dsh and dr bitwise, dx in another atomic order):
+
+| Variant | H200 (base 1632.4 µs) | A100 PCIe, SXM4 plan (base 3275.8 µs) |
+| --- | ---: | ---: |
+| wp-blk32 | 1.005 | 1.113 |
+| wp-persist | 1.203 | 1.301 |
+| wp-persist-pf | 1.264 | 1.484 |
+| wp-persist128 | 1.051 | 1.192 |
+| wp-persist128-pf | 0.987 | 1.422 |
+
+None reaches the plan's 0.97 bar. The persistent grid loses the hardware's block balancing.
+
+Runs: `runs/round9/` (`r9-lab-h200`, `r9-ncu`, `wp9-h200`, `wp9-a100`, `x9-h200`, `x9-a100`, `ord-h200`, `ord-a100`, `sxm9-b`).

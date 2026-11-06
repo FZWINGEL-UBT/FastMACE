@@ -469,6 +469,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r5](#ideas-r5) | Owner-pass forward (idea 14A) and warp groups sharing W fragments (idea 17): lab bounds | none yet (lab `store-w`, `F-w-half`, `F-w-quarter`) | FM | 17: `W_GROUP` DEFAULT on the H200 (MD 0.9946 / 0.9942); 14A: REJECTED (MD 1.045 H200, 1.066 A100; gate fails), see [ideas-r7](#ideas-r7) | 2026-11-06 | H200 14(A) est. 0.804, F-w-half 0.878, F-w-quarter 0.817; A100-SXM4 0.836, 0.876, 0.813 | [research answers](../results/research-answers-20261105/README.md#ideas-session-fifth-revision-owner-pass-forward-and-shared-w-fragments-6-november-2026) |
 | [ideas-r7](#ideas-r7) | Owner-pass forward (14A) as a switch; drift audit of the H200 and A100 defaults; lab: stored-w variants, the W_GROUP a path, A100 at 12 warps, 3xTF32 bias | `fused_forward.OWNER_PASS` (branch `fastmace/owner-pass`, parked) | FM | 14A REJECTED; drift: no change; idea 21 ADOPTED on the A100 (see [ideas-r8](#ideas-r8)) | 2026-11-06 | owner pass MD 1.0445 / 1.0460 (H200), 1.0664 / 1.0656 (A100), NbCl5 stress 2.076; A100 lab tc-warps12 0.958, w-group-12 0.905 | [research answers](../results/research-answers-20261105/README.md#round-7-owner-pass-rejected-drift-audit-lab-at-bcdeb
 | [ideas-r8](#ideas-r8) | A100 at 12 warps (`WFRAG_REGION`) with `W_GROUP`; `A_SPLIT`; ncu stall reasons (idea 18) | `fused_forward.WFRAG_REGION_GPUS`, `W_GROUP_GPUS`, `A_SPLIT` | FM | WFRAG_REGION + W_GROUP DEFAULT on the A100-SXM4; A_SPLIT REJECTED; idea 18 CLOSED | 2026-11-06 | A100 MD 0.9718 / 0.9734 (both), WFRAG_REGION alone 0.9871 / 0.9887; A100 loup 2.169 µs/atom/step; A_SPLIT H200 1.0311 / 1.0346; H200 no_instruction stalls 0.18 of 5.40 cycles | [research answers](../results/research-answers-20261105/README.md#round-8-a100-at-12-warps-a_split-ncu-stall-reasons-6-november-2026) |501-6-november-2026) |
+| [ideas-r9](#ideas-r9) | 14 and 16 warps (idea 22(ii)), part phases (25), x-load bounds, atom order, persistent w′ (23) | none (lab variants `wg14`, `wg16`, `F-x-row0`, `F-part0-only`, `wp-persist*`) | FM | 22(ii), 23, 25 CLOSED; nothing adopted | 2026-11-06 | H200 wg14 1.029, wg16 1.017 (128 regs, spills); F-no-xload-wg16 0.900 vs wg12 0.905; F-x-row0 H200 0.977, A100-SXM4 0.988; Morton = repeat; best w′ variant H200 0.987, A100 1.113 | [research answers](../results/research-answers-20261105/README.md#round-9-more-warps-part-phases-x-load-bounds-a-persistent-w-6-november-2026) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4326,6 +4327,21 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
+
+<a id="ideas-r9"></a>
+### ideas-r9: more warps, part phases, x-load bounds, a persistent w′ (6 November 2026)
+
+- **14 and 16 warps (idea 22(ii)):** ptxas caps the forward at 128 registers and spills; H200 1.029 and 1.017,
+  and without the x loads no better than 12 warps (0.915, 0.900 against 0.905). Closed.
+- **x loads:** F-no-xload (0.904) overstates them, because a constant x lets the compiler fold the TP. With opaque x
+  (`F-x-row0`) they cost about 2 % on the H200 (0.977) and on the A100-SXM4 (0.988). Morton atom order and the
+  lab's L2 flush change nothing on the H200 and the A100 PCIe.
+- **Part phases (idea 25):** part 0 alone 626 µs, part 1 alone 1,027 µs, both far above their tensor time. Not
+  built.
+- **Persistent w′ (idea 23):** best H200 variant 0.987, every A100 variant slower. Closed.
+- **ncu (H200):** the largest stall is "wait" (1.44 cycles per issued instruction, fixed-latency chains), then not
+  selected (0.91); tensor pipe 38 % active. W_GROUP's vote barrier is the hottest line (3.5 %).
+- **Modal's A100-80GB** may be an SXM4 or a PCIe card; check `run.log` before comparing.
 
 <a id="ideas-r8"></a>
 ### ideas-r8: A100 at 12 warps, A_SPLIT, ncu stall reasons (6 November 2026)

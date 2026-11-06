@@ -1,0 +1,62 @@
+exit=0
+Modal budget: metered this month $7.18 + still running $0.00 + this job's worst case $4.31 (H200, 2700 s + 300 s start) = $11.49, limit $30.00 (cap $30, reserve $0)
+forward ptxas F-no-xload-wg16              {'9.0': {'registers': 128, 'spill_store_bytes': 24}}
+forward ptxas F-part0-only                 {'9.0': {'registers': 132, 'spill_store_bytes': 0}}
+forward ptxas F-part1-only                 {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+l1-pad rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=229376) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas F-l1-28                      {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-no-xload                   {'9.0': {'registers': 166, 'spill_store_bytes': 0}}
+wg12 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=162816) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 12 x 9472 B staging = 162816 B; opt-in here 232448 B, A100-SXM4 166912 B (fits 
+wg14 rule LaunchRule(parts=2, warps=14, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 14 x 9472 B staging = 181760 B; opt-in here 232448 B, A100-SXM4 166912 B (does 
+wg16 rule LaunchRule(parts=2, warps=16, blocks_per_slice=33, shared_bytes=200704) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 16 x 9472 B staging = 200704 B; opt-in here 232448 B, A100-SXM4 166912 B (does 
+F-no-xload-wg12 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=162816) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 12 x 9472 B staging = 162816 B; opt-in here 232448 B, A100-SXM4 1669
+F-no-xload-wg14 rule LaunchRule(parts=2, warps=14, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 14 x 9472 B staging = 181760 B; opt-in here 232448 B, A100-SXM4 1669
+F-no-xload-wg16 rule LaunchRule(parts=2, warps=16, blocks_per_slice=33, shared_bytes=200704) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 16 x 9472 B staging = 200704 B; opt-in here 232448 B, A100-SXM4 1669
+l1-pad rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=229376) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward  base                1600.5 us  ratio 1.000  regs 168 local 0  
+forward  wg12                1590.3 us  ratio 0.994  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  wg14                1646.4 us  ratio 1.029  regs 128 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  wg16                1627.2 us  ratio 1.017  regs 128 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-no-xload-wg12     1448.9 us  ratio 0.905  regs 165 local 0  
+forward  F-no-xload-wg14     1465.1 us  ratio 0.915  regs 128 local 24  
+forward  F-no-xload-wg16     1439.7 us  ratio 0.900  regs 128 local 24  
+forward  F-part0-only         625.9 us  ratio 0.391  regs 132 local 0  
+forward  F-part1-only        1026.8 us  ratio 0.642  regs 168 local 0  
+forward  F-l1-28             1592.4 us  ratio 0.995  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-no-xload          1446.9 us  ratio 0.904  regs 165 local 0  
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+wg12 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=162816) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 12 x 9472 B staging = 162816 B; opt-in here 232448 B, A100-
+forward ptxas wg12                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+wg14 rule LaunchRule(parts=2, warps=14, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 14 x 9472 B staging = 181760 B; opt-in here 232448 B, A100-
+forward ptxas wg14                         {'9.0': {'registers': 128, 'spill_store_bytes': 20}}
+wg16 rule LaunchRule(parts=2, warps=16, blocks_per_slice=33, shared_bytes=200704) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 16 x 9472 B staging = 200704 B; opt-in here 232448 B, A100-
+forward ptxas wg16                         {'9.0': {'registers': 128, 'spill_store_bytes': 52}}
+F-no-xload-wg12 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=162816) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 12 x 9472 B staging = 162816 B; opt-in here 2324
+forward ptxas F-no-xload-wg12              {'9.0': {'registers': 165, 'spill_store_bytes': 0}}
+F-no-xload-wg14 rule LaunchRule(parts=2, warps=14, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 14 x 9472 B staging = 181760 B; opt-in here 2324
+forward ptxas F-no-xload-wg14              {'9.0': {'registers': 128, 'spill_store_bytes': 24}}
+F-no-xload-wg16 rule LaunchRule(parts=2, warps=16, blocks_per_slice=33, shared_bytes=200704) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 16 x 9472 B staging = 200704 B; opt-in here 2324
+forward ptxas F-no-xload-wg16              {'9.0': {'registers': 128, 'spill_store_bytes': 24}}
+forward ptxas F-part0-only                 {'9.0': {'registers': 132, 'spill_store_bytes': 0}}
+forward ptxas F-part1-only                 {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+l1-pad rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=229376) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas F-l1-28                      {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-no-xload                   {'9.0': {'registers': 166, 'spill_store_bytes': 0}}
+wg12 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=162816) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 12 x 9472 B staging = 162816 B; opt-in here 232448 B, A100-
+wg14 rule LaunchRule(parts=2, warps=14, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 14 x 9472 B staging = 181760 B; opt-in here 232448 B, A100-
+wg16 rule LaunchRule(parts=2, warps=16, blocks_per_slice=33, shared_bytes=200704) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 16 x 9472 B staging = 200704 B; opt-in here 232448 B, A100-
+F-no-xload-wg12 rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=162816) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 12 x 9472 B staging = 162816 B; opt-in here 2324
+F-no-xload-wg14 rule LaunchRule(parts=2, warps=14, blocks_per_slice=33, shared_bytes=181760) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 14 x 9472 B staging = 181760 B; opt-in here 2324
+F-no-xload-wg16 rule LaunchRule(parts=2, warps=16, blocks_per_slice=33, shared_bytes=200704) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)): W region 49152 B + 16 x 9472 B staging = 200704 B; opt-in here 2324
+l1-pad rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=229376) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward  base                1600.5 us  ratio 1.000  regs 168 local 0  
+forward  wg12                1590.3 us  ratio 0.994  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  wg14                1646.4 us  ratio 1.029  regs 128 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  wg16                1627.2 us  ratio 1.017  regs 128 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-no-xload-wg12     1448.9 us  ratio 0.905  regs 165 local 0  
+forward  F-no-xload-wg14     1465.1 us  ratio 0.915  regs 128 local 24  
+forward  F-no-xload-wg16     1439.7 us  ratio 0.900  regs 128 local 24  
+forward  F-part0-only         625.9 us  ratio 0.391  regs 132 local 0  
+forward  F-part1-only        1026.8 us  ratio 0.642  regs 168 local 0  
+forward  F-l1-28             1592.4 us  ratio 0.995  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-no-xload          1446.9 us  ratio 0.904  regs 165 local 0  
