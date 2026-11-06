@@ -412,6 +412,32 @@ SPECIES_GEMM = None
 SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
+# MACE-OFF's first block is the stock RealAgnosticInteractionBlock (not generic: its forward stays). Its skip_tp is
+# the same one-hot fully connected TP, called once as skip_tp(message, node_attrs) after the linear, and e3nn runs
+# it as per-atom [channels, channels] matrices built from the 10-element one-hot and batched products: on the A100
+# about 0.8 ms of OFF23-small's 2.57 ms water step and 1.1 ms of OFF24-medium's 6.1 ms (module profile,
+# results/off-polar-alex-20261106). generic_species_skip replaces it by a SpeciesSkip as for the generic blocks
+# (exact) where the class's forward source matches the pin below. None: on for STOCK_FIRST_SKIP_GPUS (decision 66);
+# True / False: an A/B side's choice on every device.
+STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
+    "RealAgnosticInteractionBlock": "0a9b26328a7533f380b45af53e78f60e98ffed022cb9b7c136f781ddefefdf97",
+})
+STOCK_FIRST_SKIP = None
+STOCK_FIRST_SKIP_GPUS = GPUModels(())
+
+
+def stock_first_skip_default(device=None):
+    """``STOCK_FIRST_SKIP`` on ``device`` (a torch.device, a device name or None): the constant when set, else on
+    for ``STOCK_FIRST_SKIP_GPUS``."""
+    if STOCK_FIRST_SKIP is not None:
+        return bool(STOCK_FIRST_SKIP)
+    if isinstance(device, torch.device):
+        if device.type != "cuda":
+            return False
+        device = torch.cuda.get_device_name(device)
+    return device is not None and device in STOCK_FIRST_SKIP_GPUS
+
+
 # Round 5 (5 November 2026): the edge spherical harmonics (e3nn, l <= 3, normalised, component) by
 # fastmace.kernels.triton.edge_sh.edge_sh3, one Triton kernel each way, instead of Inductor's compiled e3nn
 # polynomials, which save about 16 per-edge intermediates for autograd (A100 profile at 5b6c5550: about 230 µs of
@@ -660,5 +686,6 @@ def species_skip(skip, columns):
     raise ValueError(f"generic_species_skip: replacement of {type(skip).__name__} does not reproduce it")
 
 
-__all__ = ["GENERIC_INTERACTIONS", "SpeciesSkip", "bias_free", "fc_last_weight", "fc_split",
-           "generic_interaction_forward", "irrep_segments", "scalar_second_input", "source_hashes", "species_skip"]
+__all__ = ["GENERIC_INTERACTIONS", "STOCK_SKIP_INTERACTIONS", "SpeciesSkip", "bias_free", "fc_last_weight", "fc_split",
+           "generic_interaction_forward", "irrep_segments", "scalar_second_input", "source_hashes", "species_skip",
+           "stock_first_skip_default"]

@@ -120,6 +120,12 @@ def apply_species_skip(model, context):
     """Restrict every generic skip connection to the structure's species; returns the changed names."""
     columns = _columns(context, "generic_species_skip")
     changed = []
+    first = _stock_first(model)
+    if first is not None:  # MACE-OFF's first block: only its skip_tp (gm.STOCK_FIRST_SKIP)
+        replacement = gm.species_skip(first.skip_tp, columns.to(_device(first)))
+        if replacement is not None:
+            first.skip_tp = replacement
+            changed.append("interactions.0")
     for index, interaction, kind in _generic_interactions(model):
         _prepare(interaction, kind)
         replacement = gm.species_skip(interaction.skip_tp, columns.to(_device(interaction)))
@@ -127,6 +133,23 @@ def apply_species_skip(model, context):
             interaction.skip_tp = replacement
             changed.append(f"interactions.{index}")
     return changed
+
+
+def _stock_first(model):
+    """The model's first interaction when it is a stock block in ``gm.STOCK_SKIP_INTERACTIONS`` with the pinned
+    forward, a one-hot skip_tp, generic blocks after it and ``gm.stock_first_skip_default`` on its device; else None."""
+    interactions = list(getattr(model, "interactions", ()))
+    if not interactions or not _generic_interactions(model):
+        return None
+    first = interactions[0]
+    digest = gm.STOCK_SKIP_INTERACTIONS.get(type(first).__name__)
+    if digest is None or not gm.stock_first_skip_default(_device(first)):
+        return None
+    if hashlib.sha256(inspect.getsource(type(first).forward).encode()).hexdigest() != digest:
+        return None
+    if gm.scalar_second_input(getattr(first, "skip_tp", None)) is None:
+        return None
+    return first
 
 
 def apply_reassociate(model, context):
