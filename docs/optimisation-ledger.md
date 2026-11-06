@@ -466,6 +466,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-edge-sh](#omat0-edge-sh) | Edge spherical harmonics (l <= 3) in one Triton kernel each way, analytic backward | `generic.modules.EDGE_SH`, `EDGE_SH_GPUS` | FM | DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66) | 2026-11-05 | MD step SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-species-gemm-a100-recheck](#omat0-species-gemm-a100-recheck) | The species GEMM on the A100 again at the 11.7 ms step | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-05 | SrTiO3 0.996 / 0.994 (Triton), 0.979 / 0.980 (CUTLASS); NbCl5 1.026 / 1.027, 1.053 / 1.058 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-table-w-forward](#omat0-table-w-forward) | w from the value table inside the fused forward (the backward's TABLE_W) | none (lab `simt-slab-real`, `simt-slab3`) | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.333 (table cached: 0.988), 5060 Ti 1.356 | [round 5](../results/round5-20261105/README.md) |
+| [ideas-r5](#ideas-r5) | Owner-pass forward (idea 14A) and warp groups sharing W fragments (idea 17): lab bounds | none yet (lab `store-w`, `F-w-half`, `F-w-quarter`) | FM | BUILDING (17 first, then 14A) | 2026-11-06 | H200 14(A) est. 0.804, F-w-half 0.878, F-w-quarter 0.817; A100-SXM4 0.836, 0.876, 0.813 | [research answers](../results/research-answers-20261105/README.md#ideas-session-fifth-revision-owner-pass-forward-and-shared-w-fragments-6-november-2026) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4163,6 +4164,29 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Why: the per-GPU rewrites are keyed by exact device names; the H200 has not been screened.
 - Sources: [H200 profile](../results/omat0-h200-profile-0ab2bd9a/README.md).
 
+
+<a id="ideas-r5"></a>
+### ideas-r5: owner-pass forward and shared W fragments, lab bounds (6 November 2026)
+
+- Switch: none yet (lab `store-w`, `F-w-half`, `F-w-quarter`)
+- Engine: FM
+- Date/round: the ideas session's fifth revision (`433b4e19` on `fastmace/h200-ideas-20261105`); lab at `74838161`.
+- What:
+  - 14(A): pass 1 is the fused forward over each mirror pair's owner edge, storing w for the partner; pass 2 is product-free, for the partner edges.
+  - Idea 17: a warp group shares each W fragment across its batches.
+- Status: BUILDING. Idea 17 at G = 2 first, then 14(A).
+- Measured (OMAT-0 medium, SrTiO3 10×10×10):
+
+  | | H200 | A100-SXM4 |
+  | --- | ---: | ---: |
+  | store-w | 1.102 | 1.059 |
+  | F-tp-stored-w | 0.506 | 0.613 |
+  | 14(A) estimate | 0.804 | 0.836 |
+  | F-w-half | 0.878 | 0.876 |
+  | F-w-quarter | 0.817 | 0.813 |
+
+  Thresholds: 14(A) ≤ 0.85; G = 2 at F-w-half ≤ 0.92; G = 4 at 0.04 below F-w-half.
+- Sources: [research answers](../results/research-answers-20261105/README.md#ideas-session-fifth-revision-owner-pass-forward-and-shared-w-fragments-6-november-2026).
 
 <a id="ideas-r3"></a>
 ### ideas-r3: w once per mirror pair, lane-parallel index loads (6 November 2026)

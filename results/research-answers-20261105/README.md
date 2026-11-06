@@ -186,3 +186,45 @@ dense-product bench, because the first job lost its output to an unescaped `$OUT
 
 Runs: `runs/ideas-r5-h200/` (lab falsifiers, mirror check), `runs/ideas-r6-h200/` (pair product),
 `runs/laneidx-h200/` (MD A/B). Modal `third` stood at $11.57 metered before the A/B.
+
+## Ideas session, fifth revision: owner-pass forward and shared W fragments (6 November 2026)
+
+The fifth revision (`fastmace/h200-ideas-20261105`, `433b4e19`) reopened idea 14 as 14(A) and ranked idea 17 next.
+
+- **14(A), the owner pass:**
+  - Each mirror pair runs the fused forward once, for its owner edge, and stores w into its partner's slot.
+  - A second, product-free pass then serves the partner edges from the stored w.
+- **Idea 17:** a warp group of G warps shares each W fragment across its G batches.
+
+Three lab variants (`74838161`, Modal `third`) decide whether to build them:
+
+- `store-w`: the base with STORE_W on, bitwise.
+- `F-w-half`: both m-tiles read one W fragment. That is G = 2's W traffic, without its extra a loads and barriers.
+- `F-w-quarter`: additionally, paired path groups read one W fragment. That is G = 4's W traffic.
+
+The base includes LANE_INDICES on the H200.
+
+| Variant | H200 | A100-SXM4-80GB |
+| --- | ---: | ---: |
+| base | 1,632.9 µs | 3,107.6 µs |
+| store-w | 1.102 | 1.059 (20 B spill) |
+| F-tp-stored-w | 0.506 | 0.613 |
+| F-w-half | 0.878 | 0.876 |
+| F-w-quarter | 0.817 | 0.813 |
+| **14(A) estimate: ½ store-w + ½ F-tp-stored-w** | **0.804** | **0.836** |
+
+Both falsifiers clear the plan's thresholds on both GPUs.
+
+- **14(A): build.**
+  - The threshold is ≤ 0.85. The H200 estimate of 0.804 is about −320 µs per forward, before the second launch and
+    pass 2's message reads.
+  - It is rounding class, so a default needs the force/stress gate as well as the MD A/Bs.
+- **Idea 17: build, starting at G = 2.**
+  - G = 2: F-w-half is 0.878, below the 0.92 threshold.
+  - G = 4: F-w-quarter is 0.06 below F-w-half, above the 0.04 margin, so G = 4 is worth building too. It needs
+    idea 18's registers.
+  - Idea 17 is bitwise, so a default needs only the MD A/Bs.
+- **Order:** idea 17 first. It is a render change inside one kernel, and it makes 14(A)'s pass 1 cheaper. 14(A)
+  follows, with the rebuild's pairing, the second pass and the gate.
+
+Runs: `runs/ideas-r7-h200/`, `runs/ideas-r7-a100/`. Modal `third` stood at $12.19 metered before these two jobs.

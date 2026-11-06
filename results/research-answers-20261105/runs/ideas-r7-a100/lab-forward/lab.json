@@ -1,0 +1,120 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-06T00:23:06.700412+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "74838161054ce2e35386950b4e174f4fc89c8ddd",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 81.648183379,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=11, blocks_per_slice=27, shared_bytes=165632)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 64,
+          "median_us": 3107.6478958129883,
+          "min_us": 3094.8801040649414,
+          "max_us": 4027.872085571289,
+          "ratio": 1.0
+        },
+        "store-w": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 64,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 3291.232109069824,
+          "min_us": 3272.0959186553955,
+          "max_us": 3980.288028717041,
+          "ratio": 1.0590749722657395
+        },
+        "F-tp-stored-w": {
+          "kind": "falsifier",
+          "registers": 157,
+          "local_bytes": 48,
+          "median_us": 1903.5520553588867,
+          "min_us": 1895.359992980957,
+          "max_us": 2147.775888442993,
+          "ratio": 0.6125378804733927
+        },
+        "F-w-half": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 48,
+          "median_us": 2721.503973007202,
+          "min_us": 2705.888032913208,
+          "max_us": 3323.391914367676,
+          "ratio": 0.8757439916774202
+        },
+        "F-w-quarter": {
+          "kind": "falsifier",
+          "registers": 162,
+          "local_bytes": 48,
+          "median_us": 2526.560068130493,
+          "min_us": 2508.16011428833,
+          "max_us": 3074.0480422973633,
+          "ratio": 0.8130136208592327
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "store-w": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 20
+        }
+      },
+      "F-tp-stored-w": {
+        "9.0": {
+          "registers": 157,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-w-half": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-w-quarter": {
+        "9.0": {
+          "registers": 158,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}
