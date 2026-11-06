@@ -160,13 +160,15 @@ class FirstInteractionReassociation(torch.nn.Module):
         self.gammas = tuple(float(g) for g in gammas)
         self.ir_mul = bool(ir_mul)
         self.tf32x3 = False  # tf32x3_gemms: the per-path products as 3xTF32 (OPT4-T03)
+        self.first_div = False  # idea 31 (kernels.cutlass.first_div), set by precision.route
 
     def bind(self, species_feats):
         """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address)."""
         if self._buffers.get("species_feats") is not species_feats:
             self.register_buffer("species_feats", species_feats, persistent=False)
 
-    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None, summed_fn=None):
+    def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None, summed_fn=None,
+                divided_by=None):
         """``rows``: the message of the first ``rows`` nodes only, when every edge's receiver is one of them (the
         tiled call's tiles: the halo's rows are senders only, and the padding edges join a receiver slot); the
         senders' species still come from every row. None: every node's. ``summed_fn(key, slots) -> (sums [slots,
@@ -194,6 +196,22 @@ class FirstInteractionReassociation(torch.nn.Module):
         blocks = []
         start = 0
         c = self.channels
+        if divided_by is not None and self.tf32x3 and self.ir_mul and rows is None:
+            # idea 31 (kernels.cutlass.first_div): the blocks divided by (density + 1) in the epilogue, kept apart
+            lefts, rights = [], []
+            for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
+                size = 2 * l + 1
+                lefts.append(summed[:, :, start:start + size].transpose(1, 2).reshape(nodes * size, slots * width))
+                rights.append((gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None])
+                              .reshape(slots * width, c))
+                start += size
+            density = divided_by()
+            from fastmace.kernels.cutlass import first_div
+
+            if first_div.applies(lefts, rights, density):
+                outs = first_div.blocks_div(lefts, rights, density)
+                return tuple(out.view(nodes, 2 * degree + 1, c) for out, degree in zip(outs, self.ls))
+            start = 0
         for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
             size = 2 * l + 1
             # [nodes * size, slots * width] @ [slots * width, C]

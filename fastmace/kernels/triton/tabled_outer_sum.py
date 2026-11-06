@@ -34,6 +34,15 @@ WARPS = 1
 TABLED_FORWARD = None
 TABLED_FORWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
                                  "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# Idea 40 (plans/h200-ideas-20261105.md, 6 November 2026). POWER_BACKWARD (with TABLED_FORWARD): the backward takes a
+# and its slope (and the density column's slope) by one dual Horner pass from the value series in the power basis of
+# x (the table's ``pcoef``, converted in float64 at build), six row loads instead of six value and five derivative
+# rows. Rounding. None: on for POWER_BACKWARD_GPUS; True / False: an A/B side's choice.
+POWER_BACKWARD = None
+# NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9954 / 0.9957 (OMAT-0 medium, SrTiO3
+# 10x10x10, abab / abba); force/stress gate as the default's (worst max-error ratio 1.016, forces).
+# NVIDIA A100-SXM4-80GB: 1.0020 / 0.9977, a tie, off.
+POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200",))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
 
@@ -49,6 +58,22 @@ def _listed(index: int) -> bool:
     before it failed ("stale reference to the default stream"; ab_rewrites --order ba with a None side built second,
     H200, 5 November 2026)."""
     return torch.cuda.get_device_name(index) in TABLED_FORWARD_GPUS
+
+
+@torch.compiler.assume_constant_result
+def _power_listed(index: int) -> bool:
+    """Whether CUDA device ``index`` is one of ``POWER_BACKWARD_GPUS`` (a Dynamo constant, as ``_listed``)."""
+    return torch.cuda.get_device_name(index) in POWER_BACKWARD_GPUS
+
+
+def power_backward(device):
+    """``POWER_BACKWARD`` on ``device``: the constant when set, else on for ``POWER_BACKWARD_GPUS``."""
+    if POWER_BACKWARD is not None:
+        return bool(POWER_BACKWARD)
+    device = torch.device(device)
+    if device.type != "cuda":
+        return False
+    return _power_listed(device.index if device.index is not None else torch.cuda.current_device())
 
 
 def tabled_forward(device):
@@ -75,7 +100,7 @@ def _kernel():
                grad_density_ptr, dr_ptr, grad_y_ptr, num_edges, a_stride, E_DENSITY, n_pieces, n_bins, r_lo,
                bin_scale, r_max, K: tl.constexpr, D: tl.constexpr, INNER: tl.constexpr, TERMS: tl.constexpr,
                J: tl.constexpr, CHUNK: tl.constexpr, BLOCK_K: tl.constexpr, BLOCK_D: tl.constexpr,
-               RECOMPUTE: tl.constexpr, coef_ptr, VTERMS: tl.constexpr):
+               RECOMPUTE: tl.constexpr, coef_ptr, VTERMS: tl.constexpr, POWER: tl.constexpr):
         start = tl.program_id(0) * CHUNK
         d = tl.arange(0, BLOCK_D)
         k = tl.arange(0, BLOCK_K)
@@ -97,7 +122,21 @@ def _kernel():
             index = tl.minimum(((clamped - r_lo) * bin_scale).to(tl.int32), n_bins - 1)
             piece = tl.load(bins_ptr + index).to(tl.int64)
             x = (clamped - tl.load(starts_ptr + piece)) * tl.load(scales_ptr + piece) - 1.0
-            if RECOMPUTE:  # a = g(r) again from the value series (coef [P, pieces, VTERMS, J])
+            if POWER:  # a, da/dx and the density's d/dx by dual Horner (pcoef [P, pieces, VTERMS, J], power basis)
+                vbase = (pair * n_pieces + piece) * VTERMS * J
+                pa = tl.load(coef_ptr + vbase + (VTERMS - 1) * J + k, mask=k < K, other=0.0)
+                pd = tl.zeros((BLOCK_K,), dtype=tl.float32)
+                qa = tl.load(coef_ptr + vbase + (VTERMS - 1) * J + (J - 1))
+                qd = 0.0 * x
+                for t in tl.static_range(VTERMS - 2, -1, -1):
+                    c = tl.load(coef_ptr + vbase + t * J + k, mask=k < K, other=0.0)
+                    pd = pd * x + pa
+                    pa = pa * x + c
+                    cd = tl.load(coef_ptr + vbase + t * J + (J - 1))
+                    qd = qd * x + qa
+                    qa = qa * x + cd
+                a = tl.where(r < r_max, pa, 0.0)
+            elif RECOMPUTE:  # a = g(r) again from the value series (coef [P, pieces, VTERMS, J])
                 vbase = (pair * n_pieces + piece) * VTERMS * J
                 v1 = tl.zeros((BLOCK_K,), dtype=tl.float32)
                 v2 = tl.zeros((BLOCK_K,), dtype=tl.float32)
@@ -113,23 +152,28 @@ def _kernel():
             y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
             tl.store(grad_y_ptr + row * D + d, tl.sum(block * a[None, :], axis=1), mask=d < D)
             grad_a = tl.sum(block * y[:, None], axis=0)
-            # The derivative row (dcoef [P, pieces, TERMS, J]).
-            base = (pair * n_pieces + piece) * TERMS * J
-            b1 = tl.zeros((BLOCK_K,), dtype=tl.float32)
-            b2 = tl.zeros((BLOCK_K,), dtype=tl.float32)
-            c1 = 0.0 * x  # the density column J - 1 (a scalar Clenshaw sum)
-            c2 = 0.0 * x
-            for t in tl.static_range(TERMS - 1, 0, -1):
-                c = tl.load(dcoef_ptr + base + t * J + k, mask=k < K, other=0.0)
-                b = c + 2.0 * x * b1 - b2
-                b2 = b1
-                b1 = b
-                cd = tl.load(dcoef_ptr + base + t * J + (J - 1))
-                cn = cd + 2.0 * x * c1 - c2
-                c2 = c1
-                c1 = cn
-            slope = tl.load(dcoef_ptr + base + k, mask=k < K, other=0.0) + x * b1 - b2
-            slope_density = tl.load(dcoef_ptr + base + (J - 1)) + x * c1 - c2
+            if POWER:  # d/dr = d/dx * the piece's scale
+                sc = tl.load(scales_ptr + piece)
+                slope = pd * sc
+                slope_density = qd * sc
+            else:
+                # The derivative row (dcoef [P, pieces, TERMS, J]).
+                base = (pair * n_pieces + piece) * TERMS * J
+                b1 = tl.zeros((BLOCK_K,), dtype=tl.float32)
+                b2 = tl.zeros((BLOCK_K,), dtype=tl.float32)
+                c1 = 0.0 * x  # the density column J - 1 (a scalar Clenshaw sum)
+                c2 = 0.0 * x
+                for t in tl.static_range(TERMS - 1, 0, -1):
+                    c = tl.load(dcoef_ptr + base + t * J + k, mask=k < K, other=0.0)
+                    b = c + 2.0 * x * b1 - b2
+                    b2 = b1
+                    b1 = b
+                    cd = tl.load(dcoef_ptr + base + t * J + (J - 1))
+                    cn = cd + 2.0 * x * c1 - c2
+                    c2 = c1
+                    c1 = cn
+                slope = tl.load(dcoef_ptr + base + k, mask=k < K, other=0.0) + x * b1 - b2
+                slope_density = tl.load(dcoef_ptr + base + (J - 1)) + x * c1 - c2
             grad_density = tl.load(grad_density_ptr + row, mask=edge < E_DENSITY, other=0.0)
             total = tl.sum(grad_a * slope, axis=0) + grad_density * slope_density
             total = tl.where((r < r_max) & (r >= r_lo), total, 0.0)
@@ -235,12 +279,16 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
                               r: torch.Tensor, pair: torch.Tensor, dcoef: torch.Tensor, starts: torch.Tensor,
                               scales: torch.Tensor, bins: torch.Tensor, grad_density: torch.Tensor, r_lo: float,
                               bin_scale: float, r_max: float, inner: int = 1,
-                              coef: torch.Tensor | None = None, columns: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
+                              coef: torch.Tensor | None = None, columns: int = 0,
+                              power: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
     """(dL/dr [E], grad_y [E, D]) from the slots' gradient ``grad [slots, D * K]`` (``inner`` layout), the table rows
     ``a [E, K]`` (the table's leading K columns) and the edge density's gradient (``[E, 0]``: none). With ``coef``
-    (``TABLED_FORWARD``): ``a`` is evaluated again from the value table's leading ``columns`` (``a`` unused)."""
+    (``TABLED_FORWARD``): ``a`` is evaluated again from the value table's leading ``columns`` (``a`` unused);
+    ``power`` (``POWER_BACKWARD``): ``coef`` is the power-basis table ``pcoef``, a and the slopes by dual Horner."""
     if coef is not None:
         if not (grad.is_cuda and coef.dtype == torch.float32):
+            if power:
+                raise ValueError("the power-basis backward runs only in the fused CUDA float32 kernel")
             from fastmace.kernels.triton.radial_table import radial_table_forward
             a, _ = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, False,
                                         int(columns))
@@ -275,20 +323,21 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
             float(bin_scale), float(r_max), K=k, D=d, INNER=inner, TERMS=dcoef.shape[2], J=dcoef.shape[-1],
             CHUNK=CHUNK, BLOCK_K=triton.next_power_of_2(k), BLOCK_D=triton.next_power_of_2(d),
             RECOMPUTE=coef is not None, coef_ptr=coef if coef is not None else dcoef,
-            VTERMS=coef.shape[2] if coef is not None else 1, num_warps=WARPS)
+            VTERMS=coef.shape[2] if coef is not None else 1, POWER=bool(power) and coef is not None,
+            num_warps=WARPS)
     return dr, grad_y
 
 
 @tabled_outer_sum_backward.register_fake
 def _(grad, a, y, key, r, pair, dcoef, starts, scales, bins, grad_density, r_lo, bin_scale, r_max, inner=1,
-      coef=None, columns=0):
+      coef=None, columns=0, power=False):
     return r.new_empty((r.numel(),)), torch.empty_like(y)
 
 
 class _TabledOuterSum(torch.autograd.Function):
     @staticmethod
     def forward(ctx, r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y, key, slots,
-                inner):
+                inner, pcoef):
         from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum_forward
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -296,8 +345,9 @@ class _TabledOuterSum(torch.autograd.Function):
         ctx.inner, ctx.columns = inner, int(columns)
         ctx.shape, ctx.slots = r.shape, int(slots)
         ctx.tabled = tabled_forward(r.device) and r.dtype == torch.float32
+        ctx.power = ctx.tabled and pcoef is not None and r.is_cuda and power_backward(r.device)
         if ctx.tabled:  # nothing of a kept: the backward evaluates it again
-            ctx.save_for_backward(coef, y, key, r, pair, dcoef, starts, scales, bins)
+            ctx.save_for_backward(pcoef if ctx.power else coef, y, key, r, pair, dcoef, starts, scales, bins)
             return tabled_outer_sum_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y,
                                             key, slots, inner)
         a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, True, columns)
@@ -313,22 +363,23 @@ class _TabledOuterSum(torch.autograd.Function):
             grad_density = y.new_zeros((0,))
         if ctx.tabled:  # first is coef
             dr, grad_y = tabled_outer_sum_backward(grad, y.new_empty((0, 0)), y, key, r, pair, dcoef, starts, scales,
-                                                   bins, grad_density, *ctx.constants, ctx.inner, first, ctx.columns)
+                                                   bins, grad_density, *ctx.constants, ctx.inner, first, ctx.columns,
+                                                   ctx.power)
         else:  # first is a
             dr, grad_y = tabled_outer_sum_backward(grad, first, y, key, r, pair, dcoef, starts, scales, bins,
                                                    grad_density, *ctx.constants, ctx.inner)
         return (dr.reshape(ctx.shape), None, None, None, None, None, None, None, None, None, None, grad_y, None,
-                None, None)
+                None, None, None)
 
 
 def tabled_outer_sum(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y, key, slots,
-                     inner=1):
+                     inner=1, pcoef=None):
     """``(S [slots, D * K], edge density [E, 1])``: the table's leading ``columns`` = K values ``a`` of each edge
     length ``r``, summed as ``S[key] += y a^T`` (``edge_outer_sum``'s segmented forward, d major), with the fused
     backward (module docstring). Differentiable in ``r`` and ``y``."""
     return _TabledOuterSum.apply(r, pair, coef, dcoef, starts, scales, bins, float(r_lo), float(bin_scale),
-                                 float(r_max), int(columns), y, key, int(slots), int(inner))
+                                 float(r_max), int(columns), y, key, int(slots), int(inner), pcoef)
 
 
-__all__ = ["CHUNK", "FORWARD_CHUNK", "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "tabled_forward",
+__all__ = ["CHUNK", "FORWARD_CHUNK", "POWER_BACKWARD", "POWER_BACKWARD_GPUS", "power_backward", "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "tabled_forward",
            "tabled_outer_sum", "tabled_outer_sum_backward", "tabled_outer_sum_forward"]

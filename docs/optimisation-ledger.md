@@ -479,7 +479,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r11](#ideas-r11) | x gathers after the k-loop (idea 27, `X_LATE`), a/W one k-step ahead (`K_PIPE`), staging one batch ahead (idea 26) | `fused_forward.X_LATE_GPUS`, `K_PIPE_GPUS` | FM | X_LATE DEFAULT on the H200 and A100-SXM4; K_PIPE off; 26 REJECTED | 2026-11-06 | MD X_LATE H200 0.9884 / 0.9882, A100-SXM4 0.9937 / 0.9937; stage-ahead lab H200 1.012–1.034 | [research answers](../results/research-answers-20261105/README.md#round-11-x-gathers-after-the-k-loop-x_late-adopted-stage-ahead-rejected-6-november-2026) |
 | [ideas-r12](#ideas-r12) | CG factors folded into W (idea 24, `CG_FOLD`), TP inside the next k-loop (22(iii)) | `fused_forward.CG_FOLD_GPUS`, `cg_fold.py` | FM | CG_FOLD DEFAULT on the H200 and A100-SXM4; 22(iii) REJECTED | 2026-11-06 | MD CG_FOLD H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898; lab 22(iii) 1.03–1.21 | [research answers](../results/research-answers-20261105/README.md#round-12-cg-factors-folded-into-w-cg_fold-adopted-tp-in-the-next-k-loop-rejected-6-november-2026) |
 | [ideas-r13](#ideas-r13) | a read with one LDS.128 (17(ii), `A_LD128`), TP without flush checks (29, `TP_NOFLUSH`), further CG folds (28), K_PIPE on the fold; mirror tiles (32) | `fused_forward.A_LD128_GPUS`, `TP_NOFLUSH_GPUS`, `kloop_rewrites.py` | FM | A_LD128 DEFAULT on the H200 and A100-SXM4, TP_NOFLUSH on the A100-SXM4; 28 not ported; 32 STOPPED | 2026-11-06 | MD H200 A_LD128 0.9925 / 0.9956; A100-SXM4 both 0.9909 / 0.9923; 32: f = 0.22 at 32 rows | [research answers](../results/research-answers-20261105/README.md#round-13-one-lds128-for-a-a_ld128-and-the-tp-without-flush-checks-tp_noflush-adopted-6-november-2026) |
-| [ideas-r14](#ideas-r14) | GEMM epilogues (31, `LINEAR_DIV`), warp-specialized wgmma forward (30), mirror tiles (32), sm_90 3xTF32 GEMMs (33), w′ register cap (36) | `cutlass.linear_div.LINEAR_DIV_GPUS` | FM | LINEAR_DIV DEFAULT on the H200 and A100-SXM4; WS_FORWARD DEFAULT on the H200 (MD 0.9584 / 0.9610); 32, 33, 36 STOPPED | 2026-11-06 | MD LINEAR_DIV H200 0.9912 / 0.9934, A100-SXM4 0.9896 / 0.9891; 33 ×3 1.07; 36 maxreg80 1.255 | [research answers](../results/research-answers-20261105/README.md#revision-14-gemm-epilogue-linear_div-and-warp-specialized-forward-ws_forward-adopted-ideas-30-32-33-36-measured-6-november-2026) |
+| [ideas-r14](#ideas-r14) | GEMM epilogues (31, `LINEAR_DIV`), warp-specialized wgmma forward (30), mirror tiles (32), sm_90 3xTF32 GEMMs (33), w′ register cap (36) | `cutlass.linear_div.LINEAR_DIV_GPUS` | FM | LINEAR_DIV DEFAULT on the H200 and A100-SXM4; WS_FORWARD DEFAULT on the H200 (MD 0.9584 / 0.9610); 32, 33, 36 STOPPED; step 2: STAGE_DOUT (38) and SKIP_SELECT (31) DEFAULT on the H200 and A100-SXM4, FIRST_DIV (31) REJECTED, interaction-1 graph break removed | 2026-11-06 | MD LINEAR_DIV H200 0.9912 / 0.9934, A100-SXM4 0.9896 / 0.9891; 33 ×3 1.07; 36 maxreg80 1.255; STAGE_DOUT H200 0.9616 / 0.9638, A100-SXM4 0.9896 / 0.9920; SKIP_SELECT H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858; FIRST_DIV 1.031–1.035 | [research answers](../results/research-answers-20261105/README.md#revision-14-gemm-epilogue-linear_div-and-warp-specialized-forward-ws_forward-adopted-ideas-30-32-33-36-measured-6-november-2026) |
+| [ideas-q2](#ideas-q2) | Segmented density sums (5(b), `RECEIVER_SUM`); G1 pre-split ceiling; rcfold on the A100 (28); ZBL config, S fill, chunked S (5(d), 13, 35) | `receiver_sum.RECEIVER_SUM_GPUS` | FM | RECEIVER_SUM DEFAULT on the A100 (SXM4 and PCIe names); H200 a tie; G1, 28, 5(d), 13, 35 MEASURED, NOT BUILT (bounds ≤ 1 % or build out of proportion) | 2026-11-06 | MD A100-SXM4 0.9998 / 0.9918, 0.9990 / 0.9985; H200 0.9992 / 1.0012; G1 ceiling/plain H200 0.894, A100 0.915; rc-all 0.986 of today's A100 forward | [ideas queue 2](../results/ideas-queue2-20261106/README.md) |
+| [ideas-q1](#ideas-q1) | Folded α in the w′ table (34, `FOLD_ALPHA`), power-basis tabled backward (40, `POWER_BACKWARD`), Estrin w′ (39, `ESTRIN`); chunk sweeps and cross-checks | `wprime_backward.FOLD_ALPHA_GPUS`, `tabled_outer_sum.POWER_BACKWARD_GPUS` | FM | FOLD_ALPHA DEFAULT on the H200 and A100-SXM4; POWER_BACKWARD DEFAULT on the H200; ESTRIN REJECTED (FOLD_ALPHA faster on the A100, together nothing); sweeps and cross-checks REJECTED | 2026-11-06 | MD FOLD_ALPHA H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893; POWER_BACKWARD H200 0.9954 / 0.9957; both off on the H200 1.0073 / 1.0089; FOLD_ALPHA vs ESTRIN on the A100 0.9967 / 0.9902, 0.9884 / 0.9907 | [ideas queue](../results/ideas-queue-20261106/README.md) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -493,6 +495,8 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [sx-forward-table-w](#sx-forward-table-w) | Symmetrix-XL-style interaction 2 forward: w per edge from the value table instead of the a·W tensor-core product | none (lab bound `simt-slab-edges`) | FM | REJECTED (bound) | 2026-11-06 | H200 1.207 with the real slabs (511, 15.7 MB), L1 best case 0.901; 5060 Ti 1.238 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [sx-wprime-reduction](#sx-wprime-reduction) | w′: Symmetrix-XL's Cartesian Jacobian before the reduction, or a cheaper reduction | none (lab bounds `F-no-reduce`, `F-cart3`, `F-redux16`) | FM | REJECTED (bound) | 2026-11-06 | H200 no reduction at all 0.964; F-cart3 1.081; redux 1.135 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [h200-butterfly-off](#h200-butterfly-off) | w′ `BUTTERFLY` off again on the H200 | `wprime_backward.BUTTERFLY_GPUS` | FM | ADOPTED (H200 removed; branch `fastmace/sx012-profile-20261106`) | 2026-11-06 | H200 MD b/a 0.9659 / 0.9677 (b = off), w′ kernel 0.88 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
+| [cx-n1-cartesian-wprime](#cx-n1-cartesian-wprime) | w′: Cartesian harmonic adjoints (node converter, then dx and the edge-vector gradient from harmonic polynomials) | none (`tools/lab_cartesian.py`) | FM | REJECTED (bound) | 2026-11-06 | H200 lab 1.060 / 1.062 with converter (kernel 1.022, 56 vs 96 registers) | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
+| [cx-n2-fp64-adjoint](#cx-n2-fp64-adjoint) | w′: receiver-tiled FP64 tensor-core matrix adjoints | none (`tools/lab_cartesian.py` skeleton bound) | FM | REJECTED (bound) | 2026-11-06 | H200 optimistic floor 2.38x the default kernel | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -4395,6 +4399,52 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
 
+<a id="ideas-q2"></a>
+### ideas-q2: segmented density sums adopted on the A100; G1, rcfold and the tail bounded (6 November 2026)
+
+- **`RECEIVER_SUM` (5(b)):** the generic densities' `scatter_sum` as a segmented sum over receiver-sorted edges
+  (`fastmace::receiver_sum`; one atomic per run end per 1,024-edge block). The backward is the same gather.
+  - A100: 74.8 µs of fused atomics become 17.4 µs. MD A100-SXM4 0.9998 / 0.9918 and 0.9990 / 0.9985, with a gate
+    that passes the same checks as the default. Default on the A100, both the SXM4 and the PCIe names (the owner:
+    PCIe landings are fine).
+  - H200: a tie (0.9992 / 1.0012), so it stays off.
+- **G1 (pre-split weights):** a ceiling cubin without the B split runs at 0.894 of plain on the H200 and 0.915 on
+  the A100.
+  - The TF32×3 GEMMs take about 925 µs of the H200's 4.76 ms, so the ceiling is about 2 % of the step.
+  - A real kernel would load hi/lo B tiles, so its gain is about half that.
+  - Not built: it needs a new CUTLASS warp MMA. It is the largest open item.
+- **28 (rcfold on the A100):** rc-all is 0.944 of round 13's base, but only about 0.986 of today's default forward
+  (≈ 0.35 % of the step). It is rounding, and porting it to the current render is real work. Not ported.
+- **5(d), 13, 35:** bounded from the breakdown, not built.
+  - ZBL / geometry forward: 33 µs, near the bandwidth floor of about 30 MB.
+  - S zero fill: 33 µs on the A100, ≤ 0.34 %. Dropping it needs run-aligned chunks.
+  - Chunked S in L2: a redesign.
+- Details: [ideas queue 2](../results/ideas-queue2-20261106/README.md).
+
+<a id="ideas-q1"></a>
+### ideas-q1: folded α and the power-basis tabled backward adopted; Estrin rejected (6 November 2026)
+
+- **`FOLD_ALPHA` (34):** `FACTORED_SCALE`'s per-path α is folded into the w′ value table's rows at build (float64).
+  The kernel's terms then carry no α multiply, and scalar paths stay scalar. MD H200 0.9963 / 0.9954, A100-SXM4
+  0.9895 / 0.9893 (and 0.9911 / 0.9863 on a slow card). The gates match the default's. Default on both.
+- **`POWER_BACKWARD` (40):** the tabled outer-sum backward reads a power-basis copy of the Chebyshev table
+  (`pcoef`, cheb2poly in float64) and takes value and slope by dual Horner. MD H200 0.9954 / 0.9957; A100 a tie
+  (1.0020 / 0.9977). The gate matches the default's. Default on the H200.
+- **Both together:** with both off at `61086292`, the H200 step is 1.0073 / 1.0089, so together they save about
+  0.8 %.
+- **`ESTRIN` (39):** Estrin's scheme for w and w′ (three FMAs deep instead of five).
+  - A100 alone 0.9961 / 0.9963, and its gate matches the default's.
+  - With `FOLD_ALPHA` it gains nothing (1.0002 / 1.0028), and `FOLD_ALPHA` alone beats it (0.9967 / 0.9902,
+    0.9884 / 0.9907).
+  - H200 1.0030 / 1.0012.
+  - Off everywhere.
+- **Rejected sweeps:** tabled `CHUNK` 8 and 32, `FORWARD_CHUNK` 16 and 64, and `STAGE_DOUT_CHUNK` 16 on both GPUs.
+  Each is a tie or 0.4–1 % slower.
+- **Cross-checks:** none changes a switch; each is a tie on the other GPU.
+  - `SEGMENT_ROWS` and `BACKWARD_WALK` on the H200.
+  - `LANE_INDICES` and 8-warp radial tables on the A100.
+- **MD step:** H200 about 4.92 ms, A100-SXM4-80GB about 9.68 ms. Details: [ideas queue](../results/ideas-queue-20261106/README.md).
+
 <a id="ideas-r14"></a>
 ### ideas-r14: GEMM epilogue and warp-specialized wgmma forward adopted; three bounds stopped (6 November 2026)
 
@@ -4408,6 +4458,18 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - 32: f = 0.22 at 32-row tiles;
   - 33: sm_90 TF32 ×3 takes 1.07× today's GEMMs;
   - 36: a register cap of 80 is 1.255 without spills.
+- **Step 2 (6 November 2026):**
+  - `STAGE_DOUT` (38): the receiver's dout row in shared memory in the w′ backward; dsh and dL/dr bitwise. MD H200
+    0.9616 / 0.9638, A100-SXM4 0.9896 / 0.9920: default on both.
+  - `SKIP_SELECT` (31): the species-skip products with the own-species select in a CUTLASS epilogue; bitwise
+    kernel. MD H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858: default on both.
+  - `FIRST_DIV` (31): interaction 1's products with the division in the epilogue. MD 1.031–1.035 and the density
+    gradient not bitwise on sm_80/sm_90: rejected.
+  - Interaction 1's graph break (a traced `torch.cuda.get_device_name`) removed with
+    `torch.compiler.assume_constant_result` (`FUSED_FIRST_CONSTANT_NAME`): MD H200 1.0020 / 1.0010, A100-SXM4
+    0.9997 / 1.0004 against the old call; kept.
+  - Fastest MD step: H200 about 5.13 ms, A100-SXM4-80GB about 10.33 ms. Details:
+    [research answers](../results/research-answers-20261105/README.md#revision-14-step-2-stage_dout-and-skip_select-adopted-first_div-rejected-graph-break-removed-6-november-2026).
 
 <a id="ideas-r13"></a>
 ### ideas-r13: one LDS.128 for a and the TP without flush checks, adopted (6 November 2026)
@@ -4489,6 +4551,28 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured (H200, `d599cc70`, base with `BUTTERFLY=False` 1,634 µs): F-no-reduce 0.964; F-cart3 1.081; F-redux16 1.135; F-cart3-redux 1.156; redux 1.135; butterfly 1.145.
 - Why: removing the reduction completely saves 3.6 %. The lab's butterfly result conflicts with the H200 MD A/B behind the `BUTTERFLY` default; see the recheck in the source.
 - Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="cx-n1-cartesian-wprime"></a>
+#### cx-n1-cartesian-wprime: Cartesian harmonic adjoints for the w′ backward (H200, bound)
+- Switch: none (lab variants `N1-stage`, `N1-nostage`, `N1-convert` in `tools/lab_cartesian.py`)
+- Engine: FM
+- Date/round: 6 November 2026, Codex report [codex-ideas-20261106](../plans/codex-ideas-20261106.md) "Second pass", N1
+- What: per path, the scalar contraction with the receiver adjoint written as a Cartesian expression in a harmonic polynomial of the edge direction; a node kernel converts the adjoint rows to the polynomial coefficients once per force call, the w′ kernel then gives dx and the three edge-vector derivatives directly. Not F-cart3 (which projected the existing derivatives).
+- Status: REJECTED (bound; stop rule 0.95).
+- Measured (H200, `47e8b56a`, profile `fourth`, OMAT-0 medium SrTiO3 10x10x10, base the default w′ with `STAGE_DOUT` 1,401 / 1,400 µs): staged kernel + converter 1.060 / 1.062; kernel alone 1.022 / 1.022 (56 registers vs 96); converter 57 µs; unstaged against the unstaged default 0.961. Correct at float32 rounding: edge-vector gradient 8.2e-7 / 8.8e-7 of the max against the default's dsh and dL/dr, dx 1.9e-7.
+- Why: fewer registers do not pay for the larger hot loop once `STAGE_DOUT` is on, and the conversion costs another 4 %.
+- Sources: [cartesian backward](../results/cartesian-backward-20261106/README.md).
+
+<a id="cx-n2-fp64-adjoint"></a>
+#### cx-n2-fp64-adjoint: receiver-tiled FP64 matrix adjoints for the w′ backward (H200, bound)
+- Switch: none (lab bounds `N2-skel`, `N2-noU` in `tools/lab_cartesian.py`)
+- Engine: FM
+- Date/round: 6 November 2026, Codex report [codex-ideas-20261106](../plans/codex-ideas-20261106.md) "Second pass", N2
+- What: per receiver tile of 16 edges, U = S @ dout and M = (w x) @ doutᵀ on FP64 `mma.sync`, then the small moments contracted with the geometry derivatives.
+- Status: REJECTED (bound).
+- Measured (H200, `47e8b56a`): the report's skeleton with U consumed on chip, one vector path over all 23,360 tiles, 555 µs (0.397 of the default kernel); six vector paths give an optimistic floor of 3.33 ms, 2.38x the whole default kernel, before scalar paths, S preparation, the receiver gather, radial tables, geometry and atomics.
+- Why: the weighted-x staging and FP32-to-FP64 conversion dominate these small shapes; the matrix part alone is far above the whole kernel.
+- Sources: [cartesian backward](../results/cartesian-backward-20261106/README.md).
 
 ## Appendix: documentation defects (28 October 2026)
 

@@ -163,6 +163,24 @@ def symmetric_pairs_default(device):
     return device.type == "cuda" and torch.cuda.get_device_name(device) in SYMMETRIC_PAIRS_GPUS
 
 
+def power_basis(coef):
+    """``coef [P, K, T, J]`` (Chebyshev coefficients in x along axis 2) in the power basis of x: float64 from the
+    stored values, returned in ``coef``'s dtype."""
+    import numpy as np
+    import torch
+
+    terms = coef.shape[2]
+    basis = np.zeros((terms, terms))  # column k: T_k in the power basis
+    for k in range(terms):
+        unit = np.zeros(terms)
+        unit[k] = 1.0
+        power = np.polynomial.chebyshev.cheb2poly(unit)
+        basis[: power.size, k] = power
+    m = torch.as_tensor(basis, dtype=torch.float64, device=coef.device)
+    return torch.einsum("tk,pkj->ptj", m, coef.to(torch.float64).reshape(-1, terms, coef.shape[3])).reshape(
+        coef.shape).to(coef.dtype).contiguous() if coef.numel() else coef.clone()
+
+
 def _table_module(tables, columns, device, single=False):
     """``single``: one table for every species pair (a radial chain without species input): every edge reads
     pair 0."""
@@ -180,6 +198,10 @@ def _table_module(tables, columns, device, single=False):
             super().__init__()
             for name in ("coef", "dcoef", "starts", "scales", "bins"):
                 self.register_buffer(name, tables[name].to(device), persistent=False)
+            # The value series in the power basis of x (float64 from the stored coefficients, stored in coef's
+            # dtype): the tabled outer sum's backward takes a and its slope from it by dual Horner
+            # (tabled_outer_sum.POWER_BACKWARD, idea 40).
+            self.register_buffer("pcoef", power_basis(self.coef), persistent=False)
             self.register_buffer("columns", torch.as_tensor(columns, dtype=torch.long, device=device),
                                  persistent=False)
             self.species = len(columns)

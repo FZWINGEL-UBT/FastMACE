@@ -1,0 +1,110 @@
+{
+  "tool": "idea31_epilogue",
+  "created_utc": "2026-11-06T11:39:53.676138+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "capability": [
+    8,
+    0
+  ],
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "6718aa2ad6f742a04a4a475afc8d8a96d83ddea1",
+  "model": "omat0-medium",
+  "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+  "natoms": 5000,
+  "b_constant": [
+    "fastmace.kernels.cutlass.skip_select:SKIP_SELECT=True"
+  ],
+  "configs": 2,
+  "rattle_A": 0.05,
+  "steps": 20,
+  "comparisons": {
+    "a/a2": {
+      "bitwise": false,
+      "rows": {
+        "call0.energy": {
+          "bitwise": false,
+          "max_abs": 3.0279159545898438e-05
+        },
+        "call0.forces": {
+          "bitwise": false,
+          "max_abs": 3.5762786865234375e-06
+        },
+        "call1.energy": {
+          "bitwise": false,
+          "max_abs": 3.361701965332031e-05
+        },
+        "call1.forces": {
+          "bitwise": false,
+          "max_abs": 3.6954879760742188e-06
+        },
+        "md.positions": {
+          "bitwise": false,
+          "max_abs": 5.156925197979945e-07
+        },
+        "md.momenta": {
+          "bitwise": false,
+          "max_abs": 8.574967341960782e-06
+        },
+        "md.forces": {
+          "bitwise": false,
+          "max_abs": 8.589774370193481e-05
+        },
+        "md.energy": {
+          "bitwise": false,
+          "max_abs": 8.249282836914062e-05
+        },
+        "md.kinetic": {
+          "bitwise": false,
+          "max_abs": 1.2604348249567465e-06
+        }
+      }
+    },
+    "a/b": {
+      "bitwise": false,
+      "rows": {
+        "call0.energy": {
+          "bitwise": false,
+          "max_abs": 1.3113021850585938e-05
+        },
+        "call0.forces": {
+          "bitwise": false,
+          "max_abs": 3.337860107421875e-06
+        },
+        "call1.energy": {
+          "bitwise": false,
+          "max_abs": 1.430511474609375e-05
+        },
+        "call1.forces": {
+          "bitwise": false,
+          "max_abs": 3.0994415283203125e-06
+        },
+        "md.positions": {
+          "bitwise": false,
+          "max_abs": 6.515818213870261e-07
+        },
+        "md.momenta": {
+          "bitwise": false,
+          "max_abs": 9.14729866323405e-06
+        },
+        "md.forces": {
+          "bitwise": false,
+          "max_abs": 8.390098810195923e-05
+        },
+        "md.energy": {
+          "bitwise": false,
+          "max_abs": 4.5299530029296875e-05
+        },
+        "md.kinetic": {
+          "bitwise": false,
+          "max_abs": 5.309620760840517e-07
+        }
+      }
+    }
+  },
+  "epilogue_launches": {
+    "a": 28,
+    "b": 28,
+    "a2": 28
+  }
+}

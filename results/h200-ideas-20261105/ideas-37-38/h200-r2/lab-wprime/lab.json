@@ -1,0 +1,138 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-06T11:27:44.415994+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "4123f9f327576963cf724b1c651295b0c9b22324",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 62.804675687,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          5616,
+          1280,
+          6
+        ],
+        "gprime_MB": 164.53125,
+        "species": 3,
+        "pieces": 624,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 1621.2480068206787,
+          "min_us": 1600.0959873199463,
+          "max_us": 1653.3440351486206,
+          "ratio": 1.0
+        },
+        "stage-t8": {
+          "kind": "exact",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1496.8960285186768,
+          "min_us": 1473.3120203018188,
+          "max_us": 1516.0640478134155,
+          "ratio": 0.9232986083690796
+        },
+        "stage-t16": {
+          "kind": "exact",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 3.12e-07"
+          },
+          "median_us": 1432.0000410079956,
+          "min_us": 1409.343957901001,
+          "max_us": 1449.728012084961,
+          "ratio": 0.8832701936924476
+        },
+        "stage-t32": {
+          "kind": "exact",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 4.37e-07"
+          },
+          "median_us": 1419.3600416183472,
+          "min_us": 1397.9519605636597,
+          "max_us": 1436.352014541626,
+          "ratio": 0.8754737311299826
+        },
+        "FF-dout-row0": {
+          "kind": "falsifier",
+          "registers": 72,
+          "local_bytes": 0,
+          "median_us": 1450.2400159835815,
+          "min_us": 1436.1920356750488,
+          "max_us": 1458.3359956741333,
+          "ratio": 0.8945207703462659
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "wprime": {
+      "base": {
+        "9.0": {
+          "registers": 96,
+          "spill_store_bytes": 0
+        }
+      },
+      "stage-t8": {
+        "9.0": {
+          "registers": 72,
+          "spill_store_bytes": 0
+        }
+      },
+      "stage-t16": {
+        "9.0": {
+          "registers": 72,
+          "spill_store_bytes": 0
+        }
+      },
+      "stage-t32": {
+        "9.0": {
+          "registers": 72,
+          "spill_store_bytes": 0
+        }
+      },
+      "FF-dout-row0": {
+        "9.0": {
+          "registers": 72,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  },
+  "profiled": {
+    "wprime": []
+  }
+}

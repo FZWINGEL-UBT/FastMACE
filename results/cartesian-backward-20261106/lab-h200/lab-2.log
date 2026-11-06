@@ -1,0 +1,62 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+calls seen (kernel, edges, capturing): [('forward', 40, False), ('forward', 720, False), ('forward', 370000, False), ('forward', 373760, False), ('forward', 373760, True), ('wprime', 720, False), ('wprime', 370000, False), ('wprime', 373760, False), ('wprime', 373760, True)]
+N1 fit path a=0 l=0 L=0: residual 1.71e-16
+N1 fit path a=1 l=1 L=0: residual 4.94e-16
+N1 fit path a=0 l=1 L=1: residual 6.11e-16
+N1 fit path a=1 l=0 L=1: residual 2.94e-16
+N1 fit path a=1 l=2 L=1: residual 5.14e-16
+N1 fit path a=0 l=2 L=2: residual 3.47e-16
+N1 fit path a=1 l=1 L=2: residual 3.67e-16
+N1 fit path a=1 l=3 L=2: residual 3.38e-16
+N1 fit path a=0 l=3 L=3: residual 7.34e-16
+N1 fit path a=1 l=2 L=3: residual 3.45e-16
+N1 check: {"sh_recompute_max_abs": 1.3899173683107335e-06, "edge_vector_max_abs_over_max": 8.758085693837169e-07, "edge_vector_row_rel_median": 7.094434444894224e-07, "edge_vector_row_rel_p99": 2.9413024094537832e-05, "dx_max_abs_over_max": 1.872121262536114e-07, "real_edges": 373760}
+wprime base                    1400.1 us  ratio 1.000  {'registers': None}
+wprime base-nostage            1613.0 us  ratio 1.152  {'registers': 96, 'local_bytes': 0}
+wprime N1-convert                56.9 us  ratio 0.041  {'registers': 24, 'local_bytes': 0}
+wprime N1-stage                1431.5 us  ratio 1.022  {'registers': 56, 'local_bytes': 0}
+wprime N1-nostage              1548.4 us  ratio 1.106  {'registers': 64, 'local_bytes': 0}
+wprime N1-stage+convert        1487.1 us  ratio 1.062  {'registers': 56, 'local_bytes': 0}
+wprime N1-nostage+convert      1602.3 us  ratio 1.144  {'registers': 64, 'local_bytes': 0}
+wprime N2-skel                  740.9 us  ratio 0.529  {'registers': 56, 'local_bytes': 0}
+wprime N2-noU                   555.2 us  ratio 0.397  {'registers': 48, 'local_bytes': 0}
+wprime N2-noU-x6               3331.4 us  ratio 2.379

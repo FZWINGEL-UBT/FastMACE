@@ -110,6 +110,8 @@ except one: M 15,000, K 384, N 128, rc (0.87 with 64×32), which already fills 3
 | `perm-h200/`, `perm-a100/` | `382a85d4`: base, M-mirror-perm, B-mirror-order |
 | `hyb-h200/`, `hyb-a100/` | `7a7b3a76`: base, M-mirror-hybrid, M-mirror-perm, B-mirror-order |
 | `rtx5060ti/` | the local lab runs (H200 plan by alias) and `radial-degree.json` |
+| `stage-dout-h200/`, `stage-dout-a100/` | `efbfd01b`: MD-step A/B, b = `STAGE_DOUT=True` (A100-SXM4-80GB; earlier PCIe attempts dropped) |
+| `graph-break-h200/`, `graph-break-a100/` | `67df24ce`: MD-step A/B, b = `FUSED_FIRST_CONSTANT_NAME=False` (the old graph break) |
 
 Modal cost on profile `third`: these five jobs ran with $8.88 metered at the start; it was $9.33 before the last
 two.
@@ -699,3 +701,31 @@ product, producer/consumer warps and a native sm_90 3xTF32 GEMM). Each ran its c
   branch `fastmace/idea33-bound`).
 - **36, w′ register cap on the H200:** closed. Lab at `31c394b4`: maxreg80 1.255 (no spills), maxreg72 1.078,
   maxreg64 1.234 against 96 registers (1,646 µs). More warps make it slower.
+
+### Revision 14, step 2: `STAGE_DOUT` and `SKIP_SELECT` adopted, `FIRST_DIV` rejected, graph break removed (6 November 2026)
+
+All MD-step A/Bs below: OMAT-0 medium, SrTiO3 10x10x10, `tools/ab_rewrites.py`, both build orders in one process,
+on Modal with the exact device name checked before the run (A100 attempts that landed on an A100 80GB PCIe stopped
+with WRONG-GPU and were retried).
+
+- **38, receiver-staged dout in the w′ backward (`STAGE_DOUT`, adopted on the H200 and A100-SXM4-80GB):** the
+  receiver's dout row in shared memory, chunks of 32 edges (`fastmace/kernels/oeq_streaming/wprime_backward.py`,
+  details in `results/h200-ideas-20261105/ideas-37-38.md`). dsh and dL/dr are bitwise; dx differs only in the
+  atomics' order, so no gate (decision 66).
+  - MD step at `efbfd01b` (side b = `STAGE_DOUT=True`): H200 **0.9616 / 0.9638** (5.338 → 5.134 ms),
+    A100-SXM4-80GB **0.9896 / 0.9920** (10.443 → 10.335 ms). Run files: `runs/stage-dout-h200/`,
+    `runs/stage-dout-a100/`.
+- **31 step 3, species-skip products with the select in the epilogue (`SKIP_SELECT`, adopted on both):** bitwise
+  kernel (`fastmace/kernels/cutlass/skip_select.py`). MD step at `446909cb`, on top of `LINEAR_DIV`: H200
+  **0.9876 / 0.9919**, A100-SXM4-80GB **0.9843 / 0.9858** (`results/h200-ideas-20261105/idea31-glue.md`, step 3).
+- **31 step 3, interaction 1's products with the division in the epilogue (`FIRST_DIV`, rejected):** MD H200
+  1.0305 / 1.0330, A100-SXM4-80GB 1.0349 / 1.0337, and the density gradient is not bitwise on sm_80/sm_90.
+  Stays off; its GPU test is marked xfail.
+- **Graph break in interaction 1 (`FUSED_FIRST_CONSTANT_NAME = True`, kept):** `fused_first_backward` traced
+  `torch.cuda.get_device_name`, which split interaction 1's graph on every backend. The device check is now a
+  `torch.compiler.assume_constant_result` function (`fastmace/rewrites/generic/modules.py`). MD step at
+  `67df24ce` (side b = the old traced call): H200 1.0020 / 1.0010, A100-SXM4-80GB 0.9997 / 1.0004. Neutral to
+  slightly faster; kept on every GPU (no per-GPU list; bitwise). Run files: `runs/graph-break-h200/`,
+  `runs/graph-break-a100/`.
+- **Fastest MD step now** (SrTiO3 10x10x10, OMAT-0 medium): H200 about **5.13 ms** (5.29 ms before STAGE_DOUT),
+  A100-SXM4-80GB about **10.33 ms**.
