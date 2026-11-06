@@ -859,6 +859,46 @@ def _slab_real(kernel, groups):
     return transform
 
 
+_WPRIME_CAPTURE = {}  # main() puts the captured w' call's arguments here (the real slabs of simt-slab-edges)
+
+
+def _edge_slabs():
+    """Per edge: pair * pieces + piece of the value table, as the w' kernel computes it; the q-major table."""
+    import torch
+    a = _WPRIME_CAPTURE["args"]
+    r, pair, g, starts, bins, r_lo, bin_scale = a[8], a[9], a[10], a[11], a[13], a[14], a[15]
+    pieces = starts.numel()
+    clamped = torch.clamp(r.float(), min=float(r_lo))
+    b = torch.clamp(((clamped - float(r_lo)) * float(bin_scale)).int(), max=bins.numel() - 1).long()
+    slabs = (pair.long() * pieces + bins[b].long()).int()
+    return slabs, g
+
+
+def _slab_edges(kernel, tensor_cores):
+    def transform(s):
+        s = _tc_rerender(kernel, tensor_cores, "slab-edges")(s)
+        s = s.replace("constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;")
+        s = _ns_slab_body(s)
+        slabs, g = _edge_slabs()
+        offset = g.numel()
+        return _sub(s, "const int grp = (int)((e0 + b) % 3);",
+                    f"const int grp = reinterpret_cast<const int*>(W)[{offset}LL + (long long)min((int)(e0 + b), {slabs.numel() - 1})];")
+    return transform
+
+
+def _slab_edges_args(args):
+    import torch
+    a, weight, *rest = args
+    slabs, g = _edge_slabs()
+    if g.dim() != 3 or g.shape[1] != 1280:
+        raise ValueError(f"simt-slab-edges expects a q-major [groups, 1280, terms] table, got {tuple(g.shape)}")
+    big = torch.cat([g.reshape(-1).float(), slabs.view(torch.float32)]).contiguous()
+    print(f"slab-edges: {g.shape[0]} slabs, {g.numel() * 4 / 1e6:.0f} MB table, "
+          f"{torch.unique(slabs).numel()} slabs touched by {slabs.numel()} edges "
+          f"({torch.unique(slabs).numel() * 1280 * 6 * 4 / 1e6:.1f} MB)", flush=True)
+    return (a, big, *rest)
+
+
 def _slab_args(groups):
     def transform(args):
         import torch
@@ -1195,6 +1235,10 @@ def forward_variants(kernel=None):
         "NS-slab": ("falsifier", _ns_slab, ()),
         "simt-slab3": ("falsifier", _slab_real(kernel, 3), (), _slab_args(3)),
         "simt-slab-real": ("falsifier", _slab_real(kernel, SLAB_GROUPS), (), _slab_args(SLAB_GROUPS)),
+        # 6 November 2026 (Symmetrix-XL comparison): the same bound with each edge on its REAL table slab (pair and
+        # piece from the captured w' call's lengths, pairs and bins) and the real value table as the buffer, so the
+        # footprint is what MD touches, not all 5,340 slabs.
+        "simt-slab-edges": ("falsifier", _slab_edges(kernel, False), (), _slab_edges_args),
         "simt-ns-no-gemm": ("falsifier", lambda s: _sub(_tc_rerender(kernel, False, "simt-ns-no-gemm")(s).replace(
             "constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;"), "for (int k = 0; k < K; ++k) {",
             "for (int k = 0; k < 0; ++k) {"), ()),
@@ -1596,6 +1640,8 @@ def main(argv=None):
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, rounds=args.rounds,
                 capture_s=time.perf_counter() - started, kernels={},
                 constants={f"{m}:{n}": v for (m, n), v in constants.items()})
+    if "wprime" in captured and captured["wprime"]:
+        _WPRIME_CAPTURE["args"] = captured["wprime"][1]
     for name in args.kernels:
         kernel, cargs = captured[name]
         if name == "wprime":
