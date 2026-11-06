@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "ba09da90a6fc87d33be326681782857275d4af94",
+  "command": "real=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1); export PYTHONPATH=$PWD/tools/bench/gpu_alias:${PYTHONPATH:-} FASTMACE_GPU_ALIAS=\"$real=NVIDIA H200\";  python tools/step_breakdown.py --output $OUT/breakdown --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --model omat0-medium --structure results/loup-a100-20261103/SrTiO3.cif@10x10x10 --temperature-K 300 --timestep-fs 1 --equilibrate-steps 100 --steps 200 > $OUT/breakdown.log 2>&1; rm -f $OUT/breakdown/trace.json; true",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 142.7547209262848,
+  "estimated_gpu_cost_usd": 0.18002956472370357
+}

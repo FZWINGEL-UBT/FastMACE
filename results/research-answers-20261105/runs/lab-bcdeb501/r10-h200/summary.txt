@@ -1,0 +1,27 @@
+exit=0
+Modal budget: metered this month $5.94 + still running $4.31 + this job's worst case $5.17 (H200, 3300 s + 300 s start) = $15.43, limit $30.00 (cap $30, reserve $0)
+forward F-bias-gemm ieee K=128 A=randn: slope -1.90e-10 toward0 -4.53e-11 mean -9.40e-11 rms 2.03e-07 (n 8388608)
+forward F-bias-gemm cutlass-3xtf32 K=128 A=randn: slope -1.57e-07 toward0 -1.56e-07 mean +8.18e-11 rms 2.34e-07 (n 8388608)
+forward F-bias-gemm ieee K=128 A=abs-randn: slope -1.49e-10 toward0 -9.52e-11 mean +3.68e-12 rms 2.04e-07 (n 8388608)
+forward F-bias-gemm cutlass-3xtf32 K=128 A=abs-randn: slope -1.62e-07 toward0 -1.60e-07 mean -3.25e-09 rms 2.39e-07 (n 8388608)
+forward ptxas F-bias-mask                  {'9.0': {'registers': 168, 'spill_store_bytes': 16}}
+forward ptxas F-bias-round                 {'9.0': {'registers': 168, 'spill_store_bytes': 8}}
+forward ptxas F-bias-b1                    {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+F-bias-simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward ptxas F-bias-simt                  {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+F-bias-simt rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=74016) (plan LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104))
+forward  base                1592.0 us  ratio 1.000  regs 168 local 0  
+forward  F-bias-mask         1841.4 us  ratio 1.157  regs 168 local 16  
+forward  F-bias-mask      bias w: slope -7.74e-07 toward0 -6.98e-07 mean +3.12e-09 rms 8.40e-07 (n 474836480); messages: slope -7.48e-07 toward0 -7.18e-07 mean +3.19e-08 rms 9.69e-07 (n 25600000)
+forward  F-bias-round        2006.0 us  ratio 1.260  regs 168 local 8  
+forward  F-bias-round     bias w: slope -3.74e-07 toward0 -3.53e-07 mean +1.44e-09 rms 4.46e-07 (n 474836480); messages: slope -3.95e-07 toward0 -3.79e-07 mean +2.00e-08 rms 6.06e-07 (n 25600000)
+forward  F-bias-b1           1866.6 us  ratio 1.173  regs 168 local 0  
+forward  F-bias-b1        bias w: slope -4.45e-07 toward0 -3.95e-07 mean +4.38e-09 rms 5.29e-07 (n 474836480); messages: slope -4.34e-07 toward0 -4.24e-07 mean +2.12e-08 rms 6.94e-07 (n 25600000)
+forward  F-bias-simt         2526.4 us  ratio 1.587  regs 168 local 0  
+forward  F-bias-simt      bias w: slope +4.58e-13 toward0 -1.51e-13 mean +4.51e-11 rms 1.40e-07 (n 474836480); messages: slope -1.32e-10 toward0 -4.14e-10 mean -5.04e-11 rms 3.42e-07 (n 25600000)
+forward  store-w             1842.1 us  ratio 1.157  regs 168 local 16  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  store-w-cs          2052.7 us  ratio 1.289  regs 168 local 48  {'against': 'store-w', 'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  store-w-v4          1829.2 us  ratio 1.149  regs 168 local 0  {'against': 'store-w', 'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-wg-own-a          1546.1 us  ratio 0.971  regs 168 local 0  
+forward  F-wg-own-a-ld       1589.2 us  ratio 0.998  regs 167 local 0  
+forward  F-wg-no-bar         1558.6 us  ratio 0.979  regs 168 local 0  

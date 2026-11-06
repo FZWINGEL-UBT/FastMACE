@@ -1,0 +1,148 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-06T02:26:41.654966+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f104e196ff1ae17588aff7ef482a44a5ad92c490",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 56.703963755000004,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 0,
+          "median_us": 1595.1679944992065,
+          "min_us": 1590.1440382003784,
+          "max_us": 1649.888038635254,
+          "ratio": 1.0
+        }
+      }
+    }
+  },
+  "constants": {},
+  "owner_pass": {
+    "pairing": {
+      "edges": 370966,
+      "padding": 2794,
+      "without_mirror": 0,
+      "not_involution": 0,
+      "not_swapped": 0,
+      "owned": 185483,
+      "partner_a_rows_differing": 0,
+      "row_ptr_unchanged": true
+    },
+    "rules": {
+      "one": "LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)",
+      "pass1": "LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)",
+      "pass2": "LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104)"
+    },
+    "w_group": {
+      "one": true,
+      "pass1": true,
+      "pass2": false
+    },
+    "ptxas": {
+      "one": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 0
+        }
+      },
+      "pass1": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 24
+        }
+      },
+      "pass2": {
+        "9.0": {
+          "registers": 168,
+          "spill_store_bytes": 28
+        }
+      }
+    },
+    "w_bytes_each_way": 949672960,
+    "bitwise_vs_one_pass_owned_first": true,
+    "groups_bitwise": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "one_owned_first_vs_base_max_rel": 8.543043378674407e-07,
+    "timings_us": {
+      "base": {
+        "median_us": 1601.248025894165,
+        "min_us": 1591.3280248641968,
+        "max_us": 1688.223958015442,
+        "ratio": 1.0
+      },
+      "one-owned-first": {
+        "median_us": 1594.4639444351196,
+        "min_us": 1588.2879495620728,
+        "max_us": 1599.2319583892822,
+        "ratio": 0.9957632538186849
+      },
+      "pass1": {
+        "median_us": 1078.752040863037,
+        "min_us": 1073.15194606781,
+        "max_us": 1084.8959684371948,
+        "ratio": 0.6736945329007622
+      },
+      "pass2": {
+        "median_us": 660.256028175354,
+        "min_us": 656.7999720573425,
+        "max_us": 663.9999747276306,
+        "ratio": 0.41233838699451664
+      },
+      "owner-pass": {
+        "median_us": 1737.023949623108,
+        "min_us": 1733.9199781417847,
+        "max_us": 1742.0159578323364,
+        "ratio": 1.0847938117851064
+      },
+      "F-pass1-no-store": {
+        "median_us": 981.9520115852356,
+        "min_us": 978.7840247154236,
+        "max_us": 1002.0480155944824,
+        "ratio": 0.6132416688144838
+      },
+      "F-pass2-no-wload": {
+        "median_us": 445.0240135192871,
+        "min_us": 443.2640075683594,
+        "max_us": 446.6879963874817,
+        "ratio": 0.2779232238370929
+      }
+    }
+  },
+  "ptxas": {
+    "forward": {
+      "base": {
+        "9.0": {
+          "registers": null,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  }
+}

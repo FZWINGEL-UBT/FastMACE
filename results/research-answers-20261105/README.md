@@ -288,3 +288,86 @@ Main `7f7ef7db` changes two H200 defaults: `W_GROUP` is on, and `BUTTERFLY` is o
 - Since then: DEGREE_PARTS, LANE_INDICES, W_GROUP, BUTTERFLY off, and the round-5 changes.
 
 Run: `runs/main-7f7ef7db-h200/`.
+
+### Round 7: owner pass rejected, drift audit, lab at `bcdeb501` (6 November 2026)
+
+**Idea 14(A), the owner-pass forward, is rejected.**
+
+- **Where it is:** built behind `OWNER_PASS` on branch `fastmace/owner-pass` (`f104e196`), CPU suite green. It is
+  off by default, and the branch is parked, not merged.
+- **MD-step A/Bs** (SrTiO3 10×10×10, b = owner pass):
+
+  | GPU | b/a, order ab | b/a, order ba |
+  | --- | ---: | ---: |
+  | H200 | 1.0445 | 1.0460 |
+  | A100-SXM4 | 1.0664 | 1.0656 |
+
+- **Gate (H200):** fails. NbCl5 stress is 2.076 of 2, because the owner order changes the summation order.
+- **Lab split (H200, `--owner-pass`, 15 rounds):**
+  - The message is bitwise against the one-pass kernel in owned-first order.
+  - One pass on the owned-first order: 1594.5 µs (0.996 of 1601.2).
+  - Pass 1: 1078.8 µs (0.674). Pass 2: 660.3 µs (0.412). Both: 1737.0 µs (1.085).
+  - Pass 1 without its w stores: 982.0 µs, so the stores cost ≈ 97 µs.
+  - Pass 2 without its w loads: 445.0 µs, so the reloads cost ≈ 215 µs.
+  - Even with both free, the two passes would take 1427 µs (0.89). Storing and reloading w costs more than the
+    k-loop work it saves.
+- **Idea 19** (w′ in mirror-pair order) needed 14(A)'s pairs, so it is closed with it.
+
+**Drift audit at main `451143be`.** Every per-GPU default was re-measured as an MD-step A/B in both build orders
+(b = the switch flipped against today's default).
+
+- **H200:** all 21 switches still hold.
+  - Strongest, with the switch off:
+    - no block messages: 1.076 / 1.079;
+    - no vector a: 1.074 / 1.070;
+    - no species skip: 1.070 / 1.068;
+    - no fused first interaction: 1.068 / 1.070;
+    - no Horner: 1.047 / 1.048.
+  - Off switches stay off:
+    - SH_LDS4, BACKWARD_WALK and SEGMENT_ROWS are ties (one order each way, within 0.5 %);
+    - SPECIES_GEMM (1.009 / 1.005), TABLE_PAIRS (1.006 / 1.009), HOIST_SCALE (1.006 / 1.010) and BLOCK_LDG
+      (1.009 / 1.011) are slower when on.
+- **A100-SXM4:**
+  - Still faster: DEGREE_PARTS (off: 1.010 / 1.002), HORNER (off: 1.033 / 1.030) and TC_WFRAG (off:
+    1.023 / 1.015).
+  - BUTTERFLY on is slower (1.029 / 1.018). LANE_INDICES ties (1.000 / 0.991).
+  - No default changes.
+
+**Kernel lab at `bcdeb501`.** Forward kernel, 15 rounds, Modal. All variants are bitwise unless their name starts
+with `F-`, which marks a bound.
+
+- **Storing w (the cost of 14(A)'s pass 1):**
+
+  | GPU | store-w | store-w-cs (streaming stores) | store-w-v4 (16-byte stores) |
+  | --- | ---: | ---: | ---: |
+  | H200 | 1.157 | 1.289 | 1.149 |
+  | A100 | 1.055 | 1.048 | 1.033 |
+
+  None comes close to paying for itself.
+- **W_GROUP's a path (H200):**
+  - Each warp splitting its own a (F-wg-own-a): 0.971.
+  - The same with its own a loads (F-wg-own-a-ld): 0.998.
+  - Without the two named barriers (F-wg-no-bar): 0.979.
+  - So a pre-split a in shared memory could gain up to ≈ 3 %, and the barriers cost ≈ 2 %.
+- **A100 with a fragment-sized W region (idea 21):**
+  - tc-warps12 (12 warps instead of 11): 0.958.
+  - w-group-12 (W_GROUP at 12 warps): 0.905.
+  - It is built as the `WFRAG_REGION` switch.
+- **3xTF32 bias (idea 20):** the truncating split makes w's error proportional to w.
+
+  | Variant | H200 slope | H200 time | A100 slope | A100 time |
+  | --- | ---: | ---: | ---: | ---: |
+  | today's split (instrumented) | −7.7e-7 | 1.157 | −1.05e-6 | 1.054 |
+  | round-to-nearest split | −3.7e-7 | 1.260 | −5.2e-7 | 1.226 |
+  | B1 correction | −4.5e-7 | 1.173 | −6.6e-7 | 1.057 |
+  | SIMT FP32 | ≈ 0 | 1.587 | ≈ 0 | 1.615 |
+
+  - The times include the instrument, which costs ≈ 1.16 on the H200 and 1.05 on the A100.
+  - Against the instrumented split, rounding costs ≈ 9 % (H200) and 16 % (A100). B1 costs ≈ 1.5 % and 0.3 %.
+  - The CUTLASS 3xTF32 GEMM has a similar slope (−1.6e-7 to −1.9e-7 at K = 128).
+  - The gate passes today, so neither fix is adopted. B1 is the cheap one if a gate ever needs it.
+- **ncu stall reasons for idea 18 (the compact TP):**
+  - The first job could not lock the clocks on Modal (`LockingClocksFailed`).
+  - `tools/modal/ncu_forward.sh` now passes `--clock-control none`. The rerun is pending.
+
+Runs: `runs/owner-pass/`, `runs/drift-451143be/`, `runs/lab-bcdeb501/`.

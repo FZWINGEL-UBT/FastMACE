@@ -466,7 +466,8 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [omat0-edge-sh](#omat0-edge-sh) | Edge spherical harmonics (l <= 3) in one Triton kernel each way, analytic backward | `generic.modules.EDGE_SH`, `EDGE_SH_GPUS` | FM | DEFAULT on the RTX 5060 Ti, RTX 4000 Ada and every A100 (decision 66) | 2026-11-05 | MD step SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-species-gemm-a100-recheck](#omat0-species-gemm-a100-recheck) | The species GEMM on the A100 again at the 11.7 ms step | `SPECIES_GEMM`, `species_gemm.CUTLASS` | FM | REJECTED | 2026-11-05 | SrTiO3 0.996 / 0.994 (Triton), 0.979 / 0.980 (CUTLASS); NbCl5 1.026 / 1.027, 1.053 / 1.058 | [round 5](../results/round5-20261105/README.md) |
 | [omat0-table-w-forward](#omat0-table-w-forward) | w from the value table inside the fused forward (the backward's TABLE_W) | none (lab `simt-slab-real`, `simt-slab3`) | FM | REJECTED | 2026-11-05 | lab A100-SXM4 1.333 (table cached: 0.988), 5060 Ti 1.356 | [round 5](../results/round5-20261105/README.md) |
-| [ideas-r5](#ideas-r5) | Owner-pass forward (idea 14A) and warp groups sharing W fragments (idea 17): lab bounds | none yet (lab `store-w`, `F-w-half`, `F-w-quarter`) | FM | 17: `W_GROUP` DEFAULT on the H200 (MD 0.9946 / 0.9942); 14A: BUILDING | 2026-11-06 | H200 14(A) est. 0.804, F-w-half 0.878, F-w-quarter 0.817; A100-SXM4 0.836, 0.876, 0.813 | [research answers](../results/research-answers-20261105/README.md#ideas-session-fifth-revision-owner-pass-forward-and-shared-w-fragments-6-november-2026) |
+| [ideas-r5](#ideas-r5) | Owner-pass forward (idea 14A) and warp groups sharing W fragments (idea 17): lab bounds | none yet (lab `store-w`, `F-w-half`, `F-w-quarter`) | FM | 17: `W_GROUP` DEFAULT on the H200 (MD 0.9946 / 0.9942); 14A: REJECTED (MD 1.045 H200, 1.066 A100; gate fails), see [ideas-r7](#ideas-r7) | 2026-11-06 | H200 14(A) est. 0.804, F-w-half 0.878, F-w-quarter 0.817; A100-SXM4 0.836, 0.876, 0.813 | [research answers](../results/research-answers-20261105/README.md#ideas-session-fifth-revision-owner-pass-forward-and-shared-w-fragments-6-november-2026) |
+| [ideas-r7](#ideas-r7) | Owner-pass forward (14A) as a switch; drift audit of the H200 and A100 defaults; lab: stored-w variants, the W_GROUP a path, A100 at 12 warps, 3xTF32 bias | `fused_forward.OWNER_PASS` (branch `fastmace/owner-pass`, parked) | FM | 14A REJECTED; drift: no change; idea 21 BUILDING (`WFRAG_REGION`) | 2026-11-06 | owner pass MD 1.0445 / 1.0460 (H200), 1.0664 / 1.0656 (A100), NbCl5 stress 2.076; A100 lab tc-warps12 0.958, w-group-12 0.905 | [research answers](../results/research-answers-20261105/README.md#round-7-owner-pass-rejected-drift-audit-lab-at-bcdeb501-6-november-2026) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4307,6 +4308,23 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured (H200, Modal profile `third`): base 1,686 µs; simt-rerender 1.420; simt-slab3 (L1-resident) 0.901; simt-slab-real (164 MB hashed) 1.144; simt-slab-edges 1.207 (511 of 5,616 slabs touched, 15.7 MB). RTX 5060 Ti: 1.238 (746 slabs, 22.9 MB).
 - Why: the touched table fits L2, but every edge reads 30 KB of slab (11.5 GB per call), more than the 3xTF32 product costs. Even the L1 case saves only 10 %, below what a rewrite would need.
 - Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="ideas-r7"></a>
+### ideas-r7: owner pass rejected, drift audit, round-7 lab (6 November 2026)
+
+- **14(A), the owner pass:**
+  - Slower in MD on the H200 (1.0445 / 1.0460) and on the A100-SXM4 (1.0664 / 1.0656).
+  - The H200 gate fails: NbCl5 stress 2.076 of 2.
+  - Why, from the lab split: storing w costs about 97 µs and reloading it about 215 µs. Together that is more than
+    the k-loop work the owner pass saves.
+  - Idea 19 closes with it.
+- **Drift audit at `451143be`:** every H200 and A100 default still holds. No change.
+- **Lab at `bcdeb501`:**
+  - A fragment-sized W region gives the A100 12 warps: 0.958, and 0.905 with W_GROUP. It is built as
+    `WFRAG_REGION`.
+  - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
+  - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
+    ≈ 40 % of the slope). It is not needed while the gate passes.
 
 <a id="h200-butterfly-off"></a>
 #### h200-butterfly-off: the w′ butterfly reduction off again on the H200
