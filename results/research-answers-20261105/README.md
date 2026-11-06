@@ -668,7 +668,7 @@ Ported as `fastmace/kernels/oeq_streaming/kloop_rewrites.py` (`apply_a_ld128`, `
   below the 0.25 stop line, so 32 is stopped. 30, 31 and 33 are in progress (owner approval, 6 November 2026).
 
 
-### Revision 14: GEMM epilogue (`LINEAR_DIV`) adopted; ideas 30, 32, 33, 36 measured (6 November 2026)
+### Revision 14: GEMM epilogue (`LINEAR_DIV`) and warp-specialized forward (`WS_FORWARD`) adopted; ideas 30, 32, 33, 36 measured (6 November 2026)
 
 The owner approved revision 14's ideas 30–33 on 6 November 2026 (lifting the brief's exclusions of the wgmma a·W
 product, producer/consumer warps and a native sm_90 3xTF32 GEMM). Each ran its cheap bound first.
@@ -682,11 +682,15 @@ product, producer/consumer warps and a native sm_90 3xTF32 GEMM). Each ran its c
     on the H200 and A100-SXM4 (`tests/gpu/test_linear_div_cuda.py`).
   - MD step (SrTiO3 10x10x10, both build orders): H200 **0.9912 / 0.9934**, A100-SXM4-80GB **0.9896 / 0.9891**.
     Default on both (decision 66). More families follow (B9–B11, F2–F5, SpeciesSkip).
-- **30, warp-specialized wgmma forward (H200; in progress):** a producer warpgroup issues the wgmma 3xTF32
-  product, consumer warps run today's TP, and an mbarrier ring connects them. Lab, part 1: 0.80 of today's part.
-  Both parts: whole forward **0.859** (1,292 against 1,505 µs). Messages max rel 2.9e-7 (rounding class).
-  Production port, gate and MD A/B pending (`results/h200-ideas-20261105/idea30-full.md`, branch
-  `fastmace/idea30-ws`).
+- **30, warp-specialized wgmma forward (`WS_FORWARD`, adopted on the H200):** a producer warpgroup issues the
+  wgmma 3xTF32 product, consumer warps run today's TP, and an mbarrier ring connects them
+  (`fastmace/kernels/oeq_streaming/ws_forward.py`; only on compute capability 9.0).
+  - Lab: part 1 0.800, part 0 0.877; whole forward 0.850 with part 1's blocks first (1,268 against 1,492 µs).
+  - Messages: max rel 2.9e-7 (rounding class).
+  - Gate (OMAT-0 medium, default and WS in the same job): as the default; both fail only NbCl5 stress (2.06
+    against 2.15).
+  - MD step (SrTiO3 10x10x10, both build orders): H200 **0.9584 / 0.9610**. Default on the H200 (decision 66).
+  - Details in `results/h200-ideas-20261105/idea30-full.md`.
 - **32, w shared by mirror pairs in a tile:** stopped. f = 0.22 at the 32-row Morton tiles that fit beside W, below
   the 0.25 line.
 - **33, native sm_90 TF32 wgmma GEMM:** stopped. Three passes take 1.07× today's 3xTF32 GEMMs on the six largest

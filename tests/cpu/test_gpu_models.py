@@ -262,6 +262,8 @@ def test_h200_defaults():
     assert "NVIDIA H200" not in fused_forward.TP_NOFLUSH_GPUS
     # Idea 31 (6 November 2026): LINEAR_DIV on both, MD H200 0.9912 / 0.9934, A100-SXM4 0.9896 / 0.9891
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(linear_div.LINEAR_DIV_GPUS)
+    # Idea 30 (6 November 2026): WS_FORWARD on the H200, MD 0.9584 / 0.9610 (sm_90 only)
+    assert "NVIDIA H200" in fused_forward.WS_FORWARD_GPUS
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows

@@ -192,7 +192,9 @@ TP_NOFLUSH = None
 # H200: see results/h200-ideas-20261105/idea30-*.md. None: on for WS_FORWARD_GPUS (decision 66); True / False: an A/B
 # side's choice.
 WS_FORWARD = None
-WS_FORWARD_GPUS = GPUModels(())
+# MD-step A/B (6 November 2026, ac4b37e4; SrTiO3 10x10x10, both build orders): H200 0.9584 / 0.9610. Gate as the
+# default's (only NbCl5 stress fails: 2.06 against the default's 2.15 in the same job).
+WS_FORWARD_GPUS = GPUModels(("NVIDIA H200",))
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
