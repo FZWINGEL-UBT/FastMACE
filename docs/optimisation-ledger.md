@@ -474,6 +474,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r12](#ideas-r12) | CG factors folded into W (idea 24, `CG_FOLD`), TP inside the next k-loop (22(iii)) | `fused_forward.CG_FOLD_GPUS`, `cg_fold.py` | FM | CG_FOLD DEFAULT on the H200 and A100-SXM4; 22(iii) REJECTED | 2026-11-06 | MD CG_FOLD H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898; lab 22(iii) 1.03–1.21 | [research answers](../results/research-answers-20261105/README.md#round-12-cg-factors-folded-into-w-cg_fold-adopted-tp-in-the-next-k-loop-rejected-6-november-2026) |
 | [ideas-r13](#ideas-r13) | a read with one LDS.128 (17(ii), `A_LD128`), TP without flush checks (29, `TP_NOFLUSH`), further CG folds (28), K_PIPE on the fold; mirror tiles (32) | `fused_forward.A_LD128_GPUS`, `TP_NOFLUSH_GPUS`, `kloop_rewrites.py` | FM | A_LD128 DEFAULT on the H200 and A100-SXM4, TP_NOFLUSH on the A100-SXM4; 28 not ported; 32 STOPPED | 2026-11-06 | MD H200 A_LD128 0.9925 / 0.9956; A100-SXM4 both 0.9909 / 0.9923; 32: f = 0.22 at 32 rows | [research answers](../results/research-answers-20261105/README.md#round-13-one-lds128-for-a-a_ld128-and-the-tp-without-flush-checks-tp_noflush-adopted-6-november-2026) |
 | [ideas-r14](#ideas-r14) | GEMM epilogues (31, `LINEAR_DIV`), warp-specialized wgmma forward (30), mirror tiles (32), sm_90 3xTF32 GEMMs (33), w′ register cap (36) | `cutlass.linear_div.LINEAR_DIV_GPUS` | FM | LINEAR_DIV DEFAULT on the H200 and A100-SXM4; WS_FORWARD DEFAULT on the H200 (MD 0.9584 / 0.9610); 32, 33, 36 STOPPED; step 2: STAGE_DOUT (38) and SKIP_SELECT (31) DEFAULT on the H200 and A100-SXM4, FIRST_DIV (31) REJECTED, interaction-1 graph break removed | 2026-11-06 | MD LINEAR_DIV H200 0.9912 / 0.9934, A100-SXM4 0.9896 / 0.9891; 33 ×3 1.07; 36 maxreg80 1.255; STAGE_DOUT H200 0.9616 / 0.9638, A100-SXM4 0.9896 / 0.9920; SKIP_SELECT H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858; FIRST_DIV 1.031–1.035 | [research answers](../results/research-answers-20261105/README.md#revision-14-gemm-epilogue-linear_div-and-warp-specialized-forward-ws_forward-adopted-ideas-30-32-33-36-measured-6-november-2026) |
+| [ideas-q1](#ideas-q1) | Folded α in the w′ table (34, `FOLD_ALPHA`), power-basis tabled backward (40, `POWER_BACKWARD`), Estrin w′ (39, `ESTRIN`); chunk sweeps and cross-checks | `wprime_backward.FOLD_ALPHA_GPUS`, `tabled_outer_sum.POWER_BACKWARD_GPUS` | FM | FOLD_ALPHA DEFAULT on the H200 and A100-SXM4; POWER_BACKWARD DEFAULT on the H200; ESTRIN REJECTED (FOLD_ALPHA faster on the A100, together nothing); sweeps and cross-checks REJECTED | 2026-11-06 | MD FOLD_ALPHA H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893; POWER_BACKWARD H200 0.9954 / 0.9957; both off on the H200 1.0073 / 1.0089; FOLD_ALPHA vs ESTRIN on the A100 0.9967 / 0.9902, 0.9884 / 0.9907 | [ideas queue](../results/ideas-queue-20261106/README.md) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4333,6 +4334,30 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
+
+<a id="ideas-q1"></a>
+### ideas-q1: folded α and the power-basis tabled backward adopted; Estrin rejected (6 November 2026)
+
+- **`FOLD_ALPHA` (34):** `FACTORED_SCALE`'s per-path α is folded into the w′ value table's rows at build (float64).
+  The kernel's terms then carry no α multiply, and scalar paths stay scalar. MD H200 0.9963 / 0.9954, A100-SXM4
+  0.9895 / 0.9893 (and 0.9911 / 0.9863 on a slow card). The gates match the default's. Default on both.
+- **`POWER_BACKWARD` (40):** the tabled outer-sum backward reads a power-basis copy of the Chebyshev table
+  (`pcoef`, cheb2poly in float64) and takes value and slope by dual Horner. MD H200 0.9954 / 0.9957; A100 a tie
+  (1.0020 / 0.9977). The gate matches the default's. Default on the H200.
+- **Both together:** with both off at `61086292`, the H200 step is 1.0073 / 1.0089, so together they save about
+  0.8 %.
+- **`ESTRIN` (39):** Estrin's scheme for w and w′ (three FMAs deep instead of five).
+  - A100 alone 0.9961 / 0.9963, and its gate matches the default's.
+  - With `FOLD_ALPHA` it gains nothing (1.0002 / 1.0028), and `FOLD_ALPHA` alone beats it (0.9967 / 0.9902,
+    0.9884 / 0.9907).
+  - H200 1.0030 / 1.0012.
+  - Off everywhere.
+- **Rejected sweeps:** tabled `CHUNK` 8 and 32, `FORWARD_CHUNK` 16 and 64, and `STAGE_DOUT_CHUNK` 16 on both GPUs.
+  Each is a tie or 0.4–1 % slower.
+- **Cross-checks:** none changes a switch; each is a tie on the other GPU.
+  - `SEGMENT_ROWS` and `BACKWARD_WALK` on the H200.
+  - `LANE_INDICES` and 8-warp radial tables on the A100.
+- **MD step:** H200 about 4.92 ms, A100-SXM4-80GB about 9.68 ms. Details: [ideas queue](../results/ideas-queue-20261106/README.md).
 
 <a id="ideas-r14"></a>
 ### ideas-r14: GEMM epilogue and warp-specialized wgmma forward adopted; three bounds stopped (6 November 2026)

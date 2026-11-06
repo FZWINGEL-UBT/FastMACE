@@ -94,3 +94,10 @@ The H200 MD step stays at about 5.13 ms. Ledger entries: `cx-n1-cartesian-wprime
 expects one block per 32 edges, so the lab launches 8x the blocks it needs (the extra ones exit at once). Lab
 ratios against that base taken after `6561cc13` carry this small overhead in the denominator. `lab_cartesian.py`
 launches the base through `WPrimeBackward` itself and is not affected.
+
+**Fixed (6 November 2026, ideas-queue branch):** `wprime_launcher` reads the chunk from the kernel source
+(`stage_c0 = blockIdx.x * N`) and launches one block per N edges, as `WPrimeBackward.__call__`; a persistent or
+tiled lab launch of a `STAGE_DOUT` kernel is refused. Measured at `bd911cad` (variant `stage-grid-cohort`, the old grid, against the fixed
+base): H200 1379.4 vs 1381.2 µs, A100-SXM4-80GB 2839.6 vs 2843.6 µs (ratio 0.999 on both, noise); dsh and dr
+bitwise, dx 2.5e-7 / 1.9e-7 (atomics order). The extra blocks cost nothing measurable, so the lab ratios taken since
+`6561cc13` stand.

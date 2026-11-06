@@ -121,6 +121,27 @@ SCALAR_PATHS = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.030 / 1.030 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# Idea 39 (plans/h200-ideas-20261105.md, 6 November 2026). ESTRIN (with HORNER, six terms): w and its slope by
+# Estrin's scheme (pairs of terms, chains three FMAs deep) instead of dual Horner (five deep). Rounding. None: on for
+# ESTRIN_GPUS; True / False: an A/B side's choice.
+ESTRIN = None
+# NVIDIA A100-SXM4-80GB (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9961 / 0.9963 (OMAT-0
+# medium, SrTiO3 10x10x10, abab / abba); force/stress gate as the default's (worst max-error ratio 1.011, energy).
+# Off there all the same: with FOLD_ALPHA it gains nothing (FOLD_ALPHA + ESTRIN vs neither 1.0002 / 1.0028), and
+# FOLD_ALPHA alone beats ESTRIN alone (b = FOLD_ALPHA on, ESTRIN off vs ESTRIN on: 0.9967 / 0.9902, 0.9884 / 0.9907).
+# NVIDIA H200: 1.0030 / 1.0012, off.
+ESTRIN_GPUS = GPUModels(())
+# Idea 34 (plans/h200-ideas-20261105.md, 6 November 2026). FOLD_ALPHA (with FACTORED and TABLE_W): FACTORED_SCALE's
+# per-path magnitude alpha folded into the w' value table's rows at build (float64), so the kernel's terms carry the
+# ratio c / alpha and no per-path multiply is left; scaled paths stay on SCALAR_PATHS. Rounding. None: on for
+# FOLD_ALPHA_GPUS; True / False: an A/B side's choice.
+FOLD_ALPHA = None
+# NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9963 / 0.9954 (OMAT-0 medium, SrTiO3
+# 10x10x10, abab / abba); force/stress gate as the default's (SrTiO3 stress 2.74e-7 vs 2.44e-7, within the limit).
+# NVIDIA A100-SXM4-80GB (same day): 0.9911 / 0.9863 and 0.9895 / 0.9893 (two cards); vs ESTRIN 0.9967 / 0.9902,
+# 0.9884 / 0.9907;
+# gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
+FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
@@ -305,6 +326,10 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
     const bool inside = r < r_max;
     const scalar_t sc = scales[piece];
+    {%- if estrin %}
+    // ESTRIN: the powers of t shared by every weight of the edge.
+    const scalar_t t2 = t * t, t4 = t2 * t2, two_t = t + t, four_t = two_t + two_t;
+    {%- endif %}
     {%- else %}
     scalar_t cheb[PADDED_TERMS];
     cheb[0] = scalar_t(1);
@@ -366,7 +391,15 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     #pragma unroll
                     for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
                 }
-                {%- if horner %}
+                {%- if horner and estrin %}
+                // ESTRIN: w = (g0 + g1 t) + t^2 (g2 + g3 t) + t^4 (g4 + g5 t);
+                // dw/dt = (g1 + 2 g2 t) + t^2 (3 g3 + 4 g4 t) + t^4 (5 g5).
+                const scalar_t radial_weight =
+                    fmaf(fmaf(fmaf(gv[5], t, gv[4]), t2, fmaf(gv[3], t, gv[2])), t2, fmaf(gv[1], t, gv[0]));
+                const scalar_t radial_dt =
+                    fmaf(fmaf(gv[5] * scalar_t(5), t2, fmaf(gv[4], four_t, gv[3] * scalar_t(3))), t2,
+                         fmaf(gv[2], two_t, gv[1]));
+                {%- elif horner %}
                 scalar_t radial_weight = gv[TERMS - 1];
                 scalar_t radial_dt = scalar_t(0);
                 #pragma unroll
@@ -388,7 +421,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
                 // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
                 {%- set scalar_path = scalar_paths and path.input_irrep_dim == 1
-                                      and factored[path_index].alpha == 1.0 %}
+                                      and (factored[path_index].alpha == 1.0 or fold_alpha) %}
                 {%- for i in factored[path_index].inputs %}
                 acc_t u_{{ i }} = acc_t(0);
                 {%- endfor %}
@@ -475,7 +508,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                     {%- endif %}
                 } {%- endfor %}
                 {%- if factored %}
-                {%- set alpha = factored[path_index].alpha %}
+                {%- set alpha = 1.0 if fold_alpha else factored[path_index].alpha %}
                 {%- if alpha != 1.0 %}
                 // The path's common coefficient magnitude, applied once (FACTORED_SCALE).
                 const scalar_t alpha = {{ cpp_scalar_literal(alpha, scalar) }};
@@ -629,7 +662,7 @@ def factored_paths(schedule, scale=False):
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
-           table_pairs=False, hoist_scale=False, stage_dout=False):
+           table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -671,6 +704,11 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("table_pairs interleaves TABLE_W's value table by float2: it needs table_w and vector 2")
     if hoist_scale and not horner:
         raise ValueError("hoist_scale moves HORNER's piece scale: it needs horner")
+    if fold_alpha and not (factored and scale and table_w):
+        raise ValueError("fold_alpha folds FACTORED_SCALE's alpha into the value table: it needs factored, scale and "
+                         "table_w")
+    if estrin and not (horner and int(terms) == 6 and scalar == "float"):
+        raise ValueError("estrin evaluates HORNER's six-term power basis in float32: it needs horner and terms 6")
     if stage_dout and not stage_dout_supported(schedule, scalar, blocks):
         raise ValueError("stage_dout needs float32, 32-lane cohorts, a chunk of 1..32 edges and a dout row within "
                          "48 KB")
@@ -687,6 +725,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             butterfly=bool(butterfly), redux=bool(redux),
                                             table_pairs=bool(table_pairs), hoist_scale=bool(hoist_scale),
                                             stage_dout=bool(stage_dout), stage_chunk=int(STAGE_DOUT_CHUNK),
+                                            estrin=bool(estrin), fold_alpha=bool(fold_alpha),
                                             stage_rows=stage_rows, stage_offsets=stage_offsets,
                                             stage_total=stage_total,
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
@@ -762,14 +801,17 @@ def derivative_table(dcoef, weight, vector=0):
     return d.to(dcoef.dtype).contiguous()
 
 
-def value_table(coef, weight, vector=TABLE_W_VECTOR):
+def value_table(coef, weight, vector=TABLE_W_VECTOR, row_scale=None):
     """``G [pairs * pieces, Q, D + 1 rounded up to a multiple of vector]`` (``TABLE_W``) from a table's ``coef [P, K,
     D + 1, J]`` and the folded weight ``[Q, J - 1]``: ``w_table.fold_tables``' value half without its zero group,
-    q-major with zero padding terms. Computed in float64, stored in ``coef``'s dtype."""
+    q-major with zero padding terms. Computed in float64, stored in ``coef``'s dtype. ``row_scale [Q]`` (float64,
+    FOLD_ALPHA): each weight's row multiplied by it before rounding."""
     pairs, pieces, terms, _ = coef.shape
     width = weight.shape[1]
-    g = torch.einsum("pktj,qj->pkqt", coef[..., :width].to(torch.float64),
-                     weight.detach().to(device=coef.device, dtype=torch.float64))
+    w64 = weight.detach().to(device=coef.device, dtype=torch.float64)
+    if row_scale is not None:
+        w64 = w64 * torch.as_tensor(row_scale, dtype=torch.float64, device=coef.device)[:, None]
+    g = torch.einsum("pktj,qj->pkqt", coef[..., :width].to(torch.float64), w64)
     g = torch.nn.functional.pad(g.reshape(pairs * pieces, -1, terms), (0, padded_terms(terms, vector) - terms))
     return g.to(coef.dtype).contiguous()
 
@@ -829,7 +871,7 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False, table_pairs=False):
+                 horner=False, table_pairs=False, fold_alpha=False):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -843,6 +885,9 @@ class WPrimeBackward:
         self.blocks = blocks
         self.schedule = kernels.schedule
         self.factored = factored_default(device) if factored is None else bool(factored)
+        self.fold_alpha = bool(fold_alpha)  # the caller's table carries each path's alpha (FOLD_ALPHA)
+        if self.fold_alpha and not (self.factored and self.table_w):
+            raise ValueError("FOLD_ALPHA needs FACTORED and TABLE_W")
         self.horner = bool(horner)  # the caller's table is power_table's (HORNER)
         self.table_pairs = bool(table_pairs)  # the caller's table is pair_table's (TABLE_PAIRS)
         self.hoist_scale = self.horner and hoist_scale_default(device)
@@ -852,12 +897,13 @@ class WPrimeBackward:
         self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
         self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
+        self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
-                             scale=self.factored and FACTORED_SCALE, horner=self.horner,
+                             scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
-                             stage_dout=self.stage_dout)
+                             stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1170,6 +1216,28 @@ def hoist_scale_default(device):
     return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
 
 
+def fold_alpha_default(device):
+    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS``."""
+    return bool(FOLD_ALPHA) if FOLD_ALPHA is not None else _device_name(device) in FOLD_ALPHA_GPUS
+
+
+def alpha_rows(schedule, weights):
+    """FOLD_ALPHA's ``[weights]`` float64 row factors: each path's FACTORED_SCALE alpha on its weight rows
+    (``path.weight_start`` + edge channel * channels + channel), 1 elsewhere."""
+    import numpy as np
+
+    rows = np.ones(int(weights))
+    for path, fp in zip(schedule.paths, factored_paths(schedule, True)):
+        n = path.edge_mul * schedule.channels
+        rows[path.weight_start:path.weight_start + n] = fp["alpha"]
+    return torch.as_tensor(rows, dtype=torch.float64)
+
+
+def estrin_default(device):
+    """``ESTRIN`` on ``device``: the constant when set, else on for ``ESTRIN_GPUS``."""
+    return bool(ESTRIN) if ESTRIN is not None else _device_name(device) in ESTRIN_GPUS
+
+
 def stage_dout_default(device):
     """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS``."""
     return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
@@ -1213,9 +1281,13 @@ class WPrime(torch.nn.Module):
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
         self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
         self.horner = self.table_w and horner_default(table.coef.device)
+        device = table.coef.device
+        self.fold_alpha = (self.table_w and fold_alpha_default(device) and factored_default(device)
+                           and not FACTORED_SCALE)
         if self.table_w:
             self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
-            gprime = value_table(table.coef, weight, self.vector)
+            scale = alpha_rows(kernels.schedule, weight.shape[0]) if self.fold_alpha else None
+            gprime = value_table(table.coef, weight, self.vector, row_scale=scale)
             if self.horner:  # HORNER: the power basis of t, for both kernels
                 gprime = power_table(gprime, self.terms)
         else:
@@ -1228,7 +1300,8 @@ class WPrime(torch.nn.Module):
         self.register_buffer("gprime", gprime, persistent=False)
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
-                                     table_w=self.table_w, horner=self.horner, table_pairs=self.table_pairs)
+                                     table_w=self.table_w, horner=self.horner, table_pairs=self.table_pairs,
+                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.kernels = kernels
@@ -1253,11 +1326,14 @@ class WPrime(torch.nn.Module):
         self.block = (fused.id, blocks,
                       FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
                       WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
-                                     horner=self.horner, table_pairs=self.table_pairs))
+                                     horner=self.horner, table_pairs=self.table_pairs,
+                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
         (float32, the interaction's ``fused_folded_forward`` of width ``fused.k``)."""
+        if self.fold_alpha:
+            raise ValueError("FOLD_ALPHA scales the value table's rows; the w-rebuilding backward reads them unscaled")
         from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
         from fastmace.kernels.oeq_streaming.wrebuild_backward import WRebuildBackward
 
@@ -1311,10 +1387,10 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
            "SCALAR_PATHS_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
-           "derivative_table", "factored_default", "factored_paths", "horner_default", "max_registers_default",
+           "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
            "render", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",

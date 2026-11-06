@@ -156,7 +156,8 @@ def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, ed
     def summed_fn(key, slots):
         summed, edge_density = tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts, table.scales,
                                                 table.bins, table.r_lo, table.bin_scale, table.r_max, width,
-                                                edge_attrs.contiguous(), key, slots)
+                                                edge_attrs.contiguous(), key, slots,
+                                                pcoef=getattr(table, "pcoef", None))
         density.append(edge_density)
         return summed, width
 

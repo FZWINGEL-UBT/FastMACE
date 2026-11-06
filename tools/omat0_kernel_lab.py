@@ -610,6 +610,9 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "qmajor-f2": ("exact", lambda s: qmajor(s, 2), (), qmajor_args(2)),
         "qmajor-f4": ("exact", lambda s: qmajor(s, 4), (), qmajor_args(4)),
         "qmajor-f2+ldcs-w": ("exact", lambda s: qmajor(hints(s, g=False), 2), (), qmajor_args(2)),
+        # STAGE_DOUT kernels launch a block per chunk (as WPrimeBackward); this one launches the edge-cohort grid the
+        # lab used before the fix (8x the blocks, the extras exit at once): must match the base, and times the waste.
+        "stage-grid-cohort": ("exact", lambda s: s + "\n// lab grid: edge cohorts\n", ()),
         "maxreg64": ("exact", lambda s: s, ("--maxrregcount=64",)),
         "maxreg80": ("exact", lambda s: s, ("--maxrregcount=80",)),
         "maxreg-none": ("exact", lambda s: s, ("--maxrregcount=255",)),
@@ -737,6 +740,16 @@ def wprime_launcher(kernel, source, extra):
     threads = int(lab.group(1)) if lab else kernel.num_threads
     cohort = int(lab.group(3)) if lab and lab.group(3) else kernel.cohort  # threads per edge (idea 37: 128)
     tiled = bool(lab and lab.group(4))  # idea 38: one block per receiver tile, the starts the last argument
+    # STAGE_DOUT (a default on the H200 and A100-SXM4 since 6561cc13): a block per STAGE_DOUT_CHUNK edges, as
+    # WPrimeBackward.__call__. Read from the source, so re-rendered variants launch by their own layout. Until this fix
+    # the lab launched such kernels with the edge-cohort grid, 8x the blocks (the extras exit at once).
+    stage = re.search(r"stage_c0 = int64_t\(blockIdx\.x\) \* (\d+);", source)
+    stage_chunk = int(stage.group(1)) if stage else 0
+    if "// lab grid: edge cohorts" in source:  # stage-grid-cohort: the old grid, for the check and its overhead
+        stage_chunk = 0
+    if stage_chunk and lab and (lab.group(2) == "1" or lab.group(4)):
+        raise ValueError("a persistent or tiled lab launch of a STAGE_DOUT kernel would skip edge chunks; "
+                         "build the variant with STAGE_DOUT=False")
     persistent = 0
     if lab and lab.group(2) == "1":
         per_sm = _check(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(function, threads, kernel.shared_memory))
@@ -748,6 +761,8 @@ def wprime_launcher(kernel, source, extra):
          r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
         blocks = (edges * cohort + threads - 1) // threads
+        if stage_chunk:
+            blocks = (edges + stage_chunk - 1) // stage_chunk
         if tiled:
             blocks = perm[-1].numel() - 1
         if persistent:  # idea 23: as many blocks as fit on every SM, each looping over the edges
