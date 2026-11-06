@@ -125,7 +125,10 @@ SCALAR_PATHS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Estrin's scheme (pairs of terms, chains three FMAs deep) instead of dual Horner (five deep). Rounding. None: on for
 # ESTRIN_GPUS; True / False: an A/B side's choice.
 ESTRIN = None
-ESTRIN_GPUS = GPUModels(())
+# NVIDIA A100-SXM4-80GB (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9961 / 0.9963 (OMAT-0
+# medium, SrTiO3 10x10x10, abab / abba); force/stress gate as the default's (worst max-error ratio 1.011, energy).
+# NVIDIA H200: 1.0030 / 1.0012, off.
+ESTRIN_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 # Idea 34 (plans/h200-ideas-20261105.md, 6 November 2026). FOLD_ALPHA (with FACTORED and TABLE_W): FACTORED_SCALE's
 # per-path magnitude alpha folded into the w' value table's rows at build (float64), so the kernel's terms carry the
 # ratio c / alpha and no per-path multiply is left; scaled paths stay on SCALAR_PATHS. Rounding. None: on for

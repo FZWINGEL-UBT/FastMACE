@@ -268,6 +268,9 @@ def test_h200_defaults():
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(wprime_backward.STAGE_DOUT_GPUS)
     # Idea 31 step 3 (6 November 2026): SKIP_SELECT on both, MD H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(skip_select.SKIP_SELECT_GPUS)
+    # Idea 39 (6 November 2026): ESTRIN on the A100-SXM4 only, MD 0.9961 / 0.9963, gate as the default; H200 1.0030 / 1.0012
+    assert "NVIDIA A100-SXM4-80GB" in wprime_backward.ESTRIN_GPUS
+    assert "NVIDIA H200" not in wprime_backward.ESTRIN_GPUS
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows
