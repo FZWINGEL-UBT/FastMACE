@@ -474,6 +474,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r12](#ideas-r12) | CG factors folded into W (idea 24, `CG_FOLD`), TP inside the next k-loop (22(iii)) | `fused_forward.CG_FOLD_GPUS`, `cg_fold.py` | FM | CG_FOLD DEFAULT on the H200 and A100-SXM4; 22(iii) REJECTED | 2026-11-06 | MD CG_FOLD H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898; lab 22(iii) 1.03–1.21 | [research answers](../results/research-answers-20261105/README.md#round-12-cg-factors-folded-into-w-cg_fold-adopted-tp-in-the-next-k-loop-rejected-6-november-2026) |
 | [ideas-r13](#ideas-r13) | a read with one LDS.128 (17(ii), `A_LD128`), TP without flush checks (29, `TP_NOFLUSH`), further CG folds (28), K_PIPE on the fold; mirror tiles (32) | `fused_forward.A_LD128_GPUS`, `TP_NOFLUSH_GPUS`, `kloop_rewrites.py` | FM | A_LD128 DEFAULT on the H200 and A100-SXM4, TP_NOFLUSH on the A100-SXM4; 28 not ported; 32 STOPPED | 2026-11-06 | MD H200 A_LD128 0.9925 / 0.9956; A100-SXM4 both 0.9909 / 0.9923; 32: f = 0.22 at 32 rows | [research answers](../results/research-answers-20261105/README.md#round-13-one-lds128-for-a-a_ld128-and-the-tp-without-flush-checks-tp_noflush-adopted-6-november-2026) |
 | [ideas-r14](#ideas-r14) | GEMM epilogues (31, `LINEAR_DIV`), warp-specialized wgmma forward (30), mirror tiles (32), sm_90 3xTF32 GEMMs (33), w′ register cap (36) | `cutlass.linear_div.LINEAR_DIV_GPUS` | FM | LINEAR_DIV DEFAULT on the H200 and A100-SXM4; WS_FORWARD DEFAULT on the H200 (MD 0.9584 / 0.9610); 32, 33, 36 STOPPED; step 2: STAGE_DOUT (38) and SKIP_SELECT (31) DEFAULT on the H200 and A100-SXM4, FIRST_DIV (31) REJECTED, interaction-1 graph break removed | 2026-11-06 | MD LINEAR_DIV H200 0.9912 / 0.9934, A100-SXM4 0.9896 / 0.9891; 33 ×3 1.07; 36 maxreg80 1.255; STAGE_DOUT H200 0.9616 / 0.9638, A100-SXM4 0.9896 / 0.9920; SKIP_SELECT H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858; FIRST_DIV 1.031–1.035 | [research answers](../results/research-answers-20261105/README.md#revision-14-gemm-epilogue-linear_div-and-warp-specialized-forward-ws_forward-adopted-ideas-30-32-33-36-measured-6-november-2026) |
+| [nl-binned](#nl-binned) | Cell-list pair screen for the neighbour-list rebuild (`BINNED_SCREEN`), from the 16×16×16 overhead check | `pair_search.BINNED_SCREEN_GPUS`, `BINNED_MIN_ATOMS` | FM | DEFAULT on the H200 and A100 80GB from 10,000 atoms (bitwise); timing case unchanged | 2026-11-06 | SrTiO3 16×16×16 MD H200 0.9767 / 0.9833, A100-SXM4 0.9765 / 0.9776; 10×10×10 H200 tie, A100 1.0038 / 1.0044; build 22.3 → 5.1 ms at 20,480 atoms (RTX 4000 Ada) | [ideas queue 2](../results/ideas-queue2-20261106/README.md) |
 | [ideas-q2](#ideas-q2) | Segmented density sums (5(b), `RECEIVER_SUM`); G1 pre-split ceiling; rcfold on the A100 (28); ZBL config, S fill, chunked S (5(d), 13, 35) | `receiver_sum.RECEIVER_SUM_GPUS` | FM | RECEIVER_SUM DEFAULT on the A100 (SXM4 and PCIe names); H200 a tie; G1, 28, 5(d), 13, 35 MEASURED, NOT BUILT (bounds ≤ 1 % or build out of proportion) | 2026-11-06 | MD A100-SXM4 0.9998 / 0.9918, 0.9990 / 0.9985; H200 0.9992 / 1.0012; G1 ceiling/plain H200 0.894, A100 0.915; rc-all 0.986 of today's A100 forward | [ideas queue 2](../results/ideas-queue2-20261106/README.md) |
 | [ideas-q1](#ideas-q1) | Folded α in the w′ table (34, `FOLD_ALPHA`), power-basis tabled backward (40, `POWER_BACKWARD`), Estrin w′ (39, `ESTRIN`); chunk sweeps and cross-checks | `wprime_backward.FOLD_ALPHA_GPUS`, `tabled_outer_sum.POWER_BACKWARD_GPUS` | FM | FOLD_ALPHA DEFAULT on the H200 and A100-SXM4; POWER_BACKWARD DEFAULT on the H200; ESTRIN REJECTED (FOLD_ALPHA faster on the A100, together nothing); sweeps and cross-checks REJECTED | 2026-11-06 | MD FOLD_ALPHA H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893; POWER_BACKWARD H200 0.9954 / 0.9957; both off on the H200 1.0073 / 1.0089; FOLD_ALPHA vs ESTRIN on the A100 0.9967 / 0.9902, 0.9884 / 0.9907 | [ideas queue](../results/ideas-queue-20261106/README.md) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
@@ -4335,6 +4336,24 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
+
+<a id="nl-binned"></a>
+### nl-binned: the neighbour-list rebuild's pair screen as a cell list (6 November 2026)
+
+- **Overhead check** (the owner): the H200 at SrTiO3 16×16×16 (20,480 atoms).
+  - The graph's launch gaps stay at about 50 µs per step, and the kernels are 9 % more efficient per edge.
+  - The rebuild grew 5.3× per call for 4.1× the atoms. The time outside the kernels went from 4.8 % to 8.5 % of the
+    step.
+- **Cause:** the O(N²) tile screen, 17.8 of a 22.4 ms build at 20,480 atoms (RTX 4000 Ada).
+- **`BINNED_SCREEN`:** a cell-list screen (fractional bins at least the screen radius thick, 27 neighbour bins).
+  - Bitwise the same candidate list, through both the synchronous and the asynchronous build, with no host
+    synchronisation.
+  - Build: 22.3 → 5.1 ms at 20,480 atoms, 217 → 17.7 ms at 69,120 atoms.
+- **MD:** 16×16×16 H200 0.9767 / 0.9833, A100-SXM4 0.9765 / 0.9776. At 10×10×10 the H200 is a tie and the A100
+  1.0038 / 1.0044.
+- **Decision:** default on the H200 and the A100 80GB from `BINNED_MIN_ATOMS` = 10,000 atoms.
+- **What is left:** the float64 decision, the sort and the fill, about 4.4 ms at 20,480 atoms. Details:
+  [ideas queue 2](../results/ideas-queue2-20261106/README.md).
 
 <a id="ideas-q2"></a>
 ### ideas-q2: segmented density sums adopted on the A100; G1, rcfold and the tail bounded (6 November 2026)

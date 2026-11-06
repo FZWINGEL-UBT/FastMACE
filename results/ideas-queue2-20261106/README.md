@@ -120,6 +120,50 @@ host time equals its GPU time, so the host waits on it.
 
 For large cells, the rebuild is the next target: its scaling, and the host wait. The force kernels are not.
 
+## Neighbour-list rebuild: binned pair screen adopted from 10,000 atoms
+
+**The problem.** The rebuild's pair screen (`pair_search`) tested every sender tile against every receiver tile
+over all 27 images, which is O(N²). On leto's RTX 4000 Ada (`tools/bench/rebuild_parts.py`, SrTiO3, cutoff 6 Å)
+it was most of `build_gpu`:
+
+| Cell | Atoms | Screen | Decide (float64) | Sort and fill | `build_gpu` |
+| --- | --- | --- | --- | --- | --- |
+| 10×10×10 | 5,000 | 1.26 ms | 0.48 ms | 0.40 ms | 2.2 ms |
+| 16×16×16 | 20,480 | 17.8 ms | 1.9 ms | 2.5 ms | 22.3 ms |
+| 24×24×24 | 69,120 | 201 ms | 6.4 ms | 9.2 ms | 217 ms |
+
+**The fix: `BINNED_SCREEN`** (`fastmace/neighbors/pair_search.py`), a cell-list screen.
+- Atoms are binned in fractional slabs at least the screen radius thick, with at least 3 bins per axis.
+- One Triton program per (receiver bin, neighbour bin) runs the tile screen's float32 test.
+- The image is read off the wrap.
+
+It finds every pair within the screen radius, and the build's float64 decision and unique sort key are unchanged.
+The candidate list is therefore **bitwise** the tile screen's: `tests/gpu/test_neighbors_gpu.py` checks this on
+triclinic NaCl, NaNbO3 and NbCl5 cells, through both the synchronous and the asynchronous build. The asynchronous
+build stays free of host synchronisation (`torch.bincount` replaced, as it reads its input's maximum on the host).
+
+| Cell | Atoms | Screen, tile → binned | `build_gpu`, tile → binned |
+| --- | --- | --- | --- |
+| 10×10×10 | 5,000 | 1.26 → 0.50 ms | 2.2 → 1.5 ms |
+| 16×16×16 | 20,480 | 17.8 → 0.69 ms | 22.3 → 5.1 ms |
+| 24×24×24 | 69,120 | 201 → 1.26 ms | 217 → 17.7 ms |
+
+**MD-step A/Bs** (`hopper_sweep.sh`, new `AB_CELL`; b = `BINNED_SCREEN=True`):
+
+| GPU | 10×10×10 | 16×16×16 |
+| --- | --- | --- |
+| H200 | 1.0008 / 0.9958 (a tie) | **0.9767 / 0.9833** |
+| A100-SXM4-80GB | 1.0038 / 1.0044 | **0.9765 / 0.9776** |
+
+**Decision.** On by default on the H200 and the A100 80GB (SXM4 and PCIe names) from `BINNED_MIN_ATOMS` = 10,000
+atoms. Below that, the tile screen is cheap and hides behind the force call, and the binned path's few extra
+launches cost about 0.4 % on the A100. The timing case (5,000 atoms) is unchanged.
+
+**Left in the rebuild** at large cells: the chunked float64 decision, the int64 sort and the fill. They take 4.4 of
+the 5.1 ms at 20,480 atoms on leto and scale linearly. They are the next target if large cells matter.
+
+## Runs
+
 `runs/`: one folder per Modal job, token-clean. Gate value dumps are dropped.
 
 | Folder | What it holds |
@@ -129,4 +173,5 @@ For large cells, the rebuild is the next target: its scaling, and the host wait.
 | `segdens-*`, `segdens2-a100` | `RECEIVER_SUM` MD A/Bs |
 | `segdens-breakdown-a100` | breakdown with the switch on |
 | `breakdown-h200-16x16x16` | H200 step breakdown of SrTiO3 16×16×16 at `16472d77` |
+| `binned-*` | `BINNED_SCREEN` MD A/Bs (10×10×10 and 16×16×16), and leto's rebuild-parts bench (`binned-parts-leto.json`) |
 | `gate-segdens-a100` | the gate |

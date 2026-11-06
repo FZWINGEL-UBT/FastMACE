@@ -34,8 +34,14 @@ CPU_CHUNK = 1 << 22  # elements of the (images, rows, atoms) distance block per 
 # unique sort key give the same list: bitwise. Needs a cell given (``cell=``), at least 3 bins along every axis and
 # the full list (not ``half``); otherwise the tile screen runs. None: on for BINNED_SCREEN_GPUS; True / False: an
 # A/B side's choice.
+# SrTiO3 16x16x16 (20,480 atoms) MD: H200 0.9767 / 0.9833, A100-SXM4 0.9765 / 0.9776; the A100 80GB PCIe follows
+# the SXM4 (the owner: relative results carry over).
 BINNED_SCREEN = None
-BINNED_SCREEN_GPUS = GPUModels(())
+BINNED_SCREEN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# The default (None) takes the binned screen from this many atoms: below it the tile screen is cheap and hides behind
+# the force call, and the binned path's extra launches cost a little (A100-SXM4 SrTiO3 10x10x10, 5,000 atoms:
+# MD 1.0038 / 1.0044; H200 a tie). True forces it on at any size.
+BINNED_MIN_ATOMS = 10_000
 BIN_BLOCK = 32  # atoms per tile side of the binned screen
 
 
@@ -163,12 +169,13 @@ def _binned_listed(index: int) -> bool:
     return torch.cuda.get_device_name(index) in BINNED_SCREEN_GPUS
 
 
-def binned_screen(device) -> bool:
-    """``BINNED_SCREEN`` on ``device``: the constant when set, else on for ``BINNED_SCREEN_GPUS``."""
+def binned_screen(device, natoms: int | None = None) -> bool:
+    """``BINNED_SCREEN`` on ``device``: the constant when set, else on for ``BINNED_SCREEN_GPUS`` from
+    ``BINNED_MIN_ATOMS`` atoms (any count when ``natoms`` is None)."""
     if BINNED_SCREEN is not None:
         return bool(BINNED_SCREEN)
     device = torch.device(device)
-    if device.type != "cuda":
+    if device.type != "cuda" or (natoms is not None and natoms < BINNED_MIN_ATOMS):
         return False
     return _binned_listed(device.index if device.index is not None else torch.cuda.current_device())
 
@@ -180,7 +187,7 @@ def _bin_plan(wrapped, image_vectors, radius, cell, half):
     (a meshgrid of -k..k per axis, ``ij`` order). Bins are fractional slabs of thickness width / nb >= the screen
     radius, so two atoms within it differ by at most one bin along every axis.
     """
-    if cell is None or half or not wrapped.is_cuda or not binned_screen(wrapped.device):
+    if cell is None or half or not wrapped.is_cuda or not binned_screen(wrapped.device, wrapped.shape[0]):
         return None
     cell = np.asarray(cell, dtype=float)
     reach = radius + SCREEN_MARGIN
