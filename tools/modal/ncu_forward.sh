@@ -10,6 +10,8 @@
 #   instruction statistics) in ncu-sections.txt.
 # Each pass has its own report (.ncu-rep, open with ncu-ui). If the container may not read the performance counters,
 # ncu says ERR_NVGPUCTRPERM; run.log records it.
+# Modal does not allow ncu to lock the clocks (LockingClocksFailed, 6 November 2026), so it profiles at the
+# running clocks (--clock-control none); compare stall shares, not absolute times.
 # Usage (from WSL, Modal client venv; the image is built on first use, about 1.5 GB more than the job image):
 #   FASTMACE_MODAL_NCU=1 modal run tools/modal/fastmace_modal.py::ncu_job --gpu H200 --timeout-min 40 --commit <sha> \
 #     --command "bash tools/modal/ncu_forward.sh" --out ~/fm-runs/ncu-forward-h200
@@ -43,7 +45,7 @@ metrics+=,smsp__inst_executed.sum,sm__cycles_elapsed.max,gpu__time_duration.sum
 run_pass() {  # name, ncu options...
   local name=$1; shift
   note "start $name"
-  ncu --profile-from-start off --kernel-name fused_folded_forward --target-processes all "$@" \
+  ncu --profile-from-start off --clock-control none --kernel-name fused_folded_forward --target-processes all "$@" \
     --export "$out/$name" --force-overwrite "${lab[@]}" --output "$out/lab-$name" > "$out/$name.log" 2>&1 < /dev/null
   local code=$?
   note "end $name exit=$code $(grep -h -E 'profiled launch' "$out/$name.log" | tr '\n' ' ')"
