@@ -643,6 +643,9 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "stage-dout": ("exact", lambda s: _stage_dout(s, 2), ()),
         "stage-dout-r0": ("exact", lambda s: _stage_dout(s, 1), ()),
         "F-stage-dout-nofill": ("falsifier", lambda s: _stage_dout(s, 2, fill=False), ()),
+        # H200 ideas 37 and 38 (plan revision 15): FF-dout-row0 (the dout locality bound, against maxreg72) and the
+        # w' split by harmonic degree (tools/lab_ideas3738.py).
+        **_ideas3738_variants(kernel),
     }
 
 
@@ -730,8 +733,9 @@ def wprime_launcher(kernel, source, extra):
     registers = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))
     spills = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
                                               function))
-    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)", source)
+    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)(?: cohort=(\d+))?", source)
     threads = int(lab.group(1)) if lab else kernel.num_threads
+    cohort = int(lab.group(3)) if lab and lab.group(3) else kernel.cohort  # threads per edge (idea 37: 128)
     persistent = 0
     if lab and lab.group(2) == "1":
         per_sm = _check(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(function, threads, kernel.shared_memory))
@@ -742,7 +746,7 @@ def wprime_launcher(kernel, source, extra):
         (x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins, r_lo, bin_scale,
          r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (edges * kernel.cohort + threads - 1) // threads
+        blocks = (edges * cohort + threads - 1) // threads
         if persistent:  # idea 23: as many blocks as fit on every SM, each looping over the edges
             blocks = min(blocks, persistent)
         p = ctypes.c_void_p
@@ -1686,6 +1690,11 @@ def _round13_variants(kernel):
     import lab_round13  # tools/ is on sys.path when the lab runs as a script
     FORWARD_REFERENCES.update(lab_round13.round13_references(kernel))
     return lab_round13.round13_variants(kernel)
+
+
+def _ideas3738_variants(kernel):
+    import lab_ideas3738  # tools/ is on sys.path when the lab runs as a script
+    return lab_ideas3738.ideas3738_variants(kernel)
 
 
 def forward_variants(kernel=None):
