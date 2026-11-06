@@ -107,6 +107,7 @@ class BlockLinear(torch.nn.Module):
         self.sms = None  # grouped_launch: the device's SM count for the shape rule (None: not float32 on CUDA)
         self.tf32x3 = False  # tf32x3_gemms: every product as 3xTF32 (block_products)
         self.segment_plan = None  # tf32x3 on CUTLASS with SEGMENT_ROWS: the blocks' plan (cutlass.segment_rows)
+        self.linear_div = False  # tf32x3 on CUTLASS with LINEAR_DIV: ``divided`` (cutlass.linear_div; idea 31)
         if self.grouped:  # one product per output segment
             blocks = _group(blocks)
             self.block_ends = tuple((i, j) for i, j, _ in blocks)
@@ -144,15 +145,73 @@ class BlockLinear(torch.nn.Module):
         """Per output segment, its rows [n * dim, mul] (None where no product reaches it), from the
         rows of every input segment (in the ir_mul core layout, after ``transpose_in``)."""
         outputs = [None] * len(self.segments_out)
+        lefts = self.left_factors(rows)
+        for (_, j), part in zip(self.block_ends, block_products(self, lefts)):
+            outputs[j] = part if outputs[j] is None else outputs[j] + part
+        return outputs
+
+    def left_factors(self, rows):
+        """Each product's left factor from the input segments' rows (grouped segments joined along the channels)."""
         lefts = []
         for i, _ in self.block_ends:
             if isinstance(i, tuple):  # grouped
                 lefts.append(rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1))
             else:
                 lefts.append(rows[i])
-        for (_, j), part in zip(self.block_ends, block_products(self, lefts)):
-            outputs[j] = part if outputs[j] is None else outputs[j] + part
-        return outputs
+        return lefts
+
+    def divided(self, x, density):
+        """``self(x) / (density + 1)`` with the division in the products' epilogue and the outputs written in place
+        (idea 31, ``kernels.cutlass.linear_div``; bitwise the same), or None where it does not apply: ``linear_div``
+        off (set at build by ``precision.route``: LINEAR_DIV on and 3xTF32 on CUTLASS), a layout transpose,
+        SEGMENT_ROWS, an output segment without exactly one product, or operands the kernel does not take."""
+        if not (self.tf32x3 and self.linear_div) or self.grouped_launch or not _identity(self.transpose_out):
+            return None
+        if isinstance(x, tuple):  # wprime_backward.BLOCK_MESSAGE: the grouped products' left factors
+            lefts = list(x)
+            n = x[0].shape[0] // self.segments_in[self.block_ends[0][0][0]][2]
+        else:
+            if self.segment_plan is not None or not _identity(self.transpose_in):
+                return None
+            n = x.shape[0]
+            lefts = self.left_factors([x[:, offset:offset + dim * mul].reshape(n * dim, mul)
+                                       for offset, mul, dim in self.segments_in])
+        outputs = [j for _, j in self.block_ends]
+        if sorted(outputs) != list(range(len(self.segments_out))) or density.shape[0] != n:
+            return None
+        count = len(self.block_ends)
+        weights = [getattr(self, f"weight_{k}") for k in range(count)]
+        for left, weight, j in zip(lefts, weights, outputs):
+            _, mul, dim = self.segments_out[j]
+            if left.shape[0] != n * dim or weight.shape[1] != mul:
+                return None
+        offsets = [self.segments_out[j][0] for j in outputs]
+        from fastmace.kernels.cutlass import linear_div
+
+        if not linear_div.applies(lefts, weights, density, offsets, self.width_out):
+            return None
+        return linear_div.tf32x3_linear_div(lefts, weights, [getattr(self, f"weight_t_{k}") for k in range(count)],
+                                            offsets, self.width_out, density)
+
+
+def _identity(transpose):
+    """Whether a cuEquivariance layout transpose (``TransposeIrrepsLayout``) leaves its input as it is."""
+    return isinstance(transpose, torch.nn.Identity) or isinstance(getattr(transpose, "f", None), torch.nn.Identity)
+
+
+def reshape_view(reshape, x):
+    """MACE's ``reshape_irreps(x)`` as a view of ``x`` ([n, width] -> [n, sum of dims, mul]) where that is its
+    value: cuEquivariance's ir_mul layout with one multiplicity (its ``torch.cat`` of [n, dim, mul] pieces along
+    the dims is then x's own memory order); None otherwise."""
+    config = getattr(reshape, "cueq_config", None)
+    muls = getattr(reshape, "muls", None)
+    if (type(reshape).__name__ != "reshape_irreps" or config is None or getattr(config, "layout_str", None) != "ir_mul"
+            or not muls or len(set(muls)) != 1 or not x.is_contiguous()):
+        return None
+    dims = sum(reshape.dims)
+    if x.dim() != 2 or x.shape[1] != dims * muls[0]:
+        return None
+    return x.view(x.shape[0], dims, muls[0])
 
 
 def raw_blocks(linear):

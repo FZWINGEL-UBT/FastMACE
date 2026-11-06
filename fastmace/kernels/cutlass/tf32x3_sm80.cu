@@ -147,3 +147,223 @@ FM_TF32X3_ENTRY(fm_tf32x3_rr_64x32, RowRow64x32)
 FM_TF32X3_ENTRY(fm_tf32x3_rc_64x32, RowCol64x32)
 
 }  // extern "C"
+
+// ---------------------------------------------------------------------------------------------------------------
+// Idea 31 (6 November 2026; fastmace.kernels.cutlass.epilogue): the 64x64 kernels with an epilogue that stores row r
+// of the product at  c + (r / rows_per_atom) * atom_stride + (r % rows_per_atom) * row_stride  (an atom's (2l+1)
+// rows into its slice of a wider [atoms, width] tensor: the ir_mul cat that join_rows builds) and, if density is
+// not null, divides each element by (density[r / rows_per_atom] + 1) on the way: the "x / (density + 1)" of the
+// interaction, with Inductor's instructions (add.f32 for density + 1, then div.full.f32; idea31-glue.md, step 1).
+// The mainloop is RowRow's / RowCol's own (same Mma type, same K iterations), and alpha 1 / beta 0 as mm_into, so
+// each stored value is mm_into's accumulator, divided as the glue kernel divides it: bitwise the same.
+//   fm_tf32x3_remap_div_{rr,rc}_64x64(M, N, K, A, lda, B, ldb, C, rows_per_atom, atom_stride, row_stride, density):
+//   grid ceil(M / 64) x ceil(N / 64), fm_tf32x3_remap_info = [threads, shared bytes rr, shared bytes rc].
+// N, atom_stride and row_stride multiples of 4 and C 16-byte aligned (128-bit stores); the caller checks.
+
+namespace {
+
+__device__ __forceinline__ float div_full(float a, float b) {
+  float d;
+  asm("div.full.f32 %0, %1, %2;" : "=f"(d) : "f"(a), "f"(b));
+  return d;
+}
+
+// The output tile iterator of the epilogue: PredicatedTileIterator's thread map and row walk, with the row remap and
+// the division in store. load is never used (beta = 0: no source).
+template <typename ThreadMap_>
+class RemapDivIterator {
+ public:
+  using ThreadMap = ThreadMap_;
+  using Shape = typename ThreadMap::Shape;
+  using Element = float;
+  using Layout = cutlass::layout::RowMajor;
+  using TensorRef = cutlass::TensorRef<Element, Layout>;
+  using ConstTensorRef = typename TensorRef::ConstTensorRef;
+  using Index = typename Layout::Index;
+  using LongIndex = typename Layout::LongIndex;
+  using TensorCoord = cutlass::MatrixCoord;
+  static int const kElementsPerAccess = ThreadMap::kElementsPerAccess;
+  static int const kThreads = ThreadMap::kThreads;
+  static int const kIterations = ThreadMap::Count::kTile;
+  using Fragment = cutlass::Array<Element, ThreadMap::Iterations::kColumn * ThreadMap::Iterations::kRow *
+                                               ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster *
+                                               ThreadMap::kElementsPerAccess>;
+  using AccessType = cutlass::AlignedArray<Element, ThreadMap::kElementsPerAccess>;
+
+  struct Params {
+    float *base;
+    float const *density;
+    int rows_per_atom;
+    long long atom_stride, row_stride;
+  };
+
+  struct Mask {
+    static int const kCount = ThreadMap::Iterations::kColumn;
+    bool predicates[kCount];
+    CUTLASS_HOST_DEVICE Mask() { enable(); }
+    CUTLASS_HOST_DEVICE void clear() {
+      CUTLASS_PRAGMA_UNROLL
+      for (int i = 0; i < kCount; ++i) predicates[i] = false;
+    }
+    CUTLASS_HOST_DEVICE void enable() {
+      CUTLASS_PRAGMA_UNROLL
+      for (int i = 0; i < kCount; ++i) predicates[i] = true;
+    }
+  };
+
+ private:
+  Params params_;
+  Mask mask_;
+  Index extent_row_, extent_column_, thread_start_row_, thread_start_column_;
+  int state_[3];
+
+ public:
+  CUTLASS_DEVICE
+  RemapDivIterator(Params const &params, TensorCoord extent, int thread_idx, TensorCoord threadblock_offset)
+      : params_(params) {
+    TensorCoord thread_offset = ThreadMap::initial_offset(thread_idx) + threadblock_offset;
+    extent_row_ = extent.row();
+    extent_column_ = extent.column();
+    thread_start_row_ = thread_offset.row();
+    thread_start_column_ = thread_offset.column();
+    CUTLASS_PRAGMA_UNROLL
+    for (int c = 0; c < ThreadMap::Iterations::kColumn; ++c) {
+      mask_.predicates[c] = (thread_offset.column() + ThreadMap::Delta::kColumn * c) < extent.column();
+    }
+    state_[0] = state_[1] = state_[2] = 0;
+  }
+
+  CUTLASS_DEVICE void load(Fragment &frag) const { frag.clear(); }
+
+  CUTLASS_DEVICE void store(Fragment const &frag) const {
+    AccessType const *frag_ptr = reinterpret_cast<AccessType const *>(&frag);
+    CUTLASS_PRAGMA_UNROLL
+    for (int cluster = 0; cluster < ThreadMap::Iterations::kCluster; ++cluster) {
+      CUTLASS_PRAGMA_UNROLL
+      for (int group = 0; group < ThreadMap::Iterations::kGroup; ++group) {
+        CUTLASS_PRAGMA_UNROLL
+        for (int row = 0; row < ThreadMap::Iterations::kRow; ++row) {
+          int const frag_row_idx =
+              row + ThreadMap::Iterations::kRow * (group + ThreadMap::Iterations::kGroup * cluster);
+          int const row_offset =
+              row * ThreadMap::Delta::kRow + group * ThreadMap::Delta::kGroup + cluster * ThreadMap::Delta::kCluster;
+          int const r = row_offset + thread_start_row_;
+          if (r >= extent_row_) continue;
+          int const atom = r / params_.rows_per_atom;
+          int const m = r - atom * params_.rows_per_atom;
+          float *row_pointer = params_.base + atom * params_.atom_stride + m * params_.row_stride + thread_start_column_;
+          float scale = 0.0f;
+          if (params_.density) scale = params_.density[atom] + 1.0f;
+          CUTLASS_PRAGMA_UNROLL
+          for (int column = 0; column < ThreadMap::Iterations::kColumn; ++column) {
+            AccessType value = frag_ptr[frag_row_idx * ThreadMap::Iterations::kColumn + column];
+            if (params_.density) {
+              CUTLASS_PRAGMA_UNROLL
+              for (int e = 0; e < kElementsPerAccess; ++e) value[e] = div_full(value[e], scale);
+            }
+            cutlass::arch::global_store<AccessType, sizeof(AccessType)>(
+                value, (void *)(row_pointer + column * ThreadMap::Delta::kColumn), mask_.predicates[column]);
+          }
+        }
+      }
+    }
+  }
+
+  CUTLASS_HOST_DEVICE RemapDivIterator &operator++() {
+    ++state_[0];
+    thread_start_row_ += ThreadMap::Shape::kRow;
+    if (state_[0] == ThreadMap::Count::kRow) {
+      state_[0] = 0;
+      ++state_[1];
+      thread_start_row_ += (ThreadMap::Shape::kGroup - 1) * ThreadMap::Shape::kRow * ThreadMap::Count::kRow;
+      if (state_[1] == ThreadMap::Count::kGroup) {
+        state_[1] = 0;
+        ++state_[2];
+        thread_start_row_ +=
+            ThreadMap::Count::kGroup * ThreadMap::Shape::kGroup * ThreadMap::Count::kRow * ThreadMap::Shape::kRow;
+        if (state_[2] == ThreadMap::Count::kCluster) {
+          state_[2] = 0;
+          thread_start_row_ +=
+              ThreadMap::Shape::kGroup * ThreadMap::Shape::kRow * ThreadMap::Shape::kCluster * ThreadMap::Shape::kTile;
+        }
+      }
+    }
+    return *this;
+  }
+
+  CUTLASS_DEVICE void clear_mask() { mask_.clear(); }
+  CUTLASS_DEVICE void enable_mask() { mask_.enable(); }
+  CUTLASS_DEVICE void get_mask(Mask &mask) const { mask = mask_; }
+  CUTLASS_DEVICE void set_mask(Mask const &mask) { mask_ = mask; }
+  CUTLASS_DEVICE TensorCoord thread_start() const { return TensorCoord(thread_start_row_, thread_start_column_); }
+  CUTLASS_DEVICE Index thread_start_row() const { return thread_start_row_; }
+  CUTLASS_DEVICE Index thread_start_column() const { return thread_start_column_; }
+};
+
+// The default kernel's epilogue with RemapDivIterator as its output iterator (every other part the same).
+template <typename Kernel>
+struct RemapDiv {
+  using Mma = typename Kernel::Mma;
+  using Default = typename Kernel::Epilogue;
+  using Iterator = RemapDivIterator<typename Default::OutputTileIterator::ThreadMap>;
+  using Epilogue = cutlass::epilogue::threadblock::Epilogue<
+      typename Default::Shape, typename Default::WarpMmaOperator, Default::kPartitionsK, Iterator,
+      typename Default::AccumulatorFragmentIterator, typename Default::WarpTileIterator,
+      typename Default::SharedLoadIterator, typename Default::OutputOp, typename Default::Padding,
+      Default::kFragmentsPerIteration>;
+  union SharedStorage {
+    typename Mma::SharedStorage main_loop;
+    typename Epilogue::SharedStorage epilogue;
+  };
+};
+
+// Kernel::operator() without split-K (gemm_k_size = K, identity swizzle of one tile), with RemapDiv's epilogue.
+template <typename Kernel>
+__device__ __forceinline__ void run_remap_div(int m, int n, int k, float const *a, int lda, float const *b, int ldb,
+                                              float *c, int rows_per_atom, long long atom_stride,
+                                              long long row_stride, float const *density) {
+  using R = RemapDiv<Kernel>;
+  using Mma = typename R::Mma;
+  extern __shared__ __align__(16) char storage[];
+  auto &shared = *reinterpret_cast<typename R::SharedStorage *>(storage);
+  int const tile_m = blockIdx.x, tile_n = blockIdx.y;
+  cutlass::MatrixCoord tb_offset_a{tile_m * Mma::Shape::kM, 0};
+  cutlass::MatrixCoord tb_offset_b{0, tile_n * Mma::Shape::kN};
+  int const gemm_k_iterations = (k + Mma::Shape::kK - 1) / Mma::Shape::kK;
+  int const thread_idx = threadIdx.x;
+  typename Mma::IteratorA iterator_a(typename Mma::IteratorA::Params(typename Mma::IteratorA::Layout(lda)),
+                                     const_cast<float *>(a), {m, k}, thread_idx, tb_offset_a);
+  typename Mma::IteratorB iterator_b(typename Mma::IteratorB::Params(typename Mma::IteratorB::Layout(ldb)),
+                                     const_cast<float *>(b), {k, n}, thread_idx, tb_offset_b);
+  int const warp_idx = cutlass::canonical_warp_idx_sync();
+  int const lane_idx = threadIdx.x % 32;
+  Mma mma(shared.main_loop, thread_idx, warp_idx, lane_idx);
+  typename Mma::FragmentC accumulators;
+  accumulators.clear();
+  mma(gemm_k_iterations, accumulators, iterator_a, iterator_b, accumulators);
+  typename R::Epilogue::OutputOp output_op(typename R::Epilogue::OutputOp::Params(1.0f, 0.0f));
+  typename R::Iterator::Params params{c, density, rows_per_atom, atom_stride, row_stride};
+  cutlass::MatrixCoord tb_offset{tile_m * Mma::Shape::kM, tile_n * Mma::Shape::kN};
+  typename R::Iterator iterator_d(params, {m, n}, thread_idx, tb_offset);
+  typename R::Epilogue epilogue(shared.epilogue, thread_idx, warp_idx, lane_idx);
+  epilogue(output_op, iterator_d, accumulators, iterator_d);
+}
+
+}  // namespace
+
+extern "C" {
+
+__constant__ int fm_tf32x3_remap_info[3] = {RowRow::kThreadCount, int(sizeof(typename RemapDiv<RowRow>::SharedStorage)),
+                                            int(sizeof(typename RemapDiv<RowCol>::SharedStorage))};
+
+#define FM_TF32X3_REMAP_ENTRY(name, Kernel)                                                                       \
+  __global__ void __launch_bounds__(Kernel::kThreadCount)                                                         \
+  name(int m, int n, int k, float const *a, int lda, float const *b, int ldb, float *c, int rows_per_atom,        \
+       long long atom_stride, long long row_stride, float const *density) {                                       \
+    run_remap_div<Kernel>(m, n, k, a, lda, b, ldb, c, rows_per_atom, atom_stride, row_stride, density);           \
+  }
+
+FM_TF32X3_REMAP_ENTRY(fm_tf32x3_remap_div_rr_64x64, RowRow)
+FM_TF32X3_REMAP_ENTRY(fm_tf32x3_remap_div_rc_64x64, RowCol)
+
+}  // extern "C"
