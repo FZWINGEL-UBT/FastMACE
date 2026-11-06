@@ -228,3 +228,40 @@ Both falsifiers clear the plan's thresholds on both GPUs.
   follows, with the rebuild's pairing, the second pass and the gate.
 
 Runs: `runs/ideas-r7-h200/`, `runs/ideas-r7-a100/`. Modal `third` stood at $12.19 metered before these two jobs.
+
+### Idea 17 at G = 2: `W_GROUP` (6 November 2026)
+
+**What it does.** `fused_forward.W_GROUP` (None: `W_GROUP_GPUS`) pairs the warps of a block.
+- In the k-loop, each warp of a pair loads and splits one W m-tile once. It uses the tile for both warps' batches,
+  taking its partner's a fragments from the partner's `a_s`.
+- It writes its C fragments into the owning warp's `r_s`.
+- Each pair has one named barrier id, used twice per batch:
+  - a `bar.red.or` vote after staging, which also tells whether the pair still has work;
+  - a `bar.sync` after the `r_s` writes.
+- A warp that runs out of chunks joins its partner's k-loops with empty batches.
+- The result is bitwise.
+
+**Where it can be built.** It needs:
+- the TF32 product with `wfrag`;
+- no TC_TP and no WGMMA;
+- an even warp count.
+
+**Checks.** `tests/gpu/test_fused_folded_forward_cuda.py` tests it on an uneven neighbourhood, natively on the RTX
+5060 Ti and under the H200 alias. sm_90 at 12 warps: 168 registers, no spills. The background build was commit
+`429cebe3`.
+
+| | H200 | A100-SXM4-80GB |
+| --- | ---: | ---: |
+| lab forward, base | 1,631.9 µs | 3,805.2 µs |
+| lab `w-group` | **0.980** (bitwise) | not built: the plan runs 11 warps |
+| lab F-w-half (bound) | 0.878 | 0.878 |
+| MD step (b = on), both build orders | **0.9946 / 0.9942** (5.862 → 5.830, 5.873 → 5.839 ms) | 0.9997 / 1.0018 (switch inert) |
+
+**What follows.**
+- **Default on the H200** (decision 66). Off elsewhere.
+- **The real G = 2 keeps about a sixth of its bound.** The extra a loads (2 LDS.32 per n-tile and k-step) and the
+  two barriers per batch take the rest. G = 4 would double both, so it is not worth building without a different a
+  path.
+- **The A100-SXM4** would need an even launch rule (10 or 12 warps) to try it. Not measured.
+
+Runs: `runs/wgroup-h200/`, `runs/wgroup-a100/`.

@@ -243,6 +243,8 @@ def test_h200_defaults():
     assert "NVIDIA GeForce RTX 5060 Ti" not in fused_forward.DEGREE_PARTS_GPUS
     assert "NVIDIA H200" in fused_forward.LANE_INDICES_GPUS  # 0.9897 / 0.9913 (idea 15a, 6 November 2026)
     assert "NVIDIA GeForce RTX 5060 Ti" not in fused_forward.LANE_INDICES_GPUS  # kernel lab 1.024
+    assert "NVIDIA H200" in fused_forward.W_GROUP_GPUS  # 0.9946 / 0.9942 (idea 17 at G = 2, 6 November 2026)
+    assert "NVIDIA A100-SXM4-80GB" not in fused_forward.W_GROUP_GPUS  # A100-SXM4 plan: 11 warps, not built
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows

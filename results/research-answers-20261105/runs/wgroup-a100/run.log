@@ -1,0 +1,17 @@
+2026-11-06T00:47:53Z Modal NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0; alias NVIDIA A100-SXM4-80GB=NVIDIA A100-SXM4-80GB; source 429cebe3b8041c356224e1c3ca04ad04161a2d5e
+2026-11-06T00:47:53Z start lab-forward
+2026-11-06T00:49:37Z end lab-forward exit=0 forward  F-w-half            3340.3 us  ratio 0.878  regs 168 local 48  
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas w-group                      {'error': 'fused_folded_forward: w_group needs the TF32 product with wfrag, without tctp or wgmma, and an even warp count of at most 30'}
+forward ptxas F-w-half                     {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward w-group: fused_folded_forward: w_group needs the TF32 product with wfrag, without tctp or wgmma, and an even warp count of at most 30
+forward  base                3805.2 us  ratio 1.000  regs 168 local 64  
+forward  w-group                nan us  ratio nan  regs None local None  fused_folded_forward: w_group needs the TF32 product with wfrag, without tctp or wgmma, and an even warp count of at most 30
+forward  F-w-half            3340.3 us  ratio 0.878  regs 168 local 48  
+2026-11-06T00:49:37Z start ab-wgroup-ab
+2026-11-06T00:51:47Z end ab-wgroup-ab exit=0 SrTiO3 a 10.9083 ms b 10.9048 ms b/a 0.9997 valid
+SrTiO3 a 10.9083 ms b 10.9048 ms b/a 0.9997 valid
+2026-11-06T00:51:47Z start ab-wgroup-ba
+2026-11-06T00:53:50Z end ab-wgroup-ba exit=0 SrTiO3 b 10.9167 ms a 10.8973 ms b/a 1.0018 valid
+SrTiO3 b 10.9167 ms a 10.8973 ms b/a 1.0018 valid
+2026-11-06T00:53:50Z done

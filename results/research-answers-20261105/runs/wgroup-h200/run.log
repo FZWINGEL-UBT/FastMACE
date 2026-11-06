@@ -1,0 +1,18 @@
+2026-11-06T00:47:45Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; alias NVIDIA H200=NVIDIA H200; source 429cebe3b8041c356224e1c3ca04ad04161a2d5e
+2026-11-06T00:47:45Z start lab-forward
+2026-11-06T00:48:52Z end lab-forward exit=0 forward  F-w-half            1433.3 us  ratio 0.878  regs 168 local 0  
+forward ptxas base                         {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+w-group rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104) (the plan's)
+forward ptxas w-group                      {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+forward ptxas F-w-half                     {'9.0': {'registers': 168, 'spill_store_bytes': 0}}
+w-group rule LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=175104) (the plan's)
+forward  base                1631.9 us  ratio 1.000  regs 168 local 0  
+forward  w-group             1599.4 us  ratio 0.980  regs 168 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  F-w-half            1433.3 us  ratio 0.878  regs 168 local 0  
+2026-11-06T00:48:52Z start ab-wgroup-ab
+2026-11-06T00:50:09Z end ab-wgroup-ab exit=0 SrTiO3 a 5.8620 ms b 5.8300 ms b/a 0.9946 valid
+SrTiO3 a 5.8620 ms b 5.8300 ms b/a 0.9946 valid
+2026-11-06T00:50:09Z start ab-wgroup-ba
+2026-11-06T00:51:20Z end ab-wgroup-ba exit=0 SrTiO3 b 5.8385 ms a 5.8728 ms b/a 0.9942 valid
+SrTiO3 b 5.8385 ms a 5.8728 ms b/a 0.9942 valid
+2026-11-06T00:51:20Z done

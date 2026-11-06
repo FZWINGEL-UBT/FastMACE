@@ -169,7 +169,8 @@ TC_TP_GPUS = GPUModels(())
 TC_WFRAG_SPLIT_GPUS = GPUModels(())
 # H200 MD-step A/B (6 November 2026, results/research-answers-20261105): 0.9897 / 0.9913, both build orders.
 LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
-W_GROUP_GPUS = GPUModels(())  # not measured yet (6 November 2026)
+# H200 MD-step A/B (6 November 2026, 429cebe3): 0.9946 / 0.9942, both build orders; lab forward 0.980, bitwise.
+W_GROUP_GPUS = GPUModels(("NVIDIA H200",))
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
