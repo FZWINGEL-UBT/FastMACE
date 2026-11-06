@@ -314,6 +314,27 @@ for layout in ("ir_mul", "mul_ir"):
                         only = fused_folded_message(a_u, source_w, X_u, Y_u, *args_u, built[True, "message"].id)
                         assert torch.equal(only, base_out[0]), (layout, k, used)
                     report[name][f"w group bitwise {used}{' vec a' if vec else ''}"] = grouped.rule.warps
+                    if vec:  # A_SPLIT (round 7): the pairs' a split once at staging, bitwise the grouped kernel
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
+                        ff_module.VEC_A, ff_module.A_SPLIT = True, True
+                        max_warps = ff_module.MAX_WARPS
+                        try:
+                            split = FusedFoldedForward(kernels, k, used=used)
+                            if not split.a_split:  # the low-part tiles do not fit: the grouped kernel
+                                assert split.source == grouped.source, (layout, k, used)
+                                ff_module.MAX_WARPS = 4  # a small GPU: fewer warps, so that they fit
+                                split = FusedFoldedForward(kernels, k, used=used)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = False, None, None
+                            ff_module.VEC_A, ff_module.A_SPLIT, ff_module.MAX_WARPS = None, None, max_warps
+                        if not split.a_split:
+                            report[name][f"a split {used}"] = "does not fit"
+                            continue
+                        assert "A_LO" in split.source, (layout, k, used)
+                        split_out = fused_folded_forward(a_u, source_w, X_u, Y_u, *args_u, split.id)
+                        assert torch.equal(split_out[0], base_out[0]), (layout, k, used)
+                        assert torch.equal(split_out[1], base_out[1]), (layout, k, used)
+                        report[name][f"a split bitwise {used}"] = split.rule.shared_bytes
         # VEC_SH on the FP32-SIMT kernel: bitwise.
         ff_module.VEC_SH = True
         try:

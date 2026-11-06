@@ -121,6 +121,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "LANE_INDICES": "batch index loads lane-parallel; A/B",
                                                         "W_GROUP": "warp groups share W fragments; A/B",
                                                         "WFRAG_REGION": "fragment-sized W region; A/B",
+                                                        "A_SPLIT": "W_GROUP a split once at staging; A/B",
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
                                                         "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",
