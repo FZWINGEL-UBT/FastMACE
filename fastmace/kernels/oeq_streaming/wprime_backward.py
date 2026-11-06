@@ -164,6 +164,17 @@ TABLE_PAIRS_GPUS = GPUModels(())
 # Only dr changes, at rounding level. None: on for HOIST_SCALE_GPUS; True / False: an A/B side's choice.
 HOIST_SCALE = None
 HOIST_SCALE_GPUS = GPUModels(())
+# The receiver's output-gradient row staged in shared memory (H200 ideas plan, idea 38; 6 November 2026,
+# results/h200-ideas-20261105/ideas-37-38.md): block b owns edges [b * STAGE_DOUT_CHUNK, (b + 1) * STAGE_DOUT_CHUNK)
+# and walks the runs of equal receiver inside them (receiver-sorted edges: runs of about 74 edges on OMAT-0 SrTiO3);
+# per run the block copies the receiver's row once, then its warps run the unchanged per-edge body reading dout from
+# shared memory. The same values in the same order per edge: dsh and dL/dr bitwise, dx up to the atomics' order.
+# H200 lab (descriptor tiles of 32 / 16 edges): 0.875 / 0.883 of the w' kernel. Float32 kernels whose row fits the
+# 48 KB of static shared memory (``stage_dout_supported``), else off. None: on for STAGE_DOUT_GPUS; True / False: an
+# A/B side's choice.
+STAGE_DOUT = None
+STAGE_DOUT_GPUS = GPUModels(())
+STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -227,9 +238,42 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 
     const int lane = threadIdx.x % LOGICAL_GROUP_SIZE;
     const int logical_group = threadIdx.x / LOGICAL_GROUP_SIZE;
+{%- if stage_dout %}
+    // STAGE_DOUT: this block's edges [c0, c1), walked by runs of equal receiver; per run the receiver's dout row is
+    // copied to shared memory once, then the warps take the run's edges.
+    __shared__ __align__(16) scalar_t stage_row[{{ stage_total }}];
+    const int64_t stage_c0 = int64_t(blockIdx.x) * {{ stage_chunk }};
+    const int64_t stage_c1 = stage_c0 + {{ stage_chunk }} < edge_count ? stage_c0 + {{ stage_chunk }} : edge_count;
+    for (int64_t stage_s = stage_c0; stage_s < stage_c1;) {
+    int64_t stage_t1 = stage_c1;
+    {
+        const int32_t stage_r = receivers[stage_s];
+        const int64_t stage_i = stage_s + 1 + lane;
+        const unsigned stage_b = __ballot_sync(FULL_MASK, stage_i < stage_c1 && receivers[stage_i] != stage_r);
+        if (stage_b) stage_t1 = stage_s + __ffs(stage_b);
+        if (stage_r >= 0 && stage_r < node_count) {
+            {%- for g, offset, width in stage_rows %}
+            {
+                const scalar_t* src = {{ "dout" ~ g if blocks else "dout" }} + int64_t(stage_r) * {{ width }};
+                if ({{ width % 4 }} == 0 && (reinterpret_cast<unsigned long long>(src) & 15) == 0) {
+                    for (int i = threadIdx.x; i < {{ width // 4 }}; i += blockDim.x)
+                        reinterpret_cast<float4*>(stage_row + {{ offset }})[i] =
+                            __ldg(reinterpret_cast<const float4*>(src) + i);
+                } else {
+                    for (int i = threadIdx.x; i < {{ width }}; i += blockDim.x)
+                        stage_row[{{ offset }} + i] = __ldg(src + i);
+                }
+            }
+            {%- endfor %}
+        }
+    }
+    __syncthreads();
+    for (int64_t e = stage_s + logical_group; e < stage_t1; e += blockDim.x / LOGICAL_GROUP_SIZE) {
+{%- else %}
     const int64_t e =
         int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;
     if (e >= edge_count) return;
+{%- endif %}
 
     const int32_t sender = senders[e];
     const int32_t receiver = receivers[e];
@@ -239,7 +283,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         // wrappers allocate dsh with empty_like, so a skipped row would hold garbage; kernel review, 5 November 2026).
         for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);
         if (lane == 0) dr[e] = scalar_t(0);
-        return;
+        {{ "continue" if stage_dout else "return" }};
     }
 
     const int64_t input_base = int64_t(sender) * INPUT_DIM;
@@ -360,7 +404,14 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 
                 {% for output in path.outputs %} {
                     {%- set slot = output.accumulator %}
-                    {%- if blocks %}
+                    {%- if blocks and stage_dout %}
+                    {%- set bk = blocks[slot.start] %}
+                    const scalar_t output_gradient = stage_row[{{ stage_offsets[bk[0]] }}
+                        + {{ bk[2] + slot.component * bk[3] }} + channel];
+                    {%- elif stage_dout %}
+                    const scalar_t output_gradient =
+                        stage_row[{{ node_offset(slot.start, slot.component, slot.irrep_dim) }}];
+                    {%- elif blocks %}
                     {%- set bk = blocks[slot.start] %}
                     {%- if block_ldg %}
                     const scalar_t output_gradient = __ldg(dout{{ bk[0] }} + int64_t(receiver) * {{ bk[1] }}
@@ -538,6 +589,12 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         dr[e] = scalar_t(radial_gradient);
     }
     {%- endif %}
+{%- if stage_dout %}
+    }  // STAGE_DOUT: the run's edges
+    __syncthreads();  // every warp is done with the row before the next copy
+    stage_s = stage_t1;
+    }  // STAGE_DOUT: the runs
+{%- endif %}
 }
 """
 
@@ -571,7 +628,7 @@ def factored_paths(schedule, scale=False):
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
-           table_pairs=False, hoist_scale=False):
+           table_pairs=False, hoist_scale=False, stage_dout=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -584,7 +641,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     their edge gradient per term from w x0, without the v_j sums. ``butterfly`` (``BUTTERFLY``, round 5): the
     end-of-edge reduction as a butterfly reduce-scatter (exact; ``butterfly_supported``). ``table_pairs``
     (``TABLE_PAIRS``, with ``table_w`` and vector 2): the value table interleaved by term pair (``pair_table``).
-    ``hoist_scale`` (``HOIST_SCALE``, with ``horner``): the piece scale applied once per edge."""
+    ``hoist_scale`` (``HOIST_SCALE``, with ``horner``): the piece scale applied once per edge. ``stage_dout``
+    (``STAGE_DOUT``; ``stage_dout_supported``): a block per ``STAGE_DOUT_CHUNK`` edges, each receiver's dout row in
+    shared memory (launch ``ceil(edges / STAGE_DOUT_CHUNK)`` blocks)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -611,6 +670,10 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("table_pairs interleaves TABLE_W's value table by float2: it needs table_w and vector 2")
     if hoist_scale and not horner:
         raise ValueError("hoist_scale moves HORNER's piece scale: it needs horner")
+    if stage_dout and not stage_dout_supported(schedule, scalar, blocks):
+        raise ValueError("stage_dout needs float32, 32-lane cohorts, a chunk of 1..32 edges and a dout row within "
+                         "48 KB")
+    stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
@@ -622,7 +685,36 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             horner=bool(horner), scalar_paths=bool(scalar_paths),
                                             butterfly=bool(butterfly), redux=bool(redux),
                                             table_pairs=bool(table_pairs), hoist_scale=bool(hoist_scale),
+                                            stage_dout=bool(stage_dout), stage_chunk=int(STAGE_DOUT_CHUNK),
+                                            stage_rows=stage_rows, stage_offsets=stage_offsets,
+                                            stage_total=stage_total,
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
+
+
+def _stage_layout(schedule, blocks):
+    """STAGE_DOUT's shared row: ([(group, offset, width)], {group: offset}, total floats). Block layout: each group's
+    receiver block (``fused_forward.block_map``'s row width) in group order; otherwise the dense row, one entry."""
+    from fastmace.kernels.oeq_streaming.fused_forward import block_map
+
+    if blocks is None:
+        width = int(schedule.output_dim)
+        return [(0, 0, width)], {0: 0}, width
+    widths = {}
+    for g, width, _, _ in block_map(blocks, schedule.channels).values():
+        widths[int(g)] = int(width)
+    rows, offsets, total = [], {}, 0
+    for g in sorted(widths):
+        rows.append((g, total, widths[g]))
+        offsets[g] = total
+        total += widths[g]
+    return rows, offsets, total
+
+
+def stage_dout_supported(schedule, scalar, blocks=None):
+    """Whether ``STAGE_DOUT`` applies: float32, 32-lane cohorts, ``STAGE_DOUT_CHUNK`` in 1..32 and the receiver's
+    dout row within 48 KB of static shared memory."""
+    return (scalar == "float" and int(schedule.launch_config.logical_cohort_width) == 32
+            and 1 <= int(STAGE_DOUT_CHUNK) <= 32 and _stage_layout(schedule, blocks)[2] * 4 <= 48 * 1024)
 
 
 def redux_supported(schedule, scalar):
@@ -757,11 +849,14 @@ class WPrimeBackward:
         self.max_registers = max_registers_default(device)
         self.redux = redux_default(device) and redux_supported(kernels.schedule, scalar)
         self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
+        self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
+        self.stage_chunk = int(STAGE_DOUT_CHUNK)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and FACTORED_SCALE, horner=self.horner,
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
-                             redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale)
+                             redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
+                             stage_dout=self.stage_dout)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -780,6 +875,8 @@ class WPrimeBackward:
         from fastmace.kernels.oeq_streaming.runtime import _check
         nodes, edges = x.shape[0], sh.shape[0]
         blocks = (edges * self.cohort + self.num_threads - 1) // self.num_threads
+        if self.stage_dout:  # STAGE_DOUT: a block per stage_chunk edges
+            blocks = (edges + self.stage_chunk - 1) // self.stage_chunk
         if not blocks:
             return
         p = ctypes.c_void_p
@@ -1072,6 +1169,11 @@ def hoist_scale_default(device):
     return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
 
 
+def stage_dout_default(device):
+    """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS``."""
+    return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
+
+
 def redux_default(device):
     """``REDUX`` on ``device``: the constant when set, else on for ``REDUX_GPUS``."""
     return bool(REDUX) if REDUX is not None else _device_name(device) in REDUX_GPUS
@@ -1213,7 +1315,8 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "derivative_table", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
-           "render", "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
+           "render", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "stage_dout_default", "stage_dout_supported",
+           "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table",
            "wprime_arguments",
            "wprime_reference"]

@@ -204,6 +204,50 @@ def stage_tiles(source):
     return head + prologue + body + "\n// lab launch threads=128 persistent=0 tiles=1\n"
 
 
+def stage_chunks(source, chunk):
+    """Idea 38 without descriptors (CUDA-graph capturable, as production needs): block b owns edges
+    [b * chunk, (b + 1) * chunk) (``chunk`` <= 32) and walks the runs of equal receiver inside it. Per run every warp
+    finds the run's end with one ballot over the next 32 receivers, the block copies the receiver's dout row to
+    shared memory, a barrier, the warps process the run's edges with the unchanged per-edge body, a barrier before
+    the next copy. Any edge order is correct; receiver-sorted edges make runs long. Exact as ``stage_tiles``."""
+    if not 1 <= chunk <= 32 or 128 % chunk:
+        raise ValueError("stage_chunks: chunk must divide 128 and be at most 32")
+    tiled = stage_tiles(source)
+    head, rest = tiled.split("    const int64_t fm_t0 = fm_tiles[blockIdx.x];\n", 1)
+    head = head.replace("    scalar_t* dr,\n    const int32_t* __restrict__ fm_tiles) {", "    scalar_t* dr) {")
+    copy_start = rest.index("    {\n        const int32_t fm_r = receivers[fm_t0];")
+    loop = "    for (int64_t e = fm_t0 + logical_group; e < fm_t1; e += blockDim.x / LOGICAL_GROUP_SIZE) {\n"
+    copy_end = rest.index("    __syncthreads();\n" + loop)
+    copy = rest[copy_start:copy_end].replace("receivers[fm_t0]", "receivers[fm_s]")
+    body = rest[copy_end + len("    __syncthreads();\n" + loop):]
+    end = "    }  // lab tile edge loop\n}\n"
+    if body.count(end) != 1:
+        raise ValueError("stage_chunks: tile loop end not found")
+    body = body[:body.rindex(end)]
+    prologue = f"""    const int64_t fm_c0 = int64_t(blockIdx.x) * {chunk};
+    const int64_t fm_c1 = fm_c0 + {chunk} < edge_count ? fm_c0 + {chunk} : edge_count;
+    for (int64_t fm_s = fm_c0; fm_s < fm_c1;) {{
+        int64_t fm_t1 = fm_c1;
+        {{
+            const int32_t fm_r = receivers[fm_s];
+            const int64_t fm_i = fm_s + 1 + lane;
+            const unsigned fm_b = __ballot_sync(FULL_MASK, fm_i < fm_c1 && receivers[fm_i] != fm_r);
+            if (fm_b) fm_t1 = fm_s + __ffs(fm_b);
+        }}
+{copy}    __syncthreads();
+    for (int64_t e = fm_s + logical_group; e < fm_t1; e += blockDim.x / LOGICAL_GROUP_SIZE) {{
+"""
+    tail = f"""    }}  // lab run edge loop
+    __syncthreads();
+    fm_s = fm_t1;
+    }}  // lab run loop
+}}
+
+// lab launch threads=128 persistent=0 cohort={128 // chunk}
+"""
+    return head + prologue + body + tail
+
+
 def tile_starts(receivers, tile):
     """int32 [tiles + 1]: starts of the runs of equal receiver, each cut into pieces of at most ``tile`` edges, then
     the edge count (torch, on the receivers' device)."""
@@ -227,6 +271,7 @@ def tile_args(tile):
 def ideas3738_variants(kernel=None):
     return {
         **{f"stage-t{t}": ("exact", stage_tiles, (), tile_args(t)) for t in (8, 16, 32)},
+        **{f"stage-c{c}": ("exact", lambda s, c=c: stage_chunks(s, c), ()) for c in (16, 32)},
         "FF-dout-row0": ("falsifier", _dout_row0, ()),
         "harmonic": ("rounding", lambda s: _launch_marker(harmonic(s, rotate=False)), ()),
         "harmonic-rot": ("rounding", lambda s: _launch_marker(harmonic(s, rotate=True)), ()),

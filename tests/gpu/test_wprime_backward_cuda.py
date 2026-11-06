@@ -44,6 +44,7 @@ import torch
 from fastmace.kernels.oeq_streaming import StreamingKernels, folded_streaming_convolution
 from fastmace.kernels.oeq_streaming import wprime_backward as wp
 from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+from fastmace.kernels.oeq_streaming.fused_forward import block_shapes as fused_forward_block_shapes
 from fastmace.kernels.oeq_streaming.runtime import streaming_conv_backward
 from fastmace.kernels.triton.radial_table import radial_table, radial_table_backward
 
@@ -408,6 +409,69 @@ for layout in ("ir_mul", "mul_ir"):
     err_base = float((base[2].reshape(-1).double() - ref).abs().max()) / float(ref.abs().max())
     assert err <= 1e-5, (name, err)
     report[name] = {"dr error": err, "dr error (unhoisted)": err_base}
+    # Idea 38 (6 November 2026): STAGE_DOUT, the receiver's dout row in shared memory per run of equal receiver in a
+    # block's chunk of edges. The per-edge arithmetic is the base's: dsh and dL/dr bitwise, dx up to the atomics'
+    # order; chunks of 32 and of 5 edges (runs cut by chunk ends), with the table-w kernel too, under graph capture.
+    for chunk, table_w in ((32, False), (5, False), (32, True)):
+        name = f"stage-dout-{layout}-{chunk}{'-table-w' if table_w else ''}"
+        wp.TABLE_W, wp.STAGE_DOUT_CHUNK = table_w, chunk
+        try:
+            wp.STAGE_DOUT = False
+            plain = wp.WPrime(table, weight, kernels)
+            wp.STAGE_DOUT = True
+            new_w = wp.WPrime(table, weight, kernels)
+        finally:
+            wp.TABLE_W = wp.STAGE_DOUT = None
+            wp.STAGE_DOUT_CHUNK = 32
+        assert new_w.kernel.stage_dout and not plain.kernel.stage_dout, name
+        assert new_w.kernel.stage_chunk == chunk and "stage_row[" in new_w.kernel.source, name
+        base = run(X, Y, G, D, kernels, weight, fused, plain)
+        new = run(X, Y, G, D, kernels, weight, fused, new_w)
+        assert torch.equal(new[0], base[0]) and torch.equal(new[1], base[1]), name  # the same forward
+        assert torch.equal(new[4], base[4]) and torch.equal(new[2], base[2]), name  # dsh, dL/dr bitwise
+        torch.testing.assert_close(new[3], base[3], rtol=1e-5, atol=2e-6 * float(base[3].abs().max()))  # dx
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            captured = run(X, Y, G, D, kernels, weight, fused, new_w)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(captured[2], new[2]) and torch.equal(captured[4], new[4]), name
+        report[name] = {"bitwise": True}
+    # The block-layout message (BLOCK_MESSAGE, ir_mul): the kernels called directly with one dout tensor per group of
+    # equal irrep dimension, staged against unstaged on the same arguments.
+    if layout == "ir_mul":
+        name = "stage-dout-blocks"
+        by_dim = {}
+        for slot in kernels.schedule.output_slots:
+            by_dim.setdefault(int(slot.irrep_dim), set()).add(int(slot.start))
+        blocks = tuple((dim, tuple(sorted(st))) for dim, st in sorted(by_dim.items()))
+        douts = [torch.randn(shape, device="cuda", generator=g)
+                 for shape in fused_forward_block_shapes(blocks, kernels.schedule.channels, nodes)]
+        a, _ = radial_table(r, pair, table.coef, table.dcoef, table.starts, table.scales, table.bins, r_lo,
+                            table.bin_scale, r_max)
+        w_edge = (a @ weight.t()).contiguous()
+        ref_w = wp.WPrime(table, weight, kernels)
+        outs = {}
+        for staged in (False, True):
+            wp.STAGE_DOUT = staged
+            try:
+                kernel = wp.WPrimeBackward(kernels, ref_w.terms, ref_w.gprime.device, vector=ref_w.vector,
+                                           blocks=blocks)
+            finally:
+                wp.STAGE_DOUT = None
+            assert kernel.stage_dout == staged, name
+            dx = torch.zeros_like(X)
+            dsh = torch.empty_like(Y)
+            dr = Y.new_empty((edges,))
+            kernel(X, Y, w_edge, sender.int(), receiver.int(), douts, dx, dsh, r.reshape(-1).contiguous(), pair,
+                   ref_w.gprime, table.starts, table.scales, table.bins, r_lo, table.bin_scale, r_max, dr)
+            torch.cuda.synchronize()
+            outs[staged] = (dx, dsh, dr)
+        assert torch.equal(outs[True][1], outs[False][1]) and torch.equal(outs[True][2], outs[False][2]), name
+        torch.testing.assert_close(outs[True][0], outs[False][0], rtol=1e-5,
+                                   atol=2e-6 * float(outs[False][0].abs().max()))
+        assert float(outs[False][1].abs().max()) > 0, name  # the message gradient reached dsh
+        report[name] = {"bitwise": True}
 
 # Kernel review (5 November 2026): an edge with an out-of-range sender writes a zero dsh row (dsh is allocated with
 # empty_like, filled with NaN here through the caching allocator first; its dr still carries the edge density's
@@ -458,4 +522,6 @@ def test_wprime_backward_matches_the_chain():
                                for layout in ("ir_mul", "mul_ir") for w in ("stored-w", "table-w")} | {
                                f"{case}-{layout}" for case in ("table-pairs", "table-pairs-horner", "hoist-scale")
                                for layout in ("ir_mul", "mul_ir")} | {
+                               f"stage-dout-{layout}-{case}" for case in ("32", "5", "32-table-w")
+                               for layout in ("ir_mul", "mul_ir")} | {"stage-dout-blocks"} | {
                                f"invalid-sender-{layout}" for layout in ("ir_mul", "mul_ir")}
