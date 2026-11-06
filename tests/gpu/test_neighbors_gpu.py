@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 import torch
 
-from _support.structures import STRUCTURES, nbcl5
+from _support.structures import STRUCTURES, nacl, nanbo3, nbcl5
 from fastmace.config import NeighbourConfig
 from fastmace.neighbors.skin import SkinNeighbourList, times_3x3
 
@@ -248,3 +248,43 @@ def test_chunked_compact_on_gpu_is_bitwise_the_one_chunk_compact(variable_cell, 
     assert count == count_c > 0
     assert torch.equal(index, index_c) and torch.equal(unit, unit_c) and torch.equal(shifts, shifts_c)
 
+
+
+BINNED_CASES = [("NaClx6", nacl(repeat=6, rattle=0.05, seed=7)),  # 6 bins per axis
+                ("NaNbO3x9", nanbo3(repeat=9, rattle=0.05, seed=8)),
+                ("NbCl5x4-rattled", nbcl5(repeat=4, rattle=0.05, seed=9))]  # triclinic
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("atoms", [a for _, a in BINNED_CASES], ids=[n for n, _ in BINNED_CASES])
+def test_binned_screen_builds_bitwise_the_tile_screen_list(atoms, mode, monkeypatch):
+    """BINNED_SCREEN (the cell-list screen) gives the tile screen's candidate list bitwise, in order, through
+    ``build_gpu`` and ``build_gpu_async``; the cells here hold at least 3 bins per axis, so the binned path runs."""
+    from fastmace.neighbors import pair_search, skin
+
+    atoms = atoms.copy()  # sheared: a triclinic cell
+    atoms.set_cell(atoms.cell.array @ SHEAR, scale_atoms=True)
+    positions = torch.tensor(atoms.positions, device="cuda")
+    lists = {}
+    for binned in (False, True):
+        monkeypatch.setattr(pair_search, "BINNED_SCREEN", binned)
+        nl = make(atoms, "cuda", mode)
+        plan = pair_search._bin_plan(positions, nl._constants(torch.device("cuda"))["image_vectors"],
+                                     nl.cutoff + nl.skin, nl.cell, False)
+        assert (plan is not None) == binned
+        nl.build(positions)
+        n = nl.num_candidates
+        lists[binned] = (nl.candidate_index[:, :n].clone(), nl.candidate_unit_shifts[:n].clone(), n)
+        monkeypatch.setattr(skin, "ASYNC_EARLY_BUILD", True)
+        nl.async_build = True
+        nl.reader_stream = torch.cuda.current_stream()
+        moved = positions + 0.05
+        nl.build(moved)
+        k = int(nl._candidates_device)
+        lists[(binned, "async")] = (nl.candidate_index[:, :k].clone(), nl.candidate_unit_shifts[:k].clone(), k)
+        nl.reader_stream = None
+        monkeypatch.setattr(skin, "ASYNC_EARLY_BUILD", False)
+    for key in (lambda b: b, lambda b: (b, "async")):
+        tile, binned = lists[key(False)], lists[key(True)]
+        assert tile[2] == binned[2] and tile[2] > 0
+        assert torch.equal(tile[0], binned[0]) and torch.equal(tile[1], binned[1])
