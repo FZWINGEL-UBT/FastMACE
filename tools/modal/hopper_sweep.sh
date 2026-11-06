@@ -7,7 +7,8 @@
 # - Benchmark_loup Langevin, two fresh processes;
 # - kernel lab: the fused forward and the w' backward, the A100 default against the launch shapes and the variants
 #   the A100 rejected (FORWARD_VARIANTS, WPRIME_VARIANTS);
-# - MD-step A/Bs on SrTiO3 10x10x10, both build orders, for each entry of AB ("name|MODULE:NAME=VALUE ...").
+# - MD-step A/Bs on SrTiO3 10x10x10 (AB_CELL: another repeat, e.g. 16x16x16), both build orders, for each entry of AB
+#   ("name|MODULE:NAME=VALUE ...").
 # Usage (from WSL, Modal client venv):
 #   modal run tools/modal/fastmace_modal.py::job --gpu H200 --timeout-min 45 --commit <sha> \
 #     --command "bash tools/modal/hopper_sweep.sh" --out ~/fm-runs/hopper-sweep
@@ -54,7 +55,7 @@ for entry in "${abs[@]}"; do
   for order in ab ba; do
     pattern=$([ "$order" = ab ] && echo abab || echo abba)
     step "ab-$name-$order" python tools/ab_rewrites.py --output "$out/ab-$name-$order" --checkpoint "$ck" \
-      --model omat0-medium --structures "$st@10x10x10" --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
+      --model omat0-medium --structures "$st@${AB_CELL:-10x10x10}" --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
       --warmup 200 --block 256 --blocks 6 --order "$order" --pattern "$pattern" "${bc[@]}"
     grep -h -E "b/a" "$out/ab-$name-$order.log" | tail -n 1 >> "$log"
   done

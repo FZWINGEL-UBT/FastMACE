@@ -363,7 +363,7 @@ class SkinNeighbourList:
         offsets = torch.floor(times_3x3(positions, inverse))  # integer cell of each atom
         wrapped = positions - times_3x3(offsets, cell)
         # float32 screen (pair_search; one Triton kernel on CUDA), float64 decision below
-        codes = screen_codes(wrapped, image_vectors, r, self._pair_search_state)
+        codes = screen_codes(wrapped, image_vectors, r, self._pair_search_state, cell=self.cell)
         found = codes.numel()
         # The decision in chunks of BUILD_CHUNK pairs, so only the sort key lives for every screened pair.
         chunk = max(1, BUILD_CHUNK)
@@ -448,7 +448,7 @@ class SkinNeighbourList:
         if counter is None:
             counter = state["async_counter"] = torch.zeros(1, dtype=torch.int32, device=device)
         counter.zero_()
-        screen_into(wrapped, image_vectors, r, out, counter)
+        screen_into(wrapped, image_vectors, r, out, counter, cell=self.cell)
         self._screen_check = (counter, wrapped, image_vectors, r)  # check_found where the count is read
         slots = out.numel()
         found = counter.to(torch.int64)
