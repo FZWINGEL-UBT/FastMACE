@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import lab_idea30 as L  # noqa: E402
 
 
@@ -93,39 +94,46 @@ def run_debug(render):
     types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
     for part, ref in refs_fns:
         check(driver.cuLaunchKernel(ref, n, channels // 32, 1, 32, 1, 1, 0, stream, (values, types), 0))
-    debug = L.render_parts(render, {part: dict(product="simt") for part in PARTS}, consumers=4, w_source="global")
-    fn, info = load(debug, b"fused_folded_forward")
-    shared = L.rule_shared_bytes(render, PARTS, 0, consumers=4, w_source="global")
-    attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
-    check(driver.cuFuncSetAttribute(fn, attribute, shared))
-    lines = [line for part in PARTS for line in L.extract(render, part)["flush_lines"]]
-    for repeat in range(3):
-        for o in outs.values():
-            o.fill_(float("nan"))
-        counters = torch.zeros(8, dtype=torch.int32, device=dev)
-        wout = torch.zeros(1, dtype=torch.float32, device=dev)
-        values = (n, e, a.data_ptr(), w_full.data_ptr(), x.data_ptr(), sh.data_ptr(), snd.data_ptr(), rcv.data_ptr(),
-                  rp.data_ptr(), counters.data_ptr(), *[outs[k].data_ptr() for k in sorted(outs)], wout.data_ptr())
-        types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
-        check(driver.cuLaunchKernel(fn, 33, channels // 32, 2, 32 * 8, 1, 1, shared, stream, (values, types), 0))
-        torch.cuda.synchronize()
-        for k in sorted(outs):
-            # the checked parts' columns (every row: rows without edges must be written as zeros)
-            mask = torch.zeros_like(refs[k], dtype=torch.bool)
-            for line in lines:
-                name, offset = re.match(r"(out\d)\[cur \* \d+ \+ (\d+) \+ ch\]", line).groups()
-                if name == k:
-                    mask[:, int(offset):int(offset) + channels] = True
-            d = (outs[k][mask] - refs[k][mask]).abs().max().item() if mask.any() else 0.0
-            nans = torch.isnan(outs[k][mask]).sum().item()
-            scale = refs[k].abs().max().item() or 1.0
-            print(f"repeat {repeat} {k}: entries {int(mask.sum())} of {mask.numel()}, max|d|/max|ref| {d / scale:.2e}, "
-                  f"NaN {nans}, bitwise {bool(torch.equal(outs[k][mask], refs[k][mask]))}", flush=True)
-    print(f"debug render (parts {PARTS}): {info['registers']} registers, {info['spill']} B spill; {shared} B shared; "
-          f"E = {e}")
+    for config, (stages, order) in DEBUG_CONFIGS.items():
+        parts = {part: dict(product="simt", stages=stages) for part in PARTS}
+        debug = L.render_parts(render, parts, consumers=4, w_source="global", order=order)
+        fn, info = load(debug, b"fused_folded_forward")
+        shared = L.rule_shared_bytes(render, parts, 0, consumers=4, w_source="global")
+        attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
+        check(driver.cuFuncSetAttribute(fn, attribute, shared))
+        lines = [line for part in PARTS for line in L.extract(render, part)["flush_lines"]]
+        for repeat in range(3):
+            for o in outs.values():
+                o.fill_(float("nan"))
+            counters = torch.zeros(8, dtype=torch.int32, device=dev)
+            wout = torch.zeros(1, dtype=torch.float32, device=dev)
+            values = (n, e, a.data_ptr(), w_full.data_ptr(), x.data_ptr(), sh.data_ptr(), snd.data_ptr(),
+                      rcv.data_ptr(), rp.data_ptr(), counters.data_ptr(), *[outs[k].data_ptr() for k in sorted(outs)],
+                      wout.data_ptr())
+            types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
+            check(driver.cuLaunchKernel(fn, 33, channels // 32, 2, 32 * 8, 1, 1, shared, stream, (values, types), 0))
+            torch.cuda.synchronize()
+            for k in sorted(outs):
+                # the checked parts' columns (every row: rows without edges must be written as zeros)
+                mask = torch.zeros_like(refs[k], dtype=torch.bool)
+                for line in lines:
+                    name, offset = re.match(r"(out\d)\[cur \* \d+ \+ (\d+) \+ ch\]", line).groups()
+                    if name == k:
+                        mask[:, int(offset):int(offset) + channels] = True
+                d = (outs[k][mask] - refs[k][mask]).abs().max().item() if mask.any() else 0.0
+                nans = torch.isnan(outs[k][mask]).sum().item()
+                scale = refs[k].abs().max().item() or 1.0
+                print(f"{config} repeat {repeat} {k}: entries {int(mask.sum())} of {mask.numel()}, "
+                      f"max|d|/max|ref| {d / scale:.2e}, "
+                      f"NaN {nans}, bitwise {bool(torch.equal(outs[k][mask], refs[k][mask]))}", flush=True)
+        print(f"{config}: debug render (parts {PARTS}): {info['registers']} registers, {info['spill']} B spill; "
+              f"{shared} B shared; "
+              f"E = {e}")
 
 
 PARTS = (0, 1)
+# name: (ring stages, block order) of the debug renders
+DEBUG_CONFIGS = {"s2": (2, "z"), "s3": (3, "z"), "s3-swap": (3, "swap"), "s2-inter": (2, "interleave")}
 
 
 def main():
@@ -149,6 +157,11 @@ def main():
         "ws30-p0-n64": L.render_parts(render, {0: dict(halves=2)}),
         "ws-both": L.render_parts(render, {0: {}, 1: {}}),
         "ws-p1-keep0": L.render_parts(render, {1: {}}, "keep"),
+        "ws-both-s3": L.render_parts(render, {0: dict(stages=3), 1: {}}),
+        "ws-both-swap": L.render_parts(render, {0: {}, 1: {}}, order="swap"),
+        "ws-both-inter": L.render_parts(render, {0: {}, 1: {}}, order="interleave"),
+        "production": L.WS.apply_ws_forward(render)[0],
+        "base-swap": L.render_parts(render, {}, "keep", order="swap"),
         "debug-simt": L.render_parts(render, {0: dict(product="simt"), 1: dict(product="simt")}, consumers=4,
                                      w_source="global"),
     }
