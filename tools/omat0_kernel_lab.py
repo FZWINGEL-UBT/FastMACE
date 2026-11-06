@@ -643,6 +643,9 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "stage-dout": ("exact", lambda s: _stage_dout(s, 2), ()),
         "stage-dout-r0": ("exact", lambda s: _stage_dout(s, 1), ()),
         "F-stage-dout-nofill": ("falsifier", lambda s: _stage_dout(s, 2, fill=False), ()),
+        # H200 ideas 37 and 38 (plan revision 15): FF-dout-row0 (the dout locality bound, against maxreg72) and the
+        # w' split by harmonic degree (tools/lab_ideas3738.py).
+        **_ideas3738_variants(kernel),
     }
 
 
@@ -730,8 +733,10 @@ def wprime_launcher(kernel, source, extra):
     registers = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))
     spills = _check(driver.cuFuncGetAttribute(driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
                                               function))
-    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)", source)
+    lab = re.search(r"// lab launch threads=(\d+) persistent=(\d)(?: cohort=(\d+))?(?: tiles=(1))?", source)
     threads = int(lab.group(1)) if lab else kernel.num_threads
+    cohort = int(lab.group(3)) if lab and lab.group(3) else kernel.cohort  # threads per edge (idea 37: 128)
+    tiled = bool(lab and lab.group(4))  # idea 38: one block per receiver tile, the starts the last argument
     persistent = 0
     if lab and lab.group(2) == "1":
         per_sm = _check(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(function, threads, kernel.shared_memory))
@@ -742,7 +747,9 @@ def wprime_launcher(kernel, source, extra):
         (x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins, r_lo, bin_scale,
          r_max, dr, *perm) = args
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (edges * kernel.cohort + threads - 1) // threads
+        blocks = (edges * cohort + threads - 1) // threads
+        if tiled:
+            blocks = perm[-1].numel() - 1
         if persistent:  # idea 23: as many blocks as fit on every SM, each looping over the edges
             blocks = min(blocks, persistent)
         p = ctypes.c_void_p
@@ -1698,6 +1705,11 @@ def _idea30_variants(kernel):
 def _arch_suffix(source, capability):
     """"a" for a source that needs sm_90a (idea 30's wgmma prototype) on compute capability 9.0."""
     return "a" if "// idea 30: sm_90a" in source and tuple(capability) == (9, 0) else ""
+
+
+def _ideas3738_variants(kernel):
+    import lab_ideas3738  # tools/ is on sys.path when the lab runs as a script
+    return lab_ideas3738.ideas3738_variants(kernel)
 
 
 def forward_variants(kernel=None):
