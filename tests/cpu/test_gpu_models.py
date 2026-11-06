@@ -279,6 +279,11 @@ def test_h200_defaults():
     from fastmace.kernels.triton import tabled_outer_sum as tos
     assert "NVIDIA H200" in tos.POWER_BACKWARD_GPUS
     assert "NVIDIA A100-SXM4-80GB" not in tos.POWER_BACKWARD_GPUS
+    # Idea 5(b) (6 November 2026): RECEIVER_SUM on the A100 (both 80GB names), MD 0.9998 / 0.9918 and 0.9990 / 0.9985,
+    # gate as the default; H200 a tie (0.9992 / 1.0012)
+    from fastmace.kernels.triton import receiver_sum
+    assert {"NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"} <= set(receiver_sum.RECEIVER_SUM_GPUS)
+    assert "NVIDIA H200" not in receiver_sum.RECEIVER_SUM_GPUS
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows

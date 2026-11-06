@@ -474,6 +474,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r12](#ideas-r12) | CG factors folded into W (idea 24, `CG_FOLD`), TP inside the next k-loop (22(iii)) | `fused_forward.CG_FOLD_GPUS`, `cg_fold.py` | FM | CG_FOLD DEFAULT on the H200 and A100-SXM4; 22(iii) REJECTED | 2026-11-06 | MD CG_FOLD H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898; lab 22(iii) 1.03–1.21 | [research answers](../results/research-answers-20261105/README.md#round-12-cg-factors-folded-into-w-cg_fold-adopted-tp-in-the-next-k-loop-rejected-6-november-2026) |
 | [ideas-r13](#ideas-r13) | a read with one LDS.128 (17(ii), `A_LD128`), TP without flush checks (29, `TP_NOFLUSH`), further CG folds (28), K_PIPE on the fold; mirror tiles (32) | `fused_forward.A_LD128_GPUS`, `TP_NOFLUSH_GPUS`, `kloop_rewrites.py` | FM | A_LD128 DEFAULT on the H200 and A100-SXM4, TP_NOFLUSH on the A100-SXM4; 28 not ported; 32 STOPPED | 2026-11-06 | MD H200 A_LD128 0.9925 / 0.9956; A100-SXM4 both 0.9909 / 0.9923; 32: f = 0.22 at 32 rows | [research answers](../results/research-answers-20261105/README.md#round-13-one-lds128-for-a-a_ld128-and-the-tp-without-flush-checks-tp_noflush-adopted-6-november-2026) |
 | [ideas-r14](#ideas-r14) | GEMM epilogues (31, `LINEAR_DIV`), warp-specialized wgmma forward (30), mirror tiles (32), sm_90 3xTF32 GEMMs (33), w′ register cap (36) | `cutlass.linear_div.LINEAR_DIV_GPUS` | FM | LINEAR_DIV DEFAULT on the H200 and A100-SXM4; WS_FORWARD DEFAULT on the H200 (MD 0.9584 / 0.9610); 32, 33, 36 STOPPED; step 2: STAGE_DOUT (38) and SKIP_SELECT (31) DEFAULT on the H200 and A100-SXM4, FIRST_DIV (31) REJECTED, interaction-1 graph break removed | 2026-11-06 | MD LINEAR_DIV H200 0.9912 / 0.9934, A100-SXM4 0.9896 / 0.9891; 33 ×3 1.07; 36 maxreg80 1.255; STAGE_DOUT H200 0.9616 / 0.9638, A100-SXM4 0.9896 / 0.9920; SKIP_SELECT H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858; FIRST_DIV 1.031–1.035 | [research answers](../results/research-answers-20261105/README.md#revision-14-gemm-epilogue-linear_div-and-warp-specialized-forward-ws_forward-adopted-ideas-30-32-33-36-measured-6-november-2026) |
+| [ideas-q2](#ideas-q2) | Segmented density sums (5(b), `RECEIVER_SUM`); G1 pre-split ceiling; rcfold on the A100 (28); ZBL config, S fill, chunked S (5(d), 13, 35) | `receiver_sum.RECEIVER_SUM_GPUS` | FM | RECEIVER_SUM DEFAULT on the A100 (SXM4 and PCIe names); H200 a tie; G1, 28, 5(d), 13, 35 MEASURED, NOT BUILT (bounds ≤ 1 % or build out of proportion) | 2026-11-06 | MD A100-SXM4 0.9998 / 0.9918, 0.9990 / 0.9985; H200 0.9992 / 1.0012; G1 ceiling/plain H200 0.894, A100 0.915; rc-all 0.986 of today's A100 forward | [ideas queue 2](../results/ideas-queue2-20261106/README.md) |
 | [ideas-q1](#ideas-q1) | Folded α in the w′ table (34, `FOLD_ALPHA`), power-basis tabled backward (40, `POWER_BACKWARD`), Estrin w′ (39, `ESTRIN`); chunk sweeps and cross-checks | `wprime_backward.FOLD_ALPHA_GPUS`, `tabled_outer_sum.POWER_BACKWARD_GPUS` | FM | FOLD_ALPHA DEFAULT on the H200 and A100-SXM4; POWER_BACKWARD DEFAULT on the H200; ESTRIN REJECTED (FOLD_ALPHA faster on the A100, together nothing); sweeps and cross-checks REJECTED | 2026-11-06 | MD FOLD_ALPHA H200 0.9963 / 0.9954, A100-SXM4 0.9895 / 0.9893; POWER_BACKWARD H200 0.9954 / 0.9957; both off on the H200 1.0073 / 1.0089; FOLD_ALPHA vs ESTRIN on the A100 0.9967 / 0.9902, 0.9884 / 0.9907 | [ideas queue](../results/ideas-queue-20261106/README.md) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4334,6 +4335,28 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
+
+<a id="ideas-q2"></a>
+### ideas-q2: segmented density sums adopted on the A100; G1, rcfold and the tail bounded (6 November 2026)
+
+- **`RECEIVER_SUM` (5(b)):** the generic densities' `scatter_sum` as a segmented sum over receiver-sorted edges
+  (`fastmace::receiver_sum`; one atomic per run end per 1,024-edge block). The backward is the same gather.
+  - A100: 74.8 µs of fused atomics become 17.4 µs. MD A100-SXM4 0.9998 / 0.9918 and 0.9990 / 0.9985, with a gate
+    that passes the same checks as the default. Default on the A100, both the SXM4 and the PCIe names (the owner:
+    PCIe landings are fine).
+  - H200: a tie (0.9992 / 1.0012), so it stays off.
+- **G1 (pre-split weights):** a ceiling cubin without the B split runs at 0.894 of plain on the H200 and 0.915 on
+  the A100.
+  - The TF32×3 GEMMs take about 925 µs of the H200's 4.76 ms, so the ceiling is about 2 % of the step.
+  - A real kernel would load hi/lo B tiles, so its gain is about half that.
+  - Not built: it needs a new CUTLASS warp MMA. It is the largest open item.
+- **28 (rcfold on the A100):** rc-all is 0.944 of round 13's base, but only about 0.986 of today's default forward
+  (≈ 0.35 % of the step). It is rounding, and porting it to the current render is real work. Not ported.
+- **5(d), 13, 35:** bounded from the breakdown, not built.
+  - ZBL / geometry forward: 33 µs, near the bandwidth floor of about 30 MB.
+  - S zero fill: 33 µs on the A100, ≤ 0.34 %. Dropping it needs run-aligned chunks.
+  - Chunked S in L2: a redesign.
+- Details: [ideas queue 2](../results/ideas-queue2-20261106/README.md).
 
 <a id="ideas-q1"></a>
 ### ideas-q1: folded α and the power-basis tabled backward adopted; Estrin rejected (6 November 2026)

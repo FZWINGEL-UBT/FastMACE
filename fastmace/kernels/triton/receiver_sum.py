@@ -13,16 +13,18 @@ order already is.
 
 from __future__ import annotations
 
+from functools import cache
+
 import torch
-import triton
-import triton.language as tl
 
 from fastmace.kernels.gpu_models import GPUModels
 
 # Idea 5(b). RECEIVER_SUM: the generic interactions' density sums through ``receiver_sum``. Rounding. None: on for
-# RECEIVER_SUM_GPUS; True / False: an A/B side's choice.
+# RECEIVER_SUM_GPUS; True / False: an A/B side's choice. A100-SXM4-80GB (6 November 2026): MD b/a 0.9998 / 0.9918 and
+# 0.9990 / 0.9985, gate as the default; the A100 80GB PCIe follows it (the owner: relative results carry over).
+# H200: a tie (0.9992 / 1.0012), off.
 RECEIVER_SUM = None
-RECEIVER_SUM_GPUS = GPUModels(())
+RECEIVER_SUM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 BLOCK = 1024
 WARPS = 4
 
@@ -51,26 +53,32 @@ def applies(values: torch.Tensor, index: torch.Tensor) -> bool:
             and receiver_sum_default(values.device))
 
 
-@triton.jit
-def _segmented_add(a_start, a_value, b_start, b_value):
-    """Combine of a segmented sum: a run restarts where b starts one."""
-    return a_start | b_start, tl.where(b_start, b_value, a_value + b_value)
+@cache
+def _forward_kernel():
+    import triton
+    import triton.language as tl
 
+    @triton.jit
+    def segmented_add(a_start, a_value, b_start, b_value):
+        """Combine of a segmented sum: a run restarts where b starts one."""
+        return a_start | b_start, tl.where(b_start, b_value, a_value + b_value)
 
-@triton.jit
-def _forward(values_ptr, index_ptr, out_ptr, E, BLOCK: tl.constexpr):
-    offs = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
-    mask = offs < E
-    r = tl.load(index_ptr + offs, mask=mask, other=-1)
-    v = tl.load(values_ptr + offs, mask=mask, other=0.0)
-    r_prev = tl.load(index_ptr + offs - 1, mask=mask & (offs > 0), other=-1)
-    r_next = tl.load(index_ptr + offs + 1, mask=offs + 1 < E, other=-1)
-    first = tl.arange(0, BLOCK) == 0
-    last = (tl.arange(0, BLOCK) == BLOCK - 1) | (offs + 1 >= E)
-    start = first | (r != r_prev)
-    end = mask & (last | (r != r_next))
-    _, run = tl.associative_scan((start.to(tl.int32), v), 0, _segmented_add)
-    tl.atomic_add(out_ptr + r, run, mask=end, sem="relaxed")
+    @triton.jit
+    def kernel(values_ptr, index_ptr, out_ptr, E, BLOCK: tl.constexpr):
+        offs = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        mask = offs < E
+        r = tl.load(index_ptr + offs, mask=mask, other=-1)
+        v = tl.load(values_ptr + offs, mask=mask, other=0.0)
+        r_prev = tl.load(index_ptr + offs - 1, mask=mask & (offs > 0), other=-1)
+        r_next = tl.load(index_ptr + offs + 1, mask=offs + 1 < E, other=-1)
+        first = tl.arange(0, BLOCK) == 0
+        last = (tl.arange(0, BLOCK) == BLOCK - 1) | (offs + 1 >= E)
+        start = first | (r != r_prev)
+        end = mask & (last | (r != r_next))
+        _, run = tl.associative_scan((start.to(tl.int32), v), 0, segmented_add)
+        tl.atomic_add(out_ptr + r, run, mask=end, sem="relaxed")
+
+    return kernel
 
 
 @torch.library.custom_op("fastmace::receiver_sum", mutates_args=())
@@ -81,7 +89,7 @@ def receiver_sum(values: torch.Tensor, index: torch.Tensor, num_nodes: int) -> t
     out = v.new_zeros((num_nodes, 1))
     e = v.shape[0]
     if e:
-        _forward[(triton.cdiv(e, BLOCK),)](v, index.contiguous(), out, e, BLOCK=BLOCK, num_warps=WARPS)
+        _forward_kernel()[((e + BLOCK - 1) // BLOCK,)](v, index.contiguous(), out, e, BLOCK=BLOCK, num_warps=WARPS)
     return out
 
 
