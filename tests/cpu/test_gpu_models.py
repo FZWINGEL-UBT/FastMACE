@@ -249,7 +249,9 @@ def test_h200_defaults():
     assert "NVIDIA A100-SXM4-80GB" in fused_forward.WFRAG_REGION_GPUS  # alone 0.9871 / 0.9887
     assert "NVIDIA H200" not in fused_forward.WFRAG_REGION_GPUS  # a tie: 1.0014 / 1.0010
     assert not fused_forward.A_SPLIT_GPUS  # H200 1.0311 / 1.0346 (slower)
-    assert not fused_forward.X_LATE_GPUS and not fused_forward.K_PIPE_GPUS  # idea 27: lab only so far
+    # Idea 27 (6 November 2026): X_LATE on both, MD H200 0.9884 / 0.9882, A100-SXM4 0.9937 / 0.9937
+    assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(fused_forward.X_LATE_GPUS)
+    assert "NVIDIA H200" not in fused_forward.K_PIPE_GPUS  # with X_LATE 0.9934 / 0.9927, worse than X_LATE alone
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows

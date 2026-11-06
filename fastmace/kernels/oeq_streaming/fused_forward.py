@@ -195,7 +195,9 @@ LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
 W_GROUP_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 WFRAG_REGION_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 A_SPLIT_GPUS = GPUModels(())
-X_LATE_GPUS = GPUModels(())
+# MD-step A/Bs (6 November 2026, d74ca073; SrTiO3 10x10x10, both build orders): H200 0.9884 / 0.9882,
+# A100-SXM4-80GB 0.9937 / 0.9937; bitwise. With K_PIPE as well: H200 0.9934 / 0.9927, A100-SXM4 0.9910 / 0.9920.
+X_LATE_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 K_PIPE_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
