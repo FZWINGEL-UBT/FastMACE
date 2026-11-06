@@ -259,6 +259,22 @@ for layout in ("ir_mul", "mul_ir"):
             lane_out = fused_folded_forward(a, weight, X, Y, *args, lanes.id)
             assert torch.equal(lane_out[0], base_out[0]) and torch.equal(lane_out[1], base_out[1]), (layout, k, tc_on)
             report[name][f"lane indices {'tc' if tc_on else 'simt'}"] = True
+        # WFRAG_REGION (ideas plan, idea 21): the W region sized by the fragment layout (more warps fit), bitwise.
+        if torch.cuda.get_device_capability() >= (8, 0):
+            ff_module.TENSOR_CORES, ff_module.TC_WFRAG = True, True
+            try:
+                ff_module.WFRAG_REGION = False
+                plain = FusedFoldedForward(kernels, k)
+                ff_module.WFRAG_REGION = True
+                region = FusedFoldedForward(kernels, k)
+            finally:
+                ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.WFRAG_REGION = False, None, None
+            if plain.wfrag:
+                assert region.wfrag_region and region.rule.shared_bytes < plain.rule.shared_bytes, (layout, k)
+                base_out = fused_folded_forward(a, weight, X, Y, *args, plain.id)
+                region_out = fused_folded_forward(a, weight, X, Y, *args, region.id)
+                assert torch.equal(region_out[0], base_out[0]) and torch.equal(region_out[1], base_out[1]), (layout, k)
+                report[name][f"wfrag region ({plain.rule.warps} -> {region.rule.warps} warps)"] = True
         # W_GROUP (ideas plan, idea 17): warp pairs share each W fragment, bitwise the per-warp product, with the
         # tensor-core product in fragment order (TC_WFRAG, as the H200 plan), on the uneven neighbourhood; with the
         # zero-column skip and VEC_A where they apply, and the message-only kernel (store_w=False).

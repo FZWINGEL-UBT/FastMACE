@@ -152,6 +152,11 @@ LANE_INDICES = None
 # 0.876. Only on the TF32 product with TC_WFRAG (not presplit, TC_TP or WGMMA) and an even warp count. None: on for
 # W_GROUP_GPUS (decision 66); True / False: an A/B side's choice.
 W_GROUP = None
+# H200 ideas plan idea 21 (6 November 2026): with TC_WFRAG the W slice is read only in fragment order (tc_wfill), so
+# its region needs CHANNEL_BLOCK floats per (path, k), not TC_STRIDE. The smaller region lets the launch rule fit more
+# warps (A100-SXM4: 12 instead of 11, so W_GROUP applies there). Bitwise. Kernel lab, A100-SXM4: tc-warps12 0.958,
+# w-group-12 0.905. None: on for WFRAG_REGION_GPUS (decision 66); True / False: an A/B side's choice.
+WFRAG_REGION = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -171,6 +176,7 @@ TC_WFRAG_SPLIT_GPUS = GPUModels(())
 LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
 # H200 MD-step A/B (6 November 2026, 429cebe3): 0.9946 / 0.9942, both build orders; lab forward 0.980, bitwise.
 W_GROUP_GPUS = GPUModels(("NVIDIA H200",))
+WFRAG_REGION_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -263,6 +269,15 @@ def lane_indices_default(name=None):
     on = LANE_INDICES
     if on is None:
         on = name in LANE_INDICES_GPUS
+    return bool(on)
+
+
+def wfrag_region_default(name=None):
+    """``WFRAG_REGION`` (None: ``name`` in ``WFRAG_REGION_GPUS``); built only where it applies
+    (``FusedFoldedForward``)."""
+    on = WFRAG_REGION
+    if on is None:
+        on = name in WFRAG_REGION_GPUS
     return bool(on)
 
 
@@ -820,7 +835,7 @@ def slice_floats(paths_per_part, k, tc=False, wfrag=False):
     """Floats of a block's W slice (row stride CHANNEL_BLOCK + 1; with tensor cores ``TC_STRIDE`` and k padded to a
     multiple of 8; ``tc="presplit"``: ``TC_PSTRIDE`` float2), rounded up to keep the staging 16-byte aligned.
     ``wfrag`` (the TF32 product, ``tc=True``): the region sized by ``tc_wfill``'s fragment order, ``CHANNEL_BLOCK``
-    floats per (path, k) instead of ``TC_STRIDE`` (H200 ideas plan, idea 21; kernel lab only so far)."""
+    floats per (path, k) instead of ``TC_STRIDE`` (H200 ideas plan, idea 21; ``WFRAG_REGION``)."""
     if wfrag and tc is not True:
         raise ValueError("slice_floats: the fragment-sized region needs the TF32 product (tc=True)")
     rows, stride = ((_kpad(k), 2 * TC_PSTRIDE) if tc == "presplit" else
@@ -977,7 +992,7 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
     ``sh_lds4``: the tensor product's sh reads as float4 shared loads (``SH_LDS4``; needs ``vec_sh``, not with tctp
     or wgmma). ``w_group``: warp pairs share each W fragment (``W_GROUP``; the TF32 product with wfrag, without
     tctp or wgmma, an even warp count). ``wfrag_region``: the warps' staging after a W region sized by the fragment
-    layout (``slice_floats(..., wfrag=True)``; idea 21, kernel lab only; the rule must be ``launch_rule(...,
+    layout (``slice_floats(..., wfrag=True)``; idea 21, ``WFRAG_REGION``; the rule must be ``launch_rule(...,
     wfrag=True)``'s); needs wfrag with the TF32 product, without tctp or wgmma."""
     if wfrag_region and (tc is not True or not wfrag or tctp or wgmma):
         raise ValueError("fused_folded_forward: wfrag_region needs wfrag with the TF32 product, without tctp or wgmma")
@@ -2016,6 +2031,8 @@ class FusedFoldedForward:
                 and tc_wfrag_split_default(torch.cuda.get_device_name(device))):
             self.tc = "presplit"  # TC_WFRAG_SPLIT: the presplit slice size, in fragment order
         self.groups = None
+        self.wfrag_region = (wfrag_region_default(torch.cuda.get_device_name(device)) and self.tc is True
+                             and self.wfrag and not self.tctp and not self.wgmma)
         if self.wgmma:
             self.wfrag = False
             self.rule = launch_rule_wgmma(len(schedule.paths), self.used, schedule.edge_dim, schedule.channels,
@@ -2023,7 +2040,8 @@ class FusedFoldedForward:
         else:
             shape = (len(schedule.paths), self.used if self.tc else self.k, schedule.edge_dim, schedule.channels,
                      int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
-            options = dict(tc=self.tc, prefetch=self.prefetch, x_slots=schedule.input_dim // schedule.channels)
+            options = dict(tc=self.tc, prefetch=self.prefetch, x_slots=schedule.input_dim // schedule.channels,
+                           wfrag=self.wfrag_region)
             self.groups = degree_parts(schedule) if degree_parts_default(torch.cuda.get_device_name(device)) else None
             self.rule = launch_rule(*shape, groups=self.groups, **options) if self.groups else None
             if self.rule is None:
@@ -2040,7 +2058,7 @@ class FusedFoldedForward:
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                              prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
                              tctp=self.tctp, wgmma=self.wgmma, groups=self.groups, sh_lds4=self.sh_lds4,
-                             lane_idx=self.lane_idx, w_group=self.w_group)
+                             lane_idx=self.lane_idx, w_group=self.w_group, wfrag_region=self.wfrag_region)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
