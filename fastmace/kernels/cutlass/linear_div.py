@@ -28,7 +28,9 @@ import torch
 from fastmace.kernels.gpu_models import GPUModels
 
 LINEAR_DIV = None
-LINEAR_DIV_GPUS = GPUModels(())
+# MD-step A/Bs (6 November 2026, 7264f56f; OMAT-0 medium, SrTiO3 10x10x10, both build orders): H200 0.9912 /
+# 0.9934, A100-SXM4-80GB 0.9896 / 0.9891. Bitwise at kernel level (output, input and density gradients).
+LINEAR_DIV_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 def linear_div_default(name=None) -> bool:
