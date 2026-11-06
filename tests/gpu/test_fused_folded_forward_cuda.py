@@ -353,6 +353,27 @@ for layout in ("ir_mul", "mul_ir"):
                         else:  # the render is not of the fold's form: built without it
                             assert cgf_on.source == cgf_off.source, (layout, k, used)
                             report[name][f"cg fold {used}"] = "not applicable"
+                        # Revision 13 (A_LD128, TP_NOFLUSH): bitwise the X_LATE message kernel where they apply
+                        for r13 in ("A_LD128", "TP_NOFLUSH"):
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
+                            ff_module.VEC_A, ff_module.X_LATE = True, True
+                            try:
+                                r13_off = FusedFoldedForward(kernels, k, used=used, store_w=False)
+                                setattr(ff_module, r13, True)
+                                r13_on = FusedFoldedForward(kernels, k, used=used, store_w=False)
+                            finally:
+                                ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = False, None, None
+                                ff_module.VEC_A, ff_module.X_LATE = None, None
+                                setattr(ff_module, r13, None)
+                            if getattr(r13_on, r13.lower()):
+                                assert r13_on.source != r13_off.source, (r13, layout, k, used)
+                                r13_a = fused_folded_message(a_u, source_w, X_u, Y_u, *args_u, r13_off.id)
+                                r13_b = fused_folded_message(a_u, source_w, X_u, Y_u, *args_u, r13_on.id)
+                                assert torch.equal(r13_a, r13_b), (r13, layout, k, used)
+                                report[name][f"{r13} {used}"] = "bitwise"
+                            else:
+                                assert r13_on.source == r13_off.source, (r13, layout, k, used)
+                                report[name][f"{r13} {used}"] = "not applicable"
                     if vec:  # A_SPLIT (round 7): the pairs' a split once at staging, bitwise the grouped kernel
                         ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
                         ff_module.VEC_A, ff_module.A_SPLIT = True, True

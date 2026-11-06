@@ -177,6 +177,13 @@ K_PIPE = None
 # the TP. Rounding class (messages max rel 3e-7 to 7e-7). Only with STORE_W false and the two DEGREE_PARTS parts.
 # Kernel lab: H200 0.969, A100-SXM4 0.951. None: on for CG_FOLD_GPUS (decision 66); True / False: an A/B side's choice.
 CG_FOLD = None
+# H200 ideas plan revision 13 (6 November 2026; ``kloop_rewrites``), both bitwise. A_LD128 (idea 17(ii)): a staged as
+# one float4 per lane and k-step, read with one LDS.128 instead of four LDS.32 (VEC_A renders, not with K_PIPE);
+# kernel lab on the CG_FOLD base: H200 0.977, A100-SXM4 0.880. TP_NOFLUSH (idea 29): the TP blocks without the flush
+# checks for full batches inside row cur; lab H200 1.000, A100-SXM4 0.967. None: on for A_LD128_GPUS /
+# TP_NOFLUSH_GPUS (decision 66); True / False: an A/B side's choice.
+A_LD128 = None
+TP_NOFLUSH = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -209,6 +216,8 @@ K_PIPE_GPUS = GPUModels(())
 # both pass SrTiO3 and NaCl and fail only NbCl5 stress (H200 2.06 against the default's 2.10 in the same job,
 # A100-SXM4 2.38 against 2.42), the A100's accepted exception.
 CG_FOLD_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+A_LD128_GPUS = GPUModels(())
+TP_NOFLUSH_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -334,6 +343,22 @@ def cg_fold_default(name=None):
     on = CG_FOLD
     if on is None:
         on = name in CG_FOLD_GPUS
+    return bool(on)
+
+
+def a_ld128_default(name=None):
+    """``A_LD128`` (None: ``name`` in ``A_LD128_GPUS``); built only where ``kloop_rewrites.apply_a_ld128`` applies."""
+    on = A_LD128
+    if on is None:
+        on = name in A_LD128_GPUS
+    return bool(on)
+
+
+def tp_noflush_default(name=None):
+    """``TP_NOFLUSH`` (None: ``name`` in ``TP_NOFLUSH_GPUS``); built only where ``apply_tp_noflush`` applies."""
+    on = TP_NOFLUSH
+    if on is None:
+        on = name in TP_NOFLUSH_GPUS
     return bool(on)
 
 
@@ -2283,6 +2308,19 @@ class FusedFoldedForward:
                 self.source = apply_cg_fold(self.source)
             except ValueError:  # idea 24 does not apply to this render: built without it
                 self.cg_fold = False
+        from fastmace.kernels.oeq_streaming import kloop_rewrites
+        self.tp_noflush = tp_noflush_default(name) and not self.store_w
+        if self.tp_noflush:
+            try:
+                self.source = kloop_rewrites.apply_tp_noflush(self.source)
+            except ValueError:  # not of the X_LATE plan's form: built without it
+                self.tp_noflush = False
+        self.a_ld128 = a_ld128_default(name) and not self.k_pipe
+        if self.a_ld128:
+            try:
+                self.source = kloop_rewrites.apply_a_ld128(self.source)
+            except ValueError:  # no VEC_A staging of KP = 64, B = 8: built without it
+                self.a_ld128 = False
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
