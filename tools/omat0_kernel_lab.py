@@ -1682,6 +1682,12 @@ def _round12_variants(kernel):
     return lab_round12.round12_variants(kernel)
 
 
+def _round13_variants(kernel):
+    import lab_round13  # tools/ is on sys.path when the lab runs as a script
+    FORWARD_REFERENCES.update(lab_round13.round13_references(kernel))
+    return lab_round13.round13_variants(kernel)
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -1881,6 +1887,9 @@ def forward_variants(kernel=None):
         # Round 12 (revision 12): 22(iii) (the TP inside the next batch's k-loop; bitwise) and 24 (CG factors
         # folded into W; rounding), from tools/lab_round12.py.
         **_round12_variants(kernel),
+        # Round 13 (revision 13): 28 (further folds; rounding), 29 (tpnf, K_PIPE on the fold; bitwise), 17(ii)
+        # (LDS.128 a loads), from tools/lab_round13.py.
+        **_round13_variants(kernel),
         # Round 9 (H200 ideas revision 9). Idea 22(ii): W_GROUP with the fragment-sized region at 12, 14 and 16 warps
         # (the launch bound caps the registers: 168, 144, 128), with and without the x loads (F-no-xload: x not live
         # across the k-loop, as in 22(i)). Idea 25: one part's blocks only. 22(ii)'s carve-out: F-l1-28.
