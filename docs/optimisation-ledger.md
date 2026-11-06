@@ -4336,7 +4336,7 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   after it frees registers and shortens the k-loop's waits. Bitwise. MD step H200 0.9884 / 0.9882, A100-SXM4
   0.9937 / 0.9937: default on both.
 - **`K_PIPE`:** the next k-step's a and first W fragment one step ahead. With X_LATE: H200 0.9934 / 0.9927 (worse
-  than X_LATE alone), A100-SXM4 0.9910 / 0.9920. Off.
+  than X_LATE alone), A100-SXM4 0.9910 / 0.9920; on top of X_LATE 0.9980 / 0.9990 (noise). Off.
 - **Stage-ahead (idea 26):** cp.async of the next batch's a, sh and indices; bitwise but H200 1.012–1.034 with
   spills. Rejected.
 

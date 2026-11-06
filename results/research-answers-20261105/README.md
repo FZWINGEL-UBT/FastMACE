@@ -569,8 +569,9 @@ Runs: `runs/round9/` (`r9-lab-h200`, `r9-ncu`, `wp9-h200`, `wp9-a100`, `x9-h200`
   | A100-SXM4 | X_LATE | 0.9937 | 0.9937 |
   | A100-SXM4 | X_LATE + K_PIPE | 0.9910 | 0.9920 |
 
-  X_LATE + K_PIPE is faster on the A100-SXM4 than X_LATE alone by this table; K_PIPE on top of X_LATE has its
-  own A/B (below, when run). K_PIPE stays off; on the H200 it is slower than X_LATE alone.
+- **K_PIPE on top of X_LATE**, A100-SXM4 (commit `fc0d7531`, X_LATE on both sides): 0.9980 / 0.9990. Both orders
+  are below 1, but by about 0.15 %, within run-to-run noise. K_PIPE stays off; on the H200 it is slower than
+  X_LATE alone.
 - **CPU suite** on leto at `fc0d7531`: 5150 passed, 202 skipped.
 - **Commit:** `fc0d7531` (branch `fastmace/round11-lab`).
 
@@ -589,4 +590,4 @@ The first stage-ahead job died with CUDA_ERROR_ILLEGAL_ADDRESS. The transforms h
 lab's launcher reads to recognise VEC_A's padded a rows, so the lab passed a compacted a and the kernel read past it.
 `tools/lab_round11.py` now refuses any variant that loses that text.
 
-Runs: `runs/round11/` (`r11-h200` (the crash), `r11-a100`, `r11b-h200`, `r11c-h200`, `ab27-h200-a`, `ab27-a100-a`).
+Runs: `runs/round11/` (`r11-h200` (the crash), `r11-a100`, `r11b-h200`, `r11c-h200`, `ab27-h200-a`, `ab27-a100-a`, `kp-a100-c`).
