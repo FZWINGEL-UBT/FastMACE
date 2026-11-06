@@ -19,6 +19,9 @@ of part 1 alone (the six 1 ⊗ l paths), with the product on a producer warpgrou
   - its render is byte for byte round 13's H200 lab render; A_LD128 and TP_NOFLUSH are off there.
 - **Cost:** about $0.33 per job, under $0.70 for both.
 
+Follow-up: [idea30-full.md](idea30-full.md) applies the structure to both parts. It reaches 0.859 of the whole
+forward, just short of the 0.85 target.
+
 ## Verdict
 
 **Pass: 0.80 of part 1's time, against the threshold of 0.85.** ws30 took 780.1 µs in r1 and 778.8 µs in r2.
