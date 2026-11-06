@@ -407,6 +407,12 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-fx-e3nn](#model-fx-e3nn) | TorchScript e3nn `Linear` back to fx | `fx_e3nn_linear` | FM | DEFAULT (scoped: POLAR-1-S/M/L, hybrid float32, not reproducible) | decision 58 | with graph sums NaCl 0.7634 / 0.7589, NbCl5 0.8225 / 0.8231 | [opt4-T02](validation/speed/opt4-T02.md) |
 | [model-polar-graph-sums](#model-polar-graph-sums) | Deterministic per-graph sums for PolarMACE | `polar_graph_sums` | FM | DEFAULT (scoped: as `fx_e3nn_linear`) | decision 58 | alone −8 / −9 %; none on top | [opt4-T02](validation/speed/opt4-T02.md) |
 | [model-ffwd-polar](#model-ffwd-polar) | `fused_folded_forward` on POLAR-1-S | explicit on | FM | REJECTED | decision 64 scope | b/a 1.004 | [opt8-T02](validation/speed/opt8-T02.md) |
+| [model-polar-wprime](#model-polar-wprime) | `wprime_backward` + `fused_folded_forward` on POLAR-1 | `POLAR_DECISION_66_WPRIME_GPUS` | FM | DEFAULT (scoped: POLAR-1-M/L, RTX 4000 Ada) | owner 2026-11-05 (d66) | M with `gate_epilogue`: NaCl 0.966 / 0.966, NbCl5 0.957 / 0.958 | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-polar-gate-epilogue](#model-polar-gate-epilogue) | `gate_epilogue` on POLAR-1 | `POLAR_DECISION_66_GATE_EPILOGUE_GPUS` | FM | DEFAULT (scoped: POLAR-1, RTX 4000 Ada) | owner 2026-11-05 (d66) | NbCl5 0.989–0.994, NaCl neutral | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-polar-one-interaction](#model-polar-one-interaction) | Plan-time refusal of the second-interaction records on one-interaction models | none (fix) | FM | DEFAULT | owner 2026-11-05 | POLAR-1-S built with `wprime_backward=on` failed; now refused or off | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-polar-species-tables](#model-polar-species-tables) | `species_tables` on PolarMACE (`PolarMACE.forward` pinned) | `species_tables` | FM | DEFAULT (scoped: as MH-1, class rule) | owner 2026-11-05 | tiny PolarMACE within float64 rounding; GPU A/B pending | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-mh1-edge-sh](#model-mh1-edge-sh) | EDGE_SH for MH-1's class (MH-1, POLAR-1) | `EDGE_SH_MH1_GPUS` (empty), `EDGE_SH` | FM | PENDING | polar-T01 | not measured | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-mh1-fused-first](#model-mh1-fused-first) | FUSED_FIRST_BACKWARD (tabled outer sum) in MH-1's first interaction | `FUSED_FIRST_MH1_GPUS` (empty), `FUSED_FIRST_BACKWARD` | FM | PENDING | polar-T01 | not measured | [polar-reuse](validation/polar/polar-reuse.md) |
 | [model-ffwd-omol](#model-ffwd-omol) | `fused_folded_forward` on OMOL-0 XL | explicit on | FM | REJECTED | decision 64 scope | b/a 1.035 | [opt8-T02](validation/speed/opt8-T02.md) |
 | [model-gate-t03d](#model-gate-t03d) | Gate tool applies rule 13 (OMOL-0 on A100) | tooling | FM | DEFAULT | 2026-10-24 (`3e06d243`) | tooling | [opt4-T03](validation/speed/opt4-T03.md) §9 |
 | [model-other-models](#model-other-models) | Benchmark models, MACE-OFF, POLAR, OMOL on the GPU engine | `--model` | RE | MEASUREMENT | 2026-10-15/16 | 2.9–12.2× vs stock ASE (ten models) | `ResearchModule:LT/studies/other_models/README.md` |
@@ -3698,8 +3704,65 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - What: A/B on POLAR-1-S NbCl5.
 - Status: REJECTED (off for non-MH-1 by decision 64).
 - Measured: b/a 1.004 (pairs 0.99–1.01); the probe saw the kernel only in self-checks (not investigated).
-- Why: neutral.
+- Why: neutral. POLAR-1-S has one interaction, which is reassociated, so the kernel had nothing to act on ([model-polar-one-interaction](#model-polar-one-interaction)).
 - Sources: [opt8-T02](validation/speed/opt8-T02.md) "MH-1 family".
+
+<a id="model-polar-wprime"></a>
+#### model-polar-wprime: `wprime_backward` + `fused_folded_forward` on POLAR-1
+- Switch: `planner.fixed.POLAR_DECISION_66_WPRIME_GPUS` ("NVIDIA RTX 4000 Ada Generation")
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: MH-1's decision-66 pair for the POLAR-1 checkpoints with a second interaction (M, L); both act on the interactions after the reassociated first one.
+- Status: DEFAULT (scoped: POLAR-1-M and -L on the RTX 4000 Ada). Owner: "yes turn it on for 2 interaction models".
+- Measured (leto, POLAR-1-M, MD step b/a both orders): wprime alone NaCl 0.968 / 0.967, NbCl5 0.978 / 0.978; with the fused forward 0.963 / 0.965, 0.970 / 0.971; with `gate_epilogue` too 0.966 / 0.966, 0.957 / 0.958. Force gate passed.
+- Why: same kernels as MH-1; only the label gate kept POLAR-1 out. RTX 5060 Ti and A100 not measured.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-polar-gate-epilogue"></a>
+#### model-polar-gate-epilogue: `gate_epilogue` on POLAR-1
+- Switch: `planner.fixed.POLAR_DECISION_66_GATE_EPILOGUE_GPUS` ("NVIDIA RTX 4000 Ada Generation")
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- Status: DEFAULT (scoped: every POLAR-1 checkpoint on the RTX 4000 Ada).
+- Measured (leto): POLAR-1-S NaCl 0.998 / 1.001, NbCl5 0.994 / 0.993; POLAR-1-M NaCl 1.002 / 0.999, NbCl5 0.989 / 0.989.
+- Why: as for MH-1 (NbCl5 faster, NaCl neutral).
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-polar-one-interaction"></a>
+#### model-polar-one-interaction: second-interaction records on one-interaction models
+- Switch: none (planner rule; `SECOND_INTERACTION_RECORDS`)
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: `fused_folded_forward`, `wprime_backward` and `w_tables` skip the reassociated first interaction; on POLAR-1-S (one interaction) an explicit "on" passed the planner and the build raised. Now refused at plan time (explicit) or off with the reason (auto).
+- Status: DEFAULT. Also explains [model-ffwd-polar](#model-ffwd-polar)'s neutral 1.004.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-polar-species-tables"></a>
+#### model-polar-species-tables: `species_tables` on PolarMACE
+- Switch: `species_tables` (class rule, `on_unless_reproducible_if_model_supports`)
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: `PolarMACE.forward` pinned (the polar path's hash) next to `ScaleShiftMACE.forward`: its embedding feeds only the first interaction. `fold_readout_tail` and `fold_product_linear` stay refused (the long-range heads read every layer's features).
+- Status: DEFAULT (scoped: as MH-1). CPU: whole tiny PolarMACE within float64 rounding. GPU A/B on leto pending.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-mh1-edge-sh"></a>
+#### model-mh1-edge-sh: EDGE_SH for MH-1's class
+- Switch: `rewrites.generic.modules.EDGE_SH_MH1_GPUS` (empty), A/B constant `EDGE_SH`
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: round 5's Triton edge harmonics, attached by MH-1's streaming record as by `generic_streaming`.
+- Status: PENDING (off: no GPU measured; leto A/Bs queued).
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-mh1-fused-first"></a>
+#### model-mh1-fused-first: FUSED_FIRST_BACKWARD in MH-1's first interaction
+- Switch: `rewrites.mh1.modules.FUSED_FIRST_MH1_GPUS` (empty), A/B constant `generic.modules.FUSED_FIRST_BACKWARD`
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: the tabled outer sum in MH-1's reassociated first interaction; the folded weight [W, b] reads the table's leading h + 1 columns. CPU test (fallback path) on tiny MH-1 and PolarMACE.
+- Status: PENDING (off: no GPU measured; leto A/Bs queued).
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
 
 <a id="model-ffwd-omol"></a>
 #### model-ffwd-omol: `fused_folded_forward` on OMOL-0 XL

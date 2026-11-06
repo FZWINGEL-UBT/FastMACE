@@ -295,15 +295,20 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
     # OPT-T08 (fastmace.rewrites.species): ScaleShiftMACE only (its forward is pinned). species_tables and
     # fold_product_linear: a factored first interaction with species-only inputs; fold_readout_tail: a factored
     # last interaction (its skip_tp is a linear layer).
+    # PolarMACE's forward is pinned too (polar-T01): its embedding feeds only the first interaction, so the species
+    # tables apply; the two folds change what a layer's features mean, and its long-range heads read every layer's.
     scale_shift = type(model).__name__ == "ScaleShiftMACE"
+    polar_class = type(model).__name__ == "PolarMACE"
+    pinned = scale_shift or polar_class
     first = bool(interactions) and interactions[0] in FACTORED_INTERACTIONS
     last = bool(interactions) and interactions[-1] in FACTORED_INTERACTIONS
-    class_reason = f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned"
+    class_reason = (f"{type(model).__name__}: only ScaleShiftMACE's and PolarMACE's forwards are pinned"
+                    if not polar_class else "PolarMACE: its long-range heads read every layer's features")
     joint = hasattr(model, "joint_embedding")
-    tables = scale_shift and first and species_only and not joint
+    tables = pinned and first and species_only and not joint
     support["species_tables"] = RewriteSupport(
         tables,
-        "ok" if tables else class_reason if not scale_shift else
+        "ok" if tables else class_reason if not pinned else
         f"the first interaction is not {FACTORED_INTERACTIONS}" if not first else
         "a joint embedding (charge/spin) is added to the first input, which is then not species-only" if joint
         else "first-interaction inputs are not species-only")
@@ -314,13 +319,13 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
     # fold_product_linear: MH-1's class through the species tables (species_tables), or a generic model whose first
     # product has no skip term (generic_fold_product_linear: its consumers' block linears and species skip).
     generic_fold, generic_reason = generic_fold_product_support(model)
-    if tables:
+    if tables and scale_shift:
         support["fold_product_linear"] = RewriteSupport(True, "ok")
     elif generic_fold:
         support["fold_product_linear"] = RewriteSupport(True, "ok (generic: no skip term in the first product)")
     else:
         support["fold_product_linear"] = RewriteSupport(
-            False, generic_reason if generic else support["species_tables"].reason)
+            False, class_reason if polar_class else generic_reason if generic else support["species_tables"].reason)
     return support
 
 

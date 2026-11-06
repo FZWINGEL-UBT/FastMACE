@@ -85,12 +85,14 @@ FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX
                                        "NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 
 
-def fused_first_backward(device):
-    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``FUSED_FIRST_BACKWARD_GPUS``."""
+def fused_first_backward(device, gpus=None):
+    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``gpus`` (default
+    ``FUSED_FIRST_BACKWARD_GPUS``, the generic family's; MH-1's class passes its own list)."""
     if FUSED_FIRST_BACKWARD is not None:
         return bool(FUSED_FIRST_BACKWARD)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in (
+        FUSED_FIRST_BACKWARD_GPUS if gpus is None else gpus)
 
 
 def _first_inputs(augmented, last):
@@ -113,12 +115,12 @@ def bias_free(linear):
                 if "bias" in name and tensor.numel() > 0]
 
 
-def fused_first_applies(self, edge_feats):
+def fused_first_applies(self, edge_feats, gpus=None):
     """Whether ``fused_first_message`` serves this tabled, reassociated interaction (``FUSED_FIRST_BACKWARD``)."""
     table, reassociation = getattr(self, "radial_table", None), getattr(self, "first_reassociation", None)
     return (table is not None and reassociation is not None and not FIRST_FULL_ROWS and reassociation.segmented
             and table.coef.dtype == torch.float32 and edge_feats.dtype == torch.float32
-            and fused_first_backward(table.coef.device))
+            and fused_first_backward(table.coef.device, gpus))
 
 
 def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
@@ -347,18 +349,34 @@ EDGE_SH = None
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 EDGE_SH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                           "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
+# MH-1's interaction class (MH-1, POLAR-1): applied by MH-1's streaming record (fastmace.rewrites.mh1
+# streaming_convolutions) on these GPUs; none measured yet (decision 66), EDGE_SH=True for the A/B (polar-T01).
+EDGE_SH_MH1_GPUS = GPUModels(())
 
 
-def edge_sh_default(device=None):
+def edge_sh_default(device=None, gpus=None):
     """``EDGE_SH`` on ``device`` (a torch.device, a device name or None): the constant when set, else on for
-    ``EDGE_SH_GPUS``."""
+    ``gpus`` (default ``EDGE_SH_GPUS``, the generic family's)."""
     if EDGE_SH is not None:
         return bool(EDGE_SH)
     if isinstance(device, torch.device):
         if device.type != "cuda":
             return False
         device = torch.cuda.get_device_name(device)
-    return device is not None and device in EDGE_SH_GPUS
+    return device is not None and device in (EDGE_SH_GPUS if gpus is None else gpus)
+
+
+def attach_edge_sh(model, gpus=None):
+    """Replace ``model.spherical_harmonics`` by ``EdgeSH`` where it is e3nn's l <= 3 component harmonics and
+    ``edge_sh_default`` holds for the model's device and ``gpus``; True if it did."""
+    sh = getattr(model, "spherical_harmonics", None)
+    if not edge_sh_replaceable(sh):
+        return False
+    parameter = next(model.parameters(), None)
+    if not edge_sh_default(parameter.device if parameter is not None else None, gpus):
+        return False
+    model.spherical_harmonics = EdgeSH(sh)
+    return True
 
 
 class EdgeSH(torch.nn.Module):
@@ -382,7 +400,7 @@ def edge_sh_replaceable(module):
         return False
     if getattr(module, "normalization", None) != "component":
         return False
-    return [int(l) for l in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
+    return [int(ell) for ell in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
 
 
 class SpeciesSkip(torch.nn.Module):
