@@ -29,7 +29,9 @@ shim=/tmp/sx-shim; mkdir -p "$shim"
 for lib in nvrtc cudart cublas cublasLt; do
   [ -e "$cu13/lib$lib.so.13" ] && ln -sf "$cu13/lib$lib.so.13" "$shim/lib$lib.so"
 done
-export LD_LIBRARY_PATH=$shim:$cu13:${LD_LIBRARY_PATH:-} SYMMETRIX_JIT_CACHE=/tmp/sx-jit
+# 0.1.2 refuses a JIT cache whose ancestors are world-writable without the sticky bit (Modal's /tmp is).
+mkdir -p -m 700 /root/sx-jit
+export LD_LIBRARY_PATH=$shim:$cu13:${LD_LIBRARY_PATH:-} SYMMETRIX_JIT_CACHE=/root/sx-jit
 chmod +x "$lmp"
 ldd "$lmp" > "$out/ldd.txt" 2>&1
 grep -q "not found" "$out/ldd.txt" && note "missing libraries: $(grep 'not found' "$out/ldd.txt" | tr '\n' ' ')"
