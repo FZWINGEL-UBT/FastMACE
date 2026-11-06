@@ -1,0 +1,67 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+calls seen (kernel, edges, capturing): [('forward', 40, False), ('forward', 720, False), ('forward', 370000, False), ('forward', 373760, False), ('forward', 373760, True), ('wprime', 720, False), ('wprime', 370000, False), ('wprime', 373760, False), ('wprime', 373760, True)]
+forward ptxas base                         {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas F-part0-only                 {'9.0': {'registers': 117, 'spill_store_bytes': 0}}
+forward ptxas F-part1-only                 {'9.0': {'registers': 142, 'spill_store_bytes': 0}}
+forward ptxas ws-both                      {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws30-p0                      {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws30-p0-s3                   {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws-both-s3                   {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws-both-swap                 {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws-both-inter                {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws-both-s3-swap              {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas ws-both-s3-inter             {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas base-swap                    {'9.0': {'registers': 154, 'spill_store_bytes': 0}}
+forward ptxas base-inter                   {'9.0': {'registers': 164, 'spill_store_bytes': 0}}
+forward  base                1491.9 us  ratio 1.000  regs 154 local 0  
+forward  F-part0-only         594.0 us  ratio 0.398  regs 117 local 0  
+forward  F-part1-only         973.3 us  ratio 0.652  regs 143 local 0  
+forward  ws-both             1283.5 us  ratio 0.860  regs 154 local 64  {'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws30-p0              521.2 us  ratio 0.349  regs 154 local 16  {'against': 'F-part0-only', 'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws30-p0-s3           525.2 us  ratio 0.352  regs 154 local 16  {'against': 'F-part0-only', 'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws-both-s3          1284.6 us  ratio 0.861  regs 154 local 64  {'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws-both-swap        1268.4 us  ratio 0.850  regs 154 local 64  {'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws-both-inter       1520.4 us  ratio 1.019  regs 154 local 64  {'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws-both-s3-swap     1267.9 us  ratio 0.850  regs 154 local 64  {'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  ws-both-s3-inter    1508.8 us  ratio 1.011  regs 154 local 64  {'out0': 'max|d|/max|a| = 1.09e-07', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 8.07e-08', 'out3': 'max|d|/max|a| = 1.25e-07', 'w': 'bitwise'}
+forward  base-swap           1483.0 us  ratio 0.994  regs 154 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  base-inter          1563.3 us  ratio 1.048  regs 164 local 0  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}

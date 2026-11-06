@@ -133,7 +133,8 @@ def run_debug(render):
 
 PARTS = (0, 1)
 # name: (ring stages, block order) of the debug renders
-DEBUG_CONFIGS = {"s2": (2, "z"), "s3": (3, "z"), "s3-swap": (3, "swap"), "s2-inter": (2, "interleave")}
+DEBUG_CONFIGS = {"s2": (2, "z"), "s3": (3, "z"), "s3-swap": (3, "swap"),
+                 "s2-swap": (2, "swap"), "s2-inter": (2, "interleave")}
 
 
 def main():

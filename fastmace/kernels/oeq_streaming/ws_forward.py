@@ -38,8 +38,8 @@ VEC_A_MARK = "// a is read with VEC_A's row stride AS: reinterpret_cast<const fl
 CONSUMERS = 8
 WARPS = 4 + CONSUMERS
 BARRIER_BYTES = 128  # full[S], empty[S], wready[S] (uint64), active[S], fin[S] (int); S <= 4
-STAGES = {0: 3, 1: 2}  # ring stages per part (OMAT-0 medium on the H200: part 0 has room for a third)
-ORDER = "z"
+STAGES = {}  # ring stages per part, default 2 (lab r4, H200: part 0 with 3 stages a tie, 525.2 against 521.2 us)
+ORDER = "swap"  # lab r4 (H200, whole forward / base): "z" 0.860, "swap" 0.850, "interleave" 1.019
 SHARED_LIMIT = 232448  # the H200's opt-in shared memory per block (the stages' budget)
 
 HELPERS = r"""__device__ __forceinline__ unsigned smem_u32(const void* p) {
