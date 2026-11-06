@@ -216,8 +216,11 @@ K_PIPE_GPUS = GPUModels(())
 # both pass SrTiO3 and NaCl and fail only NbCl5 stress (H200 2.06 against the default's 2.10 in the same job,
 # A100-SXM4 2.38 against 2.42), the A100's accepted exception.
 CG_FOLD_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
-A_LD128_GPUS = GPUModels(())
-TP_NOFLUSH_GPUS = GPUModels(())
+# MD-step A/Bs (6 November 2026, 17212f86; SrTiO3 10x10x10, both build orders; bitwise): H200 A_LD128 0.9925 /
+# 0.9956, TP_NOFLUSH 0.9992 / 1.0018 (noise), both 0.9920 / 0.9956. A100-SXM4-80GB: A_LD128 0.9995 / 1.0001 (tie),
+# TP_NOFLUSH 0.9936 / 0.9954, both 0.9909 / 0.9923 (faster than either alone in both orders).
+A_LD128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+TP_NOFLUSH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give

@@ -630,3 +630,39 @@ Ideas session revision 12 (`tools/lab_round12.py`), kernel lab at `54488d00` (OM
     reference value moves between jobs (6.3–6.5e-8). CG_FOLD changes none of this, so it was adopted
     ("make them default if they are faster and accurate").
   - **Default since this commit on the H200 and A100-SXM4-80GB** (decision 66).
+
+
+### Round 13: one LDS.128 for a (`A_LD128`) and the TP without flush checks (`TP_NOFLUSH`), adopted (6 November 2026)
+
+Ideas session revision 13 (`tools/lab_round13.py`). Kernel lab at `f92c1eb0` on the CG_FOLD base (OMAT-0 medium
+forward kernel, SrTiO3, 15 rounds, L2 flush 256 MB; Modal H200 on `fourth`, A100-SXM4-80GB on `third`; that A100
+base ran at 3211 µs instead of round 12's 2622 µs, so its ratios are probably inflated). Runs in `runs/round13/`.
+
+| Variant | What it does | H200 (base 1494.7 µs) | A100-SXM4 (base 3211.3 µs) | Messages |
+| --- | --- | --- | --- | --- |
+| `rowfold` | 28: CG factors folded per row as well | 0.997 | 0.969 | max rel ≤ 2.9e-7 |
+| `rcfold` | 28: rows and columns | 0.991 | 0.962 | max rel ≤ 2.9e-7 |
+| `fold-tpnf` | 29: TP blocks without flush checks for full in-row batches | 1.000 | 0.967 | bitwise |
+| `rcfold-tpnf` | both | 0.984 | 0.960 | bitwise to rcfold |
+| `fold-kp` | K_PIPE on the fold | 1.012 | 0.999 | bitwise |
+| `fold-a-ld128` | 17(ii): a staged as one float4 per lane and k-step, one LDS.128 | **0.977** | **0.880** | bitwise |
+| `F-a-ld128` | falsifier: LDS.128 with wrong values | 0.974 | 0.805 | – |
+| `rc-all` | rcfold + tpnf + a-ld128 | 0.976 | 0.773 | bitwise to rcfold |
+
+Ported as `fastmace/kernels/oeq_streaming/kloop_rewrites.py` (`apply_a_ld128`, `apply_tp_noflush`), switched by
+`fused_forward.A_LD128` / `TP_NOFLUSH` (bitwise in `tests/gpu/test_fused_folded_forward_cuda.py`). MD-step A/Bs at
+`17212f86` (SrTiO3 10x10x10, b = the switch, both build orders):
+
+| GPU | A_LD128 | TP_NOFLUSH | both |
+| --- | --- | --- | --- |
+| H200 | **0.9925 / 0.9956** | 0.9992 / 1.0018 | 0.9920 / 0.9956 |
+| A100-SXM4-80GB | 0.9995 / 1.0001 | 0.9936 / 0.9954 | **0.9909 / 0.9923** |
+
+- **Defaults (decision 66):** A_LD128 on the H200; A_LD128 and TP_NOFLUSH together on the A100-SXM4 (the pair is
+  faster than either alone in both orders). Both are bitwise, so no gate.
+- **28 (rcfold):** not ported. On the H200 it adds ≈ 0.1 % on top of A_LD128 (rc-all 0.976 against 0.977), and
+  the A100's lab numbers are on the slow base.
+- **K_PIPE on the fold:** slower or a tie; stays off.
+- **Ideas 32 and 30–33 (revision 14):** 32's locality bound is f = 0.08 / 0.14 / 0.22 / 0.33 / 0.42 for Morton tiles
+  of 8 / 16 / 32 / 64 / 128 rows (SrTiO3 10x10x10, 6 Å). Only 32 rows fit in shared memory beside W, where f is
+  below the 0.25 stop line, so 32 is stopped. 30, 31 and 33 are in progress (owner approval, 6 November 2026).

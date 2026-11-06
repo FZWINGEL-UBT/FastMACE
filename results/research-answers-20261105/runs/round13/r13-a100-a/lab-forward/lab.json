@@ -1,0 +1,227 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-06T09:48:08.885790+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f92c1eb0c4a3a91e7be08b9d74c71f489116516c",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 65.124106411,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=27, shared_bytes=162816)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 161,
+          "local_bytes": 64,
+          "median_us": 3211.26389503479,
+          "min_us": 2607.1040630340576,
+          "max_us": 3248.1279373168945,
+          "ratio": 1.0
+        },
+        "rowfold": {
+          "kind": "rounding",
+          "registers": 159,
+          "local_bytes": 48,
+          "compare": {
+            "out0": "max|d|/max|a| = 3.74e-08",
+            "out1": "max|d|/max|a| = 2.91e-07",
+            "out2": "max|d|/max|a| = 1.51e-07",
+            "out3": "max|d|/max|a| = 2.08e-07",
+            "w": "bitwise"
+          },
+          "median_us": 3112.96010017395,
+          "min_us": 2536.4480018615723,
+          "max_us": 3128.3199787139893,
+          "ratio": 0.9693878179825596
+        },
+        "rcfold": {
+          "kind": "rounding",
+          "registers": 167,
+          "local_bytes": 48,
+          "compare": {
+            "out0": "max|d|/max|a| = 3.74e-08",
+            "out1": "max|d|/max|a| = 2.91e-07",
+            "out2": "max|d|/max|a| = 1.51e-07",
+            "out3": "max|d|/max|a| = 2.08e-07",
+            "w": "bitwise"
+          },
+          "median_us": 3090.4319286346436,
+          "min_us": 2514.944076538086,
+          "max_us": 3098.6239910125732,
+          "ratio": 0.9623724582128005
+        },
+        "fold-tpnf": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 64,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 3104.7680377960205,
+          "min_us": 2529.279947280884,
+          "max_us": 3164.1600131988525,
+          "ratio": 0.9668367780662835
+        },
+        "rcfold-tpnf": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 48,
+          "compare": {
+            "against": "rcfold",
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 3082.240104675293,
+          "min_us": 2509.82403755188,
+          "max_us": 3115.0081157684326,
+          "ratio": 0.9598214925409924
+        },
+        "fold-kp": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 64,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 3207.1681022644043,
+          "min_us": 2604.032039642334,
+          "max_us": 3249.1519451141357,
+          "ratio": 0.9987245542863299
+        },
+        "fold-a-ld128": {
+          "kind": "exact",
+          "registers": 168,
+          "local_bytes": 64,
+          "compare": {
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 2827.2640705108643,
+          "min_us": 2609.15207862854,
+          "max_us": 3239.936113357544,
+          "ratio": 0.880420969102645
+        },
+        "F-a-ld128": {
+          "kind": "falsifier",
+          "registers": 168,
+          "local_bytes": 64,
+          "median_us": 2583.5518836975098,
+          "min_us": 2549.760103225708,
+          "max_us": 3171.328067779541,
+          "ratio": 0.8045280513047092
+        },
+        "rc-all": {
+          "kind": "exact",
+          "registers": 167,
+          "local_bytes": 48,
+          "compare": {
+            "against": "rcfold",
+            "out0": "bitwise",
+            "out1": "bitwise",
+            "out2": "bitwise",
+            "out3": "bitwise",
+            "w": "bitwise"
+          },
+          "median_us": 2483.2000732421875,
+          "min_us": 2462.7199172973633,
+          "max_us": 3044.3520545959473,
+          "ratio": 0.7732781093081997
+        }
+      }
+    }
+  },
+  "constants": {},
+  "ptxas": {
+    "forward": {
+      "base": {
+        "9.0": {
+          "registers": 150,
+          "spill_store_bytes": 0
+        }
+      },
+      "rowfold": {
+        "9.0": {
+          "registers": 163,
+          "spill_store_bytes": 0
+        }
+      },
+      "rcfold": {
+        "9.0": {
+          "registers": 163,
+          "spill_store_bytes": 0
+        }
+      },
+      "fold-tpnf": {
+        "9.0": {
+          "registers": 153,
+          "spill_store_bytes": 0
+        }
+      },
+      "rcfold-tpnf": {
+        "9.0": {
+          "registers": 156,
+          "spill_store_bytes": 0
+        }
+      },
+      "fold-kp": {
+        "9.0": {
+          "registers": 154,
+          "spill_store_bytes": 0
+        }
+      },
+      "fold-a-ld128": {
+        "9.0": {
+          "registers": 162,
+          "spill_store_bytes": 0
+        }
+      },
+      "F-a-ld128": {
+        "9.0": {
+          "registers": 156,
+          "spill_store_bytes": 0
+        }
+      },
+      "rc-all": {
+        "9.0": {
+          "registers": 157,
+          "spill_store_bytes": 0
+        }
+      }
+    }
+  },
+  "profiled": {
+    "forward": []
+  }
+}

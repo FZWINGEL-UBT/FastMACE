@@ -472,6 +472,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ideas-r9](#ideas-r9) | 14 and 16 warps (idea 22(ii)), part phases (25), x-load bounds, atom order, persistent w′ (23) | none (lab variants `wg14`, `wg16`, `F-x-row0`, `F-part0-only`, `wp-persist*`) | FM | 22(ii), 23, 25 CLOSED; nothing adopted | 2026-11-06 | H200 wg14 1.029, wg16 1.017 (128 regs, spills); F-no-xload-wg16 0.900 vs wg12 0.905; F-x-row0 H200 0.977, A100-SXM4 0.988; Morton = repeat; best w′ variant H200 0.987, A100 1.113 | [research answers](../results/research-answers-20261105/README.md#round-9-more-warps-part-phases-x-load-bounds-a-persistent-w-6-november-2026) |
 | [ideas-r11](#ideas-r11) | x gathers after the k-loop (idea 27, `X_LATE`), a/W one k-step ahead (`K_PIPE`), staging one batch ahead (idea 26) | `fused_forward.X_LATE_GPUS`, `K_PIPE_GPUS` | FM | X_LATE DEFAULT on the H200 and A100-SXM4; K_PIPE off; 26 REJECTED | 2026-11-06 | MD X_LATE H200 0.9884 / 0.9882, A100-SXM4 0.9937 / 0.9937; stage-ahead lab H200 1.012–1.034 | [research answers](../results/research-answers-20261105/README.md#round-11-x-gathers-after-the-k-loop-x_late-adopted-stage-ahead-rejected-6-november-2026) |
 | [ideas-r12](#ideas-r12) | CG factors folded into W (idea 24, `CG_FOLD`), TP inside the next k-loop (22(iii)) | `fused_forward.CG_FOLD_GPUS`, `cg_fold.py` | FM | CG_FOLD DEFAULT on the H200 and A100-SXM4; 22(iii) REJECTED | 2026-11-06 | MD CG_FOLD H200 0.9938 / 0.9959, A100-SXM4 0.9877 / 0.9898; lab 22(iii) 1.03–1.21 | [research answers](../results/research-answers-20261105/README.md#round-12-cg-factors-folded-into-w-cg_fold-adopted-tp-in-the-next-k-loop-rejected-6-november-2026) |
+| [ideas-r13](#ideas-r13) | a read with one LDS.128 (17(ii), `A_LD128`), TP without flush checks (29, `TP_NOFLUSH`), further CG folds (28), K_PIPE on the fold; mirror tiles (32) | `fused_forward.A_LD128_GPUS`, `TP_NOFLUSH_GPUS`, `kloop_rewrites.py` | FM | A_LD128 DEFAULT on the H200 and A100-SXM4, TP_NOFLUSH on the A100-SXM4; 28 not ported; 32 STOPPED | 2026-11-06 | MD H200 A_LD128 0.9925 / 0.9956; A100-SXM4 both 0.9909 / 0.9923; 32: f = 0.22 at 32 rows | [research answers](../results/research-answers-20261105/README.md#round-13-one-lds128-for-a-a_ld128-and-the-tp-without-flush-checks-tp_noflush-adopted-6-november-2026) |
 | [ideas-r3](#ideas-r3) | w once per mirror pair (idea 14); lane-parallel batch index loads in the fused forward (idea 15a) | `fused_forward.LANE_INDICES`, `LANE_INDICES_GPUS` | FM | idea 14 DROPPED (bound); LANE_INDICES DEFAULT on the H200 | 2026-11-06 | H200 MD step 0.9897 / 0.9913; lab forward 0.966 (bitwise); 5060 Ti lab 1.024 | [research answers](../results/research-answers-20261105/README.md#ideas-session-third-revision-w-once-per-mirror-pair-lane-parallel-index-loads-6-november-2026) |
 | [kr-sh-lds4](#kr-sh-lds4) | Fused forward: the TP's sh reads as float4 shared loads | `fused_forward.SH_LDS4`, `SH_LDS4_GPUS` | FM | DEFAULT on the RTX 5060 Ti (decision 66) | 2026-11-06 | lab 5060 Ti 0.972, H200 0.989, A100-SXM4 0.993 (bitwise); MD 5060 Ti 0.9932 / 0.9902, H200 1.0014 / 1.0027, A100-SXM4 1.0008 / 0.9949 | [kernel review](validation/kernel-review-20261105.md) |
 | [kr-x-nodep](#kr-x-nodep) | Fused forward: register prefetch of the next batch's x (the senders → x dependency) | none (lab bound `F-x-nodep`) | FM | REJECTED (bound) | 2026-11-06 | F-x-nodep 5060 Ti 0.989 against F-no-xload 0.930; H200 1.094 against 0.900 | [kernel review](validation/kernel-review-20261105.md) |
@@ -4329,6 +4330,18 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
   - A pre-split a for W_GROUP could gain up to about 3 % on the H200.
   - The B1 bias correction is the cheap fix for the 3xTF32 slope (≈ 1.5 % of the forward on the H200, removing
     ≈ 40 % of the slope). It is not needed while the gate passes.
+
+<a id="ideas-r13"></a>
+### ideas-r13: one LDS.128 for a and the TP without flush checks, adopted (6 November 2026)
+
+- **`A_LD128` (17(ii)):** a staged so that a lane's four a values of a k-step lie in one float4; the k-loop reads
+  them with one LDS.128 instead of four LDS.32. Bitwise. MD step H200 0.9925 / 0.9956 (default); A100-SXM4 alone a
+  tie, with TP_NOFLUSH 0.9909 / 0.9923 (default).
+- **`TP_NOFLUSH` (29):** a copy of the TP blocks without flush checks for full batches whose last receiver is the
+  current row. Bitwise. A100-SXM4 0.9936 / 0.9954 (default); H200 noise (off).
+- **28 (rowfold, rcfold):** rounding; ≈ 0.1 % on the H200 on top of A_LD128. Not ported.
+- **32 (w shared by mirror pairs in a tile):** f = 0.22 at the 32-row tiles that fit beside W, below the 0.25 stop
+  line. Stopped.
 
 <a id="ideas-r12"></a>
 ### ideas-r12: CG factors folded into W, adopted; TP in the next k-loop rejected (6 November 2026)

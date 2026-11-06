@@ -1,0 +1,11 @@
+exit=0
+Modal budget: metered this month $18.87 + still running $0.00 + this job's worst case $2.35 (A100-80GB, 2400 s + 300 s start) = $21.22, limit $30.00 (cap $30, reserve $0)
+forward  F-a-ld128           2583.6 us  ratio 0.805  regs 168 local 64  
+forward  base                3211.3 us  ratio 1.000  regs 161 local 64  
+forward  fold-a-ld128        2827.3 us  ratio 0.880  regs 168 local 64  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  fold-kp             3207.2 us  ratio 0.999  regs 167 local 64  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  fold-tpnf           3104.8 us  ratio 0.967  regs 167 local 64  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rc-all              2483.2 us  ratio 0.773  regs 167 local 48  {'against': 'rcfold', 'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rcfold              3090.4 us  ratio 0.962  regs 167 local 48  {'out0': 'max|d|/max|a| = 3.74e-08', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 1.51e-07', 'out3': 'max|d|/max|a| = 2.08e-07', 'w': 'bitwise'}
+forward  rcfold-tpnf         3082.2 us  ratio 0.960  regs 167 local 48  {'against': 'rcfold', 'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rowfold             3113.0 us  ratio 0.969  regs 159 local 48  {'out0': 'max|d|/max|a| = 3.74e-08', 'out1': 'max|d|/max|a| = 2.91e-07', 'out2': 'max|d|/max|a| = 1.51e-07', 'out3': 'max|d|/max|a| = 2.08e-07', 'w': 'bitwise'}
