@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "aa6dad8ca604419bd1086b041ab14b81f7466dbe",
+  "command": "nvidia-smi --query-gpu=name --format=csv,noheader | grep -q 'H200' || { echo WRONG-GPU; nvidia-smi --query-gpu=name --format=csv,noheader; exit 3; }; ALIAS='NVIDIA H200' TESTS=0 GATE=0 LOUP=0 FORWARD_VARIANTS= WPRIME_VARIANTS=  AB='estrin|fastmace.kernels.oeq_streaming.wprime_backward:ESTRIN=True' bash tools/modal/hopper_sweep.sh",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 208.74595308303833,
+  "estimated_gpu_cost_usd": 0.26325184083249836
+}
