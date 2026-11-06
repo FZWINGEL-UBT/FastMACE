@@ -122,6 +122,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "W_GROUP": "warp groups share W fragments; A/B",
                                                         "WFRAG_REGION": "fragment-sized W region; A/B",
                                                         "A_SPLIT": "W_GROUP a split once at staging; A/B",
+                                                        "X_LATE": "idea 27: x gathers after the k-loop; A/B",
+                                                        "K_PIPE": "idea 27: a and W one k-step ahead; A/B",
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
                                                         "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",

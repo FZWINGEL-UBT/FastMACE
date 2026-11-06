@@ -164,6 +164,14 @@ WFRAG_REGION = None
 # warps x KP x B x 4 bytes; off when that does not fit). Bitwise. None: on for A_SPLIT_GPUS (decision 66); True /
 # False: an A/B side's choice.
 A_SPLIT = None
+# H200 ideas plan idea 27 (round 11, 6 November 2026): with W_GROUP the x gathers (and their index shuffles) sit in
+# the staging, so x and the receivers stay live in registers through the whole k-loop although only the TP reads them.
+# X_LATE moves them to just before the C-write barrier (after the k-loop); K_PIPE loads the next k-step's a values and
+# first W fragment one k-step ahead. Both bitwise (the same loads and products, in the same order per accumulator).
+# Kernel lab, A100-SXM4: xlate 0.961, xlate-kp 0.958. Only with W_GROUP and without A_SPLIT. None: on for
+# X_LATE_GPUS / K_PIPE_GPUS (decision 66); True / False: an A/B side's choice.
+X_LATE = None
+K_PIPE = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -187,6 +195,8 @@ LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
 W_GROUP_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 WFRAG_REGION_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 A_SPLIT_GPUS = GPUModels(())
+X_LATE_GPUS = GPUModels(())
+K_PIPE_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -288,6 +298,22 @@ def a_split_default(name=None):
     on = A_SPLIT
     if on is None:
         on = name in A_SPLIT_GPUS
+    return bool(on)
+
+
+def x_late_default(name=None):
+    """``X_LATE`` (None: ``name`` in ``X_LATE_GPUS``); built only with ``W_GROUP`` and without ``A_SPLIT``."""
+    on = X_LATE
+    if on is None:
+        on = name in X_LATE_GPUS
+    return bool(on)
+
+
+def k_pipe_default(name=None):
+    """``K_PIPE`` (None: ``name`` in ``K_PIPE_GPUS``); built only with ``W_GROUP`` and without ``A_SPLIT``."""
+    on = K_PIPE
+    if on is None:
+        on = name in K_PIPE_GPUS
     return bool(on)
 
 
@@ -1017,13 +1043,106 @@ def _node(layout, channels, start, component, dim):
     return f"{start + component} + ch * {dim}"
 
 
+
+# Idea 27 (X_LATE, K_PIPE): text transforms of the W_GROUP render, each pattern's count checked.
+_KP_A_OLD = """                    #pragma unroll 2
+                    for (int k0 = 0; k0 < KP; k0 += 8) {
+                        unsigned bh[2][2], bl[2][2];  // a^T fragments of batch t: k = k0 + tq (+4), edge = gid
+                        #pragma unroll
+                        for (int t = 0; t < 2; ++t) {
+                            const float* at = a_s + (t - gr) * A_STRIDE;
+                            split_tf32(at[gid * KP + (((k0 >> 2) ^ gid) << 2) + tq],
+                                       bh[t][0], bl[t][0]);
+                            split_tf32(at[gid * KP + ((((k0 >> 2) + 1) ^ gid) << 2) + tq],
+                                       bh[t][1], bl[t][1]);
+                        }
+"""
+_KP_A_NEW = """                    float pa[2][2];  // K_PIPE: the next k-step's a values, loaded one k-step ahead
+                    float4 pw;       // and its first W fragment (g = 0)
+                    #pragma unroll
+                    for (int t = 0; t < 2; ++t) {
+                        const float* at = a_s + (t - gr) * A_STRIDE;
+                        pa[t][0] = at[gid * KP + ((0 ^ gid) << 2) + tq];
+                        pa[t][1] = at[gid * KP + ((1 ^ gid) << 2) + tq];
+                    }
+                    pw = reinterpret_cast<const float4*>(Ws)[gr * 32 + lane];
+                    #pragma unroll 2
+                    for (int k0 = 0; k0 < KP; k0 += 8) {
+                        unsigned bh[2][2], bl[2][2];  // a^T fragments of batch t: k = k0 + tq (+4), edge = gid
+                        #pragma unroll
+                        for (int t = 0; t < 2; ++t) {
+                            split_tf32(pa[t][0], bh[t][0], bl[t][0]);
+                            split_tf32(pa[t][1], bh[t][1], bl[t][1]);
+                        }
+                        const float4 w0 = pw;
+                        const int k1 = (k0 + 8 < KP) ? k0 + 8 : k0;  // the last k-step reloads its own (unused)
+                        #pragma unroll
+                        for (int t = 0; t < 2; ++t) {
+                            const float* at = a_s + (t - gr) * A_STRIDE;
+                            pa[t][0] = at[gid * KP + (((k1 >> 2) ^ gid) << 2) + tq];
+                            pa[t][1] = at[gid * KP + ((((k1 >> 2) + 1) ^ gid) << 2) + tq];
+                        }
+                        pw = reinterpret_cast<const float4*>(Ws)[((k1 >> 3) * 2 + gr) * 32 + lane];
+"""
+_KP_W_OLD = """                            const float4 wv = reinterpret_cast<const float4*>(Ws)[
+                                ((g * (KP / 8) + (k0 >> 3)) * 2 + gr) * 32 + lane];
+"""
+_KP_W_NEW = """                            const float4 wv = (g == 0) ? w0 : reinterpret_cast<const float4*>(Ws)[
+                                ((g * (KP / 8) + (k0 >> 3)) * 2 + gr) * 32 + lane];
+"""
+_XL_START = "                float xv[B]"
+_XL_END = "                __syncwarp();\n                if (!group_any(!done, gbar)) break;"
+_XL_BAR = "                group_sync(gbar);  // the group's r_s rows written\n"
+
+
+def _exact_sub(source, old, new, count):
+    found = source.count(old)
+    if found != count:
+        raise ValueError(f"fused_forward idea 27: pattern found {found} times, not {count}: {old[:70]!r}")
+    return source.replace(old, new)
+
+
+def apply_k_pipe(source):
+    """``K_PIPE`` on a W_GROUP render (VEC_A's a tile): the next k-step's a values and first W fragment loaded one
+    k-step ahead, in every part's k-loop. Raises ValueError where the patterns do not apply."""
+    count = source.count(_KP_A_OLD)
+    if not count:
+        raise ValueError("fused_forward K_PIPE needs the W_GROUP render with VEC_A")
+    return _exact_sub(_exact_sub(source, _KP_A_OLD, _KP_A_NEW, count), _KP_W_OLD, _KP_W_NEW, count)
+
+
+def apply_x_late(source):
+    """``X_LATE`` on a W_GROUP render: every part's x gathers (from ``float xv[B]`` to the group vote) moved to just
+    before the C-write barrier, after the k-loop."""
+    count = source.count(_XL_START)
+    for marker in (_XL_START, _XL_END, _XL_BAR):
+        if not count or source.count(marker) != count:
+            raise ValueError(f"fused_forward X_LATE needs the W_GROUP render: {marker[:40]!r} found "
+                             f"{source.count(marker)} times")
+    out, pos = source, 0
+    for _ in range(count):
+        i = out.index(_XL_START, pos)
+        j = out.index(_XL_END, i)
+        b = out.index(_XL_BAR, j)
+        out = out[:i] + out[j:b] + out[i:j] + out[b:]
+        pos = b + len(_XL_BAR)
+    return out
+
+
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-           lane_idx=False, w_group=False, wfrag_region=False, a_split=False):
-    """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``)."""
+           lane_idx=False, w_group=False, wfrag_region=False, a_split=False, x_late=False, k_pipe=False):
+    """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``); ``k_pipe`` and
+    ``x_late``: idea 27's transforms (W_GROUP renders without A_SPLIT)."""
     source = _render(schedule, k, rule, store_w, used, stream_store, tc, blocks, prefetch, vec_sh, vec_a, wfrag, tctp,
                      wgmma, groups, sh_lds4, w_group, wfrag_region, a_split)
-    return lane_indices(source) if lane_idx else source
+    if lane_idx:
+        source = lane_indices(source)
+    if k_pipe:
+        source = apply_k_pipe(source)
+    if x_late:
+        source = apply_x_late(source)
+    return source
 
 
 def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
@@ -2120,11 +2239,19 @@ class FusedFoldedForward:
                 self.rule = dataclasses.replace(self.rule, shared_bytes=self.rule.shared_bytes + extra)
             else:
                 self.a_split = False
-        self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
-                             prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
-                             tctp=self.tctp, wgmma=self.wgmma, groups=self.groups, sh_lds4=self.sh_lds4,
-                             lane_idx=self.lane_idx, w_group=self.w_group, wfrag_region=self.wfrag_region,
-                             a_split=self.a_split)
+        name = torch.cuda.get_device_name(device)
+        self.k_pipe = k_pipe_default(name) and self.w_group and not self.a_split
+        self.x_late = x_late_default(name) and self.w_group and not self.a_split
+        options = dict(prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag, tctp=self.tctp,
+                       wgmma=self.wgmma, groups=self.groups, sh_lds4=self.sh_lds4, lane_idx=self.lane_idx,
+                       w_group=self.w_group, wfrag_region=self.wfrag_region, a_split=self.a_split)
+        try:
+            self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
+                                 x_late=self.x_late, k_pipe=self.k_pipe, **options)
+        except ValueError:  # idea 27's patterns do not apply to this render: built without them
+            self.x_late = self.k_pipe = False
+            self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
+                                 **options)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))

@@ -314,6 +314,25 @@ for layout in ("ir_mul", "mul_ir"):
                         only = fused_folded_message(a_u, source_w, X_u, Y_u, *args_u, built[True, "message"].id)
                         assert torch.equal(only, base_out[0]), (layout, k, used)
                     report[name][f"w group bitwise {used}{' vec a' if vec else ''}"] = grouped.rule.warps
+                    # Idea 27 (X_LATE, K_PIPE; round 11): bitwise the grouped kernel; K_PIPE only with VEC_A.
+                    for late, pipe in ((True, False), (False, True), (True, True)):
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
+                        ff_module.VEC_A, ff_module.X_LATE, ff_module.K_PIPE = vec, late, pipe
+                        try:
+                            moved = FusedFoldedForward(kernels, k, used=used)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = False, None, None
+                            ff_module.VEC_A, ff_module.X_LATE, ff_module.K_PIPE = None, None, None
+                        label = f"{'x late ' if late else ''}{'k pipe ' if pipe else ''}{used}{' vec a' if vec else ''}"
+                        if pipe and not vec:  # K_PIPE needs VEC_A's a tile: built without idea 27
+                            assert not moved.k_pipe and not moved.x_late and moved.source == grouped.source, label
+                            continue
+                        assert moved.x_late == late and moved.k_pipe == pipe, label
+                        assert moved.source != grouped.source, label
+                        moved_out = fused_folded_forward(a_u, source_w, X_u, Y_u, *args_u, moved.id)
+                        assert torch.equal(moved_out[0], base_out[0]), label
+                        assert torch.equal(moved_out[1], base_out[1]), label
+                        report[name][f"bitwise {label}"] = moved.rule.warps
                     if vec:  # A_SPLIT (round 7): the pairs' a split once at staging, bitwise the grouped kernel
                         ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
                         ff_module.VEC_A, ff_module.A_SPLIT = True, True
