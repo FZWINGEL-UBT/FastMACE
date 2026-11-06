@@ -61,6 +61,112 @@ Earlier statements that "dout locality is worth nothing" are now refuted, not ju
 CPU check: the share of contributing edges that lie in receiver tiles of at least eight edges, with a stop below
 one half. Then comes the 32-channel striped design. Its own ceiling is ≈ 190 µs, before staging costs.
 
+## Idea 38, continued: receiver-staged dout (STAGE_DOUT)
+
+### CPU check: receiver-tile lengths
+
+[tile_census.py](ideas-37-38/tile_census.py) emulates FastMACE's skin list on SrTiO3 10×10×10 (cutoff 6 Å, skin
+0.5 Å; output in [tile_census.txt](ideas-37-38/tile_census.txt)):
+
+- pairs within cutoff + skin are sorted by receiver (`sort_receivers` is on for the hybrid graph engine), then
+  compacted stably so the pairs within the cutoff come first;
+- the list is cut to the captured 373,760 edges.
+
+With 0.07 Å Gaussian disorder (≈ 300 K):
+
+- 368,902 contributing edges;
+- runs of equal receiver have 62–86 contributing edges (mean 73.8);
+- with 16-edge tiles, 98.9 % of the contributing edges lie in tiles of at least 8 edges (32-edge tiles: 99.9 %);
+- 0.068 dout rows are read per edge (16-edge tiles) or 0.038 (32-edge tiles), against one per edge today.
+
+The ideal lattice gives 98.4 %. The plan's stop line (below one half) is far away.
+
+### The form the tiles support
+
+The runs are about 74 edges long, so the receiver's whole dout row can be staged instead of 32-channel stripes.
+That is 5,120 floats, 20 KB, per block of up to 16–32 edges.
+
+- The whole row keeps the per-edge body unchanged: one warp per edge, four channel passes.
+- So no dsh/dr reduction across stripes is needed, and the outputs stay bitwise.
+- The cost is 20 KB of shared memory per 128-thread block. At 72 registers that allows seven blocks per SM, which
+  uses 147 KB of the H200's 228 KB.
+
+Two lab forms (`tools/lab_ideas3738.py`):
+
+- **`stage-t<T>` (descriptor tiles):**
+  - one block per tile of at most T consecutive edges of one receiver; the tile starts are built from the receivers
+    on the host side of the lab and are not timed;
+  - the block copies the receiver's row with float4 loads, then one barrier;
+  - the four warps take the tile's edges in turn.
+- **`stage-c<C>` (chunks, what production uses):**
+  - block b owns edges [bC, (b + 1)C) and walks the runs of equal receiver inside them;
+  - one `__ballot_sync` over the next 32 receivers finds each run's end;
+  - per run: copy the row, barrier, the warps run the run's edges, barrier.
+  - It needs no descriptors and no data-dependent grid, so it can be captured in a CUDA graph. It is also correct
+    for any edge order; unsorted edges just make the runs short.
+
+sm_90 builds of all forms (CPU, [sass-summary.json](ideas-37-38/cpu-sm90/sass-summary.json)):
+
+- 72 registers, no stack, 21,504 B static shared memory;
+- the 40 dout LDGs become 40 LDS (64 LDG instead of 97).
+
+### H200 lab
+
+Runs r2 at `4123f9f3` (app `ap-p5tocgQG2krVpM5OQUo2nP`) and r3 at `0cca39cf` (app `ap-0THiqFWkpbA9FAiicKlJfb`). Same workload and lab settings as above.
+
+| Variant | r2 µs | r2 / base | r3 µs | r3 / base | dsh | dr | dx |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| base | 1,621.2 | 1.000 | 1,643.7 | 1.000 | | | |
+| stage-t8 | 1,496.9 | 0.923 | | | bitwise | bitwise | 2.5e-7 |
+| stage-t16 | 1,432.0 | 0.883 | | | bitwise | bitwise | 3.1e-7 |
+| stage-t32 | 1,419.4 | 0.875 | 1,441.0 | 0.877 | bitwise | bitwise | 3.1–4.4e-7 |
+| stage-c16 | | | 1,458.6 | 0.887 | bitwise | bitwise | 3.1e-7 |
+| **stage-c32** | | | **1,440.7** | **0.877** | bitwise | bitwise | 3.7e-7 |
+| FF-dout-row0 (bound) | 1,450.2 | 0.895 | 1,462.5 | 0.890 | – | – | – |
+
+- The dx differences are the atomics' order, as for the bitwise-exact maxreg variants.
+- The staged kernels beat the "perfect locality" bound by about 1.5 %. The bound still reads its dout through
+  global loads, while staging turns 40 LDG per channel pass into LDS. The chunk form is as fast as the descriptor
+  tiles at 32 edges.
+- **Lab verdict:** 0.877 ≤ 0.95, so it is ported.
+
+### Production: `wprime_backward.STAGE_DOUT`
+
+Branch `fastmace/wp-ideas-37-38`, `0107847c` (kernel) and `0cca39cf` (job script).
+
+- **The switch:**
+  - `STAGE_DOUT = None`, `STAGE_DOUT_GPUS = GPUModels(())` (empty: off everywhere);
+  - `stage_dout_default(device)`;
+  - `STAGE_DOUT_CHUNK = 32`.
+- **Where:** a `stage_dout` render option in the Jinja template, the chunk form. It covers the block-layout message
+  (`BLOCK_MESSAGE`, the H200 default) and the dense row.
+- **Fallback:** `stage_dout_supported` requires float32, 32-lane cohorts, a chunk of 1–32 edges and a dout row
+  within 48 KB; otherwise the kernel is unstaged. The copy uses float4 when the row is 16-byte aligned and its
+  length is a multiple of 4, else scalar loads. The launch is `ceil(edges / 32)` blocks.
+- **Layering:** a `test_layering` allow-list entry.
+- **GPU test** (`tests/gpu/test_wprime_backward_cuda.py`):
+  - cases `stage-dout-{ir_mul,mul_ir}-{32,5,32-table-w}`, staged against unstaged through `WPrime.convolution`,
+    with and without graph capture;
+  - case `stage-dout-blocks`: the block-layout kernels called directly;
+  - dsh and dL/dr must be bitwise, dx within the atomic tolerance.
+  - **H200:** the whole file passes (r3, `gputest.log`, 28 s).
+  - **RTX 5060 Ti:** the file's first, pre-existing check fails, on origin/main too (REDUX's fixed-point dsh against
+    the 1e-6 tolerance). With REDUX off, every STAGE_DOUT case is bitwise.
+
+**MD-step A/B** (r3; `tools/ab_rewrites.py`, SrTiO3 10×10×10, OMAT-0 medium, 1 fs, skin 0.5, 6 blocks of 256
+steps after 200 warm-up; b = `STAGE_DOUT=True`):
+
+| Order | a (ms) | b (ms) | b/a |
+| --- | --- | --- | --- |
+| ab | 5.5034 | 5.3313 | **0.9687** |
+| ba | 5.4899 | 5.3239 | **0.9698** |
+
+That is about −170 µs per MD step, consistent with the kernel's −200 µs. No force/stress gate was run: dsh and dL/dr
+are bitwise and dx differs only in the atomics' order, which already varies between runs of the base.
+
+**Verdict:** STAGE_DOUT is ready for a decision-66 H200 default (add "NVIDIA H200" to `STAGE_DOUT_GPUS`). It stays
+off here as asked. The A100-SXM4 and other GPUs are unmeasured.
+
 ## Idea 37: the w′ split by harmonic degree
 
 **Integration.** Feasible, about an hour of work. The lab transform rebuilds Codex's prototype from the plan's
@@ -97,5 +203,12 @@ this kernel.
 
 ## Budget
 
-One Modal H200 job (profile `fourth`), 337 s wall time, $0.20 metered. The profile's month stood at $13.17
-afterwards.
+Three Modal H200 jobs (profile `fourth`):
+
+| Run | Wall time | Metered |
+| --- | --- | --- |
+| r1 | 337 s | $0.20 |
+| r2 | 334 s | $0.47 |
+| r3 | 477 s | $0.92 |
+
+The profile's month stood at $14.55 afterwards.
