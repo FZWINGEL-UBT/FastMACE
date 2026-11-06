@@ -58,6 +58,17 @@ receiver = torch.sort(receiver).values
 sender = torch.randint(0, nodes, (edges,), device="cuda", generator=g)
 key = torch.where(torch.arange(edges, device="cuda") < edges - padding, receiver, torch.full_like(receiver, nodes))
 rows = torch.searchsorted(key, torch.arange(nodes + 1, device="cuda")).to(torch.int32)
+# An uneven neighbourhood for W_GROUP: every 37th receiver has 150 edges, the others 0 to 5, then the padding edges,
+# so the two warps of a pair run out of chunks at different times.
+nodes_u = 2000
+degree = torch.randint(0, 6, (nodes_u,), device="cuda", generator=g)
+degree[::37] = 150
+real_u = torch.repeat_interleave(torch.arange(nodes_u, device="cuda"), degree)
+receiver_u = torch.cat([real_u, torch.full((padding,), nodes_u - 1, device="cuda")])
+key_u = torch.cat([real_u, torch.full((padding,), nodes_u, device="cuda")])
+rows_u = torch.searchsorted(key_u, torch.arange(nodes_u + 1, device="cuda")).to(torch.int32)
+edges_u = receiver_u.numel()
+sender_u = torch.randint(0, nodes_u, (edges_u,), device="cuda", generator=g)
 report = {}
 for layout in ("ir_mul", "mul_ir"):
     kernels = StreamingKernels(problem, np.float32, layout=layout)
@@ -248,6 +259,45 @@ for layout in ("ir_mul", "mul_ir"):
             lane_out = fused_folded_forward(a, weight, X, Y, *args, lanes.id)
             assert torch.equal(lane_out[0], base_out[0]) and torch.equal(lane_out[1], base_out[1]), (layout, k, tc_on)
             report[name][f"lane indices {'tc' if tc_on else 'simt'}"] = True
+        # W_GROUP (ideas plan, idea 17): warp pairs share each W fragment, bitwise the per-warp product, with the
+        # tensor-core product in fragment order (TC_WFRAG, as the H200 plan), on the uneven neighbourhood; with the
+        # zero-column skip and VEC_A where they apply, and the message-only kernel (store_w=False).
+        if torch.cuda.get_device_capability() >= (8, 0):
+            X_u = torch.randn((nodes_u, irreps_in1.dim), device="cuda", generator=g)
+            Y_u = torch.randn((edges_u, irreps_in2.dim), device="cuda", generator=g)
+            a_u = torch.randn((edges_u, k), device="cuda", generator=g)
+            args_u = (sender_u.int(), receiver_u.int(), rows_u)
+            for used in sorted({k, k - 1}):
+                source_w = weight if used == k else zero
+                for vec in ((False, True) if used % 32 == 0 else (False,)):
+                    built = {}
+                    for on in (False, True):
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, on
+                        ff_module.VEC_A = vec
+                        try:
+                            built[on] = FusedFoldedForward(kernels, k, used=used)
+                            if vec:
+                                built[on, "message"] = FusedFoldedForward(kernels, k, used=used, store_w=False)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = False, None, None
+                            ff_module.VEC_A = None
+                    plain, grouped = built[False], built[True]
+                    if grouped.rule.warps % 2:  # pairs need an even warp count: ignored (the plain kernel)
+                        assert not grouped.w_group and grouped.source == plain.source, (layout, k, used, vec)
+                        report[name][f"w group {used}{' vec a' if vec else ''}"] = f"odd warps {grouped.rule.warps}"
+                        continue
+                    assert grouped.w_group and "group_any(" in grouped.source, (layout, k, used, vec)
+                    assert not plain.w_group and "group_any(" not in plain.source, (layout, k, used, vec)
+                    assert grouped.wfrag and grouped.vec_a == vec, (layout, k, used, vec)
+                    base_out = fused_folded_forward(a_u, source_w, X_u, Y_u, *args_u, plain.id)
+                    group_out = fused_folded_forward(a_u, source_w, X_u, Y_u, *args_u, grouped.id)
+                    assert torch.equal(group_out[0], base_out[0]), (layout, k, used, vec)
+                    assert torch.equal(group_out[1], base_out[1]), (layout, k, used, vec)
+                    if vec:
+                        from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_message
+                        only = fused_folded_message(a_u, source_w, X_u, Y_u, *args_u, built[True, "message"].id)
+                        assert torch.equal(only, base_out[0]), (layout, k, used)
+                    report[name][f"w group bitwise {used}{' vec a' if vec else ''}"] = grouped.rule.warps
         # VEC_SH on the FP32-SIMT kernel: bitwise.
         ff_module.VEC_SH = True
         try:

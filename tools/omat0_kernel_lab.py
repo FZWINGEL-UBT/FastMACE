@@ -865,6 +865,21 @@ def _tc_wfrag_split(kernel):
     return transform
 
 
+def _w_group(kernel):
+    """The plan's wfrag kernel re-rendered with warp pairs sharing each W fragment (fused_forward.W_GROUP, idea 17 at
+    G = 2): bitwise, the plan's launch rule, parts, staging and flags."""
+    def transform(s):
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        if not getattr(kernel, "wfrag", False) or kernel.tc is not True or kernel.tctp or kernel.wgmma:
+            raise ValueError("w-group needs the plan's wfrag kernel (TC_WFRAG, not presplit, TC_TP or WGMMA)")
+        source = ff.render(kernel.schedule, kernel.k, kernel.rule, kernel.store_w, kernel.used, tc=True,
+                           blocks=kernel.blocks, prefetch=False, vec_sh=kernel.vec_sh, vec_a=kernel.vec_a, wfrag=True,
+                           groups=kernel.groups, sh_lds4=kernel.sh_lds4, lane_idx=kernel.lane_idx, w_group=True)
+        print(f"w-group rule {kernel.rule} (the plan's)", flush=True)
+        return source
+    return transform
+
+
 def _ns_slab(s):
     """No store, and w from a 6-term slab with float2 loads instead of the a.W product (wprime_backward.TABLE_W in the
     forward): w[g][b] = sum_k a_k G_k, the a row's first 6 values standing in for the Chebyshev basis and W's own
@@ -1366,6 +1381,8 @@ def forward_variants(kernel=None):
         "F-w-half": ("falsifier", lambda s: _sub(s, _WFRAG_INDEX, _WFRAG_INDEX.replace("* 2 + m)", "* 2 + 0)")), ()),
         "F-w-quarter": ("falsifier", lambda s: _sub(s, _WFRAG_INDEX, _WFRAG_INDEX.replace("* 2 + m)", "* 2 + 0)")
                                                      .replace("((g * (KP", "(((g & ~1) * (KP")), ()),
+        # Idea 17 built at G = 2 (fused_forward.W_GROUP): warp pairs share each W fragment. Bitwise.
+        "w-group": ("exact", _w_group(kernel), ()),
         "F-skew-100ns": ("exact", lambda s: _skew(s, "(warp & 1) * 100"), ()),
         "F-skew-300ns": ("exact", lambda s: _skew(s, "(warp & 1) * 300"), ()),
         "F-skew-1us": ("exact", lambda s: _skew(s, "(warp & 1) * 1000"), ()),

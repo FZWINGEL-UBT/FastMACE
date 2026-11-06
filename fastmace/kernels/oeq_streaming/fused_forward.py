@@ -142,6 +142,16 @@ TC_WFRAG_SPLIT = None
 # RTX 5060 Ti (H200 plan) 1.024; H200 MD step 0.990 (decision 66: default there). None: on for LANE_INDICES_GPUS
 # (decision 66); True / False: an A/B side's choice.
 LANE_INDICES = None
+# Ideas plan idea 17 (6 November 2026): warp pairs share each W fragment (G = 2). Warps 2v and 2v + 1 form group v
+# (named barrier 1 + v); each stages its own batch as before, then in the k-loop computes one m-tile of every path of
+# its part (16 of the 32 channels: m = warp & 1) for both batches of its group, reading the partner's a fragments from
+# the partner's a_s, and writes those C fragments into the owning warp's r_s. Each W fragment is loaded and split once
+# for two batches (half the k-loop's W traffic); the accumulators stay at today's count. A warp without chunks joins
+# its group's k-loops with an empty batch until a bar.red.or vote says neither has one. Bitwise: every w is the same
+# MMAs of one W tile and one batch, k ascending. Kernel lab bounds (F-w-half): H200 0.878 of the forward, A100-SXM4
+# 0.876. Only on the TF32 product with TC_WFRAG (not presplit, TC_TP or WGMMA) and an even warp count. None: on for
+# W_GROUP_GPUS (decision 66); True / False: an A/B side's choice.
+W_GROUP = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -159,6 +169,7 @@ TC_TP_GPUS = GPUModels(())
 TC_WFRAG_SPLIT_GPUS = GPUModels(())
 # H200 MD-step A/B (6 November 2026, results/research-answers-20261105): 0.9897 / 0.9913, both build orders.
 LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
+W_GROUP_GPUS = GPUModels(())  # not measured yet (6 November 2026)
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -252,6 +263,27 @@ def lane_indices_default(name=None):
     if on is None:
         on = name in LANE_INDICES_GPUS
     return bool(on)
+
+
+def w_group_default(name=None):
+    """``W_GROUP`` (None: ``name`` in ``W_GROUP_GPUS``); built only where it applies (``FusedFoldedForward``)."""
+    on = W_GROUP
+    if on is None:
+        on = name in W_GROUP_GPUS
+    return bool(on)
+
+
+W_GROUP_HELPERS = """// W_GROUP: a warp pair's named barrier (64 threads) and its vote (bar.red.or: any lane's pred).
+__device__ __forceinline__ void group_sync(int barrier) {
+    asm volatile("bar.sync %0, 64;" :: "r"(barrier) : "memory");
+}
+__device__ __forceinline__ int group_any(int pred, int barrier) {
+    int any;
+    asm volatile("{\\n.reg .pred p, q;\\nsetp.ne.b32 q, %1, 0;\\nbar.red.or.pred p, %2, 64, q;\\n"
+                 "selp.b32 %0, 1, 0, p;\\n}\\n" : "=r"(any) : "r"(pred), "r"(barrier) : "memory");
+    return any;
+}
+"""
 
 
 def lane_indices(source):
@@ -602,10 +634,14 @@ def tc_astage_vec():
                 }"""
 
 
-def tc_product(npl, presplit=False, vec_a=False, wfrag=False, keep=False):
+def tc_product(npl, presplit=False, vec_a=False, wfrag=False, keep=False, group=False):
     """``float w[npl][B]`` (lane = channel) from the staged a and the W slice through 3xTF32 mma.sync m16n8k8 tiles
     (16 channels x B = 8 edges) and the warp's redistribution tile ``r_s``; ``presplit``: the slice holds the
-    split parts (``tc_wfill``)."""
+    split parts (``tc_wfill``). ``group``: the warp-pair form (``W_GROUP``, ``tc_product_group``)."""
+    if group:
+        if presplit or not wfrag or keep:
+            raise ValueError("tc_product: the group form needs wfrag, without presplit or keep")
+        return tc_product_group(npl, vec_a)
     if presplit and wfrag:  # tc_wfill's split fragment order: two float4 per lane
         wload = """                                const float4* wq = reinterpret_cast<const float4*>(Ws)
                                                    + ((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 64 + lane;
@@ -682,6 +718,74 @@ def tc_product(npl, presplit=False, vec_a=False, wfrag=False, keep=False):
                         }}
                 }}
                 __syncwarp();
+                float w[{npl}][B];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) w[g][b] = r_s[(g * B + b) * RS + lane];"""
+
+
+def tc_product_group(npl, vec_a=False):
+    """``tc_product`` (wfrag) for a warp pair (``W_GROUP``): the warp (``gr`` = warp & 1 in its group, named barrier
+    ``gbar``) computes m-tile ``gr`` of every path for the group's two batches t (warp 2 (warp >> 1) + t, a_s and
+    r_s at ``(t - gr) * A_STRIDE`` from its own), so each W fragment is loaded and split once for two n-tiles; then
+    writes those C fragments into batch t's r_s and, after the group barrier, reads its own w as ``tc_product``.
+    The same MMAs of the same tiles, k ascending: bitwise. Expects both warps' batches staged and their r_s free (the
+    caller's ``group_any`` vote is that barrier)."""
+    if vec_a:  # the edge-major, group-swizzled tile of tc_astage_vec
+        afrag = """                            split_tf32(at[gid * KP + (((k0 >> 2) ^ gid) << 2) + tq],
+                                       bh[t][0], bl[t][0]);
+                            split_tf32(at[gid * KP + ((((k0 >> 2) + 1) ^ gid) << 2) + tq],
+                                       bh[t][1], bl[t][1]);"""
+    else:
+        afrag = """                            split_tf32(at[(k0 + tq) * B + gid], bh[t][0], bl[t][0]);
+                            split_tf32(at[(k0 + tq + 4) * B + gid], bh[t][1], bl[t][1]);"""
+    return f"""                float wacc[{npl}][2][4];  // [path][the group's batch t][C fragment] of m-tile gr
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int t = 0; t < 2; ++t)
+                        #pragma unroll
+                        for (int i = 0; i < 4; ++i) wacc[g][t][i] = 0.f;
+                {{
+                    const int gid = lane >> 2, tq = lane & 3;
+                    #pragma unroll 2
+                    for (int k0 = 0; k0 < KP; k0 += 8) {{
+                        unsigned bh[2][2], bl[2][2];  // a^T fragments of batch t: k = k0 + tq (+4), edge = gid
+                        #pragma unroll
+                        for (int t = 0; t < 2; ++t) {{
+                            const float* at = a_s + (t - gr) * A_STRIDE;
+{afrag}
+                        }}
+                        #pragma unroll
+                        for (int g = 0; g < {npl}; ++g) {{  // W fragment: channel gr*16 + gid (+8), k0 + tq (+4)
+                            const float4 wv = reinterpret_cast<const float4*>(Ws)[
+                                ((g * (KP / 8) + (k0 >> 3)) * 2 + gr) * 32 + lane];
+                            unsigned ah[4], al[4];
+                            split_tf32(wv.x, ah[0], al[0]);
+                            split_tf32(wv.y, ah[1], al[1]);
+                            split_tf32(wv.z, ah[2], al[2]);
+                            split_tf32(wv.w, ah[3], al[3]);
+                            #pragma unroll
+                            for (int t = 0; t < 2; ++t) {{
+                                mma_tf32(wacc[g][t], al, bh[t]);
+                                mma_tf32(wacc[g][t], ah, bl[t]);
+                                mma_tf32(wacc[g][t], ah, bh[t]);
+                            }}
+                        }}
+                    }}
+                    #pragma unroll
+                    for (int g = 0; g < {npl}; ++g)
+                        #pragma unroll
+                        for (int t = 0; t < 2; ++t) {{  // C fragment: channel gr*16 + gid (+8), edge 2 tq (+1) of t
+                            float* rp = r_s + (t - gr) * A_STRIDE + (g * B + 2 * tq) * RS + gr * 16 + gid;
+                            rp[0] = wacc[g][t][0];
+                            rp[RS] = wacc[g][t][1];
+                            rp[8] = wacc[g][t][2];
+                            rp[RS + 8] = wacc[g][t][3];
+                        }}
+                }}
+                group_sync(gbar);  // the group's r_s rows written
                 float w[{npl}][B];
                 #pragma unroll
                 for (int g = 0; g < {npl}; ++g)
@@ -840,15 +944,16 @@ def _node(layout, channels, start, component, dim):
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-           lane_idx=False):
+           lane_idx=False, w_group=False):
     """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``)."""
     source = _render(schedule, k, rule, store_w, used, stream_store, tc, blocks, prefetch, vec_sh, vec_a, wfrag, tctp,
-                     wgmma, groups, sh_lds4)
+                     wgmma, groups, sh_lds4, w_group)
     return lane_indices(source) if lane_idx else source
 
 
 def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
-            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False):
+            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
+            w_group=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -862,7 +967,11 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
     with float4 loads (``VEC_SH``; edge_dim % 4 == 0, sh 16-byte aligned). ``wgmma``: the product on Hopper wgmma
     (``WGMMA``; the TF32 product without prefetch, tctp or wfrag; the rule must be ``launch_rule_wgmma``'s).
     ``sh_lds4``: the tensor product's sh reads as float4 shared loads (``SH_LDS4``; needs ``vec_sh``, not with tctp
-    or wgmma)."""
+    or wgmma). ``w_group``: warp pairs share each W fragment (``W_GROUP``; the TF32 product with wfrag, without
+    tctp or wgmma, an even warp count)."""
+    if w_group and (tc is not True or not wfrag or tctp or wgmma or rule.warps % 2 or rule.warps // 2 > 15):
+        raise ValueError("fused_folded_forward: w_group needs the TF32 product with wfrag, without tctp or wgmma, "
+                         "and an even warp count of at most 30")
     if sh_lds4 and (not vec_sh or tctp or wgmma):
         raise ValueError("fused_folded_forward: sh_lds4 needs vec_sh, without tctp or wgmma")
     if wgmma and (tc is not True or prefetch or tctp or wfrag):
@@ -903,13 +1012,14 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
                     raise ValueError("fused_folded_forward: an output slot is shared by two path parts")
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
-    flags = (tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp, wgmma, sh_lds4)
+    flags = (tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp, wgmma, sh_lds4, w_group)
     cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, *flags)}    }} break;"
                       for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
         raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
     helpers = (tc_helpers() + TC_FP16_HELPERS) if tc == "fp16" else tc_helpers() if tc else ""
     helpers += CP_ASYNC_HELPERS if prefetch else ""
+    helpers += W_GROUP_HELPERS if w_group else ""
     if wgmma:
         helpers += wgmma_helpers([len(part) * CHANNEL_BLOCK for part in parts], _kpad(used))
     if tctp:
@@ -1559,7 +1669,7 @@ def _wgmma_pipelined(names, slots, C, layout, bmap, nw, npl, wst, eb, astage, sh
 
 
 def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False, vec_a=False,
-          wfrag=False, tctp=False, wgmma=False, sh_lds4=False):
+          wfrag=False, tctp=False, wgmma=False, sh_lds4=False, w_group=False):
     if wgmma:
         return _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a)
     if tctp:
@@ -1598,7 +1708,7 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
     elif tc:
         pre = tc == "presplit"
         wfill, astage, product = (tc_wfill(npl, "KA", pre, wfrag), tc_astage_vec() if vec_a else tc_astage("KA"),
-                                  tc_product(npl, pre, vec_a, wfrag))
+                                  tc_product(npl, pre, vec_a, wfrag, group=w_group))
     else:
         wfill = f"""            for (int i = threadIdx.x; i < {npl} * K * CB; i += blockDim.x) {{
                 const int p = i / (K * CB), rem = i - p * (K * CB), k = rem / CB, l = rem - k * CB;
@@ -1699,6 +1809,8 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                 for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
                 ++cur;
             }}"""
+    if w_group:
+        return _part_group(npl, n, nx, wst, wfill, astage, shstage, xloads, product, store, tp, flush, shq)
     return f"""
         {fp16_decl}
         {{
@@ -1765,6 +1877,99 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
 """
 
 
+def _part_group(npl, n, nx, wst, wfill, astage, shstage, xloads, product, store, tp, flush, shq):
+    """``_part``'s chunk and batch loops for warp pairs (``W_GROUP``): both warps of a group run their batches in
+    lockstep, since each k-loop reads the partner's a_s and writes into its r_s. A warp keeps its own chunks,
+    receivers, TP and flushes, as ``_part``; one without chunks left stages an empty batch (``nb`` = 0, zero rows)
+    and joins the group's k-loops until the vote after the staging (``group_any``, named barrier ``gbar``) finds
+    neither warp with a batch. Two group barriers per batch: that vote (the group's a_s staged, its r_s free) and
+    ``group_sync`` after the r_s writes (``tc_product_group``)."""
+    return f"""
+        {{
+            const int wst[{npl}] = {{{wst}}};
+{wfill}
+        }}
+        __syncthreads();
+        {{
+            const int gr = warp & 1, gbar = 1 + (warp >> 1);  // the warp's place in its pair and the pair's barrier
+            bool have = false, done = false, tail = false;
+            int64_t r1 = 0, eend = 0, cur = 0, e0 = 0;
+            float acc[{n}];
+            #pragma unroll
+            for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
+            while (true) {{
+                if (!done && (!have || e0 >= eend)) {{  // the next chunk with edges; empty ones flushed on the way
+                    if (have) while (cur < r1) {flush}
+                    have = false;
+                    while (true) {{
+                        int cc = 0;
+                        if (lane == 0) cc = atomicAdd(ctr, 1);
+                        cc = __shfl_sync(FULL, cc, 0);
+                        int64_t r0, ebeg;
+                        tail = cc >= receiver_chunks;
+                        if (!tail) {{
+                            r0 = (int64_t)cc * RC;
+                            r1 = r0 + RC < N ? r0 + RC : N;
+                            ebeg = row_ptr[r0] < 0 ? 0 : row_ptr[r0];
+                            eend = row_ptr[r1] < ebeg ? ebeg : row_ptr[r1];
+                            eend = eend > E ? E : eend;
+                        }} else {{
+                            r0 = r1 = N;
+                            ebeg = tail_begin + (cc - receiver_chunks) * TAIL;
+                            if (ebeg >= E || !STORE_W) {{
+                                done = true;
+                                break;
+                            }}
+                            eend = ebeg + TAIL < E ? ebeg + TAIL : E;
+                        }}
+                        cur = r0;
+                        if (ebeg < eend) {{
+                            have = true;
+                            e0 = ebeg;
+                            break;
+                        }}
+                        while (cur < r1) {flush}
+                    }}
+                }}
+                const int nb = done ? 0 : (int)((eend - e0) < B ? (eend - e0) : B);  // done: an empty batch
+                __syncwarp();
+{astage}
+{shstage}
+                float xv[B][{nx}];
+                int rv[B];
+                #pragma unroll
+                for (int b = 0; b < B; ++b) {{
+                    rv[b] = (b < nb && !tail) ? receivers[e0 + b] : 0x7fffffff;
+                    int snd = (b < nb && !tail) ? senders[e0 + b] : -1;
+                    if (snd < 0 || snd >= N) snd = -1;
+{xloads}
+                }}
+                __syncwarp();
+                if (!group_any(!done, gbar)) break;  // the group's a_s staged and its r_s free; or both warps done
+{product}
+                if (STORE_W) {{
+                    const int wst[{npl}] = {{{wst}}};
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b)
+                        if (b < nb) {{
+                            #pragma unroll
+                            for (int g = 0; g < {npl}; ++g) {store}
+                        }}
+                }}
+                if (!tail) {{
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) {{
+                        if (b >= nb) break;
+                        while (cur < rv[b]) {flush}{shq}
+{chr(10).join(tp)}
+                    }}
+                }}
+                e0 += B;
+            }}
+        }}
+"""
+
+
 class FusedFoldedForward:
     """Compiled ``fused_folded_forward`` for the streaming kernels of one interaction (``StreamingKernels``) and a
     folded input width ``k``; float32 only. ``used``: the inputs the k-loop reads (``used_columns``; default ``k``)."""
@@ -1818,10 +2023,12 @@ class FusedFoldedForward:
         self.store_w = bool(store_w)
         self.blocks = None if blocks is None else tuple((int(d), tuple(int(s) for s in st)) for d, st in blocks)
         self.lane_idx = lane_indices_default(torch.cuda.get_device_name(device)) and not self.wgmma
+        self.w_group = (w_group_default(torch.cuda.get_device_name(device)) and self.tc is True and self.wfrag
+                        and not self.tctp and not self.wgmma and self.rule.warps % 2 == 0)
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                              prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
                              tctp=self.tctp, wgmma=self.wgmma, groups=self.groups, sh_lds4=self.sh_lds4,
-                             lane_idx=self.lane_idx)
+                             lane_idx=self.lane_idx, w_group=self.w_group)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))

@@ -119,6 +119,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "TC_WFRAG": "W slice in mma fragment order; per GPU, A/B",
                                                         "TC_WFRAG_SPLIT": "fragment-order slice stored split; A/B",
                                                         "LANE_INDICES": "batch index loads lane-parallel; A/B",
+                                                        "W_GROUP": "warp groups share W fragments; A/B",
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
                                                         "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",
