@@ -87,6 +87,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                   "BACKWARD_WALK": "run-walking backward; per GPU, A/B"},
     "fastmace/kernels/triton/tabled_outer_sum.py": {"TABLED_FORWARD": "table read inside the sums; per GPU, A/B",
                                                    "POWER_BACKWARD": "idea 40: power-basis backward; per GPU, A/B"},
+    "fastmace/kernels/triton/receiver_sum.py": {"RECEIVER_SUM": "idea 5(b): segmented density sums; per GPU, A/B"},
     "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B",
                                                 "WARPS": "table forward num_warps; tools/radial_table_lab.py"},
     "fastmace/kernels/triton/species_gemm.py": {"TENSOR_CORES": "species products in our mma.sync kernel; A/B",

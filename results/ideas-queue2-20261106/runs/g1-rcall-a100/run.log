@@ -1,0 +1,12 @@
+2026-11-06T15:44:29Z Modal NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0; source 66062fdabc30e191113afa81dcbd713bef16f15e
+2026-11-06T15:45:37Z shapes exit=0 {'m': 35000, 'k': 384, 'n': 128, 'layout': 'rc', 'tf32x3_tile': True, 'calls': 5}
+2026-11-06T15:45:42Z g1 exit=0 {"gpu": "NVIDIA A100-SXM4-80GB", "us_per_force_call": {"shipped": 4751.0, "plain": 4749.6, "ceiling": 4345.3}, "ratio_to_plain": {"shipped": 1.0003, "plain": 1.0, "ceiling": 0.9149}}
+2026-11-06T15:46:57Z lab-r13base exit=0 forward  rc-all              2467.8 us  ratio 0.944  regs 167 local 48  {'against': 'rcfold', 'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  base                2615.3 us  ratio 1.000  regs 161 local 64  
+forward  fold-tpnf           2529.3 us  ratio 0.967  regs 167 local 64  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  fold-a-ld128        2612.2 us  ratio 0.999  regs 168 local 64  {'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+forward  rcfold              2513.9 us  ratio 0.961  regs 167 local 48  {'out0': 'max|d|/max|a| = 4.00e-08', 'out1': 'max|d|/max|a| = 3.27e-07', 'out2': 'max|d|/max|a| = 1.31e-07', 'out3': 'max|d|/max|a| = 2.50e-07', 'w': 'bitwise'}
+forward  rc-all              2467.8 us  ratio 0.944  regs 167 local 48  {'against': 'rcfold', 'out0': 'bitwise', 'out1': 'bitwise', 'out2': 'bitwise', 'out3': 'bitwise', 'w': 'bitwise'}
+2026-11-06T15:47:56Z lab-default exit=0 forward  base                2502.7 us  ratio 1.000  regs 164 local 64  
+forward  base                2502.7 us  ratio 1.000  regs 164 local 64  
+2026-11-06T15:47:56Z done
