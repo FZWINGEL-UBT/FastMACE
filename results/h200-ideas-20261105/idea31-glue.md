@@ -185,6 +185,88 @@ Optionally, also store acc ÷ (density[row]+1) as a second output, either in the
 
 **Third:** the output-slice-only stores of `linear_up` and the backward (#54, #150, and #130 with #108): 48.5 µs.
 
+## Step 2 (6 November 2026): Inductor's code, the first family built, bitwise check and MD A/B
+
+**Commit** `7264f56f` (branch `fastmace/idea31-glue`). Switch `fastmace.kernels.cutlass.linear_div.LINEAR_DIV`
+(`None` with `LINEAR_DIV_GPUS = GPUModels(())`: off everywhere; `True` for an A/B side). Run files: `idea31/`.
+
+### Inductor's generated code (local RTX 5060 Ti under the H200 plan)
+
+Dump: `TORCH_LOGS=output_code`, fresh Inductor and Triton caches, one OMAT-0 medium force call on SrTiO3 10×10×10
+(`tools/bench/idea31_epilogue.py --dump-only`, `FASTMACE_GPU_ALIAS="NVIDIA GeForce RTX 5060 Ti=NVIDIA H200"`; local only,
+not kept: `~/fm-runs/idea31-dump`). The glue is the same custom-op boundary on every backend, so the bodies hold for the
+H200 too; only the GEMM inside `tf32x3_mm` was Triton here.
+- **`cat_view_9`** (#66): a pure select-and-copy of the four [M_l, 128] products into [5000, 2048] (offsets 0, 128, 512,
+  1152). No arithmetic.
+- **`add_cat_div_slice_view_10`** (#67): reads #66's output and `density[a]`, computes `tmp = d + 1.0` then `x / tmp`,
+  writes [5000, 16, 128] (`reshape_irreps`' cat, the same element order). The same `x / (d + 1)` per element as the
+  model, in fp32.
+- **Division instruction:** every division in these kernels and in `add_div_slice…tf32x3_mm` (#31–#38), the backward
+  `add_clone_div_slice…` (#112–#115) and the ∂density reductions is **`div.full.f32`** (approximate full-range, not
+  `div.rn`); `d + 1` is `add.f32` (rn; `add.f32x2` on sm_120). The epilogue therefore uses inline PTX `div.full.f32`
+  after a plain fp32 add.
+- **Signed zeros:** no `+0.0` padding is involved in #66/#67 (`tl.where` selects, no add with zero).
+- **∂density (int. 1, #141 `red_fused_add_div_mul_neg_slice_backward_sum_view_4`):** `-g * ((cat / (d+1)) / (d+1))`,
+  summed over the 2048 columns in a looped reduction (`fma.rn` contraction of the accumulate). This is aten's
+  `div_tensor_other_backward`, which the new op's backward reproduces, with `cat / (d+1)` taken from the op's output
+  (the same bits).
+- **#20–#26 (`clone_div_mul_slice_t…`):** no floating-point instructions in the PTX at all (integer index arithmetic
+  only), so they are pure transpose copies despite the names: **V**, not **P**.
+- **F1:** confirmed unread: `FirstInteractionReassociation.forward` uses `self.species_feats`, never `node_feats`, when
+  `summed_fn` is set (the fused-first path), so interaction 1's `linear_up` product is dead work (7.5 µs). Not changed
+  here.
+
+### What was built (F13–F16 only)
+
+- **Kernel:** `fm_tf32x3_remap_div_{rr,rc}_64x64` in `tf32x3_sm80.cu`. It is the 64x64 `mm_into` mainloop (the same
+  `Mma` type and K iterations; alpha 1, beta 0) with CUTLASS's default epilogue around a new output iterator. Row r is
+  stored at `c + (r / rows_per_atom) * atom_stride + (r % rows_per_atom) * row_stride`, each element as
+  `div.full(acc, density[r / rows_per_atom] + 1)`. Both cubins are rebuilt; the SASS of every existing entry is
+  unchanged (cuobjdump hash per function, sm_80 and sm_90).
+- **Op:** `fastmace::tf32x3_linear_div` (`kernels/cutlass/linear_div.py`). It is called from `BlockLinear.divided` in
+  `generic_interaction_forward` for `self.linear(message) / (density + 1)`. `reshape_irreps` becomes a view of its
+  output, so #66 and #67 are gone.
+- **Backward:** aten's formulas (`grad / (d+1)`; `-grad * (out / (d+1))` summed), and `tf32x3_mm(grad_j, weight_t_j)`
+  per block, as `Tf32x3Matmul`.
+- **Where it applies:** only where `precision.route` finds the CUTLASS backend and the switch on (decided at build, so
+  the trace has no new graph break). It covers the tuple input of `BLOCK_MESSAGE` (the H200 and A100 default) or a
+  tensor input without `SEGMENT_ROWS`. On OMAT-0 medium it fires in interaction 2 only (28 launches counted while
+  warming up and capturing).
+- **Not built yet:** F2–F5 (interaction 1, inside the reassociation, whose ÷(d+1) copies would stay as the F6–F9 A
+  copies unless the epilogue stores [M_l, 128]) and B9–B11. The `rc` entry exists for B9–B11, but nothing calls it.
+
+### Bitwise check
+
+- **Op level (`tests/gpu/test_linear_div_cuda.py`):** OMAT-0's interaction-2 shapes (l = 0..3, K = 256/384/384/256 →
+  128, n = 5000 and 997, zero rows). The test compiles `linear(x) / (d + 1)` (today: `mm_into` per block plus
+  Inductor's cat and division) and `linear.divided(x, d)` with `torch.compile`, then compares the output, every left
+  factor's gradient and the density gradient as int32 bit patterns. **Passed on the H200 and the A100-SXM4-80GB** (with
+  the tile tests: 7 passed on each). It also passed locally on the RTX 5060 Ti with a local sm_120 cubin of the same
+  source (not shipped).
+- **Force calls and MD (`tools/bench/idea31_epilogue.py`, SrTiO3 10×10×10, 2 rattled force calls and 20 Langevin
+  steps):** the run-to-run floor is not zero. A second build of the *default* (a2) already differs from the first (a):
+
+| GPU | a2 vs a: forces (call) | md.forces after 20 steps | b vs a: forces (call) | md.forces after 20 steps |
+| --- | ---: | ---: | ---: | ---: |
+| H200 | 3.8e-6 | 8.1e-5 | 3.6e-6 | 8.1e-5 |
+| A100-SXM4-80GB | 3.2e-6 | 8.5e-5 | 3.6e-6 | 8.1e-5 |
+| RTX 5060 Ti (local, sm_120 cubin) | 3.1e-6 | 4.3e-5 | 3.7e-6 | 4.5e-5 |
+
+  End to end, LINEAR_DIV is indistinguishable from a rebuild of today's path. The nondeterminism is upstream (the energy
+  of the first force call already differs between a and a2). The bitwise statement rests on the op-level test.
+
+### MD-step A/B (OMAT-0 medium, SrTiO3 10×10×10, 1 fs, b = LINEAR_DIV=True, `hopper_sweep.sh`)
+
+| GPU (Modal) | b/a, build order ab (abab) | b/a, build order ba (abba) | a (ms) | b (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| NVIDIA H200 (profile fourth) | **0.9912** | **0.9934** | 5.583 / 5.581 | 5.534 / 5.544 |
+| NVIDIA A100-SXM4-80GB (profile third) | **0.9896** | **0.9891** | 10.552 / 10.555 | 10.442 / 10.440 |
+
+All four runs are valid (no compile while timed, no other GPU process). The H200 gains 37–49 µs per step, close to
+#66 + #67's 54 µs. The A100 gains about 110 µs. The first A100 attempt got an A100 80GB PCIe and stopped with WRONG-GPU
+(`idea31/a100-pcie-wrong-gpu/`). Run directories: `idea31/h200/`, `idea31/a100/`, `idea31/local-rtx5060ti/`. Job:
+`tools/modal/idea31_check.sh`.
+
 ## Next step (one GPU)
 
 1. **Read the generated code.** Dump Inductor's output code (`TORCH_LOGS=output_code`) for Benchmark_loup on the H200.
