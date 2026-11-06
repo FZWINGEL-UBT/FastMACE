@@ -58,13 +58,7 @@ def main(argv=None) -> int:
     from fastmace.kernels.cutlass import tf32x3
     from fastmace.kernels.triton import tf32x3_gemm
 
-    record = dict(gpu=torch.cuda.get_device_name(0), capability=list(torch.cuda.get_device_capability(0)),
-                  sms=torch.cuda.get_device_properties(0).multi_processor_count, torch=torch.__version__,
-                  oeq_runtime=oeq_runtime, structure=args.structure, model=args.model,
-                  today_tile=tf32x3.TILE, backend=tf32x3_gemm.backend(torch.device("cuda")),
-                  build=(HERE / "build.txt").read_text() if (HERE / "build.txt").is_file() else None)
-    print(json.dumps({k: record[k] for k in ("gpu", "capability", "sms", "backend", "today_tile")}), flush=True)
-
+    record = {}
     # 1. Shapes of one eager force call.
     started = time.perf_counter()
     args.checkpoint = args.checkpoint.expanduser().resolve(strict=True)
@@ -104,6 +98,14 @@ def main(argv=None) -> int:
         torch.cuda.synchronize()
     finally:
         tf32x3_gemm._launch = original
+    # The GPU record after the engine build: tf32x3_gemm.backend() touches CUDA, and the engine must set the
+    # allocator (expandable segments) before the first CUDA allocation.
+    record.update(gpu=torch.cuda.get_device_name(0), capability=list(torch.cuda.get_device_capability(0)),
+                  sms=torch.cuda.get_device_properties(0).multi_processor_count, torch=torch.__version__,
+                  oeq_runtime=oeq_runtime, structure=args.structure, model=args.model,
+                  today_tile=tf32x3.TILE, backend=tf32x3_gemm.backend(torch.device("cuda")),
+                  build=(HERE / "build.txt").read_text() if (HERE / "build.txt").is_file() else None)
+    print(json.dumps({k: record[k] for k in ("gpu", "capability", "sms", "backend", "today_tile")}), flush=True)
     record["setup_s"] = time.perf_counter() - started
     record["natoms"] = len(atoms)
     record["cutlass_launches_per_force_call"] = sum(seen.values())
