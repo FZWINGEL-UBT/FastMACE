@@ -1688,6 +1688,18 @@ def _round13_variants(kernel):
     return lab_round13.round13_variants(kernel)
 
 
+def _idea30_variants(kernel):
+    import lab_idea30  # tools/ is on sys.path when the lab runs as a script
+    FORWARD_REFERENCES.update(lab_idea30.idea30_references())
+    return lab_idea30.idea30_variants(kernel, _RULES, _part_only, ("for (int k0 = 0; k0 < KP; k0 += 8) {",
+                                                                   "for (int k0 = 0; k0 < 0; k0 += 8) {"))
+
+
+def _arch_suffix(source, capability):
+    """"a" for a source that needs sm_90a (idea 30's wgmma prototype) on compute capability 9.0."""
+    return "a" if "// idea 30: sm_90a" in source and tuple(capability) == (9, 0) else ""
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -1890,6 +1902,9 @@ def forward_variants(kernel=None):
         # Round 13 (revision 13): 28 (further folds; rounding), 29 (tpnf, K_PIPE on the fold; bitwise), 17(ii)
         # (LDS.128 a loads), from tools/lab_round13.py.
         **_round13_variants(kernel),
+        # Idea 30 (revision 14; user approval 6 November 2026): the warp-specialized wgmma forward of part 1, a lab
+        # prototype (tools/lab_idea30.py); ws30 is compared with F-part1-only.
+        **_idea30_variants(kernel),
         # Round 9 (H200 ideas revision 9). Idea 22(ii): W_GROUP with the fragment-sized region at 12, 14 and 16 warps
         # (the launch bound caps the registers: 168, 144, 128), with and without the x loads (F-no-xload: x not live
         # across the k-loop, as in 22(i)). Idea 25: one part's blocks only. 22(ii)'s carve-out: F-l1-28.
@@ -1979,7 +1994,8 @@ def forward_launcher(kernel, source, extra):
 
     from fastmace.kernels.oeq_streaming.fused_forward import CHANNEL_BLOCK
     from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
-    cubin = compile_cubin(source, torch.cuda.get_device_capability(), extra)
+    capability = torch.cuda.get_device_capability()
+    cubin = compile_cubin(source, capability, extra, suffix=_arch_suffix(source, capability))
     module = _check(driver.cuModuleLoadData(cubin))
     function = _check(driver.cuModuleGetFunction(module, b"fused_folded_forward"))
     attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
@@ -2029,8 +2045,8 @@ def ptxas_report(source, capability, extra=()):
     # cache hit prints no ptxas info (6 November 2026: "registers None" for sources compiled before).
     source = f"{source}\n__device__ int fm_ptxas_report_{time.time_ns()};\n"
     program = _check(nvrtc.nvrtcCreateProgram(source.encode(), b"lab.cu", 0, [], []))
-    options = [f"--gpu-architecture=sm_{major}{minor}".encode(), b"--std=c++17", b"-default-device",
-               b"--ptxas-options=-v"] + [o.encode() for o in extra]
+    options = [f"--gpu-architecture=sm_{major}{minor}{_arch_suffix(source, capability)}".encode(), b"--std=c++17",
+               b"-default-device", b"--ptxas-options=-v"] + [o.encode() for o in extra]
     result = nvrtc.nvrtcCompileProgram(program, len(options), options)
     size = _check(nvrtc.nvrtcGetProgramLogSize(program))
     log = b" " * size

@@ -184,6 +184,15 @@ CG_FOLD = None
 # TP_NOFLUSH_GPUS (decision 66); True / False: an A/B side's choice.
 A_LD128 = None
 TP_NOFLUSH = None
+# H200 ideas plan idea 30 (6 November 2026; ``ws_forward.apply_ws_forward``): the warp-specialized wgmma forward. A
+# producer warpgroup runs the a.W product as wgmma (3xTF32) into a two-stage shared-memory ring that eight consumer
+# warps fill with cp.async (a, sh) and drain with today's TP, chunk walk and flushes. Rounding class (wgmma's order).
+# Compute capability 9.0 only (sm_90a), the message kernel (STORE_W false) of the H200 plan (VEC_A, VEC_SH, W_GROUP
+# with X_LATE); otherwise today's render. Not with TP_NOFLUSH or A_LD128 (their text is replaced). Kernel lab on the
+# H200: see results/h200-ideas-20261105/idea30-*.md. None: on for WS_FORWARD_GPUS (decision 66); True / False: an A/B
+# side's choice.
+WS_FORWARD = None
+WS_FORWARD_GPUS = GPUModels(())
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -354,6 +363,15 @@ def a_ld128_default(name=None):
     on = A_LD128
     if on is None:
         on = name in A_LD128_GPUS
+    return bool(on)
+
+
+def ws_forward_default(name=None):
+    """``WS_FORWARD`` (None: ``name`` in ``WS_FORWARD_GPUS``); built only on compute capability 9.0 and where
+    ``ws_forward.apply_ws_forward`` applies."""
+    on = WS_FORWARD
+    if on is None:
+        on = name in WS_FORWARD_GPUS
     return bool(on)
 
 
@@ -2311,20 +2329,33 @@ class FusedFoldedForward:
                 self.source = apply_cg_fold(self.source)
             except ValueError:  # idea 24 does not apply to this render: built without it
                 self.cg_fold = False
+        self.ws_forward = (ws_forward_default(name) and tuple(torch.cuda.get_device_capability(device)) == (9, 0)
+                           and not self.store_w and not self.wgmma and self.vec_a and self.vec_sh)
+        if self.ws_forward:
+            from fastmace.kernels.oeq_streaming.ws_forward import WARPS, apply_ws_forward
+            try:
+                source, shared = apply_ws_forward(self.source)
+                if shared > int(props.shared_memory_per_block_optin):
+                    raise ValueError("ws_forward: needs more shared memory than the GPU has")
+                self.source = source
+                self.rule = dataclasses.replace(self.rule, warps=WARPS, shared_bytes=shared)
+            except ValueError:  # not the H200 plan's message render: built without it
+                self.ws_forward = False
         from fastmace.kernels.oeq_streaming import kloop_rewrites
-        self.tp_noflush = tp_noflush_default(name) and not self.store_w
+        self.tp_noflush = tp_noflush_default(name) and not self.store_w and not self.ws_forward
         if self.tp_noflush:
             try:
                 self.source = kloop_rewrites.apply_tp_noflush(self.source)
             except ValueError:  # not of the X_LATE plan's form: built without it
                 self.tp_noflush = False
-        self.a_ld128 = a_ld128_default(name) and not self.k_pipe
+        self.a_ld128 = a_ld128_default(name) and not self.k_pipe and not self.ws_forward
         if self.a_ld128:
             try:
                 self.source = kloop_rewrites.apply_a_ld128(self.source)
             except ValueError:  # no VEC_A staging of KP = 64, B = 8: built without it
                 self.a_ld128 = False
-        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
+        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device),
+                              suffix="a" if self.wgmma or self.ws_forward else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
         self._function = _check(driver.cuModuleGetFunction(self._module, b"fused_folded_forward"))

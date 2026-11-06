@@ -128,6 +128,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                         "CG_FOLD": "idea 24: CG factors folded into W; A/B",
                                                         "A_LD128": "17(ii): a read with one LDS.128; A/B",
                                                         "TP_NOFLUSH": "29: TP without flush checks; A/B",
+                                                        "WS_FORWARD": "idea 30: warp-specialized wgmma forward; A/B",
                                                         "TC_TP": "tensor product on tensor cores; per GPU, A/B",
                                                         "WGMMA": "a.W on Hopper wgmma; per GPU, A/B (round 5)",
                                                         "WGMMA_PIPELINED": "wgmma product overlapped with the TP; A/B",
