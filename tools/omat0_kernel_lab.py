@@ -1455,6 +1455,34 @@ def _wfrag_region(kernel, name, warps=12, w_group=False):
     return transform
 
 
+def _part_only(part):
+    """Idea 25's falsifier: only part ``part``'s blocks work (the others return at once); wrong outputs for the
+    other parts. Times one part's phase of the forward."""
+    def transform(s):
+        anchor = "    const int cb = blockIdx.y;\n"
+        return _sub(s, anchor, f"    if (blockIdx.z != {part}) return;\n" + anchor, 1)
+    return transform
+
+
+def _l1_pad(kernel, total):
+    """F-l1-28 (idea 22(ii)): the plan's kernel with its dynamic shared request padded to ``total`` bytes, so the SM
+    takes the largest carve-out and keeps less L1 (224 KB: 28 KB of L1 on the H200). Bitwise."""
+    def transform(s):
+        import dataclasses
+        source = s + f"\n// lab shared request padded to {total} B\n"
+        _RULES[source] = dataclasses.replace(kernel.rule, shared_bytes=max(total, kernel.rule.shared_bytes))
+        print(f"l1-pad rule {_RULES[source]} (plan {kernel.rule})", flush=True)
+        return source
+    return transform
+
+
+_NO_XLOAD = (r"\(snd >= 0\) \? x\[[^\]]*\] : 0\.f", "(snd >= 0) ? 0.5f : 0.f")
+
+
+def _no_xload(s):
+    return _sub(s, *_NO_XLOAD, regex=True)
+
+
 # F-bias (idea 20): the signed mean error of w against the float64 product, and of the messages against the plan's
 # TP fed that product rounded to float32. Relative measures over the real edges (those in the CSR rows) and all Q:
 # slope = sum(err ref) / sum(ref^2) (the plan's bias, the relative shrink: negative toward zero),
@@ -1774,6 +1802,15 @@ def forward_variants(kernel=None):
         # and 4 with W_GROUP): the render's bitwise check where 12 warps do not fit.
         "tc-region": ("exact", _wfrag_region(kernel, "tc-region", warps=None), ()),
         "w-group-region": ("exact", _wfrag_region(kernel, "w-group-region", warps=None, w_group=True), ()),
+        # Round 9 (H200 ideas revision 9). Idea 22(ii): W_GROUP with the fragment-sized region at 12, 14 and 16 warps
+        # (the launch bound caps the registers: 168, 144, 128), with and without the x loads (F-no-xload: x not live
+        # across the k-loop, as in 22(i)). Idea 25: one part's blocks only. 22(ii)'s carve-out: F-l1-28.
+        **{f"wg{w}": ("exact", _wfrag_region(kernel, f"wg{w}", warps=w, w_group=True), ()) for w in (12, 14, 16)},
+        **{f"F-no-xload-wg{w}": ("falsifier", _then(_wfrag_region(kernel, f"F-no-xload-wg{w}", warps=w, w_group=True),
+                                                     _no_xload), ()) for w in (12, 14, 16)},
+        "F-part0-only": ("falsifier", _part_only(0), ()),
+        "F-part1-only": ("falsifier", _part_only(1), ()),
+        "F-l1-28": ("exact", _l1_pad(kernel, 224 * 1024), ()),
     }
 
 

@@ -17,7 +17,8 @@
 #     --command "bash tools/modal/ncu_forward.sh" --out ~/fm-runs/ncu-forward-h200
 # Environment: VARIANTS (default "F-skew-100ns"; space-separated lab variants), ALIAS (a plan GPU's name, e.g.
 # "NVIDIA A100-SXM4-80GB" for the A100 plan on an H200; default none, the GPU's own plan), CONSTANTS (lab --constant
-# words), EQUILIBRATE (lab --equilibrate-steps, default 300), SECTIONS=0 (skip pass 2).
+# words), EQUILIBRATE (lab --equilibrate-steps, default 300), SECTIONS=0 (skip pass 2),
+# STALLS=1 (pass 3: every stall reason, pipe utilisation, SourceCounters; ncu-stalls.csv, ncu-source-sass.csv).
 set -uo pipefail
 out=${OUT:?the job sets OUT}
 ck=$FASTMACE_MODELS/mace-omat-0-medium.model
@@ -61,6 +62,14 @@ if [ "${SECTIONS:-1}" != 0 ]; then
     --section MemoryWorkloadAnalysis_Tables --section ComputeWorkloadAnalysis --section Occupancy \
     --section LaunchStats --section InstructionStats
   [ -f "$out/sections.ncu-rep" ] && ncu --import "$out/sections.ncu-rep" --page details > "$out/ncu-sections.txt" 2>&1
+fi
+if [ "${STALLS:-0}" != 0 ]; then  # round 9: every stall reason, the pipes, and the stalls by SASS line
+  run_pass stalls --metrics "regex:smsp__average_warps_issue_stalled_.*_per_issue_active\.ratio,regex:sm__inst_executed_pipe_.*\.avg\.pct_of_peak_sustained_active,regex:sm__pipe_.*_cycles_active\.avg\.pct_of_peak_sustained_active" \
+    --section SourceCounters --section WarpStateStats --import-source yes
+  if [ -f "$out/stalls.ncu-rep" ]; then
+    ncu --import "$out/stalls.ncu-rep" --csv --page raw > "$out/ncu-stalls.csv" 2>&1
+    ncu --import "$out/stalls.ncu-rep" --csv --page source --print-source sass > "$out/ncu-source-sass.csv" 2>&1
+  fi
 fi
 [ -f "$out/ncu-metrics.csv" ] && cat "$out/ncu-metrics.csv" >> "$log"
 note done
