@@ -22,6 +22,7 @@ from fastmace.model.capabilities import (
     ALL_ELECTRON,
     PSEUDOPOTENTIAL,
     SMALL,
+    STOCK_FIRST_TABLES,
     UNKNOWN,
     ModelTraits,
     RewriteSupport,
@@ -224,7 +225,7 @@ EXPECTED = {
                  "reassociate_first": (True, "ok (GENERIC_REASSOCIATE)"), "streaming_conv": (True, "ok"),
                  "species_skip": (True, "ok"), "fused_folded_backward": (True, "ok"),
                  "chunked_conv_backward": (True, GENERIC_FOLDED),
-                 "radial_tables": (False, "not every interaction is generic"),
+                 "radial_tables": (True, STOCK_FIRST_TABLES),
                  "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED),
                  "fold_product_linear": (False, NOT_BOTH_GENERIC)}),
 }

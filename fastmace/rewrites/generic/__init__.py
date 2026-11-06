@@ -135,17 +135,23 @@ def apply_species_skip(model, context):
     return changed
 
 
-def _stock_first(model):
-    """The model's first interaction when it is a stock block in ``gm.STOCK_SKIP_INTERACTIONS`` with the pinned
-    forward, a one-hot skip_tp, generic blocks after it and ``gm.stock_first_skip_default`` on its device; else None."""
+def stock_first_block(model):
+    """MACE-OFF's first interaction: a stock block of ``gm.STOCK_SKIP_INTERACTIONS`` whose forward matches the pin,
+    with only generic interactions after it; else None."""
     interactions = list(getattr(model, "interactions", ()))
-    if not interactions or not _generic_interactions(model):
+    if not interactions or len(_generic_interactions(model)) != len(interactions) - 1:
         return None
     first = interactions[0]
     digest = gm.STOCK_SKIP_INTERACTIONS.get(type(first).__name__)
-    if digest is None or not gm.stock_first_skip_default(_device(first)):
+    if digest is None or hashlib.sha256(inspect.getsource(type(first).forward).encode()).hexdigest() != digest:
         return None
-    if hashlib.sha256(inspect.getsource(type(first).forward).encode()).hexdigest() != digest:
+    return first
+
+
+def _stock_first(model):
+    """``stock_first_block`` with a one-hot skip_tp, on a device where ``gm.stock_first_skip_default`` holds."""
+    first = stock_first_block(model)
+    if first is None or not gm.stock_first_skip_default(_device(first)):
         return None
     if gm.scalar_second_input(getattr(first, "skip_tp", None)) is None:
         return None
@@ -531,4 +537,4 @@ RECORDS = {
 __all__ = ["NODE_ATTRS", "RECORDS", "apply_chunked_conv_backward", "apply_fused_folded_forward",
            "apply_fused_radial_backward", "apply_reassociate",
            "apply_recompute_conv_weights", "apply_species_skip",
-           "apply_streaming"]
+           "apply_streaming", "stock_first_block"]

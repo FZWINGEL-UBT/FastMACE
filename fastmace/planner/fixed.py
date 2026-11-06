@@ -481,6 +481,9 @@ DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeF
                                                                      "NVIDIA RTX 4000 Ada Generation",
                                                                      "NVIDIA A100 80GB PCIe", "NVIDIA A100-SXM4-80GB",
                                                                      "NVIDIA H200"))
+# The same tables on MACE-OFF, whose stock first block takes one too (off-polar-alex, 6 November 2026): none
+# measured yet (decision 66).
+DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(())
 # generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
 # whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
 # medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;
@@ -1265,8 +1268,16 @@ class FixedPlanner:
             # generic_radial_tables (certified, float32 only): decision 66, "auto" on only on the measured GPUs
             # (owner, 2 November 2026); the float32 and reproducible rules are _fastmace_rules'.
             name = getattr(hardware, "name", None)
+            from fastmace.model.capabilities import STOCK_FIRST_TABLES
+
+            stock_first = support["radial_tables"][1] == STOCK_FIRST_TABLES  # MACE-OFF's first block too
             if "radial_tables" in explicit:
                 v["_why"]["radial_tables"] += "; stage 2: on, generic radial tables (explicit)"
+            elif stock_first and name not in DECISION_66_STOCK_FIRST_TABLES_GPUS:
+                reason = f"tables with a stock first block not measured on this GPU, decision 66 ({name})"
+                v["radial_tables"] = False
+                v["_auto_off"]["radial_tables"] = reason
+                v["_why"]["radial_tables"] += f"; stage 2: off, {reason}"
             elif name in DECISION_66_GENERIC_RADIAL_TABLES_GPUS:
                 v["_why"]["radial_tables"] += (f"; stage 2: on, generic radial tables on a measured GPU, "
                                                f"decision 66 ({name})")

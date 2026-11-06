@@ -1073,6 +1073,46 @@ def _generic_interactions(model):
             if type(interaction).__name__ in gm.GENERIC_INTERACTIONS]
 
 
+def _tabled_interactions(model):
+    """[(index, interaction)] that the generic tables cover: every generic interaction, and MACE-OFF's stock first
+    block (``generic.stock_first_block``; its ``conv_tp_weights`` becomes a ``StockTableWeights``) before them."""
+    from fastmace.rewrites.generic import stock_first_block
+
+    first = stock_first_block(model)
+    return ([(0, first)] if first is not None else []) + _generic_interactions(model)
+
+
+def _radial_net(interaction):
+    """The interaction's radial network (MACE-OFF's stock block keeps it as ``radial_original`` once tabled)."""
+    original = getattr(interaction, "radial_original", None)
+    return original if original is not None else interaction.conv_tp_weights
+
+
+def _stock_table_weights(table, weight):
+    """MACE-OFF's stock first block's ``conv_tp_weights`` from its table: lengths ``[E, 1]`` -> ``(h c) W`` (the
+    stock forward multiplies by the cutoff only when it gets one; with the tables it gets None). One table: the
+    stock chain reads no species."""
+    import torch
+
+    class StockTableWeights(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.table = table
+            self.register_buffer("weight", weight.detach().contiguous(), persistent=False)
+
+        def forward(self, lengths):
+            from fastmace.kernels.triton.radial_table import radial_table
+            from fastmace.kernels.triton.skinny_linear import folded_linear
+
+            t = self.table
+            pair = torch.zeros(lengths.shape[0], dtype=torch.int32, device=lengths.device)
+            augmented, _ = radial_table(lengths, pair, t.coef, t.dcoef, t.starts, t.scales, t.bins, t.r_lo,
+                                        t.bin_scale, t.r_max, False)
+            return folded_linear(augmented[:, :-1].contiguous(), self.weight)
+
+    return StockTableWeights()
+
+
 def _species_radial(model):
     """Whether the radial embedding reads the species (a distance transform such as Agnesi's): then one table per
     ordered species pair, else one table per interaction."""
@@ -1085,12 +1125,14 @@ def _generic_support(model):
     from fastmace.rewrites.generic import modules as gm
 
     interactions = list(getattr(model, "interactions", ()))
-    generic = _generic_interactions(model)
+    generic = _tabled_interactions(model)
     if not interactions or len(generic) != len(interactions):
         return Support(False, "every interaction must be a generic MACE interaction (the embedding is shared)")
+    if type(interactions[0]).__name__ not in gm.GENERIC_INTERACTIONS and _species_radial(model):
+        return Support(False, "a stock first block takes one table: its radial chain must not read the species")
     for index, interaction in generic:
         try:
-            gm.fc_split(interaction.conv_tp_weights)
+            gm.fc_split(_radial_net(interaction))
         except (AttributeError, ValueError) as error:
             return Support(False, f"interactions.{index}: {error}")
     # Float32 only (decision 61): a float64 model does not take it, so "auto" resolves to off there before any
@@ -1119,11 +1161,11 @@ class _GenericChain:
         self.columns = list(columns)
         self.radial = copy.deepcopy(radial if radial is not None else model.radial_embedding).to(
             device=device, dtype=dtype)
-        hidden, last = gm.fc_split(interaction.conv_tp_weights)
+        hidden, last = gm.fc_split(_radial_net(interaction))
         self.hidden = copy.deepcopy(hidden).to(device=device, dtype=dtype)
-        kind = gm.GENERIC_INTERACTIONS[type(interaction).__name__][0]
+        kind = gm.GENERIC_INTERACTIONS.get(type(interaction).__name__, ("stock",))[0]
         self.density = (copy.deepcopy(interaction.density_fn).to(device=device, dtype=dtype)
-                        if kind != "residual" else None)
+                        if kind not in ("residual", "stock") else None)
         weight = gm.fc_last_weight(last).detach().to(device=device, dtype=dtype)
         self.folded = torch.cat([weight, weight.new_zeros(weight.shape[0], 1)], dim=1)  # [W, 0]: (h W) c
 
@@ -1159,15 +1201,22 @@ def tabulate_generic(model, context):
     parameter = next(model.parameters())
     if parameter.dtype != torch.float32:
         raise RewriteError(f"generic_radial_tables: float32 models only, not {parameter.dtype}")
-    generic = _generic_interactions(model)
+    from fastmace.rewrites.generic import modules as gm
+
+    generic = _tabled_interactions(model)
     if not generic or len(generic) != len(model.interactions):
         raise RewriteError("generic_radial_tables: every interaction must be a generic MACE interaction")
+    stock = {index for index, interaction in generic if type(interaction).__name__ not in gm.GENERIC_INTERACTIONS}
     for index, interaction in generic:
+        if index in stock:
+            continue
         if getattr(interaction, "radial_hidden", None) is None:
             raise RewriteError(f"generic_radial_tables requires the split radial network "
                                f"(generic_fused_radial_backward) in interactions.{index}")
     superset = _superset(model, context)
     per_pair = _species_radial(model)
+    if per_pair and stock:
+        raise RewriteError("generic_radial_tables: a stock first block takes one table (no species radial)")
     columns = superset if per_pair else superset[:1]
     pairs = [(s, t) for s in range(len(columns)) for t in range(len(columns))]
     r_max = float(model.r_max)
@@ -1190,6 +1239,11 @@ def tabulate_generic(model, context):
         table = _table_module(tables, columns, parameter.device, single=not per_pair)
         table.certificate = certificate
         interaction.radial_table = table
+        if index in stock:  # MACE-OFF's first block: its own forward calls conv_tp_weights(edge_feats)
+            interaction.radial_original = interaction.conv_tp_weights
+            last = gm.fc_split(interaction.radial_original)[1]
+            interaction.conv_tp_weights = _stock_table_weights(
+                table, gm.fc_last_weight(last).to(device=parameter.device, dtype=parameter.dtype))
         names.append(f"interactions.{index} ({table.pieces} pieces, {len(pairs)} "
                      f"{'pairs' if per_pair else 'table, no species input'}, "
                      f"certificate {table.certificate['worst']:.2f}, {source})")
@@ -1208,7 +1262,7 @@ def _generic_selfcheck(original, rewritten, context):
     cases, failures, dtype = CaseErrors(), [], None
     generator = torch.Generator().manual_seed(context.seed + 17)
     radial = getattr(rewritten.radial_embedding, "original", None)
-    for index, interaction in _generic_interactions(rewritten):
+    for index, interaction in _tabled_interactions(rewritten):
         table = getattr(interaction, "radial_table", None)
         if table is None or radial is None:
             failures.append(f"interactions.{index}: no table")

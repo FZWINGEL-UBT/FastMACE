@@ -35,6 +35,11 @@ GENERIC_INTERACTIONS: Mapping[str, str] = MappingProxyType({
     "RealAgnosticDensityResidualInteractionBlock": "density_residual",
 })
 
+# MACE-OFF's stock first interaction, whose radial network the generic tables cover too (off-polar-alex,
+# 6 November 2026); the support reason the planner reads.
+STOCK_TABLE_FIRST = ("RealAgnosticInteractionBlock",)
+STOCK_FIRST_TABLES = "ok (generic radial tables, stock first block)"
+
 # E0 classes (SPEC §4.3 "Energy scale").
 ALL_ELECTRON = "all_electron"  # total energy of the isolated atom with all electrons
 PSEUDOPOTENTIAL = "pseudopotential"  # valence energy with an effective core potential (def2 from Rb on)
@@ -289,8 +294,13 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
     # Certified radial tables: MH-1's folded class (radial_tables), or a model whose every interaction is generic
     # (generic_radial_tables: the radial embedding is replaced by the lengths, so every interaction must take them).
     all_generic = bool(interactions) and all(name in GENERIC_INTERACTIONS for name in interactions)
+    # MACE-OFF: a stock first block (STOCK_TABLE_FIRST) whose conv_tp_weights takes a table too, generic blocks after
+    # it (the record checks the block's pinned forward).
+    stock_first = (len(interactions) > 1 and interactions[0] in STOCK_TABLE_FIRST
+                   and all(name in GENERIC_INTERACTIONS for name in interactions[1:]))
     support["radial_tables"] = RewriteSupport(
-        fold or all_generic, "ok" if fold else "ok (generic radial tables)" if all_generic else
+        fold or all_generic or stock_first, "ok" if fold else "ok (generic radial tables)" if all_generic else
+        STOCK_FIRST_TABLES if stock_first else
         support["fold_cutoff"].reason if not generic else "not every interaction is generic")
     # OPT-T08 (fastmace.rewrites.species): ScaleShiftMACE only (its forward is pinned). species_tables and
     # fold_product_linear: a factored first interaction with species-only inputs; fold_readout_tail: a factored
