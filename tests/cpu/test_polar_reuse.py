@@ -141,11 +141,17 @@ ADA = "NVIDIA RTX 4000 Ada Generation"
 # Decision 66 for POLAR-1 (owner, 5 November 2026; docs/validation/polar/polar-reuse.md section 4): measured GPUs only.
 POLAR_WPRIME = ("fused_folded_forward", "wprime_backward")  # models with a second interaction (M, L)
 POLAR_MEASURED = {"wprime": (ADA,), "gate_epilogue": (ADA,)}
+# fastmace/off-polar-alex (6 November 2026): tf32x3_gemms for S, M and L on the A100 (every A100 model).
+POLAR_TF32X3 = ("NVIDIA A100-SXM4-80GB",)
 
 
 def _expected_on(label, gpu):
     """The label-gated fields POLAR-1 takes by default on ``gpu``."""
     on = set()
+    if gpu in POLAR_TF32X3:
+        on.add("tf32x3_gemms")
+        if label == "polar1-m":  # the pair on the A100 for M only (L: NbCl5 slower in both orders)
+            on.update(POLAR_WPRIME)
     if gpu in POLAR_MEASURED["wprime"] and label != "polar1-s":
         on.update(POLAR_WPRIME)
     if gpu in POLAR_MEASURED["gate_epilogue"]:

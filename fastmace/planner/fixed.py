@@ -402,6 +402,12 @@ DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDI
 # either (SECOND_INTERACTION).
 POLAR_DECISION_66_WPRIME_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
 POLAR_DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
+# The same pair by label (fastmace/off-polar-alex, 6 November 2026, NHR@FAU Alex A100-SXM4-80GB, on top of the A100's
+# tf32x3_gemms, NaCl / NbCl5 3x3x3, both build orders): POLAR-1-M 0.9755 / 0.9768, 0.9200 / 0.9195 (gate passes).
+# POLAR-1-L is not here: NaCl 0.9563 / 0.9570 but NbCl5 1.0028 / 1.0018 (slower in both orders, the mixed-cell rule).
+POLAR_DECISION_66_WPRIME_LABEL_GPUS = MappingProxyType({
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),
+})
 # The records that act on the interactions after the reassociated first one (fastmace.rewrites.radial attach_wprime
 # and attach_w_tables, mh1 fused_folded_forwards skip it): a one-interaction model with reassociate_first has none,
 # and the build would fail. Refused (explicit) or off (auto) at plan time.
@@ -431,6 +437,10 @@ DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
     "off23-large": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9667 / 0.9634
     "off23b-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9795 / 0.9760
     "off24-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9797 / 0.9805
+    # POLAR-1, NaCl / NbCl5 3x3x3; force gates on NaCl and NbCl5 3x3x3 pass.
+    "polar1-s": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9402 / 0.9381, 0.8465 / 0.8465
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9309 / 0.9303, 0.8422 / 0.8425
+    "polar1-l": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9064 / 0.9070, 0.7922 / 0.7927
 })
 # grouped_launch outside the generic family (decision 57) where measured (exact): OFF23-small on the A100-SXM4-80GB
 # 0.9889 / 0.9953 (water_216; results/off-polar-alex-20261106). OFF23-large loses (1.0083 / 1.0092); the other OFF
@@ -1362,7 +1372,9 @@ class FixedPlanner:
                 v["_auto_off"][name] = SECOND_INTERACTION
                 v["_why"][name] += f"; stage 2: off, {SECOND_INTERACTION}"
         polar_wprime = (_qualified_polar(traits, model_label) and v["wprime_backward"]
-                        and getattr(hardware, "name", None) in POLAR_DECISION_66_WPRIME_GPUS)
+                        and (getattr(hardware, "name", None) in POLAR_DECISION_66_WPRIME_GPUS
+                             or getattr(hardware, "name", None) in POLAR_DECISION_66_WPRIME_LABEL_GPUS.get(
+                                 model_label, ())))
         if v["fused_folded_forward"] and "fused_folded_forward" not in explicit:
             # Decision 64: measured faster on MH-1 only (POLAR-1-S neutral, OMOL-0 XL 3.5 % slower; OPT8-T02).
             if _mh1(model_label):

@@ -1186,3 +1186,23 @@ def test_decision_66_mace_off_on_the_a100():
             assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("off", "off"), (label, hardware.name)
     p = plan(a100_80, "off23-medium", precision=PrecisionConfig(dtype="float64"))
     assert p.rewrites.tf32x3_gemms == "off"
+
+
+def test_decision_66_polar1_tf32x3_on_the_a100():
+    """POLAR-1 on the A100 (fastmace/off-polar-alex, 6 November 2026): tf32x3_gemms is on for S, M and L (force
+    gates pass); not on other GPUs."""
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+    def plan(hardware, label):
+        return planner(engine=EngineConfig()).plan(traits(label), nacl(), IntegratorConfig(), hardware,
+                                                   model_label=label)
+
+    for label in fixed.POLAR_GRAPH_LABELS:
+        for hardware in (a100_80, A100):
+            p = plan(hardware, label)
+            assert p.rewrites.tf32x3_gemms == "on", (label, hardware.name)
+            assert p.rewrites.gate_epilogue == "off" and p.rewrites.grouped_launch == "off"
+            pair = (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward)
+            assert pair == (("on", "on") if label == "polar1-m" else ("off", "off")), (label, hardware.name)
+        for hardware in (GPU, ADA, L4):
+            assert plan(hardware, label).rewrites.tf32x3_gemms == "off", (label, hardware.name)
