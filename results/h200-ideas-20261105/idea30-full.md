@@ -9,9 +9,15 @@ set four steps, each with a stop on failure:
 3. Only if step 2 holds: port to production as `fused_forward.WS_FORWARD` (sm_90 only).
 4. Then the force/stress gate and the MD-step A/B on a Modal H200.
 
-**Result: step 2 misses its target.** The whole forward with both parts warp-specialized takes **0.859** of base
-(1,292.1 against 1,504.8 µs). Per the brief, the work stops there: no production port was committed, and no gate
-or MD A/B was run.
+**Result: step 2 first missed its target.** The whole forward with both parts warp-specialized took **0.859** of
+base (1,292.1 against 1,504.8 µs), and the work stopped there. The coordinator then ruled that 0.85 was only the
+falsifier line and asked for the full version anyway. That is now done:
+- r4 tested the extras;
+- block order "swap" was adopted, reaching **0.850**;
+- the production port is `fused_forward.WS_FORWARD`;
+- r5 ran the force/stress gate and the MD-step A/B: **0.958 / 0.961** in both build orders.
+
+See "The full version (r4, r5)" at the end.
 
 - **Branch:** `fastmace/idea30-ws`. Lab at `0477660f`, adding the `ws30-p0`, `ws-both` and `ws-p1-keep0` variants to
   `tools/lab_idea30.py`; the debug check in `tools/check_idea30_local.py` now covers both parts.
@@ -114,3 +120,119 @@ To clear 0.85 the forward must lose about 13 µs more. Candidate levers, none me
 
 Each would need another lab job. The plan's larger lever, more TP throughput via 12 consumer warps, does not fit in
 shared memory on the H200 (step 1).
+
+## The full version (r4, r5)
+
+The coordinator answered that 0.85 was only the falsifier line and that 0.859 is worth taking. He asked for:
+- one lab job with the cheap extras;
+- the production port;
+- one job with the force/stress gate and the MD-step A/B.
+
+**Generator.** It now lives in production, in `fastmace/kernels/oeq_streaming/ws_forward.py`. `tools/lab_idea30.py`
+wraps it and keeps the naive reference of the debug check. Two options are new:
+- `stages`: an S-stage ring, with the TP S − 1 rounds behind the staging;
+- `order`: which part a block runs.
+  - "z" is today's order: all part-0 blocks launch before part 1's, since the grid is [33, 4, 2] with one block per
+    SM.
+  - "swap" runs part 1, the heavier part, first.
+  - "interleave" alternates the parts over the linear block index.
+
+Locally (`tools/check_idea30_local.py --run`, RTX 5060 Ti), the debug render matched the naive reference bitwise in
+every column over three launches in each configuration:
+
+| Stages | Order |
+| ---: | --- |
+| 2 | z |
+| 3 | z |
+| 3 | swap |
+| 2 | swap |
+| 2 | interleave |
+
+### Lab extras (r4, `710c26e0`; H200, µs, median of 15)
+
+| Variant | Time | / base | Notes |
+| --- | ---: | ---: | --- |
+| base | 1,491.9 | 1.000 | |
+| `ws-both` (z, 2 stages) | 1,283.5 | 0.860 | as r3 (0.859) |
+| `ws30-p0` / `ws30-p0-s3` (part 0 alone, 2 / 3 stages) | 521.2 / 525.2 | 0.349 / 0.352 | third stage: no gain |
+| `ws-both-s3` | 1,284.6 | 0.861 | |
+| **`ws-both-swap`** | **1,268.4** | **0.850** | adopted |
+| `ws-both-s3-swap` | 1,267.9 | 0.850 | a tie with swap; 2 stages kept |
+| `ws-both-inter` / `ws-both-s3-inter` | 1,520.4 / 1,508.8 | 1.019 / 1.011 | rejected |
+| `base-swap` (today's kernel, part 1 first) | 1,483.0 | 0.994 | bitwise today's |
+| `base-inter` | 1,563.3 | 1.048 | |
+
+- **The per-half ready barrier was not built.** The TP text reads every path's w for each edge (the render's
+  `w[g][b]` loop), so the consumers cannot start on the first half's paths before the second half lands.
+  Splitting it would mean rewriting the TP, not the protocol.
+- **The third stage gains nothing.** Part 0's ring is not the limit, so production keeps two stages.
+- **Block order is the useful lever.** With part 1 first, part 0's short blocks fill the end of the launch.
+  Against today's kernel with the same swap, ws is 1,268.4 / 1,483.0 = 0.855.
+- **A side result:** `base-swap` makes today's kernel 0.6 % faster in the lab, bitwise. It is not adopted here.
+- **Correctness:** each ws variant matched base to between 8.1e-8 (out2) and 2.9e-7 (out1), as max |d| / max |a|
+  per output.
+
+### Production: `fused_forward.WS_FORWARD` (`ac4b37e4`)
+
+- **Switch:**
+  - `WS_FORWARD = None`, `WS_FORWARD_GPUS = GPUModels(())` (empty) and `ws_forward_default(name)`, as for CG_FOLD and
+    A_LD128;
+  - layering allow-list entry in `tests/cpu/test_layering.py`.
+- **When it applies:** `FusedFoldedForward` applies it only when every condition holds:
+  - compute capability 9.0;
+  - STORE_W is false;
+  - it is not round 5's WGMMA kernel;
+  - VEC_A and VEC_SH are on;
+  - `apply_ws_forward` accepts the render.
+- **What it changes:** the launch rule becomes 12 warps with ws's shared memory (217,216 B, checked against the
+  GPU's opt-in limit), and the kernel compiles for sm_90a. TP_NOFLUSH and A_LD128 are not applied on top.
+- **Fallback:** a render that `apply_ws_forward` refuses (ValueError) is built as today's kernel.
+- **Defaults:** `ws_forward.STAGES = {}` (2 stages) and `ORDER = "swap"`.
+- **GPU test:** `tests/gpu/test_ws_forward_cuda.py`, skipped unless compute capability is 9.0.
+  - **Setup:** the H200 plan's message kernel with and without WS_FORWARD, on a synthetic C = 128 problem. The
+    graph is uneven: 15 % empty rows, empty receiver chunks, receivers with 150 edges and padding edges.
+  - **Check:** both layouts, three launches each, max |d| / max |ref| < 1e-5.
+  - **Result:** it passed on the H200 in r4 and in r5, with a max rel of 7.4e-8 (ir_mul) and 6.3e-8 (mul_ir).
+- **Lint:** ruff is clean on the new files. fused_forward.py has its 6 earlier E501 lines and no new ones.
+- **Job script:** `tools/modal/ws_forward_check.sh`, which runs the lab variants, the GPU test, the gate and the
+  A/B.
+
+### Gate and MD A/B (r5, `ac4b37e4`; Modal H200, one job)
+
+Force/stress gate: OMAT-0 medium, `results/loup-a100-20261103/SrTiO3.cif@3x3x3`, NaCl and NbCl5. The H200's
+default plan was run against `--production-constant fastmace.kernels.oeq_streaming.fused_forward:WS_FORWARD=True`
+in the same job. Each cell is the error ratio to ASE float32.
+
+| Structure | Quantity | Default | WS_FORWARD | Limit | Pass (default / ws) |
+| --- | --- | ---: | ---: | --- | --- |
+| SrTiO3 3×3×3 | energy (max abs, eV) | 3.09e-3 | 3.14e-3 | 0.01 | yes / yes |
+| | forces | 0.992 | 0.992 | ≤ 2 | yes / yes |
+| | stress | 0.877 | 0.979 | ≤ 2 | yes / yes |
+| NaCl | energy (max abs, eV) | 4.02e-4 | 4.01e-4 | 0.01 | yes / yes |
+| | forces | 0.746 | 0.751 | ≤ 2 (floor) | yes / yes |
+| | stress | 0.996 | 0.954 | ≤ 2 (floor) | yes / yes |
+| NbCl5 | energy (max abs, eV) | 9.16e-4 | 9.12e-4 | 0.01 | yes / yes |
+| | forces | 0.977 | 0.966 | ≤ 2 | yes / yes |
+| | **stress** | **2.152** | **2.062** | ≤ 2 | **no / no** |
+
+WS_FORWARD fails exactly what the default fails: NbCl5 stress, the H200's known exception (2.06–2.10 in earlier
+jobs). It does so at a slightly lower ratio, 2.06 against the default's 2.15 in this job. Everything else passes as
+the default does.
+
+MD-step A/B: `hopper_sweep.sh`, `AB='ws|fastmace.kernels.oeq_streaming.fused_forward:WS_FORWARD=True'`, SrTiO3
+10×10×10, 1 fs, 6 blocks of 256 steps after 200 warm-up steps, both build orders. a is the default, b is
+WS_FORWARD.
+
+| Order | a (ms) | b (ms) | b/a |
+| --- | ---: | ---: | ---: |
+| abab | 5.5584 | 5.3274 | **0.9584** |
+| abba | 5.5501 | 5.3337 | **0.9610** |
+
+That is −0.22 ms per step, about 4 %, as the lab predicted (−215 µs on the forward). Both runs are marked valid.
+
+**Cost:** r4 $0.14 GPU (ledger $11.93 → $12.12), r5 about $0.92 with the gates (→ $13.04), on profile `fourth`.
+
+**Open:**
+- the default decision: `WS_FORWARD_GPUS` stays empty, and the coordinator decides;
+- the CPU suite on leto: test_layering's allow-list check included;
+- an H100 run, if wanted: the switch applies on any compute capability 9.0 GPU, but only the H200 was measured.
