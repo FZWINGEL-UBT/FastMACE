@@ -265,3 +265,26 @@ Runs: `runs/ideas-r7-h200/`, `runs/ideas-r7-a100/`. Modal `third` stood at $12.1
 - **The A100-SXM4** would need an even launch rule (10 or 12 warps) to try it. Not measured.
 
 Runs: `runs/wgroup-h200/`, `runs/wgroup-a100/`.
+
+### H200 defaults after round 6: gate and Benchmark_loup at `7f7ef7db` (6 November 2026)
+
+Main `7f7ef7db` changes two H200 defaults: `W_GROUP` is on, and `BUTTERFLY` is off (kernel-review session,
+`results/sx012-profile-20261106`). One H200 job (Modal `fourth`) checked the result.
+
+**Force/stress gate:** passes. Ratios to the float32 calculator's error, with each limit:
+
+| Crystal | Energy (absolute floor 10 meV) | Forces (limit 2) | Stress (limit 2) |
+| --- | ---: | ---: | ---: |
+| NaCl | 3.00 (0.39 meV) | 0.76 | 0.92 |
+| NbCl5 | 3.82 (0.90 meV) | 0.98 | **1.96** |
+| SrTiO3 | 11.5 (3.1 meV) | 0.94 | 0.93 |
+
+- NbCl5 stress has the least headroom: 1.96 of 2, against 1.93 at `62556704`. Any change of summation order
+  (14(A)) must recheck it.
+
+**Benchmark_loup (Langevin, OMAT-0 medium, SrTiO3 10×10×10):** **5.495 ms per step, 1.099 µs per atom and step.**
+
+- On 5 November (`62556704`) it was 5.73–5.78 ms.
+- Since then: DEGREE_PARTS, LANE_INDICES, W_GROUP, BUTTERFLY off, and the round-5 changes.
+
+Run: `runs/main-7f7ef7db-h200/`.

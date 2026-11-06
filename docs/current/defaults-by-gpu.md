@@ -118,6 +118,11 @@ Both pass that test, so both stay on:
   NbCl5 stress has the least headroom ([h200-defaults](../../results/h200-defaults-20261105/README.md)).
 - This closes the kernel review's open item ([kernel-review-20261105](../validation/kernel-review-20261105.md)).
 
+**Current H200 figures (main `7f7ef7db`, 6 November 2026):**
+- Benchmark_loup: 5.495 ms per step (1.099 µs per atom and step).
+- Force/stress gate: passes; NbCl5 stress 1.96 of 2.
+- Source: [round 6](../../results/research-answers-20261105/README.md#h200-defaults-after-round-6-gate-and-benchmark_loup-at-7f7ef7db-6-november-2026).
+
 `LANE_INDICES` (idea 15a, bitwise) joined the H200 set on 6 November 2026: MD step 0.9897 / 0.9913 (b = on)
 ([ledger: ideas-r3](../optimisation-ledger.md#ideas-r3)).
 
