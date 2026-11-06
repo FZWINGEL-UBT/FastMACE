@@ -32,6 +32,8 @@ def main(argv=None) -> int:
     p.add_argument("--steps", type=int, default=20)
     p.add_argument("--workdir", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--wrap", default="", help="a command prefix for lmp, e.g. 'nsys profile -t cuda -o FILE' "
+                                              "(6 November 2026, the Symmetrix-XL 0.1.2 kernel profile)")
     args = p.parse_args(argv)
 
     from ase.io import read, write
@@ -66,6 +68,7 @@ run {args.steps} pre no
     command = [str(args.lmp), "-k", "on", "g", "1", "-sf", "kk", "-pk", "kokkos", "neigh", "half", "newton", "on",
                "-in", "in.md", "-log", "log.lammps"]
     started = time.time()
+    command = args.wrap.split() + command
     proc = subprocess.run(command, cwd=args.workdir, capture_output=True, text=True)
     wall = time.time() - started
     (args.workdir / "stdout.txt").write_text(proc.stdout + "\n--- stderr ---\n" + proc.stderr)
