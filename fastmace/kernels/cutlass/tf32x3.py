@@ -60,6 +60,9 @@ class _Kernels:
             # idea 31 (linear_div): the 64x64 kernels with the remapped, divided store
             self.remap_functions = {layout: _check(driver.cuModuleGetFunction(
                 self.module, f"fm_tf32x3_remap_div_{layout}_64x64".encode())) for layout in ("rr", "rc")}
+            # idea 31 (skip_select): the same with the own-species selection in the store (the same shared memory)
+            self.select_functions = {layout: _check(driver.cuModuleGetFunction(
+                self.module, f"fm_tf32x3_remap_select_{layout}_64x64".encode())) for layout in ("rr", "rc")}
             pointer, size = _check(driver.cuModuleGetGlobal(self.module, b"fm_tf32x3_remap_info"))
             remap_info = np.zeros(size // 4, dtype=np.int32)
             _check(driver.cuMemcpyDtoH(remap_info, pointer, size))
@@ -77,9 +80,10 @@ class _Kernels:
         self.species_threads, self.species_shared = int(species_info[0]), int(species_info[1])
         if self.species_shared > 48 * 1024:
             _check(driver.cuFuncSetAttribute(self.species_function, attribute, self.species_shared))
-        for layout, function in self.remap_functions.items():
-            if self.remap_shared[layout] > 48 * 1024:
-                _check(driver.cuFuncSetAttribute(function, attribute, self.remap_shared[layout]))
+        for functions in (self.remap_functions, self.select_functions):
+            for layout, function in functions.items():
+                if self.remap_shared[layout] > 48 * 1024:
+                    _check(driver.cuFuncSetAttribute(function, attribute, self.remap_shared[layout]))
 
 
 def available(device, family=False) -> bool:
@@ -221,6 +225,34 @@ def remap_div_into(a, b, out, rows_per_atom, atom_stride, row_stride, density=No
                                  1, 1, kernels.remap_shared[layout], stream, (values, types), 0))
 
 
+def remap_select_into(a, b, out, rows_per_atom, atom_stride, row_stride, kind, select_columns):
+    """``remap_div_into`` without the division and with the species skip's selection: ``b`` holds one block of
+    ``select_columns`` columns per species ([K, species * select_columns]); element (r, j) is stored only if
+    ``kind[r // rows_per_atom] == j // select_columns`` (``kind`` int32, contiguous, one per atom), at column
+    ``j % select_columns`` of the remapped row (``fm_tf32x3_remap_select_*_64x64``; idea 31, ``skip_select``).
+    ``select_columns`` a multiple of ``ALIGNMENT``; otherwise as ``remap_div_into``."""
+    from cuda.bindings import driver
+
+    from fastmace.kernels.oeq_streaming.runtime import _check
+    index = a.device.index if a.device.index is not None else torch.cuda.current_device()
+    kernels = _kernels(index)
+    current = _check(driver.cuCtxGetCurrent())
+    if int(current) != int(kernels.context):
+        _check(driver.cuCtxSetCurrent(kernels.context))
+    m, k = a.shape
+    n = b.shape[1]
+    _, lda = _layout(a)
+    lb, ldb = _layout(b)
+    p, i, q = ctypes.c_void_p, ctypes.c_int, ctypes.c_longlong
+    values = (m, n, k, a.data_ptr(), lda, b.data_ptr(), ldb, out.data_ptr(), rows_per_atom, atom_stride, row_stride,
+              0, kind.data_ptr(), select_columns)
+    types = (i, i, i, p, i, p, i, p, i, q, q, p, p, i)
+    stream = driver.CUstream(torch.cuda.current_stream(a.device).cuda_stream)
+    layout = "r" + lb
+    _check(driver.cuLaunchKernel(kernels.select_functions[layout], -(-m // 64), -(-n // 64), 1, kernels.remap_threads,
+                                 1, 1, kernels.remap_shared[layout], stream, (values, types), 0))
+
+
 def species_into(a, lda, gather, w, out, scatter, counts, size, grid_rows):
     """``out[scatter[r]] = a[gather[r]] @ w[s]`` for every species s's rows r (rows sorted by species, ``counts[s] *
     size`` of them; ``grid_rows`` = ``species_gemm.tiles``): ``a`` the base of rows ``lda`` floats apart, ``w`` [S, K,
@@ -245,4 +277,4 @@ def species_into(a, lda, gather, w, out, scatter, counts, size, grid_rows):
 
 
 __all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "CUBINS", "LONG_K", "MIN_TILES", "TILE", "available", "eligible", "fit",
-           "mm_into", "remap_div_into", "species_into", "takes"]
+           "mm_into", "remap_div_into", "remap_select_into", "species_into", "takes"]

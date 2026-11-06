@@ -159,6 +159,11 @@ FM_TF32X3_ENTRY(fm_tf32x3_rc_64x32, RowCol64x32)
 //   fm_tf32x3_remap_div_{rr,rc}_64x64(M, N, K, A, lda, B, ldb, C, rows_per_atom, atom_stride, row_stride, density):
 //   grid ceil(M / 64) x ceil(N / 64), fm_tf32x3_remap_info = [threads, shared bytes rr, shared bytes rc].
 // N, atom_stride and row_stride multiples of 4 and C 16-byte aligned (128-bit stores); the caller checks.
+// fm_tf32x3_remap_select_{rr,rc}_64x64(..., density, kind, select_columns) (idea 31, skip_select): the same, B holding
+// one block of select_columns columns per species side by side ([K, species * select_columns]); column j (species
+// j / select_columns) of row r is stored only if kind[r / rows_per_atom] is that species, at column
+// j % select_columns of the remapped row: the species skip's own-species selection, each element stored once from
+// its own block's accumulator. select_columns a multiple of 4 (a 128-bit access never straddles two species).
 
 namespace {
 
@@ -170,7 +175,7 @@ __device__ __forceinline__ float div_full(float a, float b) {
 
 // The output tile iterator of the epilogue: PredicatedTileIterator's thread map and row walk, with the row remap and
 // the division in store. load is never used (beta = 0: no source).
-template <typename ThreadMap_>
+template <typename ThreadMap_, bool Select = false>
 class RemapDivIterator {
  public:
   using ThreadMap = ThreadMap_;
@@ -195,6 +200,8 @@ class RemapDivIterator {
     float const *density;
     int rows_per_atom;
     long long atom_stride, row_stride;
+    int const *kind;  // Select: each atom's species
+    int select_columns;  // Select: the columns of one species' block
   };
 
   struct Mask {
@@ -254,6 +261,8 @@ class RemapDivIterator {
           float *row_pointer = params_.base + atom * params_.atom_stride + m * params_.row_stride + thread_start_column_;
           float scale = 0.0f;
           if (params_.density) scale = params_.density[atom] + 1.0f;
+          int species = 0;
+          if (Select) species = params_.kind[atom];
           CUTLASS_PRAGMA_UNROLL
           for (int column = 0; column < ThreadMap::Iterations::kColumn; ++column) {
             AccessType value = frag_ptr[frag_row_idx * ThreadMap::Iterations::kColumn + column];
@@ -261,8 +270,16 @@ class RemapDivIterator {
               CUTLASS_PRAGMA_UNROLL
               for (int e = 0; e < kElementsPerAccess; ++e) value[e] = div_full(value[e], scale);
             }
-            cutlass::arch::global_store<AccessType, sizeof(AccessType)>(
-                value, (void *)(row_pointer + column * ThreadMap::Delta::kColumn), mask_.predicates[column]);
+            if (Select) {
+              int const j = thread_start_column_ + column * ThreadMap::Delta::kColumn;
+              int const block = j / params_.select_columns;
+              cutlass::arch::global_store<AccessType, sizeof(AccessType)>(
+                  value, (void *)(row_pointer - thread_start_column_ + (j - block * params_.select_columns)),
+                  mask_.predicates[column] && block == species);
+            } else {
+              cutlass::arch::global_store<AccessType, sizeof(AccessType)>(
+                  value, (void *)(row_pointer + column * ThreadMap::Delta::kColumn), mask_.predicates[column]);
+            }
           }
         }
       }
@@ -301,11 +318,11 @@ class RemapDivIterator {
 };
 
 // The default kernel's epilogue with RemapDivIterator as its output iterator (every other part the same).
-template <typename Kernel>
+template <typename Kernel, bool Select = false>
 struct RemapDiv {
   using Mma = typename Kernel::Mma;
   using Default = typename Kernel::Epilogue;
-  using Iterator = RemapDivIterator<typename Default::OutputTileIterator::ThreadMap>;
+  using Iterator = RemapDivIterator<typename Default::OutputTileIterator::ThreadMap, Select>;
   using Epilogue = cutlass::epilogue::threadblock::Epilogue<
       typename Default::Shape, typename Default::WarpMmaOperator, Default::kPartitionsK, Iterator,
       typename Default::AccumulatorFragmentIterator, typename Default::WarpTileIterator,
@@ -318,11 +335,12 @@ struct RemapDiv {
 };
 
 // Kernel::operator() without split-K (gemm_k_size = K, identity swizzle of one tile), with RemapDiv's epilogue.
-template <typename Kernel>
+template <typename Kernel, bool Select = false>
 __device__ __forceinline__ void run_remap_div(int m, int n, int k, float const *a, int lda, float const *b, int ldb,
                                               float *c, int rows_per_atom, long long atom_stride,
-                                              long long row_stride, float const *density) {
-  using R = RemapDiv<Kernel>;
+                                              long long row_stride, float const *density, int const *kind = nullptr,
+                                              int select_columns = 0) {
+  using R = RemapDiv<Kernel, Select>;
   using Mma = typename R::Mma;
   extern __shared__ __align__(16) char storage[];
   auto &shared = *reinterpret_cast<typename R::SharedStorage *>(storage);
@@ -342,7 +360,7 @@ __device__ __forceinline__ void run_remap_div(int m, int n, int k, float const *
   accumulators.clear();
   mma(gemm_k_iterations, accumulators, iterator_a, iterator_b, accumulators);
   typename R::Epilogue::OutputOp output_op(typename R::Epilogue::OutputOp::Params(1.0f, 0.0f));
-  typename R::Iterator::Params params{c, density, rows_per_atom, atom_stride, row_stride};
+  typename R::Iterator::Params params{c, density, rows_per_atom, atom_stride, row_stride, kind, select_columns};
   cutlass::MatrixCoord tb_offset{tile_m * Mma::Shape::kM, tile_n * Mma::Shape::kN};
   typename R::Iterator iterator_d(params, {m, n}, thread_idx, tb_offset);
   typename R::Epilogue epilogue(shared.epilogue, thread_idx, warp_idx, lane_idx);
@@ -365,5 +383,16 @@ __constant__ int fm_tf32x3_remap_info[3] = {RowRow::kThreadCount, int(sizeof(typ
 
 FM_TF32X3_REMAP_ENTRY(fm_tf32x3_remap_div_rr_64x64, RowRow)
 FM_TF32X3_REMAP_ENTRY(fm_tf32x3_remap_div_rc_64x64, RowCol)
+
+#define FM_TF32X3_SELECT_ENTRY(name, Kernel)                                                                      \
+  __global__ void __launch_bounds__(Kernel::kThreadCount)                                                         \
+  name(int m, int n, int k, float const *a, int lda, float const *b, int ldb, float *c, int rows_per_atom,        \
+       long long atom_stride, long long row_stride, float const *density, int const *kind, int select_columns) {   \
+    run_remap_div<Kernel, true>(m, n, k, a, lda, b, ldb, c, rows_per_atom, atom_stride, row_stride, density, kind, \
+                                select_columns);                                                                  \
+  }
+
+FM_TF32X3_SELECT_ENTRY(fm_tf32x3_remap_select_rr_64x64, RowRow)
+FM_TF32X3_SELECT_ENTRY(fm_tf32x3_remap_select_rc_64x64, RowCol)
 
 }  // extern "C"

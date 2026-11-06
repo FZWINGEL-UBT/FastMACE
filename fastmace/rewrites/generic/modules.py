@@ -121,9 +121,13 @@ def fused_first_applies(self, edge_feats):
             and fused_first_backward(table.coef.device))
 
 
-def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
+def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None,
+                        density_of=None):
     """``(message, edge density)`` through the tabled outer sum (the table read inside the reassociation's per-slot
-    sums, one fused backward; ``kernels.triton.tabled_outer_sum``), or None where ``fused_first_applies`` is false."""
+    sums, one fused backward; ``kernels.triton.tabled_outer_sum``), or None where ``fused_first_applies`` is false.
+    ``density_of(edge density) -> density``: the reassociation divides its blocks by ``density + 1`` in the products'
+    epilogue (idea 31, ``kernels.cutlass.first_div``) and returns them as a tuple where it can; the result is then
+    ``(message, edge density, density)``."""
     if not fused_first_applies(self, edge_feats):
         return None
     from fastmace.kernels.triton.tabled_outer_sum import tabled_outer_sum
@@ -141,8 +145,16 @@ def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, ed
         density.append(edge_density)
         return summed, width
 
+    computed = []
+
+    def divided_by():
+        computed.append(density_of(density[0]))
+        return computed[0]
+
     message = reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, rows=rows,
-                            summed_fn=summed_fn)
+                            summed_fn=summed_fn, divided_by=divided_by if density_of is not None else None)
+    if density_of is not None:
+        return message, density[0], computed[0] if computed else None
     return message, density[0]
 
 
@@ -168,6 +180,21 @@ def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
 
     return checkpoint(first_table_region, self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
                       use_reentrant=False, preserve_rng_state=False)
+
+
+def first_div_applies(self, kind, n_real):
+    """Whether the first-interaction blocks go through ``kernels.cutlass.first_div`` (``first_div`` set at build by
+    ``precision.route``): a density interaction without halo rows whose linear is the identity (the generic fold)
+    and whose skip is a ``SpeciesSkip`` in ir_mul with one input segment per reassociated path."""
+    reassociation = getattr(self, "first_reassociation", None)
+    skip = getattr(self, "skip_tp", None)
+    if (kind != "density" or n_real is not None or not getattr(reassociation, "first_div", False)
+            or not isinstance(self.linear, torch.nn.Identity) or not isinstance(skip, SpeciesSkip)
+            or skip.layout != "ir_mul" or len(skip.segments_in) != len(reassociation.ls)):
+        return False
+    c = reassociation.channels
+    return all(mul == c and dim == c * (2 * degree + 1)
+               for (_, mul, dim), degree in zip(skip.segments_in, reassociation.ls))
 
 
 def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
@@ -199,6 +226,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     wprime_lengths = (edge_feats if tabled and chunked and getattr(self, "generic_recompute", None) is None
                       and getattr(self, "wprime_backward", None) is not None else None)
     message = None
+    early_density = None  # first_div: the density summed before the products
     if recompute_table and reassociation is not None:
         message, table_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
                                                         edge_index)
@@ -210,6 +238,13 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         from fastmace.rewrites.mh1.modules import streaming_message
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                    node_attrs=node_attrs, wprime_lengths=wprime_lengths)
+    elif tabled and reassociation is not None and fused_first_applies(self, edge_feats) and first_div_applies(self,
+                                                                                                         kind, n_real):
+        # idea 31 (kernels.cutlass.first_div): the density first, the blocks divided in the epilogue, kept apart
+        message, table_density, early_density = fused_first_message(
+            self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=n_real,
+            density_of=lambda edge_density: scatter_sum(src=edge_density, index=edge_index[1], dim=0,
+                                                        dim_size=num_nodes))
     elif tabled and reassociation is not None and fused_first_applies(self, edge_feats):
         message, table_density = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
                                                      rows=n_real)
@@ -233,8 +268,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             tp_weights = self.conv_tp_weights(edge_feats)
         if cutoff is not None:
             tp_weights = tp_weights * cutoff
-    density = None
-    if kind != "residual":
+    density = early_density
+    if kind != "residual" and density is None:
         if tabled:
             edge_density = table_density
         else:
@@ -279,7 +314,9 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         message = self.linear(message) / self.avg_num_neighbors
         return self.reshape(message), sc
     divided = None
-    if getattr(self, "density_before_linear", False):  # GENERIC_DENSITY_FIRST (not carried over); bias-free linear
+    if early_density is not None and isinstance(message, tuple):
+        pass  # first_div: the blocks are divided already (the linear is the identity)
+    elif getattr(self, "density_before_linear", False):  # GENERIC_DENSITY_FIRST (not carried over); bias-free linear
         message = self.linear(message / (density + 1))
     else:
         # idea 31 (kernels.cutlass.linear_div): the division and the join in the products' epilogue, bitwise
@@ -288,6 +325,12 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         message = divided if divided is not None else self.linear(message) / (density + 1)
     if kind == "density":
         message = self.skip_tp(message, node_attrs)
+        if getattr(self.skip_tp, "skip_select", False):  # idea 31: the epilogue stored the joined [n, width] tensor
+            from fastmace.rewrites.linear.modules import reshape_view
+
+            view = reshape_view(self.reshape, message)
+            if view is not None:
+                return view, None
         return self.reshape(message), None
     sc = self.truncate_ghosts(sc, n_real)
     if divided is not None:  # the epilogue's output is reshape_irreps' [n, irreps, mul] tensor already
@@ -412,6 +455,7 @@ class SpeciesSkip(torch.nn.Module):
             self.register_buffer(f"wt{index}", weight.transpose(1, 2).contiguous(), persistent=False)
             self.pairs.append((i, j))
         self.tf32x3 = False  # tf32x3_gemms: the products as 3xTF32 (OPT4-T03)
+        self.skip_select = False  # idea 31 (kernels.cutlass.skip_select), set by precision.route
         # SPECIES_GEMM None: the device's default, fixed when the module is built on it
         self.species_gemm_gpu = (columns.is_cuda and torch.cuda.get_device_name(columns.device) in SPECIES_GEMM_GPUS)
 
@@ -422,12 +466,48 @@ class SpeciesSkip(torch.nn.Module):
             return block.reshape(x.shape[0], dim // mul, mul)
         return block.reshape(x.shape[0], mul, dim // mul).transpose(1, 2)
 
+    def _select_layout(self):
+        """Whether ``kernels.cutlass.skip_select`` can join the products: ir_mul, one product per output block, the
+        blocks side by side from column 0 (static: no graph break)."""
+        if self.layout != "ir_mul" or sorted(j for _, j in self.pairs) != list(range(len(self.segments_out))):
+            return False
+        offset = 0
+        for start, _, dim in self.segments_out:
+            if start != offset:
+                return False
+            offset += dim
+        return True
+
+    def _selected(self, x1, blocks_in, onehot):
+        """The skip through ``tf32x3_skip_select`` (each product's own-species columns stored into the joined
+        output by the epilogue), or None where it does not apply."""
+        from fastmace.kernels.cutlass import skip_select
+
+        atoms = onehot.shape[0]
+        lefts, weights, offsets = [], [], []
+        for index, (i, j) in enumerate(self.pairs):
+            xi = blocks_in[i] if blocks_in is not None else self._view(x1, self.segments_in[i])
+            lefts.append(xi.reshape(atoms * xi.shape[1], -1))
+            weights.append(getattr(self, f"w{index}"))
+            offsets.append(self.segments_out[j][0])
+        width = self.segments_out[-1][0] + self.segments_out[-1][2]
+        if not skip_select.applies(lefts, weights, onehot, offsets, width):
+            return None
+        kind = onehot.argmax(dim=1).to(torch.int32)
+        return skip_select.tf32x3_skip_select(lefts, weights, onehot, kind, offsets, width)
+
     def forward(self, x1, x2):
         onehot = x2[:, self.columns]  # [atoms, species]
         atoms, species = onehot.shape
         outputs = [None] * len(self.segments_out)
+        blocks_in = x1 if isinstance(x1, tuple) else None  # first_div: each input segment as [atoms, size, mul]
+        x1 = x1[0] if blocks_in is not None else x1
         on = self.species_gemm_gpu if SPECIES_GEMM is None else SPECIES_GEMM
         grouped = on and x1.is_cuda and x1.dtype == torch.float32
+        if not grouped and self.tf32x3 and self.skip_select and self._select_layout():
+            selected = self._selected(x1, blocks_in, onehot)
+            if selected is not None:
+                return selected
         if grouped:
             from fastmace.kernels.triton.species_gemm import species_mm, species_plan
             kind = onehot.argmax(dim=1)
@@ -435,7 +515,7 @@ class SpeciesSkip(torch.nn.Module):
             order, counts = species_plan(kind, species)
         for index, (i, j) in enumerate(self.pairs):
             weight = getattr(self, f"w{index}")
-            xi = self._view(x1, self.segments_in[i])  # [atoms, size, mul_in]
+            xi = blocks_in[i] if blocks_in is not None else self._view(x1, self.segments_in[i])  # [atoms, size, mul]
             if grouped:
                 y = species_mm(xi, getattr(self, f"ws{index}"), getattr(self, f"wt{index}"), kind, order, counts,
                                precision)
