@@ -3,7 +3,7 @@ TABLE_W's per-GPU default for the generic family."""
 
 import torch
 
-from fastmace.kernels.cutlass import linear_div
+from fastmace.kernels.cutlass import linear_div, skip_select
 from fastmace.kernels.gpu_models import GPUModels, is_a100
 from fastmace.kernels.oeq_streaming import fused_forward, wprime_backward
 from fastmace.planner import fixed
@@ -264,6 +264,10 @@ def test_h200_defaults():
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(linear_div.LINEAR_DIV_GPUS)
     # Idea 30 (6 November 2026): WS_FORWARD on the H200, MD 0.9584 / 0.9610 (sm_90 only)
     assert "NVIDIA H200" in fused_forward.WS_FORWARD_GPUS
+    # Idea 38 (6 November 2026): STAGE_DOUT on both, MD H200 0.9616 / 0.9638, A100-SXM4 0.9896 / 0.9920 (bitwise)
+    assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(wprime_backward.STAGE_DOUT_GPUS)
+    # Idea 31 step 3 (6 November 2026): SKIP_SELECT on both, MD H200 0.9876 / 0.9919, A100-SXM4 0.9843 / 0.9858
+    assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(skip_select.SKIP_SELECT_GPUS)
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033
     from fastmace.kernels.cutlass import segment_rows

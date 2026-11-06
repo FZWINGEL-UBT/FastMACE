@@ -171,9 +171,10 @@ HOIST_SCALE_GPUS = GPUModels(())
 # shared memory. The same values in the same order per edge: dsh and dL/dr bitwise, dx up to the atomics' order.
 # H200 lab (descriptor tiles of 32 / 16 edges): 0.875 / 0.883 of the w' kernel. Float32 kernels whose row fits the
 # 48 KB of static shared memory (``stage_dout_supported``), else off. None: on for STAGE_DOUT_GPUS; True / False: an
-# A/B side's choice.
+# A/B side's choice. MD-step A/B on the current main (6 November 2026, Modal, SrTiO3 10x10x10): H200 0.9616 / 0.9638,
+# A100-SXM4-80GB 0.9896 / 0.9920 (both build orders); bitwise, so no gate.
 STAGE_DOUT = None
-STAGE_DOUT_GPUS = GPUModels(())
+STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored

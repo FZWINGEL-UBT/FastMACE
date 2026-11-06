@@ -32,7 +32,9 @@ import torch
 from fastmace.kernels.gpu_models import GPUModels
 
 SKIP_SELECT = None
-SKIP_SELECT_GPUS = GPUModels(())
+# MD-step A/B (6 November 2026, Modal, SrTiO3 10x10x10): H200 0.9876 / 0.9919, A100-SXM4-80GB 0.9843 / 0.9858
+# (both build orders); bitwise kernel, so no gate.
+SKIP_SELECT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 def skip_select_default(name=None) -> bool:
