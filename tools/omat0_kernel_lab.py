@@ -1357,6 +1357,15 @@ def forward_variants(kernel=None):
         # Ideas session third revision (6 November 2026): idea 15(a) (exact) and idea 14's bound.
         "x-lane-idx": ("exact", _lane_indices, ()),
         "F-tp-stored-w": ("falsifier", _stored_w, (), _stored_w_args(kernel)),
+        # Ideas session, fifth revision (6 November 2026). 14(A), the owner-pass forward: its pass 1 is the base with
+        # STORE_W on (w for every edge here, so twice pass 1's stores); estimate (A) = store-w / 2 + F-tp-stored-w / 2.
+        "store-w": ("exact", lambda s: _sub(s, "constexpr bool STORE_W = false;", "constexpr bool STORE_W = true;", 1),
+                    (), _stored_w_args(kernel)),
+        # Idea 17 (warp groups share each W fragment): timing bounds with G = 2's and G = 4's W traffic. Both m-tiles
+        # (F-w-half), and also paired path groups (F-w-quarter), read one fragment; outputs wrong, time only.
+        "F-w-half": ("falsifier", lambda s: _sub(s, _WFRAG_INDEX, _WFRAG_INDEX.replace("* 2 + m)", "* 2 + 0)")), ()),
+        "F-w-quarter": ("falsifier", lambda s: _sub(s, _WFRAG_INDEX, _WFRAG_INDEX.replace("* 2 + m)", "* 2 + 0)")
+                                                     .replace("((g * (KP", "(((g & ~1) * (KP")), ()),
         "F-skew-100ns": ("exact", lambda s: _skew(s, "(warp & 1) * 100"), ()),
         "F-skew-300ns": ("exact", lambda s: _skew(s, "(warp & 1) * 300"), ()),
         "F-skew-1us": ("exact", lambda s: _skew(s, "(warp & 1) * 1000"), ()),
@@ -1386,6 +1395,9 @@ def _lane_indices(source):
     load = (r"\n\2const int lane_rv = (lane < nb && !tail) ? receivers[e0 + lane] : 0x7fffffff;"
             r"\n\2const int lane_snd = (lane < nb && !tail) ? senders[e0 + lane] : -1;\1")
     return _sub(source, head, load, regex=True)
+
+
+_WFRAG_INDEX = "((g * (KP / 8) + (k0 >> 3)) * 2 + m) * 32 + lane]"
 
 
 def _stored_w(source):

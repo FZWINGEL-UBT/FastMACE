@@ -168,7 +168,7 @@ Every `*_GPUS` set was compared with `docs/current/defaults-by-gpu.md`, the ledg
 | DEGREE_PARTS | The comment cited `results/degree-parts-20261105`, which does not exist. | Fixed: cites `results/h200-ideas-20261105` (idea 2). |
 | TABLED_FORWARD on the H200 | `results/h200-defaults-20261105` says it stays off; the code has it on. | Consistent: the later run after the recapture fix (`results/h200-wgmma-20261105`) measured 0.9838 / 0.9871. The ba JSON's inner ratio 1.0131 is the same measurement indexed by build slot (1 / 0.9871). |
 | SKIP_ZERO_COLUMN on Ada and A100 | Single figures (0.981, 0.986), not both build orders. | Bitwise, and the H200's both-order A/B is large (1.092 / 1.090). No action. |
-| `grouped_launch` (5060 Ti), `gate_epilogue` (5060 Ti, Ada) | On with mixed cells: NbCl5 1.002 / 0.998, NaCl 1.000 / 1.005. | Policy question for the owner: per cell or in aggregate. |
+| `grouped_launch` (5060 Ti), `gate_epilogue` (5060 Ti, Ada) | On with mixed cells: NbCl5 1.002 / 0.998, NaCl 1.000 / 1.005. | **Decided** (6 November 2026; the owner left it to the conductor): the mixed-cell rule in `docs/current/defaults-by-gpu.md` keeps both on. |
 
 Every other set matches its recorded measurement. GPU names are consistent; `GPUModels` covers the A100 spellings.
 

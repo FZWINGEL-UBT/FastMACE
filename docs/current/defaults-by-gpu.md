@@ -61,6 +61,27 @@ The A100 plan's one accepted gate failure: OMAT-0 NbCl5 stress 1.8e-7 eV/Å³ ag
 the 3×TF32 GEMMs and the tensor-core forward together (each passes alone); the owner kept both (5 November 2026;
 [omat0-tp-backward](../validation/omat0/omat0-tp-backward.md) §3.1).
 
+### Mixed cells under decision 66 (6 November 2026)
+
+The owner left this rule to the conductor ("you can decide yourself"). It answers the kernel review's question:
+does a per-GPU default have to win on every benchmark cell, or in aggregate?
+
+A switch can be a GPU's default when both of these hold on that GPU's benchmark cells:
+
+1. **A win:** on at least one cell, it is faster in both build orders.
+2. **No loss:** on no cell is it slower in both build orders.
+
+A cell where one order is faster and the other slower, each within 0.5 %, is a tie and counts as neither.
+
+So `grouped_launch` (RTX 5060 Ti) and `gate_epilogue` (RTX 5060 Ti, RTX 4000 Ada) stay on:
+
+| Switch | Win | Ties |
+| --- | --- | --- |
+| `grouped_launch` | NaCl | NbCl5 1.002 / 0.998, NaNbO3 1.001 / 0.999 |
+| `gate_epilogue` | NbCl5 and NaNbO3 | NaCl 1.000 / 1.005 (5060 Ti) and 0.998 / 1.003 (Ada) |
+
+A switch that loses on a cell in both orders needs a per-cell rule (a planner condition) or stays off.
+
 ### NVIDIA H200 (5 November 2026)
 
 The tables above have no H200 column. The H200 (Modal, sm_90) is in these sets, every one from MD-step A/Bs in both
