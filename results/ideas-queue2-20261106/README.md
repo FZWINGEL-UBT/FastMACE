@@ -92,7 +92,33 @@ what the MD A/B can resolve. Not ported.
 **MD step after this queue:** H200 about 4.93 ms (unchanged). On the A100-SXM4, `RECEIVER_SUM` saves about 0.3 % on
 the MD step (about 9.68 ms before).
 
-## Runs
+## Overhead at a bigger cell: H200, SrTiO3 16×16×16 (owner's request)
+
+The same step breakdown as `runs/breakdown-h200` (main `7ffcaf7a`, 10×10×10), here at main `16472d77`. The cell is
+16×16×16: 20,480 atoms, 4.1× the atoms (`runs/breakdown-h200-16x16x16`).
+
+| | 10×10×10 | 16×16×16 | ratio |
+| --- | --- | --- | --- |
+| Padded edges | 373,760 | 1,591,296 | 4.26 |
+| Wall per MD step | 4.974 ms | 20.015 ms | 4.02 |
+| Wall per atom-step | 0.995 µs | 0.977 µs | 0.98 |
+| Force-graph kernel time | 4.735 ms | 18.323 ms | 3.87 |
+| Kernel time per padded edge | 12.7 ns | 11.5 ns | 0.91 |
+| Gaps inside the graph (133 kernels) | 53 µs (1.1 %) | 48 µs (0.3 %) | – |
+| Wall minus kernel time | 0.24 ms (4.8 %) | 1.69 ms (8.5 %) | 7.0 |
+| Neighbour rebuild (GPU) | 5.5 ms × 24 per 200 steps | 29.3 ms × 26 per 200 steps | 5.3 per rebuild |
+
+**Launch overhead is not what limits us.** The graph's gaps stay at about 50 µs per step, which is 1 % at 5,000
+atoms. The kernels also get about 9 % more efficient per edge at 4× the size: the small cell underfills the GPU
+slightly.
+
+**The neighbour-list rebuild grows faster than the cell.** It is 5.3× per rebuild for 4.1× the atoms, and its
+host time equals its GPU time, so the host waits on it.
+- At 10×10×10 it mostly overlaps the force call: the stages overlap by 0.62 ms of the 0.66 ms per step.
+- At 16×16×16 it costs 3.8 ms per step against 3.5 ms of overlap. The time outside the kernels grows from 4.8 % to
+  8.5 % of the step.
+
+For large cells, the rebuild is the next target: its scaling, and the host wait. The force kernels are not.
 
 `runs/`: one folder per Modal job, token-clean. Gate value dumps are dropped.
 
@@ -102,4 +128,5 @@ the MD step (about 9.68 ms before).
 | `breakdown-h200`, `breakdown-a100` | step breakdowns at `7ffcaf7a` |
 | `segdens-*`, `segdens2-a100` | `RECEIVER_SUM` MD A/Bs |
 | `segdens-breakdown-a100` | breakdown with the switch on |
+| `breakdown-h200-16x16x16` | H200 step breakdown of SrTiO3 16×16×16 at `16472d77` |
 | `gate-segdens-a100` | the gate |

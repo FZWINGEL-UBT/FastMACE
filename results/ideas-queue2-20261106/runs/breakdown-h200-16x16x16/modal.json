@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "H200",
+  "source_commit": "16472d778874d2e99c607e8d8bcf1a10dda93013",
+  "command": "nvidia-smi --query-gpu=name --format=csv,noheader | grep -q H200 || { echo WRONG-GPU; exit 3; }; python tools/step_breakdown.py --output $OUT/breakdown --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --model omat0-medium --structure results/loup-a100-20261103/SrTiO3.cif@16x16x16 --temperature-K 300 --timestep-fs 1 --equilibrate-steps 100 --steps 200 > $OUT/breakdown.log 2>&1; echo exit=$?; rm -f $OUT/breakdown/trace.json; tail -n 3 $OUT/breakdown.log",
+  "nvidia_smi": "NVIDIA H200, 610.57.04, 143771 MiB, 9.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 87.3332142829895,
+  "estimated_gpu_cost_usd": 0.11013688690132564
+}
