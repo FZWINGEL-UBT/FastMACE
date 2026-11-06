@@ -152,6 +152,17 @@ LANE_INDICES = None
 # 0.876. Only on the TF32 product with TC_WFRAG (not presplit, TC_TP or WGMMA) and an even warp count. None: on for
 # W_GROUP_GPUS (decision 66); True / False: an A/B side's choice.
 W_GROUP = None
+# Ideas plan idea 14(A), stage 1 (6 November 2026): the owner-pass forward. Every edge i <- j has a mirror j <- i of
+# bitwise-equal length, and where the radial input is symmetric in the species pair both form the same a and w. The
+# skin neighbour list (``SkinNeighbourList(owner_pairs=True)``) gives each mirror pair one owner edge and orders each
+# receiver's owned edges first; the force call's search yields each receiver's split ``mid``. Pass 1 is the fused
+# forward over the owned ranges [row_ptr[i], mid[i]) and stores each owned edge's w into its mirror's row of an [E, Q]
+# buffer; pass 2 is a product-free forward over the partner ranges [mid[i], row_ptr[i + 1]) that reads w from that
+# buffer and continues each receiver's message from pass 1's. Bitwise the one-pass forward on the owned-first order.
+# Only the TABLE_W block message (``_WPrimeBlockConvolution``) of a model whose radial rows are symmetric in the pair,
+# with the skin list; ignored elsewhere. None: on for OWNER_PASS_GPUS (decision 66); True / False: an A/B side's choice.
+OWNER_PASS = None
+OWNER_PASS_GPUS = GPUModels(())
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -272,6 +283,79 @@ def w_group_default(name=None):
     if on is None:
         on = name in W_GROUP_GPUS
     return bool(on)
+
+
+def owner_pass_default(name=None):
+    """``OWNER_PASS`` (None: ``name`` in ``OWNER_PASS_GPUS``); acts only where it applies
+    (``WPrime.prepare_blocks``)."""
+    on = OWNER_PASS
+    if on is None:
+        on = name in OWNER_PASS_GPUS
+    return bool(on)
+
+
+OWNER_HELPERS = """// OWNER_PASS (idea 14A): a chunk walks its receivers' owned (pass 1) or partner (pass 2) ranges end
+// to end; EV(j) is the edge at index j of that walk: segment r begins at index sc[r], holds the edges sb[r] + j.
+__device__ __forceinline__ int64_t owner_edge(int64_t j, const int64_t (&sb)[RC], const int64_t (&sc)[RC]) {
+    int64_t e = sb[0] + j;
+    #pragma unroll
+    for (int r = 1; r < RC; ++r)
+        if (j >= sc[r]) e = sb[r] + j;
+    return e;
+}
+#define EV(j) owner_edge((j), sb, sc)
+"""
+
+
+def _subn(pattern, repl, source, what, exact=None):
+    out, count = re.subn(pattern, repl, source)
+    if not count or (exact is not None and count != exact):
+        raise ValueError(f"owner_source: {what} found {count} times")
+    return out
+
+
+def owner_source(source, which, parts):
+    """``source`` (``render``'s, after ``lane_indices``) as an owner-pass kernel (``OWNER_PASS``): ``which`` is
+    "pass1" (the owned ranges; w stored into the mirror's row, ``mirror[e]``, none where it is -1) or "pass2" (the
+    partner ranges; ``_part(stored_w=True)``'s product-free body). Each of the ``parts`` chunk loops walks its
+    receivers' ranges with ``EV``; no padding chunks. Two arguments more: ``mid`` and ``mirror``."""
+    lo, hi = ("row_ptr[i]", "mid[i]") if which == "pass1" else ("mid[i]", "row_ptr[i + 1]")
+    source = _subn(r"(constexpr int A_STRIDE = \d+;\n)", lambda m: m.group(1) + OWNER_HELPERS, source, "A_STRIDE", 1)
+    source = _subn(r"float\* __restrict__ wout\) \{",
+                   "float* __restrict__ wout, const int* __restrict__ mid, const int* __restrict__ mirror) {",
+                   source, "the signature", 1)
+
+    def ranges(m):
+        ind = m.group(1)
+        return (f"\n{ind}ebeg = 0;\n{ind}eend = 0;\n{ind}#pragma unroll\n{ind}for (int r = 0; r < RC; ++r) {{\n"
+                f"{ind}    const int64_t i = r0 + r;\n{ind}    int64_t lo = 0, hi = 0;\n"
+                f"{ind}    if (i < r1) {{\n{ind}        lo = {lo};\n{ind}        hi = {hi};\n{ind}    }}\n"
+                f"{ind}    hi = hi < lo ? lo : hi;\n{ind}    sb[r] = lo - eend;\n{ind}    sc[r] = eend;\n"
+                f"{ind}    eend += hi - lo;\n{ind}}}")
+    source = _subn(r"\n([ \t]*)ebeg = row_ptr\[r0\] < 0 \? 0 : row_ptr\[r0\];\n[ \t]*eend = row_ptr\[r1\] < ebeg \? "
+                   r"ebeg : row_ptr\[r1\];\n[ \t]*eend = eend > E \? E : eend;", ranges, source, "the chunk range",
+                   parts)
+    source = _subn(r"\n([ \t]*)(int64_t r0, r1, ebeg, eend;|int64_t r1 = 0, eend = 0, cur = 0, e0 = 0;)",
+                   lambda m: f"\n{m.group(1)}{m.group(2)}\n{m.group(1)}int64_t sb[RC] = {{}}, sc[RC] = {{}};",
+                   source, "the chunk variables", parts)
+    source = _subn(r"ebeg >= E \|\| !STORE_W", "true", source, "the padding chunks", parts)
+    source = _subn(r"\(e0 \+ b\)", "EV(e0 + b)", source, "the batch's edges")
+    source = _subn(r"(receivers|senders)\[e0 \+ (b|lane)\]", r"\1[EV(e0 + \2)]", source, "the indices")
+    if "sh + e0 * ED) + i)" in source:
+        source = source.replace("sh + e0 * ED) + i)", "sh + EV(e0 + 4 * i / ED) * ED) + i % (ED / 4))")
+    else:
+        source = _subn(r"sh\[e0 \* ED \+ i\]", "sh[EV(e0 + i / ED) * ED + i % ED]", source, "the sh staging")
+    if which == "pass1":
+        source = _subn(r"constexpr bool STORE_W = false;", "constexpr bool STORE_W = true;", source, "STORE_W", 1)
+        mirror = "{ const int me = mirror[EV(e0 + b)]; if (me >= 0) "
+        source = _subn(r"__stcs\(&wout\[EV\(e0 \+ b\) \* Q \+ wst\[g\] \+ ch\], w\[g\]\[b\]\);",
+                       mirror + "__stcs(&wout[(int64_t)me * Q + wst[g] + ch], w[g][b]); }", source, "the store") \
+            if "__stcs(&wout" in source else \
+            _subn(r"wout\[EV\(e0 \+ b\) \* Q \+ wst\[g\] \+ ch\] = w\[g\]\[b\];",
+                  mirror + "wout[(int64_t)me * Q + wst[g] + ch] = w[g][b]; }", source, "the store")
+    if re.search(r"[^V]\(e0 \+ |e0 \* ED", source):
+        raise ValueError("owner_source: an edge access was not mapped")
+    return source
 
 
 W_GROUP_HELPERS = """// W_GROUP: a warp pair's named barrier (64 threads) and its vote (bar.red.or: any lane's pred).
@@ -945,16 +1029,24 @@ def _node(layout, channels, start, component, dim):
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-           lane_idx=False, w_group=False):
-    """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``)."""
+           lane_idx=False, w_group=False, owner=None):
+    """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``). ``owner``: "pass1" or
+    "pass2" of the owner-pass forward (``OWNER_PASS``, ``owner_source``; store_w=False, without prefetch, tctp or
+    wgmma; pass 2 without w_group)."""
+    if owner is not None:
+        if owner not in ("pass1", "pass2") or store_w or prefetch or tctp or wgmma or tc == "fp16" or (
+                owner == "pass2" and w_group):
+            raise ValueError("fused_folded_forward: owner needs 'pass1' or 'pass2', store_w=False, no prefetch, tctp, "
+                             "wgmma or fp16, and pass 2 without w_group")
     source = _render(schedule, k, rule, store_w, used, stream_store, tc, blocks, prefetch, vec_sh, vec_a, wfrag, tctp,
-                     wgmma, groups, sh_lds4, w_group)
-    return lane_indices(source) if lane_idx else source
+                     wgmma, groups, sh_lds4, w_group, stored_w=owner == "pass2")
+    source = lane_indices(source) if lane_idx else source
+    return owner_source(source, owner, rule.parts) if owner is not None else source
 
 
 def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
             vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-            w_group=False):
+            w_group=False, stored_w=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -969,7 +1061,7 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
     (``WGMMA``; the TF32 product without prefetch, tctp or wfrag; the rule must be ``launch_rule_wgmma``'s).
     ``sh_lds4``: the tensor product's sh reads as float4 shared loads (``SH_LDS4``; needs ``vec_sh``, not with tctp
     or wgmma). ``w_group``: warp pairs share each W fragment (``W_GROUP``; the TF32 product with wfrag, without
-    tctp or wgmma, an even warp count)."""
+    tctp or wgmma, an even warp count). ``stored_w``: the owner pass's pass 2 body (``_part``)."""
     if w_group and (tc is not True or not wfrag or tctp or wgmma or rule.warps % 2 or rule.warps // 2 > 15):
         raise ValueError("fused_folded_forward: w_group needs the TF32 product with wfrag, without tctp or wgmma, "
                          "and an even warp count of at most 30")
@@ -1014,8 +1106,8 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
     slots = {s.name: s for s in schedule.output_slots}
     npp = max(len(p) for p in parts)
     flags = (tc, bmap, prefetch, vec_sh, vec_a, wfrag, tctp, wgmma, sh_lds4, w_group)
-    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, *flags)}    }} break;"
-                      for q, part in enumerate(parts))
+    cases = "\n".join(f"    case {q}: {{{_part(schedule, part, slots, C, layout, store, *flags, stored_w=stored_w)}"
+                      "    } break;" for q, part in enumerate(parts))
     if tc == "fp16" and _kpad(used) % 16:
         raise ValueError(f"tc='fp16' needs the used columns padded to a multiple of 16, not {_kpad(used)}")
     helpers = (tc_helpers() + TC_FP16_HELPERS) if tc == "fp16" else tc_helpers() if tc else ""
@@ -1670,7 +1762,12 @@ def _wgmma_pipelined(names, slots, C, layout, bmap, nw, npl, wst, eb, astage, sh
 
 
 def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch=False, vec_sh=False, vec_a=False,
-          wfrag=False, tctp=False, wgmma=False, sh_lds4=False, w_group=False):
+          wfrag=False, tctp=False, wgmma=False, sh_lds4=False, w_group=False, stored_w=False):
+    """One path part's chunk loop. ``stored_w`` (the owner pass's pass 2, ``OWNER_PASS``): no W slice, a staging or
+    product; each batch's w rows are read from ``wout``, and each receiver's accumulators start from its message in
+    ``out`` (pass 1's), so the stored message is the one-pass sum over both ranges."""
+    if stored_w and (w_group or tctp or wgmma or prefetch):
+        raise ValueError("fused_folded_forward: stored_w needs no w_group, tctp, wgmma or prefetch")
     if wgmma:
         return _part_wgmma(schedule, part, slots, C, layout, store, bmap, vec_sh, vec_a)
     if tctp:
@@ -1729,6 +1826,21 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                 for (int k = 0; k < K; ++k) {{
 {nl.join(gemm)}
                 }}"""
+    start = ""
+    if stored_w:
+        wfill = astage = ""
+        product = f"""                const int wsl[{npl}] = {{{wst}}};
+                float w[{npl}][B];
+                #pragma unroll
+                for (int g = 0; g < {npl}; ++g)
+                    #pragma unroll
+                    for (int b = 0; b < B; ++b) w[g][b] = (b < nb) ? __ldg(wout + (e0 + b) * Q + wsl[g] + ch) : 0.f;"""
+        loads = "\n".join(f"                    acc[{i}] = {_out(slots[name], C, layout, bmap)};"
+                          for name, i in si.items())
+        start = f"""
+            if (cur < r1) {{
+{loads}
+            }}"""
     if vec_sh:
         shstage = """                for (int i = lane; i < B * ED / 4; i += 32)
                     reinterpret_cast<float4*>(sh_s)[i] = (4 * i / ED < nb)
@@ -1810,6 +1922,14 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
                 for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
                 ++cur;
             }}"""
+    if stored_w:  # the next receiver continues from its pass-1 message
+        flush = f"""{{
+{outs}
+                ++cur;
+                if (cur < r1) {{
+{loads}
+                }}
+            }}"""
     if w_group:
         return _part_group(npl, n, nx, wst, wfill, astage, shstage, xloads, product, store, tp, flush, shq)
     return f"""
@@ -1840,7 +1960,7 @@ def _part(schedule, part, slots, C, layout, store, tc=False, bmap=None, prefetch
             float acc[{n}];
             #pragma unroll
             for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
-            int64_t cur = r0;
+            int64_t cur = r0;{start}
 {loop_head}
                 float xv[B][{nx}];
                 int rv[B];
@@ -1973,9 +2093,11 @@ def _part_group(npl, n, nx, wst, wfill, astage, shstage, xloads, product, store,
 
 class FusedFoldedForward:
     """Compiled ``fused_folded_forward`` for the streaming kernels of one interaction (``StreamingKernels``) and a
-    folded input width ``k``; float32 only. ``used``: the inputs the k-loop reads (``used_columns``; default ``k``)."""
+    folded input width ``k``; float32 only. ``used``: the inputs the k-loop reads (``used_columns``; default ``k``).
+    ``owner``: "pass1" or "pass2" of the owner-pass forward (``OWNER_PASS``; built with store_w=False; pass 2 without
+    W_GROUP), called with ``mid`` and ``mirror``."""
 
-    def __init__(self, kernels, k, device=None, store_w=True, used=None, blocks=None):
+    def __init__(self, kernels, k, device=None, store_w=True, used=None, blocks=None, owner=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -2026,10 +2148,15 @@ class FusedFoldedForward:
         self.lane_idx = lane_indices_default(torch.cuda.get_device_name(device)) and not self.wgmma
         self.w_group = (w_group_default(torch.cuda.get_device_name(device)) and self.tc is True and self.wfrag
                         and not self.tctp and not self.wgmma and self.rule.warps % 2 == 0)
+        self.owner = owner
+        if owner is not None:
+            if self.prefetch or self.tctp or self.wgmma:
+                raise ValueError("fused_folded_forward: the owner pass needs a kernel without PREFETCH, TC_TP or WGMMA")
+            self.w_group = self.w_group and owner == "pass1"
         self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                              prefetch=self.prefetch, vec_sh=self.vec_sh, vec_a=self.vec_a, wfrag=self.wfrag,
                              tctp=self.tctp, wgmma=self.wgmma, groups=self.groups, sh_lds4=self.sh_lds4,
-                             lane_idx=self.lane_idx, w_group=self.w_group)
+                             lane_idx=self.lane_idx, w_group=self.w_group, owner=owner)
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -2040,9 +2167,11 @@ class FusedFoldedForward:
         self.id = content_id("FusedFoldedForward", self.source, self.rule, _device_key(device))
         _REGISTRY[self.id] = self
 
-    def __call__(self, a, weight, x, sh, senders, receivers, row_ptr, out, w):
+    def __call__(self, a, weight, x, sh, senders, receivers, row_ptr, out, w, mid=None, mirror=None):
         """Writes the message into ``out [N, output_dim]`` (a list of the groups with ``blocks``) and
-        ``a @ weight.T`` into ``w [E, Q]``."""
+        ``a @ weight.T`` into ``w [E, Q]``. Owner pass: ``mid`` [N] (int32), ``mirror`` [E] (int32); pass 1 writes
+        each owned edge's w into its mirror's row of ``w`` and the owned ranges' message, pass 2 reads ``w`` and adds
+        the partner ranges to the message in ``out``."""
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check
@@ -2056,6 +2185,10 @@ class FusedFoldedForward:
         values = (nodes, edges, a.data_ptr(), weight.data_ptr(), x.data_ptr(), sh.data_ptr(), senders.data_ptr(),
                   receivers.data_ptr(), row_ptr.data_ptr(), counters.data_ptr(),
                   *([o.data_ptr() for o in out] if self.blocks else [out.data_ptr()]), w.data_ptr())
+        if self.owner is not None:
+            if mid is None or mirror is None:
+                raise ValueError("fused_folded_forward: an owner-pass kernel needs mid and mirror")
+            values += (mid.data_ptr(), mirror.data_ptr())
         types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         _check(driver.cuLaunchKernel(self._function, self.rule.blocks_per_slice, self.channels // CHANNEL_BLOCK,
@@ -2125,4 +2258,58 @@ def fused_folded_message_blocks(a: torch.Tensor, weight: torch.Tensor, x: torch.
 def _(a, weight, x, sh, senders, receivers, row_ptr, fused_id):
     fused = _REGISTRY[fused_id]
     return [x.new_empty(shape) for shape in block_shapes(fused.blocks, fused.channels, x.shape[0])]
+
+
+def owner_message(pass1, pass2, a, weight, x, sh, senders, receivers, row_ptr, mid, mirror, out):
+    """The owner-pass forward (``OWNER_PASS``) into ``out`` (a list of groups with ``blocks``): pass 1 over the owned
+    ranges with each owned edge's w stored into its mirror's row of a transient [E, Q] buffer, then pass 2 over the
+    partner ranges. Bitwise the one-pass message-only kernel on the same (owned-first) edge order."""
+    if not (sh.shape[0] or x.shape[0]):
+        return
+    a, weight, x, sh = a.contiguous(), weight.contiguous(), x.contiguous(), sh.contiguous()
+    senders, receivers, row_ptr = senders.contiguous(), receivers.contiguous(), row_ptr.contiguous()
+    mid, mirror = mid.contiguous(), mirror.contiguous()
+    w = x.new_empty((sh.shape[0], weight.shape[0]))
+    pass1(a, weight, x, sh, senders, receivers, row_ptr, out, w, mid, mirror)
+    pass2(a, weight, x, sh, senders, receivers, row_ptr, out, w, mid, mirror)
+
+
+@torch.library.custom_op("fastmace::fused_folded_message_blocks_owner", mutates_args=())
+def fused_folded_message_blocks_owner(a: torch.Tensor, weight: torch.Tensor, x: torch.Tensor, sh: torch.Tensor,
+                                      senders: torch.Tensor, receivers: torch.Tensor, row_ptr: torch.Tensor,
+                                      mid: torch.Tensor, mirror: torch.Tensor, pass1_id: int,
+                                      pass2_id: int) -> list[torch.Tensor]:
+    """``fused_folded_message_blocks`` through the owner-pass kernels ``pass1_id`` and ``pass2_id`` (``OWNER_PASS``):
+    ``mid`` [N] each receiver's split between its owned and partner edges, ``mirror`` [E] each edge's mirror (-1:
+    none)."""
+    pass1, pass2 = _REGISTRY[pass1_id], _REGISTRY[pass2_id]
+    if pass1.owner != "pass1" or pass2.owner != "pass2" or not pass1.blocks or pass1.blocks != pass2.blocks:
+        raise ValueError("fused_folded_message_blocks_owner needs the block-layout pass 1 and pass 2 kernels")
+    out = [x.new_empty(shape) for shape in block_shapes(pass1.blocks, pass1.channels, x.shape[0])]
+    owner_message(pass1, pass2, a, weight, x, sh, senders, receivers, row_ptr, mid, mirror, out)
+    return out
+
+
+@fused_folded_message_blocks_owner.register_fake
+def _(a, weight, x, sh, senders, receivers, row_ptr, mid, mirror, pass1_id, pass2_id):
+    fused = _REGISTRY[pass1_id]
+    return [x.new_empty(shape) for shape in block_shapes(fused.blocks, fused.channels, x.shape[0])]
+
+
+@torch.library.custom_op("fastmace::fused_folded_message_owner", mutates_args=())
+def fused_folded_message_owner(a: torch.Tensor, weight: torch.Tensor, x: torch.Tensor, sh: torch.Tensor,
+                               senders: torch.Tensor, receivers: torch.Tensor, row_ptr: torch.Tensor,
+                               mid: torch.Tensor, mirror: torch.Tensor, pass1_id: int, pass2_id: int) -> torch.Tensor:
+    """``fused_folded_message`` (the message [N, output_dim]) through the owner-pass kernels (``OWNER_PASS``)."""
+    pass1, pass2 = _REGISTRY[pass1_id], _REGISTRY[pass2_id]
+    if pass1.owner != "pass1" or pass2.owner != "pass2" or pass1.blocks or pass2.blocks:
+        raise ValueError("fused_folded_message_owner needs the dense pass 1 and pass 2 kernels")
+    out = x.new_empty((x.shape[0], pass1.output_dim))
+    owner_message(pass1, pass2, a, weight, x, sh, senders, receivers, row_ptr, mid, mirror, out)
+    return out
+
+
+@fused_folded_message_owner.register_fake
+def _(a, weight, x, sh, senders, receivers, row_ptr, mid, mirror, pass1_id, pass2_id):
+    return x.new_empty((x.shape[0], _REGISTRY[pass1_id].output_dim))
 
