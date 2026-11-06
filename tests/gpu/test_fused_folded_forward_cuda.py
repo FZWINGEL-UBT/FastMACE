@@ -333,6 +333,26 @@ for layout in ("ir_mul", "mul_ir"):
                         assert torch.equal(moved_out[0], base_out[0]), label
                         assert torch.equal(moved_out[1], base_out[1]), label
                         report[name][f"bitwise {label}"] = moved.rule.warps
+                    if vec:  # Idea 24 (CG_FOLD; round 12): the message kernel only; rounding class where it applies
+                        ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
+                        ff_module.VEC_A, ff_module.CG_FOLD = True, True
+                        try:
+                            cgf_on = FusedFoldedForward(kernels, k, used=used, store_w=False)
+                            cgf_w = FusedFoldedForward(kernels, k, used=used)
+                        finally:
+                            ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = False, None, None
+                            ff_module.VEC_A, ff_module.CG_FOLD = None, None
+                        assert not cgf_w.cg_fold, (layout, k, used)  # w stored: never folded
+                        cgf_off = built[True, "message"]
+                        if cgf_on.cg_fold:
+                            assert cgf_on.source != cgf_off.source, (layout, k, used)
+                            cgf_out = fused_folded_message(a_u, source_w, X_u, Y_u, *args_u, cgf_on.id)
+                            scale = base_out[0].abs().max().clamp_min(1e-30)
+                            assert ((cgf_out - base_out[0]).abs().max() / scale).item() < 1e-5, (layout, k, used)
+                            report[name][f"cg fold {used}"] = "applied"
+                        else:  # the render is not of the fold's form: built without it
+                            assert cgf_on.source == cgf_off.source, (layout, k, used)
+                            report[name][f"cg fold {used}"] = "not applicable"
                     if vec:  # A_SPLIT (round 7): the pairs' a split once at staging, bitwise the grouped kernel
                         ff_module.TENSOR_CORES, ff_module.TC_WFRAG, ff_module.W_GROUP = True, True, True
                         ff_module.VEC_A, ff_module.A_SPLIT = True, True

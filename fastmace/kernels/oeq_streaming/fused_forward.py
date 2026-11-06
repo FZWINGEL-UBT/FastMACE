@@ -172,6 +172,11 @@ A_SPLIT = None
 # X_LATE_GPUS / K_PIPE_GPUS (decision 66); True / False: an A/B side's choice.
 X_LATE = None
 K_PIPE = None
+# H200 ideas plan idea 24 (round 12, 6 November 2026; ``cg_fold.apply_cg_fold``): the TP's CG factors folded into W
+# (one factor per part-1 path, applied as the block fills its W slice) and part 0's w x0 first: fewer FP32 products in
+# the TP. Rounding class (messages max rel 3e-7 to 7e-7). Only with STORE_W false and the two DEGREE_PARTS parts.
+# Kernel lab: H200 0.969, A100-SXM4 0.951. None: on for CG_FOLD_GPUS (decision 66); True / False: an A/B side's choice.
+CG_FOLD = None
 # Round 4 (5 November 2026): the tensor product on tensor cores too. The a.W product's C fragments hold w as
 # (channel, edge) tiles; with the edge pair 2 tq, 2 tq + 1 of a lane as its k columns tq, tq + 4, (w x)[channel,
 # (edge, m1)] is directly the A fragment of a second 3xTF32 product against S_e[m1, m3] = sum_m2 CG sh_e[m2] (built per
@@ -199,6 +204,7 @@ A_SPLIT_GPUS = GPUModels(())
 # A100-SXM4-80GB 0.9937 / 0.9937; bitwise. With K_PIPE as well: H200 0.9934 / 0.9927, A100-SXM4 0.9910 / 0.9920.
 X_LATE_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 K_PIPE_GPUS = GPUModels(())
+CG_FOLD_GPUS = GPUModels(())
 TC_WFRAG_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 # Hopper wgmma product (round 5, 5 November 2026; the H200 open item "wgmma product"): the a.W product as
 # warpgroup-wide wgmma.mma_async m64nNk8 tf32 (sm_90a; 3xTF32, the mask split): a warpgroup's four warps each give
@@ -316,6 +322,14 @@ def k_pipe_default(name=None):
     on = K_PIPE
     if on is None:
         on = name in K_PIPE_GPUS
+    return bool(on)
+
+
+def cg_fold_default(name=None):
+    """``CG_FOLD`` (None: ``name`` in ``CG_FOLD_GPUS``); built only where ``cg_fold.apply_cg_fold`` applies."""
+    on = CG_FOLD
+    if on is None:
+        on = name in CG_FOLD_GPUS
     return bool(on)
 
 
@@ -1133,9 +1147,10 @@ def apply_x_late(source):
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-           lane_idx=False, w_group=False, wfrag_region=False, a_split=False, x_late=False, k_pipe=False):
+           lane_idx=False, w_group=False, wfrag_region=False, a_split=False, x_late=False, k_pipe=False,
+           cg_fold=False):
     """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``); ``k_pipe`` and
-    ``x_late``: idea 27's transforms (W_GROUP renders without A_SPLIT)."""
+    ``x_late``: idea 27's transforms (W_GROUP renders without A_SPLIT); ``cg_fold``: idea 24's (``CG_FOLD``)."""
     source = _render(schedule, k, rule, store_w, used, stream_store, tc, blocks, prefetch, vec_sh, vec_a, wfrag, tctp,
                      wgmma, groups, sh_lds4, w_group, wfrag_region, a_split)
     if lane_idx:
@@ -1144,6 +1159,9 @@ def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fal
         source = apply_k_pipe(source)
     if x_late:
         source = apply_x_late(source)
+    if cg_fold:
+        from fastmace.kernels.oeq_streaming.cg_fold import apply_cg_fold
+        source = apply_cg_fold(source)
     return source
 
 
@@ -2254,6 +2272,13 @@ class FusedFoldedForward:
             self.x_late = self.k_pipe = False
             self.source = render(schedule, self.k, self.rule, self.store_w, self.used, tc=self.tc, blocks=self.blocks,
                                  **options)
+        self.cg_fold = cg_fold_default(name) and not self.store_w
+        if self.cg_fold:
+            from fastmace.kernels.oeq_streaming.cg_fold import apply_cg_fold
+            try:
+                self.source = apply_cg_fold(self.source)
+            except ValueError:  # idea 24 does not apply to this render: built without it
+                self.cg_fold = False
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), suffix="a" if self.wgmma else "")
         torch.cuda.current_stream(device)
         self._module = _check(driver.cuModuleLoadData(cubin))
