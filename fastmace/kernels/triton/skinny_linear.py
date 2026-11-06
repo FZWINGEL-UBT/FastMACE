@@ -19,16 +19,56 @@ picks 128-row tiles with 8 warps where the 64-row grid is a few waves over
 the SMs (small cells: 2 to 8 waves), the fixed tiles elsewhere. BLOCK_K stays
 32 in both, so every row is reduced in the same order: the results are bitwise
 the same (``tile_choice``).
+
+``RADIAL_TF32X3`` (an A/B constant, off-polar-alex 6 November 2026; ``radial_tf32x3_default``): the forward and
+the input gradient as 3xTF32 products (``tf32x3_gemm.tf32x3_mm``, CUTLASS on the A100), K and N padded with zeros
+to the kernels' alignment. MACE-OFF23-large's [E, 64] @ [64, 3808] and its [E, 3808] @ [3808, 64] gradient run
+compute-bound on SIMT FP32 (1.0 and 1.3 ms of a 12.1 ms force call on the A100-SXM4-80GB). Rounding.
 """
 
 from functools import cache
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 # One fixed configuration for every crystal and GPU (no autotuning).
 BLOCK_M, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 32, 4, 3
 MAX_TRITON_COLUMNS = 128  # P above this falls back to PyTorch (the block of P columns lives in registers)
 TILE_RULES = ("fixed", "waves")
+# RADIAL_TF32X3: None follows RADIAL_TF32X3_GPUS (none measured yet, decision 66); True / False: an A/B side's choice.
+RADIAL_TF32X3 = None
+RADIAL_TF32X3_GPUS = GPUModels(())
+_ALIGN = 4  # cutlass.tf32x3.ALIGNMENT: K and N padded to it
+
+
+@torch.compiler.assume_constant_result
+def _tf32x3_listed(index: int) -> bool:
+    """Whether CUDA device ``index`` is one of ``RADIAL_TF32X3_GPUS`` (a Dynamo constant, as
+    ``receiver_sum._listed``)."""
+    return torch.cuda.get_device_name(index) in RADIAL_TF32X3_GPUS
+
+
+def radial_tf32x3_default(device) -> bool:
+    """``RADIAL_TF32X3`` on ``device``: the constant when set, else on for ``RADIAL_TF32X3_GPUS``; never off CUDA."""
+    device = torch.device(device)
+    if device.type != "cuda":
+        return False
+    if RADIAL_TF32X3 is not None:
+        return bool(RADIAL_TF32X3)
+    return _tf32x3_listed(device.index if device.index is not None else torch.cuda.current_device())
+
+
+def _padded(t, rows=0, columns=0):
+    return torch.nn.functional.pad(t, (0, columns, 0, rows)) if rows or columns else t
+
+
+def tf32x3_forward(a, weight):
+    """``a @ weight.T`` (a [E, K], weight [Q, K]) as one 3xTF32 product, K padded to the alignment with zeros."""
+    from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+
+    pad = -a.shape[1] % _ALIGN
+    return tf32x3_mm(_padded(a, columns=pad), _padded(weight, columns=pad).t())
 # The waves rule (OPT2-T03): 128-row tiles, 8 warps, where the 64-row grid has WAVES_MIN to WAVES_MAX waves
 # over the SMs. Measured on the RTX 5060 Ti (36 SMs), kernel alone: 0.71x at 3.6 waves (NaCl 3x3x3), 0.90x at
 # 7.1, 1.01x at 1.8 and 1.03x at 14; at 0.9 waves 1.67x. Same BLOCK_K, so the same reduction order.
@@ -131,6 +171,22 @@ def folded_linear_input_grad_parts(grad: torch.Tensor, weight: torch.Tensor, mai
     return _input_grad(grad, main, last, tile_rule)
 
 
+@torch.library.custom_op("fastmace::folded_linear_input_grad_tf32x3", mutates_args=())
+def folded_linear_input_grad_tf32x3(grad: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+    """``grad @ weight`` (grad [E, Q], weight [Q, P + 1]) as one 3xTF32 product (``RADIAL_TF32X3``): weight's
+    columns padded to the alignment with zeros, the padding cut off."""
+    from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm
+
+    columns = weight.shape[1]
+    out = tf32x3_mm(grad.contiguous(), _padded(weight, columns=-columns % _ALIGN).contiguous())
+    return out if out.shape[1] == columns else out[:, :columns].contiguous()
+
+
+@folded_linear_input_grad_tf32x3.register_fake
+def _(grad, weight):
+    return grad.new_empty((grad.shape[0], weight.shape[1]))
+
+
 @folded_linear_input_grad_parts.register_fake
 def _(grad, weight, main, last, tile_rule="fixed"):
     return grad.new_empty((grad.shape[0], weight.shape[1]))
@@ -146,6 +202,9 @@ class _FoldedLinear(torch.autograd.Function):
     def forward(ctx, a, weight, contiguous_weight, tile_rule, main=None, last=None):
         ctx.save_for_backward(weight, main, last)
         ctx.tile_rule = tile_rule
+        ctx.tf32x3 = a.dtype == torch.float32 and radial_tf32x3_default(a.device)
+        if ctx.tf32x3:
+            return tf32x3_forward(a, weight)
         if contiguous_weight:
             # a @ (W^T stored contiguously): cuBLAS's non-transposed kernels, 1.86 -> 1.52 ms for
             # [E, 65] @ [65, 1280] on NaNbO3 shapes (the contiguous folded weight screen).
@@ -155,6 +214,8 @@ class _FoldedLinear(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         weight, main, last = ctx.saved_tensors
+        if ctx.tf32x3:
+            return folded_linear_input_grad_tf32x3(grad, weight), None, None, None, None, None
         if main is not None:
             return folded_linear_input_grad_parts(grad, weight, main, last, ctx.tile_rule), None, None, None, None, None
         return folded_linear_input_grad(grad, weight, ctx.tile_rule), None, None, None, None, None
