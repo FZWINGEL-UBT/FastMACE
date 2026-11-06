@@ -56,34 +56,43 @@ def _between(text, start, end, start_at=0):
     return text[i:j]
 
 
-def extract(source):
-    """The pieces of the plan's render that ws30 reuses: the kernel's header and prologue, and part 1's W fill
-    expression, path weight starts, CG factors, x gathers, TP and flush."""
+def _case(source, part):
+    """The text of ``case part: { ... } break;`` in the plan's render."""
+    start = source.index(f"    case {part}: {{")
+    end = source.index("    } break;\n", start) + len("    } break;\n")
+    return source[start:end]
+
+
+def parts_of(source):
+    return [int(v) for v in re.findall(r"^    case (\d+): \{", source, re.M)]
+
+
+def extract(source, part=1):
+    """The pieces of the plan's render that the warp-specialized kernel reuses: the kernel's header and prologue, and
+    part ``part``'s W fill expression, path weight starts, CG factors, x gathers, TP and flush."""
     if "constexpr bool STORE_W = false;" not in source:
         raise ValueError("ws30 needs STORE_W false (the H200 plan with CG_FOLD)")
     head = source[:source.index('extern "C"')]
     kernel_start = source.index('extern "C"')
     signature = source[kernel_start:source.index("{\n", kernel_start) + 2]
     prologue = _between(source, "    extern __shared__ float smem[];", "    switch (blockIdx.z) {")
-    prologue = "\n".join(line for line in prologue.splitlines()
-                         if not re.match(r"\s*float\* (a_s|sh_s|r_s) =", line)) + "\n"
-    case1 = source[source.index("    case 1: {"):]
-    wst = re.search(r"const int wst\[(\d+)\] = \{([^}]*)\};", case1)
+    case = _case(source, part)
+    wst = re.search(r"const int wst\[(\d+)\] = \{([^}]*)\};", case)
     npl = int(wst.group(1))
-    cpf = re.search(r"const float cpf\[\d+\] = \{[^}]*\};", case1)
+    cpf = re.search(r"const float cpf\[\d+\] = \{[^}]*\};", case)
     wexpr = re.search(r"\] = (k < K \? .*?W\[\(int64_t\)\(wst\[p\] \+ cb \* CB \+ l\) \* KA \+ k\] : 0\.f);",
-                      case1, re.S).group(1)
-    nacc = int(re.search(r"float acc\[(\d+)\];", case1).group(1))
-    flush_lines = re.findall(r"out\d\[cur \* \d+ \+ \d+ \+ ch\] = acc\[\d+\];", case1)[:nacc]
+                      case, re.S).group(1)
+    nacc = int(re.search(r"float acc\[(\d+)\];", case).group(1))
+    flush_lines = re.findall(r"out\d\[cur \* \d+ \+ \d+ \+ ch\] = acc\[\d+\];", case)[:nacc]
     if len(flush_lines) != nacc:
-        raise ValueError("ws30: part 1's flush not found")
-    xv = _between(case1, "                float xv[B][", "                group_sync(gbar);")
+        raise ValueError(f"ws30: part {part}'s flush not found")
+    xv = _between(case, "                float xv[B][", "                group_sync(gbar);")
     nx = int(re.search(r"float xv\[B\]\[(\d+)\];", xv).group(1))
-    tp_start = case1.index("                if (!tail) {\n", case1.index("if (STORE_W) {"))
-    tp = case1[tp_start:case1.index("                e0 += B;", tp_start)]
+    tp_start = case.index("                if (!tail) {\n", case.index("if (STORE_W) {"))
+    tp = case[tp_start:case.index("                e0 += B;", tp_start)]
     if "sh_s[b * ED + " not in tp or "w[0][b]" not in tp:
-        raise ValueError("ws30: part 1's TP does not read sh_s / w as expected")
-    return dict(head=head, signature=signature, prologue=prologue, npl=npl, wst=wst.group(0),
+        raise ValueError(f"ws30: part {part}'s TP does not read sh_s / w as expected")
+    return dict(head=head, signature=signature, prologue=prologue, npl=npl, wst=wst.group(0), part=part, case=case,
                 cpf=cpf.group(0) if cpf else "", wexpr=wexpr, nacc=nacc, nx=nx, flush_lines=flush_lines, xv=xv,
                 tp=tp)
 
@@ -151,7 +160,8 @@ def _kp(source):
     return int(re.search(r"constexpr int KP = (\d+);", source).group(1))
 
 
-def shared_bytes(info, consumers=8, w_source="smem", kp=64, rs=36, ed=16):
+def part_shared_bytes(info, consumers=8, w_source="smem", kp=64, rs=36, ed=16):
+    """Dynamic shared memory of one warp-specialized part: W's two TF32 planes, two stages, the barriers."""
     rows = 8 * consumers
     w_floats = 2 * info["npl"] * 32 * kp if w_source == "smem" else 0
     stage = info["npl"] * rows * rs + rows * ed
@@ -159,13 +169,21 @@ def shared_bytes(info, consumers=8, w_source="smem", kp=64, rs=36, ed=16):
     return -(-total // 128) * 128
 
 
-def render_ws(source, consumers=8, product="wgmma", w_source="smem", tp=True, halves=2):
-    """Part 1 of the plan's render ``source`` as the warp-specialized kernel (see the module docstring).
-    ``product``: "wgmma" (sm_90a), "simt" (FP32 FMAs, the debug render) or "none" (F-ws30-no-product);
-    ``w_source``: "smem" (W's TF32 planes in shared memory; needed by wgmma) or "global" (debug); ``tp``: False for
-    F-ws30-no-tp; ``halves``: the product's N split (2: two m64n96k8 per pass and k step)."""
-    info = extract(source)
-    kp = _kp(source)
+def shared_bytes(info, consumers=8, w_source="smem", kp=64, rs=36, ed=16):
+    return part_shared_bytes(info, consumers, w_source, kp, rs, ed)
+
+
+def default_halves(npl):
+    """The product's N split: N = 32 paths; halves of at most 128 columns (part 1: 2 x 96; part 0: 1 x 128)."""
+    nw = 32 * npl
+    halves = 1
+    while nw // halves > 128 or nw % halves or (nw // halves) % 8:
+        halves += 1
+    return halves
+
+
+def _part_body(info, kp, consumers, product, w_source, tp, halves):
+    """The ``case`` body of one part as the warp-specialized kernel (producer warpgroup + consumer warps)."""
     npl, nacc = info["npl"], info["nacc"]
     nw = npl * 32
     if product == "wgmma" and (consumers != 8 or w_source != "smem"):
@@ -173,8 +191,6 @@ def render_ws(source, consumers=8, product="wgmma", w_source="smem", tp=True, ha
     if nw % halves or (nw // halves) % 8 or nw // halves > 256:
         raise ValueError(f"ws30: N = {nw} does not split into {halves} wgmma widths")
     hn = nw // halves
-    threads = 32 * (4 + consumers)
-    signature = re.sub(r"__launch_bounds__\(\d+, 1\)", f"__launch_bounds__({threads}, 1)", info["signature"])
     flush = "\n".join(f"                        {line}" for line in info["flush_lines"])
     zero = "\n".join("                            " + re.sub(r"acc\[\d+\]", "0.f", line).replace("cur", "zr")
                      for line in info["flush_lines"])
@@ -186,20 +202,20 @@ def render_ws(source, consumers=8, product="wgmma", w_source="smem", tp=True, ha
                     }}"""
     wfill = ""
     if w_source == "smem":
-        wfill = f"""    {{  // W's TF32 planes (high, low) for wgmma's B: [N rows][KP] in 8 x 4 core matrices, no swizzle
-        {info['wst']}
-        {info['cpf']}
-        float* Wl = Ws + NW * KP;
-        for (int i = threadIdx.x; i < NW * KP; i += blockDim.x) {{
-            const int nn = i / KP, k = i - nn * KP, p = nn >> 5, l = nn & 31;
-            unsigned hi, lo;
-            split_tf32({info['wexpr']}, hi, lo);
-            const int o = ((nn >> 3) * (KP / 4) + (k >> 2)) * 32 + (nn & 7) * 4 + (k & 3);
-            Ws[o] = __uint_as_float(hi);
-            Wl[o] = __uint_as_float(lo);
+        wfill = f"""        {{  // W's TF32 planes (high, low) for wgmma's B: [N rows][KP] in 8 x 4 core matrices, no swizzle
+            {info['wst']}
+            {info['cpf']}
+            float* Wl = Ws + NW * KP;
+            for (int i = threadIdx.x; i < NW * KP; i += blockDim.x) {{
+                const int nn = i / KP, k = i - nn * KP, p = nn >> 5, l = nn & 31;
+                unsigned hi, lo;
+                split_tf32({info['wexpr']}, hi, lo);
+                const int o = ((nn >> 3) * (KP / 4) + (k >> 2)) * 32 + (nn & 7) * 4 + (k & 3);
+                Ws[o] = __uint_as_float(hi);
+                Wl[o] = __uint_as_float(lo);
+            }}
+            asm volatile("fence.proxy.async.shared::cta;" ::: "memory");
         }}
-        asm volatile("fence.proxy.async.shared::cta;" ::: "memory");
-    }}
 """
     if product == "wgmma":
         product_code = f"""                unsigned ah[KP / 8][4], al[KP / 8][4];  // A: edge 16 pw + gid (+8), k 8 ks + tq (+4)
@@ -282,33 +298,26 @@ def render_ws(source, consumers=8, product="wgmma", w_source="smem", tp=True, ha
                     }}
                     if (p_last) while (cur < p_r1) {flush_block}
 """
-    marks = (SM90A_MARK + "\n" if product == "wgmma" else "") + VEC_A_MARK + "\n"
-    helpers = HELPERS + (_wgmma_helpers([hn], kp) if product == "wgmma" else "")
-    xv = info["xv"]
-    return f"""{info['head']}{helpers}{marks}constexpr int NC = {consumers};  // consumer warps (warps 4 .. 4 + NC - 1)
-constexpr int ROWS = 8 * NC;  // edges per round: one 8-edge batch per consumer warp
-constexpr int AW = KP + 4;  // the a tile's row stride
-constexpr int NW = {nw};  // the part's W rows (paths x 32 channels): the product's N
-constexpr int WREG = {npl} * ROWS * RS;  // a stage's w tile [paths][ROWS][RS]; its a tile [ROWS][AW] overlaps it
-constexpr int STG = WREG + ROWS * ED;  // w tile, then the sh tile [ROWS][ED]
-constexpr int W_FLOATS = {2 * nw * kp if w_source == "smem" else 0};
-constexpr int BAR_OFF = W_FLOATS + 2 * STG;
-static_assert(ROWS * AW <= WREG, "the a tile fits inside the w tile");
-
-{signature}{info['prologue']}    if (blockIdx.z != 1) return;  // idea 30: part 1 only
-    int* flags = reinterpret_cast<int*>(smem + BAR_OFF + 12);  // active[2], fin[2]
-    const unsigned bar0 = smem_u32(smem + BAR_OFF);  // full[s] at + 8 s, empty[s] + 16 + 8 s, wready[s] + 32 + 8 s
-{wfill}    if (threadIdx.x == 0) {{
-        for (int s = 0; s < 2; ++s) {{
-            mb_init(bar0 + 8 * s, NC * 32);
-            mb_init(bar0 + 16 + 8 * s, NC * 32);
-            mb_init(bar0 + 32 + 8 * s, 128);
-            flags[s] = 0;
-            flags[2 + s] = 0;
+    return f"""    case {info['part']}: {{  // idea 30: warp-specialized (producer warpgroup + {consumers} consumer warps)
+        constexpr int NW = {nw};  // the part's W rows (paths x 32 channels): the product's N
+        constexpr int WREG = {npl} * ROWS * RS;  // a stage's w tile [paths][ROWS][RS]; the a tile [ROWS][AW] overlaps it
+        constexpr int STG = WREG + ROWS * ED;  // w tile, then the sh tile [ROWS][ED]
+        constexpr int W_FLOATS = {2 * nw * kp if w_source == "smem" else 0};
+        constexpr int BAR_OFF = W_FLOATS + 2 * STG;
+        static_assert(ROWS * AW <= WREG, "the a tile fits inside the w tile");
+        int* flags = reinterpret_cast<int*>(smem + BAR_OFF + 12);  // active[2], fin[2]
+        const unsigned bar0 = smem_u32(smem + BAR_OFF);  // full[s] at + 8 s, empty[s] + 16 + 8 s, wready[s] + 32 + 8 s
+{wfill}        if (threadIdx.x == 0) {{
+            for (int s = 0; s < 2; ++s) {{
+                mb_init(bar0 + 8 * s, NC * 32);
+                mb_init(bar0 + 16 + 8 * s, NC * 32);
+                mb_init(bar0 + 32 + 8 * s, 128);
+                flags[s] = 0;
+                flags[2 + s] = 0;
+            }}
         }}
-    }}
-    __syncthreads();
-    if (warp < 4) {{  // the producer warpgroup
+        __syncthreads();
+        if (warp < 4) {{  // the producer warpgroup
         const int pw = warp, gid = lane >> 2, tq = lane & 3;
         const unsigned wh = smem_u32(Ws), wl = wh + NW * KP * 4;
         (void)wh; (void)wl; (void)gid; (void)tq;
@@ -328,7 +337,7 @@ static_assert(ROWS * AW <= WREG, "the a tile fits inside the w tile");
             }}
 {product_code}            mb_arrive(bar0 + 32 + 8 * s);  // wready: the round's w tile written
         }}
-    }} else {{  // consumer warps: today's chunks and TP, one round behind their staging
+        }} else {{  // consumer warps: today's chunks and TP, one round behind their staging
         const int c = warp - 4;
         bool have = false, done = false;
         int64_t r0 = 0, r1 = 0, eend = 0, e0 = 0, cur = 0;
@@ -389,7 +398,7 @@ static_assert(ROWS * AW <= WREG, "the a tile fits inside the w tile");
             if (n >= 1) {{  // the TP of round n - 1
                 const int ps = s ^ 1;
                 const int lane_rv = p_rv, lane_snd = p_snd;
-{xv}                mb_wait(bar0 + 32 + 8 * ps, ((n - 1) >> 1) & 1);  // wready
+{info['xv']}                mb_wait(bar0 + 32 + 8 * ps, ((n - 1) >> 1) & 1);  // wready
                 if (*(volatile int*)&flags[2 + ps]) break;
                 if (p_nb > 0) {{
                     const float* pst = smem + W_FLOATS + ps * STG;
@@ -411,18 +420,70 @@ static_assert(ROWS * AW <= WREG, "the a tile fits inside the w tile");
             p_r0 = r0;
             p_r1 = r1;
         }}
-    }}
+        }}
+    }} break;
+"""
+
+
+def render_parts(source, parts=None, others="return", consumers=8, w_source="smem"):
+    """The plan's render with the parts in ``parts`` ({part: dict(product=, tp=, halves=)}) warp-specialized.
+    ``others``: "return" (the other parts' blocks return at once, as the lab's part-only falsifiers) or "keep"
+    (today's code). ``product``: "wgmma" (sm_90a), "simt" (the debug render's FP32 FMAs) or "none"; ``tp``: False
+    for F-ws30-no-tp; ``halves``: the product's N split (``default_halves``)."""
+    parts = {1: {}} if parts is None else parts
+    kp = _kp(source)
+    info0 = extract(source, next(iter(parts)))
+    threads = 32 * (4 + consumers)
+    signature = re.sub(r"__launch_bounds__\(\d+, 1\)", f"__launch_bounds__({threads}, 1)", info0["signature"])
+    cases, widths, wgmma = [], [], False
+    for part in parts_of(source):
+        if part in parts:
+            options = dict(parts[part])
+            info = extract(source, part)
+            product = options.get("product", "wgmma")
+            halves = options.get("halves") or default_halves(info["npl"])
+            wgmma |= product == "wgmma"
+            widths.append(info["npl"] * 32 // halves)
+            cases.append(_part_body(info, kp, consumers, product, w_source, options.get("tp", True), halves))
+        elif others == "keep":
+            if consumers != 8:
+                raise ValueError("ws30: today's parts need 12 warps")
+            cases.append(_case(source, part))
+        else:
+            cases.append(f"    case {part}: return;  // idea 30: part {part} not run\n")
+    marks = (SM90A_MARK + "\n" if wgmma else "") + VEC_A_MARK + "\n"
+    helpers = HELPERS + (_wgmma_helpers(widths, kp) if wgmma else "")
+    return f"""{info0['head']}{helpers}{marks}constexpr int NC = {consumers};  // consumer warps (warps 4 .. 4 + NC - 1)
+constexpr int ROWS = 8 * NC;  // edges per round: one 8-edge batch per consumer warp
+constexpr int AW = KP + 4;  // the a tile's row stride
+
+{signature}{info0['prologue']}    switch (blockIdx.z) {{
+{''.join(cases)}    }}
 }}
 """
 
 
-def reference_kernel(source):
-    """A naive reference of part 1's messages (debug check): one block per receiver row and channel block, one thread
-    per channel; w by FP32 FMAs in k order (as the simt debug product); the same TP text with one edge per batch."""
-    info = extract(source)
+def render_ws(source, consumers=8, product="wgmma", w_source="smem", tp=True, halves=None, part=1):
+    """One part warp-specialized, the other parts' blocks returning at once (round 1's ws30 and its falsifiers)."""
+    return render_parts(source, {part: dict(product=product, tp=tp, halves=halves)}, "return", consumers, w_source)
+
+
+def rule_shared_bytes(source, parts, plan_bytes, others="return", consumers=8, w_source="smem"):
+    """The launch rule's shared memory: the largest warp-specialized part's, or the plan's when today's parts stay."""
+    kp = _kp(source)
+    sizes = [part_shared_bytes(extract(source, p), consumers, w_source, kp) for p in parts]
+    if others == "keep":
+        sizes.append(plan_bytes)
+    return max(sizes)
+
+
+def reference_kernel(source, part=1):
+    """A naive reference of part ``part``'s messages (debug check): one block per receiver row and channel block, one
+    thread per channel; w by FP32 FMAs in k order (as the simt debug product); the same TP text, one edge per batch."""
+    info = extract(source, part)
     flush = "\n".join(f"    {line}" for line in info["flush_lines"])
     return f"""{info['head']}
-extern "C" __global__ void ref_part1(int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
+extern "C" __global__ void ref_part{part}(int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
     const float* __restrict__ x, const float* __restrict__ sh, const int* __restrict__ senders,
     const int* __restrict__ receivers, const int* __restrict__ row_ptr,
     float* __restrict__ out0, float* __restrict__ out1, float* __restrict__ out2, float* __restrict__ out3) {{
@@ -453,35 +514,44 @@ extern "C" __global__ void ref_part1(int64_t N, int64_t E, const float* __restri
 
 def idea30_variants(kernel, rules, part_only, no_product_pattern):
     """name -> (kind, transform, extra) for the lab's ``forward_variants``; ``rules``: the lab's ``_RULES`` (each
-    ws30 source gets its launch rule: 12 warps, its shared memory); ``part_only``: the lab's ``_part_only``;
+    ws source gets its launch rule: 12 warps, its shared memory); ``part_only``: the lab's ``_part_only``;
     ``no_product_pattern``: (old, new) of the lab's F-tc-no-product."""
     import dataclasses
 
-    def ws(**options):
+    def ws(parts, others="return"):
         def transform(s):
-            out = render_ws(s, **options)
-            info = extract(s)
+            out = render_parts(s, parts, others)
             rule = kernel.rule if kernel is not None else None
             if rule is not None:
-                rules[out] = dataclasses.replace(rule, warps=4 + options.get("consumers", 8),
-                                                 shared_bytes=shared_bytes(info, kp=_kp(s)))
+                rules[out] = dataclasses.replace(rule, warps=12, shared_bytes=rule_shared_bytes(
+                    s, parts, rule.shared_bytes, others))
             return out
         return transform
 
-    def no_product_p1(s):
-        old, new = no_product_pattern
-        if s.count(old) != 2:
-            raise ValueError("F-tc-no-product-p1: the k-loop pattern is not in both parts")
-        return part_only(1)(s.replace(old, new))
+    def no_product_part(part):
+        def transform(s):
+            old, new = no_product_pattern
+            if s.count(old) != 2:
+                raise ValueError("F-tc-no-product-p*: the k-loop pattern is not in both parts")
+            return part_only(part)(s.replace(old, new))
+        return transform
 
     return {
-        "ws30": ("rounding", ws(), ()),
-        "ws30-n192": ("rounding", ws(halves=1), ()),
-        "F-ws30-no-tp": ("falsifier", ws(tp=False), ()),
-        "F-ws30-no-product": ("falsifier", ws(product="none"), ()),
-        "F-tc-no-product-p1": ("falsifier", no_product_p1, ()),
+        "ws30": ("rounding", ws({1: {}}), ()),
+        "ws30-n192": ("rounding", ws({1: dict(halves=1)}), ()),
+        "F-ws30-no-tp": ("falsifier", ws({1: dict(tp=False)}), ()),
+        "F-ws30-no-product": ("falsifier", ws({1: dict(product="none")}), ()),
+        "F-tc-no-product-p1": ("falsifier", no_product_part(1), ()),
+        # Full version, step 2: part 0 (4 paths, N = 128) the same way, alone and with part 1.
+        "ws30-p0": ("rounding", ws({0: {}}), ()),
+        "ws30-p0-n64": ("rounding", ws({0: dict(halves=2)}), ()),
+        "F-ws30-p0-no-tp": ("falsifier", ws({0: dict(tp=False)}), ()),
+        "F-tc-no-product-p0": ("falsifier", no_product_part(0), ()),
+        "ws-both": ("rounding", ws({0: {}, 1: {}}), ()),
+        "ws-p1-keep0": ("rounding", ws({1: {}}, "keep"), ()),
     }
 
 
 def idea30_references():
-    return {"ws30": "F-part1-only", "ws30-n192": "F-part1-only"}
+    return {"ws30": "F-part1-only", "ws30-n192": "F-part1-only", "ws30-p0": "F-part0-only",
+            "ws30-p0-n64": "F-part0-only"}

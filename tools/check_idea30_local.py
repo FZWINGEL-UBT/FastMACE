@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -86,16 +87,18 @@ def run_debug(render):
 
     stream = driver.CUstream(torch.cuda.current_stream().cuda_stream)
     p = ctypes.c_void_p
-    ref, _ = load(L.reference_kernel(render), b"ref_part1")
+    refs_fns = [(part, load(L.reference_kernel(render, part), f"ref_part{part}".encode())[0]) for part in PARTS]
     values = (n, e, a.data_ptr(), w_full.data_ptr(), x.data_ptr(), sh.data_ptr(), snd.data_ptr(), rcv.data_ptr(),
               rp.data_ptr(), *[refs[k].data_ptr() for k in sorted(refs)])
     types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * (len(values) - 2)
-    check(driver.cuLaunchKernel(ref, n, channels // 32, 1, 32, 1, 1, 0, stream, (values, types), 0))
-    debug = L.render_ws(render, consumers=4, product="simt", w_source="global")
+    for part, ref in refs_fns:
+        check(driver.cuLaunchKernel(ref, n, channels // 32, 1, 32, 1, 1, 0, stream, (values, types), 0))
+    debug = L.render_parts(render, {part: dict(product="simt") for part in PARTS}, consumers=4, w_source="global")
     fn, info = load(debug, b"fused_folded_forward")
-    shared = L.shared_bytes(L.extract(render), consumers=4, w_source="global")
+    shared = L.rule_shared_bytes(render, PARTS, 0, consumers=4, w_source="global")
     attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
     check(driver.cuFuncSetAttribute(fn, attribute, shared))
+    lines = [line for part in PARTS for line in L.extract(render, part)["flush_lines"]]
     for repeat in range(3):
         for o in outs.values():
             o.fill_(float("nan"))
@@ -107,18 +110,22 @@ def run_debug(render):
         check(driver.cuLaunchKernel(fn, 33, channels // 32, 2, 32 * 8, 1, 1, shared, stream, (values, types), 0))
         torch.cuda.synchronize()
         for k in sorted(outs):
-            # part 1's columns only (every row: rows without edges must be written as zeros); the rest stay NaN here
+            # the checked parts' columns (every row: rows without edges must be written as zeros)
             mask = torch.zeros_like(refs[k], dtype=torch.bool)
-            for line in L.extract(render)["flush_lines"]:
+            for line in lines:
                 name, offset = re.match(r"(out\d)\[cur \* \d+ \+ (\d+) \+ ch\]", line).groups()
                 if name == k:
                     mask[:, int(offset):int(offset) + channels] = True
             d = (outs[k][mask] - refs[k][mask]).abs().max().item() if mask.any() else 0.0
-            nan_part1 = torch.isnan(outs[k][mask]).sum().item()
+            nans = torch.isnan(outs[k][mask]).sum().item()
             scale = refs[k].abs().max().item() or 1.0
-            print(f"repeat {repeat} {k}: part-1 entries {int(mask.sum())}, max|d|/max|ref| {d / scale:.2e}, "
-                  f"NaN {nan_part1}, bitwise {bool(torch.equal(outs[k][mask], refs[k][mask]))}", flush=True)
-    print(f"debug render: {info['registers']} registers, {info['spill']} B spill; {shared} B shared; E = {e}")
+            print(f"repeat {repeat} {k}: entries {int(mask.sum())} of {mask.numel()}, max|d|/max|ref| {d / scale:.2e}, "
+                  f"NaN {nans}, bitwise {bool(torch.equal(outs[k][mask], refs[k][mask]))}", flush=True)
+    print(f"debug render (parts {PARTS}): {info['registers']} registers, {info['spill']} B spill; {shared} B shared; "
+          f"E = {e}")
+
+
+PARTS = (0, 1)
 
 
 def main():
@@ -129,19 +136,32 @@ def main():
     args = p.parse_args()
     render = args.render.read_text()
     args.outdir.mkdir(parents=True, exist_ok=True)
-    info = L.extract(render)
-    print(f"part 1: {info['npl']} paths, {info['nacc']} accumulators, {info['nx']} x rows; "
-          f"shared {L.shared_bytes(info)} B")
-    for name, options in {"ws30": {}, "ws30-n192": dict(halves=1), "F-ws30-no-tp": dict(tp=False), "F-ws30-no-product": dict(product="none"),
-                          "debug-simt": dict(consumers=4, product="simt", w_source="global")}.items():
-        source = L.render_ws(render, **options)
+    for part in L.parts_of(render):
+        info = L.extract(render, part)
+        print(f"part {part}: {info['npl']} paths, {info['nacc']} accumulators, {info['nx']} x rows; "
+              f"shared {L.part_shared_bytes(info)} B")
+    sources = {
+        "ws30": L.render_parts(render, {1: {}}),
+        "ws30-n192": L.render_parts(render, {1: dict(halves=1)}),
+        "F-ws30-no-tp": L.render_parts(render, {1: dict(tp=False)}),
+        "F-ws30-no-product": L.render_parts(render, {1: dict(product="none")}),
+        "ws30-p0": L.render_parts(render, {0: {}}),
+        "ws30-p0-n64": L.render_parts(render, {0: dict(halves=2)}),
+        "ws-both": L.render_parts(render, {0: {}, 1: {}}),
+        "ws-p1-keep0": L.render_parts(render, {1: {}}, "keep"),
+        "debug-simt": L.render_parts(render, {0: dict(product="simt"), 1: dict(product="simt")}, consumers=4,
+                                     w_source="global"),
+    }
+    for name, source in sources.items():
         (args.outdir / f"{name}.cu").write_text(source, newline="\n")
+        unique = f"\n__device__ int fm_unique_{name.replace('-', '_')}_{time.time_ns()};\n"
         try:
-            result, _ = nvrtc_compile(source, "sm_90a")
+            result, _ = nvrtc_compile(source + unique, "sm_90a")
             print(f"{name:20s} sm_90a: {result['registers']} registers, {result['spill']} B spill stores", flush=True)
         except RuntimeError as error:
             print(f"{name:20s} sm_90a: FAILED\n{error}", flush=True)
-    (args.outdir / "reference.cu").write_text(L.reference_kernel(render), newline="\n")
+    for part in L.parts_of(render):
+        (args.outdir / f"reference{part}.cu").write_text(L.reference_kernel(render, part), newline="\n")
     if args.run:
         run_debug(render)
 
