@@ -1725,6 +1725,27 @@ def compare(name, base, other):
     return result
 
 
+def _owner_variant(kernel, pattern, replacement):
+    """A copy of the owner-pass kernel ``kernel`` (a FusedFoldedForward) compiled from its source with ``pattern``
+    replaced (regex, at least once); launched through ``FusedFoldedForward.__call__``."""
+    import copy
+
+    import torch
+    from cuda.bindings import driver
+
+    from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+    source, count = re.subn(pattern, replacement, kernel.source)
+    if not count:
+        raise ValueError(f"owner variant: {pattern!r} not found")
+    variant = copy.copy(kernel)
+    variant.source = source
+    variant._module = _check(driver.cuModuleLoadData(compile_cubin(source, torch.cuda.get_device_capability())))
+    variant._function = _check(driver.cuModuleGetFunction(variant._module, b"fused_folded_forward"))
+    attribute = driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
+    _check(driver.cuFuncSetAttribute(variant._function, attribute, variant.rule.shared_bytes))
+    return variant
+
+
 def owner_lab(kernel, cargs, args):
     """``--owner-pass`` (ideas plan idea 14(A), ``fused_forward.OWNER_PASS``): the captured forward call's edges paired
     by atom pair (one image per pair: the cell is wider than twice the cutoff; checked) and ordered owned-first; then
@@ -1739,6 +1760,8 @@ def owner_lab(kernel, cargs, args):
     from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
     from fastmace.neighbors.owner import mirror_pairs, owned_first_order, owner_flags, split_rows
 
+    if len(cargs) != 9:  # the owner op's call (mid, mirror): main captures with OWNER_PASS off
+        raise SystemExit(f"--owner-pass needs the one-pass forward's call (9 arguments), got {len(cargs)}")
     a, weight, x, sh, senders, receivers, row_ptr, out, w = cargs
     if kernel.blocks is None:
         raise SystemExit("--owner-pass needs the plan's block message forward (wprime_backward.BLOCK_MESSAGE)")
@@ -1808,6 +1831,16 @@ def owner_lab(kernel, cargs, args):
                                    mirror_p),
     }
     launches["owner-pass"] = lambda: (launches["pass1"](), launches["pass2"]())
+    # Time-only falsifiers (wrong outputs, launched after the bitwise check): pass 1 without the w stores into the
+    # mirror rows, pass 2 without the w loads; their differences to pass 1 and pass 2 are the w round trip in HBM.
+    stores = _owner_variant(passes[0], r"if \(me >= 0\)", "if (me < -1)")
+    loads = _owner_variant(passes[1], r"__ldg\(wout \+ EV\(e0 \+ b\) \* Q \+ wsl\[g\] \+ ch\)",
+                           "(float)(wsl[g] + ch + (int)EV(e0 + b))")
+    launches["F-pass1-no-store"] = lambda: stores(a_p, weight, x, sh_p, senders_p, receivers_p, row_ptr32, out_two,
+                                                  wbuf, mid, mirror_p)
+    launches["F-pass2-no-wload"] = lambda: loads(a_p, weight, x, sh_p, senders_p, receivers_p, row_ptr32, out_two,
+                                                 wbuf, mid, mirror_p)
+    report["w_bytes_each_way"] = pairing["owned"] * kernel.weight_dim * 4
     for _ in range(args.warmup):
         launches["base"]()
         launches["one-owned-first"]()
@@ -1886,6 +1919,9 @@ def main(argv=None):
         raise SystemExit("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
+    if args.owner_pass:  # capture the plan's one-pass forward, not an owner op (OWNER_PASS_GPUS may name the GPU)
+        from fastmace.kernels.oeq_streaming import fused_forward
+        fused_forward.OWNER_PASS = False
     captured, meta = capture(args)
     meta.update(tool="omat0_kernel_lab", created_utc=datetime.now(timezone.utc).isoformat(),
                 host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
