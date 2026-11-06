@@ -1725,6 +1725,127 @@ def compare(name, base, other):
     return result
 
 
+def owner_lab(kernel, cargs, args):
+    """``--owner-pass`` (ideas plan idea 14(A), ``fused_forward.OWNER_PASS``): the captured forward call's edges paired
+    by atom pair (one image per pair: the cell is wider than twice the cutoff; checked) and ordered owned-first; then
+    times, round-robin with the same L2 flush, the plan's one-pass kernel on the captured order (``base``), the same
+    kernel on the owned-first order (``one-owned-first``, the bitwise reference), pass 1, pass 2 and both passes
+    (``owner-pass``), and checks the passes' message bit for bit against the reference. ``--ptxas-archs``: both passes'
+    registers and spills. Returns the report."""
+    import types
+
+    import torch
+
+    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+    from fastmace.neighbors.owner import mirror_pairs, owned_first_order, owner_flags, split_rows
+
+    a, weight, x, sh, senders, receivers, row_ptr, out, w = cargs
+    if kernel.blocks is None:
+        raise SystemExit("--owner-pass needs the plan's block message forward (wprime_backward.BLOCK_MESSAGE)")
+    nodes, total = x.shape[0], sh.shape[0]
+    edges = int(row_ptr[-1])
+    valid = torch.arange(total, device=sh.device) < edges
+    s64, r64 = senders.long(), receivers.long()
+    zero = torch.zeros(total, 3, dtype=torch.int64, device=sh.device)
+    mirror = mirror_pairs(s64, r64, zero, valid, nodes)
+    has = (mirror >= 0) & valid
+    m = mirror.clamp(min=0)
+    pairing = dict(edges=edges, padding=total - edges, without_mirror=int((valid & (mirror < 0)).sum()),
+                   not_involution=int((has & (mirror[m] != torch.arange(total, device=sh.device))).sum()),
+                   not_swapped=int((has & ((s64[m] != r64) | (r64[m] != s64))).sum()))
+    if pairing["not_involution"] or pairing["not_swapped"]:
+        raise SystemExit(f"--owner-pass: the atom-pair pairing is not a mirror pairing here: {pairing}")
+    owned = owner_flags(s64, r64, zero, mirror) | ~valid
+    order = owned_first_order(r64, owned, valid, nodes)
+    inverse = torch.empty_like(order)
+    inverse[order] = torch.arange(total, device=order.device)
+    moved = mirror[order]
+    mirror_p = torch.where(moved >= 0, inverse[moved.clamp(min=0)], -1).to(torch.int32)
+    owned_p = owned[order]
+    a_p, sh_p = a[order].contiguous(), sh[order].contiguous()
+    senders_p, receivers_p = senders[order].contiguous(), receivers[order].contiguous()
+    partner = torch.nonzero(valid & ~owned_p).flatten()
+    differ = (a_p[partner] != a_p[mirror_p[partner].long()]).any(1)
+    pairing.update(owned=int((owned_p & valid).sum()), partner_a_rows_differing=int(differ.sum()))
+    if differ.any():  # the passes read the owner's w for its partner: the reference must see the same a
+        a_p[partner] = a_p[mirror_p[partner].long()]
+    mid_rows, mid = split_rows(receivers_p, owned_p, torch.tensor(edges, device=sh.device), nodes)
+    pairing["row_ptr_unchanged"] = bool(torch.equal(mid_rows, row_ptr.to(torch.int32)))
+    print("owner-pass pairing:", pairing, flush=True)
+
+    shell = types.SimpleNamespace(source="using scalar_t = float;", schedule=kernel.schedule,
+                                  weight_dim=kernel.weight_dim)
+    passes = [FusedFoldedForward(shell, kernel.k, store_w=False, used=kernel.used, blocks=kernel.blocks, owner=which)
+              for which in ("pass1", "pass2")]
+    report = dict(pairing=pairing, rules={"one": str(kernel.rule), "pass1": str(passes[0].rule),
+                                          "pass2": str(passes[1].rule)},
+                  w_group={"one": kernel.w_group, "pass1": passes[0].w_group, "pass2": passes[1].w_group})
+    if args.ptxas_archs:
+        report["ptxas"] = {}
+        for label, source in (("one", kernel.source), ("pass1", passes[0].source), ("pass2", passes[1].source)):
+            report["ptxas"][label] = {arch: ptxas_report(source, tuple(int(v) for v in arch.split(".")))
+                                      for arch in args.ptxas_archs}
+            print(f"owner-pass ptxas {label:6s} {report['ptxas'][label]}", flush=True)
+        if args.ptxas_only:
+            return report
+
+    def fresh():
+        return [torch.zeros_like(o) for o in out]
+
+    out_base, out_one, out_two = fresh(), fresh(), fresh()
+    wbuf = torch.zeros(total, kernel.weight_dim, device=sh.device, dtype=sh.dtype)
+    row_ptr32 = row_ptr.to(torch.int32) if row_ptr.dtype != torch.int32 else row_ptr
+
+    def one(args_, target):
+        kernel(*args_[:7], target, w)
+
+    launches = {
+        "base": lambda: one((a, weight, x, sh, senders, receivers, row_ptr), out_base),
+        "one-owned-first": lambda: one((a_p, weight, x, sh_p, senders_p, receivers_p, row_ptr), out_one),
+        "pass1": lambda: passes[0](a_p, weight, x, sh_p, senders_p, receivers_p, row_ptr32, out_two, wbuf, mid,
+                                   mirror_p),
+        "pass2": lambda: passes[1](a_p, weight, x, sh_p, senders_p, receivers_p, row_ptr32, out_two, wbuf, mid,
+                                   mirror_p),
+    }
+    launches["owner-pass"] = lambda: (launches["pass1"](), launches["pass2"]())
+    for _ in range(args.warmup):
+        launches["base"]()
+        launches["one-owned-first"]()
+    launches["owner-pass"]()
+    torch.cuda.synchronize()
+    same = [bool(torch.equal(u, v)) for u, v in zip(out_one, out_two)]
+    scale = max(float(u.abs().max()) for u in out_base) or 1.0
+    report["bitwise_vs_one_pass_owned_first"] = all(same)
+    report["groups_bitwise"] = same
+    report["one_owned_first_vs_base_max_rel"] = max(float((u - v).abs().max()) for u, v in zip(out_one, out_base)) \
+        / scale
+    print(f"owner-pass message bitwise vs the one-pass kernel on the owned-first order: {all(same)} {same}; "
+          f"owned-first vs captured order (rounding): {report['one_owned_first_vs_base_max_rel']:.2e}", flush=True)
+    times = {name: [] for name in launches}
+    flush = (torch.empty(int(args.flush_l2_mb) << 18, dtype=torch.float32, device="cuda")
+             if args.flush_l2_mb else None)
+    for _ in range(args.rounds):
+        for name, launch in launches.items():
+            if flush is not None:
+                flush.fill_(0.0)
+            start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+            start.record()
+            launch()
+            end.record()
+            end.synchronize()
+            times[name].append(start.elapsed_time(end) * 1000.0)
+    base = sorted(times["base"])[len(times["base"]) // 2]
+    report["timings_us"] = {}
+    for name, values in times.items():
+        ordered = sorted(values)
+        row = dict(median_us=ordered[len(ordered) // 2], min_us=ordered[0], max_us=ordered[-1])
+        row["ratio"] = row["median_us"] / base
+        report["timings_us"][name] = row
+        print(f"owner    {name:16s} {row['median_us']:9.1f} us  ratio {row['ratio']:.3f}  "
+              f"(min {row['min_us']:.1f}, max {row['max_us']:.1f})", flush=True)
+    return report
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", type=Path, required=True)
@@ -1751,6 +1872,8 @@ def main(argv=None):
     p.add_argument("--ptxas-archs", nargs="*", default=[], metavar="MAJOR.MINOR",
                    help="also report ptxas registers and spills of every variant for these architectures")
     p.add_argument("--ptxas-only", action="store_true", help="report ptxas only; no launches or timings")
+    p.add_argument("--owner-pass", action="store_true",
+                   help="the owner-pass forward (fused_forward.OWNER_PASS) on the captured forward call (owner_lab)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -1781,6 +1904,10 @@ def main(argv=None):
                           gprime_MB=gprime.numel() * gprime.element_size() / 2**20, species=species,
                           pieces=starts.shape[0], threads=kernel.num_threads, cohort=kernel.cohort)
         else:
+            if args.owner_pass:
+                meta["owner_pass"] = owner_lab(kernel, cargs, args)
+                gc.collect()
+                torch.cuda.empty_cache()
             table, launcher = forward_variants(kernel), forward_launcher
             shapes = dict(edges=cargs[3].shape[0], k=kernel.k, rule=str(kernel.rule),
                           weight_last_column_zero=bool((cargs[1][:, -1] == 0).all()))
