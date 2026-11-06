@@ -299,6 +299,9 @@ class FusedIntegrator:
             inside, cum, neighbours.candidate_index, unit, neighbours.edge_index, neighbours.unit_shifts,
             neighbours.shifts, cell, neighbours.count, self.largest, self.thresholds, engine.rebuild_needed,
             engine._flags, engine._pipe_flags, capacity, PIPELINED=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
+        if getattr(neighbours, "owner_pairs", False):  # the owner flags and mirrors to the compacted edges
+            index = torch.arange(capacity, device=cum.device)
+            neighbours._carry(torch.where(inside.bool(), cum - 1, cum[-1] + index - cum))
         d3_needs_rebuild = getattr(engine.force_field, "d3_needs_rebuild", None)
         if d3_needs_rebuild is not None:  # the D3 list's own test, OR-ed into the flags the kernels wrote (3b-T04)
             flag = d3_needs_rebuild(state.positions)

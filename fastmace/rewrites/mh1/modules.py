@@ -418,11 +418,19 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     density = None
     if wprime_lengths is not None:
         radial = getattr(self, "generic_folded", None) or self.conv_tp_weights  # generic_wprime_backward
+        owned, mid, mirror = getattr(self, "streaming_owned", None), None, None
+        if owned is not None and rows == num_nodes and getattr(self.wprime_backward, "owner", None) is not None:
+            # The owner-pass forward (fused_forward.OWNER_PASS): each receiver's owned edges come first; one search
+            # on 2 receiver + (not owned) gives row_ptr and each receiver's split mid.
+            from fastmace.neighbors.owner import split_rows
+            edges = receiver.shape[0]
+            row_ptr, mid = split_rows(receiver, owned[:edges], self.streaming_count, num_nodes)
+            mirror = self.streaming_mirror[:edges]
         message, density = self.wprime_backward.convolution(
             wprime_lengths, self.radial_table.pair(node_attrs, edge_index), self.radial_table, radial.folded_weight(),
             feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,
             getattr(self, "fused_folded_forward", None), getattr(self, "recompute_weight_rows", 0),
-            linear=getattr(self, "linear", None))  # BLOCK_MESSAGE: a tuple of linear_1's input groups
+            linear=getattr(self, "linear", None), mid=mid, mirror=mirror)  # BLOCK_MESSAGE: linear_1's input groups
     elif w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
         message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,

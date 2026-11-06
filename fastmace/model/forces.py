@@ -630,10 +630,15 @@ class MACEForceField:
         self.whole_system_released = False
         self._setup_species(atoms, z_table, early)
         segmented = any(name in SEGMENTED_RECORDS for name in enabled)
+        # The owner-pass forward (fused_forward.OWNER_PASS, built by WPrime.prepare_blocks where it applies) reads
+        # each edge's owner flag and mirror: the skin list pairs its candidates (receiver-sorted; with sender groups
+        # each receiver's owned half and partner half keep the group order, so the segmented sum sees split runs).
+        owner_pairs = bool(sort_receivers and any(
+            getattr(module._modules.get("wprime_backward"), "owner", None) is not None for module in self._streaming))
         self.neighbours = SkinNeighbourList(
             cell, calc.r_max, self._device, self._dtype, neighbours,
             sender_groups=self._sender_groups if segmented and sort_receivers else None,
-            group_count=len(self.superset), variable_cell=self._compute_stress)
+            group_count=len(self.superset), variable_cell=self._compute_stress, owner_pairs=owner_pairs)
         self._setup_tables()
         if self._compute_stress:
             # Fixed-address cell that MACE's stress path reads (set_cell refills it).
@@ -945,10 +950,17 @@ class MACEForceField:
         address it was captured with. Nothing outside the force field ever rebinds.
         """
         # A copy that follows another force field (``follow``) reads that force field's edges and count.
-        count = (self.neighbours if self._leader is None else self._leader.neighbours).count
+        neighbours = self.neighbours if self._leader is None else self._leader.neighbours
+        count = neighbours.count
+        # The owner-pass forward's edge owner flags and mirrors (None: the one-pass forward).
+        owned, mirror = ((getattr(neighbours, "owned", None), getattr(neighbours, "mirror_edge", None))
+                         if getattr(neighbours, "owner_pairs", False) else (None, None))
         for module in self._streaming:
             if module._buffers.get("streaming_count") is not count:
                 module.register_buffer("streaming_count", count, persistent=False)
+            if module._buffers.get("streaming_owned") is not owned:
+                module.register_buffer("streaming_owned", owned, persistent=False)
+                module.register_buffer("streaming_mirror", mirror, persistent=False)
         for _, reassociation, table, _ in self._tables:
             reassociation.bind(table)
 

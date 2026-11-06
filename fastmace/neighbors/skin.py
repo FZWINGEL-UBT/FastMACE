@@ -123,11 +123,17 @@ class SkinNeighbourList:
     sigma_min(F) >= 1 - |F - I|_F. A pair farther than cutoff + skin at the build therefore
     stays beyond the cutoff while 2 max|y - y_build| <= cutoff + skin - cutoff / (1 - |F - I|_F),
     which is the rebuild test (skin, as for the fixed cell, when F = I).
+
+    ``owner_pairs=True`` (the owner-pass forward, ``fused_forward.OWNER_PASS``; receiver-sorted): every build pairs
+    each candidate with its mirror and orders each receiver's owned candidates first (``fastmace.neighbors.owner``;
+    stable, so with ``sender_groups`` each half keeps the group order and a group's run splits in two, which the
+    segmented first sum allows), and ``compact`` carries each edge's owner flag (``owned``) and its mirror's position
+    (``mirror_edge``, -1: none) to the compacted edges. Compaction is stable, so the edges stay in that order.
     """
 
     def __init__(self, cell, cutoff, device, float_dtype, config: NeighbourConfig | None = None, *,
                  sort_receivers: bool | None = None, gpu_build: bool | None = None, sender_groups=None,
-                 group_count: int | None = None, variable_cell: bool = False):
+                 group_count: int | None = None, variable_cell: bool = False, owner_pairs: bool = False):
         config = NeighbourConfig() if config is None else config
         self.config = config
         self.cell = np.asarray(cell, dtype=float)
@@ -148,6 +154,9 @@ class SkinNeighbourList:
                               torch.as_tensor(sender_groups, dtype=torch.int64, device=self.device))
         self.group_count = (1 if self.sender_groups is None else
                             int(group_count) if group_count is not None else int(self.sender_groups.max()) + 1)
+        self.owner_pairs = bool(owner_pairs)
+        if self.owner_pairs and not self.sort_receivers:
+            raise ValueError("owner_pairs needs receiver-sorted candidates")
         self.capacity = 0
         self._candidates_device = None  # an asynchronous build's candidate count, until num_candidates reads it
         self.num_candidates = 0
@@ -207,6 +216,12 @@ class SkinNeighbourList:
         self.edge_index = new(2, capacity, dtype=torch.int64)
         self.unit_shifts = new(capacity, 3, dtype=self.float_dtype)
         self.shifts = new(capacity, 3, dtype=self.float_dtype)
+        if self.owner_pairs:  # each candidate's and each edge's owner flag and mirror (-1: none)
+            self.candidate_owned = torch.ones(capacity, dtype=torch.bool, device=self.device)
+            self.candidate_mirror = torch.full((capacity,), -1, dtype=torch.int32, device=self.device)
+            self.owned = torch.ones(capacity, dtype=torch.bool, device=self.device)
+            self.mirror_edge = torch.full((capacity,), -1, dtype=torch.int32, device=self.device)
+            self.destination = new(capacity, dtype=torch.int64)  # compact's chunked destinations
 
     def set_capacity(self, capacity: int) -> bool:
         """Reallocate the edge buffers to exactly ``capacity`` (a resumed run's, SPEC §10.6). True if they moved.
@@ -315,6 +330,8 @@ class SkinNeighbourList:
         self.build_cell.copy_(torch.from_numpy(self.cell))  # compact()'s times_3x3 (not numpy's @) uses it
         self._set_reference(torch.from_numpy(positions))
         self.num_candidates = n
+        if self.owner_pairs:
+            self._pair(len(positions), n)
         self.rebuilds += 1
         return grew
 
@@ -404,6 +421,8 @@ class SkinNeighbourList:
         self.build_cell.copy_(cell)
         self._set_reference(positions)
         self.num_candidates = n
+        if self.owner_pairs:
+            self._pair(natoms, n)
         self.rebuilds += 1
         return grew
 
@@ -487,8 +506,33 @@ class SkinNeighbourList:
         self.reference_positions.copy_(positions + overflow.to(positions.dtype) * OVERFLOW_DISPLACEMENT_A)
         self._num_candidates = 0
         self._candidates_device = torch.clamp(n, max=self.capacity)
+        if self.owner_pairs:
+            self._pair(natoms, self._candidates_device)
         self.rebuilds += 1
         self.async_builds += 1
+
+    def _pair(self, natoms, count):
+        """owner_pairs: the candidates ordered owned-first within each receiver (stable), each one's owner flag and
+        its mirror's index (``fastmace.neighbors.owner.pair_candidates``). ``count``: the valid candidates (an int
+        or a device scalar; fixed-shape device operations, no host synchronisation)."""
+        from .owner import pair_candidates
+
+        capacity = self.candidate_index.shape[1]
+        valid = torch.arange(capacity, device=self.device) < count
+        shifts = torch.round(self.candidate_unit_shifts.to(torch.float64)).to(torch.int64)
+        order, owned, mirror = pair_candidates(self.candidate_index[0].to(torch.int64),
+                                               self.candidate_index[1].to(torch.int64), shifts, valid, int(natoms))
+        self.candidate_index.copy_(self.candidate_index[:, order])
+        self.candidate_unit_shifts.copy_(self.candidate_unit_shifts[order])
+        self.candidate_owned.copy_(owned)
+        self.candidate_mirror.copy_(mirror)
+
+    def _carry(self, destination):
+        """owner_pairs: each candidate's owner flag and its mirror's new position to the compacted edges."""
+        self.owned.index_copy_(0, destination, self.candidate_owned)
+        mirror = self.candidate_mirror.to(torch.int64)
+        moved = torch.where(mirror >= 0, destination[mirror.clamp(min=0)], -1)
+        self.mirror_edge.index_copy_(0, destination, moved.to(torch.int32))
 
     def _set_reference(self, positions):
         if self.reference_positions is None:
@@ -508,6 +552,8 @@ class SkinNeighbourList:
         """
         names = ["candidate_index", "candidate_unit_shifts", "edge_index", "unit_shifts", "shifts", "count",
                  "reference_positions"]
+        if self.owner_pairs:
+            names += ["candidate_owned", "candidate_mirror", "owned", "mirror_edge"]
         out = {name: getattr(self, name) for name in names if getattr(self, name, None) is not None}
         if self.variable_cell:
             out["cell"] = self.cell_t
@@ -618,6 +664,8 @@ class SkinNeighbourList:
             self.unit_shifts.index_copy_(0, destination, self.candidate_unit_shifts)
             self.shifts.index_copy_(0, destination, shifts64.to(self.float_dtype))
             self.count.copy_(count)
+            if self.owner_pairs:
+                self._carry(destination)
             return
         # Pass 1: each candidate's test (one byte each) and the count. Pass 2: each chunk's destinations from the
         # counts before it, the same integers as the one-chunk cumulative sums, and its copies.
@@ -635,5 +683,9 @@ class SkinNeighbourList:
             self.edge_index.index_copy_(1, destination, self.candidate_index[:, start:stop].to(torch.int64))
             self.unit_shifts.index_copy_(0, destination, self.candidate_unit_shifts[start:stop])
             self.shifts.index_copy_(0, destination, shifts_of(start, stop).to(self.float_dtype))
+            if self.owner_pairs:
+                self.destination[start:stop] = destination
             before += within[-1]
         self.count.copy_(count)
+        if self.owner_pairs:
+            self._carry(self.destination)

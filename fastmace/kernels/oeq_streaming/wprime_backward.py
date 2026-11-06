@@ -893,13 +893,22 @@ class _WPrimeBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
-                sh, senders, receivers, row_ptr, message_id, wprime_id):
-        from fastmace.kernels.oeq_streaming.fused_forward import a_columns, fused_folded_message_blocks
+                sh, senders, receivers, row_ptr, message_id, wprime_id, mid=None, mirror=None, pass1_id=-1,
+                pass2_id=-1):
+        from fastmace.kernels.oeq_streaming.fused_forward import (
+            a_columns,
+            fused_folded_message_blocks,
+            fused_folded_message_blocks_owner,
+        )
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
                                           a_columns(message_id))  # VEC_A: rows padded for float4 staging
-        groups = fused_folded_message_blocks(a, weight, x, sh, senders, receivers, row_ptr, message_id)
+        if pass1_id >= 0:  # OWNER_PASS: pass 1 over the owned edges, pass 2 over their mirrors (each receiver's rest)
+            groups = fused_folded_message_blocks_owner(a, weight, x, sh, senders, receivers, row_ptr, mid, mirror,
+                                                       pass1_id, pass2_id)
+        else:
+            groups = fused_folded_message_blocks(a, weight, x, sh, senders, receivers, row_ptr, message_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins)
         ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
         return (*groups, density)
@@ -916,7 +925,7 @@ class _WPrimeBlockConvolution(torch.autograd.Function):
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
         return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
-                None, None, None, None, None)
+                None, None, None, None, None, None, None, None, None)
 
 
 def block_spec(linear, schedule):
@@ -1128,6 +1137,13 @@ class WPrime(torch.nn.Module):
                                      table_w=self.table_w, horner=self.horner, table_pairs=self.table_pairs)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
+        # The owner-pass forward (fused_forward.OWNER_PASS): both edges of a mirror pair form the same a only where
+        # every pair's table rows equal its mirror pair's bit for bit (or one table serves every pair).
+        from fastmace.rewrites.radial import symmetric_rows
+        species = getattr(table, "species", None)
+        self.rows_symmetric = bool(getattr(table, "single", False)) or (species is not None and symmetric_rows(
+            {"coef": table.coef, "dcoef": table.dcoef}, int(species)))
+        self.owner = None  # OWNER_PASS on the block message: (pass 1, pass 2) FusedFoldedForward
         self.kernels = kernels
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
@@ -1151,6 +1167,13 @@ class WPrime(torch.nn.Module):
                       FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
                       WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
                                      horner=self.horner, table_pairs=self.table_pairs))
+        self.owner = None
+        from fastmace.kernels.oeq_streaming.fused_forward import owner_pass_default
+        one = self.block[2]
+        if (owner_pass_default(torch.cuda.get_device_name(device)) and self.rows_symmetric and not one.prefetch
+                and not one.tctp and not one.wgmma):
+            self.owner = tuple(FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used,
+                                                  blocks=blocks, owner=which) for which in ("pass1", "pass2"))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1167,19 +1190,24 @@ class WPrime(torch.nn.Module):
                                          batch=REBUILD_BATCH))
 
     def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None,
-                    recompute_rows=0, linear=None):
+                    recompute_rows=0, linear=None, mid=None, mirror=None):
         """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh).
         ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward. With the rebuild
         kernels attached (``attach_rebuild``) and ``fused``, the forward stores no ``w`` and the backward builds it on
-        chip; otherwise the backward builds it again in chunks of that many edges."""
+        chip; otherwise the backward builds it again in chunks of that many edges. ``mid`` and ``mirror`` (the skin
+        list's owner pairs, each receiver's owned edges first): the block message through the owner-pass kernels
+        (``OWNER_PASS``) where they are built."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
+            owner = self.owner is not None and mid is not None and mirror is not None
             *groups, density = _WPrimeBlockConvolution.apply(
                 lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), weight, self.gprime, x, sh,
-                senders, receivers, row_ptr, self.block[2].id, self.block[3].id)
+                senders, receivers, row_ptr, self.block[2].id, self.block[3].id,
+                mid if owner else None, mirror if owner else None,
+                self.owner[0].id if owner else -1, self.owner[1].id if owner else -1)
             return tuple(groups), density
         if self.table_w:  # no w is kept anyway; the fused forward's message-only kernel stores none
             if fused is not None and (self.message is None or self.message[0] != fused.id):

@@ -1431,6 +1431,9 @@ class TiledForceField:
         field._bind_streaming_count()  # species tables; then every tile edge is a real edge
         saved = []
         for module in field._streaming:
+            if module._buffers.get("streaming_owned") is not None:  # tiles: the one-pass forward (no owner pairs)
+                module.register_buffer("streaming_owned", None, persistent=False)
+                module.register_buffer("streaming_mirror", None, persistent=False)
             saved.append((module, module._buffers.get("streaming_count")))
             module.register_buffer("streaming_count", self._big if count is None else count, persistent=False)
         return saved
