@@ -21,6 +21,8 @@ Entry points (``modal run tools/modal/fastmace_modal.py::<name> ...``):
 - ``sx_job``: as ``job``, in the Symmetrix-XL image (``sx_image``: Ubuntu 24.04, Python 3.12, the Symmetrix-XL
   wheels for one architecture, ``SX_WHEEL_ARCH``; 5 November 2026, the Benchmark_loup comparison on the H200). Its
   LAMMPS binary is built locally (``symmetrix_build.py lammps``, MPI off) and uploaded with ``put``.
+- ``ncu_job``: as ``job``, in the job image plus Nsight Compute's CLI (``ncu_image``; 6 November 2026, the H200
+  ideas plan's ncu measurement, ``tools/modal/ncu_forward.sh``); needs ``FASTMACE_MODAL_NCU=1``.
 - ``put``: a local file or directory into the volume (``--src``, ``--dest``).
 
 Every job writes ``modal.json`` into its results: the GPU, driver, CUDA, image pip freeze hash, the source
@@ -117,6 +119,25 @@ sx_image = (
 ) if SX else None
 
 
+# Nsight Compute image (6 November 2026; the H200 ideas plan, revision 7, "Next measurements" item 5): the job image
+# plus NVIDIA's nsight-compute package from the CUDA repository of the image's Debian release (about 1.5 GB), ``ncu``
+# on the PATH. Defined only with FASTMACE_MODAL_NCU=1 (set in the shell for ncu_job, and in the image), so that
+# ordinary jobs never build it. Whether the container may read the GPU's performance counters is Modal's to grant:
+# ``ncu_forward.sh`` records ncu's verdict (ERR_NVGPUCTRPERM when it may not).
+NCU = os.environ.get("FASTMACE_MODAL_NCU") == "1"
+NCU_VERSION = "2026.4.0"
+ncu_image = (
+    image.apt_install("wget", "gnupg", "ca-certificates")
+    .run_commands(
+        ". /etc/os-release && wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian${VERSION_ID}"
+        "/x86_64/cuda-keyring_1.1-1_all.deb && dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb"
+        f" && apt-get update && apt-get install -y --no-install-recommends nsight-compute-{NCU_VERSION}"
+        f" && ln -sf $(ls -d /opt/nvidia/nsight-compute/{NCU_VERSION}*/ncu | sort -V | tail -n 1) /usr/local/bin/ncu"
+        " && ncu --version")
+    .env({"FASTMACE_MODAL_NCU": "1"})
+) if NCU else None
+
+
 def _environment(gpu, src, out):
     cache = f"/data/cache/{gpu}"
     env = dict(os.environ)
@@ -181,6 +202,14 @@ if SX:
                   scaledown_window=2, cpu=JOB_CPU, memory=JOB_MEMORY_MIB)
     def run_sx_job(gpu: str, tarball: bytes, command: str, timeout_s: int) -> bytes:
         """The command in the Symmetrix-XL image on the GPU this function was called with."""
+        return _run(gpu, tarball, command, timeout_s)
+
+
+if NCU:
+    @app.function(image=ncu_image, gpu="H200", volumes={"/data": volume}, timeout=3 * 3600, retries=0,
+                  scaledown_window=2, cpu=JOB_CPU, memory=JOB_MEMORY_MIB)
+    def run_ncu_job(gpu: str, tarball: bytes, command: str, timeout_s: int) -> bytes:
+        """The command in the Nsight Compute image on the GPU this function was called with."""
         return _run(gpu, tarball, command, timeout_s)
 
 
@@ -328,6 +357,17 @@ def sx_job(command: str, commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastM
         raise SystemExit("sx_job needs FASTMACE_MODAL_SX=1 (the Symmetrix-XL image is defined only then)")
     _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd, owner_override,
          function=globals()["run_sx_job"])
+
+
+@app.local_entrypoint()
+def ncu_job(command: str, commit: str = "HEAD", repo: str = "/mnt/d/Margraf/FastMACE", tarball: str = "",
+            gpu: str = "H200", timeout_min: int = 30, out: str = "~/fastmace-acceptance/modal-ncu-job",
+            limit_usd: str = "", owner_override: str = ""):
+    """``job`` in the Nsight Compute image (``ncu_image``); needs FASTMACE_MODAL_NCU=1 in the environment."""
+    if not NCU:
+        raise SystemExit("ncu_job needs FASTMACE_MODAL_NCU=1 (the Nsight Compute image is defined only then)")
+    _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd, owner_override,
+         function=globals()["run_ncu_job"])
 
 
 def _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd="", owner_override="", function=None):

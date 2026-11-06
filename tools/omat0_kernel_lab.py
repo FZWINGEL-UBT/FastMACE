@@ -1273,6 +1273,314 @@ def _tc_hybrid16(source):
     return _after_constants(source, HYBRID16_HELPERS)
 
 
+# ------------------------------------------------------------------- H200 ideas plan, revision 7 (6 November 2026)
+def _then(first, *after):
+    """``first``, then the source edits ``after``; a launch rule ``first`` registered (``_RULES``) carries over."""
+    def transform(s):
+        out = first(s)
+        rule = _RULES.get(out)
+        for edit in after:
+            out = edit(out)
+        if rule is not None:
+            _RULES[out] = rule
+        return out
+    return transform
+
+
+def _store_w_on(s):
+    """STORE_W on (w stored for every edge; unchanged where the plan stores it already)."""
+    return s.replace("constexpr bool STORE_W = false;", "constexpr bool STORE_W = true;", 1)
+
+
+def _split_mode(mode):
+    """The source with ``split_tf32``'s body set to ``fused_forward._TC_SPLITS[mode]`` ("mask", "round", "rna")."""
+    def edit(s):
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        body = ff._TC_SPLITS[mode]
+        return _sub(s, r"(?s)(void split_tf32\(float x, unsigned& hi, unsigned& lo\) \{\n).*?(\n\})",
+                    lambda m: m.group(1) + body + m.group(2), count=1, regex=True)
+    return edit
+
+
+B1_HELPERS = """// Idea 20 B1 (lab): W rounded to 22 significant bits (to nearest even) as the slice is filled,
+// so the mask split keeps it exactly; a split with its high part rounded to nearest and the low part the raw
+// remainder (random sign).
+__device__ __forceinline__ float round22(float x) {
+    const unsigned u = __float_as_uint(x);
+    return __uint_as_float((u + 1u + ((u >> 2) & 1u)) & ~3u);
+}
+__device__ __forceinline__ void split_tf32_a(float x, unsigned& hi, unsigned& lo) {
+    hi = (__float_as_uint(x) + 0x1000u) & 0xffffe000u;
+    lo = __float_as_uint(x - __uint_as_float(hi));
+}
+"""
+
+
+def _b1(s):
+    """Idea 20's B1: the mask split for W, whose slice is filled rounded to 22 bits (``round22``), and a split with a
+    rounded high part for a (``split_tf32_a``; one integer add per a value). Rounding class."""
+    s = _split_mode("mask")(s)
+    s = _sub(s, r"= k < K \? (W\[[^;]*?\]) : 0\.f;", r"= k < K ? round22(\1) : 0.f;", regex=True)
+    s = _sub(s, r"split_tf32\((?=(?:at|a_s)\[)", "split_tf32_a(", regex=True)
+    return _after_constants(s, B1_HELPERS)
+
+
+_W_BUFFER = {}  # (edges, weight_dim) -> one [E, Q] w buffer the revision-7 variants share (the plan may store no w)
+
+
+def _shared_w_args(kernel):
+    """A w buffer [E, Q] shared by the variants that store w (``poison`` zeroes it before each); the plan's own
+    buffer where the plan stores w."""
+    def transform(args):
+        import torch
+        args = list(args)
+        edges = args[3].shape[0]
+        if tuple(args[8].shape) == (edges, kernel.weight_dim):
+            return args
+        key = (edges, kernel.weight_dim)
+        if key not in _W_BUFFER:
+            _W_BUFFER.clear()
+            _W_BUFFER[key] = torch.zeros(edges, kernel.weight_dim, device=args[3].device, dtype=args[3].dtype)
+        args[8] = _W_BUFFER[key]
+        return args
+    return transform
+
+
+_W_STORE = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
+
+
+def _stream_store(s):
+    """w stored with ``__stcs`` (evict-first; ``render(..., stream_store=True)``, ``STREAM_STORE_W``)."""
+    return _sub(s, _W_STORE, "__stcs(&wout[(e0 + b) * Q + wst[g] + ch], w[g][b]);")
+
+
+def _store_v4(s):
+    """14(A)'s pass-1 stores (``store-w-v4``): after the r_s writes, each lane reads four channels of one (path, edge)
+    row with an LDS.128 and stores them with an STG.128 (2 npl LDS.128 and STG.128 per batch instead of 8 npl
+    STG.32). Bitwise: the same values. Needs the tensor-core product's r_s and B = 8."""
+    if "constexpr int B = 8;" not in s or "w[g][b] = r_s[(g * B + b) * RS + lane];" not in s:
+        raise ValueError("store-w-v4 needs the tensor-core product's r_s and B = 8")
+    pattern = (r"(const int wst\[(\d+)\] = \{[^}]*\};\n)(\s*)#pragma unroll\n\s*for \(int b = 0; b < B; \+\+b\)\n"
+               r"\s*if \(b < nb\) \{\n\s*#pragma unroll\n\s*for \(int g = 0; g < \2; \+\+g\) "
+               + re.escape(_W_STORE) + r"\n\s*\}")
+
+    def v4(m):
+        i = m.group(3)
+        return (f"{m.group(1)}{i}#pragma unroll\n"
+                f"{i}for (int it = 0; it < 2 * {m.group(2)}; ++it) {{  // store-w-v4: rows (g, b), 4 per step\n"
+                f"{i}    const int g = it >> 1, b = (it & 1) * 4 + (lane >> 3), q = lane & 7;\n"
+                f"{i}    const float4 v = *reinterpret_cast<const float4*>(&r_s[(g * B + b) * RS + 4 * q]);\n"
+                f"{i}    if (b < nb) *reinterpret_cast<float4*>(&wout[(e0 + b) * Q + wst[g] + cb * CB + 4 * q]) = v;\n"
+                f"{i}}}")
+    return _sub(s, pattern, v4, regex=True)
+
+
+def _w_from_buffer(source):
+    """F-bias's message reference: the plan's kernel with w read from ``wout`` (the float64 product rounded to float32,
+    filled by ``main``) instead of the product's r_s, STORE_W off. The TP and its sums are the plan's."""
+    old = "w[g][b] = r_s[(g * B + b) * RS + lane];"
+    if old not in source:
+        raise ValueError("F-bias message reference: needs the tensor-core product's r_s")
+    out = []
+    for block in re.split(r"(?=\n    case \d+: \{)", source):
+        m = re.search(r"const int wst\[(\d+)\] = (\{[^}]*\});", block)
+        if m and old in block:
+            block = _sub(block, f"float w[{m.group(1)}][B];",
+                         f"const int wsl[{m.group(1)}] = {m.group(2)};\n                float w[{m.group(1)}][B];", 1)
+            block = block.replace(old, "w[g][b] = (b < nb) ? __ldg(wout + (e0 + b) * Q + wsl[g] + ch) : 0.f;")
+        out.append(block)
+    return "".join(out).replace("constexpr bool STORE_W = true;", "constexpr bool STORE_W = false;", 1)
+
+
+def _wg_own_a(offset):
+    """Idea 17's a path on the W_GROUP render (timing bounds, wrong w): each warp reads its own a_s for the partner's
+    n-tile too. ``offset`` "0": the same address, so the compiler may drop the duplicated loads and splits (the
+    partner's a loads disappear); "1": its own slice one float on (the same instructions, no reads from the
+    partner's slice)."""
+    def transform(s):
+        old = "const float* at = a_s + (t - gr) * A_STRIDE;"
+        if "group_sync(gbar);" not in s:
+            raise ValueError("F-wg-own-a needs the W_GROUP render (fused_forward.W_GROUP)")
+        return _sub(s, old, "const float* at = a_s;" if offset == "0" else "const float* at = a_s + (t != gr);")
+    return transform
+
+
+def _wg_no_bar(s):
+    """Idea 17's a path: the W_GROUP render without its group barriers (timing bound, wrong w: the partner's a_s and
+    r_s race). A done warp leaves at once."""
+    if "group_sync(gbar);" not in s:
+        raise ValueError("F-wg-no-bar needs the W_GROUP render (fused_forward.W_GROUP)")
+    s = _sub(s, "group_sync(gbar);  // the group's r_s rows written", "")
+    return _sub(s, "if (!group_any(!done, gbar)) break;", "if (done) break;")
+
+
+A100_SXM4_OPTIN = 166912  # bytes of opt-in shared memory per block (163 KB of the 164 KB per SM)
+
+
+def _wfrag_region(kernel, name, warps=12, w_group=False):
+    """Idea 21: the plan's wfrag kernel re-rendered with the W region sized by the fragment layout
+    (``fused_forward.slice_floats(..., wfrag=True)``) and launched at ``warps`` warps (``w_group``: with W_GROUP;
+    None: as many as fit here, ``launch_rule(..., wfrag=True)``, even with W_GROUP). Bitwise. Its rule's shared
+    bytes are printed against this device's opt-in and the A100-SXM4's."""
+    def transform(s):
+        import dataclasses
+
+        import torch
+
+        from fastmace.kernels.oeq_streaming import fused_forward as ff
+        if not getattr(kernel, "wfrag", False) or kernel.tc is not True or kernel.tctp or kernel.wgmma:
+            raise ValueError(f"{name} needs the plan's wfrag kernel (TC_WFRAG, not presplit, TC_TP or WGMMA)")
+        props = torch.cuda.get_device_properties(0)
+        optin = int(props.shared_memory_per_block_optin)
+        ed, x_slots = kernel.schedule.edge_dim, kernel.schedule.input_dim // kernel.channels
+        shape = (kernel.paths, kernel.used, ed, kernel.channels, optin, int(props.multi_processor_count))
+        options = dict(tc=True, prefetch=False, x_slots=x_slots, wfrag=True)
+        groups = kernel.groups
+        rule = ff.launch_rule(*shape, groups=groups, **options) if groups else None
+        if rule is None:
+            groups, rule = None, ff.launch_rule(*shape, **options)
+        per = max(len(g) for g in groups) if groups else -(-kernel.paths // rule.parts)
+        wbytes = 4 * ff.slice_floats(per, kernel.used, True, wfrag=True)
+        staging = 4 * ff.staging_floats(kernel.used, ed, True, per, False, x_slots)
+        count = warps if warps is not None else rule.warps - (rule.warps % 2 if w_group else 0)
+        rule = dataclasses.replace(rule, warps=count, shared_bytes=wbytes + count * staging)
+        source = ff.render(kernel.schedule, kernel.k, rule, kernel.store_w, kernel.used, tc=True, blocks=kernel.blocks,
+                           prefetch=False, vec_sh=kernel.vec_sh, vec_a=kernel.vec_a, wfrag=True, groups=groups,
+                           sh_lds4=kernel.sh_lds4, lane_idx=kernel.lane_idx, w_group=w_group, wfrag_region=True)
+        _RULES[source] = rule
+        print(f"{name} rule {rule} (plan {kernel.rule}): W region {wbytes} B + {count} x {staging} B staging = "
+              f"{rule.shared_bytes} B; opt-in here {optin} B, A100-SXM4 {A100_SXM4_OPTIN} B "
+              f"({'fits' if rule.shared_bytes <= A100_SXM4_OPTIN else 'does NOT fit'} there)", flush=True)
+        return source
+    return transform
+
+
+# F-bias (idea 20): the signed mean error of w against the float64 product, and of the messages against the plan's
+# TP fed that product rounded to float32. Relative measures over the real edges (those in the CSR rows) and all Q:
+# slope = sum(err ref) / sum(ref^2) (the plan's bias, the relative shrink: negative toward zero),
+# toward0 = mean(err sign(ref)) / mean|ref|, mean = mean(err) / mean|ref| (the plain signed mean),
+# rms = rms(err) / rms(ref).
+FORWARD_REFERENCES = {"store-w-cs": "store-w", "store-w-v4": "store-w"}  # variant -> the variant it must match
+
+
+class _Moments:
+    def __init__(self):
+        self.er = self.rr = self.es = self.ar = self.ee = self.e = 0.0
+        self.n = 0
+
+    def add(self, err, ref):
+        self.er += float((err * ref).sum())
+        self.rr += float((ref * ref).sum())
+        self.es += float((err * ref.sign()).sum())
+        self.ar += float(ref.abs().sum())
+        self.ee += float((err * err).sum())
+        self.e += float(err.sum())
+        self.n += ref.numel()
+
+    def result(self):
+        if not self.n or not self.rr:
+            return dict(n=self.n)
+        return dict(slope=self.er / self.rr, toward0=self.es / self.ar, mean=self.e / self.ar,
+                    rms=(self.ee / self.rr) ** 0.5, n=self.n)
+
+
+def _real_edges(args):
+    return max(0, min(int(args[6][-1]), int(args[3].shape[0])))
+
+
+def w_reference(kernel, args, rows):
+    """The float64 product ``a @ W.T`` over the used columns, edges ``rows`` (a slice)."""
+    used = kernel.used
+    return args[0][rows, :used].double() @ args[1][:, :used].double().T
+
+
+def bias_of(kernel, args, message_reference=None, chunk=4096):
+    """F-bias statistics of a launched variant's w (``args[8]``) and messages (``args[7]``)."""
+    import torch
+    w = args[8]
+    result = {}
+    if tuple(w.shape) == (args[3].shape[0], kernel.weight_dim):
+        moments = _Moments()
+        for e in range(0, _real_edges(args), chunk):
+            rows = slice(e, min(e + chunk, _real_edges(args)))
+            ref = w_reference(kernel, args, rows)
+            moments.add(w[rows].double() - ref, ref)
+        result["w"] = moments.result()
+    if message_reference is not None:
+        moments = _Moments()
+        outs = args[7] if isinstance(args[7], list) else [args[7]]
+        for o, r in zip(outs, message_reference):
+            for i in range(0, o.shape[0], chunk):
+                ref = r[i:i + chunk].double()
+                moments.add(o[i:i + chunk].double() - ref, ref)
+        result["messages"] = moments.result()
+    torch.cuda.synchronize()
+    return result
+
+
+def message_reference(kernel, args, chunk=4096):
+    """The plan's TP fed the float64 product rounded to float32 (``_w_from_buffer``): the messages without the
+    product's rounding. Fills ``args[8]`` (the shared w buffer) on the way; the caller poisons it after."""
+    import torch
+    w = args[8]
+    for e in range(0, w.shape[0], chunk):
+        rows = slice(e, min(e + chunk, w.shape[0]))
+        w[rows] = w_reference(kernel, args, rows).float()
+    launch, _ = forward_launcher(kernel, _w_from_buffer(kernel.source), ())
+    ref = list(args)
+    ref[7] = [torch.zeros_like(o) for o in args[7]] if isinstance(args[7], list) else torch.zeros_like(args[7])
+    launch(ref)
+    torch.cuda.synchronize()
+    return ref[7] if isinstance(ref[7], list) else [ref[7]]
+
+
+def gemm_bias(rows=65536, k=128, n=128, seed=20261106):
+    """F-bias for one GEMM at K = ``k``: CUTLASS's 3xTF32 (``fastmace.kernels.cutlass.tf32x3.mm_into``; the error
+    where this GPU has no cubin) and cuBLAS IEEE float32 (TF32 off), against float64; A = randn and A = |randn|."""
+    import torch
+
+    from fastmace.kernels.cutlass import tf32x3
+    generator = torch.Generator(device="cuda").manual_seed(seed)
+    results = {}
+    allow = torch.backends.cuda.matmul.allow_tf32
+    try:
+        torch.backends.cuda.matmul.allow_tf32 = False
+        for label in ("randn", "abs-randn"):
+            a = torch.randn(rows, k, generator=generator, device="cuda")
+            a = a.abs() if label == "abs-randn" else a
+            b = torch.randn(k, n, generator=generator, device="cuda")
+            ref = a.double() @ b.double()
+            products = {"ieee": lambda: a @ b}
+
+            def cutlass():
+                out = torch.empty(rows, n, device="cuda")
+                if not tf32x3.eligible(a, b, out):
+                    raise RuntimeError("tf32x3.eligible is False")
+                tf32x3.mm_into(a, b, out)
+                torch.cuda.synchronize()
+                return out
+            products["cutlass-3xtf32"] = cutlass
+            for name, product in products.items():
+                try:
+                    moments = _Moments()
+                    moments.add(product().double() - ref, ref)
+                    results[f"{name} K={k} A={label}"] = moments.result()
+                except Exception as error:  # no cubin for this GPU (sm_120), or a load error
+                    results[f"{name} K={k} A={label}"] = dict(error=f"{type(error).__name__}: {str(error)[-300:]}")
+    finally:
+        torch.backends.cuda.matmul.allow_tf32 = allow
+    return results
+
+
+def _fmt_bias(result):
+    def one(m):
+        if "error" in m or "slope" not in m:
+            return str(m)
+        return (f"slope {m['slope']:+.2e} toward0 {m['toward0']:+.2e} mean {m['mean']:+.2e} rms {m['rms']:.2e} "
+                f"(n {m['n']})")
+    return "; ".join(f"{key}: {one(m)}" for key, m in result.items())
+
+
 def forward_variants(kernel=None):
     store = "wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];"
 
@@ -1441,6 +1749,31 @@ def forward_variants(kernel=None):
         "F-no-out": ("falsifier", lambda s: _sub(s, r"out(\d)\[cur \* (\d+) \+ ([^\]]*)\] = acc\[(\d+)\];",
                                                  r"if (acc[\4] == 12345.f) out\1[cur * \2 + \3] = acc[\4];",
                                                  regex=True), ()),
+        # H200 ideas plan, revision 7 (6 November 2026).
+        # Idea 20, F-bias: w (STORE_W on) and the messages against float64 for the 3xTF32 splits "mask" (truncating
+        # high part, raw low part), "round", B1 (W rounded to 22 bits, a's high part rounded) and the FP32-SIMT
+        # product; F-bias-gemm: one CUTLASS 3xTF32 GEMM at K = 128 (and cuBLAS IEEE), no forward launch.
+        "F-bias-mask": ("bias", _then(_split_mode("mask"), _store_w_on), (), _shared_w_args(kernel)),
+        "F-bias-round": ("bias", _then(_split_mode("round"), _store_w_on), (), _shared_w_args(kernel)),
+        "F-bias-b1": ("bias", _then(_b1, _store_w_on), (), _shared_w_args(kernel)),
+        "F-bias-simt": ("bias", _then(_tc_rerender(kernel, False, "F-bias-simt"), _store_w_on), (),
+                        _shared_w_args(kernel)),
+        "F-bias-gemm": ("bias-gemm", None, ()),
+        # 14(A), pass 1's stores: store-w with evict-first stores, and with LDS.128 + STG.128 from r_s. Both bitwise
+        # against store-w (FORWARD_REFERENCES).
+        "store-w-cs": ("exact", _then(lambda s: s, _store_w_on, _stream_store), (), _shared_w_args(kernel)),
+        "store-w-v4": ("exact", _then(lambda s: s, _store_w_on, _store_v4), (), _shared_w_args(kernel)),
+        # Idea 17's a path on the W_GROUP render (timing bounds, wrong w).
+        "F-wg-own-a": ("falsifier", _wg_own_a("0"), ()),
+        "F-wg-own-a-ld": ("falsifier", _wg_own_a("1"), ()),
+        "F-wg-no-bar": ("falsifier", _wg_no_bar, ()),
+        # Idea 21 (A100-SXM4): the fragment-sized W region at 12 warps, without and with W_GROUP. Bitwise.
+        "tc-warps12": ("exact", _wfrag_region(kernel, "tc-warps12"), ()),
+        "w-group-12": ("exact", _wfrag_region(kernel, "w-group-12", w_group=True), ()),
+        # The same region at as many warps as fit this GPU (the A100-SXM4: 12, i.e. tc-warps12; the RTX 5060 Ti: 5,
+        # and 4 with W_GROUP): the render's bitwise check where 12 warps do not fit.
+        "tc-region": ("exact", _wfrag_region(kernel, "tc-region", warps=None), ()),
+        "w-group-region": ("exact", _wfrag_region(kernel, "w-group-region", warps=None, w_group=True), ()),
     }
 
 
@@ -1562,6 +1895,9 @@ def ptxas_report(source, capability, extra=()):
 
     from fastmace.kernels.oeq_streaming.runtime import _check
     major, minor = capability
+    # A unique symbol in the PTX: NVRTC caches compiled programs across processes (keyed past the comments), and a
+    # cache hit prints no ptxas info (6 November 2026: "registers None" for sources compiled before).
+    source = f"{source}\n__device__ int fm_ptxas_report_{time.time_ns()};\n"
     program = _check(nvrtc.nvrtcCreateProgram(source.encode(), b"lab.cu", 0, [], []))
     options = [f"--gpu-architecture=sm_{major}{minor}".encode(), b"--std=c++17", b"-default-device",
                b"--ptxas-options=-v"] + [o.encode() for o in extra]
@@ -1751,6 +2087,9 @@ def main(argv=None):
     p.add_argument("--ptxas-archs", nargs="*", default=[], metavar="MAJOR.MINOR",
                    help="also report ptxas registers and spills of every variant for these architectures")
     p.add_argument("--ptxas-only", action="store_true", help="report ptxas only; no launches or timings")
+    p.add_argument("--profile-variants", nargs="*", default=[], metavar="NAME",
+                   help="after the timings, launch each of these variants once between cudaProfilerStart and "
+                        "cudaProfilerStop (ncu --profile-from-start off; tools/modal/ncu_forward.sh)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -1788,6 +2127,18 @@ def main(argv=None):
         names = [v for v in (args.variants or table) if v in table]
         if "base" not in names:
             names.insert(0, "base")
+        for variant, reference in (FORWARD_REFERENCES.items() if name == "forward" else ()):
+            if variant in names and reference in table and (reference not in names
+                                                             or names.index(reference) > names.index(variant)):
+                if reference in names:  # the reference runs first
+                    names.remove(reference)
+                names.insert(names.index(variant), reference)
+        pseudo = [v for v in names if table[v][0] == "bias-gemm"]
+        names = [v for v in names if v not in pseudo]
+        if pseudo and not args.ptxas_only:
+            meta.setdefault("bias_gemm", {}).update(gemm_bias())
+            for key, value in meta["bias_gemm"].items():
+                print(f"{name} F-bias-gemm {key}: {_fmt_bias(dict(c=value))[3:]}", flush=True)
         # Two output sets (the forward's w is 1.9 GB): the base kernel's, and one all other variants share; each
         # exact variant is compared with the base right after its first launch, before the next one overwrites it.
         base_args, shared_args = outputs_of(name, cargs), outputs_of(name, cargs)
@@ -1819,16 +2170,37 @@ def main(argv=None):
             own = base_args if variant == "base" else (arguments[0](shared_args) if arguments else shared_args)
             built[variant] = dict(kind=kind, launch=launch, args=own, **info)
         live = [v for v in names if "launch" in built[v]]
+        references = {r for v, r in FORWARD_REFERENCES.items() if v in live} if name == "forward" else set()
+        snapshots, messages = {}, None
         for variant in live:  # base first: the reference of the comparisons
             b = built[variant]
+            if b["kind"] == "bias" and messages is None:
+                try:
+                    messages = message_reference(kernel, b["args"])
+                except Exception as error:
+                    messages = False
+                    print(f"{name} F-bias message reference: {error}", flush=True)
+                    meta.setdefault("bias_message_reference_error", str(error)[-400:])
             if variant != "base":  # the variants share buffers: cleared first, so a stale output cannot pass as theirs
                 poison(name, b["args"])
             for _ in range(args.warmup):
                 reset(name, b["args"])
                 b["launch"](b["args"])
             torch.cuda.synchronize()
-            if variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
+            if variant in references:  # its outputs, for the variants that must match it
+                own = b["args"]
+                snapshots[variant] = list(own)
+                snapshots[variant][7] = [o.clone() for o in own[7]] if isinstance(own[7], list) else own[7].clone()
+                snapshots[variant][8] = own[8].clone()
+            reference = FORWARD_REFERENCES.get(variant) if name == "forward" else None
+            if b["kind"] == "bias":
+                b["bias"] = bias_of(kernel, b["args"], messages or None)
+            elif reference is not None:
+                b["compare"] = (dict(against=reference, **compare(name, snapshots[reference], b["args"]))
+                                if reference in snapshots else dict(error=f"the reference {reference} did not run"))
+            elif variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
+        snapshots = None
         times = {v: [] for v in live}
         flush = (torch.empty(int(args.flush_l2_mb) << 18, dtype=torch.float32, device="cuda")
                  if args.flush_l2_mb else None)
@@ -1844,6 +2216,17 @@ def main(argv=None):
                 end.record()
                 end.synchronize()
                 times[variant].append(start.elapsed_time(end) * 1000.0)
+        profiled = [v for v in live if v in args.profile_variants]
+        for index, variant in enumerate(profiled):  # one launch each inside the profiler range (ncu)
+            b = built[variant]
+            reset(name, b["args"])
+            torch.cuda.synchronize()
+            torch.cuda.profiler.start()
+            b["launch"](b["args"])
+            torch.cuda.synchronize()
+            torch.cuda.profiler.stop()
+            print(f"{name} profiled launch {index}: {variant}", flush=True)
+        meta.setdefault("profiled", {})[name] = profiled
         base_median = sorted(times["base"])[len(times["base"]) // 2] if "base" in times else None
         rows = {}
         for variant in names:
@@ -1858,8 +2241,11 @@ def main(argv=None):
             print(f"{name:8s} {variant:16s} {row.get('median_us', float('nan')):9.1f} us  "
                   f"ratio {row.get('ratio', float('nan')):.3f}  regs {row.get('registers')} "
                   f"local {row.get('local_bytes')}  {row.get('compare', row.get('error', ''))}", flush=True)
+            if "bias" in row:
+                print(f"{name:8s} {variant:16s} bias {_fmt_bias(row['bias'])}", flush=True)
         meta["kernels"][name] = dict(shapes=shapes, variants=rows)
         built = base_args = shared_args = None
+        _W_BUFFER.clear()
         gc.collect()
         torch.cuda.empty_cache()
     (args.output / "lab.json").write_text(json.dumps(meta, indent=2, default=str) + "\n")

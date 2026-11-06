@@ -816,11 +816,15 @@ class LaunchRule:
     shared_bytes: int
 
 
-def slice_floats(paths_per_part, k, tc=False):
+def slice_floats(paths_per_part, k, tc=False, wfrag=False):
     """Floats of a block's W slice (row stride CHANNEL_BLOCK + 1; with tensor cores ``TC_STRIDE`` and k padded to a
-    multiple of 8; ``tc="presplit"``: ``TC_PSTRIDE`` float2), rounded up to keep the staging 16-byte aligned."""
-    rows, stride = ((_kpad(k), 2 * TC_PSTRIDE) if tc == "presplit" else (_kpad(k), TC_STRIDE) if tc
-                    else (k, CHANNEL_BLOCK + 1))
+    multiple of 8; ``tc="presplit"``: ``TC_PSTRIDE`` float2), rounded up to keep the staging 16-byte aligned.
+    ``wfrag`` (the TF32 product, ``tc=True``): the region sized by ``tc_wfill``'s fragment order, ``CHANNEL_BLOCK``
+    floats per (path, k) instead of ``TC_STRIDE`` (H200 ideas plan, idea 21; kernel lab only so far)."""
+    if wfrag and tc is not True:
+        raise ValueError("slice_floats: the fragment-sized region needs the TF32 product (tc=True)")
+    rows, stride = ((_kpad(k), 2 * TC_PSTRIDE) if tc == "presplit" else
+                    (_kpad(k), CHANNEL_BLOCK if wfrag else TC_STRIDE) if tc else (k, CHANNEL_BLOCK + 1))
     return -(-paths_per_part * rows * stride // 4) * 4
 
 
@@ -834,15 +838,17 @@ def staging_floats(k, edge_dim, tc=False, paths_per_part=0, prefetch=False, x_sl
     return (1 + bool(prefetch)) * BATCH * (k + edge_dim) + xs
 
 
-def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefetch=False, x_slots=0, groups=None):
+def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefetch=False, x_slots=0, groups=None,
+                wfrag=False):
     """The kernel's parts, warps and grid for ``paths`` uvu paths of ``k``-wide folded inputs on a device with
     ``shared_optin`` bytes of opt-in shared memory per block and ``sms`` SMs (module docstring); ``tc``: the
     tensor-core product's shared layout (``TENSOR_CORES``). ``groups`` (``DEGREE_PARTS``): the parts given as path
-    groups; None when their largest W slice and ``MIN_WARPS`` warps' staging do not fit."""
+    groups; None when their largest W slice and ``MIN_WARPS`` warps' staging do not fit. ``wfrag``: the W region
+    sized by the fragment layout (``slice_floats``; the render's ``wfrag_region``)."""
     if groups is not None:
         per, parts = max(len(g) for g in groups), len(groups)
         staging = 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
-        wbytes = 4 * slice_floats(per, k, tc)
+        wbytes = 4 * slice_floats(per, k, tc, wfrag)
         if wbytes + MIN_WARPS * staging > shared_optin:
             return None
         warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
@@ -851,7 +857,8 @@ def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefe
     parts = max(1, -(-paths * BATCH // W_TILE_REGISTERS))
     while parts <= paths:
         per = -(-paths // parts)
-        if (4 * slice_floats(per, k, tc) + MIN_WARPS * 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
+        if (4 * slice_floats(per, k, tc, wfrag)
+                + MIN_WARPS * 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
                 <= shared_optin):
             break
         parts += 1
@@ -861,7 +868,7 @@ def launch_rule(paths, k, edge_dim, channels, shared_optin, sms, tc=False, prefe
     per = -(-paths // parts)
     parts = -(-paths // per)
     staging = 4 * staging_floats(k, edge_dim, tc, per, prefetch, x_slots)
-    wbytes = 4 * slice_floats(per, k, tc)
+    wbytes = 4 * slice_floats(per, k, tc, wfrag)
     warps = min(MAX_WARPS, (shared_optin - wbytes) // staging)
     slices = (channels // CHANNEL_BLOCK) * parts
     return LaunchRule(parts, warps, max(1, -(-BLOCKS_PER_SM * sms // slices)), wbytes + warps * staging)
@@ -945,16 +952,16 @@ def _node(layout, channels, start, component, dim):
 
 def render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
            vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-           lane_idx=False, w_group=False):
+           lane_idx=False, w_group=False, wfrag_region=False):
     """``_render``'s source; ``lane_idx``: with ``lane_indices`` applied (``LANE_INDICES``)."""
     source = _render(schedule, k, rule, store_w, used, stream_store, tc, blocks, prefetch, vec_sh, vec_a, wfrag, tctp,
-                     wgmma, groups, sh_lds4, w_group)
+                     wgmma, groups, sh_lds4, w_group, wfrag_region)
     return lane_indices(source) if lane_idx else source
 
 
 def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=False, blocks=None, prefetch=False,
             vec_sh=False, vec_a=False, wfrag=False, tctp=False, wgmma=False, groups=None, sh_lds4=False,
-            w_group=False):
+            w_group=False, wfrag_region=False):
     """CUDA source of ``fused_folded_forward`` for a schedule, the folded input width ``k`` and a launch rule.
     ``store_w=False``: the message alone; ``w`` is neither stored nor built for the padding edges (``wout`` unused;
     plans/capacity.md, the w-rebuild falsifier). ``used``: the leading inputs the k-loop reads (``used_columns``;
@@ -969,7 +976,11 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
     (``WGMMA``; the TF32 product without prefetch, tctp or wfrag; the rule must be ``launch_rule_wgmma``'s).
     ``sh_lds4``: the tensor product's sh reads as float4 shared loads (``SH_LDS4``; needs ``vec_sh``, not with tctp
     or wgmma). ``w_group``: warp pairs share each W fragment (``W_GROUP``; the TF32 product with wfrag, without
-    tctp or wgmma, an even warp count)."""
+    tctp or wgmma, an even warp count). ``wfrag_region``: the warps' staging after a W region sized by the fragment
+    layout (``slice_floats(..., wfrag=True)``; idea 21, kernel lab only; the rule must be ``launch_rule(...,
+    wfrag=True)``'s); needs wfrag with the TF32 product, without tctp or wgmma."""
+    if wfrag_region and (tc is not True or not wfrag or tctp or wgmma):
+        raise ValueError("fused_folded_forward: wfrag_region needs wfrag with the TF32 product, without tctp or wgmma")
     if w_group and (tc is not True or not wfrag or tctp or wgmma or rule.warps % 2 or rule.warps // 2 > 15):
         raise ValueError("fused_folded_forward: w_group needs the TF32 product with wfrag, without tctp or wgmma, "
                          "and an even warp count of at most 30")
@@ -1028,7 +1039,7 @@ def _render(schedule, k, rule, store_w=True, used=None, stream_store=None, tc=Fa
                     + _TC_SPLITS[TC_TP_SPLIT] + "\n}\n")
     ka = used if tc else k  # the staged width of a (tensor cores: the used columns)
     x_slots = schedule.input_dim // C
-    a_base = slice_floats(npp, ka, tc)
+    a_base = slice_floats(npp, ka, tc, wfrag_region)
     a_stride = staging_floats(ka, schedule.edge_dim, tc, npp, prefetch, x_slots)
     if wgmma:
         a_base, a_stride = 2 * npp * CHANNEL_BLOCK * _kpad(ka), wgmma_staging_floats(ka, schedule.edge_dim, npp)
