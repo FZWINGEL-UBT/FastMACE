@@ -1871,6 +1871,11 @@ def forward_variants(kernel=None):
         **{f"wg{w}": ("exact", _wfrag_region(kernel, f"wg{w}", warps=w, w_group=True), ()) for w in (12, 14, 16)},
         **{f"F-no-xload-wg{w}": ("falsifier", _then(_wfrag_region(kernel, f"F-no-xload-wg{w}", warps=w, w_group=True),
                                                      _no_xload), ()) for w in (12, 14, 16)},
+        # The x loads' price without F-no-xload's constant x (which lets the compiler fold the TP's x products):
+        # every edge reads node 0's row (an L1 hit), or its receiver's row (receiver-sorted: local). Wrong outputs.
+        "F-x-row0": ("falsifier", lambda s: _sub(s, "x[(int64_t)snd * IN_DIM", "x[(int64_t)(snd & 0) * IN_DIM"), ()),
+        "F-x-rcv": ("falsifier", lambda s: _sub(s, "x[(int64_t)snd * IN_DIM",
+                                                "x[(int64_t)(rv[b] < N ? rv[b] : 0) * IN_DIM"), ()),
         "F-part0-only": ("falsifier", _part_only(0), ()),
         "F-part1-only": ("falsifier", _part_only(1), ()),
         "F-l1-28": ("exact", _l1_pad(kernel, 224 * 1024), ()),
