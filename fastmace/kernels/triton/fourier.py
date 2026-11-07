@@ -28,6 +28,12 @@ import torch
 
 BLOCK_K, BLOCK_N, WARPS = 64, 64, 4
 
+# A/B constant (off-polar-alex, 7 November 2026): each backward in one tile sweep (``fourier_backward``: the thin
+# factors' gradient and the phase gradient from the same cosines and sines), and only the gradients autograd asks
+# for (no k-vector gradient without the cell's, as in NVT). Off: the separate sums. Same formulas; rounding only
+# where a sum's order changes. tests/cpu/test_polar_fused_fourier.py, tests/gpu/test_fourier_cuda.py.
+JOINT_BACKWARD = False
+
 
 def _uses_triton(*tensors) -> bool:
     return all(t.is_cuda and t.dtype == torch.float32 for t in tensors)
@@ -107,7 +113,43 @@ def _kernels():
             tl.store(gr_ptr + pk * N * 3 + cols * 3 + d, tl.sum(dtheta * kd[:, None], axis=0), mask=in_n)
             tl.store(gk_ptr + pn * K * 3 + rows * 3 + d, tl.sum(dtheta * rd[None, :], axis=1), mask=in_k)
 
-    return ksum, nsum, phase_grad
+    @triton.jit
+    def joint(k_ptr, r_ptr, mask_ptr, alpha_ptr, beta_ptr, z_ptr, yc_ptr, ys_ptr, n_ptr, gr_ptr, gk_ptr, K, N,
+              M: tl.constexpr, KSUM: tl.constexpr, NSUM: tl.constexpr, GR: tl.constexpr, GK: tl.constexpr,
+              BK: tl.constexpr, BN: tl.constexpr):
+        """One sweep: ksum of z (partials [N blocks, K, M]), nsum with u = -beta, v = alpha (partials [K blocks,
+        N, M]) and phase_grad's gr / gk partials, each when its flag is set."""
+        pk, pn = tl.program_id(0), tl.program_id(1)
+        rows, cols, in_k, in_n, c, s = _tile(k_ptr, r_ptr, K, N, pk, pn, BK, BN)
+        keep = tl.load(mask_ptr + rows, mask=in_k, other=0.0)
+        p = tl.zeros((BK, BN), dtype=tl.float32)
+        q = tl.zeros((BK, BN), dtype=tl.float32)
+        for m in tl.static_range(M):
+            zm = tl.load(z_ptr + cols * M + m, mask=in_n, other=0.0)
+            am = tl.load(alpha_ptr + rows * M + m, mask=in_k, other=0.0)
+            bm = tl.load(beta_ptr + rows * M + m, mask=in_k, other=0.0)
+            if GR or GK:
+                p += am[:, None] * zm[None, :]
+                q += bm[:, None] * zm[None, :]
+            if KSUM:
+                tl.store(yc_ptr + pn * K * M + rows * M + m, tl.sum(c * zm[None, :], axis=1) * keep, mask=in_k)
+                tl.store(ys_ptr + pn * K * M + rows * M + m, tl.sum(s * zm[None, :], axis=1) * keep, mask=in_k)
+            if NSUM:
+                um = -bm * keep
+                vm = am * keep
+                tl.store(n_ptr + pk * N * M + cols * M + m, tl.sum(c * um[:, None] + s * vm[:, None], axis=0),
+                         mask=in_n)
+        if GR or GK:
+            dtheta = (c * p + s * q) * keep[:, None]
+            for d in tl.static_range(3):
+                if GR:
+                    kd = tl.load(k_ptr + rows * 3 + d, mask=in_k, other=0.0)
+                    tl.store(gr_ptr + pk * N * 3 + cols * 3 + d, tl.sum(dtheta * kd[:, None], axis=0), mask=in_n)
+                if GK:
+                    rd = tl.load(r_ptr + cols * 3 + d, mask=in_n, other=0.0)
+                    tl.store(gk_ptr + pn * K * 3 + rows * 3 + d, tl.sum(dtheta * rd[None, :], axis=1), mask=in_k)
+
+    return ksum, nsum, phase_grad, joint
 
 
 def _grid(K, N):
@@ -190,6 +232,61 @@ def _(k, r, mask, alpha, beta, z):
     return r.new_empty((r.shape[0], 3)), k.new_empty((k.shape[0], 3))
 
 
+@torch.library.custom_op("fastmace::fourier_backward", mutates_args=())
+def fourier_backward(k: torch.Tensor, r: torch.Tensor, mask: torch.Tensor, alpha: torch.Tensor, beta: torch.Tensor,
+                     z: torch.Tensor, ksum: bool, nsum: bool, grad_r: bool,
+                     grad_k: bool) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """One sweep over the phases: ``(Yc, Ys)`` = ``fourier_ksum(k, r, mask, z)`` (``ksum``), ``fourier_nsum(k, r,
+    mask, -beta, alpha)`` (``nsum``) and ``fourier_phase_grad(k, r, mask, alpha, beta, z)``'s ``dL/dr`` and
+    ``dL/dk`` (``grad_r``, ``grad_k``); what is not asked for comes back empty."""
+    K, N, M = k.shape[0], r.shape[0], z.shape[1]
+
+    def empty():  # one per unused output: a custom op's outputs may not alias each other
+        return k.new_empty((0,))
+
+    if not _uses_triton(k, r, mask, alpha, beta, z):
+        theta = _phases(k, r)
+        cos, sin = torch.cos(theta), torch.sin(theta)
+        yc = mask[:, None] * (cos @ z) if ksum else empty()
+        ys = mask[:, None] * (sin @ z) if ksum else empty()
+        n_out = cos.t() @ (mask[:, None] * -beta) + sin.t() @ (mask[:, None] * alpha) if nsum else empty()
+        gr, gk = empty(), empty()
+        if grad_r or grad_k:
+            dtheta = mask[:, None] * (cos * (alpha @ z.t()) + sin * (beta @ z.t()))
+            gr = dtheta.t() @ k if grad_r else empty()
+            gk = dtheta @ r if grad_k else empty()
+        return yc, ys, n_out, gr, gk
+    grid = _grid(K, N)
+    yc = k.new_empty((grid[1], K, M) if ksum else (1, 0))
+    ys = k.new_empty((grid[1], K, M) if ksum else (1, 0))
+    n_out = k.new_empty((grid[0], N, M) if nsum else (1, 0))
+    gr = k.new_empty((grid[0], N, 3) if grad_r else (1, 0))
+    gk = k.new_empty((grid[1], K, 3) if grad_k else (1, 0))
+    if K and N and M:
+        _kernels()[3][grid](k.contiguous(), r.contiguous(), mask.contiguous(), alpha.contiguous(), beta.contiguous(),
+                            z.contiguous(), yc, ys, n_out, gr, gk, K, N, M, KSUM=ksum, NSUM=nsum, GR=grad_r,
+                            GK=grad_k, BK=BLOCK_K, BN=BLOCK_N, num_warps=WARPS)
+    else:
+        for t in (yc, ys, n_out, gr, gk):
+            t.zero_()
+
+    def total(t, wanted):
+        return t.sum(0) if wanted else empty()
+
+    return total(yc, ksum), total(ys, ksum), total(n_out, nsum), total(gr, grad_r), total(gk, grad_k)
+
+
+@fourier_backward.register_fake
+def _(k, r, mask, alpha, beta, z, ksum, nsum, grad_r, grad_k):
+    K, N, M = k.shape[0], r.shape[0], z.shape[1]
+
+    def shaped(wanted, *shape):
+        return k.new_empty(shape if wanted else (0,))
+
+    return (shaped(ksum, K, M), shaped(ksum, K, M), shaped(nsum, N, M), shaped(grad_r, N, 3),
+            shaped(grad_k, K, 3))
+
+
 # --------------------------------------------------------------------------- autograd
 
 
@@ -208,6 +305,12 @@ class _StructureFactor(torch.autograd.Function):
         k, r, mask, x = ctx.saved_tensors
         grad_cos = _zero_if_none(grad_cos, k.new_empty((k.shape[0], x.shape[1])))
         grad_sin = _zero_if_none(grad_sin, k.new_empty((k.shape[0], x.shape[1])))
+        if JOINT_BACKWARD:  # nsum(grad_cos, grad_sin) = nsum(-beta, alpha) with alpha = grad_sin, beta = -grad_cos
+            wanted = ctx.needs_input_grad
+            _, _, grad_x, grad_r, grad_k = fourier_backward(k, r, mask, grad_sin, -grad_cos, x, False, wanted[3],
+                                                            wanted[1], wanted[0])
+            return (grad_k if wanted[0] else None, grad_r if wanted[1] else None, None,
+                    grad_x if wanted[3] else None)
         grad_x = fourier_nsum(k, r, mask, grad_cos, grad_sin) if ctx.needs_input_grad[3] else None
         grad_k = grad_r = None
         if ctx.needs_input_grad[0] or ctx.needs_input_grad[1]:
@@ -225,6 +328,12 @@ class _FourierProject(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         k, r, mask, a, b = ctx.saved_tensors
+        if JOINT_BACKWARD:
+            wanted = ctx.needs_input_grad
+            grad_a, grad_b, _, grad_r, grad_k = fourier_backward(k, r, mask, b, -a, grad, wanted[3] or wanted[4],
+                                                                 False, wanted[1], wanted[0])
+            return (grad_k if wanted[0] else None, grad_r if wanted[1] else None, None,
+                    grad_a if wanted[3] else None, grad_b if wanted[4] else None)
         grad_a = grad_b = grad_k = grad_r = None
         if ctx.needs_input_grad[3] or ctx.needs_input_grad[4]:
             grad_a, grad_b = fourier_ksum(k, r, mask, grad)
@@ -245,4 +354,5 @@ def fourier_project(k, r, mask, a, b):
     return _FourierProject.apply(k, r, mask, a, b)
 
 
-__all__ = ["fourier_ksum", "fourier_nsum", "fourier_phase_grad", "fourier_project", "structure_factor"]
+__all__ = ["JOINT_BACKWARD", "fourier_backward", "fourier_ksum", "fourier_nsum", "fourier_phase_grad",
+           "fourier_project", "structure_factor"]

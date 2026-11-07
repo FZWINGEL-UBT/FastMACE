@@ -73,6 +73,47 @@ def test_one_unused_output_of_the_structure_factor():
     torch.testing.assert_close(got, expected, rtol=1e-10, atol=1e-11)
 
 
+@pytest.mark.parametrize("joint", [False, True])
+@pytest.mark.parametrize("wanted", [(0, 1, 3), (1, 3), (0, 1), (3,)])
+def test_backward_with_and_without_the_joint_sweep(monkeypatch, joint, wanted):
+    """``JOINT_BACKWARD``: each backward in one sweep (``fourier_backward``), only the gradients asked for (no k
+    gradient without the cell's, as in NVT); the same values as the two-sweep backward."""
+    monkeypatch.setattr(fourier, "JOINT_BACKWARD", joint)
+    k, r, mask, x, a, b = _inputs(seed=5)
+    for function, args, dense in (
+            (fourier.structure_factor, (k, r, mask, x),
+             lambda k, r, x: (mask[:, None] * torch.cos(k @ r.t()) @ x, mask[:, None] * torch.sin(k @ r.t()) @ x)),
+            (fourier.fourier_project, (k, r, mask, a, b),
+             lambda k, r, a, b: (torch.cos(k @ r.t()).t() @ (mask[:, None] * a)
+                                 + torch.sin(k @ r.t()).t() @ (mask[:, None] * b),))):
+        leaves = [t.detach().clone().requires_grad_(i in wanted or i >= 3) for i, t in enumerate(args)]
+        leaves[2] = mask
+        fused = function(*leaves)
+        fused = fused if isinstance(fused, tuple) else (fused,)
+        inputs = [leaves[i] for i in sorted(set(wanted) | set(range(3, len(args))))]
+        got = _gradients(fused, inputs)
+        dense_leaves = [leaves[0], leaves[1]] + leaves[3:]
+        expected = _gradients(dense(*dense_leaves), inputs)
+        for g, e in zip(got, expected):
+            torch.testing.assert_close(g, e, rtol=1e-10, atol=1e-11)
+
+
+def test_fourier_backward_returns_only_what_is_asked():
+    k, r, mask, x, a, b = (t.detach() for t in _inputs(seed=6))
+    yc, ys, n_out, grad_r, grad_k = fourier.fourier_backward(k, r, mask, a, b, x, True, False, True, False)
+    assert yc.shape == a.shape and ys.shape == a.shape and grad_r.shape == r.shape
+    assert n_out.numel() == 0 and grad_k.numel() == 0
+    theta = k @ r.t()
+    torch.testing.assert_close(yc, mask[:, None] * torch.cos(theta) @ x)
+    torch.testing.assert_close(ys, mask[:, None] * torch.sin(theta) @ x)
+    _, _, n_out, _, grad_k = fourier.fourier_backward(k, r, mask, a, b, x, False, True, False, True)
+    # nsum with u = -beta, v = alpha
+    expected = torch.cos(theta).t() @ (mask[:, None] * -b) + torch.sin(theta).t() @ (mask[:, None] * a)
+    torch.testing.assert_close(n_out, expected)
+    dtheta = mask[:, None] * (torch.cos(theta) * (a @ x.t()) + torch.sin(theta) * (b @ x.t()))
+    torch.testing.assert_close(grad_k, dtheta @ r)
+
+
 def test_the_mask_takes_one_graph_only(monkeypatch):
     k_batch = torch.tensor([0, 1, 0])
     positions = torch.zeros(4, 3)

@@ -106,6 +106,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                    "FUSED_FOURIER": "k-space sums without dense cos/sin; A/B"},
     "fastmace/rewrites/linear/__init__.py": {"E3NN_BLOCK_LINEAR": "e3nn Linears as BlockLinear (POLAR); A/B"},
     "fastmace/kernels/triton/skinny_linear.py": {"RADIAL_TF32X3": "radial last layer as 3xTF32; per GPU, A/B"},
+    "fastmace/kernels/triton/fourier.py": {"JOINT_BACKWARD": "one tile sweep per Fourier backward; A/B"},
     # OMAT-0 kernel lab follow-ups (3 November 2026, tools/omat0_kernel_lab.py): bitwise A/B switches, off by default.
     "fastmace/rewrites/radial/__init__.py": {"SYMMETRIC_PAIRS": "mirror pairs read one table row; per GPU, A/B"},
     "fastmace/kernels/oeq_streaming/wprime_backward.py": {"STREAM_W": "streaming loads of the stored w; screen A/B",

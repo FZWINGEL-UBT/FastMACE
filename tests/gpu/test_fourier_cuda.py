@@ -37,8 +37,10 @@ def _close(got, expected, rtol):
     assert float((got.double() - expected).abs().max() / scale) < rtol
 
 
+@pytest.mark.parametrize("joint", [False, True])
 @pytest.mark.parametrize("K,N,M", [(2989, 1944, 4), (243, 216, 8), (70, 33, 1)])
-def test_kernels_match_float64(K, N, M):
+def test_kernels_match_float64(monkeypatch, K, N, M, joint):
+    monkeypatch.setattr(fourier, "JOINT_BACKWARD", joint)
     k, r, mask, x, a, b, w, v = _inputs(K, N, M)
     for function, args, weights in ((fourier.structure_factor, (k, r, mask, x), (w, w.flip(0))),
                                     (fourier.fourier_project, (k, r, mask, a, b), (v,))):
@@ -55,3 +57,18 @@ def test_kernels_are_deterministic():
     first = fourier.fourier_ksum(k, r, mask, x)
     second = fourier.fourier_ksum(k, r, mask, x)
     assert all(torch.equal(p, q) for p, q in zip(first, second))
+
+
+@pytest.mark.parametrize("grads_of", [[0, 1, 3], [1, 3], [1]])
+def test_the_joint_sweep_matches_the_separate_sums(monkeypatch, grads_of):
+    """``JOINT_BACKWARD`` (one sweep, only the gradients asked for) against the two-sweep backward, in float32."""
+    k, r, mask, x, a, b, w, v = [t.float() for t in _inputs(2989, 1944, 4, seed=2)]
+    for function, args, weights in ((fourier.structure_factor, (k, r, mask, x), (w, w.flip(0))),
+                                    (fourier.fourier_project, (k, r, mask, a, b), (v,))):
+        wanted = [i for i in grads_of if i < len(args)] + ([4] if len(args) == 5 and 3 in grads_of else [])
+        monkeypatch.setattr(fourier, "JOINT_BACKWARD", False)
+        _, separate = _run(function, args, weights, wanted)
+        monkeypatch.setattr(fourier, "JOINT_BACKWARD", True)
+        _, joint = _run(function, args, weights, wanted)
+        for got, expected in zip(joint, separate):
+            _close(got, expected.double(), 1e-5)
