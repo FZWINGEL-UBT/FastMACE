@@ -1,0 +1,28 @@
+2026-11-07T18:38:24Z Modal NVIDIA H200, 610.57.04, 143771 MiB, 9.0; source 02166191af6a3e0ac878f8e0c81fad65854787df
+2026-11-07T18:38:24Z start lab
+2026-11-07T18:39:37Z end lab exit=0
+sx-layout: w' table factors per path [1.0, 0.57735, 1.0, 1.0, 0.547723, 1.0, 0.707107, 0.48795, 1.0, 0.57735]; table w vs a.W after them 1.04e-07
+sx-layout: species columns [7, 21, 37] (a from the chain vs the captured a: 2.88e-07)
+sx-spline256: 31.3 MB table (6 pairs, 255 intervals, h = 0.02235 A), 374 rows touched (7.7 MB); spline w vs a.W at 8244 edges max|d|/max|a| = 1.41e-07
+sx-spline2048: 251.5 MB table (6 pairs, 2047 intervals, h = 0.00278 A), 2618 rows touched (53.6 MB); spline w vs a.W at 8244 edges max|d|/max|a| = 1.44e-07
+sx-spline4096: 503.2 MB table (6 pairs, 4095 intervals, h = 0.00139 A), 4890 rows touched (100.1 MB); spline w vs a.W at 8244 edges max|d|/max|a| = 1.44e-07
+forward guard sx-wbuf: worst max|d|/max|a| 1.82e-06 (limit 0.0001)
+forward guard sx-table6: worst max|d|/max|a| 1.82e-06 (limit 0.001)
+forward guard sx-spline256: worst max|d|/max|a| 2.25e-06 (limit 0.05)
+forward guard sx-spline2048: worst max|d|/max|a| 1.76e-06 (limit 0.05)
+forward guard sx-spline4096: worst max|d|/max|a| 2.44e-06 (limit 0.05)
+forward  base                1270.3 us  ratio 1.000  regs 154 local 64  
+forward  sx-wbuf             1131.0 us  ratio 0.890  regs 80 local 0  {'out0': 'max|d|/max|a| = 1.09e-06', 'out1': 'max|d|/max|a| = 1.82e-06', 'out2': 'max|d|/max|a| = 1.29e-06', 'out3': 'max|d|/max|a| = 1.00e-06', 'w': 'bitwise'}
+forward  sx-table6           1345.1 us  ratio 1.059  regs 99 local 0  {'out0': 'max|d|/max|a| = 1.14e-06', 'out1': 'max|d|/max|a| = 1.82e-06', 'out2': 'max|d|/max|a| = 1.29e-06', 'out3': 'max|d|/max|a| = 1.00e-06', 'w': 'bitwise'}
+forward  sx-spline256        1105.8 us  ratio 0.871  regs 80 local 0  {'out0': 'max|d|/max|a| = 1.09e-06', 'out1': 'max|d|/max|a| = 2.25e-06', 'out2': 'max|d|/max|a| = 1.45e-06', 'out3': 'max|d|/max|a| = 1.50e-06', 'w': 'bitwise'}
+forward  sx-spline2048       1243.0 us  ratio 0.979  regs 80 local 0  {'out0': 'max|d|/max|a| = 1.20e-06', 'out1': 'max|d|/max|a| = 1.76e-06', 'out2': 'max|d|/max|a| = 1.45e-06', 'out3': 'max|d|/max|a| = 1.42e-06', 'w': 'bitwise'}
+forward  sx-spline4096       1463.3 us  ratio 1.152  regs 80 local 0  {'out0': 'max|d|/max|a| = 1.09e-06', 'out1': 'max|d|/max|a| = 2.44e-06', 'out2': 'max|d|/max|a| = 1.37e-06', 'out3': 'max|d|/max|a| = 1.27e-06', 'w': 'bitwise'}
+forward  sx-F-w1              501.9 us  ratio 0.395  regs 80 local 0  
+wprime guard B-spline256: worst max|d|/max|a| 1.28e-05 (limit 0.05)
+wprime guard B-spline2048: worst max|d|/max|a| 1.55e-06 (limit 0.05)
+wprime guard B-spline4096: worst max|d|/max|a| 1.65e-06 (limit 0.05)
+wprime   base                1403.1 us  ratio 1.000  regs 72 local 0  
+wprime   B-spline256         1226.6 us  ratio 0.874  regs 72 local 0  {'dsh': 'max|d|/max|a| = 2.79e-07', 'dr': 'max|d|/max|a| = 1.28e-05', 'dx': 'max|d|/max|a| = 3.74e-07'}
+wprime   B-spline2048        1301.7 us  ratio 0.928  regs 72 local 0  {'dsh': 'max|d|/max|a| = 2.79e-07', 'dr': 'max|d|/max|a| = 1.55e-06', 'dx': 'max|d|/max|a| = 3.74e-07'}
+wprime   B-spline4096        1497.3 us  ratio 1.067  regs 72 local 0  {'dsh': 'max|d|/max|a| = 2.79e-07', 'dr': 'max|d|/max|a| = 1.65e-06', 'dx': 'max|d|/max|a| = 4.37e-07'}
+2026-11-07T18:39:37Z done

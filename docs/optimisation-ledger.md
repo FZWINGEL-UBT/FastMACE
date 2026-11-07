@@ -489,6 +489,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [fusion-receiver-local](#fusion-receiver-local) | Receiver-local forward + backward of the last interaction (dout, sh, x on chip; no message store) | none (lab bounds `F-no-out`, `F-smem-*`) | FM | REJECTED (fusion and dout staging) | 2026-11-06 | H200: F-no-out 0.994, w′ F-smem-dout 0.847 (bound), real staging 1.935–1.986, staged layout without fill 1.131; 5060 Ti 1.015, 0.825, 1.464–2.323, 1.373 | [fusion bound](../results/fusion-bound-20261106/README.md) |
 | [sx-forward-table-w](#sx-forward-table-w) | Symmetrix-XL-style interaction 2 forward: w per edge from the value table instead of the a·W tensor-core product | none (lab bound `simt-slab-edges`) | FM | REJECTED (bound) | 2026-11-06 | H200 1.207 with the real slabs (511, 15.7 MB), L1 best case 0.901; 5060 Ti 1.238 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [sx-wprime-reduction](#sx-wprime-reduction) | w′: Symmetrix-XL's Cartesian Jacobian before the reduction, or a cheaper reduction | none (lab bounds `F-no-reduce`, `F-cart3`, `F-redux16`) | FM | REJECTED (bound) | 2026-11-06 | H200 no reduction at all 0.964; F-cart3 1.081; redux 1.135 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
+| [sx-layout-spline](#sx-layout-spline) | Interaction 2 forward in Symmetrix-XL's layout (one thread per receiver and channel, edges serial, message in registers) with w from a cubic spline; w′ with the same spline | none (lab `sx-spline{256,2048,4096}`, `sx-wbuf`, `sx-table6`, `B-spline{n}`) | FM | PROPOSED (waits for the conductor's go) | 2026-11-07 | H200 forward 0.871 (256 knots) / 0.979 (2,048), w′ 0.874 / 0.928; net −341 / −129 µs per step (−6.0 / −2.2 %); gate 1.81 / 1.14; certificate r ≥ 1 Å fails 74x / passes 0.17 | [sx-layout lab](../results/sx-layout-lab-20261107/README.md) |
 | [h200-butterfly-off](#h200-butterfly-off) | w′ `BUTTERFLY` off again on the H200 | `wprime_backward.BUTTERFLY_GPUS` | FM | ADOPTED (H200 removed; branch `fastmace/sx012-profile-20261106`) | 2026-11-06 | H200 MD b/a 0.9659 / 0.9677 (b = off), w′ kernel 0.88 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [cx-n1-cartesian-wprime](#cx-n1-cartesian-wprime) | w′: Cartesian harmonic adjoints (node converter, then dx and the edge-vector gradient from harmonic polynomials) | none (`tools/lab_cartesian.py`) | FM | REJECTED (bound) | 2026-11-06 | H200 lab 1.060 / 1.062 with converter (kernel 1.022, 56 vs 96 registers) | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
 | [cx-n2-fp64-adjoint](#cx-n2-fp64-adjoint) | w′: receiver-tiled FP64 tensor-core matrix adjoints | none (`tools/lab_cartesian.py` skeleton bound) | FM | REJECTED (bound) | 2026-11-06 | H200 optimistic floor 2.38x the default kernel | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
@@ -4507,6 +4508,22 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured (H200, `d599cc70`, base with `BUTTERFLY=False` 1,634 µs): F-no-reduce 0.964; F-cart3 1.081; F-redux16 1.135; F-cart3-redux 1.156; redux 1.135; butterfly 1.145.
 - Why: removing the reduction completely saves 3.6 %. The lab's butterfly result conflicts with the H200 MD A/B behind the `BUTTERFLY` default; see the recheck in the source.
 - Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="sx-layout-spline"></a>
+#### sx-layout-spline: Symmetrix-XL's interaction 2 forward layout with spline w, and the spline w′ (H200, lab)
+- Switch: none (lab variants in `tools/sx_layout_lab.py`)
+- Engine: FM
+- Date/round: 7 November 2026 (owner, via the conductor: copy Symmetrix-XL's whole interaction 2 forward with a 4-value spline table)
+- What: one thread per (receiver, channel), edges walked serially, message in registers, using production's angular code; w from a uniform-knot cubic Hermite spline per species pair (or our 6-term table, a w buffer, w = 1); the `TABLE_W` w′ kernel with the spline instead of the table.
+- Status: PROPOSED: both knot counts clear the 2 % bar by the bound. Not built; waits for the conductor's go.
+- Measured (H200, `02166191`, profile `fourth`, Benchmark_loup SrTiO3 10×10×10):
+  - forward, production 1,270 µs: sx-wbuf 0.890, sx-table6 1.059, sx-spline256 0.871, sx-spline2048 0.979, sx-spline4096 1.152, sx-F-w1 0.395;
+  - w′, production 1,403 µs: B-spline256 0.874, B-spline2048 0.928, B-spline4096 1.067;
+  - net per step: −341 µs (256 knots, −6.0 %) and −129 µs (2,048 knots, −2.2 %);
+  - gate worst ratio: 1.81 (256 knots) and 1.14 (2,048 knots);
+  - certificate slope at r ≥ 1 Å: 74x (256 knots, fails) and 0.17 (2,048 knots, passes); whole domain 2,025x and 4.35.
+- Why: the layout alone wins 11 % (80 registers, no spill, against 154 plus spill). After that, w traffic decides: our 6-term table loses in this layout, a 256-knot spline fits in L2, and 4,096 knots does not.
+- Sources: [sx-layout lab](../results/sx-layout-lab-20261107/README.md).
 
 <a id="cx-n1-cartesian-wprime"></a>
 #### cx-n1-cartesian-wprime: Cartesian harmonic adjoints for the w′ backward (H200, bound)
