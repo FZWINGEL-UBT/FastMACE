@@ -1091,7 +1091,7 @@ def _radial_net(interaction):
 def _stock_table_weights(table, weight):
     """MACE-OFF's stock first block's ``conv_tp_weights`` from its table: lengths ``[E, 1]`` -> ``(h c) W`` (the
     stock forward multiplies by the cutoff only when it gets one; with the tables it gets None). One table: the
-    stock chain reads no species."""
+    stock chain reads no species. MACE-OFF only, so the product is eligible for ``RADIAL_TF32X3_GPUS``."""
     import torch
 
     class StockTableWeights(torch.nn.Module):
@@ -1108,7 +1108,7 @@ def _stock_table_weights(table, weight):
             pair = torch.zeros(lengths.shape[0], dtype=torch.int32, device=lengths.device)
             augmented, _ = radial_table(lengths, pair, t.coef, t.dcoef, t.starts, t.scales, t.bins, t.r_lo,
                                         t.bin_scale, t.r_max, False)
-            return folded_linear(augmented[:, :-1].contiguous(), self.weight)
+            return folded_linear(augmented[:, :-1].contiguous(), self.weight, tf32x3=True)
 
     return StockTableWeights()
 

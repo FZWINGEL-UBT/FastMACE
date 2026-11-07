@@ -229,6 +229,9 @@ def test_fused_radial_backward_matches_the_original(family):
     rewritten, applied = rewrite(model, batch, ["generic_fused_radial_backward"])
     flags = [getattr(i, "fused_radial_backward", False) for i in rewritten.interactions]
     assert flags == ([False, True] if family == "off" else [True, True])
+    # MACE-OFF's radial products are the ones eligible for RADIAL_TF32X3_GPUS (off-polar-alex, 7 November 2026)
+    assert [getattr(i, "radial_tf32x3", None) for i, flag in zip(rewritten.interactions, flags) if flag] == (
+        [True] if family == "off" else [False, False])
     assert applied[0].detail == [f"interactions.{i}" for i, flag in enumerate(flags) if flag]
     assert_same_physics(model, rewritten)
 
@@ -382,6 +385,8 @@ def test_mace_off_first_block_species_skip_needs_the_pinned_forward(monkeypatch)
 
 
 def test_stock_first_skip_default_by_device(monkeypatch):
+    assert gm.STOCK_FIRST_SKIP is None and gm.STOCK_FIRST_SKIP_GPUS == ("NVIDIA A100-SXM4-80GB",)
+    assert gm.stock_first_skip_default("NVIDIA A100 80GB PCIe")  # the family (off-polar-alex, 7 November 2026)
     assert not gm.stock_first_skip_default(torch.device("cpu"))
     assert not gm.stock_first_skip_default("NVIDIA L4")
     monkeypatch.setattr(gm, "STOCK_FIRST_SKIP_GPUS", gm.GPUModels(("NVIDIA A100-SXM4-80GB",)))

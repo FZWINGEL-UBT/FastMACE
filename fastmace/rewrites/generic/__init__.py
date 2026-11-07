@@ -193,14 +193,17 @@ def apply_segmented_first_sum(model, context):
 
 
 def apply_fused_radial_backward(model, context):
-    """Route the last radial layer of every non-reassociated generic interaction through folded_linear."""
+    """Route the last radial layer of every non-reassociated generic interaction through folded_linear; on a
+    MACE-OFF model (``stock_first_block``) mark it eligible for ``skinny_linear.RADIAL_TF32X3_GPUS``."""
     changed = []
+    off = stock_first_block(model) is not None
     for index, interaction, kind in _generic_interactions(model):
         if getattr(interaction, "first_reassociation", None) is not None:
             continue
         _prepare(interaction, kind)
         interaction.radial_hidden, interaction.radial_last = gm.fc_split(interaction.conv_tp_weights)
         interaction.fused_radial_backward = True
+        interaction.radial_tf32x3 = off
         changed.append(f"interactions.{index}")
     return changed
 

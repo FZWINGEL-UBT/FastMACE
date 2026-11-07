@@ -291,7 +291,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         pass
     elif tabled and reassociation is None:
         from fastmace.kernels.triton.skinny_linear import folded_linear
-        tp_weights = folded_linear(augmented[:, :-1].contiguous(), fc_last_weight(self.radial_last).contiguous())
+        tp_weights = folded_linear(augmented[:, :-1].contiguous(), fc_last_weight(self.radial_last).contiguous(),
+                                   tf32x3=getattr(self, "radial_tf32x3", False))
     elif chunked:
         hidden = self.radial_hidden(edge_feats)
         augmented = (torch.cat([hidden, torch.ones_like(hidden[:, :1])], dim=1) if cutoff is None
@@ -299,7 +300,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     elif reassociation is None:
         if getattr(self, "fused_radial_backward", False):
             from fastmace.kernels.triton.skinny_linear import folded_linear
-            tp_weights = folded_linear(self.radial_hidden(edge_feats), fc_last_weight(self.radial_last).contiguous())
+            tp_weights = folded_linear(self.radial_hidden(edge_feats), fc_last_weight(self.radial_last).contiguous(),
+                                       tf32x3=getattr(self, "radial_tf32x3", False))
         else:
             tp_weights = self.conv_tp_weights(edge_feats)
         if cutoff is not None:
@@ -418,12 +420,14 @@ SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generati
 # about 0.8 ms of OFF23-small's 2.57 ms water step and 1.1 ms of OFF24-medium's 6.1 ms (module profile,
 # results/off-polar-alex-20261106). generic_species_skip replaces it by a SpeciesSkip as for the generic blocks
 # (exact) where the class's forward source matches the pin below. None: on for STOCK_FIRST_SKIP_GPUS (decision 66);
-# True / False: an A/B side's choice on every device.
+# True / False: an A/B side's choice on every device. A100-SXM4-80GB (off-polar-alex, 7 November 2026,
+# results/off-polar-alex-20261106): MD step b/a (b = on), water_216, abab / abba: OFF23-small, -medium, OFF23b,
+# OFF24 and OFF23-large all faster in both orders (OFF23b 0.832 / 0.821, OFF23-large 0.707 / 0.714).
 STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
     "RealAgnosticInteractionBlock": "0a9b26328a7533f380b45af53e78f60e98ffed022cb9b7c136f781ddefefdf97",
 })
 STOCK_FIRST_SKIP = None
-STOCK_FIRST_SKIP_GPUS = GPUModels(())
+STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 
 
 def stock_first_skip_default(device=None):
