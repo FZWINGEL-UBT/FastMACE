@@ -219,7 +219,7 @@ def test_assemble_row():
     assert row["ase_f32"]["energy_meV_atom"] == pytest.approx(0.5)
     assert row["production"]["energy_meV_atom"] == pytest.approx(0.75)
     assert gate.summarize([row])["passed"]
-    worse = gate.assemble_row("full-2", 2, f64, f32, (10.0021, *prod[1:]))  # 1.05 meV/atom > 2 x 0.5
+    worse = gate.assemble_row("full-2", 2, f64, f32, (10.0031, *prod[1:]))  # 1.55 meV/atom > 3 x 0.5
     assert not gate.summarize([worse])["energy"]["passed"]
 
 

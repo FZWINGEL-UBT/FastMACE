@@ -304,8 +304,8 @@ def test_energy_floor():
 
 
 @pytest.mark.parametrize("production, yardstick, passed", [
-    (2.0e-4, 1.0e-4, True),     # exactly twice the float32 error
-    (2.01e-4, 1.0e-4, False),   # just above
+    (3.0e-4, 1.0e-4, True),     # exactly 3 x the float32 error (owner, 7 November 2026)
+    (3.01e-4, 1.0e-4, False),   # just above
     (0.5e-4, 1.0e-4, True),     # better than float32
 ])
 def test_ratio_rule(production, yardstick, passed):
@@ -338,13 +338,13 @@ def _config(production_forces, f32_forces, production_stress, f32_stress, e_prod
 
 
 def test_summary_takes_the_worst_configuration_of_each_path():
-    configs = [_config(3e-4, 2e-4, 1e-6, 2e-6), _config(1e-4, 1e-4, 5e-6, 1e-6)]
+    configs = [_config(3e-4, 2e-4, 1e-6, 2e-6), _config(1e-4, 1e-4, 7e-6, 1e-6)]
     summary = gate.summarize(configs)
     assert summary["forces"]["production_max_abs"] == 3e-4
     assert summary["forces"]["ase_f32_max_abs"] == 2e-4
     assert summary["forces"]["ratio"] == pytest.approx(1.5) and summary["forces"]["passed"]
-    assert summary["stress"]["production_max_abs"] == 5e-6
-    assert summary["stress"]["ratio"] == pytest.approx(2.5) and not summary["stress"]["passed"]
+    assert summary["stress"]["production_max_abs"] == 7e-6
+    assert summary["stress"]["ratio"] == pytest.approx(3.5) and not summary["stress"]["passed"]
     assert summary["energy"]["production_max_abs"] == 0.001 and summary["energy"]["ase_f32_max_abs"] == 0.002
     assert summary["energy"]["passed"]
     assert summary["passed"] is False
