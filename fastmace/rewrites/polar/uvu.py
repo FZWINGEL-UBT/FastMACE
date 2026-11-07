@@ -97,6 +97,10 @@ def apply(model, context=None):
 
     if update_fold.FOLD_UPDATE:  # the folded update MLP (an A/B constant, off-polar-alex lab)
         names += [f"{name} (update MLP folded)" for name in update_fold.apply(model)]
+    from fastmace.rewrites.polar import head_compose
+
+    if head_compose.COMPOSE_HEADS:  # the head projections composed into the dot products (polar-megakernel, P1)
+        names += [f"{name} (head composed)" for name in head_compose.apply(model)]
     return names
 
 
