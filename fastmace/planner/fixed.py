@@ -430,9 +430,12 @@ DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe", "NVIDIA H200
 # MACE-OFF and POLAR-1 on the A100 (branch fastmace/off-polar-alex, 6 November 2026; owner: "bring all mace off and
 # mace polar models up to current speeds ... fastest speed on a100"): MD step b/a in both build orders, NHR@FAU Alex
 # NVIDIA A100-SXM4-80GB, b = tf32x3_gemms on (results/off-polar-alex-20261106). OFF: water_216 (648 atoms); force
-# gates on the organic set pass (paracetamol stress 1.95-1.99 of 2 for OFF23 medium and large). OFF23-small is not
-# here: its gate fails (paracetamol forces 2.19, default 1.36); it takes grouped_launch instead.
+# gates on the organic set pass (paracetamol stress 1.95-1.99 of 2 for OFF23 medium and large). OFF23-small since
+# 7 November 2026: its gate failed at 2x (paracetamol forces 2.19) and passes at 3x; on top of the A100 OFF defaults
+# of 7 November (stock skip, OFF tables, radial 3xTF32) b/a 0.9663 / 0.9472 (A100 80GB PCIe, Modal), gate on the
+# A100-SXM4-80GB: paracetamol forces 2.55, stress 2.77 (default 1.53, 1.30). It replaces grouped_launch there.
 DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
+    "off23-small": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9663 / 0.9472 on the 7 November defaults
     "off23-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9677 / 0.9657
     "off23-large": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9667 / 0.9634
     "off23b-medium": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9795 / 0.9760
@@ -442,12 +445,11 @@ DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
     "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9309 / 0.9303, 0.8422 / 0.8425
     "polar1-l": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9064 / 0.9070, 0.7922 / 0.7927
 })
-# grouped_launch outside the generic family (decision 57) where measured (exact): OFF23-small on the A100-SXM4-80GB
-# 0.9889 / 0.9953 (water_216; results/off-polar-alex-20261106). OFF23-large loses (1.0083 / 1.0092); the other OFF
-# models win too (0.988-0.995) but take tf32x3_gemms, which reroutes the same products and is faster.
-DECISION_66_GROUPED_LAUNCH_MODEL_GPUS = MappingProxyType({
-    "off23-small": GPUModels(("NVIDIA A100-SXM4-80GB",)),
-})
+# grouped_launch outside the generic family (decision 57) where measured (exact). OFF23-small on the A100-SXM4-80GB
+# won 0.9889 / 0.9953 (water_216; results/off-polar-alex-20261106) and was listed here until 7 November 2026, when
+# tf32x3_gemms (faster, and it reroutes the same products) took its place. OFF23-large loses (1.0083 / 1.0092); the
+# other OFF models win too (0.988-0.995) but take tf32x3_gemms. Empty: no model measured faster with it.
+DECISION_66_GROUPED_LAUNCH_MODEL_GPUS = MappingProxyType({})
 # generic_chunked_conv_backward (chunked_conv_backward on a generic model's folded path,
 # docs/validation/omat0/omat0-capacity.md) under decision 66: "auto" keeps it on only on the GPUs whose same-process A/Bs,
 # in both build orders, found the MD step no slower; exact device names. MACE-OMAT-0 medium, MD step b/a in the two
