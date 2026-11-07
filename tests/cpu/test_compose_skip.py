@@ -76,5 +76,7 @@ def test_composed_is_float64_then_cast():
     assert torch.equal(w_t, w.transpose(1, 2))
 
 
-def test_off_by_default():
-    assert compose_skip.COMPOSE_SKIP is None and not compose_skip.compose_skip_default("NVIDIA H200")
+def test_on_for_the_listed_gpus_only():
+    assert compose_skip.COMPOSE_SKIP is None and compose_skip.compose_skip_default("NVIDIA H200")
+    assert not compose_skip.compose_skip_default("NVIDIA A100-SXM4-80GB")
+    assert not compose_skip.compose_skip_default("NVIDIA GeForce RTX 5060 Ti")

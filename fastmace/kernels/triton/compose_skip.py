@@ -24,7 +24,9 @@ import torch
 from fastmace.kernels.gpu_models import GPUModels
 
 COMPOSE_SKIP = None
-COMPOSE_SKIP_GPUS = GPUModels(())
+# NVIDIA H200 (7 November 2026, results/h200-compose-quads-20261107): MD step b/a 0.9698 / 0.9738 against the H200
+# defaults (OMAT-0 medium, SrTiO3 10x10x10, Benchmark_loup settings, ab / ba), force/stress gate passes (decision 66).
+COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def compose_skip_default(name=None) -> bool:

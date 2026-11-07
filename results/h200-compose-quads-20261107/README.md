@@ -53,7 +53,7 @@ Integrated below (`COMPOSE_SKIP`).
 
 ## Idea 1 integrated: `COMPOSE_SKIP` on the H200 ([compose-skip/](compose-skip/))
 
-`kernels.triton.compose_skip.COMPOSE_SKIP` (off; `COMPOSE_SKIP_GPUS` empty), commit `92f2fa7a`. On OMAT-0 medium the
+`kernels.triton.compose_skip.COMPOSE_SKIP`, measured at commit `92f2fa7a` (switch off, set on for the A/B); **adopted for the H200 family** (`COMPOSE_SKIP_GPUS`, decision 66). On OMAT-0 medium the
 first interaction's linear is a per-l `BlockLinear` (not the identity), so the composition is
 `C_l,z = right_l L_l B_l,z` (float64, stored float32). The reassociation multiplies by it through `species_mm` (CUTLASS
 launch), and the interaction then only divides by `density + 1`, skipping both its linear and `skip_tp`. Unit `fm-compose-skip2`, Modal
