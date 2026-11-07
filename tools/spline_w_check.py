@@ -44,14 +44,18 @@ def main(argv=None) -> int:
     sim.run(steps=args.steps)
     rows = []
     for obj in gc.get_objects():
-        if isinstance(obj, WPrime):
+        if issubclass(type(obj), WPrime):  # type(): a weakproxy in gc's list must not be dereferenced
             spline = obj.spline or {}
             rows.append(dict(repr=obj.extra_repr(), attached=obj.spline is not None,
                              in_use=obj.spline_block is not None,
                              intervals=sum(g[2] for g in spline.get("grid", [])) or None,
                              certificate=(spline.get("certificate") or {}).get("worst"),
                              grid=spline.get("grid"),
-                             forward_registers=obj.spline_block[1].registers if obj.spline_block else None))
+                             forward_registers=obj.spline_block[1].registers if obj.spline_block else None,
+                             forward_local_bytes=obj.spline_block[1].local_bytes if obj.spline_block else None,
+                             forward_threads=obj.spline_block[1].threads if obj.spline_block else None,
+                             forward_min_blocks=obj.spline_block[1].min_blocks if obj.spline_block else None,
+                             forward_parts=obj.spline_block[1].parts if obj.spline_block else None))
     used = any(r["in_use"] for r in rows)
     record = dict(constants=args.constant, structure=args.structure, wprime=rows, spline_in_use=used)
     print(json.dumps(record, indent=1, default=str))

@@ -21,7 +21,16 @@ from fastmace.kernels.gpu_models import GPUModels
 # None: on for SPLINE_W_GPUS (decision 66); True / False: forced (an A/B side). Empty until its MD A/B and gate pass.
 SPLINE_W = None
 SPLINE_W_GPUS = GPUModels(())
+# Launch shape (SX improvement screen, 7 November 2026; plans/notes/sx-layout-opportunities-20261107). THREADS: one
+# owner per (receiver, channel); 128 threads with 128 channels is one receiver per block, so receivers of different
+# degree retire independently instead of in pairs. MIN_BLOCKS: __launch_bounds__' minimum blocks per SM (a register
+# cap: 128 x 6 and 256 x 3 both give 24 warps at 80 registers), None for none. PARTS: one kernel per input irrep
+# dimension (scalar-input and vector-input paths; DEGREE_PARTS' split in this layout), each walking every receiver's
+# edges for its own output slots: fewer registers per kernel, the edge walk and lookup twice. All three bitwise (the
+# same terms, per output slot in the same edge order). A/B switches; THREADS 256, MIN_BLOCKS None, PARTS False today.
 THREADS = 256
+MIN_BLOCKS = None
+PARTS = False
 
 _REGISTRY = {}
 
@@ -53,9 +62,25 @@ def lookup_code(grid, r, scalar="float", indent="    "):
     return "\n".join(lines)
 
 
-def render(schedule, blocks, grid, r_max, path_scale=None):
+def spline_parts(schedule):
+    """``PARTS``' path groups (``fused_forward.degree_parts``), or None where there is one input degree or two
+    groups share an output slot (each part must own its slots)."""
+    from fastmace.kernels.oeq_streaming.fused_forward import degree_parts
+
+    groups = degree_parts(schedule)
+    if groups is None:
+        return None
+    owned = [{o.accumulator.name for g in group for o in schedule.paths[g].outputs} for group in groups]
+    if sum(len(o) for o in owned) != len(set().union(*owned)):
+        return None
+    return groups
+
+
+def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
+           name="spline_forward"):
     """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
-    ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here."""
+    ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here. ``part``:
+    the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds."""
     from fastmace.kernels.oeq_streaming.fused_forward import _lit, _node, block_map
 
     if schedule.layout != "ir_mul":
@@ -63,17 +88,22 @@ def render(schedule, blocks, grid, r_max, path_scale=None):
     paths, C = schedule.paths, schedule.channels
     if any(p.edge_mul != 1 for p in paths):
         raise ValueError("spline_forward: one weight per path and channel (edge_mul 1)")
+    threads = THREADS if threads is None else int(threads)
+    own = set(range(len(paths)) if part is None else part)
+    mine = [p for g, p in enumerate(paths) if g in own]
     scale = [1.0] * len(paths) if path_scale is None else [float(v) for v in path_scale]
     bmap = block_map(blocks, C)
     slots = {s.name: s for s in schedule.output_slots}
-    names = list(dict.fromkeys(o.accumulator.name for p in paths for o in p.outputs))
+    names = list(dict.fromkeys(o.accumulator.name for p in mine for o in p.outputs))
     si = {n: i for i, n in enumerate(names)}
-    xkeys = sorted({(p.input_start, t.input_component, p.input_irrep_dim) for p in paths for o in p.outputs
+    xkeys = sorted({(p.input_start, t.input_component, p.input_irrep_dim) for p in mine for o in p.outputs
                     for t in o.terms})
     xi = {key: i for i, key in enumerate(xkeys)}
     body = [f"            const float x{i} = __ldg(x + (int64_t)snd * IN_DIM + {_node('ir_mul', C, s, c, d)});"
             for (s, c, d), i in xi.items()]
     for g, p in enumerate(paths):
+        if g not in own:
+            continue
         body.append("            {")
         for j in range(p.edge_irrep_dim):
             body.append(f"                const float e{j} = __ldg(sh + e * ED + {p.edge_start + j});")
@@ -85,14 +115,15 @@ def render(schedule, blocks, grid, r_max, path_scale=None):
             body.append(f"                acc[{si[o.accumulator.name]}] = fmaf(w, {terms}, acc[{si[o.accumulator.name]}]);")
         body.append("            }")
     stores = []
-    for name, i in si.items():
-        slot = slots[name]
+    for slot_name, i in si.items():
+        slot = slots[slot_name]
         group, width, base, stride = bmap[slot.start]
         stores.append(f"        out{group}[(int64_t)rcv * {width} + {base + slot.component * stride} + ch] = acc[{i}];")
     outs = ", ".join(f"float* __restrict__ out{g}" for g in range(len(blocks)))
     n = len(names)
     nl = "\n"
-    return f"""// spline_forward (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
+    bounds = f"{threads}" if min_blocks is None else f"{threads}, {int(min_blocks)}"
+    return f"""// {name} (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
 using int64_t = long long;
 constexpr int C = {C};
 constexpr int64_t Q = {len(paths) * C};
@@ -100,7 +131,7 @@ constexpr int IN_DIM = {schedule.input_dim};
 constexpr int ED = {schedule.edge_dim};
 constexpr float R_MAX = {_lit(r_max)};
 
-extern "C" __global__ void __launch_bounds__({THREADS}) spline_forward(
+extern "C" __global__ void __launch_bounds__({bounds}) {name}(
     int64_t N, int64_t E, const float* __restrict__ x, const float* __restrict__ sh,
     const int* __restrict__ senders, const int* __restrict__ row_ptr, const float* __restrict__ lengths,
     const int* __restrict__ pairs, const float4* __restrict__ table, int intervals, {outs}) {{
@@ -139,12 +170,22 @@ class SplineForward:
         device = torch.device(device)
         self.blocks, self.channels, self.grid = blocks, schedule.channels, [tuple(g) for g in grid]
         self.intervals = sum(int(g[2]) for g in self.grid)
-        self.source = render(schedule, blocks, self.grid, r_max, path_scale)
-        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), ())
-        self._module = _check(driver.cuModuleLoadData(cubin))
-        self._function = _check(driver.cuModuleGetFunction(self._module, b"spline_forward"))
-        self.registers = int(_check(driver.cuFuncGetAttribute(
-            driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, self._function)))
+        self.threads, self.min_blocks = int(THREADS), MIN_BLOCKS
+        self.parts = (spline_parts(schedule) if PARTS else None) or [None]
+        self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
+                               f"spline_forward{k}") for k, part in enumerate(self.parts)]
+        self.source = "\n".join(self.sources)
+        capability = torch.cuda.get_device_capability(device)
+        attr = driver.CUfunction_attribute
+        self._modules, self._functions, self.registers, self.local_bytes = [], [], [], []
+        for k, source in enumerate(self.sources):
+            module = _check(driver.cuModuleLoadData(compile_cubin(source, capability, ())))
+            function = _check(driver.cuModuleGetFunction(module, f"spline_forward{k}".encode()))
+            self._modules.append(module)
+            self._functions.append(function)
+            self.registers.append(int(_check(driver.cuFuncGetAttribute(attr.CU_FUNC_ATTRIBUTE_NUM_REGS, function))))
+            self.local_bytes.append(int(_check(driver.cuFuncGetAttribute(
+                attr.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, function))))
         self.id = content_id("SplineForward", self.source, _device_key(device))
         _REGISTRY[self.id] = self
 
@@ -153,7 +194,7 @@ class SplineForward:
 
         from fastmace.kernels.oeq_streaming.runtime import _check
         nodes, edges = x.shape[0], sh.shape[0]
-        blocks = (nodes * self.channels + THREADS - 1) // THREADS
+        blocks = (nodes * self.channels + self.threads - 1) // self.threads
         if not blocks:
             return
         p = ctypes.c_void_p
@@ -161,7 +202,8 @@ class SplineForward:
                   lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *[o.data_ptr() for o in outs])
         types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * 7 + (ctypes.c_int,) + (p,) * len(outs)
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
-        _check(driver.cuLaunchKernel(self._function, blocks, 1, 1, THREADS, 1, 1, 0, stream, (values, types), 0))
+        for function in self._functions:  # PARTS: each part writes its own output slots
+            _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.threads, 1, 1, 0, stream, (values, types), 0))
 
 
 @torch.library.custom_op("fastmace::spline_message_blocks", mutates_args=())
@@ -186,5 +228,5 @@ def _(x, sh, senders, row_ptr, lengths, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "lookup_code", "render", "spline_message_blocks",
-           "spline_w_default"]
+__all__ = ["MIN_BLOCKS", "PARTS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS", "lookup_code", "render",
+           "spline_message_blocks", "spline_parts", "spline_w_default"]

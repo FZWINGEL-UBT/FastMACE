@@ -116,6 +116,31 @@ def test_forward_source_divides_out_the_path_scale_and_stores_each_slot_once():
         sf.render(SimpleNamespace(**{**vars(schedule), "layout": "mul_ir"}), blocks, GRID, R_MAX)
 
 
+def _two_degree_schedule():
+    """``_schedule`` with its second path's input a vector (1o x 0e-like: input_irrep_dim 3)."""
+    from types import SimpleNamespace
+
+    schedule = _schedule()
+    first, second = schedule.paths
+    second = SimpleNamespace(**{**vars(second), "input_start": schedule.channels, "input_irrep_dim": 3})
+    return SimpleNamespace(**{**vars(schedule), "paths": (first, second), "input_dim": 4 * schedule.channels})
+
+
+def test_parts_split_the_output_slots_and_launch_bounds_render():
+    assert sf.spline_parts(_schedule()) is None  # one input degree
+    schedule = _two_degree_schedule()
+    blocks = [(1, [0]), (3, [64])]
+    parts = sf.spline_parts(schedule)
+    assert parts is not None and sorted(i for p in parts for i in p) == list(range(len(schedule.paths)))
+    whole = sf.render(schedule, blocks, GRID, R_MAX)
+    sources = [sf.render(schedule, blocks, GRID, R_MAX, part=p, name=f"spline_forward{k}") for k, p in enumerate(parts)]
+    stores = [s.count("[(int64_t)rcv *") for s in sources]
+    assert all(stores) and sum(stores) == whole.count("[(int64_t)rcv *")  # every slot stored by exactly one part
+    assert "__launch_bounds__(256) spline_forward(" in whole
+    bounded = sf.render(schedule, blocks, GRID, R_MAX, threads=128, min_blocks=6, name="spline_forward0")
+    assert "__launch_bounds__(128, 6) spline_forward0(" in bounded
+
+
 def test_wprime_source_reads_the_spline_interval():
     source = wp.render(_schedule(), "float", 4, vector=2, table_w=True, factored=True, scale=True, horner=True,
                        blocks=[(1, [0]), (3, [64])], spline=GRID)
@@ -134,5 +159,8 @@ def test_spline_sources_compile_with_nvrtc():
     blocks = [(1, [0]), (3, [64])]
     for capability in ((9, 0), (8, 0), (12, 0)):
         assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7]), capability)
+        two = _two_degree_schedule()
+        for part in sf.spline_parts(two):
+            assert compile_cubin(sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], part, 128, 6), capability)
         assert compile_cubin(wp.render(_schedule(), "float", 4, vector=2, table_w=True, factored=True, scale=True,
                                        horner=True, blocks=blocks, spline=GRID), capability)
