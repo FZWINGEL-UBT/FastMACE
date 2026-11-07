@@ -35,7 +35,7 @@ def _block(lmax, channels=16, species=5, seed=0):
 
 def _inputs(block, atoms=11, seed=1):
     generator = torch.Generator().manual_seed(seed)
-    species = block.source_embedding.irreps_in.dim
+    species = block.node_attrs_irreps.dim
     node_attrs = torch.nn.functional.one_hot(torch.randint(species, (atoms,), generator=generator), species).double()
     node_feats = torch.randn(atoms, block.node_feats_irreps.dim, generator=generator, dtype=torch.float64)
     potential = torch.randn(atoms, block.potential_irreps.dim, generator=generator, dtype=torch.float64)
@@ -67,6 +67,27 @@ def test_the_folded_block_matches_mace(lmax):
     for expected, got in zip(_run(block, *inputs), _run(folded, *inputs)):
         torch.testing.assert_close(got, expected, rtol=1e-12, atol=1e-12)
     assert update_fold.apply(folded) == []  # once
+
+
+class _Wrapped(torch.nn.Module):
+    """A source_embedding another rewrite replaced (as BlockLinear does): no ``irreps_in``."""
+
+    def __init__(self, inner):
+        super().__init__()
+        self.inner = inner
+
+    def forward(self, x):
+        return self.inner(x)
+
+
+def test_a_replaced_source_embedding_is_folded_as_it_runs():
+    block = _block(1)
+    block.source_embedding = _Wrapped(block.source_embedding)
+    folded = copy.deepcopy(block)
+    assert update_fold.apply(folded) == [""]
+    inputs = _inputs(block)
+    for expected, got in zip(_run(block, *inputs), _run(folded, *inputs)):
+        torch.testing.assert_close(got, expected, rtol=1e-12, atol=1e-12)
 
 
 def test_uvu_apply_folds_only_with_the_constant(monkeypatch):

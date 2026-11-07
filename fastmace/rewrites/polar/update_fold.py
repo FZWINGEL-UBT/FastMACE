@@ -77,10 +77,18 @@ def _constants(module):
     first, last = net[0], net[-1]
     channels = last.out_features
     w1 = first.weight.detach().double().cpu()
-    embedding = copy.deepcopy(module.source_embedding).double().cpu()
-    species = module.source_embedding.irreps_in.dim
-    with torch.no_grad():
-        table = embedding(torch.eye(species, dtype=torch.float64))  # [species, C]
+    # source_embedding may already be another rewrite's module (BlockLinear): evaluate it as it runs, on the one-hot
+    # identity, in float64 where it allows it.
+    species = module.node_attrs_irreps.dim
+    device = first.weight.device
+    try:
+        embedding = copy.deepcopy(module.source_embedding).double()
+        with torch.no_grad():
+            table = embedding(torch.eye(species, dtype=torch.float64, device=device))
+    except (RuntimeError, TypeError, NotImplementedError):
+        with torch.no_grad():
+            table = module.source_embedding(torch.eye(species, dtype=first.weight.dtype, device=device))
+    table = table.double().cpu()  # [species, C]
     s = table @ w1[:, channels:].t()  # [species, 64]
     v = last.weight.detach().double().cpu()  # [C, 64]
     b = last.bias.detach().double().cpu()
