@@ -405,6 +405,14 @@ SHARED_GEOMETRY = False
 FUSED_FOURIER = False
 
 
+# A/B constant (off-polar-alex, 7 November 2026): PolarMACE's charge recursion computes both spin channels' field
+# features in one call (``spin_field_features``: graph_longrange's multichannel k-space sums, one [k, atoms] product
+# with twice the columns instead of two products) when the cache has full-PBC cosines and sines; the source edit
+# ``SPIN_BATCH_EDITS``. Pure removal of launches; rounding only where a wider product blocks its sums differently.
+# tests/cpu/test_polar_spin_batched.py.
+SPIN_BATCHED = False
+
+
 def _fourier_mask(k_vector_batch, node_positions, call):
     """The kept k-vectors as a [k] 0/1 column when ``FUSED_FOURIER`` takes this call (one graph), else None."""
     if not (FUSED_FOURIER and call is not None and call.data is not None and "ptr" in call.data
@@ -467,6 +475,47 @@ def pbc_forward_dynamic(self, original, source_feats, cache):
     if not self.include_self_interaction:
         features_flat = features_flat - si_terms
     return features_flat
+
+
+def spin_field_features(descriptor, cache, alpha, beta, pbc):
+    """(alpha, beta) field features of ``descriptor`` (a GTOElectrostaticFeatures) in one multichannel call.
+
+    Takes full-PBC caches with cosines and sines; real space, non-periodic corrections and the fused Fourier sums
+    (``cache["fourier_mask"]``) keep the descriptor's own two calls. ``alpha`` and ``beta`` are [atoms, m].
+    """
+    import torch
+    from graph_longrange.features import (
+        CORRECTION_MODE_MIXED,
+        CORRECTION_MODE_PBC,
+        apply_coulomb_kernel_batch,
+        assemble_fourier_series_batch_channels,
+        project_to_features_batch_channels,
+    )
+
+    if (cache.get("mode") == "realspace" or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC
+            or cache.get("fourier_mask") is not None or cache.get("cosines") is None):
+        return (descriptor.forward_dynamic(cache=cache, source_feats=alpha.unsqueeze(-2), pbc=pbc),
+                descriptor.forward_dynamic(cache=cache, source_feats=beta.unsqueeze(-2), pbc=pbc))
+    n_nodes = alpha.size(0)
+    source = torch.stack((alpha, beta), dim=1)  # [atoms, 2 spins, m]
+    density = assemble_fourier_series_batch_channels(source_feats=source, cosines=cache["cosines"],
+                                                     sines=cache["sines"], density_basis_fs=cache["density_basis_fs"],
+                                                     volume_per_k=cache["volume_per_k"])
+    potential = apply_coulomb_kernel_batch(k_norm2=cache["k_norm2"], density=density,
+                                           k_factor_coulomb=cache["k_factor_coulomb"])
+    features = project_to_features_batch_channels(potential=potential, feature_basis_fs=cache["feature_basis_fs"],
+                                                  cosines=cache["cosines"], sines=cache["sines"],
+                                                  k_factor_proj=cache["k_factor_proj"])  # [atoms, 2, sigma, m]
+    features_flat = descriptor._permute_output_channels(features.reshape(n_nodes, 2, -1))
+    if not descriptor.include_self_interaction:  # per atom: both spins as one [2 atoms, m] batch
+        si_terms = descriptor.self_interaction_terms(torch.cat((alpha, beta), dim=0))
+        features_flat = features_flat - si_terms.view(2, n_nodes, -1).transpose(0, 1)
+    return features_flat[:, 0], features_flat[:, 1]
+
+
+def _spin_field_features_call(descriptor, cache, alpha, beta, pbc):
+    """What ``SPIN_BATCH_EDITS`` calls (looks ``spin_field_features`` up per call)."""
+    return spin_field_features(descriptor, cache, alpha, beta, pbc)
 
 
 def _pbc_geometry_factors(k_norm2, k0_mask, volume):
@@ -879,6 +928,36 @@ GRAPH_SUM_EDITS = (
 )
 
 
+# MACE 0.3.16's PolarMACE.forward recursion: the alpha and beta field features in one call (``SPIN_BATCHED``).
+SPIN_BATCH_EDITS = ((
+    """            field_feats_alpha = self.electric_potential_descriptor.forward_dynamic(
+                cache=field_feature_cache,
+                source_feats=source_feats_alpha.unsqueeze(-2),
+                pbc=data["pbc"].view(-1, 3),
+            )
+            field_feats_beta = self.electric_potential_descriptor.forward_dynamic(
+                cache=field_feature_cache,
+                source_feats=source_feats_beta.unsqueeze(-2),
+                pbc=data["pbc"].view(-1, 3),
+            )
+""",
+    """            field_feats_alpha, field_feats_beta = _fastmace_spin_field_features(
+                self.electric_potential_descriptor, field_feature_cache,
+                source_feats_alpha, source_feats_beta, data["pbc"].view(-1, 3),
+            )
+"""),
+)
+
+
+def spin_batched_source(source):
+    """``source`` with ``SPIN_BATCH_EDITS``; refuses another source (``PolarUnavailableError``)."""
+    for old, new in SPIN_BATCH_EDITS:
+        if source.count(old) != 1:
+            raise PolarUnavailableError("PolarMACE.forward is not MACE 0.3.16's; the spin batching does not apply")
+        source = source.replace(old, new)
+    return source
+
+
 def graph_sums_source(source, stabilise=False):
     """``source`` with ``GRAPH_SUM_EDITS`` (after PR 1762's edits when ``stabilise``); refuses another source."""
     import re
@@ -892,15 +971,16 @@ def graph_sums_source(source, stabilise=False):
     return source
 
 
-def polar_forward(original_forward, stabilise=False, float64_energy=False, graph_sums=False):
-    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``), the float64 energy reduction and/or the
-    one-graph sums (``graph_sums``, ``GRAPH_SUM_EDITS``).
+def polar_forward(original_forward, stabilise=False, float64_energy=False, graph_sums=False, spin_batched=False):
+    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``), the float64 energy reduction, the
+    one-graph sums (``graph_sums``, ``GRAPH_SUM_EDITS``) and/or one field-feature call for both spins
+    (``spin_batched``, ``SPIN_BATCH_EDITS``).
 
     None: ``original_forward`` itself. Otherwise built from its source like ``pr1762_forward``.
     An unqualified source raises ``PolarUnavailableError`` (PR 1762, graph sums) or
     ``fastmace.model.energy.EnergyReductionError``.
     """
-    if not float64_energy and not graph_sums:
+    if not float64_energy and not graph_sums and not spin_batched:
         return pr1762_forward(original_forward) if stabilise else original_forward
     import mace.modules.extensions as extensions
 
@@ -916,13 +996,16 @@ def polar_forward(original_forward, stabilise=False, float64_energy=False, graph
         source = energy.apply_edits(source, FLOAT64_ENERGY_EDITS, "PolarMACE.forward")
     if graph_sums:
         source = graph_sums_source(source, stabilise)
+    if spin_batched:
+        source = spin_batched_source(source)
     namespace = dict(vars(extensions))
     namespace.update(_fastmace_normalise_fukui=_model_normalise_fukui,
                      _fastmace_cap_charge_dipole=_model_cap_charge_dipole,
                      _fastmace_coulomb_energy_float64=coulomb_energy_float64,
                      _fastmace_graph_sum=graph_sum, _fastmace_graph_mean=graph_mean,
-                     _fastmace_graph_gather=graph_gather)
-    what = ", ".join(name for name, on in (("float64 energy", float64_energy), ("graph sums", graph_sums)) if on)
+                     _fastmace_graph_gather=graph_gather, _fastmace_spin_field_features=_spin_field_features_call)
+    what = ", ".join(name for name, on in (("PR 1762", stabilise), ("float64 energy", float64_energy),
+                                           ("graph sums", graph_sums), ("spin batched", spin_batched)) if on)
     return energy.compile_forward(source, namespace, f"<fastmace PolarMACE.forward, {what}>")
 
 
@@ -1032,11 +1115,11 @@ def install():
 
     def model_forward(holder):
         key = (stabilised(holder.config), bool(holder.float64_energy), holder.single_graph_strain,
-               bool(holder.graph_sums))
-        if key == (False, False, None, False):
+               bool(holder.graph_sums), bool(SPIN_BATCHED))
+        if key == (False, False, None, False, False):
             return original_forward
         if key not in rewritten:
-            function = polar_forward(original_forward, *key[:2], graph_sums=key[3])
+            function = polar_forward(original_forward, *key[:2], graph_sums=key[3], spin_batched=key[4])
             if key[2] is not None:
                 # After install(): the module functions it replaced are in the copied globals.
                 from fastmace.rewrites import engine as engine_rewrites
@@ -1287,7 +1370,7 @@ def no_sync_check():
 
 __all__ = [
     "FLOAT64_ENERGY_EDITS", "GRAPH_SUM_EDITS", "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS",
-    "SOURCE_HASHES",
+    "SOURCE_HASHES", "SPIN_BATCH_EDITS", "spin_batched_source", "spin_field_features",
     "ZERO_FORCE_REASON", "PolarHolder", "PolarState", "PolarUnavailableError", "cap_charge_dipole",
     "compute_k_vectors_fixed", "configure", "coulomb_energy_float64", "coulomb_energy_pbc", "disable", "enable",
     "frozen_kset", "get_config", "get_state", "graph_gather", "graph_mean", "graph_sum",
