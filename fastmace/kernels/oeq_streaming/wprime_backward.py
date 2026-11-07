@@ -29,7 +29,7 @@ import ctypes
 
 import torch
 
-from fastmace.kernels.gpu_models import GPUModels
+from fastmace.kernels.gpu_models import GPUModels, lookup
 
 _REGISTRY = {}
 # The w-rebuilding backward's launch for recompute_conv_weights: one path part, four edges per batch (the fastest of
@@ -1255,7 +1255,7 @@ def butterfly_default(device):
 
 def max_registers_default(device):
     """``MAX_REGISTERS`` on ``device`` (0: no cap): the constant when set, else ``MAX_REGISTERS_GPUS``' entry."""
-    return int(MAX_REGISTERS) if MAX_REGISTERS is not None else int(MAX_REGISTERS_GPUS.get(_device_name(device), 0))
+    return int(MAX_REGISTERS) if MAX_REGISTERS is not None else int(lookup(MAX_REGISTERS_GPUS, _device_name(device), 0))
 
 
 def prepare_block_messages(model):

@@ -26,6 +26,8 @@ from functools import cache
 
 import torch
 
+from fastmace.kernels.gpu_models import lookup
+
 BLOCK_E = 32
 # Columns per program of the forward (None: all J in one program). The forward's register tile is [BLOCK_E,
 # next_power_of_2(J)]: OMAT-0's J = 66 pads to 128 (212 registers, 13 % occupancy on the A100). With 64, a second
@@ -41,7 +43,7 @@ WARPS_GPUS = {"NVIDIA H200": 8}  # device name -> warps
 
 @cache
 def _device_warps(index):
-    return WARPS_GPUS.get(torch.cuda.get_device_name(index))
+    return lookup(WARPS_GPUS, torch.cuda.get_device_name(index))
 
 
 def forward_warps(device):

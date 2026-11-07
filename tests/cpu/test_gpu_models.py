@@ -4,7 +4,7 @@ TABLE_W's per-GPU default for the generic family."""
 import torch
 
 from fastmace.kernels.cutlass import linear_div, skip_select
-from fastmace.kernels.gpu_models import GPUModels, is_a100
+from fastmace.kernels.gpu_models import GPUModels, family, is_a100, lookup
 from fastmace.kernels.oeq_streaming import fused_forward, wprime_backward
 from fastmace.planner import fixed
 from fastmace.rewrites import radial
@@ -25,6 +25,23 @@ def test_an_a100_entry_covers_every_a100():
     assert "NVIDIA A100-SXM4-40GB" not in GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
     assert "NVIDIA A100-PCIE-40GB" in GPUModels(("NVIDIA L4",)) + GPUModels(("NVIDIA A100 80GB PCIe",))
     assert models == ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti")  # still a tuple
+
+
+def test_families(monkeypatch):
+    """Owner, 7 November 2026: a GPU tested on one variant counts for every variant of its family, unless the variants
+    differ significantly in performance (the H100 SXM and PCIe cards stay separate)."""
+    from fastmace.kernels.triton import radial_table as rt
+
+    assert family("NVIDIA H200 NVL") == family("NVIDIA H200") == "H200"
+    assert family("NVIDIA H20") == "NVIDIA H20" and family(None) is None
+    assert "NVIDIA H200 NVL" in GPUModels(("NVIDIA H200",))
+    assert "NVIDIA H100 PCIe" not in GPUModels(("NVIDIA H100 80GB HBM3",))
+    assert "NVIDIA H100 80GB HBM3" not in GPUModels(("NVIDIA H200",))
+    assert lookup({"NVIDIA H200": 8}, "NVIDIA H200 NVL") == 8
+    assert lookup({"NVIDIA H200": 8}, "NVIDIA A100-SXM4-80GB") is None
+    assert lookup({"NVIDIA A100-SXM4-80GB": 1, "NVIDIA A100-PCIE-40GB": 2}, "NVIDIA A100-PCIE-40GB") == 2
+    assert rt.WARPS_GPUS == {"NVIDIA H200": 8}
+    assert all("NVIDIA H200 NVL" in models for models in (fused_forward.WS_FORWARD_GPUS, fixed.DECISION_66_TF32X3_OMAT0_GPUS))
 
 
 def test_a100_defaults_cover_every_model():

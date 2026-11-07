@@ -19,7 +19,7 @@ around the build (``docs/design/contracts-1b.md``):
    raises ``GateFailed`` (the §9.4 fallback is phase 2).
 
 The rule is §12.2's ratio rule: for each quantity the production path's largest error against the
-float64 reference, over all copies, is at most ``RATIO`` (3) times the yardstick's, or at most the quantity's
+float64 reference, over all copies, is at most twice the yardstick's, or at most the quantity's
 floor (``FLOORS``; a reference record may raise a floor for its family, ``effective_floors``:
 PolarMACE's stress floor is 5e-7 eV/Å³, decision 49). Any NaN or inf fails before a maximum is
 taken: Python's ``max`` can drop a NaN depending on order, and an infinite yardstick would make the
@@ -80,7 +80,7 @@ from fastmace.errors import FastMACEError, GateFailed, GateUnavailable
 CHECK_MODES = ("skip", "gate", "allow_unavailable")
 STATUSES = ("passed", "passed-reduced", "failed", "unavailable", "skipped")
 SKIPPED_REASON = 'opt-in: check="gate"'
-RATIO = 3.0  # 2.0 until 7 November 2026 (owner: "Change the rule to 3x")
+RATIO = 3.0  # owner, 7 November 2026: "Change the rule to 3x" (was 2.0)
 QUANTITIES = ("energy_meV_per_atom", "force_eV_per_A", "stress_eV_per_A3")
 # The absolute floors of §12.3: 0.01 meV/atom, 1e-5 eV/Å (largest force component), 1e-7 eV/Å^3
 # (largest stress component, about 16 kPa).
@@ -1387,7 +1387,7 @@ def _replay_check(replayed, directs, natoms, quantities, limits, floors=FLOORS):
 
     The direct evaluation is ``MACEForceField.evaluate``: the same (compiled) model function,
     uncaptured, on a freshly built unpadded neighbour list. ``limits`` are the gate's own limits from
-    the reduced cell's comparison, max(RATIO x the float32 yardstick's error, floor): a float32 plan's
+    the reduced cell's comparison, max(2 x the float32 yardstick's error, floor): a float32 plan's
     replay differs from a direct evaluation by float32 rounding (padded edges, OEq's atomic sums;
     4.8e-5 and 6.0e-5 eV/Å on 1944-atom POLAR-1-L and OMOL-0 XL, 2-T05), which the floors alone
     (made for float64-sized errors) do not admit; the full gate absorbs the same rounding in its

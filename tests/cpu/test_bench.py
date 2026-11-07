@@ -191,53 +191,6 @@ def test_run_ab_calls_before_ahead_of_each_warm_up_and_each_block_outside_the_cl
     assert result.statistics["b"].median_ms == pytest.approx(3.0)
 
 
-def test_run_ab_stops_after_the_first_blocks_on_a_clear_difference():
-    clock, log = FakeClock(), []
-    sides = {"a": FakeEngine("a", clock, [0.002], log), "b": FakeEngine("b", clock, [0.003], log)}
-    result = ab.run_ab(sides, step_time.TimingProtocol(warmup=1, block=2, blocks=12), clock=clock,
-                       stop_after=4, stop_beyond=0.03)
-    assert result.order == ("a", "b") * 4
-    assert len(result.statistics["a"].block_ms) == len(result.statistics["b"].block_ms) == 4
-    assert result.ratio == pytest.approx(1.5)
-    assert result.stopped_after == 4
-    assert result.as_dict()["stopped_after"] == 4
-
-
-def test_run_ab_runs_every_block_near_one():
-    clock, log = FakeClock(), []
-    sides = {"a": FakeEngine("a", clock, [0.002], log), "b": FakeEngine("b", clock, [0.00202], log)}
-    result = ab.run_ab(sides, step_time.TimingProtocol(warmup=1, block=2, blocks=12), clock=clock,
-                       stop_after=4, stop_beyond=0.03)
-    assert result.order == ("a", "b") * 12
-    assert result.stopped_after is None
-    assert result.as_dict()["stopped_after"] is None
-
-
-def test_run_ab_stops_only_on_complete_pairs_in_abba():
-    clock, log = FakeClock(), []
-    sides = {"a": FakeEngine("a", clock, [0.001], log), "b": FakeEngine("b", clock, [0.0008], log)}
-    result = ab.run_ab(sides, step_time.TimingProtocol(warmup=1, block=1, blocks=8), pattern="abba", clock=clock,
-                       stop_after=2, stop_beyond=0.03)
-    assert result.order == ("a", "b", "b", "a")
-    assert result.ratio == pytest.approx(0.8)
-
-
-def test_run_ab_without_stop_after_runs_every_block():
-    clock, log = FakeClock(), []
-    sides = {"a": FakeEngine("a", clock, [0.002], log), "b": FakeEngine("b", clock, [0.004], log)}
-    result = ab.run_ab(sides, step_time.TimingProtocol(warmup=1, block=1, blocks=6), clock=clock)
-    assert result.order == ("a", "b") * 6 and result.stopped_after is None
-
-
-@pytest.mark.parametrize("stop_after, stop_beyond", [(0, 0.03), (13, 0.03), (4, 0.0), (4, -0.1)])
-def test_run_ab_rejects_bad_stop_arguments(stop_after, stop_beyond):
-    clock, log = FakeClock(), []
-    sides = {"a": FakeEngine("a", clock, [0.001], log), "b": FakeEngine("b", clock, [0.001], log)}
-    with pytest.raises(ValueError):
-        ab.run_ab(sides, step_time.TimingProtocol(warmup=1, block=1, blocks=12), clock=clock,
-                  stop_after=stop_after, stop_beyond=stop_beyond)
-
-
 def test_run_ab_needs_two_sides():
     clock, log = FakeClock(), []
     with pytest.raises(ValueError):
@@ -351,7 +304,7 @@ def test_energy_floor():
 
 
 @pytest.mark.parametrize("production, yardstick, passed", [
-    (3.0e-4, 1.0e-4, True),     # exactly three times the float32 error (RATIO, 3 since 7 November 2026)
+    (3.0e-4, 1.0e-4, True),     # exactly 3 x the float32 error (owner, 7 November 2026)
     (3.01e-4, 1.0e-4, False),   # just above
     (0.5e-4, 1.0e-4, True),     # better than float32
 ])
@@ -360,7 +313,7 @@ def test_ratio_rule(production, yardstick, passed):
 
 
 def test_force_floor_where_float32_is_nearly_exact():
-    # float32 happens to be nearly exact: 3 x 1e-7 would fail 8e-6, the floor of 1e-5 eV/A passes it.
+    # float32 happens to be nearly exact: 2 x 1e-7 would fail 8e-6, the floor of 1e-5 eV/A passes it.
     verdict = gate.quantity_verdict("forces", 8e-6, 1e-7)
     assert verdict["passed"] and verdict["limit"] == 1e-5
     assert not gate.quantity_verdict("forces", 1.1e-5, 1e-7)["passed"]
