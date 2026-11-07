@@ -1,0 +1,10 @@
+{
+ "_comment": "p90 of the in-container wall time (s) per template and GPU family: base_s + per_unit_s x units (ab: switches; gate: gates = switches + 1; profile: 1). The launcher sets the command timeout to twice this, rounded up to a minute (resource framework 3.5). Fitted on 7 November 2026 from the modal.json of 130 hopper_sweep A/B and 6 const_gate jobs under WSL ~/fm-runs (H200: 1 switch p90 ~210 s, 3 ~575 s, 5 ~790 s, 12 ~1570 s; A100: 1 switch p90 ~300 s, 2 ~510 s, 3 ~560 s, 5 ~920 s; gates of 2: H200 ~600 s, A100 ~750 s). profile has no Modal data yet: a guess, refit after the first runs.",
+ "version": 1,
+ "ab": {"H200": {"base_s": 90, "per_unit_s": 150}, "H100": {"base_s": 90, "per_unit_s": 150},
+        "A100": {"base_s": 120, "per_unit_s": 180}, "L4": {"base_s": 180, "per_unit_s": 420}},
+ "gate": {"H200": {"base_s": 30, "per_unit_s": 310}, "H100": {"base_s": 30, "per_unit_s": 310},
+          "A100": {"base_s": 30, "per_unit_s": 380}, "L4": {"base_s": 60, "per_unit_s": 900}},
+ "profile": {"H200": {"base_s": 0, "per_unit_s": 600}, "H100": {"base_s": 0, "per_unit_s": 600},
+             "A100": {"base_s": 0, "per_unit_s": 900}, "L4": {"base_s": 0, "per_unit_s": 1500}}
+}
