@@ -49,5 +49,39 @@ gate as well as the MD A/B. The lab's old chain runs the join/divide glue eagerl
 of it, so the MD saving will be smaller than 512 µs. The profile puts interaction 1's skip_select forward alone at
 205 µs per force call.
 
-Next: integrate behind a switch (`FirstInteractionReassociation` with per-species composed right factors, the
-interaction's skip skipped), CPU float64 check of the composition, then H200 A/B in both orders and the gate.
+Integrated below (`COMPOSE_SKIP`).
+
+## Idea 1 integrated: `COMPOSE_SKIP` on the H200 ([compose-skip/](compose-skip/))
+
+`kernels.triton.compose_skip.COMPOSE_SKIP` (off; `COMPOSE_SKIP_GPUS` empty), commit `92f2fa7a`. On OMAT-0 medium the
+first interaction's linear is a per-l `BlockLinear` (not the identity), so the composition is
+`C_l,z = right_l L_l B_l,z` (float64, stored float32). The reassociation multiplies by it through `species_mm` (CUTLASS
+launch), and the interaction then only divides by `density + 1`, skipping both its linear and `skip_tp`. Unit `fm-compose-skip2`, Modal
+profile `sixth`.
+
+| Measurement | Result |
+| --- | --- |
+| In use in the production build | yes ([check-compose.json](compose-skip/check-compose.json)) |
+| Forces, SrTiO3 10x10x10 rattled 0.05 Å, vs defaults | max \|ΔF\| 4.3e-6 eV/Å (same build twice: 3.5e-6; max \|F\| 7.07) |
+| Force/stress gate (limit 3) | **passed**; force ratios 0.968 / 0.847 / 0.970, stress 0.467 / 0.815 / 1.121 (SrTiO3 / NaCl / NbCl5); energies below their 0.01 eV floor |
+| MD-step A/B, order ab | 4.1212 → 3.9967 ms, **0.9698** |
+| MD-step A/B, order ba | 4.1172 → 4.0095 ms, **0.9738** |
+
+**About −115 µs (−2.8 %) of the MD step.**
+
+## Items 3-5 (Codex H200 follow-up), one job ([ideas345/](ideas345/))
+
+Commit `d96b92a3`, unit `fm-ideas345`, Modal profile `sixth`. Each variant was checked in the production build: forces
+on the rattled cell differ from the defaults by no more than the build's own run-to-run spread (3.2–3.6e-6 against
+3.1–3.5e-6 eV/Å). The w′ kernel keeps 72 registers, no spill.
+
+| Variant | Switch | What the compiler shows | MD b/a (ab / ba) |
+| --- | --- | --- | --- |
+| Item 3: first radial table two terms per float4 | `tabled_outer_sum.PACKED_COEF` | per walk (forward, power and recompute backward) LDG.64 −6, LDG.128 +3, registers unchanged (64 / 80 / 80) | **1.0072 / 1.0079** (slower) |
+| Item 4a: w × common factor once per path | `spline_forward.FACTOR_W` | forward still 80 registers, 8 local bytes; gate passes (force ratios 0.969 / 0.895 / 0.980) | 0.9969 / 0.9995 |
+| Item 4b: int loop state | `spline_forward.CURSOR32` | forward still 80 registers, 8 local bytes | 1.0016 / 1.0033 |
+| Item 5: one spline locator per edge | `spline_forward.SHARED_LOCATOR` | producer 24 registers; forward still 80 / 8 | 0.9966 / 0.9974 |
+
+None clears 1 %. The halved coefficient load count does not speed up the first radial table: it loses 0.7–0.8 %. Factoring
+removes multiplies but no registers, so the forward's 8-byte spill stays. The shared locator's −0.3 % is about what
+its record traffic costs. **All four are measured and left off.**
