@@ -19,7 +19,9 @@ approximation. The MLPs, gates and every other consumer of the layer features ar
 
 Mechanics: the embedding / up-projection instances return the narrow sources (a tuple) instead of the 512-wide
 sum, and their ``dot_products`` instances take that tuple; any tensor argument still runs ``uvu_forward``. Works
-with FOLD_UPDATE (which replaces only the update's MLP tail). mul_ir layouts only (no layout wrappers).
+with FOLD_UPDATE (which replaces only the update's MLP tail). Both layouts: under cuEquivariance (ir_mul) MACE wraps
+the o3 linears in layout transposes, which are permutations; the composed matrices stay the same, and only the gather
+index into the sources and the view of the node features follow the dot products' layout.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ READOUT_CLASS = "OneBodyMLPFieldReadout"
 EMBEDDING_CLASS = "AgnosticChargeBiasedLinearPotentialEmbedding"
 MARKER = "_fastmace_head_compose"
 _TAG = "fastmace_head_compose"
+_READOUT_TRANSPOSES = ("_q_to_mul_ir", "_v_to_mul_ir", "_up_from_mul_ir")
 
 
 def _irrep_entries(irreps):
@@ -95,7 +98,7 @@ def _entry_of(irreps, start):
     raise ValueError(f"no irreps entry starts at {start}")
 
 
-def _compose(tp, node_irreps, square, sources, dtype, device):
+def _compose(tp, node_irreps, square, sources, dtype, device, layout="mul_ir"):
     """Per path of ``tp``: the square block (W A, or None), the narrow source block [mul, K] (or None), the gather
     index [d, K] into the concatenated sources, and the bias [mul] (or None)."""
     import torch
@@ -118,8 +121,11 @@ def _compose(tp, node_irreps, square, sources, dtype, device):
             for i, (off_i, mul_i, l_i, p_i) in enumerate(_irrep_entries(irreps_in)):
                 if (o_block := blocks.get((entry, i))) is not None:
                     matrices.append(w @ o_block)
-                    columns.append(source_offset + off_i + torch.arange(mul_i)[None, :] * d
-                                   + torch.arange(d)[:, None])  # [d, mul_i]
+                    if layout == "mul_ir":  # component (u, m) of the entry at off_i + u d + m
+                        column = torch.arange(mul_i)[None, :] * d + torch.arange(d)[:, None]
+                    else:  # ir_mul: at off_i + m mul + u
+                        column = torch.arange(mul_i)[None, :] + torch.arange(d)[:, None] * mul_i
+                    columns.append(source_offset + off_i + column)  # [d, mul_i]
             if l == 0:
                 lo = _irrep_entries(node_irreps)[entry][0]
                 entry_bias = b[lo:lo + mul2]
@@ -149,11 +155,14 @@ def composed_dot(self, x1, x2):
     src = sources[0] if len(sources) == 1 else torch.cat(sources, dim=-1)
     batch = x1.shape[0]
     out = x1.new_zeros((batch, self.irreps_out.dim))
+    ir_mul = self.layout != "mul_ir"
     for plan in self._head_plans:
         plan = {key: (getattr(self, value) if key in _TENSORS and value is not None else value)
                 for key, value in plan.items()}
         mul, d = plan["mul"], plan["d"]
-        x1v = x1[:, plan["in1"][0]:plan["in1"][1]].view(batch, mul, d)
+        block = x1[:, plan["in1"][0]:plan["in1"][1]]
+        # x1t [batch, d, mul] (a view in ir_mul, a transpose in mul_ir)
+        x1t = block.view(batch, d, mul) if ir_mul else block.view(batch, mul, d).transpose(1, 2)
         y = None
         if plan["narrow"] is not None:
             narrow_in = src[:, plan["index"]].reshape(batch * d, -1)  # [batch * d, K]
@@ -161,11 +170,11 @@ def composed_dot(self, x1, x2):
         if plan["bias"] is not None:  # l = 0 only: d = 1
             y = plan["bias"].expand(batch, mul) if y is None else y + plan["bias"]
         if plan["square"] is not None:
-            h_t = x1v.transpose(1, 2).reshape(batch * d, mul)
+            h_t = x1t.reshape(batch * d, mul)
             y = h_t @ plan["square"].t() if y is None else torch.addmm(y, h_t, plan["square"].t())
         if y is None:
             continue
-        mixed = (x1v * y.reshape(batch, d, mul).transpose(1, 2)).sum(-1)
+        mixed = (x1t * y.reshape(batch, d, mul)).sum(1)
         o0, o1 = plan["out"]
         out[:, o0:o1] = out[:, o0:o1] + mixed
     return out * self.output_mask
@@ -179,8 +188,10 @@ def _up_forward(self, x):
     return (_TAG, x)
 
 
-def _no_wrappers(module, names):
-    return all(getattr(module, name, None) is None for name in names)
+def _wrappers_match(module, names, layout):
+    """MACE's layout transposes around the o3 linears: none in mul_ir, all of them in ir_mul."""
+    present = [getattr(module, name, None) is not None for name in names]
+    return not any(present) if layout == "mul_ir" else all(present)
 
 
 def support(module):
@@ -190,19 +201,19 @@ def support(module):
         emb = module.potential_embedding
         if type(emb).__name__ != EMBEDDING_CLASS:
             return False, f"potential embedding {type(emb).__name__}"
-        if not _no_wrappers(emb, ("_potential_to_mul_ir", "_node_feats_to_mul_ir", "_charges_to_mul_ir",
-                                  "_node_feats_from_mul_ir")):
-            return False, "layout wrappers (cuEquivariance ir_mul layout)"
-        tp = module.dot_products
+        tps, holder = (module.dot_products,), emb
+        names = ("_potential_to_mul_ir", "_node_feats_to_mul_ir", "_charges_to_mul_ir", "_node_feats_from_mul_ir")
     elif kind == READOUT_CLASS:
-        if not _no_wrappers(module, ("_q_to_mul_ir", "_v_to_mul_ir", "_up_from_mul_ir")):
-            return False, "layout wrappers (cuEquivariance ir_mul layout)"
-        tp = module.dot_products_q
+        tps, holder = (module.dot_products_q, module.dot_products_v), module
+        names = _READOUT_TRANSPOSES
     else:
         return False, f"{kind} is not a POLAR head"
-    if getattr(tp, "layout", "mul_ir") != "mul_ir":
-        return False, "dot products in ir_mul layout"
-    if any(meta[9] != 0 for meta in tp._path_meta):
+    layouts = {getattr(tp, "layout", "mul_ir") for tp in tps}
+    if len(layouts) != 1 or not layouts <= {"mul_ir", "ir_mul"}:
+        return False, f"dot-product layouts {sorted(layouts)}"
+    if not _wrappers_match(holder, names, layouts.pop()):
+        return False, "the layout transposes do not match the dot products' layout"
+    if any(meta[9] != 0 for tp in tps for meta in tp._path_meta):
         return False, "a dot-product path is not l x l -> 0"
     return True, "ok"
 
@@ -240,7 +251,7 @@ def apply(model, context=None):
                                                              ref.dtype, ref.device)),
                        (emb.charges_irreps, _linear_blocks(emb.charge_embedding, emb.charges_irreps, node,
                                                            ref.dtype, ref.device))]
-            _install(tp, _compose(tp, node, square, sources, ref.dtype, ref.device))
+            _install(tp, _compose(tp, node, square, sources, ref.dtype, ref.device, tp.layout))
             emb.forward = types.MethodType(_embedding_forward, emb)
         else:
             node = module.node_feats_irreps
@@ -248,8 +259,13 @@ def apply(model, context=None):
                                    (module.linear_up_v, module.dot_products_v, module.potential_irreps)):
                 ref = tp.weight
                 sources = [(irreps, _linear_blocks(up, irreps, node, ref.dtype, ref.device))]
-                _install(tp, _compose(tp, node, None, sources, ref.dtype, ref.device))
+                _install(tp, _compose(tp, node, None, sources, ref.dtype, ref.device, tp.layout))
                 up.forward = types.MethodType(_up_forward, up)
+            # ir_mul: the sources are gathered in their own layout and the result is never transposed back, so the
+            # readout's layout transposes (permutations) go; its forward skips a None transpose.
+            for wrapper in _READOUT_TRANSPOSES:
+                if getattr(module, wrapper, None) is not None:
+                    setattr(module, wrapper, None)
         setattr(module, MARKER, True)
         names.append(name)
     return names

@@ -2,7 +2,8 @@
 
 The composed field update (with and without FOLD_UPDATE) and the composed electron readout must match MACE's
 forward and its gradients (node features, potentials, charges) in float64, on blocks built like MACE-POLAR-1
-(hidden degrees 0..lmax, a duplicated potential irreps list as ``field_irreps * 2``). The checkpoints: the gate.
+(hidden degrees 0..lmax, a duplicated potential irreps list as ``field_irreps * 2``), in MACE's e3nn layout (mul_ir)
+and in its cuEquivariance layout (ir_mul, with the layout transposes around the o3 linears). The checkpoints: the gate.
 """
 
 from __future__ import annotations
@@ -25,6 +26,16 @@ def _node_irreps(lmax, channels):
     return o3.Irreps("+".join(f"{channels}x{degree}{'eo'[degree % 2]}" for degree in range(lmax + 1)))
 
 
+def _cueq(layout):
+    """None (e3nn, mul_ir) or MACE's cuEquivariance config for the ir_mul layout (skips without cuEquivariance)."""
+    if layout == "mul_ir":
+        return None
+    pytest.importorskip("cuequivariance_torch")
+    from mace.modules.wrapper_ops import CuEquivarianceConfig
+
+    return CuEquivarianceConfig(enabled=True, layout="ir_mul", group="O3_e3nn")
+
+
 def _randomise(block, seed):
     torch.manual_seed(seed)
     with torch.no_grad():
@@ -33,21 +44,21 @@ def _randomise(block, seed):
     return block.double()
 
 
-def _update(lmax, channels=16, species=5, seed=0):
+def _update(lmax, channels=16, species=5, seed=0, layout="mul_ir"):
     node = _node_irreps(lmax, channels)
     block = field_blocks.AgnosticEmbeddedOneBodyVariableUpdate(
         node_attrs_irreps=o3.Irreps(f"{species}x0e"), node_feats_irreps=node, edge_attrs_irreps=o3.Irreps("1x0e+1x1o"),
         edge_feats_irreps=o3.Irreps("8x0e"), target_irreps=node, hidden_irreps=node, avg_num_neighbors=10.0,
-        potential_irreps=POTENTIAL, charges_irreps=CHARGES, field_norm_factor=1.0)
+        potential_irreps=POTENTIAL, charges_irreps=CHARGES, field_norm_factor=1.0, cueq_config=_cueq(layout))
     return _randomise(block, seed)
 
 
-def _readout(lmax, channels=16, species=5, seed=0):
+def _readout(lmax, channels=16, species=5, seed=0, layout="mul_ir"):
     node = _node_irreps(lmax, channels)
     block = field_blocks.OneBodyMLPFieldReadout(
         node_attrs_irreps=o3.Irreps(f"{species}x0e"), node_feats_irreps=node, edge_attrs_irreps=o3.Irreps("1x0e+1x1o"),
         edge_feats_irreps=o3.Irreps("8x0e"), target_irreps=node, hidden_irreps=node, avg_num_neighbors=10.0,
-        potential_irreps=POTENTIAL, charges_irreps=CHARGES)
+        potential_irreps=POTENTIAL, charges_irreps=CHARGES, cueq_config=_cueq(layout))
     return _randomise(block, seed)
 
 
@@ -83,10 +94,12 @@ def test_the_constant_is_off():
     assert head_compose.COMPOSE_HEADS is False
 
 
+@pytest.mark.parametrize("layout", ["mul_ir", "ir_mul"])
 @pytest.mark.parametrize("fold", [False, True])
 @pytest.mark.parametrize("lmax", [0, 1, 3])
-def test_the_composed_update_matches_mace(lmax, fold):
-    block = _update(lmax)
+def test_the_composed_update_matches_mace(lmax, fold, layout):
+    block = _update(lmax, layout=layout)
+    assert block.dot_products.layout == layout
     assert head_compose.support(block) == (True, "ok")
     composed = copy.deepcopy(block)
     uvu.apply(composed)
@@ -97,9 +110,11 @@ def test_the_composed_update_matches_mace(lmax, fold):
     _check(block, composed)
 
 
+@pytest.mark.parametrize("layout", ["mul_ir", "ir_mul"])
 @pytest.mark.parametrize("lmax", [0, 1, 3])
-def test_the_composed_readout_matches_mace(lmax):
-    block = _readout(lmax)
+def test_the_composed_readout_matches_mace(lmax, layout):
+    block = _readout(lmax, layout=layout)
+    assert block.dot_products_q.layout == layout
     assert head_compose.support(block) == (True, "ok")
     composed = copy.deepcopy(block)
     uvu.apply(composed)
@@ -115,6 +130,13 @@ def test_a_composed_block_survives_deep_copy_and_dtype_moves():
     _check(block, copy.deepcopy(composed))
     single = copy.deepcopy(composed).float()
     assert single.dot_products._head_0_square.dtype == torch.float32
+
+
+def test_mismatched_layout_transposes_are_not_composed():
+    block = _update(1)
+    block.potential_embedding._potential_to_mul_ir = torch.nn.Identity()  # transposes without an ir_mul product
+    assert not head_compose.support(block)[0]
+    assert head_compose.apply(block) == []
 
 
 def test_uvu_apply_composes_only_with_the_constant(monkeypatch):
