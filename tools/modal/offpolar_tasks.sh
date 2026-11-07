@@ -29,6 +29,7 @@ switch() {  # set -> the b side's ab_rewrites arguments
 gate_args() {  # set -> force_stress_gate.py production arguments of the candidate
   case $1 in
     offtables) echo "--rewrites radial_tables=on" ;;
+    offst) echo "--rewrites radial_tables=on --production-constant fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True" ;;
     offall) echo "--rewrites radial_tables=on --production-constant"       "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3=True" ;;
     *) switch "$1" | sed 's/--b-constant/--production-constant/' ;;
   esac
