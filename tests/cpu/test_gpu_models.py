@@ -313,6 +313,14 @@ def test_h200_defaults():
     assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
     assert "NVIDIA H200" not in wprime_backward.BUTTERFLY_GPUS  # on 5 Nov; 0.9659 / 0.9677 off at d599cc70 (6 Nov)
     assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured
+    # SPLINE_W (7 November 2026, results/spline-w-h200-20261107): MD H200 0.8789 / 0.8775, gate passes; R128 on top
+    # 0.9838 / 0.9848; PARTS off (0.9938 / 0.9904, under 1 %); the A100 not measured
+    from fastmace.kernels.oeq_streaming import spline_forward
+    assert "NVIDIA H200" in spline_forward.SPLINE_W_GPUS and "NVIDIA H200 NVL" in spline_forward.SPLINE_W_GPUS
+    assert "NVIDIA H200" in spline_forward.R128_GPUS
+    assert "NVIDIA A100-SXM4-80GB" not in spline_forward.SPLINE_W_GPUS
+    assert "NVIDIA A100-SXM4-80GB" not in spline_forward.R128_GPUS
+    assert spline_forward.PARTS is False
 
 
 def test_radial_table_warps(monkeypatch):

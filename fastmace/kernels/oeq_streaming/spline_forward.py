@@ -18,9 +18,11 @@ import torch
 
 from fastmace.kernels.gpu_models import GPUModels
 
-# None: on for SPLINE_W_GPUS (decision 66); True / False: forced (an A/B side). Empty until its MD A/B and gate pass.
+# None: on for SPLINE_W_GPUS (decision 66); True / False: forced (an A/B side).
 SPLINE_W = None
-SPLINE_W_GPUS = GPUModels(())
+# NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107): MD step b/a 0.8789 / 0.8775 (b = on; OMAT-0 medium,
+# SrTiO3 10x10x10, Benchmark_loup settings, ab / ba), force/stress gate passes. The A100 is not measured.
+SPLINE_W_GPUS = GPUModels(("NVIDIA H200",))
 # Launch shape (SX improvement screen, 7 November 2026; plans/notes/sx-layout-opportunities-20261107). THREADS: one
 # owner per (receiver, channel); 128 threads with 128 channels is one receiver per block, so receivers of different
 # degree retire independently instead of in pairs. MIN_BLOCKS: __launch_bounds__' minimum blocks per SM (a register
@@ -30,7 +32,21 @@ SPLINE_W_GPUS = GPUModels(())
 # same terms, per output slot in the same edge order). A/B switches; THREADS 256, MIN_BLOCKS None, PARTS False today.
 THREADS = 256
 MIN_BLOCKS = None
-PARTS = False
+PARTS = False  # H200 on top of SPLINE_W with MIN_BLOCKS 4: 0.9938 / 0.9904 (under 1 %; off, not tried with R128)
+# R128: THREADS 128 with MIN_BLOCKS 6 (one receiver per block, 80-register cap) as the launch shape; it overrides
+# THREADS and MIN_BLOCKS where on. None: on for R128_GPUS (decision 66); True / False: an A/B side's choice.
+R128 = None
+# NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107): MD step b/a 0.9838 / 0.9848 on top of SPLINE_W
+# (80 registers, 8 bytes local memory).
+R128_GPUS = GPUModels(("NVIDIA H200",))
+
+
+def r128_default(device):
+    """``R128`` on ``device``: the constant when set, else on for ``R128_GPUS``."""
+    if R128 is not None:
+        return bool(R128)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in R128_GPUS
 
 _REGISTRY = {}
 
@@ -170,7 +186,7 @@ class SplineForward:
         device = torch.device(device)
         self.blocks, self.channels, self.grid = blocks, schedule.channels, [tuple(g) for g in grid]
         self.intervals = sum(int(g[2]) for g in self.grid)
-        self.threads, self.min_blocks = int(THREADS), MIN_BLOCKS
+        self.threads, self.min_blocks = (128, 6) if r128_default(device) else (int(THREADS), MIN_BLOCKS)
         self.parts = (spline_parts(schedule) if PARTS else None) or [None]
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}") for k, part in enumerate(self.parts)]
@@ -228,5 +244,5 @@ def _(x, sh, senders, row_ptr, lengths, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["MIN_BLOCKS", "PARTS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS", "lookup_code", "render",
-           "spline_message_blocks", "spline_parts", "spline_w_default"]
+__all__ = ["MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
+           "lookup_code", "r128_default", "render", "spline_message_blocks", "spline_parts", "spline_w_default"]

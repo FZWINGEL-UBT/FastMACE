@@ -86,9 +86,8 @@ check searched the stored plan text, which holds no record names. One is the run
 Variants: one container on `third` (7 min); the first launch was refused by the budget guard (38-min timeout) and
 relaunched with 20 min. Metered this month afterwards: fifth $24.87, third $27.68 of $30.
 
-## Decision for the conductor
+## Decision (conductor, 7 November 2026, decision 66)
 
-SPLINE_W is faster in both orders (0.879 / 0.878) and the gate passes. Per decision 66 the H200 can go into
-`SPLINE_W_GPUS`. That is not done on this branch; the conductor decides. `r128` (0.984 / 0.985) also qualifies on
-top of it (`THREADS = 128`, `MIN_BLOCKS = 6` as defaults where SPLINE_W is on). `parts` is under the 1 % bound, so
-it is recorded, not proposed. The A100 was not measured.
+SPLINE_W is on for the H200 family: `SPLINE_W_GPUS` holds `NVIDIA H200`, which also covers the H200 NVL. `R128`
+(`R128_GPUS`: one receiver per 128-thread block, `__launch_bounds__(128, 6)`) is on there too. `PARTS` stays off. Both
+stay off on the A100 until it is measured. Asserted in `tests/cpu/test_gpu_models.py::test_h200_defaults`.
