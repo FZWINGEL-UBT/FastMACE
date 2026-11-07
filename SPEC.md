@@ -2786,7 +2786,15 @@ Open decisions for the owner:
    families are the A100 (SXM4 and PCIe, 40 and 80 GB; owner, 4 November 2026)
    and the H200 (SXM and NVL, same chip, SM count and memory). Variants that
    differ significantly in performance stay separate names: the H100 PCIe (114
-   SMs, HBM2e) is not the H100 SXM (132 SMs, HBM3). Everywhere else it stays off or opt-in, and
+   SMs, HBM2e) is not the H100 SXM (132 SMs, HBM3). Amended again (owner,
+   7 November 2026, "Yes" to the off-polar worker's rule): a switch that only
+   removes work, deleting operations or memory traffic without adding or
+   replacing a kernel, changing tiling, launch shape or precision, or keeping
+   more memory alive, is on for every GPU (a plain `True` default, no
+   `*_GPUS` set) once one same-process MD-step A/B on any GPU shows it not
+   slower in both build orders and it is exact or passes
+   `tools/force_stress_gate.py`. Fusions, kernel substitutions, retiling and
+   precision changes stay per GPU family. Everywhere else it stays off or opt-in, and
    the planner's off reason names the GPU. The usual gates still apply per
    record (force/stress gate, NVE drift, exactness class). Per-structure and
    shape-keyed tables stay forbidden, and measured values are never stored or
@@ -3376,3 +3384,5 @@ the conversion instead of loading and converting again (about 3.1 s per composit
 between plans is unchanged. See `docs/validation/capacity/setup-fixes.md`.
 
 **Decision 66 counts every variant of a GPU family (7 November 2026, owner: "Ok change the decision to that if its tested on one variant of a gpu it counts for all gpus (unless the variants vary significantly in performance)"; conductor):** decision 66 amended. `kernels/gpu_models.py` gains `family()` and `lookup()`: a `GPUModels` entry, and a per-GPU dict entry (`radial_table.WARPS_GPUS`, `wprime_backward.MAX_REGISTERS_GPUS`), now covers every variant of its family. The families are the A100 (unchanged since 4 November) and the H200, which adds the H200 NVL (the same GH100 with 132 SMs and 141 GB of HBM3e; a lower power limit) to every H200 default. The H100 SXM, PCIe and NVL cards stay separate names, as their SM counts and memory differ significantly. No default changes on a measured GPU. The off-polar A100 40GB final checks were cancelled as redundant; the two already measured (MACE-OFF23 small and medium) stay as confirmation.
+
+**Pure work removal goes on for every GPU (7 November 2026, owner: "Yes" to the rule proposed in the off-polar worker; conductor):** decision 66 amended. A switch that only deletes operations or memory traffic, with no new or replaced kernel, no change of tiling, launch shape or precision, and no more memory kept alive, defaults on for every GPU after one not-slower same-process MD-step A/B (both build orders) on any GPU, if it is exact or passes the force/stress gate. The reasoning: every per-GPU split so far was a trade (the fused Fourier transform recomputes cos/sin and was 1.08-1.40x slower on the A100; the chunked conv backward 3-4x slower on the RTX A4000; 128-row tiles lost 2 % on the A100; 3xTF32 wins only on the A100; the gate epilogue tied on the A100), while pure skips have not lost (the zero-column skip measured 1.000 on the RTX 5060 Ti and won elsewhere). Fusions, substitutions, retiling and precision changes stay per GPU family.

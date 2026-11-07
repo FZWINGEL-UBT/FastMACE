@@ -11,7 +11,9 @@ build orders (ab / ba); below 1 is faster. GPUs: **5060 Ti** = NVIDIA GeForce RT
 is a `GPUModels` (owner, 4 November 2026: "turn on a100 speedups no matter which version of it it runs on";
 `fastmace/kernels/gpu_models.py`), and an H200 entry covers the H200 NVL too (owner, 7 November 2026: a GPU
 tested on one variant counts for every variant unless they differ significantly in performance; the H100 SXM and
-PCIe cards stay separate). Otherwise the exact name given. Any other GPU (L4, RTX A4000, RTX PRO 6000, …) gets
+PCIe cards stay separate). Otherwise the exact name given. A switch that only removes work (no new or replaced kernel, no change of tiling,
+launch shape, precision or memory kept alive) is on for every GPU after one not-slower A/B on any GPU (owner,
+7 November 2026). Any other GPU (L4, RTX A4000, RTX PRO 6000, …) gets
 none of the switches below: decision 66 (owner, 29 October 2026) enables a per-GPU default only where same-process
 whole-step A/Bs in both build orders measured a speed-up, by device name, never by compute capability.
 Benchmark_loup = OMAT-0 medium, SrTiO3 5,000 atoms unless stated. "on" = default on; "–" = off (not measured, or
