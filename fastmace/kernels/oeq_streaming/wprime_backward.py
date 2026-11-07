@@ -199,8 +199,20 @@ STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
-# load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. An A/B switch; 2 today.
-SPLINE_VECTOR = 2
+# load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
+# (decision 66), else 2; 2 / 4: an A/B side's choice.
+SPLINE_VECTOR = None
+# NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107 follow-ups): MD step b/a 0.9739 / 0.9793 (b = 4,
+# against the H200 defaults with SPLINE_W and R128 on).
+SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200",))
+
+
+def spline_vector_default(device):
+    """``SPLINE_VECTOR`` on ``device``: the constant when set, else 4 on ``SPLINE_VECTOR_GPUS`` and 2 elsewhere."""
+    if SPLINE_VECTOR is not None:
+        return int(SPLINE_VECTOR)
+    device = torch.device(device)
+    return 4 if device.type == "cuda" and torch.cuda.get_device_name(device) in SPLINE_VECTOR_GPUS else 2
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -1428,7 +1440,7 @@ class WPrime(torch.nn.Module):
                 fused.id,
                 SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
                               self.spline["path_scale"]),
-                WPrimeBackward(self.kernels, 4, device, vector=int(SPLINE_VECTOR), table_w=True, blocks=blocks,
+                WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid))
 
@@ -1501,7 +1513,8 @@ class WPrime(torch.nn.Module):
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
            "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
-           "SCALAR_PATHS_GPUS", "TABLE_W", "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
+           "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
+           "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",

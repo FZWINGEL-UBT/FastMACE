@@ -321,6 +321,11 @@ def test_h200_defaults():
     assert "NVIDIA A100-SXM4-80GB" not in spline_forward.SPLINE_W_GPUS
     assert "NVIDIA A100-SXM4-80GB" not in spline_forward.R128_GPUS
     assert spline_forward.PARTS is False
+    assert spline_forward.MIN_BLOCKS is None  # R128's cap stays 6; cap 5 0.9925 / 0.9937, not combined with vec4
+    # SPLINE_VECTOR (7 November 2026): the spline w' table as one float4 per weight, MD H200 0.9739 / 0.9793
+    assert "NVIDIA H200" in wprime_backward.SPLINE_VECTOR_GPUS
+    assert "NVIDIA A100-SXM4-80GB" not in wprime_backward.SPLINE_VECTOR_GPUS
+    assert wprime_backward.SPLINE_VECTOR is None and wprime_backward.spline_vector_default("cpu") == 2
 
 
 def test_radial_table_warps(monkeypatch):

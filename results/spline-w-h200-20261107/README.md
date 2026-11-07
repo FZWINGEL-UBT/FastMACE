@@ -113,3 +113,5 @@ lost before (conv-receiver-backward, fusion-receiver-local, omat0-wprime-split, 
 own interaction-2 backward is 3.9 ms against our 1.83 ms. On the H200, removing all reductions saves 3.6 %, and
 removing the atomics made the kernel slower (1.080). The kernel is bound by load instructions in L1, so a full layout
 rework was not built; fewer load instructions (`vec4`) are what pay.
+
+Decision (conductor, 7 November 2026, decision 66): `SPLINE_VECTOR` 4 on the H200 family (`SPLINE_VECTOR_GPUS`); bitwise, so no gate. `MIN_BLOCKS` stays 6; cap 5 recorded as measured, not combined.
