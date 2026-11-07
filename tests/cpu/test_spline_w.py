@@ -148,6 +148,9 @@ def test_wprime_source_reads_the_spline_interval():
     assert "const float sc = sx_inv;" in source or "const scalar_t sc = sx_inv;" in source
     with pytest.raises(ValueError):
         wp.render(_schedule(), "float", 6, vector=2, table_w=True, horner=True, spline=GRID)
+    wide = wp.render(_schedule(), "float", 4, vector=4, table_w=True, factored=True, scale=True, horner=True,
+                     blocks=[(1, [0]), (3, [64])], spline=GRID)  # SPLINE_VECTOR 4: one float4 per weight
+    assert "const float4 v = __ldg(gq + k);" in wide and "PADDED_TERMS = 4;" in wide and "float2" not in wide
 
 
 def test_spline_sources_compile_with_nvrtc():
@@ -162,5 +165,6 @@ def test_spline_sources_compile_with_nvrtc():
         two = _two_degree_schedule()
         for part in sf.spline_parts(two):
             assert compile_cubin(sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], part, 128, 6), capability)
-        assert compile_cubin(wp.render(_schedule(), "float", 4, vector=2, table_w=True, factored=True, scale=True,
-                                       horner=True, blocks=blocks, spline=GRID), capability)
+        for vector in (2, 4):
+            assert compile_cubin(wp.render(_schedule(), "float", 4, vector=vector, table_w=True, factored=True,
+                                           scale=True, horner=True, blocks=blocks, spline=GRID), capability)

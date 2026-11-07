@@ -197,6 +197,10 @@ HOIST_SCALE_GPUS = GPUModels(())
 STAGE_DOUT = None
 STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
+# SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
+# float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
+# load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. An A/B switch; 2 today.
+SPLINE_VECTOR = 2
 
 TEMPLATE = r"""// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
 // oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
@@ -1424,7 +1428,7 @@ class WPrime(torch.nn.Module):
                 fused.id,
                 SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
                               self.spline["path_scale"]),
-                WPrimeBackward(self.kernels, 4, device, vector=self.vector, table_w=True, blocks=blocks,
+                WPrimeBackward(self.kernels, 4, device, vector=int(SPLINE_VECTOR), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid))
 
