@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import force_stress_gate as gate  # noqa: E402
 import sx_spline_error as spl  # noqa: E402
+import sx_spline_knots as kn  # noqa: E402
 from fastmace.planner import selfcheck  # noqa: E402
 from fastmace.reference import calculators  # noqa: E402
 from fastmace.rewrites import radial as rt  # noqa: E402
@@ -49,9 +50,10 @@ class Stash(torch.nn.Module):
 class SplineWeights(torch.nn.Module):
     """w from the spline of the stashed lengths, divided by the stashed cutoff (MACE multiplies it back)."""
 
-    def __init__(self, coef32, h, r_lo, columns, store):
+    def __init__(self, coef32, h, r_lo, columns, store, grid=None):
         super().__init__()
         self.coef, self.h, self.r_lo, self.columns, self.store = coef32, h, r_lo, columns, store
+        self.grid = grid  # piecewise-uniform knots (sx_spline_knots); None: uniform spacing h
         self.calls = 0
 
     def forward(self, edge_feats):
@@ -60,11 +62,14 @@ class SplineWeights(torch.nn.Module):
         r = s["r"].reshape(-1).to(torch.float32)
         species = s["node_attrs"][:, self.columns].argmax(dim=1)
         pair = species[s["edge_index"][0]] * len(self.columns) + species[s["edge_index"][1]]
-        u = (r - self.r_lo) * (1.0 / self.h)
-        i = torch.clamp(torch.floor(u.detach()).long(), 0, self.coef.shape[1] - 1)
-        t = (u - i.to(u.dtype))[:, None]
-        c = self.coef[pair, i]
-        w = c[:, 0] + t * (c[:, 1] + t * (c[:, 2] + t * c[:, 3]))
+        if self.grid is not None:
+            w, _ = kn.grid_eval(self.coef, self.grid, r, pair)
+        else:
+            u = (r - self.r_lo) * (1.0 / self.h)
+            i = torch.clamp(torch.floor(u.detach()).long(), 0, self.coef.shape[1] - 1)
+            t = (u - i.to(u.dtype))[:, None]
+            c = self.coef[pair, i]
+            w = c[:, 0] + t * (c[:, 1] + t * (c[:, 2] + t * c[:, 3]))
         cutoff = s["cutoff"]
         if cutoff is None:
             return w.to(edge_feats.dtype)
@@ -78,6 +83,7 @@ def main(argv=None):
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5", "results/loup-a100-20261103/SrTiO3.cif"])
     p.add_argument("--structures-root", default=str(Path.home() / "fastmace-baseline/1a-T18"))
     p.add_argument("--knots", type=int, nargs="*", default=[32, 256, 2048, 4096])
+    p.add_argument("--grids", nargs="*", default=[], help="piecewise-uniform knots, as sx_spline_knots.py --grids")
     p.add_argument("--configs", type=int, default=3)
     args = p.parse_args(argv)
     torch.set_num_threads(8)
@@ -85,7 +91,8 @@ def main(argv=None):
     plain = torch.load(args.checkpoint, map_location="cpu", weights_only=False).float()
     numbers = [int(z) for z in plain.atomic_numbers]
     r_max = float(plain.r_max)
-    report = dict(checkpoint=args.checkpoint, ratio_rule=selfcheck.RATIO, knots=args.knots, structures={})
+    report = dict(checkpoint=args.checkpoint, ratio_rule=selfcheck.RATIO, knots=args.knots, grids=args.grids,
+                  structures={})
     for spec in args.structures:
         name, source, repeat = gate.structure_spec(spec, (3, 3, 3), args.structures_root)
         from ase.io import read
@@ -108,6 +115,10 @@ def main(argv=None):
         for n in args.knots:
             coef, h = spl.spline_coefficients(chain64, pairs, rt.R_LO, r_max, n)
             cand[f"spline {n}"] = SplineWeights(coef.to(torch.float32), h, rt.R_LO, columns, store)
+        for text in args.grids:
+            grid = kn.parse_grid(text)
+            coef, _ = kn.grid_coefficients(chain64, pairs, grid)
+            cand[f"grid {text}"] = SplineWeights(coef.to(torch.float32), None, rt.R_LO, columns, store, grid=grid)
         values = {}
         for label, module in cand.items():
             model.interactions[1].conv_tp_weights = original if module is None else module

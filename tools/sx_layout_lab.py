@@ -111,10 +111,7 @@ def _angular(parts):
 
 # --------------------------------------------------------------------------------------------- the forward source
 _W_CODE = {
-    "spline": """            const float u = fmaxf((re - SX0) * SXINV, 0.f);
-            int iv = (int)u;
-            iv = iv < SXNI - 1 ? iv : SXNI - 1;
-            const float t = u - (float)iv;
+    "spline": """SX_LOOKUP
             const float* cp = tab + (int64_t)(pmap[pair[e]] * SXNI + iv) * 4 * Q + ch;
             float wv[P];
             #pragma unroll
@@ -157,6 +154,8 @@ def forward_source(production, mode, constants):
     in_dim = int(re.search(r"constexpr int IN_DIM = (\d+);", production).group(1))
     ed = int(re.search(r"constexpr int ED = (\d+);", production).group(1))
     outs = sorted({s[0] for part in parts for s in part["stores"]}, key=lambda o: int(o[3:]))
+    w_code = (_W_CODE[mode].replace("SX_LOOKUP", lookup_code(constants.pop("SX_GRID"), "re", "float", "            "))
+              if mode == "spline" else _W_CODE[mode])
     consts = "\n".join(f"constexpr {'int' if isinstance(v, int) else 'float'} {k} = "
                        f"{v if isinstance(v, int) else repr(float(v)) + 'f'};" for k, v in constants.items())
     return f"""// sx_layout_forward (sx-layout lab, 7 November 2026): Symmetrix-XL's forward layout, w by {mode}.
@@ -187,7 +186,7 @@ extern "C" __global__ void __launch_bounds__({THREADS}) sx_layout_forward(
             if (!(re < R_MAX)) continue;  // Symmetrix-XL's edge_is_active
             const int snd = senders[e];
             if (snd < 0 || snd >= N) continue;
-{_W_CODE[mode]}
+{w_code}
 {body}
         }}
 {stores}
@@ -283,10 +282,63 @@ def _chain_and_columns():
     return _CACHE["chain"]
 
 
-def spline64(knots):
-    """float64 [S*S, knots - 1, 4, Q] power-basis coefficients in t of the cubic Hermite spline of w per ordered
-    pair (mirror pairs equal), the knot spacing and x0."""
-    key = ("spline", knots)
+# Piecewise-uniform knots (follow-up, 7 November 2026: dense where w curves, at short r; tools/sx_spline_knots.py):
+# segments "start:end:intervals", each uniform. "a695" passes the radial certificate over the whole domain (slope
+# 0.63), "p399" only at r >= 1 A (0.63; coarse below 1 A).
+GRIDS = {"a695": "0.3:0.5:150,0.5:0.75:110,0.75:1.0:85,1.0:1.5:110,1.5:2.0:50,2.0:2.5:30,2.5:6.0:160",
+         "p399": "0.3:1.0:32,1.0:1.5:110,1.5:2.5:100,2.5:6.0:157"}
+
+
+def grid_of(spec):
+    """[(start, end, intervals)] for an int knot count (uniform on [R_LO, r_max)) or a GRIDS name."""
+    from fastmace.rewrites import radial as rt
+    _, _, r_max = _chain_and_columns()
+    if isinstance(spec, int):
+        return [(rt.R_LO, r_max, spec - 1)]
+    grid = [(float(a), float(b), int(n)) for a, b, n in (part.split(":") for part in GRIDS[spec].split(","))]
+    if abs(grid[0][0] - rt.R_LO) > 1e-12 or abs(grid[-1][1] - r_max) > 1e-12:
+        raise ValueError(f"sx-layout: grid {spec} does not span [{rt.R_LO}, {r_max})")
+    return grid
+
+
+def locate(r64, grid):
+    """float64 (interval, t, 1/h) per length, as the kernels' lookup."""
+    import torch
+    iv = torch.zeros_like(r64, dtype=torch.long)
+    t, inv = torch.zeros_like(r64), torch.zeros_like(r64)
+    offset = 0
+    for k, (a, b, n) in enumerate(grid):
+        mask = (r64 >= a) if k else torch.ones_like(r64, dtype=torch.bool)
+        u = torch.clamp((r64 - a) * (n / (b - a)), min=0)
+        i = torch.clamp(u.long(), max=n - 1)
+        iv, t = torch.where(mask, offset + i, iv), torch.where(mask, u - i, t)
+        inv = torch.where(mask, torch.full_like(r64, n / (b - a)), inv)
+        offset += n
+    return iv, t, inv
+
+
+def lookup_code(grid, r, scalar, indent):
+    """C code defining ``iv`` (global interval), ``t`` in [0, 1) and ``sx_inv`` (1/h) from length ``r``: one compare
+    per segment boundary (an edge is one warp's for every channel, so the branch is uniform), then one multiply."""
+    def f(v):
+        return f"{scalar}({float(v)!r})" if scalar != "float" else f"{float(v)!r}f"
+    lines = [f"{indent}int iv; {scalar} t, sx_inv;"]
+    offset = 0
+    for k, (a, b, n) in enumerate(grid):
+        head = "if" if k == 0 else "else if"
+        cond = f"{head} ({r} < {f(b)}) " if k < len(grid) - 1 else ("else " if k else "")
+        body = (f"{{ sx_inv = {f(n / (b - a))}; {scalar} u = ({r} - {f(a)}) * sx_inv; u = u > {f(0)} ? u : {f(0)}; "
+                f"int il = (int)u; il = il < {n - 1} ? il : {n - 1}; t = u - ({scalar})il; iv = {offset} + il; }}")
+        lines.append(f"{indent}{cond}{body}")
+        offset += n
+    return "\n".join(lines)
+
+
+def spline64(spec):
+    """float64 [S*S, intervals, 4, Q] power-basis coefficients in each interval's t of the cubic Hermite spline of w
+    per ordered pair (mirror pairs equal), on the knots of ``spec`` (see ``grid_of``); the grid; r_lo; the species
+    count."""
+    key = ("spline", spec)
     if key in _CACHE:
         return _CACHE[key]
     import torch
@@ -295,19 +347,21 @@ def spline64(knots):
     chain, columns, r_max = _chain_and_columns()
     s_count = len(columns)
     r_lo = rt.R_LO
-    h = (r_max - r_lo) / (knots - 1)
-    x = r_lo + h * torch.arange(knots, dtype=torch.float64, device="cuda")
+    grid = grid_of(spec)
+    xs = [torch.linspace(a, b, n + 1, dtype=torch.float64, device="cuda") for a, b, n in grid]
+    x = torch.cat([xs[0]] + [v[1:] for v in xs[1:]])
+    h = (x[1:] - x[:-1])[:, None]
     rows = {}
     for s in range(s_count):
         for t in range(s, s_count):
             with torch.no_grad():
                 g, dg = chain.with_derivative(x, s, t)
             y = g[:, :-1] @ chain.folded.T
-            m = dg[:, :-1] @ chain.folded.T * h
-            y0, y1, m0, m1 = y[:-1], y[1:], m[:-1], m[1:]
+            m = dg[:, :-1] @ chain.folded.T
+            y0, y1, m0, m1 = y[:-1], y[1:], m[:-1] * h, m[1:] * h
             rows[(s, t)] = torch.stack([y0, m0, 3 * (y1 - y0) - 2 * m0 - m1, 2 * (y0 - y1) + m0 + m1], dim=1)
     coef = torch.stack([rows[(min(s, t), max(s, t))] for s in range(s_count) for t in range(s_count)])
-    _CACHE[key] = (coef, h, r_lo, s_count)
+    _CACHE[key] = (coef, grid, r_lo, s_count)
     return _CACHE[key]
 
 
@@ -363,23 +417,23 @@ def _forward_args(mode, knots=None):
         dummy_i = torch.zeros(1, dtype=torch.int32, device=x.device)
         sx = dict(r=r, pair=pair, pmap=dummy_i, tab=dummy_f, starts=dummy_f, scales=dummy_f, bins=dummy_i)
         if mode == "spline":
-            coef, h, r_lo, s_count = spline64(knots)
+            coef, grid, r_lo, s_count = spline64(knots)
             unordered = [(s, t) for s in range(s_count) for t in range(s, s_count)]
             pmap = [unordered.index((min(s, t), max(s, t))) for s in range(s_count) for t in range(s_count)]
             sx["tab"] = torch.stack([coef[s * s_count + t] for s, t in unordered]).float().contiguous()
             sx["pmap"] = torch.tensor(pmap, dtype=torch.int32, device=x.device)
             rows = torch.arange(0, r.numel(), max(1, r.numel() // 8192), device=r.device)
             keep = rows[r[rows] < float(wp[16])]
-            u = torch.clamp((r[keep].double() - r_lo) / h, min=0)
-            iv = torch.clamp(u.long(), max=coef.shape[1] - 1)
-            t = (u - iv)[:, None]
+            iv, t, _ = locate(r[keep].double(), grid)
+            t = t[:, None]
             c = coef[pair[keep].long(), iv]
             ws = c[:, 0] + t * (c[:, 1] + t * (c[:, 2] + t * c[:, 3]))
             ref = _reference_w(keep)
             touched = torch.unique(sx["pmap"][pair.long()].long() * coef.shape[1]
-                                   + torch.clamp(((r.double() - r_lo) / h).long(), 0, coef.shape[1] - 1)).numel()
+                                   + locate(r.double(), grid)[0]).numel()
+            spacing = ", ".join(f"{a}-{b}: {(b - a) / n:.5f}" for a, b, n in grid)
             print(f"sx-spline{knots}: {sx['tab'].numel() * 4 / 1e6:.1f} MB table ({len(unordered)} pairs, "
-                  f"{coef.shape[1]} intervals, h = {h:.5f} A), {touched} rows touched "
+                  f"{coef.shape[1]} intervals, h = {spacing} A), {touched} rows touched "
                   f"({touched * 4 * coef.shape[-1] * 4 / 1e6:.1f} MB); spline w vs a.W at {keep.numel()} edges "
                   f"max|d|/max|a| = {float((ws - ref).abs().max() / ref.abs().max()):.2e}", flush=True)
         elif mode == "table6":
@@ -403,8 +457,8 @@ def _forward_transform(mode, knots=None):
         wp = CONTEXT["wprime_args"]
         constants = dict(R_MAX=float(wp[16]))
         if mode == "spline":
-            coef, h, r_lo, _ = spline64(knots)
-            constants.update(SX0=float(r_lo), SXINV=float(1.0 / h), SXNI=int(coef.shape[1]))
+            coef, grid, _, _ = spline64(knots)
+            constants.update(SXNI=int(coef.shape[1]), SX_GRID=grid)
         elif mode == "table6":
             constants.update(T_RLO=float(wp[14]), T_BINSCALE=float(wp[15]), T_NBINS=int(wp[13].numel()),
                              T_PIECES=int(wp[11].numel()))
@@ -413,7 +467,7 @@ def _forward_transform(mode, knots=None):
     return transform
 
 
-def forward_variants(kernel=None, knots=(256, 2048, 4096)):
+def forward_variants(kernel=None, knots=(256, 2048, 4096, *GRIDS)):
     table = {"sx-wbuf": ("rounding", _forward_transform("wbuf"), (), _forward_args("wbuf")),
              "sx-table6": ("rounding", _forward_transform("table6"), (), _forward_args("table6")),
              "sx-F-w1": ("falsifier", _forward_transform("w1"), (), _forward_args("w1"))}
@@ -432,14 +486,11 @@ _WP_PIECE = """    int32_t bin = int32_t((clamped - r_lo) * bin_scale);
 def _wp_transform(knots):
     def transform(s):
         from omat0_kernel_lab import _sub
-        coef, h, r_lo, _ = spline64(knots)
+        coef, grid, _, _ = spline64(knots)
         s = _sub(s, "constexpr int TERMS = 6;", "constexpr int TERMS = 4;", 1)
         s = _sub(s, re.search(r"constexpr int PADDED_TERMS = \d+;", s).group(0), "constexpr int PADDED_TERMS = 4;", 1)
-        spline = f"""    // sx-layout lab: the cubic spline's interval and t in [0, 1) instead of the table's piece.
-    const scalar_t sx_u = (clamped - scalar_t({float(r_lo)!r})) * scalar_t({1.0 / h!r});
-    int32_t piece = int32_t(sx_u);
-    piece = piece < {coef.shape[1]} - 1 ? piece : {coef.shape[1]} - 1;
-    const scalar_t t = sx_u - scalar_t(piece);"""
+        spline = ("    // sx-layout lab: the cubic spline's interval and t in [0, 1) instead of the table's piece.\n"
+                  + lookup_code(grid, "clamped", "scalar_t", "    ") + "\n    const int32_t piece = iv;")
         # The table's piece lookup, from the bin to t (the exact text of 6 November as _WP_PIECE; any later
         # rendering of the same four statements by the pattern).
         pattern = (r"    int32_t bin = int32_t\(\(clamped - r_lo\) \* bin_scale\);.*?"
@@ -449,7 +500,7 @@ def _wp_transform(knots):
         s = re.sub(pattern, lambda m: spline, s, flags=re.S)
         if len(re.findall(r"const scalar_t sc = [^;]*;", s)) != 1:
             raise ValueError("B-spline: the w' slope scale was not found once")
-        return re.sub(r"const scalar_t sc = [^;]*;", f"const scalar_t sc = scalar_t({1.0 / h!r});", s)
+        return re.sub(r"const scalar_t sc = [^;]*;", "const scalar_t sc = sx_inv;", s)
     return transform
 
 
@@ -457,7 +508,7 @@ def _wp_args(knots):
     def transform(args):
         import torch
         args = list(args)
-        coef, h, r_lo, s_count = spline64(knots)
+        coef, _, _, _ = spline64(knots)
         alpha = alphas()
         # q-major [pairs * intervals, Q, 4], FOLD_ALPHA's per-path factor folded in as production folds it.
         tab = (coef * alpha.repeat_interleave(CHANNELS)[None, None, None, :]).permute(0, 1, 3, 2)
@@ -467,7 +518,7 @@ def _wp_args(knots):
     return transform
 
 
-def wprime_variants(kernel=None, knots=(256, 2048, 4096)):
+def wprime_variants(kernel=None, knots=(256, 2048, 4096, *GRIDS)):
     return {f"B-spline{n}": ("rounding", _wp_transform(n), (), _wp_args(n)) for n in knots}
 
 
