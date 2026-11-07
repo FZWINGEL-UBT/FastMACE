@@ -15,7 +15,13 @@ Pure Python, no Modal import, so the CPU tests can fake the billing calls. ``fas
   hard limits, so the bound holds.
 - **Jobs still running:** the worst cases of jobs launched from this checkout that have not finished yet
   (``in_flight``, a JSON file; ``holding`` adds and removes the entry) count as spent, so parallel launches cannot
-  each fit on their own and overrun together. An entry expires at its own worst-case end.
+  each fit on their own and overrun together. An entry has a time to live (``Decision.ttl_s``: the function's
+  timeout, which is the command's timeout + 10 min; resource framework §3.5), so a crash cannot hold budget past
+  it, and ``prune`` drops the entries of clients that are no longer running (owner, 7 November 2026: "Clear stale
+  reservations").
+- **Ledger:** one row per job, with the Modal profile, the batch and the idea ids (``tools/jobs/launch.py`` sets
+  ``FASTMACE_BATCH`` and ``FASTMACE_IDEA``). A ledger written before these columns existed is rewritten once with
+  them, empty for the old rows.
 - **Unreadable billing:** a summary or rate table that cannot be read or parsed refuses the job.
 """
 
@@ -40,7 +46,8 @@ GPU_RATE_KEYS = {"L4": "gpu_hour_cost_l4", "A100": "gpu_hour_cost_a100_40gb", "A
                  "H100": "gpu_hour_cost_h100", "H200": "gpu_hour_cost_h200",
                  "RTX-PRO-6000": "gpu_hour_cost_rtx6000", None: None}
 LEDGER_FIELDS = ("date_utc", "commit", "gpu", "timeout_s", "wall_s", "estimated_cost_usd", "worst_case_usd",
-                 "metered_before_usd", "metered_after_usd", "metered_delta_usd", "limit_usd", "override", "exit")
+                 "metered_before_usd", "metered_after_usd", "metered_delta_usd", "limit_usd", "override", "exit",
+                 "profile", "batch", "idea")
 
 
 class BudgetRefused(RuntimeError):
@@ -57,6 +64,7 @@ class Decision:
     override: str
     message: str
     worst_case_s: int = 0
+    ttl_s: int = 0
 
 
 def _decimal(value, what):
@@ -118,17 +126,25 @@ def worst_case(rates, gpu, timeout_s, cpu_limit, memory_limit_gib):
 
 
 @contextlib.contextmanager
-def _locked(path):
-    """``path``'s entries under an exclusive lock (``fcntl`` where available), written back on exit."""
+def _file_lock(path):
+    """An exclusive lock on ``path`` + ``.lock`` (``fcntl`` where available; Windows: none, the CPU tests only)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path.with_suffix(path.suffix + ".lock"), "a") as lock:
         try:
             import fcntl
-        except ImportError:  # Windows: no lock, the CPU tests only
+        except ImportError:
             fcntl = None
         if fcntl is not None:
             fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+@contextlib.contextmanager
+def _locked(path):
+    """``path``'s live entries under an exclusive lock, written back on exit (expired ones are dropped)."""
+    path = Path(path)
+    with _file_lock(path):
         try:
             entries = json.loads(path.read_text()) if path.exists() and path.read_text().strip() else {}
         except ValueError as error:
@@ -137,6 +153,29 @@ def _locked(path):
         entries = {key: entry for key, entry in entries.items() if float(entry["expires"]) > now}
         yield entries
         path.write_text(json.dumps(entries, indent=1) + "\n")
+
+
+def _pid_alive(pid):
+    if not pid:
+        return True  # no pid recorded: only the time to live can drop the entry
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def prune(in_flight, alive=_pid_alive):
+    """Drop ``in_flight``'s entries whose client process has ended (its Modal app stopped with it), and the
+    expired ones; returns the dropped entries. Run it on the machine whose clients wrote the file."""
+    dropped = {}
+    with _locked(in_flight) as entries:
+        for key in list(entries):
+            if not alive(entries[key].get("pid", 0)):
+                dropped[key] = entries.pop(key)
+    return dropped
 
 
 def pending(in_flight):
@@ -153,7 +192,7 @@ def holding(in_flight, decision):
     key = uuid.uuid4().hex
     with _locked(in_flight) as entries:
         entries[key] = dict(worst_case_usd=str(decision.worst_case_usd), pid=os.getpid(),
-                            expires=time.time() + decision.worst_case_s)
+                            expires=time.time() + (decision.ttl_s or decision.worst_case_s))
     try:
         yield key
     finally:
@@ -182,21 +221,48 @@ def check(read_metered, read_rates, gpu, timeout_s, cpu_limit, memory_limit_gib,
                f"(cap ${CAP_USD}, reserve ${RESERVE_USD}){'; owner override: ' + override if override else ''}")
     if total > limit_usd:
         raise BudgetRefused("refused: " + message)
-    return Decision(True, metered, worst, running, limit_usd, override, message, int(timeout_s) + START_S)
+    return Decision(True, metered, worst, running, limit_usd, override, message, int(timeout_s) + START_S,
+                    int(timeout_s))
 
 
-def record(ledger, decision, *, commit, gpu, timeout_s, wall_s, estimated_cost, metered_after, exit_code):
-    """Append the job to the month ledger (CSV; the header is written once)."""
+def _migrate(ledger):
+    """Rewrite a ledger whose header is not ``LEDGER_FIELDS`` with all of them (missing values empty)."""
+    with ledger.open(newline="") as stream:
+        reader = csv.DictReader(stream)
+        if tuple(reader.fieldnames or ()) == LEDGER_FIELDS:
+            return
+        rows = list(reader)
+    tmp = ledger.with_suffix(ledger.suffix + ".tmp")
+    with tmp.open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=LEDGER_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(tmp, ledger)
+
+
+def record(ledger, decision, *, commit, gpu, timeout_s, wall_s, estimated_cost, metered_after, exit_code,
+           profile="", batch="", idea=""):
+    """Append the job to the month ledger (CSV; the header is written once), under the ledger's lock."""
     ledger = Path(ledger)
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    new = not ledger.exists()
+    with _file_lock(ledger):
+        new = not ledger.exists() or not ledger.read_text().strip()
+        if not new:
+            _migrate(ledger)
+        return _append(ledger, new, decision, commit=commit, gpu=gpu, timeout_s=timeout_s, wall_s=wall_s,
+                       estimated_cost=estimated_cost, metered_after=metered_after, exit_code=exit_code,
+                       profile=profile, batch=batch, idea=idea)
+
+
+def _append(ledger, new, decision, *, commit, gpu, timeout_s, wall_s, estimated_cost, metered_after, exit_code,
+            profile, batch, idea):
     after = None if metered_after is None else Decimal(str(metered_after))
     row = dict(date_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"), commit=commit, gpu=gpu or "CPU",
                timeout_s=timeout_s, wall_s=round(float(wall_s), 1), estimated_cost_usd=f"{float(estimated_cost):.4f}",
                worst_case_usd=f"{decision.worst_case_usd:.4f}", metered_before_usd=f"{decision.metered_usd:.4f}",
                metered_after_usd="" if after is None else f"{after:.4f}",
                metered_delta_usd="" if after is None else f"{after - decision.metered_usd:.4f}",
-               limit_usd=f"{decision.limit_usd:.2f}", override=decision.override, exit=exit_code)
+               limit_usd=f"{decision.limit_usd:.2f}", override=decision.override, exit=exit_code,
+               profile=profile, batch=batch, idea=idea)
     with ledger.open("a", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=LEDGER_FIELDS)
         if new:
@@ -206,4 +272,4 @@ def record(ledger, decision, *, commit, gpu, timeout_s, wall_s, estimated_cost, 
 
 
 __all__ = ["BudgetRefused", "CAP_USD", "Decision", "LIMIT_USD", "RESERVE_USD", "START_S", "check", "cost",
-           "holding", "pending", "record", "resolve_limit", "worst_case"]
+           "holding", "pending", "prune", "record", "resolve_limit", "worst_case"]

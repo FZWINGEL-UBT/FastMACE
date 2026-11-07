@@ -178,6 +178,52 @@ def test_ledger_records_the_delta(tmp_path):
     assert rows[1]["metered_after_usd"] == "" and rows[1]["exit"] == "error"
 
 
+
+def test_in_flight_entry_lives_for_the_function_timeout(tmp_path):
+    # Resource framework 3.5: the time to live is the function's timeout (the command's + 10 min), not the worst case.
+    in_flight = tmp_path / "in-flight.json"
+    decision = _check("1.00", in_flight=in_flight)
+    assert decision.ttl_s == JOB["timeout_s"] and decision.worst_case_s == JOB["timeout_s"] + budget.START_S
+    with budget.holding(in_flight, decision):
+        (entry,) = json.loads(in_flight.read_text()).values()
+        assert abs(entry["expires"] - (time.time() + JOB["timeout_s"])) < 5
+
+
+def test_prune_drops_dead_clients_and_keeps_live_ones(tmp_path):
+    in_flight = tmp_path / "in-flight.json"
+    later = time.time() + 3600
+    in_flight.write_text(json.dumps({"dead": dict(worst_case_usd="2", pid=111, expires=later),
+                                     "live": dict(worst_case_usd="3", pid=222, expires=later),
+                                     "nopid": dict(worst_case_usd="1", expires=later)}))
+    dropped = budget.prune(in_flight, alive=lambda pid: not pid or int(pid) != 111)
+    assert set(dropped) == {"dead"}
+    assert budget.pending(in_flight) == Decimal("4")
+
+
+def test_ledger_records_profile_batch_and_idea(tmp_path):
+    ledger = tmp_path / "modal-ledger.csv"
+    budget.record(ledger, _check("1.00"), commit="abc", gpu="H200", timeout_s=1800, wall_s=900,
+                  estimated_cost=Decimal("1.2"), metered_after=None, exit_code=0, profile="fourth",
+                  batch="b7", idea="i41+i42")
+    (row,) = csv.DictReader(ledger.read_text().splitlines())
+    assert (row["profile"], row["batch"], row["idea"]) == ("fourth", "b7", "i41+i42")
+
+
+def test_an_old_ledger_gets_the_new_columns_once(tmp_path):
+    ledger = tmp_path / "modal-ledger.csv"
+    old = budget.LEDGER_FIELDS[:13]
+    with ledger.open("w", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(old)
+        writer.writerow(["2026-11-01T00:00:00+00:00", "x", "L4"] + ["1"] * 9 + ["0"])
+    budget.record(ledger, _check("1.00"), commit="abc", gpu="L4", timeout_s=60, wall_s=1, estimated_cost=0,
+                  metered_after=None, exit_code=0, profile="third", batch="b1", idea="i1")
+    rows = list(csv.DictReader(ledger.read_text().splitlines()))
+    assert tuple(rows[0]) == budget.LEDGER_FIELDS and len(rows) == 2
+    assert rows[0]["commit"] == "x" and rows[0]["profile"] == "" and rows[1]["profile"] == "third"
+    assert ledger.read_text().count("date_utc") == 1
+
+
 def _keywords(call):
     return {k.arg: k.value for k in call.keywords if k.arg}
 

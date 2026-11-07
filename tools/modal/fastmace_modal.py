@@ -35,7 +35,8 @@ job's worst case (function timeout plus a start allowance, at the GPU, CPU-limit
 ``modal.Workspace.billing.rates``) must stay within $27 (the $30 monthly credit minus a $3 reserve). Otherwise,
 or if the billing cannot be read, the job is refused. ``--limit-usd`` (or ``FASTMACE_MODAL_LIMIT_USD``) sets a
 lower limit; a higher one needs ``--owner-override "who: why"``, which the ledger records. After every job the
-month ledger ``~/.fastmace-modal/modal-ledger.csv`` gets a row with the metered cost before and after (Modal's
+month ledger ``~/.fastmace-modal/modal-ledger.csv`` gets a row (with the profile, and the batch and idea ids from
+``FASTMACE_BATCH`` and ``FASTMACE_IDEA``) with the metered cost before and after (Modal's
 metering lags by minutes, so the after value may not contain the whole job yet). The ledger and the list of
 jobs in flight live in one directory for every checkout and worktree on the machine (``FASTMACE_MODAL_STATE``,
 default ``~/.fastmace-modal``), so parallel jobs from different worktrees count against each other; the
@@ -266,8 +267,20 @@ def _guarded(launch, *, commit, gpu, function_timeout_s, cpu, memory_mib, limit_
             except Exception:  # noqa: BLE001  (the row is still written; the next check reads billing again)
                 estimate, after = float("nan"), None
             row = budget.record(LEDGER, decision, commit=commit, gpu=gpu, timeout_s=function_timeout_s, wall_s=wall,
-                                estimated_cost=estimate, metered_after=after, exit_code=code)
+                                estimated_cost=estimate, metered_after=after, exit_code=code, profile=PROFILE,
+                                batch=os.environ.get("FASTMACE_BATCH", ""),
+                                idea=os.environ.get("FASTMACE_IDEA", ""))
             print("ledger:", LEDGER, json.dumps(row))
+
+
+def _tarball_commit(data: bytes) -> str:
+    """The ``.source_commit`` of a tarball (``tools/jobs/slim_tar.py`` adds it), else "tarball"."""
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            member = archive.extractfile(".source_commit")
+            return member.read().decode().strip() or "tarball"
+    except (KeyError, tarfile.TarError, AttributeError):
+        return "tarball"
 
 
 def _receive(result: bytes, dest: Path):
@@ -378,7 +391,7 @@ def _job(command, commit, repo, tarball, gpu, timeout_min, out, limit_usd="", ow
         raise SystemExit("--timeout-min must be positive")
     if tarball:
         data = Path(os.path.expanduser(tarball)).read_bytes()
-        sha = "tarball"
+        sha = _tarball_commit(data)
     else:
         sha, data = _archive(commit, os.path.expanduser(repo))
     print(f"source {sha}, {len(data) / 1e6:.1f} MB; gpu {gpu}; timeout {timeout_min} min")
