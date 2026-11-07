@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPLINE_W on the H200 (owner, 7 November 2026): one container (resource framework: packed) with
-#   1. the force/stress gate of SPLINE_W=True (gate_pack's command; the job stops here if it fails, or if the plan
-#      does not use the spline: a broken build then costs one gate);
+#   0. tools/spline_w_check.py: a short Benchmark_loup build (SrTiO3 10x10x10, 20 steps) with SPLINE_W=True must have an
+#      interaction whose wprime_backward uses the spline (the job stops otherwise);
+#   1. the force/stress gate of SPLINE_W=True (gate_pack's command; the job stops here if it fails);
 #   2. the MD-step A/B, a = default, b = SPLINE_W=True, both build orders (ab_pack's command);
 #   3. Benchmark_loup itself (tools/bench/loup_md.py: Langevin 300 K, friction 0.002 / fs, 1 fs, skin 0.5, seed 1,
 #      from rest, SrTiO3 10x10x10), fresh processes in the order default, spline, spline, default;
@@ -20,15 +21,20 @@ st=results/loup-a100-20261103/SrTiO3.cif
 switch=fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=True
 note "spline_w_job on $(nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader); source $(cat .source_commit 2>/dev/null)"
 
+note "start check-spline"
+python tools/spline_w_check.py --checkpoint "$ck" --structure "$st@10x10x10" --output "$out/check-spline.json" \
+  > "$out/check-spline.log" 2>&1 < /dev/null
+code=$?
+note "end check-spline exit=$code $(grep -hoE '"(spline_in_use|intervals|certificate)": [^,]+' "$out/check-spline.log" | sort -u | tr '\n' ' ' | cut -c1-200)"
+if [ "$code" != 0 ]; then note "stop: spline not in use"; exit 4; fi
+
 note "start gate-spline"
 python tools/force_stress_gate.py --output "$out/gate-spline" --engine fastmace --model omat0-medium \
   --checkpoint "$ck" --structures-root "$FASTMACE_STRUCTURES" --structures "$st@3x3x3" NaCl NbCl5 \
   --production-constant "$switch" > "$out/gate-spline.log" 2>&1 < /dev/null
 code=$?
 note "end gate-spline exit=$code $(grep -h -iE 'verdict' "$out/gate-spline.log" | tail -n 1 | cut -c1-200)"
-used=$(grep -rhoE "spline [0-9]+ intervals, certificate [0-9.]+" "$out/gate-spline" "$out/gate-spline.log" 2>/dev/null | sort -u | head -n 3 | tr '\n' ' ')
-note "spline in the plan: ${used:-NONE}"
-if [ "$code" != 0 ] || [ -z "$used" ]; then note "stop: gate failed or spline not used"; exit 4; fi
+if [ "$code" != 0 ]; then note "stop: gate failed"; exit 4; fi
 
 for order in ab ba; do
   pattern=$([ "$order" = ab ] && echo abab || echo abba)
