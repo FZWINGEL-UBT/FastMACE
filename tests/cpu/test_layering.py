@@ -105,6 +105,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B",
                                    "FUSED_FOURIER": "k-space sums without dense cos/sin; A/B",
                                    "SPIN_BATCHED": "alpha and beta field features in one call; A/B"},
+    "fastmace/rewrites/polar/update_fold.py": {"FOLD_UPDATE": "POLAR update MLP folded at setup; A/B"},
     "fastmace/rewrites/inductor.py": {"SMALL_MATMULS": "small mm/addmm as fused multiply-sum; rejected, A/B"},
     "fastmace/rewrites/linear/__init__.py": {"E3NN_BLOCK_LINEAR": "e3nn Linears as BlockLinear (POLAR); A/B"},
     "fastmace/kernels/triton/skinny_linear.py": {"RADIAL_TF32X3": "radial last layer as 3xTF32; per GPU, A/B"},
