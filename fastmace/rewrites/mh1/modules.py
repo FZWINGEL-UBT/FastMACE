@@ -164,11 +164,63 @@ class FirstInteractionReassociation(torch.nn.Module):
         # its SpeciesSkip, the skip's product index per path), set by precision.route; the forward then returns the
         # skip's output before the division, and the interaction skips its linear and skip_tp
         self.compose_skip = None
+        # kernels.triton.compose_skip.COMPOSE_FAST, set by precision.route: the interaction's radial last layer
+        # (``bind`` composes the weights once per table), and the products through one joined species product
+        self.compose_radial = None
+        self.compose_joined = False
 
     def bind(self, species_feats):
-        """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address)."""
+        """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address).
+        With ``compose_skip``, also at that table's composed weights (``refresh_composed``)."""
         if self._buffers.get("species_feats") is not species_feats:
             self.register_buffer("species_feats", species_feats, persistent=False)
+        if species_feats is None or self.compose_skip is None or self.compose_radial is None:
+            return
+        entry = self.refresh_composed(species_feats)
+        for k, tensor in enumerate(entry[2]):
+            if self._buffers.get(f"composed_{k}") is not tensor:
+                self.register_buffer(f"composed_{k}", tensor, persistent=False)
+
+    def refresh_composed(self, table):
+        """The composed weights of ``table`` (``compose_skip``), computed on first use and again in place (same
+        addresses) after the table changed (its version): ``[w_0, w_t_0, w_1, ...]`` per path, as the forward
+        would compose them from the same parameters. Returns the cache entry ``[table ref, version, weights]``."""
+        import weakref
+
+        cache = self.__dict__.setdefault("_composed_cache", {})
+        entry = cache.get(id(table))
+        if entry is not None and entry[0]() is table and entry[1] == table._version:
+            return entry
+        with torch.no_grad():
+            weights = self._compose_weights(table, self._radial_weight())
+        if entry is None or entry[0]() is not table:
+            entry = [weakref.ref(table), table._version, weights]
+            cache[id(table)] = entry
+        else:
+            for dst, src in zip(entry[2], weights):
+                dst.copy_(src)
+            entry[1] = table._version
+        return entry
+
+    def _radial_weight(self):
+        """The radial last layer's matrix as the generic first interaction passes it (``_first_inputs``)."""
+        from fastmace.rewrites.generic import modules as generic
+
+        weight = generic.fc_last_weight(self.compose_radial)
+        return torch.nn.functional.pad(weight, (0, 1)) if generic.FIRST_FULL_ROWS else weight
+
+    def _compose_weights(self, x, weight):
+        """Per path ``compose_skip.composed(right, ws, linear)`` as ``[w_0, w_t_0, w_1, w_t_1, ...]``."""
+        from fastmace.kernels.triton import compose_skip
+
+        linear, linear_products, skip, products = self.compose_skip
+        c = self.channels
+        out = []
+        for path, gamma in enumerate(self.gammas):
+            right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(-1, c)
+            mid = getattr(linear, f"weight_{linear_products[path]}") if linear_products else None
+            out += compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid)
+        return out
 
     def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None, summed_fn=None,
                 divided_by=None):
@@ -239,7 +291,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         (``kernels.triton.compose_skip``): per path ``species_mm(left, right L B_z)``, joined as the skip joins its
         output blocks (ir_mul, path order)."""
         from fastmace.kernels.triton import compose_skip
-        from fastmace.kernels.triton.species_gemm import species_mm, species_plan
+        from fastmace.kernels.triton.species_gemm import joined_rows, species_mm, species_mm_joined, species_plan
 
         if torch.is_grad_enabled() and (weight.requires_grad or x.requires_grad):
             raise RuntimeError("compose_skip has no gradient for the weights: inference only (frozen parameters)")
@@ -252,15 +304,31 @@ class FirstInteractionReassociation(torch.nn.Module):
         else:
             precision = "tf32x3-cutlass" if getattr(self, "tf32x3_backend", None) == "cutlass" else "tf32x3"
         c = self.channels
-        blocks, start = [], 0
+        # the table's composed weights from ``bind`` where they match these shapes, else composed here
+        bound = [self._buffers.get(f"composed_{k}") for k in range(2 * len(self.ls))]
+        if any(t is None for t in bound) or bound[0].shape[1] != slots * width:
+            bound = None
+        lefts, ws, w_ts, start = [], [], [], 0
         for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
             size = 2 * l + 1
-            left = summed[:, :, start:start + size].transpose(1, 2).reshape(nodes, size, slots * width)
-            right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
-            mid = getattr(linear, f"weight_{linear_products[path]}") if linear_products else None
-            w, w_t = compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid)
-            blocks.append(species_mm(left, w, w_t, kind, order, counts, precision).reshape(nodes, -1))
+            lefts.append(summed[:, :, start:start + size].transpose(1, 2).reshape(nodes, size, slots * width))
+            if bound is not None:
+                w, w_t = bound[2 * path], bound[2 * path + 1]
+            else:
+                right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
+                mid = getattr(linear, f"weight_{linear_products[path]}") if linear_products else None
+                w, w_t = compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid)
+            ws.append(w)
+            w_ts.append(w_t)
             start += size
+        if precision == "tf32x3-cutlass" and self.compose_joined:
+            # one product per path into the joined output, its rows built here (fused by a compiled caller)
+            gathers, scatters = joined_rows(order, [left.shape[1] for left in lefts])
+            lefts = [left.contiguous() for left in lefts]
+            return species_mm_joined(lefts, ws, w_ts, kind, order, counts, gathers, scatters,
+                                     precision).reshape(nodes, -1)
+        blocks = [species_mm(left, w, w_t, kind, order, counts, precision).reshape(nodes, -1)
+                  for left, w, w_t in zip(lefts, ws, w_ts)]
         return torch.cat(blocks, dim=1)
 
 

@@ -68,6 +68,9 @@ def route(model):
                     [getattr(module, f"weight_{k}") for k in range(count)])
         names.append(name)
     _route_compose_skip(model)
+    from fastmace.rewrites import cueq_projection
+
+    cueq_projection.route(model)  # CUEQ_PROJECTED
     return names
 
 
@@ -84,6 +87,8 @@ def _route_compose_skip(model):
         if reassociation is None or not hasattr(reassociation, "compose_skip"):
             continue
         reassociation.compose_skip = None
+        reassociation.compose_radial = None
+        reassociation.compose_joined = False
         device = reassociation.columns.device
         if device.type != "cuda" or not compose_skip.compose_skip_default(torch.cuda.get_device_name(device)):
             continue
@@ -91,6 +96,13 @@ def _route_compose_skip(model):
         if products is not None:
             linear, skip = products
             reassociation.compose_skip = (module.linear, linear, module.skip_tp, skip)
+            if not compose_skip.compose_fast_default(torch.cuda.get_device_name(device)):
+                continue
+            reassociation.compose_joined = True
+            reassociation.compose_radial = getattr(module, "radial_last", None)
+            table = reassociation._buffers.get("species_feats")
+            if table is not None and reassociation.compose_radial is not None:
+                reassociation.bind(table)
 
 
 def _support(model):

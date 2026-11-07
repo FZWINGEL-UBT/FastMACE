@@ -29,6 +29,22 @@ COMPOSE_SKIP = None
 COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200",))
 
 
+# The fast path of ``COMPOSE_SKIP`` (h200-fastpath, bitwise): the composed weights once per species table
+# (``FirstInteractionReassociation.bind``, refreshed with the table) instead of in every call, and the four
+# products through one ``species_gemm.species_mm_joined`` (rows built outside the opaque product, written straight
+# into the joined output, no ``torch.cat``), the division's result viewed rather than copied (``reshape_view``).
+COMPOSE_FAST = None
+COMPOSE_FAST_GPUS = GPUModels(())
+
+
+def compose_fast_default(name=None) -> bool:
+    """``COMPOSE_FAST`` (None: ``name`` in ``COMPOSE_FAST_GPUS``)."""
+    on = COMPOSE_FAST
+    if on is None:
+        on = name in COMPOSE_FAST_GPUS
+    return bool(on)
+
+
 def compose_skip_default(name=None) -> bool:
     """``COMPOSE_SKIP`` (None: ``name`` in ``COMPOSE_SKIP_GPUS``)."""
     on = COMPOSE_SKIP
@@ -46,4 +62,5 @@ def composed(right, ws, linear=None):
     return c.contiguous(), c.transpose(1, 2).contiguous()
 
 
-__all__ = ["COMPOSE_SKIP", "COMPOSE_SKIP_GPUS", "compose_skip_default", "composed"]
+__all__ = ["COMPOSE_FAST", "COMPOSE_FAST_GPUS", "COMPOSE_SKIP", "COMPOSE_SKIP_GPUS", "compose_fast_default",
+           "compose_skip_default", "composed"]
