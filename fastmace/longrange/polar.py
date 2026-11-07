@@ -405,12 +405,14 @@ SHARED_GEOMETRY = False
 FUSED_FOURIER = False
 
 
-# A/B constant (off-polar-alex, 7 November 2026): PolarMACE's charge recursion computes both spin channels' field
+# Default on (off-polar-alex, 7 November 2026): PolarMACE's charge recursion computes both spin channels' field
 # features in one call (``spin_field_features``: graph_longrange's multichannel k-space sums, one [k, atoms] product
 # with twice the columns instead of two products) when the cache has full-PBC cosines and sines; the source edit
 # ``SPIN_BATCH_EDITS``. Pure removal of launches; rounding only where a wider product blocks its sums differently.
-# tests/cpu/test_polar_spin_batched.py.
-SPIN_BATCHED = False
+# A plain default under the pure-removal rule: faster on the A100-SXM4-80GB (POLAR-1 S 0.91-0.94, M 0.96-0.97,
+# L 0.98) and the RTX 5060 Ti (S 0.89-0.95, M 0.95-0.98), and tools/force_stress_gate.py passes for S, M and L.
+# False is the stock two-call recursion, kept as the A/B side. tests/cpu/test_polar_spin_batched.py.
+SPIN_BATCHED = True
 
 
 def _fourier_mask(k_vector_batch, node_positions, call):
