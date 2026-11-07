@@ -50,19 +50,21 @@ def row(prod=(0.1, 1e-4, 1e-6), yard=(0.1, 1e-4, 1e-6)):
     return {"production": errors(prod), "yardstick": errors(yard)}
 
 
-def test_ratio_rule_passes_at_twice_the_yardstick_and_fails_above():
-    assert selfcheck.verdict([row(prod=(0.2, 2e-4, 2e-6))])["passed"]
-    result = selfcheck.verdict([row(prod=(0.21, 1e-4, 1e-6))])
+def test_ratio_rule_passes_at_three_times_the_yardstick_and_fails_above():
+    assert selfcheck.RATIO == 3.0
+    assert selfcheck.verdict([row(prod=(0.3, 3e-4, 3e-6))])["passed"]
+    result = selfcheck.verdict([row(prod=(0.31, 1e-4, 1e-6))])
     assert not result["passed"]
     assert [name for name, q in result["quantities"].items() if not q["passed"]] == ["energy_meV_per_atom"]
-    assert not selfcheck.verdict([row(prod=(0.1, 2.1e-4, 1e-6))])["passed"]
-    assert not selfcheck.verdict([row(prod=(0.1, 1e-4, 2.1e-6))])["passed"]
+    assert not selfcheck.verdict([row(prod=(0.1, 3.1e-4, 1e-6))])["passed"]
+    assert not selfcheck.verdict([row(prod=(0.1, 1e-4, 3.1e-6))])["passed"]
 
 
 def test_ratio_rule_takes_the_worst_copy_of_each_path():
-    rows = [row(prod=(0.3, 1e-4, 1e-6), yard=(0.1, 1e-4, 1e-6)), row(prod=(0.1, 1e-4, 1e-6), yard=(0.2, 1e-4, 1e-6))]
+    rows = [row(prod=(0.5, 1e-4, 1e-6), yard=(0.1, 1e-4, 1e-6)), row(prod=(0.1, 1e-4, 1e-6), yard=(0.2, 1e-4, 1e-6))]
     energy = selfcheck.verdict(rows)["quantities"]["energy_meV_per_atom"]
-    assert (energy["production"], energy["yardstick"], energy["limit"]) == (0.3, 0.2, 0.4)
+    assert energy["production"] == 0.5 and energy["yardstick"] == 0.2
+    assert abs(energy["limit"] - 0.6) < 1e-12
     assert energy["passed"]
 
 
@@ -92,8 +94,8 @@ def test_a_record_floor_raises_only_its_quantity():
     assert selfcheck.verdict(rows)["quantities"]["stress_eV_per_A3"]["floor_source"] == "SPEC §12.3"
     # A stress error above the PolarMACE floor is still caught, and the ratio rule still binds above it.
     assert not selfcheck.verdict([row(prod=(0.0, 0.0, 5.1e-7), yard=tiny)], floors=floors)["passed"]
-    assert selfcheck.verdict([row(prod=(0.0, 0.0, 8e-7), yard=(0.0, 0.0, 4e-7))], floors=floors)["passed"]
-    assert not selfcheck.verdict([row(prod=(0.0, 0.0, 8.1e-7), yard=(0.0, 0.0, 4e-7))], floors=floors)["passed"]
+    assert selfcheck.verdict([row(prod=(0.0, 0.0, 1.2e-6), yard=(0.0, 0.0, 4e-7))], floors=floors)["passed"]
+    assert not selfcheck.verdict([row(prod=(0.0, 0.0, 1.21e-6), yard=(0.0, 0.0, 4e-7))], floors=floors)["passed"]
     # The energy and force floors stay the general ones.
     assert not selfcheck.verdict([row(prod=(0.011, 0.0, 0.0), yard=tiny)], floors=floors)["passed"]
     assert not selfcheck.verdict([row(prod=(0.0, 1.1e-5, 0.0), yard=tiny)], floors=floors)["passed"]
@@ -101,8 +103,10 @@ def test_a_record_floor_raises_only_its_quantity():
 
 
 def test_the_1b_t23_nacl_rounding_case_passes_under_the_polar_floor():
-    # 1b-T23: POLAR-1-S on NaCl 3x3x3, hybrid stress 1.2e-7 eV/Å^3 against a 3-4e-8 float32 yardstick.
-    rows = [row(prod=(0.0, 0.0, 1.2e-7), yard=(0.0, 0.0, 4e-8))]
+    # 1b-T23: POLAR-1-S on NaCl 3x3x3, hybrid stress 1.2e-7 eV/Å^3 against a 3-4e-8 float32 yardstick: 3 x the
+    # yardstick since the 3x rule (7 November 2026); a little more still needs the PolarMACE floor.
+    assert selfcheck.verdict([row(prod=(0.0, 0.0, 1.2e-7), yard=(0.0, 0.0, 4e-8))])["passed"]
+    rows = [row(prod=(0.0, 0.0, 1.5e-7), yard=(0.0, 0.0, 4e-8))]
     assert not selfcheck.verdict(rows)["passed"]
     assert selfcheck.verdict(rows, floors=selfcheck.effective_floors(POLAR_FLOORS))["passed"]
 

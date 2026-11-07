@@ -323,7 +323,7 @@ def test_errors():
 def test_floors_are_the_spec_floors():
     from fastmace.planner import selfcheck
 
-    assert gate.GATE_RATIO == 2.0 == selfcheck.RATIO
+    assert gate.GATE_RATIO == 3.0 == selfcheck.RATIO
     assert gate.FLOORS == {"energy": 0.01, "forces": 1e-5, "stress": 1e-7}  # meV/atom, eV/A, eV/A^3 (§12.3)
     assert gate.QUANTITIES == ("energy", "forces", "stress")
 
@@ -351,8 +351,8 @@ def test_energy_floor():
 
 
 @pytest.mark.parametrize("production, yardstick, passed", [
-    (2.0e-4, 1.0e-4, True),     # exactly twice the float32 error
-    (2.01e-4, 1.0e-4, False),   # just above
+    (3.0e-4, 1.0e-4, True),     # exactly three times the float32 error (RATIO, 3 since 7 November 2026)
+    (3.01e-4, 1.0e-4, False),   # just above
     (0.5e-4, 1.0e-4, True),     # better than float32
 ])
 def test_ratio_rule(production, yardstick, passed):
@@ -360,7 +360,7 @@ def test_ratio_rule(production, yardstick, passed):
 
 
 def test_force_floor_where_float32_is_nearly_exact():
-    # float32 happens to be nearly exact: 2 x 1e-7 would fail 8e-6, the floor of 1e-5 eV/A passes it.
+    # float32 happens to be nearly exact: 3 x 1e-7 would fail 8e-6, the floor of 1e-5 eV/A passes it.
     verdict = gate.quantity_verdict("forces", 8e-6, 1e-7)
     assert verdict["passed"] and verdict["limit"] == 1e-5
     assert not gate.quantity_verdict("forces", 1.1e-5, 1e-7)["passed"]
@@ -385,13 +385,13 @@ def _config(production_forces, f32_forces, production_stress, f32_stress, e_prod
 
 
 def test_summary_takes_the_worst_configuration_of_each_path():
-    configs = [_config(3e-4, 2e-4, 1e-6, 2e-6), _config(1e-4, 1e-4, 5e-6, 1e-6)]
+    configs = [_config(3e-4, 2e-4, 1e-6, 2e-6), _config(1e-4, 1e-4, 7e-6, 1e-6)]
     summary = gate.summarize(configs)
     assert summary["forces"]["production_max_abs"] == 3e-4
     assert summary["forces"]["ase_f32_max_abs"] == 2e-4
     assert summary["forces"]["ratio"] == pytest.approx(1.5) and summary["forces"]["passed"]
-    assert summary["stress"]["production_max_abs"] == 5e-6
-    assert summary["stress"]["ratio"] == pytest.approx(2.5) and not summary["stress"]["passed"]
+    assert summary["stress"]["production_max_abs"] == 7e-6
+    assert summary["stress"]["ratio"] == pytest.approx(3.5) and not summary["stress"]["passed"]
     assert summary["energy"]["production_max_abs"] == 0.001 and summary["energy"]["ase_f32_max_abs"] == 0.002
     assert summary["energy"]["passed"]
     assert summary["passed"] is False
