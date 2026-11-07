@@ -93,6 +93,10 @@ def apply(model, context=None):
         module.forward = types.MethodType(uvu_forward, module)
         setattr(module, MARKER, True)
         names.append(name)
+    from fastmace.rewrites.polar import update_fold
+
+    if update_fold.FOLD_UPDATE:  # the folded update MLP (an A/B constant, off-polar-alex lab)
+        names += [f"{name} (update MLP folded)" for name in update_fold.apply(model)]
     return names
 
 
