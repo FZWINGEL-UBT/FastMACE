@@ -168,3 +168,26 @@ def test_spline_sources_compile_with_nvrtc():
         for vector in (2, 4):
             assert compile_cubin(wp.render(_schedule(), "float", 4, vector=vector, table_w=True, factored=True,
                                            scale=True, horner=True, blocks=blocks, spline=GRID), capability)
+
+
+def test_stage_quads_read_four_staged_components_per_shared_load():
+    """STAGE_QUADS: STAGE_DOUT's block-layout row as component quartets; one float4 shared load per quartet."""
+    schedule = _schedule()
+    blocks = [(1, [0]), (3, [64])]
+    quads, quad_of = wp.stage_quad_layout(schedule, blocks)
+    assert [len(q) for q in quads] == [4] and sorted(quad_of.values()) == [(0, k) for k in range(4)]
+    plain = wp.render(schedule, "float", 4, vector=4, table_w=True, factored=True, scale=True, horner=True,
+                      blocks=blocks, spline=GRID, stage_dout=True)
+    quad = wp.render(schedule, "float", 4, vector=4, table_w=True, factored=True, scale=True, horner=True,
+                     blocks=blocks, spline=GRID, stage_dout=True, stage_quads=True)
+    assert "reinterpret_cast<const float4*>(stage_row)[0 + channel]" in quad and quad.count("sq0 = ") == 1
+    assert all(f"sq0.{c}" in quad for c in "xyzw") and "stage_row[" not in quad.split("STAGE_QUADS: quartet")[1]
+    total = lambda src: src.split("stage_row[")[1].split("]")[0]  # noqa: E731
+    assert int(total(quad)) == 4 * schedule.channels <= int(total(plain)) + 3 * schedule.channels
+    with pytest.raises(ValueError):
+        wp.render(schedule, "float", 4, vector=4, table_w=True, horner=True, blocks=blocks, spline=GRID,
+                  stage_quads=True)
+    from fastmace.kernels import nvrtc_available
+    if nvrtc_available():
+        from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+        assert compile_cubin(quad, (9, 0))

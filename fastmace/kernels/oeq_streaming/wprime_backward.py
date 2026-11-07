@@ -197,6 +197,14 @@ HOIST_SCALE_GPUS = GPUModels(())
 STAGE_DOUT = None
 STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
+# STAGE_DOUT's row as quartets of output-gradient components (Codex H200 follow-up, 7 November 2026, item 2): with
+# the block layout, component o (in the order the paths read them) of channel c at (o // 4) * 4C + 4c + o % 4, so a
+# lane reads four components of its channel with one LDS.128 (40 per edge and lane-channel instead of 160 scalar LDS
+# at 4 channels per lane); the fill reads them with coalesced scalar loads and stores float4. The same row size (the
+# component count rounded up to 4) and the same values in the same order: bitwise. None: on for STAGE_QUADS_GPUS;
+# True / False: an A/B side's choice. Applies only with STAGE_DOUT and the block layout.
+STAGE_QUADS = None
+STAGE_QUADS_GPUS = GPUModels(())
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
@@ -290,6 +298,23 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         const unsigned stage_b = __ballot_sync(FULL_MASK, stage_i < stage_c1 && receivers[stage_i] != stage_r);
         if (stage_b) stage_t1 = stage_s + __ffs(stage_b);
         if (stage_r >= 0 && stage_r < node_count) {
+            {%- if stage_quads %}
+            // STAGE_QUADS: quartet q of channel c at float4 q * CHANNEL_DIM + c.
+            for (int c = threadIdx.x; c < CHANNEL_DIM; c += blockDim.x) {
+                {%- for quad in stage_quads %}
+                {
+                    float4 v;
+                    {%- for g, width, offset in quad %}
+                    v.{{ "xyzw"[loop.index0] }} = __ldg(dout{{ g }} + int64_t(stage_r) * {{ width }} + {{ offset }} + c);
+                    {%- endfor %}
+                    {%- for k in range(quad | length, 4) %}
+                    v.{{ "xyzw"[k] }} = 0.f;
+                    {%- endfor %}
+                    reinterpret_cast<float4*>(stage_row)[{{ loop.index0 * schedule.channels }} + c] = v;
+                }
+                {%- endfor %}
+            }
+            {%- else %}
             {%- for g, offset, width in stage_rows %}
             {
                 const scalar_t* src = {{ "dout" ~ g if blocks else "dout" }} + int64_t(stage_r) * {{ width }};
@@ -303,6 +328,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 }
             }
             {%- endfor %}
+            {%- endif %}
         }
     }
     __syncthreads();
@@ -385,6 +411,9 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         {%- for slot in schedule.input_gradient_slots %}
             acc_t {{ slot.name }} = acc_t(0);
         {%- endfor %}
+        {%- if stage_quads %}
+        float4 {% for quad in stage_quads %}sq{{ loop.index0 }}{{ ", " if not loop.last else ";" }}{% endfor %}
+        {%- endif %}
 
         {% for path in schedule.paths %}
             {%- set path_index = loop.index0 %}
@@ -460,7 +489,13 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 
                 {% for output in path.outputs %} {
                     {%- set slot = output.accumulator %}
-                    {%- if blocks and stage_dout %}
+                    {%- if stage_quads %}
+                    {%- set qk = quad_of[slot.name] %}
+                    {%- if qk[1] == 0 and edge_channel == 0 %}
+                    sq{{ qk[0] }} = reinterpret_cast<const float4*>(stage_row)[{{ qk[0] * schedule.channels }} + channel];
+                    {%- endif %}
+                    const scalar_t output_gradient = sq{{ qk[0] }}.{{ "xyzw"[qk[1]] }};
+                    {%- elif blocks and stage_dout %}
                     {%- set bk = blocks[slot.start] %}
                     const scalar_t output_gradient = stage_row[{{ stage_offsets[bk[0]] }}
                         + {{ bk[2] + slot.component * bk[3] }} + channel];
@@ -684,7 +719,8 @@ def factored_paths(schedule, scale=False):
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
-           table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None):
+           table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
+           stage_quads=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -700,7 +736,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     ``hoist_scale`` (``HOIST_SCALE``, with ``horner``): the piece scale applied once per edge. ``stage_dout``
     (``STAGE_DOUT``; ``stage_dout_supported``): a block per ``STAGE_DOUT_CHUNK`` edges, each receiver's dout row in
     shared memory (launch ``ceil(edges / STAGE_DOUT_CHUNK)`` blocks). ``spline`` (``SPLINE_W``): the spline's grid
-    ``[(start, end, intervals)]``; the table is ``spline_table``'s (4 power-basis terms per interval, HORNER)."""
+    ``[(start, end, intervals)]``; the table is ``spline_table``'s (4 power-basis terms per interval, HORNER).
+    ``stage_quads`` (``STAGE_QUADS``; with ``stage_dout`` and ``blocks``): the staged row as component quartets."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -738,7 +775,13 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     if stage_dout and not stage_dout_supported(schedule, scalar, blocks):
         raise ValueError("stage_dout needs float32, 32-lane cohorts, a chunk of 1..32 edges and a dout row within "
                          "48 KB")
+    if stage_quads and not (stage_dout and blocks is not None):
+        raise ValueError("stage_quads lays out STAGE_DOUT's block-layout row: it needs stage_dout and blocks")
     stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
+    quads, quad_of = (None, None)
+    if stage_quads:
+        quads, quad_of = stage_quad_layout(schedule, blocks)
+        stage_total = len(quads) * 4 * int(schedule.channels)
     env = get_jinja_environment(backend="cuda", warp_size=schedule.launch_config.logical_cohort_width)
     return env.from_string(TEMPLATE).render(scalar=scalar, schedule=schedule, layout=schedule.layout,
                                             terms=int(terms), stream_w=STREAM_W if stream_w is None else stream_w,
@@ -753,7 +796,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             stage_dout=bool(stage_dout), stage_chunk=int(STAGE_DOUT_CHUNK),
                                             estrin=bool(estrin), fold_alpha=bool(fold_alpha),
                                             stage_rows=stage_rows, stage_offsets=stage_offsets,
-                                            stage_total=stage_total,
+                                            stage_total=stage_total, stage_quads=quads, quad_of=quad_of,
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1,
                                             spline=None if spline is None else _spline_lookup(spline, scalar))
 
@@ -781,6 +824,33 @@ def _stage_layout(schedule, blocks):
         offsets[g] = total
         total += widths[g]
     return rows, offsets, total
+
+
+def stage_quad_layout(schedule, blocks):
+    """``STAGE_QUADS``' row: ([quartet: [(group, width, row offset without the channel)]], {slot name: (quartet,
+    component)}), the output-gradient components numbered in the order the paths read them."""
+    from fastmace.kernels.oeq_streaming.fused_forward import block_map
+
+    bmap = block_map(blocks, schedule.channels)
+    order = []
+    for path in schedule.paths:
+        for output in path.outputs:
+            slot = output.accumulator
+            if slot.name not in order:
+                order.append(slot.name)
+    slots = {}
+    for path in schedule.paths:
+        for output in path.outputs:
+            slots[output.accumulator.name] = output.accumulator
+    quads, quad_of = [], {}
+    for o, name in enumerate(order):
+        slot = slots[name]
+        g, width, base, stride = bmap[slot.start]
+        if o % 4 == 0:
+            quads.append([])
+        quads[-1].append((int(g), int(width), int(base + slot.component * stride)))
+        quad_of[name] = (o // 4, o % 4)
+    return quads, quad_of
 
 
 def stage_dout_supported(schedule, scalar, blocks=None):
@@ -930,6 +1000,7 @@ class WPrimeBackward:
         self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
         self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
+        self.stage_quads = self.stage_dout and blocks is not None and stage_quads_default(device)
         self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
@@ -938,7 +1009,7 @@ class WPrimeBackward:
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
-                             spline=self.spline)
+                             spline=self.spline, stage_quads=self.stage_quads)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1324,6 +1395,11 @@ def stage_dout_default(device):
     return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
 
 
+def stage_quads_default(device):
+    """``STAGE_QUADS`` on ``device``: the constant when set, else on for ``STAGE_QUADS_GPUS``."""
+    return bool(STAGE_QUADS) if STAGE_QUADS is not None else _device_name(device) in STAGE_QUADS_GPUS
+
+
 def redux_default(device):
     """``REDUX`` on ``device``: the constant when set, else on for ``REDUX_GPUS``."""
     return bool(REDUX) if REDUX is not None else _device_name(device) in REDUX_GPUS
@@ -1518,7 +1594,8 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
-           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "stage_dout_default", "stage_dout_supported",
+           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS",
+           "stage_quad_layout", "stage_quads_default", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table",
            "wprime_arguments",
