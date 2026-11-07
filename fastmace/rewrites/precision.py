@@ -67,7 +67,30 @@ def route(model):
                     module.segments_in, module.segments_out, module.block_ends,
                     [getattr(module, f"weight_{k}") for k in range(count)])
         names.append(name)
+    _route_compose_skip(model)
     return names
+
+
+def _route_compose_skip(model):
+    """``kernels.triton.compose_skip`` on every generic interaction that qualifies (``compose_skip_products``), on
+    CUDA where ``compose_skip_default`` says so for the GPU."""
+    import torch
+
+    from fastmace.kernels.triton import compose_skip
+    from fastmace.rewrites.generic.modules import compose_skip_products
+
+    for module in model.modules():
+        reassociation = getattr(module, "first_reassociation", None)
+        if reassociation is None or not hasattr(reassociation, "compose_skip"):
+            continue
+        reassociation.compose_skip = None
+        device = reassociation.columns.device
+        if device.type != "cuda" or not compose_skip.compose_skip_default(torch.cuda.get_device_name(device)):
+            continue
+        products = compose_skip_products(module)
+        if products is not None:
+            linear, skip = products
+            reassociation.compose_skip = (module.linear, linear, module.skip_tp, skip)
 
 
 def _support(model):

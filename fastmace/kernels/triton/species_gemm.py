@@ -12,7 +12,8 @@ most ``ceil(atoms * size / BLOCK_M) + species`` of them; the tiles past the last
 from ``x`` and scatters its results to ``y``; every row is written once.
 
 Each output element is the same K-long dot product as in the concatenated product, reduced in ``BLOCK_K`` steps;
-``precision`` "ieee" (FP32 FMA) or "tf32x3" (``tf32x3_gemms``). On the CPU the product runs in PyTorch.
+``precision`` "ieee" (FP32 FMA), "tf32x3" (``tf32x3_gemms``) or "tf32x3-cutlass" (tf32x3 through the CUTLASS
+launch where the operands fit, whatever ``CUTLASS`` says). On the CPU the product runs in PyTorch.
 
 ``TENSOR_CORES`` (tf32x3 only, compute capability 8.0+, N a multiple of 16 up to 256): the product in a CUDA
 kernel of our own instead of Triton's tf32x3 dot, which on the A100 runs at about a third of the CUTLASS kernels'
@@ -307,7 +308,10 @@ def _launch(x, w, order, counts, out, precision):
 
     atoms, size, k = x.shape
     n = w.shape[2]
-    if CUTLASS and precision == "tf32x3":
+    cutlass = CUTLASS
+    if precision == "tf32x3-cutlass":  # the caller's choice of the CUTLASS launch (compose_skip), else as "tf32x3"
+        precision, cutlass = "tf32x3", True
+    if cutlass and precision == "tf32x3":
         lda = _cutlass_rows(x, w, out)
         if lda:
             _launch_cutlass(x, w, order, counts, out, lda)
