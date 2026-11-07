@@ -5,6 +5,7 @@
 # build orders (ab with abab, ba with abba). Optional gate first: GATE_ARGS = force_stress_gate.py production args.
 #   OUT=runs/<id> MODEL=off23-medium CKPT=MACE-OFF23_medium.model STRUCTS="$ORG/water_216.extxyz@1x1x1" \
 #     SETS_FILE=sets.tsv bash tools/offpolar_ab.sh
+# STOP_AFTER=4 ends a structure's A/B after 4 blocks per side when b/a is more than 3 % from 1 (a clear result).
 set -uo pipefail
 out=${OUT:?the job sets OUT}
 mkdir -p "$out"
@@ -35,7 +36,7 @@ while IFS=$'\t' read -r name args; do
     eval "set -- $args"
     job "ab-$name-$order" python tools/ab_rewrites.py --output "$out/ab-$name-$order" --checkpoint "$ckpt" \
       --model "$model" --structures "${structs[@]}" --warmup "${WARMUP:-300}" --block "${BLOCK:-200}" \
-      --blocks "${BLOCKS:-8}" --order "$order" --pattern "$pattern" "$@"
+      --blocks "${BLOCKS:-8}" --order "$order" --pattern "$pattern" ${STOP_AFTER:+--stop-after $STOP_AFTER} "$@"
   done
 done < "$SETS_FILE"
 note "done"
