@@ -88,3 +88,36 @@ def test_tabled_outer_sum_matches_float64(monkeypatch, density, tabled):
     scale = ref_dr.abs().max()
     assert (dr.double().cpu()[:, 0] - ref_dr).abs().max() / scale < 1e-5
     assert (dy.double().cpu() - ref_y).abs().max() / ref_y.abs().max() < 1e-5  # float32 sums of 64 terms
+
+
+@pytest.mark.parametrize("power", [False, True])
+def test_packed_coef_changes_no_bit(monkeypatch, power):
+    """PACKED_COEF (idea 3): the walks reading the channel-pair packed series give the unpacked walks' bits (the
+    edge density, dL/dr and grad_y; the slot sums up to the atomics' order across programs)."""
+    monkeypatch.setattr(tos, "TABLED_FORWARD", True)
+    monkeypatch.setattr(tos, "POWER_BACKWARD", power)
+    from fastmace.rewrites.radial import power_basis
+
+    coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max = _table()
+    edges, d, k, slots = 500, 16, 64, 53
+    g = torch.Generator().manual_seed(13)
+    r = (torch.rand((edges, 1), generator=g, dtype=torch.float64) * 6.4 + 0.2).float().cuda()
+    pair = torch.randint(0, coef.shape[0], (edges,), generator=g).to(torch.int32).cuda()
+    y = torch.randn((edges, d), generator=g).cuda()
+    key = torch.sort(torch.randint(0, slots, (edges,), generator=g)).values.cuda()
+    grads = [torch.randn((slots, d * k), generator=g).cuda(), torch.randn((edges, 1), generator=g).cuda()]
+    coef_c, dcoef_c, starts_c, scales_c, bins_c = (t.float().cuda() if t.is_floating_point() else t.cuda()
+                                                   for t in (coef, dcoef, starts, scales, bins))
+    pcoef_c = power_basis(coef_c)
+    results = []
+    for packed in (False, True):
+        r_c, y_c = r.clone().requires_grad_(True), y.clone().requires_grad_(True)
+        summed, density = tos.tabled_outer_sum(
+            r_c, pair, coef_c, dcoef_c, starts_c, scales_c, bins_c, r_lo, bin_scale, r_max, k, y_c, key, slots,
+            pcoef=pcoef_c, packed=tos.packed_coef(coef_c) if packed else None,
+            ppacked=tos.packed_coef(pcoef_c) if packed else None)
+        dr, dy = torch.autograd.grad([summed, density], (r_c, y_c), grads)
+        results.append((summed, density, dr, dy))
+    (s0, e0, r0, y0), (s1, e1, r1, y1) = results
+    assert torch.equal(e0, e1) and torch.equal(r0, r1) and torch.equal(y0, y1)
+    torch.testing.assert_close(s1, s0, rtol=1e-6, atol=1e-6)
