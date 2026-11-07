@@ -413,10 +413,71 @@ FUSED_FOURIER = False
 SPIN_BATCHED = False
 
 
+# Opt-in switch (polar-megakernel, 7 November 2026): each field-feature call of the charge recursion (one graph,
+# full PBC; both spins in one call with SPIN_BATCHED) as one persistent kernel per direction
+# (fastmace.kernels.triton.kspace_megakernel: structure factor, density, Coulomb kernel and projection, with the
+# per-k glue on chip). Takes the fused k-space geometry (no dense cosines and sines) like FUSED_FOURIER; the Coulomb
+# energy then uses FUSED_FOURIER's structure factor. None: on for MEGAKERNEL_GPUS (decision 66; empty until it wins
+# an MD-step A/B in both orders and passes the gate); True / False: an A/B. Rounding.
+# tests/cpu/test_kspace_megakernel.py, tests/gpu/test_kspace_megakernel_cuda.py.
+MEGAKERNEL = None
+MEGAKERNEL_GPUS = ()
+
+
+def megakernel_on(tensor):
+    """``MEGAKERNEL`` for float32 CUDA ``tensor``: the constant when set, else on for ``MEGAKERNEL_GPUS``."""
+    import torch
+
+    if not (tensor.is_cuda and tensor.dtype == torch.float32):
+        return False
+    if MEGAKERNEL is not None:
+        return bool(MEGAKERNEL)
+    index = tensor.device.index if tensor.device.index is not None else torch.cuda.current_device()
+    return _megakernel_listed(index)
+
+
+def _megakernel_listed(index):
+    """Whether CUDA device ``index`` is one of ``MEGAKERNEL_GPUS``, as a Dynamo constant (a traced
+    ``torch.cuda.get_device_name`` breaks the graph; see ``generic.modules._fused_first_listed``)."""
+    return _megakernel_listed_constant(index)
+
+
+def _megakernel_listed_constant(index):  # a Dynamo constant (below)
+    import torch
+
+    from fastmace.kernels.gpu_models import GPUModels
+
+    return torch.cuda.get_device_name(index) in GPUModels(MEGAKERNEL_GPUS)
+
+
+# torch.compiler.assume_constant_result without importing torch here (it only sets this attribute).
+_megakernel_listed_constant._dynamo_marked_constant = True
+
+
+def _megakernel_features(cache, source):
+    """Field features [atoms, C, sigma * m] of ``source`` [atoms, C, m] through the k-space megakernel."""
+    from graph_longrange.features import FIELD_CONSTANT
+
+    from fastmace.kernels.triton.kspace_megakernel import kspace_field
+
+    density_basis, feature_basis = cache["density_basis_fs"], cache["feature_basis_fs"]
+    n_k = density_basis.size(0)
+    dr = density_basis[..., 0].reshape(n_k, -1)
+    di = density_basis[..., 1].reshape(n_k, -1)
+    pr = feature_basis[..., 0].reshape(n_k, -1)
+    pi = feature_basis[..., 1].reshape(n_k, -1)
+    if cache["k_factor_proj"] is not None:
+        pr = pr * cache["k_factor_proj"].unsqueeze(-1)
+        pi = pi * cache["k_factor_proj"].unsqueeze(-1)
+    w = (2 * math.pi) ** 3 / cache["volume_per_k"] * cache["k_factor_coulomb"] * FIELD_CONSTANT
+    return kspace_field(cache["k_vectors"], cache["node_positions"], cache["fourier_mask"], source, dr, di, w, pr, pi)
+
+
 def _fourier_mask(k_vector_batch, node_positions, call):
-    """The kept k-vectors as a [k] 0/1 column when ``FUSED_FOURIER`` takes this call (one graph), else None."""
-    if not (FUSED_FOURIER and call is not None and call.data is not None and "ptr" in call.data
-            and call.data["ptr"].shape[0] == 2):
+    """The kept k-vectors as a [k] 0/1 column when ``FUSED_FOURIER`` or the megakernel takes this call (one
+    graph), else None."""
+    if not ((FUSED_FOURIER or megakernel_on(node_positions)) and call is not None and call.data is not None
+            and "ptr" in call.data and call.data["ptr"].shape[0] == 2):
         return None
     return (k_vector_batch == 0).to(dtype=node_positions.dtype)
 
@@ -463,6 +524,14 @@ def pbc_forward_dynamic(self, original, source_feats, cache):
     mask = cache.get("fourier_mask")
     if mask is None or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC:
         return original(self, source_feats, cache)
+    if megakernel_on(cache["node_positions"]):
+        n_nodes = source_feats.size(0)
+        features = _megakernel_features(cache, source_feats.reshape(n_nodes, 1, -1))
+        features_flat = self._permute_output_channels(features.reshape(n_nodes, -1))
+        source_feats_lm = source_feats.squeeze(-2) if source_feats.dim() == 3 else source_feats
+        if not self.include_self_interaction:
+            features_flat = features_flat - self.self_interaction_terms(source_feats_lm)
+        return features_flat
     density = _fused_density(source_feats, cache["k_vectors"], cache["node_positions"], mask,
                              cache["density_basis_fs"], cache["volume_per_k"])
     potential = apply_coulomb_kernel_batch(k_norm2=cache["k_norm2"], density=density,
@@ -492,6 +561,15 @@ def spin_field_features(descriptor, cache, alpha, beta, pbc):
         project_to_features_batch_channels,
     )
 
+    if (cache.get("mode") != "realspace" and cache.get("correction_mode", CORRECTION_MODE_MIXED) == CORRECTION_MODE_PBC
+            and cache.get("fourier_mask") is not None and megakernel_on(cache["node_positions"])):
+        n_nodes = alpha.size(0)
+        features = _megakernel_features(cache, torch.stack((alpha, beta), dim=1))  # [atoms, 2 spins, sigma * m]
+        features_flat = descriptor._permute_output_channels(features)
+        if not descriptor.include_self_interaction:
+            si_terms = descriptor.self_interaction_terms(torch.cat((alpha, beta), dim=0))
+            features_flat = features_flat - si_terms.view(2, n_nodes, -1).transpose(0, 1)
+        return features_flat[:, 0], features_flat[:, 1]
     if (cache.get("mode") == "realspace" or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC
             or cache.get("fourier_mask") is not None or cache.get("cosines") is None):
         return (descriptor.forward_dynamic(cache=cache, source_feats=alpha.unsqueeze(-2), pbc=pbc),
