@@ -1,0 +1,57 @@
+{
+ "tool": "loup_md",
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "atoms": 5000,
+ "ensemble": "langevin",
+ "skin": 0.5,
+ "warmup": 300,
+ "steps": 256,
+ "blocks": 8,
+ "requested": {},
+ "constants": {
+  "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W": true
+ },
+ "gpu": "NVIDIA H200",
+ "fastmace": "1.0.0",
+ "setup_s": 33.51287549799997,
+ "block_s": [
+  1.095996280999998,
+  1.1000572310000507,
+  1.1028169410000146,
+  1.103685368000015,
+  1.1039842530000215,
+  1.1040227160000313,
+  1.1046169249999593,
+  1.1053192800000033
+ ],
+ "us_per_atom_step": [
+  0.8562470945312484,
+  0.8594197117187896,
+  0.8615757351562614,
+  0.8622541937500117,
+  0.8624876976562668,
+  0.8625177468750245,
+  0.8629819726562182,
+  0.8635306875000026
+ ],
+ "median_us_per_atom_step": 0.8623709457031392,
+ "ms_per_step": 4.311854728515696,
+ "rewrites_on": [
+  "block_linear",
+  "chunked_conv_backward",
+  "fold_product_linear",
+  "fused_folded_backward",
+  "fused_folded_forward",
+  "grouped_linear",
+  "merged_residual",
+  "radial_tables",
+  "reassociate_first",
+  "segmented_first_sum",
+  "single_graph_strain",
+  "species_skip",
+  "streaming_conv",
+  "tf32x3_gemms",
+  "wprime_backward"
+ ],
+ "max_memory_allocated_mib": 1197.76123046875
+}
