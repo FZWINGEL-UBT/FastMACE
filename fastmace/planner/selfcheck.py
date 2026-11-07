@@ -80,7 +80,7 @@ from fastmace.errors import FastMACEError, GateFailed, GateUnavailable
 CHECK_MODES = ("skip", "gate", "allow_unavailable")
 STATUSES = ("passed", "passed-reduced", "failed", "unavailable", "skipped")
 SKIPPED_REASON = 'opt-in: check="gate"'
-RATIO = 2.0
+RATIO = 3.0  # owner, 7 November 2026: "Change the rule to 3x" (was 2.0)
 QUANTITIES = ("energy_meV_per_atom", "force_eV_per_A", "stress_eV_per_A3")
 # The absolute floors of §12.3: 0.01 meV/atom, 1e-5 eV/Å (largest force component), 1e-7 eV/Å^3
 # (largest stress component, about 16 kPa).

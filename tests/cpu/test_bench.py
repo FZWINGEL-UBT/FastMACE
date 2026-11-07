@@ -276,7 +276,7 @@ def test_errors():
 def test_floors_are_the_spec_floors():
     from fastmace.planner import selfcheck
 
-    assert gate.GATE_RATIO == 2.0 == selfcheck.RATIO
+    assert gate.GATE_RATIO == 3.0 == selfcheck.RATIO
     assert gate.FLOORS == {"energy": 0.01, "forces": 1e-5, "stress": 1e-7}  # meV/atom, eV/A, eV/A^3 (§12.3)
     assert gate.QUANTITIES == ("energy", "forces", "stress")
 
