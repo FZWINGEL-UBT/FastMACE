@@ -14,7 +14,7 @@ log=$out/run.log
 note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
 note "Modal $(nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader); source $(cat .source_commit 2>/dev/null)"
 note "start lab"
-python tools/omat0_kernel_lab.py --checkpoint "$ck" --structure "$st@10x10x10" --kernels wprime forward --rounds 15 \
+python tools/omat0_kernel_lab.py --checkpoint "$ck" --structure "$st@10x10x10" --kernels forward wprime --rounds 15 \
   --variants ${VARIANTS-base sx-wbuf sx-table6 sx-spline256 sx-spline2048 sx-spline4096 sx-F-w1 B-spline256 B-spline2048 B-spline4096} \
   --output "$out/lab" > "$out/lab.log" 2>&1 < /dev/null
 note "end lab exit=$?"

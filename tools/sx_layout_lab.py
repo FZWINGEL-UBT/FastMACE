@@ -367,7 +367,7 @@ def _forward_args(mode, knots=None):
                       bins=wp[13].int().contiguous())
         elif mode == "wbuf":
             k = 64
-            sx["tab"] = (a[:, :k] @ weight[:, :k].T).contiguous()
+            sx["tab"] = (a[:, :k].double() @ weight[:, :k].double().T).float().contiguous()  # no TF32
         return [a, weight, x, sh, senders, receivers, row_ptr, out, w, sx]
     return transform
 
@@ -435,3 +435,41 @@ def _wp_args(knots):
 
 def wprime_variants(kernel=None, knots=(256, 2048, 4096)):
     return {f"B-spline{n}": ("rounding", _wp_transform(n), (), _wp_args(n)) for n in knots}
+
+
+# --------------------------------------------------------------------------------------------- guard
+# Largest message error against the production base (max|d|/max|a|) before any timing: the layout with w = a.W must
+# match production to rounding; the table and the splines to their approximation. A larger value is a bug, and the
+# job stops before the timed rounds (owner's budget: a broken kernel should cost only its compile time).
+GUARD = {"sx-wbuf": 1e-4, "sx-table6": 1e-3, "sx-spline": 0.05, "B-spline": 0.05}
+
+
+def _worst(compare):
+    values = []
+    for key, text in compare.items():
+        if key == "against":
+            continue
+        if text == "bitwise":
+            values.append(0.0)
+            continue
+        found = re.search(r"max\|d\|/max\|a\| = ([0-9.eE+-]+|nan|inf)", str(text))
+        values.append(float(found.group(1)) if found else float("inf"))
+    return max(values) if values else float("inf")
+
+
+def check_before_timing(kernel_name, built):
+    """Raise SystemExit when a sx-layout variant failed to build or its outputs are off by more than GUARD."""
+    problems = []
+    for variant, b in built.items():
+        limit = next((v for k, v in GUARD.items() if variant.startswith(k)), None)
+        if limit is None:
+            continue
+        if "launch" not in b:
+            problems.append(f"{variant}: not built ({b.get('error', '')[-300:]})")
+            continue
+        worst = _worst(b.get("compare", {}))
+        print(f"{kernel_name} guard {variant}: worst max|d|/max|a| {worst:.2e} (limit {limit:g})", flush=True)
+        if not worst <= limit:
+            problems.append(f"{variant}: {worst:.2e} > {limit:g} {b.get('compare')}")
+    if problems:
+        raise SystemExit("sx-layout guard failed before timing:\n" + "\n".join(problems))

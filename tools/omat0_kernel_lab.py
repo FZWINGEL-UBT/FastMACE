@@ -2393,6 +2393,8 @@ def main(argv=None):
             elif variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
         snapshots = None
+        if any(v.startswith(("sx-", "B-spline")) for v in built):  # the sx-layout lab: stop before any timing
+            _sx_layout_lab().check_before_timing(name, built)
         times = {v: [] for v in live}
         flush = (torch.empty(int(args.flush_l2_mb) << 18, dtype=torch.float32, device="cuda")
                  if args.flush_l2_mb else None)
