@@ -253,7 +253,10 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            # chunked_conv_backward: MH-1's class, and every label with a generic interaction on its folded path
            # (generic_chunked_conv_backward; decision 66: this file's GPU is measured)
            "chunked_conv_backward": LABELS,
-           "radial_tables": (*FACTORED_LABELS, *GENERIC_FAMILY_LABELS),  # generic: decision 66 (this file's GPU)
+           # generic: decision 66 (this file's GPU); MACE-OFF (stock first block): DECISION_66_STOCK_FIRST_TABLES_GPUS,
+           # which lists this file's GPU since off-polar-alex (7 November 2026)
+           "radial_tables": (*FACTORED_LABELS, *GENERIC_FAMILY_LABELS,
+                             *(label for label in LABELS if label.startswith("off"))),
            # species_tables: PolarMACE.forward pinned too (polar-T01); the folds stay MH-1's
            "species_tables": (*MH1_LABELS, *fixed.POLAR_GRAPH_LABELS), "fold_product_linear": MH1_LABELS,
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),

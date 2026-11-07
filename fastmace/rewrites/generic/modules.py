@@ -426,8 +426,10 @@ SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generati
 STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
     "RealAgnosticInteractionBlock": "0a9b26328a7533f380b45af53e78f60e98ffed022cb9b7c136f781ddefefdf97",
 })
+# RTX 5060 Ti (local, 7 November 2026, ~/fm-runs/offlocal-ab-20261107): with the OFF tables, MD step b/a in both
+# orders, water_216: OFF23-small 0.677 / 0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811.
 STOCK_FIRST_SKIP = None
-STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
 
 
 def stock_first_skip_default(device=None):
