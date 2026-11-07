@@ -359,7 +359,11 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const scalar_t r = lengths[e];
     const bool sloped = r < r_max && r >= r_lo;
     const scalar_t clamped = r > r_lo ? r : r_lo;
-    {%- if spline %}
+    {%- if spline and shared_locator %}
+    // SHARED_LOCATOR: the slab, t and 1 / h from spline_locator's record (passed as bins), the same lookup.
+    const int4 loc = __ldg(reinterpret_cast<const int4*>(bins) + e);
+    const float t = __int_as_float(loc.y), sx_inv = __int_as_float(loc.z);
+    {%- elif spline %}
     // SPLINE_W: the cubic spline's interval and t in [0, 1) (rewrites.radial.spline; pieces = its intervals).
 {{ spline }}
     const int32_t piece = iv;
@@ -369,7 +373,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const int32_t piece = bins[bin];
     const scalar_t t = (clamped - starts[piece]) * scales[piece] - scalar_t(1);
     {%- endif %}
-    const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;
+    const scalar_t* g = gprime + {{ slab }} * PADDED_TERMS * WEIGHT_DIM;
     {%- if horner %}
     // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
     const bool inside = r < r_max;
@@ -720,7 +724,7 @@ def factored_paths(schedule, scale=False):
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
            table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
-           stage_quads=False):
+           stage_quads=False, shared_locator=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -737,7 +741,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     (``STAGE_DOUT``; ``stage_dout_supported``): a block per ``STAGE_DOUT_CHUNK`` edges, each receiver's dout row in
     shared memory (launch ``ceil(edges / STAGE_DOUT_CHUNK)`` blocks). ``spline`` (``SPLINE_W``): the spline's grid
     ``[(start, end, intervals)]``; the table is ``spline_table``'s (4 power-basis terms per interval, HORNER).
-    ``stage_quads`` (``STAGE_QUADS``; with ``stage_dout`` and ``blocks``): the staged row as component quartets."""
+    ``stage_quads`` (``STAGE_QUADS``; with ``stage_dout`` and ``blocks``): the staged row as component quartets.
+    ``shared_locator`` (``spline_forward.SHARED_LOCATOR``; with ``spline``): the slab, t and 1 / h read from
+    ``spline_locator``'s per-edge int4 record, passed in the ``bins`` argument."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -777,6 +783,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                          "48 KB")
     if stage_quads and not (stage_dout and blocks is not None):
         raise ValueError("stage_quads lays out STAGE_DOUT's block-layout row: it needs stage_dout and blocks")
+    if shared_locator and spline is None:
+        raise ValueError("shared_locator reads the spline locator's records: it needs spline")
     stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
     quads, quad_of = (None, None)
     if stage_quads:
@@ -798,7 +806,10 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             stage_rows=stage_rows, stage_offsets=stage_offsets,
                                             stage_total=stage_total, stage_quads=quads, quad_of=quad_of,
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1,
-                                            spline=None if spline is None else _spline_lookup(spline, scalar))
+                                            spline=None if spline is None else _spline_lookup(spline, scalar),
+                                            shared_locator=bool(shared_locator),
+                                            slab="int64_t(loc.x)" if shared_locator
+                                            else "(int64_t(pairs[e]) * pieces + piece)")
 
 
 def _spline_lookup(grid, scalar):
@@ -974,7 +985,7 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False, table_pairs=False, fold_alpha=False, spline=None):
+                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -1003,13 +1014,14 @@ class WPrimeBackward:
         self.stage_quads = self.stage_dout and blocks is not None and stage_quads_default(device)
         self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
+        self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
-                             spline=self.spline, stage_quads=self.stage_quads)
+                             spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1199,6 +1211,41 @@ class _SplineBlockConvolution(torch.autograd.Function):
         # The spline kernel's piece count is spline_starts' length (its intervals); scales and bins are not read.
         dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
                                                             spline_starts, scales, bins, *ctx.constants,
+                                                            ctx.wprime_id)
+        if grads[-1] is not None:
+            dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 5
+
+
+class _SplineLocatedBlockConvolution(torch.autograd.Function):
+    """``_SplineBlockConvolution`` with ``spline_forward.SHARED_LOCATOR``: ``spline_locate`` writes each edge's
+    spline record once; the forward and the w' kernel read it (the w' kernel in place of ``bins``)."""
+
+    @staticmethod
+    def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id):
+        from fastmace.kernels.oeq_streaming.spline_forward import spline_locate, spline_message_blocks_located
+        from fastmace.kernels.triton.radial_table import radial_table_forward
+
+        _, density = radial_table_forward(r, pair, density_coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
+                                          0)
+        locator = spline_locate(r, pair, spline_id)
+        groups = spline_message_blocks_located(x, sh, senders, row_ptr, locator, pair, table, spline_id)
+        ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
+                              bins, locator)
+        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
+        return (*groups, density)
+
+    @staticmethod
+    def backward(ctx, *grads):
+        (x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
+         bins, locator) = ctx.saved_tensors
+        kernel = _REGISTRY[ctx.wprime_id]
+        from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
+        shapes = block_shapes(kernel.blocks, kernel.channels, x.shape[0])
+        douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
+        dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
+                                                            spline_starts, scales, locator, *ctx.constants,
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
@@ -1484,7 +1531,7 @@ class WPrime(torch.nn.Module):
                              persistent=False)
         self.register_buffer("density_coef", table.coef[..., -1:].contiguous(), persistent=False)
         self.spline = dict(grid=[tuple(g) for g in spline["grid"]], r_max=float(table.r_max),
-                           certificate=certificate,
+                           r_lo=float(table.r_lo), certificate=certificate,
                            path_scale=None if scale is None else [float(scale[p.weight_start])
                                                                   for p in self.kernels.schedule.paths])
         return True
@@ -1509,16 +1556,18 @@ class WPrime(torch.nn.Module):
                                      horner=self.horner, table_pairs=self.table_pairs,
                                      factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha))
         self.spline_block = None
-        from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, spline_w_default
+        from fastmace.kernels.oeq_streaming.spline_forward import (SplineForward, shared_locator_default,
+                                                                   shared_locator_supported, spline_w_default)
         if self.spline is not None and spline_w_default(device):
             grid = self.spline["grid"]
+            shared = shared_locator_default(device) and shared_locator_supported(grid, self.spline["r_lo"])
             self.spline_block = (
                 fused.id,
                 SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                              self.spline["path_scale"]),
+                              self.spline["path_scale"], shared_locator=shared),
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
-                               spline=grid))
+                               spline=grid, shared_locator=shared))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1546,7 +1595,9 @@ class WPrime(torch.nn.Module):
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
         if (self.spline_block is not None and fused is not None and linear is not None
                 and self.spline_block[0] == fused.id and BLOCK_MESSAGE is not False):  # SPLINE_W
-            *groups, density = _SplineBlockConvolution.apply(
+            convolution = (_SplineLocatedBlockConvolution if self.spline_block[1].shared_locator
+                           else _SplineBlockConvolution)  # SHARED_LOCATOR
+            *groups, density = convolution.apply(
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
                 x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id)

@@ -170,6 +170,115 @@ def test_spline_sources_compile_with_nvrtc():
                                            scale=True, horner=True, blocks=blocks, spline=GRID), capability)
 
 
+def test_shared_locator_is_off_without_a_listed_gpu(monkeypatch):
+    assert sf.SHARED_LOCATOR is None and len(sf.SHARED_LOCATOR_GPUS) == 0
+    assert not sf.shared_locator_default("cpu")
+    monkeypatch.setattr(sf, "SHARED_LOCATOR", True)
+    assert sf.shared_locator_default("cpu")
+
+
+def _wprime(**options):
+    return wp.render(_schedule(), "float", 4, table_w=True, factored=True, scale=True, horner=True,
+                     blocks=[(1, [0]), (3, [64])], spline=GRID, **{"vector": 4, **options})
+
+
+def test_shared_locator_off_leaves_both_sources_unchanged():
+    blocks = [(1, [0]), (3, [64])]
+    for threads, min_blocks in ((None, None), (128, 6)):
+        plain = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, threads, min_blocks)
+        assert plain == sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, threads, min_blocks,
+                                  shared_locator=False)
+        assert "locator" not in plain and "SHARED_LOCATOR" not in plain
+        assert sf.lookup_code(GRID, "re", "float", "            ") in plain
+    for options in ({}, {"vector": 2}, {"stage_dout": True, "stage_quads": True}, {"hoist_scale": True}):
+        plain = _wprime(**options)
+        assert plain == _wprime(shared_locator=False, **options)
+        assert "SHARED_LOCATOR" not in plain and "loc." not in plain
+        assert "gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;" in plain
+
+
+def test_shared_locator_sources_read_the_record_instead_of_locating():
+    blocks = [(1, [0]), (3, [64])]
+    lookup = sf.lookup_code(GRID, "re", "float", "        ")
+    producer = sf.render_locator(GRID, R_MAX)
+    assert lookup in producer  # the same lookup text as both kernels, so the same float32 operations
+    assert "make_int4((int)((int64_t)pairs[e] * intervals + iv), __float_as_int(t), __float_as_int(sx_inv)," in producer
+    assert f"constexpr float R_MAX = {(R_MAX).hex()}f;" in producer and "re < R_MAX ? 1 : 0" in producer
+    for threads, min_blocks in ((None, None), (128, 6)):
+        on = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, threads, min_blocks, shared_locator=True)
+        off = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, threads, min_blocks)
+        assert "const int4* __restrict__ locator," in on and "lengths" not in on
+        assert "__ldg(locator + e)" in on and "if (!loc.w) continue;" in on
+        assert "sx_inv" not in on and "pairs[e]" not in on and "else if" not in on
+        assert "const float4* tq = table + (int64_t)loc.x * Q + ch;" in on
+        # everything after the edge head (the message arithmetic and the stores) is the same text
+        assert on.split("const float4* tq")[1].split("\n", 1)[1] == off.split("const float4* tq")[1].split("\n", 1)[1]
+    two = _two_degree_schedule()
+    for k, part in enumerate(sf.spline_parts(two)):
+        assert "__ldg(locator + e)" in sf.render(two, blocks, GRID, R_MAX, None, part, 128, 6, f"spline_forward{k}",
+                                                 shared_locator=True)
+    with pytest.raises(ValueError):
+        sf.located_source("// not a spline_forward source", GRID)
+    for options in ({}, {"vector": 2}, {"stage_dout": True, "stage_quads": True}, {"hoist_scale": True}):
+        on = _wprime(shared_locator=True, **options)
+        assert "const int4 loc = __ldg(reinterpret_cast<const int4*>(bins) + e);" in on
+        assert "gprime + int64_t(loc.x) * PADDED_TERMS * WEIGHT_DIM;" in on
+        assert "else if" not in on and "pairs[e]" not in on and " sc = sx_inv;" in on
+        assert "const bool sloped = r < r_max && r >= r_lo;" in on and "const bool inside = r < r_max;" in on
+    with pytest.raises(ValueError):
+        wp.render(_schedule(), "float", 4, vector=4, table_w=True, horner=True, shared_locator=True)
+
+
+def _lengths():
+    """float32 lengths: random in and around the grid, the band edges and their float32 neighbours, the cutoff."""
+    r = torch.rand(4000, generator=torch.Generator().manual_seed(11), dtype=torch.float64) * 6.6
+    edges = torch.tensor([a for a, _, _ in GRID] + [b for _, b, _ in GRID] + [0.0, 1e-30, 7.0, 1e9],
+                         dtype=torch.float32)
+    near = torch.cat([edges, torch.nextafter(edges, edges + 1), torch.nextafter(edges, edges - 1)])
+    return torch.cat([r.float(), near])
+
+
+def test_locator_reference_matches_the_python_locate():
+    r = _lengths()
+    pair = torch.randint(0, 4, r.shape, generator=torch.Generator().manual_seed(12))
+    record = sf.locator_reference(r.tolist(), pair.tolist(), GRID, R_MAX)
+    iv, t, inv = sp.locate(r, GRID)
+    intervals = sum(n for _, _, n in GRID)
+    assert record[:, 0].tolist() == (pair * intervals + iv).tolist()
+    assert torch.equal(record[:, 1].view(torch.float32), t)  # bitwise
+    assert torch.equal(record[:, 2].view(torch.float32), inv)
+    assert record[:, 3].tolist() == (r < R_MAX).int().tolist()
+
+
+def test_wprime_clamp_at_r_lo_does_not_change_the_record():
+    """The w' kernel located max(r, r_lo); the record locates r. Equal wherever ``shared_locator_supported``."""
+    assert sf.shared_locator_supported(GRID, GRID[0][0]) and sf.shared_locator_supported(GRID, 0.1)
+    assert not sf.shared_locator_supported(GRID, 0.31)
+    r = _lengths()
+    r = torch.cat([r, torch.tensor([float("-inf"), -1.0, 0.29, float("inf")])])
+    pair = [1] * len(r)
+    plain = sf.locator_reference(r.tolist(), pair, GRID, R_MAX)
+    for r_lo in (GRID[0][0], 0.1):
+        clamped = torch.where(r > torch.tensor(r_lo, dtype=torch.float32), r,
+                              torch.tensor(r_lo, dtype=torch.float32))
+        assert torch.equal(sf.locator_reference(clamped.tolist(), pair, GRID, R_MAX)[:, :3], plain[:, :3])
+
+
+def test_shared_locator_sources_compile_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    blocks = [(1, [0]), (3, [64])]
+    assert compile_cubin(sf.render_locator(GRID, R_MAX), (9, 0))
+    for threads, min_blocks in ((None, None), (128, 6)):
+        assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, threads, min_blocks,
+                                       shared_locator=True), (9, 0))
+    for options in ({}, {"vector": 2}, {"stage_dout": True, "stage_quads": True}):
+        assert compile_cubin(_wprime(shared_locator=True, **options), (9, 0))
+
+
 def test_stage_quads_read_four_staged_components_per_shared_load():
     """STAGE_QUADS: STAGE_DOUT's block-layout row as component quartets; one float4 shared load per quartet."""
     schedule = _schedule()
