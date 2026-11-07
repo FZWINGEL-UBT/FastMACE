@@ -91,3 +91,25 @@ relaunched with 20 min. Metered this month afterwards: fifth $24.87, third $27.6
 SPLINE_W is on for the H200 family: `SPLINE_W_GPUS` holds `NVIDIA H200`, which also covers the H200 NVL. `R128`
 (`R128_GPUS`: one receiver per 128-thread block, `__launch_bounds__(128, 6)`) is on there too. `PARTS` stays off. Both
 stay off on the A100 until it is measured. Asserted in `tests/cpu/test_gpu_models.py::test_h200_defaults`.
+
+## Follow-ups against the H200 defaults (SPLINE_W and R128 on)
+
+One container (unit `fm-spline-fu-20261107a`, profile `fifth`, commit `efd4e41d`,
+`tools/modal/spline_followups_job.sh`). MD-step A/B, a = H200 defaults (about 4.26 ms), b = the variant, 6 blocks
+x 256 steps, both orders, Benchmark_loup settings. [followups/](followups/).
+
+| Variant | What | b/a ab | b/a ba |
+| --- | --- | ---: | ---: |
+| `vec4` | `wprime_backward.SPLINE_VECTOR=4`: the w′ kernel reads the spline's four terms per weight as one float4 (two float2 today); bitwise | **0.9739** | **0.9793** |
+| `cap5` | 128 threads, `MIN_BLOCKS=5`: 96 registers, no spill (R128's 6: 80 registers, 8-byte spill) | 0.9925 | 0.9937 |
+| `nocap` | 128 threads, no cap | 1.0122 | 1.0134 |
+| `r128parts` | `PARTS` on top of R128 | 1.0101 | 1.0075 |
+
+`vec4` saves about 2.3 % of the step (~100 µs), from the w′ kernel's table loads alone. `cap5` beats R128's cap of 6
+by 0.7 % (under the 1 % bound), and was not combined with `vec4`. `nocap` and `parts` on top of R128 are slower.
+
+Context for the w′ backward (ledger check, 7 November 2026): every receiver- or sender-owned layout of the w′
+lost before (conv-receiver-backward, fusion-receiver-local, omat0-wprime-split, piece order), and Symmetrix-XL's
+own interaction-2 backward is 3.9 ms against our 1.83 ms. On the H200, removing all reductions saves 3.6 %, and
+removing the atomics made the kernel slower (1.080). The kernel is bound by load instructions in L1, so a full layout
+rework was not built; fewer load instructions (`vec4`) are what pay.
