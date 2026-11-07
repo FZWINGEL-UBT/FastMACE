@@ -39,6 +39,32 @@ R128 = None
 # NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107): MD step b/a 0.9838 / 0.9848 on top of SPLINE_W
 # (80 registers, 8 bytes local memory).
 R128_GPUS = GPUModels(("NVIDIA H200",))
+# Codex H200 follow-up, item 4 (7 November 2026). FACTOR_W: a path whose terms all share one input component x_k
+# (scalar-input paths) or one edge component e_j (scalar-edge paths) multiplies w by it once (wf = w * x_k) and
+# accumulates fmaf(wf, rest, acc): fewer multiplies, rounding-class (the products associate differently; gate).
+# CURSOR32: the owner and edge-cursor loop state in int (the pointer offsets widened where they multiply), where
+# N * C and E fit (checked at launch); bitwise. Both A/B switches: False today; None would mean the GPU lists.
+FACTOR_W = False
+FACTOR_W_GPUS = GPUModels(())
+CURSOR32 = False
+CURSOR32_GPUS = GPUModels(())
+
+
+def _switch(value, gpus, device):
+    if value is not None:
+        return bool(value)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in gpus
+
+
+def factor_w_default(device):
+    """``FACTOR_W`` on ``device`` (None: on for ``FACTOR_W_GPUS``)."""
+    return _switch(FACTOR_W, FACTOR_W_GPUS, device)
+
+
+def cursor32_default(device):
+    """``CURSOR32`` on ``device`` (None: on for ``CURSOR32_GPUS``)."""
+    return _switch(CURSOR32, CURSOR32_GPUS, device)
 
 
 def r128_default(device):
@@ -92,11 +118,27 @@ def spline_parts(schedule):
     return groups
 
 
+def _factor(p, xi):
+    """``FACTOR_W``'s common factor of path ``p``: ("x", k) when every term reads input value x_k, ("e", j) when
+    every term reads edge component e_j (the input key first), else None."""
+    terms = [t for o in p.outputs for t in o.terms]
+    if not terms:
+        return None
+    xs = {xi[(p.input_start, t.input_component, p.input_irrep_dim)] for t in terms}
+    if len(xs) == 1:
+        return "x", xs.pop()
+    es = {t.edge_component for t in terms}
+    if len(es) == 1:
+        return "e", es.pop()
+    return None
+
+
 def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
-           name="spline_forward"):
+           name="spline_forward", factor_w=False, cursor32=False):
     """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
     ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here. ``part``:
-    the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds."""
+    the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds.
+    ``factor_w``: ``FACTOR_W``; ``cursor32``: ``CURSOR32`` (the launch checks the ranges)."""
     from fastmace.kernels.oeq_streaming.fused_forward import _lit, _node, block_map
 
     if schedule.layout != "ir_mul":
@@ -122,13 +164,24 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
             continue
         body.append("            {")
         for j in range(p.edge_irrep_dim):
-            body.append(f"                const float e{j} = __ldg(sh + e * ED + {p.edge_start + j});")
+            edge = "(int64_t)e" if cursor32 else "e"  # CURSOR32: the offset widened before it multiplies
+            body.append(f"                const float e{j} = __ldg(sh + {edge} * ED + {p.edge_start + j});")
         body.append(f"                const float4 c = __ldg(tq + {p.weight_start});")
         body.append("                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);")
+        common = _factor(p, xi) if factor_w else None
+        if common is not None:
+            body.append(f"                const float wf = w * {common[0]}{common[1]};  // FACTOR_W")
         for o in p.outputs:
-            terms = " + ".join(f"x{xi[(p.input_start, t.input_component, p.input_irrep_dim)]} * e{t.edge_component}"
-                               f" * {_lit(t.coefficient / scale[g])}" for t in o.terms) or "0.f"
-            body.append(f"                acc[{si[o.accumulator.name]}] = fmaf(w, {terms}, acc[{si[o.accumulator.name]}]);")
+            def factors(t):
+                x = f"x{xi[(p.input_start, t.input_component, p.input_irrep_dim)]}"
+                e = f"e{t.edge_component}"
+                if common is None:
+                    return f"{x} * {e} * "
+                return f"{e} * " if common[0] == "x" else f"{x} * "
+            terms = " + ".join(f"{factors(t)}{_lit(t.coefficient / scale[g])}" for t in o.terms) or "0.f"
+            factor = "w" if common is None else "wf"
+            body.append(f"                acc[{si[o.accumulator.name]}] = fmaf({factor}, {terms}, "
+                        f"acc[{si[o.accumulator.name]}]);")
         body.append("            }")
     stores = []
     for slot_name, i in si.items():
@@ -139,6 +192,24 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
     n = len(names)
     nl = "\n"
     bounds = f"{threads}" if min_blocks is None else f"{threads}, {int(min_blocks)}"
+    if cursor32:  # CURSOR32: the loop state in int; N * C and E < 2^31 (the launch checks)
+        cursor = """    const int owners = (int)(N * C);
+    const int stride = blockDim.x * gridDim.x;
+    for (int owner = blockIdx.x * blockDim.x + threadIdx.x; owner < owners; owner += stride) {
+        const int rcv = owner / C, ch = owner % C;"""
+        edges = """        int eb = row_ptr[rcv], ee = row_ptr[rcv + 1];
+        eb = eb < 0 ? 0 : eb;
+        ee = ee > (int)E ? (int)E : ee;
+        for (int e = eb; e < ee; ++e) {"""
+    else:
+        cursor = """    const int64_t owners = N * C;
+    const int64_t stride = (int64_t)blockDim.x * gridDim.x;
+    for (int64_t owner = (int64_t)blockIdx.x * blockDim.x + threadIdx.x; owner < owners; owner += stride) {
+        const int rcv = (int)(owner / C), ch = (int)(owner % C);"""
+        edges = """        int64_t eb = row_ptr[rcv], ee = row_ptr[rcv + 1];
+        eb = eb < 0 ? 0 : eb;
+        ee = ee > E ? E : ee;
+        for (int64_t e = eb; e < ee; ++e) {"""
     return f"""// {name} (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
 using int64_t = long long;
 constexpr int C = {C};
@@ -151,17 +222,11 @@ extern "C" __global__ void __launch_bounds__({bounds}) {name}(
     int64_t N, int64_t E, const float* __restrict__ x, const float* __restrict__ sh,
     const int* __restrict__ senders, const int* __restrict__ row_ptr, const float* __restrict__ lengths,
     const int* __restrict__ pairs, const float4* __restrict__ table, int intervals, {outs}) {{
-    const int64_t owners = N * C;
-    const int64_t stride = (int64_t)blockDim.x * gridDim.x;
-    for (int64_t owner = (int64_t)blockIdx.x * blockDim.x + threadIdx.x; owner < owners; owner += stride) {{
-        const int rcv = (int)(owner / C), ch = (int)(owner % C);
+{cursor}
         float acc[{n}];
         #pragma unroll
         for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
-        int64_t eb = row_ptr[rcv], ee = row_ptr[rcv + 1];
-        eb = eb < 0 ? 0 : eb;
-        ee = ee > E ? E : ee;
-        for (int64_t e = eb; e < ee; ++e) {{
+{edges}
             const float re = lengths[e];
             if (!(re < R_MAX)) continue;  // w = 0 at and beyond the cutoff (and the padding edges)
             const int snd = senders[e];
@@ -188,8 +253,10 @@ class SplineForward:
         self.intervals = sum(int(g[2]) for g in self.grid)
         self.threads, self.min_blocks = (128, 6) if r128_default(device) else (int(THREADS), MIN_BLOCKS)
         self.parts = (spline_parts(schedule) if PARTS else None) or [None]
+        self.factor_w, self.cursor32 = factor_w_default(device), cursor32_default(device)
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
-                               f"spline_forward{k}") for k, part in enumerate(self.parts)]
+                               f"spline_forward{k}", self.factor_w, self.cursor32)
+                        for k, part in enumerate(self.parts)]
         self.source = "\n".join(self.sources)
         capability = torch.cuda.get_device_capability(device)
         attr = driver.CUfunction_attribute
@@ -210,6 +277,8 @@ class SplineForward:
 
         from fastmace.kernels.oeq_streaming.runtime import _check
         nodes, edges = x.shape[0], sh.shape[0]
+        if self.cursor32 and (nodes * self.channels >= 2 ** 31 or edges >= 2 ** 31):
+            raise RuntimeError(f"CURSOR32: {nodes} x {self.channels} owners or {edges} edges exceed int")
         blocks = (nodes * self.channels + self.threads - 1) // self.threads
         if not blocks:
             return
@@ -244,5 +313,6 @@ def _(x, sh, senders, row_ptr, lengths, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
+__all__ = ["CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
+           "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS", "cursor32_default", "factor_w_default",
            "lookup_code", "r128_default", "render", "spline_message_blocks", "spline_parts", "spline_w_default"]

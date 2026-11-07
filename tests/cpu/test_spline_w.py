@@ -191,3 +191,25 @@ def test_stage_quads_read_four_staged_components_per_shared_load():
     if nvrtc_available():
         from fastmace.kernels.oeq_streaming.runtime import compile_cubin
         assert compile_cubin(quad, (9, 0))
+
+
+def test_factor_w_and_cursor32_render_and_compile():
+    """FACTOR_W hoists w times a path's common input / edge component; CURSOR32 keeps the loop state in int; off by
+    default, and the default source is unchanged by either switch's code."""
+    assert sf.FACTOR_W is False and sf.CURSOR32 is False
+    blocks = [(1, [0]), (3, [64])]
+    two = _two_degree_schedule()
+    plain = sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7])
+    assert "wf" not in plain and "for (int64_t e = eb" in plain and "(int64_t)e * ED" not in plain
+    factored = sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], factor_w=True)
+    hoisted = [line for line in factored.splitlines() if "const float wf = w * " in line]
+    assert hoisted and factored.count("fmaf(wf, ") >= len(hoisted)
+    narrow = sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], cursor32=True)
+    assert "for (int e = eb" in narrow and "(int64_t)e * ED" in narrow and "for (int owner" in narrow
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    both = sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], threads=128, min_blocks=6, factor_w=True, cursor32=True)
+    assert compile_cubin(both, (9, 0))
