@@ -16,6 +16,8 @@ def main(argv=None) -> int:
     p.add_argument("--structure", default="results/loup-a100-20261103/SrTiO3.cif@4x4x4")
     p.add_argument("--checkpoint", type=Path, required=True)
     p.add_argument("--constant", nargs="*", default=["fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=True"])
+    p.add_argument("--sha256", default="d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+                   help="OMAT-0 medium's, as tools/bench/loup_md.py")
     p.add_argument("--steps", type=int, default=20)
     p.add_argument("--output", type=Path, default=None)
     args = p.parse_args(argv)
@@ -33,7 +35,7 @@ def main(argv=None) -> int:
 
     path, repeat = args.structure.split("@")
     atoms = read(path).repeat(tuple(int(n) for n in repeat.split("x")))
-    loaded = fm.load(str(args.checkpoint), sha256=None)
+    loaded = fm.load(str(args.checkpoint), sha256=args.sha256)
     field = fm.ForceField(loaded, atoms, precision="float32", rewrites="auto")
     sim = fm.Simulation(atoms, field, integrator=fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0,
                                                                          friction_per_fs=0.002),
