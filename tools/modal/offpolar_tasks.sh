@@ -21,6 +21,7 @@ switch() {  # set -> the b side's ab_rewrites arguments
     sharedgeo) echo "--b-constant fastmace.longrange.polar:SHARED_GEOMETRY=True" ;;
     spin) echo "--b-constant fastmace.longrange.polar:SPIN_BATCHED=True" ;;
     mm) echo "--b-constant fastmace.rewrites.inductor:SMALL_MATMULS=True" ;;
+    tf32x3) echo "--b tf32x3_gemms=on" ;;
     offst) echo "--b radial_tables=on --b-constant fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True" ;;
     offall) echo "--b radial_tables=on --b-constant fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True"       "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3=True" ;;
     *) echo "unknown set $1" >&2; return 1 ;;
@@ -29,6 +30,7 @@ switch() {  # set -> the b side's ab_rewrites arguments
 gate_args() {  # set -> force_stress_gate.py production arguments of the candidate
   case $1 in
     offtables) echo "--rewrites radial_tables=on" ;;
+    tf32x3) echo "--rewrites tf32x3_gemms=on" ;;
     offst) echo "--rewrites radial_tables=on --production-constant fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True" ;;
     offall) echo "--rewrites radial_tables=on --production-constant"       "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3=True" ;;
     *) switch "$1" | sed 's/--b-constant/--production-constant/' ;;
