@@ -319,7 +319,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [launch-memsets](#launch-memsets) | cuBLAS memsets, per-step constants, eager zero-fills | none | FM | NOT BUILT | 2026-10-21 | not timed | [opt3-T04](validation/speed/opt3-T04.md) |
 | [launch-pdl](#launch-pdl) | Inductor programmatic dependent launch | `INDUCTOR_PDL` | RE | REJECTED | 2026-10-15 | wrong forces in graph replays | `ResearchModule:LT/studies/further_optimizations/2026-10-15-fourth-round.md` §3 |
 | [launch-batching](#launch-batching) | Disconnected-graph batching (idea 7) | probe | RE | REJECTED | 2026-10-09 | 2.32 % (2 × NaCl) | `ResearchModule:LT/studies/batching/README.md` |
-| [launch-megakernel](#launch-megakernel) | Complete force megakernel | none | FM | NOT BUILT | 2026-10-20 | ceiling 8–16 % NaCl, 1–2 % NbCl5 | [megakernel research](design/research/2026-10-20-megakernel-research.md) |
+| [launch-megakernel](#launch-megakernel) | Complete force megakernel | none | FM | NOT BUILT | 2026-10-20, POLAR-1 2026-11-07 | ceiling 8–16 % NaCl, 1–2 % NbCl5; POLAR-1 sm_120: wide GEMMs 40–47 % at ~82 % FP32 peak | [megakernel research](design/research/2026-10-20-megakernel-research.md), [POLAR-1 bound](design/research/2026-11-07-polar-megakernel.md) |
 | [launch-het-megakernel](#launch-het-megakernel) | Heterogeneous persistent megakernel; co-execution gate | probe | FM | REJECTED | owner 2026-10-24 | sm_120 gain 1.04, A100 0.92 | [opt4-T07](validation/speed/opt4-T07-megakernel-probe.md) |
 | [launch-sched-iso](#launch-sched-iso) | Scheduler-isolated co-execution | probe | FM | REJECTED | 2026-10-26 | sched_iso 0.72 | [opt5-T01](validation/speed/opt5-T01-scheduler-probe.md) |
 | [launch-regional-persistence](#launch-regional-persistence) | Regional persistence of the fused atom block (OPT-T05) | none | FM | PENDING | 2026-10-20; close-out recommended 2026-10-24 | gaps 100–152 µs (0.5–5 %) | [opt-4](../plans/opt-4.md) §2 |
@@ -654,7 +654,7 @@ Do not retry these unless the stated condition changes.
 | 3×TF32 GEMMs on sm_89, sm_120 and A100 via Triton | [prec-tf32x3-triton](#prec-tf32x3-triton): slower on 89 of 92 shapes (sm_89), 0 of 92 faster (A100) | the A100 or another GPU with TF32 ≥ 3× FP32 becomes a production target (then CUTLASS stage 2, [prec-cutlass-a100](#prec-cutlass-a100)) |
 | 3×FP16 / hybrid SIMT + MMA GEMMs on consumer GPUs | [prec-fp16x3-other-gpus](#prec-fp16x3-other-gpus) 1.12–1.71× of cuBLAS; [prec-hybrid-gemm](#prec-hybrid-gemm), [prec-decoupled](#prec-decoupled), [prec-packed-b](#prec-packed-b) | a GPU with BF16/FP16 dense ≥ 6× FP32 and a kernel better than Triton's |
 | Heterogeneous megakernel / co-execution | [launch-het-megakernel](#launch-het-megakernel) gate fails on sm_120 (gain 1.04) and A100 (0.92); [launch-sched-iso](#launch-sched-iso) | a GPU where TF32 MMA exceeds FFMA rate and the gate passes |
-| Complete force megakernel, persistent scheduling, two-stream branches | [launch-megakernel](#launch-megakernel) ceiling 8–16 % NaCl, 1–2 % NbCl5; [launch-cublasdx](#launch-cublasdx) primitive 1.062× slower; [launch-two-streams](#launch-two-streams) | graph gaps grow well above 5 % of a step |
+| Complete force megakernel, persistent scheduling, two-stream branches | [launch-megakernel](#launch-megakernel) ceiling 8–16 % NaCl, 1–2 % NbCl5; POLAR-1 on sm_120 gaps are 6–12 % on NaCl but the wide GEMMs block it; [launch-cublasdx](#launch-cublasdx) primitive 1.062× slower; [launch-two-streams](#launch-two-streams) | graph gaps grow well above 5 % of a step |
 | Inductor programmatic dependent launch | [launch-pdl](#launch-pdl): wrong forces in captured-graph replays (ratios 1e4–1e5) | never enable (SPEC §6.2) |
 | Inductor combo kernels, aggressive fusion, `decompose_mm_pass`, `max-autotune`, GEMM autotuning | [launch-combo-kernels](#launch-combo-kernels) NbCl5 +2.4 to +2.7 %; [rad-decompose-mm](#rad-decompose-mm); [setup-max-autotune](#setup-max-autotune) fails with outer graphs; [lin-gemm-autotune](#lin-gemm-autotune) slower, 141–756 s setup | per-shape autotuning becomes acceptable (production rule excludes it) |
 | Own FP32 GEMMs, split-K, concurrent l-branches, cuBLASLt, cuBLASDx, hand-written CUDA GEMM | [lin-split-k](#lin-split-k), [lin-concurrent-branches](#lin-concurrent-branches), [lin-cublaslt](#lin-cublaslt), [lin-cublaslt-heuristic](#lin-cublaslt-heuristic), [rad-cuda-gemm](#rad-cuda-gemm), [lin-faster-fp32](#lin-faster-fp32) | a new FP32 kernel source beats cuBLAS at 4096³ |
@@ -3018,6 +3018,20 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Measured: ceiling from the 2-T20a fit 8–16 % NaCl, 1–2 % NbCl5; the report budgets 0–15 % "with regression possible"; gaps about 0.15 ms of 2.77 ms on NaCl.
 - Why: months of work for a small ceiling; the step is per-size arithmetic, not launch overhead.
 - Sources: [opt-1 plan](../plans/opt-1.md); [opt-1](validation/speed/opt-1.md) §3; [megakernel research](design/research/2026-10-20-megakernel-research.md).
+- MACE-POLAR-1 on the RTX 5060 Ti (sm_120), 7 November 2026 (polar-megakernel session; conductor: the full step
+  stays NOT BUILT). The local profiles (`~/fm-runs/detailed-profiles-20261107`) show graph gaps of 6–12 % on
+  216-atom NaCl, which meets the reopen condition. The full step stays out anyway:
+  - The wide 512-channel irrep GEMMs are 40–47 % of a NaCl step and run at about 82 % of FP32 peak
+    (`[648, 512] @ [512, 512]` in 17.5 µs, 19.4 TFLOPS).
+  - No in-kernel FP32 primitive on sm_120 matches cuBLAS: cuBLASDx is 1.06× slower ([launch-cublasdx](#launch-cublasdx)) and
+    Triton IEEE `tl.dot` about 2.6× slower (OPT4-T01).
+  - One layer's 512-channel intermediates are 7.1 MB (216 atoms × 512 × 16 × 4 B), against about 12.8 MB of
+    registers and shared memory on the whole card, which also has to hold the weights.
+
+  What is left is a narrow megakernel: the polar k-space chain plus the narrow source heads, one launch per
+  direction, built on off-polar-alex's switches (`FUSED_FOURIER`, `JOINT_BACKWARD`, `SPIN_BATCHED`,
+  `SMALL_MATMULS`). Its bound is about 1–2 % on NaCl over those switches. Source:
+  [POLAR-1 bound](design/research/2026-11-07-polar-megakernel.md).
 
 <a id="launch-het-megakernel"></a>
 #### launch-het-megakernel: heterogeneous persistent megakernel and its co-execution gate (OPT4-T07)
