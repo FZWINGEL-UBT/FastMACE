@@ -4,7 +4,8 @@ One field-feature call of the charge recursion for both spins (C = 2, J = 4 dens
 POLAR-1), forward and backward (positions and sources; ``--stress`` also the k-vectors and the per-k factors),
 captured in a CUDA graph and replayed, in alternating blocks:
 
-- ``mega``: ``kspace_megakernel.kspace_field``, one launch per direction;
+- ``mega``: ``kspace_megakernel.kspace_field``, one launch per direction (Triton);
+- ``cuda``: the same with ``CUDA = True`` (fastmace.kernels.cuda.kspace, CUDA C++);
 - ``fused``: off-polar-alex's FUSED_FOURIER path (``fourier.structure_factor`` and ``fourier.fourier_project`` with
   ``JOINT_BACKWARD``, the per-k glue in eager PyTorch), one call per spin as the model makes it;
 - ``dense``: graph_longrange's multichannel sums on dense cosines and sines (SPIN_BATCHED), the cosines included.
@@ -46,6 +47,14 @@ def mega(k, r, mask, x, dbf, fbf, vol, kfc, kfp):
     pi = fbf[..., 1].reshape(K, -1) * kfp[:, None]
     w = (2 * math.pi) ** 3 / vol * kfc * 14.399645
     return mk.kspace_field(k, r, mask, x, dbf[..., 0].reshape(K, -1), dbf[..., 1].reshape(K, -1), w, pr, pi)
+
+
+def cuda(*args):
+    mk.CUDA = True
+    try:
+        return mega(*args)
+    finally:
+        mk.CUDA = False
 
 
 def fused(k, r, mask, x, dbf, fbf, vol, kfc, kfp):
@@ -120,7 +129,7 @@ def main():
         K, N = map(int, size.split("x"))
         args = inputs(K, N)
         graphs = {name: capture(step_fn(fn, args, a.stress)) for name, fn in
-                  (("mega", mega), ("fused", fused), ("dense", dense))}
+                  (("mega", mega), ("cuda", cuda), ("fused", fused), ("dense", dense))}
         times = {name: [] for name in graphs}
         for block in range(a.blocks):
             order = list(graphs) if block % 2 == 0 else list(reversed(graphs))
@@ -129,7 +138,9 @@ def main():
         med = {name: sorted(v)[len(v) // 2] for name, v in times.items()}
         print(json.dumps({"K": K, "N": N, "us_median": {n: round(v, 2) for n, v in med.items()},
                           "mega_over_fused": round(med["mega"] / med["fused"], 3),
-                          "mega_over_dense": round(med["mega"] / med["dense"], 3)}))
+                          "mega_over_dense": round(med["mega"] / med["dense"], 3),
+                          "cuda_over_dense": round(med["cuda"] / med["dense"], 3),
+                          "cuda_over_mega": round(med["cuda"] / med["mega"], 3)}))
 
 
 if __name__ == "__main__":

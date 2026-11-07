@@ -107,6 +107,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                    "SPIN_BATCHED": "alpha and beta field features in one call; A/B",
                                    "MEGAKERNEL": "k-space megakernel; None = MEGAKERNEL_GPUS, A/B",
                                    "PHASE_RECURRENCE": "k-space phases from per-axis tables; A/B"},
+    "fastmace/kernels/triton/kspace_megakernel.py": {"CUDA": "k-space megakernel in CUDA C++, not Triton; A/B"},
     "fastmace/rewrites/polar/update_fold.py": {"FOLD_UPDATE": "POLAR update MLP folded at setup; A/B"},
     "fastmace/rewrites/polar/head_compose.py": {"COMPOSE_HEADS": "POLAR head maps composed at setup; A/B"},
     "fastmace/rewrites/polar/head_liveness.py": {"PRUNE_DEAD_DEGREES": "dead POLAR head degrees pruned; A/B"},

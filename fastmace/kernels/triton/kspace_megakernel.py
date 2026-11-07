@@ -38,6 +38,11 @@ import torch
 
 S0 = 2.0 / (2.0 * math.pi) ** 3
 BLOCK_K, BLOCK_N, WARPS = 64, 64, 4
+# A/B constant (polar-megakernel, 7 November 2026): False, the Triton kernels below; True, the CUDA C++ kernels of
+# fastmace.kernels.cuda.kspace (every sum split over both indices, one precise sincosf per pair, FFMA on the narrow
+# factors; the Coulomb energy's structure factor too), where they have an entry for the shapes and the device. The
+# same sums; rounding. tests/gpu/test_kspace_megakernel_cuda.py.
+CUDA = False
 
 _COUNTERS: dict = {}
 
@@ -387,6 +392,11 @@ def kspace_field_forward(k: torch.Tensor, r: torch.Tensor, mask: torch.Tensor, x
         for t in (out, yc, ys, a, b):
             t.zero_()
         return out, yc, ys, a, b
+    if CUDA:
+        from fastmace.kernels.cuda import kspace as cuda_kspace
+
+        if cuda_kspace.supports_field(k, r, mask, x, dr, di, w, pr, pi, C=C, J=J, F=F):
+            return cuda_kspace.field_forward(k, r, mask, x, dr, di, w, pr, pi)
     G = _grid(k.device)
     _kernels()[0][(G,)](k.contiguous(), r.contiguous(), mask.contiguous(), x.contiguous(), dr.contiguous(),
                         di.contiguous(), w.contiguous(), pr.contiguous(), pi.contiguous(), out, yc, ys, a, b,
@@ -417,6 +427,11 @@ def kspace_field_backward(k: torch.Tensor, r: torch.Tensor, mask: torch.Tensor, 
         dk = res[0] if grad_k else empty[0]
         rest = [t.contiguous() if factors else e for t, e in zip(res[3:], empty[1:])]
         return (dk, res[1].contiguous(), res[2].contiguous(), *rest)
+    if CUDA and K > 0 and N > 0:
+        from fastmace.kernels.cuda import kspace as cuda_kspace
+
+        if cuda_kspace.supports_field(k, r, mask, x, g, yc, ys, a, b, dr, di, w, pr, pi, C=C, J=J, F=F):
+            return cuda_kspace.field_backward(k, r, mask, x, g, yc, ys, a, b, dr, di, w, pr, pi, factors, grad_k)
     G = _grid(k.device)
     tiles = -(-N // BLOCK_N)
     dyc, dys = k.new_empty((K, C, J)), k.new_empty((K, C, J))

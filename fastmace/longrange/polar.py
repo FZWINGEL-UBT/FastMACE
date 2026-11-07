@@ -496,11 +496,18 @@ def _fused_density(source_feats, k_vectors, node_positions, mask, density_basis_
     """graph_longrange.features.assemble_fourier_series_batch with the structure factor fused."""
     import torch
 
+    from fastmace.kernels.triton import kspace_megakernel
     from fastmace.kernels.triton.fourier import structure_factor
 
     n_nodes, n_sigma, m_dim = source_feats.size(0), density_basis_fs.size(1), density_basis_fs.size(2)
     sm_dim = n_sigma * m_dim
-    coeff_cos, coeff_sin = structure_factor(k_vectors, node_positions, mask, source_feats.reshape(n_nodes, sm_dim))
+    sources = source_feats.reshape(n_nodes, sm_dim)
+    if kspace_megakernel.CUDA and megakernel_on(node_positions):
+        from fastmace.kernels.cuda import kspace as cuda_kspace
+
+        if cuda_kspace.supports_sf(k_vectors, node_positions, mask, sources, width=sm_dim):
+            structure_factor = cuda_kspace.structure_factor
+    coeff_cos, coeff_sin = structure_factor(k_vectors, node_positions, mask, sources)
     density_basis_r = density_basis_fs[..., 0].reshape(density_basis_fs.size(0), sm_dim)
     density_basis_i = density_basis_fs[..., 1].reshape(density_basis_fs.size(0), sm_dim)
     rho_real = (density_basis_r * coeff_cos).sum(dim=-1) + (density_basis_i * coeff_sin).sum(dim=-1)
