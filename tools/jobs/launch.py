@@ -326,15 +326,22 @@ def load_plan(path):
     return data, jobs
 
 
-def copy_templates(batch_dir, repo=REPO):
-    """Copy the job templates, this launcher and the Modal app into the batch folder (never edited afterwards)."""
+def copy_templates(batch_dir, repo=REPO, commit=None):
+    """Copy the job templates, this launcher and the Modal app into the batch folder (never edited afterwards):
+    from ``commit`` in the git repository ``repo`` (the tarball's own versions), or from ``repo``'s files."""
     batch_dir = Path(batch_dir)
-    for sub, names, src in (("tools/jobs", TEMPLATE_FILES, repo / "tools" / "jobs"),
-                            ("tools/modal", MODAL_FILES, repo / "tools" / "modal")):
+    for sub, names in (("tools/jobs", TEMPLATE_FILES), ("tools/modal", MODAL_FILES)):
         dest = batch_dir / sub
         dest.mkdir(parents=True, exist_ok=True)
         for name in names:
-            shutil.copy2(src / name, dest / name)
+            if commit is None:
+                shutil.copy2(Path(repo) / sub / name, dest / name)
+                continue
+            data = subprocess.run(["git", "-C", str(repo), "show", f"{commit}:{sub}/{name}"], capture_output=True,
+                                  check=True).stdout
+            (dest / name).write_bytes(data)
+            if name.endswith((".sh", ".py")):
+                (dest / name).chmod(0o755)
     return batch_dir / "tools"
 
 
@@ -475,6 +482,7 @@ def main(argv=None):
         p.add_argument("--p90", type=Path, default=HERE / "p90.json")
         if name == "start":
             p.add_argument("--commit", required=True, help="the source commit (must contain tools/jobs)")
+            p.add_argument("--repo", default=str(REPO), help="git repository holding the commit (default: this one)")
             p.add_argument("--root", default="~/fm-runs")
             p.add_argument("--modal", default="~/environments/modal_client/bin/modal")
             p.add_argument("--no-unit", action="store_true", help="run in the foreground (tests, debugging)")
@@ -504,14 +512,15 @@ def main(argv=None):
         return 0
 
     import slim_tar  # noqa: E402  (next to this file)
-    sha = slim_tar.resolve(args.commit, REPO)
-    if subprocess.run(["git", "-C", str(REPO), "cat-file", "-e", f"{sha}:tools/jobs/ab_pack.sh"]).returncode:
+    repo = Path(args.repo).expanduser()
+    sha = slim_tar.resolve(args.commit, repo)
+    if subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{sha}:tools/jobs/ab_pack.sh"]).returncode:
         raise SystemExit(f"commit {sha[:8]} has no tools/jobs templates; launch from a commit that has them")
     batch_dir = make_batch_dir(args.root, args.batch)
-    copy_templates(batch_dir)  # before anything launches
+    copy_templates(batch_dir, repo, sha)  # the commit's own versions, before anything launches
     shutil.copy2(args.manifest, batch_dir / "manifest.csv")
     tarball = batch_dir / f"src-{sha[:8]}.tar"
-    _, kept, dropped = slim_tar.slim_tar(sha, tarball, REPO)
+    _, kept, dropped = slim_tar.slim_tar(sha, tarball, repo)
     print(f"slim tarball {tarball}: {kept / 1e6:.1f} MB kept, {dropped / 1e6:.1f} MB dropped")
     meta = dict(version=VERSION, batch=args.batch, commit=sha, tarball=str(tarball), modal=args.modal,
                 created=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
