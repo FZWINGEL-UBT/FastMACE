@@ -2778,8 +2778,15 @@ Open decisions for the owner:
    rule's ban on per-GPU choices (goal 2, §9.1, project rule of 10 October
    2026) is lifted. A rewrite may be on by default on the GPU models where
    same-process A/Bs of the whole MD step, in both build orders, measured it
-   faster, matched by exact device name as in decision 65 (an unmeasured GPU of
-   the same capability stays off); everywhere else it stays off or opt-in, and
+   faster, matched by device name as in decision 65 (an unmeasured GPU of
+   the same capability stays off). Amended (owner, 7 November 2026: "if its
+   tested on one variant of a gpu it counts for all gpus (unless the variants
+   vary significantly in performance)"): a name stands for every variant of its
+   GPU family (`kernels/gpu_models.py`: `GPUModels`, `family`, `lookup`). The
+   families are the A100 (SXM4 and PCIe, 40 and 80 GB; owner, 4 November 2026)
+   and the H200 (SXM and NVL, same chip, SM count and memory). Variants that
+   differ significantly in performance stay separate names: the H100 PCIe (114
+   SMs, HBM2e) is not the H100 SXM (132 SMs, HBM3). Everywhere else it stays off or opt-in, and
    the planner's off reason names the GPU. The usual gates still apply per
    record (force/stress gate, NVE drift, exactness class). Per-structure and
    shape-keyed tables stay forbidden, and measured values are never stored or
@@ -3367,3 +3374,5 @@ names the GPU models where same-process A/Bs measured a whole-step speed-up (exa
 belong to the `LoadedModel`, not to each `ForceField`, so a new composition from the same `fm.load` result copies
 the conversion instead of loading and converting again (about 3.1 s per composition after the first). Isolation
 between plans is unchanged. See `docs/validation/capacity/setup-fixes.md`.
+
+**Decision 66 counts every variant of a GPU family (7 November 2026, owner: "Ok change the decision to that if its tested on one variant of a gpu it counts for all gpus (unless the variants vary significantly in performance)"; conductor):** decision 66 amended. `kernels/gpu_models.py` gains `family()` and `lookup()`: a `GPUModels` entry, and a per-GPU dict entry (`radial_table.WARPS_GPUS`, `wprime_backward.MAX_REGISTERS_GPUS`), now covers every variant of its family. The families are the A100 (unchanged since 4 November) and the H200, which adds the H200 NVL (the same GH100 with 132 SMs and 141 GB of HBM3e; a lower power limit) to every H200 default. The H100 SXM, PCIe and NVL cards stay separate names, as their SM counts and memory differ significantly. No default changes on a measured GPU. The off-polar A100 40GB final checks were cancelled as redundant; the two already measured (MACE-OFF23 small and medium) stay as confirmation.

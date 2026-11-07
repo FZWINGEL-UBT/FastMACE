@@ -9,7 +9,9 @@ Conventions. b/a = candidate time over baseline time, same-process A/B, alternat
 build orders (ab / ba); below 1 is faster. GPUs: **5060 Ti** = NVIDIA GeForce RTX 5060 Ti (local, sm_120);
 **Ada** = NVIDIA RTX 4000 Ada Generation (murphy, leto, leeloo; sm_89); **A100** = every A100 model where the set
 is a `GPUModels` (owner, 4 November 2026: "turn on a100 speedups no matter which version of it it runs on";
-`fastmace/kernels/gpu_models.py`), else the exact name given. Any other GPU (L4, RTX A4000, RTX PRO 6000, …) gets
+`fastmace/kernels/gpu_models.py`), and an H200 entry covers the H200 NVL too (owner, 7 November 2026: a GPU
+tested on one variant counts for every variant unless they differ significantly in performance; the H100 SXM and
+PCIe cards stay separate). Otherwise the exact name given. Any other GPU (L4, RTX A4000, RTX PRO 6000, …) gets
 none of the switches below: decision 66 (owner, 29 October 2026) enables a per-GPU default only where same-process
 whole-step A/Bs in both build orders measured a speed-up, by device name, never by compute capability.
 Benchmark_loup = OMAT-0 medium, SrTiO3 5,000 atoms unless stated. "on" = default on; "–" = off (not measured, or
