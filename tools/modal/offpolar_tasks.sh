@@ -43,12 +43,13 @@ for task in ${TASKS:?}; do
   run=$OUT/$kind-$set-$model
   echo "$(date -u +%FT%TZ) begin $task"
   if [ "$kind" = ab ]; then
-    printf '%s\t%s\n' "$set" "$(switch "$set")" > "$OUT/sets/$set.tsv"
+    sets=$OUT/sets/$set.tsv  # set before OUT=$run below, which changes $OUT for the rest of that line
+    printf '%s\t%s\n' "$set" "$(switch "$set")" > "$sets"
     if [ "${model%%-*}" = polar1 ]; then
-      OUT=$run MODEL=$model CKPT=$ckpt STRUCTS="NaCl NbCl5" SETS_FILE=$OUT/sets/$set.tsv BLOCK=400 BLOCKS=12 \
+      OUT=$run MODEL=$model CKPT=$ckpt STRUCTS="NaCl NbCl5" SETS_FILE=$sets BLOCK=400 BLOCKS=12 \
         STOP_AFTER=${STOP_AFTER:-4} bash tools/offpolar_ab.sh
     else
-      OUT=$run MODEL=$model CKPT=$ckpt STRUCTS="$ORG/water_216.extxyz@1x1x1" SETS_FILE=$OUT/sets/$set.tsv \
+      OUT=$run MODEL=$model CKPT=$ckpt STRUCTS="$ORG/water_216.extxyz@1x1x1" SETS_FILE=$sets \
         WARMUP=500 BLOCK=1000 BLOCKS=16 STOP_AFTER=${STOP_AFTER:-4} bash tools/offpolar_ab.sh
     fi
     grep -h "b/a" "$run"/ab-*.log | sed "s|^|RATIO $set $model |"
