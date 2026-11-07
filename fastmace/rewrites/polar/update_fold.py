@@ -95,12 +95,18 @@ def _constants(module):
     tp = module.tp_out
     weights = tp.weight.detach().double().cpu()
     blocks, biases = [], []
-    for meta in tp._path_meta:
+    for meta in _live_meta(module):
         w_start, w_stop, path_weight, mul1, mul2, d1 = meta[6], meta[7], meta[8], meta[10], meta[11], meta[12]
         w = weights[w_start:w_stop].view(mul1, mul2) * (float(path_weight) / math.sqrt(float(d1)))
         blocks.append(w @ v)
         biases.append(w @ b)
     return w1[:, :channels].clone(), s, first.bias.detach().double().cpu(), torch.cat(blocks), torch.cat(biases)
+
+
+def _live_meta(module):
+    """The ``tp_out`` paths the fold runs: all of them, or the live ones head_liveness proved (polar-megakernel)."""
+    live = getattr(module, "_live_out_meta", None)
+    return module.tp_out._path_meta if live is None else live
 
 
 def folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index, potential_features,
@@ -119,7 +125,7 @@ def folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_in
     batch = node_feats.shape[0]
     out = node_feats.new_zeros((batch, tp.irreps_out.dim))
     column = 0
-    for meta in tp._path_meta:
+    for meta in _live_meta(self):
         in1_start, in1_stop, out_start, out_stop, mul1, d1 = meta[0], meta[1], meta[4], meta[5], meta[10], meta[12]
         gate = gates[:, column:column + mul1]
         column += mul1

@@ -33,8 +33,10 @@ SOURCE_HASHES = {
 THRESHOLDS = {"float64": 1e-10, "float32": 1e-4}
 
 
-def uvu_forward(self, x1, x2):
-    """mace.modules.field_blocks.SparseUvuTensorProduct.forward with the reassociated l x l -> 0 path."""
+def uvu_forward(self, x1, x2, path_meta=None):
+    """mace.modules.field_blocks.SparseUvuTensorProduct.forward with the reassociated l x l -> 0 path.
+
+    ``path_meta`` (default: all of ``self._path_meta``) lets a head run only its live paths (head_liveness)."""
     import torch
 
     if x1.ndim != 2 or x2.ndim != 2:
@@ -53,7 +55,7 @@ def uvu_forward(self, x1, x2):
         return t.transpose(1, 2).reshape(batch, -1)
 
     for (in1_start, in1_stop, in2_start, in2_stop, out_start, out_stop, w_start, w_stop, path_weight, mode_code,
-         mul1, mul2, d1) in self._path_meta:
+         mul1, mul2, d1) in (self._path_meta if path_meta is None else path_meta):
         in1_block = x1[:, in1_start:in1_stop]
         in2_block = x2[:, in2_start:in2_stop]
         out_block = out[:, out_start:out_stop]
@@ -93,8 +95,10 @@ def apply(model, context=None):
         module.forward = types.MethodType(uvu_forward, module)
         setattr(module, MARKER, True)
         names.append(name)
-    from fastmace.rewrites.polar import update_fold
+    from fastmace.rewrites.polar import head_liveness, update_fold
 
+    if head_liveness.PRUNE_DEAD_DEGREES:  # dead head degrees, before the fold reads the live paths (R5)
+        names += [f"{name} (dead degrees pruned)" for name in head_liveness.apply(model)]
     if update_fold.FOLD_UPDATE:  # the folded update MLP (an A/B constant, off-polar-alex lab)
         names += [f"{name} (update MLP folded)" for name in update_fold.apply(model)]
     from fastmace.rewrites.polar import head_compose

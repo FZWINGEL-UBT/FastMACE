@@ -108,6 +108,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                    "MEGAKERNEL": "k-space megakernel; None = MEGAKERNEL_GPUS, A/B"},
     "fastmace/rewrites/polar/update_fold.py": {"FOLD_UPDATE": "POLAR update MLP folded at setup; A/B"},
     "fastmace/rewrites/polar/head_compose.py": {"COMPOSE_HEADS": "POLAR head maps composed at setup; A/B"},
+    "fastmace/rewrites/polar/head_liveness.py": {"PRUNE_DEAD_DEGREES": "dead POLAR head degrees pruned; A/B"},
     "fastmace/rewrites/inductor.py": {"SMALL_MATMULS": "small mm/addmm as fused multiply-sum; rejected, A/B"},
     "fastmace/rewrites/linear/__init__.py": {"E3NN_BLOCK_LINEAR": "e3nn Linears as BlockLinear (POLAR); A/B"},
     "fastmace/kernels/triton/skinny_linear.py": {"RADIAL_TF32X3": "radial last layer as 3xTF32; per GPU, A/B"},
