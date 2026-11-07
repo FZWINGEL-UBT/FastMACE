@@ -7,7 +7,11 @@ backward?
 Verdict: **yes, it is faster in both directions.** At 256 knots per pair the forward plus w′ saves about **341 µs per MD
 step**, about 6 % of the H200 Benchmark_loup step (5.72 ms). At 2,048 knots it saves about 129 µs (2.2 %). Both pass
 the 3x force/stress gate. Only 2,048 knots passes the radial certificate at r ≥ 1 Å; 256 knots fails it there by 74x
-on the slope. A production switch is proposed below and **is not built**; it waits for the conductor's go.
+on the slope.
+
+The follow-up places the knots densely at short r (grid `a695`, below). It saves **310 µs (5.4 %)**, passes the
+certificate over the whole domain and passes the gate at 1.37. A production switch is proposed below and **is not
+built**; it waits for the conductor's go.
 
 ## Method
 
@@ -116,18 +120,65 @@ Not counted:
   only the density column. That could save up to about 90 µs; it was not measured.
 - The production path must also keep the spline's extra memory: 31 MB at 256 knots, 252 MB at 2,048.
 
+## Follow-up: denser knots at short r (owner, 7 November 2026)
+
+The uniform spline's error depends strongly on r. `tools/sx_spline_knots.py --diagnose` (`knots_diagnose.json`) maps
+the certificate score by band at 256 uniform knots. Slope error:
+
+- r < 0.5 Å: 2,025x;
+- 1.0–1.25 Å: 74x;
+- 1.5–1.75 Å: 5.9x;
+- 2.0–2.5 Å: 1.07x;
+- r ≥ 2.5 Å: 0.5x or less.
+
+Hermite slope error scales as h³. So each band gets its own uniform spacing, chosen for a score of about 0.5. The
+kernels find the segment with one compare per boundary. An edge belongs to one warp for all its channels, so the
+branch is uniform within the warp. Few MD edges fall in the dense region. As a result, the rows the step actually
+touches barely grow: 393 rows (8.0 MB), against 374 rows (7.7 MB) at 256 uniform knots.
+
+| grid (`GRIDS` in `tools/sx_layout_lab.py`) | intervals | table, 6 pairs | certificate slope, all r / r ≥ 1 Å | gate worst |
+| --- | ---: | ---: | --- | ---: |
+| `a695`: 0.3–0.5 Å ×150, –0.75 ×110, –1.0 ×85, –1.5 ×110, –2.0 ×50, –2.5 ×30, –6.0 ×160 | 695 | 85 MB | **0.54 / 0.63, passes** | **1.37** |
+| `p399`: 0.3–1.0 Å ×32, –1.5 ×110, –2.5 ×100, –6.0 ×157 | 399 | 49 MB | 1,957 / 0.63 (r ≥ 1 Å only) | 1.62 |
+
+Gate per structure, energy / force / stress (`knots_gate.json`):
+
+- `a695`: NaCl 1.37 / 1.32 / 1.14, NbCl5 1.18 / 0.96 / 0.89, SrTiO3 0.99 / 1.07 / 1.14.
+- `p399`: NaCl 1.28 / 1.62 / 0.87, NbCl5 1.12 / 0.95 / 0.77, SrTiO3 0.94 / 1.05 / 1.41.
+
+H200 run: `h200-knots/`, commit `1e71246a`, Modal `fourth`, 7 November 2026 19:50 CET, 51 s, $0.06 estimated. It is
+the same capture and 15 rounds as above, with production re-timed in the same process.
+
+| knots | forward µs (ratio) | w′ µs (ratio) | net Δ µs | net % of step | certificate | gate |
+| --- | --- | --- | ---: | ---: | --- | ---: |
+| production | 1279.6 (1.000) | 1410.0 (1.000) | — | — | certified table | — |
+| uniform 256 | 1104.0 (0.863) | 1241.0 (0.880) | −345 | −6.0 % | fails (74x at r ≥ 1 Å) | 1.81 |
+| uniform 2048 | 1249.7 (0.977) | 1312.8 (0.931) | −127 | −2.2 % | r ≥ 1 Å only | 1.14 |
+| **a695** | **1120.0 (0.875)** | **1259.8 (0.894)** | **−310** | **−5.4 %** | **passes, whole domain** | **1.37** |
+| p399 | 1100.5 (0.860) | 1257.7 (0.892) | −331 | −5.8 % | r ≥ 1 Å only | 1.62 |
+
+The uniform rows reproduce the first run within 1 %. Every variant passed the in-process message check. The spline's
+w matches a·W to 1.3–1.4e-7, and the guards' message and gradient errors are 1.9e-6 or less (w′ dr up to 3.2e-6).
+
+The dense grid keeps 90 % of the 256-knot gain and passes both accuracy tests as they stand. The w′ backward gains
+about 18 µs less than with uniform 256 knots, probably because the lookup branches per edge. The forward gains about
+16 µs less, from the slightly larger table and the branch.
+
 ## Proposal (not built; waits for the conductor's go)
 
-Both clear the brief's 2 % bar by the bound. Switch the H200 generic family's interaction 2 to a spline w, forward and
-w′ together:
+All candidates clear the brief's 2 % bar by the bound. **Recommended: `a695`.** Switch the H200 generic family's
+interaction 2 to a spline w on piecewise-uniform knots, forward and w′ together. It is −5.4 % of the step, passes the
+certificate unchanged over the whole domain, and passes the gate at 1.37.
 
-1. **2,048 knots is the safe choice:** −2.2 % of the step, gate 1.14, certificate passed where MD samples. It needs a
-   certificate amendment (r ≥ 1 Å instead of the whole domain) or a short-range fallback to the degree-5 table below
-   1 Å.
-2. **256 knots is the fast choice:** −6.0 % of the step and gate 1.81, but it fails the certificate by 74x on the
-   slope. It would need the owner to accept the gate as the only accuracy test for this table. Alternatively,
-   non-uniform knots (dense below about 1.5 Å, 256-knot spacing above) may keep most of the speed and pass the
-   certificate; that was not tried.
+Alternatives:
+
+- `p399` gains 0.4 % more, but only by amending the certificate to r ≥ 1 Å.
+- Uniform 2,048 knots gains less and also needs that amendment.
+- Uniform 256 knots fails the certificate.
+
+In production, the grid would be fitted per model by the certificate rule (per band, the coarsest spacing that passes
+with margin), not taken from this table. The `a695` breakpoints are specific to OMAT-0 interaction 2, and AGENTS.md
+forbids per-model tables.
 
 Before it can become a default, the production build needs:
 
@@ -142,8 +193,13 @@ structures, where the table's L2 footprint changes.
 
 ## Cost and provenance
 
-- H200 lab: 2 Modal runs on `fourth`. Try 1 (guard abort): 63 s, about $0.11. Try 2: 73 s, $0.09 estimated, metered
-  about $0.02 per run on the budget ledger. All CPU work was local (WSL).
+- H200 lab: 3 Modal runs on `fourth`. Try 1 (guard abort): 63 s, about $0.11. Try 2: 73 s, $0.09 estimated. Knots
+  follow-up: 51 s, $0.06 estimated. All CPU work was local (WSL).
+- Knots follow-up files:
+  - `tools/sx_spline_knots.py`: the map by band and the grid scores;
+  - `tools/sx_spline_gate.py --grids`: the gate on the grids;
+  - `tools/modal/sx_knots_lab.sh`: the job;
+  - results: `knots_diagnose.json`, `knots_grids.json`, `knots_gate.json`, `h200-knots/`.
 - Source: branch `fastmace/sx-layout-lab`. Lab at `02166191` (main `7bbc759e` merged in). Driver image and packages
   are in `h200/modal.json` and `h200/pip-freeze.txt`; the generated kernels are in `h200/lab/forward.cu` and
   `wprime.cu`.
