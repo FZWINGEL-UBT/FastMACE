@@ -5,11 +5,11 @@ w from a 4-value cubic spline table, does it drop toward their ~950 µs, and wha
 backward?
 
 Verdict: **yes, it is faster in both directions.** At 256 knots per pair the forward plus w′ saves about **341 µs per MD
-step**, about 6 % of the H200 Benchmark_loup step (5.72 ms). At 2,048 knots it saves about 129 µs (2.2 %). Both pass
+step**, about 6.9 % of the H200 Benchmark_loup step (4.93 ms on current main, `results/ideas-queue2-20261106`; the brief said 5.72 ms, an older figure). At 2,048 knots it saves about 129 µs (2.6 %). Both pass
 the 3x force/stress gate. Only 2,048 knots passes the radial certificate at r ≥ 1 Å; 256 knots fails it there by 74x
 on the slope.
 
-The follow-up places the knots densely at short r (grid `a695`, below). It saves **310 µs (5.4 %)**, passes the
+The follow-up places the knots densely at short r (grid `a695`, below). It saves **310 µs (6.3 %; about 4.62 ms per step)**, passes the
 certificate over the whole domain and passes the gate at 1.37. A production switch is proposed below and **is not
 built**; it waits for the conductor's go.
 
@@ -108,11 +108,11 @@ Reading:
 The w′ backward reads the same w table as the forward, so its spline variant gains for the same reason (fewer
 coefficients per edge, no piece lookup).
 
-| knots | forward Δ µs | w′ Δ µs | net Δ µs | net % of the 5.72 ms step | gate worst | certificate (r ≥ 1 Å) |
+| knots | forward Δ µs | w′ Δ µs | net Δ µs | net % of the 4.93 ms step | gate worst | certificate (r ≥ 1 Å) |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| 256 | −164.5 | −176.5 | **−341** | **−6.0 %** | 1.81 | FAIL (slope 74x) |
-| 2048 | −27.3 | −101.4 | **−129** | **−2.2 %** | 1.14 | pass (0.17); whole domain 4.35 |
-| 4096 | +193.0 | +94.2 | +287 | +5.0 % | 1.46 | pass (0.09) |
+| 256 | −164.5 | −176.5 | **−341** | **−6.9 %** | 1.81 | FAIL (slope 74x) |
+| 2048 | −27.3 | −101.4 | **−129** | **−2.6 %** | 1.14 | pass (0.17); whole domain 4.35 |
+| 4096 | +193.0 | +94.2 | +287 | +5.8 % | 1.46 | pass (0.09) |
 
 Not counted:
 
@@ -149,13 +149,13 @@ Gate per structure, energy / force / stress (`knots_gate.json`):
 H200 run: `h200-knots/`, commit `1e71246a`, Modal `fourth`, 7 November 2026 19:50 CET, 51 s, $0.06 estimated. It is
 the same capture and 15 rounds as above, with production re-timed in the same process.
 
-| knots | forward µs (ratio) | w′ µs (ratio) | net Δ µs | net % of step | certificate | gate |
+| knots | forward µs (ratio) | w′ µs (ratio) | net Δ µs | net % of the 4.93 ms step | certificate | gate |
 | --- | --- | --- | ---: | ---: | --- | ---: |
 | production | 1279.6 (1.000) | 1410.0 (1.000) | — | — | certified table | — |
-| uniform 256 | 1104.0 (0.863) | 1241.0 (0.880) | −345 | −6.0 % | fails (74x at r ≥ 1 Å) | 1.81 |
-| uniform 2048 | 1249.7 (0.977) | 1312.8 (0.931) | −127 | −2.2 % | r ≥ 1 Å only | 1.14 |
-| **a695** | **1120.0 (0.875)** | **1259.8 (0.894)** | **−310** | **−5.4 %** | **passes, whole domain** | **1.37** |
-| p399 | 1100.5 (0.860) | 1257.7 (0.892) | −331 | −5.8 % | r ≥ 1 Å only | 1.62 |
+| uniform 256 | 1104.0 (0.863) | 1241.0 (0.880) | −345 | −7.0 % | fails (74x at r ≥ 1 Å) | 1.81 |
+| uniform 2048 | 1249.7 (0.977) | 1312.8 (0.931) | −127 | −2.6 % | r ≥ 1 Å only | 1.14 |
+| **a695** | **1120.0 (0.875)** | **1259.8 (0.894)** | **−310** | **−6.3 %** | **passes, whole domain** | **1.37** |
+| p399 | 1100.5 (0.860) | 1257.7 (0.892) | −331 | −6.7 % | r ≥ 1 Å only | 1.62 |
 
 The uniform rows reproduce the first run within 1 %. Every variant passed the in-process message check. The spline's
 w matches a·W to 1.3–1.4e-7, and the guards' message and gradient errors are 1.9e-6 or less (w′ dr up to 3.2e-6).
@@ -167,7 +167,7 @@ about 18 µs less than with uniform 256 knots, probably because the lookup branc
 ## Proposal (not built; waits for the conductor's go)
 
 All candidates clear the brief's 2 % bar by the bound. **Recommended: `a695`.** Switch the H200 generic family's
-interaction 2 to a spline w on piecewise-uniform knots, forward and w′ together. It is −5.4 % of the step, passes the
+interaction 2 to a spline w on piecewise-uniform knots, forward and w′ together. It is −6.3 % of the step (4.93 → about 4.62 ms), passes the
 certificate unchanged over the whole domain, and passes the gate at 1.37.
 
 Alternatives:
