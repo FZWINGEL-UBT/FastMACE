@@ -57,3 +57,22 @@ def test_each_step_sets_its_sides_constants():
         assert seen == [8, 4, 8] and a.engine == "engine"
     finally:
         tile_rule.TRITON_NUM_WARPS = before
+
+
+def test_pack_entries_split_constants_from_rewrite_fields():
+    entries = tool.pack_entries("t4|fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS=4 ;"
+                                " seg|segment_gemm=on fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS=8;")
+    key = ("fastmace.kernels.triton.tile_rule", "TRITON_NUM_WARPS")
+    assert entries == [("t4", {}, {key: 4}), ("seg", {"segment_gemm": "on"}, {key: 8})]
+    for bad in ("", "noitems|", "|segment_gemm=on", "a b|segment_gemm=on", "x|nonsense=on",
+                "x|segment_gemm=on;x|gated_rows=on", "x|fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS='4'"):
+        with pytest.raises(ValueError):
+            tool.pack_entries(bad)
+
+
+def test_pack_entries_must_differ_from_side_a():
+    args = tool.parse_args(["--output", "o", "--checkpoint", "c", "--pack", "s|segment_gemm=on;g|gated_rows=on"])
+    assert [name for name, _, _ in args.pack] == ["s", "g"] and args.b == {}
+    with pytest.raises(SystemExit):  # entry "same" equals side a
+        tool.parse_args(["--output", "o", "--checkpoint", "c", "--a", "segment_gemm=on",
+                         "--pack", "s|gated_rows=on;same|segment_gemm=on"])
