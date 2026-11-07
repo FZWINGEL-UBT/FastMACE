@@ -304,6 +304,7 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
     for parameter in private.parameters():
         parameter.requires_grad_(False)
     drop_unused_outputs(private)
+    options = inductor_records.compile_options(options)  # with the A/B constants' passes (SMALL_MATMULS)
     if options:  # a record's Inductor options (fastmace.rewrites.inductor; OPT3-T04)
         if mode not in (None, "default"):
             raise ValueError(f"Inductor options {sorted(options)} need compile mode 'default', got {mode!r}")

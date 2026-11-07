@@ -114,6 +114,8 @@ SOURCE_HASHES = {
         "800cb31cce6b7409ad272fec88c82a80f2c84aa1b184ba35e7a7a0f505c41674",
     "graph_longrange.features:GTOElectrostaticFeatures._pbc_precompute_geometry":
         "d88aa4542016e95d72dd134497f604e6d5f842e82cfdaf4cba5070d59e798427",
+    "graph_longrange.features:GTOElectrostaticFeatures._pbc_forward_dynamic":
+        "7208bb5d0bffd26d46f5ffb0a689771c76056615e08df7f1545bd09eaf2d7b32",
     "graph_longrange.energy:GTOElectrostaticEnergy.forward":
         "cad95d2a9d5d3977a2631e790f450bf3e7b0fd177f68beb7a1b355e5dac6c3a7",
     "graph_longrange.energy:GTOElectrostaticEnergy._pbc_energy_batch":
@@ -389,16 +391,164 @@ def _long_range_geometry(node_positions, volume):
     return call.data["positions"], call.volume
 
 
-def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume):
+# A/B constant (off-polar-alex, 6 November 2026): for one graph, the [k, atoms] cosines and sines masked by the
+# k-vectors' column instead of a [k, atoms] comparison, and built once per call (the feature projection's geometry
+# and the Coulomb energy share them when they get the same k-vectors and positions). The forward is unchanged bit
+# for bit; the backward rounds differently (the two uses' gradients meet before the cosine's derivative).
+# tests/cpu/test_polar_shared_geometry.py.
+SHARED_GEOMETRY = False
+
+# A/B constant (off-polar-alex, 6 November 2026): for one graph, the k-space sums through
+# fastmace.kernels.triton.fourier (the phases recomputed in tiles; no [k, atoms] cosines, sines or their dense
+# gradients), the structure factor in the Coulomb energy and the field features' density and projection.
+# Rounding. tests/cpu/test_polar_fused_fourier.py.
+FUSED_FOURIER = False
+
+
+# A/B constant (off-polar-alex, 7 November 2026): PolarMACE's charge recursion computes both spin channels' field
+# features in one call (``spin_field_features``: graph_longrange's multichannel k-space sums, one [k, atoms] product
+# with twice the columns instead of two products) when the cache has full-PBC cosines and sines; the source edit
+# ``SPIN_BATCH_EDITS``. Pure removal of launches; rounding only where a wider product blocks its sums differently.
+# tests/cpu/test_polar_spin_batched.py.
+SPIN_BATCHED = False
+
+
+def _fourier_mask(k_vector_batch, node_positions, call):
+    """The kept k-vectors as a [k] 0/1 column when ``FUSED_FOURIER`` takes this call (one graph), else None."""
+    if not (FUSED_FOURIER and call is not None and call.data is not None and "ptr" in call.data
+            and call.data["ptr"].shape[0] == 2):
+        return None
+    return (k_vector_batch == 0).to(dtype=node_positions.dtype)
+
+
+def _fused_density(source_feats, k_vectors, node_positions, mask, density_basis_fs, volume_per_k):
+    """graph_longrange.features.assemble_fourier_series_batch with the structure factor fused."""
     import torch
 
+    from fastmace.kernels.triton.fourier import structure_factor
+
+    n_nodes, n_sigma, m_dim = source_feats.size(0), density_basis_fs.size(1), density_basis_fs.size(2)
+    sm_dim = n_sigma * m_dim
+    coeff_cos, coeff_sin = structure_factor(k_vectors, node_positions, mask, source_feats.reshape(n_nodes, sm_dim))
+    density_basis_r = density_basis_fs[..., 0].reshape(density_basis_fs.size(0), sm_dim)
+    density_basis_i = density_basis_fs[..., 1].reshape(density_basis_fs.size(0), sm_dim)
+    rho_real = (density_basis_r * coeff_cos).sum(dim=-1) + (density_basis_i * coeff_sin).sum(dim=-1)
+    rho_imag = (density_basis_i * coeff_cos).sum(dim=-1) - (density_basis_r * coeff_sin).sum(dim=-1)
+    density = torch.stack([rho_real, rho_imag], dim=-1)
+    return (2 * math.pi) ** 3 * density / volume_per_k.unsqueeze(-1)
+
+
+def _fused_projection(potential, feature_basis_fs, k_vectors, node_positions, mask, k_factor_proj):
+    """graph_longrange.features.project_to_features_batch with the projection fused."""
+    from fastmace.kernels.triton.fourier import fourier_project
+
+    n_k, n_sigma, m_dim = feature_basis_fs.size(0), feature_basis_fs.size(1), feature_basis_fs.size(2)
+    sm_dim = n_sigma * m_dim
+    proj_basis_r = feature_basis_fs[..., 0].reshape(n_k, sm_dim)
+    proj_basis_i = feature_basis_fs[..., 1].reshape(n_k, sm_dim)
+    a = potential[:, 0].unsqueeze(-1) * proj_basis_r + potential[:, 1].unsqueeze(-1) * proj_basis_i
+    b = potential[:, 0].unsqueeze(-1) * proj_basis_i - potential[:, 1].unsqueeze(-1) * proj_basis_r
+    if k_factor_proj is not None:
+        a = a * k_factor_proj.unsqueeze(-1)
+        b = b * k_factor_proj.unsqueeze(-1)
+    projections = 2.0 * fourier_project(k_vectors, node_positions, mask, a, b)  # [atoms, sm]
+    return projections.reshape(node_positions.size(0), n_sigma, m_dim) / (2 * math.pi) ** 3
+
+
+def pbc_forward_dynamic(self, original, source_feats, cache):
+    """GTOElectrostaticFeatures._pbc_forward_dynamic with the fused k-space sums (``cache["fourier_mask"]``, full
+    PBC); ``original`` otherwise."""
+    from graph_longrange.features import CORRECTION_MODE_MIXED, CORRECTION_MODE_PBC, apply_coulomb_kernel_batch
+
+    mask = cache.get("fourier_mask")
+    if mask is None or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC:
+        return original(self, source_feats, cache)
+    density = _fused_density(source_feats, cache["k_vectors"], cache["node_positions"], mask,
+                             cache["density_basis_fs"], cache["volume_per_k"])
+    potential = apply_coulomb_kernel_batch(k_norm2=cache["k_norm2"], density=density,
+                                           k_factor_coulomb=cache["k_factor_coulomb"])
+    features_si = _fused_projection(potential, cache["feature_basis_fs"], cache["k_vectors"],
+                                    cache["node_positions"], mask, cache["k_factor_proj"])
+    features_flat = self._permute_output_channels(features_si.reshape(features_si.size(0), -1))
+    source_feats_lm = source_feats.squeeze(-2) if source_feats.dim() == 3 else source_feats
+    si_terms = self.self_interaction_terms(source_feats_lm)
+    if not self.include_self_interaction:
+        features_flat = features_flat - si_terms
+    return features_flat
+
+
+def spin_field_features(descriptor, cache, alpha, beta, pbc):
+    """(alpha, beta) field features of ``descriptor`` (a GTOElectrostaticFeatures) in one multichannel call.
+
+    Takes full-PBC caches with cosines and sines; real space, non-periodic corrections and the fused Fourier sums
+    (``cache["fourier_mask"]``) keep the descriptor's own two calls. ``alpha`` and ``beta`` are [atoms, m].
+    """
+    import torch
+    from graph_longrange.features import (
+        CORRECTION_MODE_MIXED,
+        CORRECTION_MODE_PBC,
+        apply_coulomb_kernel_batch,
+        assemble_fourier_series_batch_channels,
+        project_to_features_batch_channels,
+    )
+
+    if (cache.get("mode") == "realspace" or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC
+            or cache.get("fourier_mask") is not None or cache.get("cosines") is None):
+        return (descriptor.forward_dynamic(cache=cache, source_feats=alpha.unsqueeze(-2), pbc=pbc),
+                descriptor.forward_dynamic(cache=cache, source_feats=beta.unsqueeze(-2), pbc=pbc))
+    n_nodes = alpha.size(0)
+    source = torch.stack((alpha, beta), dim=1)  # [atoms, 2 spins, m]
+    density = assemble_fourier_series_batch_channels(source_feats=source, cosines=cache["cosines"],
+                                                     sines=cache["sines"], density_basis_fs=cache["density_basis_fs"],
+                                                     volume_per_k=cache["volume_per_k"])
+    potential = apply_coulomb_kernel_batch(k_norm2=cache["k_norm2"], density=density,
+                                           k_factor_coulomb=cache["k_factor_coulomb"])
+    features = project_to_features_batch_channels(potential=potential, feature_basis_fs=cache["feature_basis_fs"],
+                                                  cosines=cache["cosines"], sines=cache["sines"],
+                                                  k_factor_proj=cache["k_factor_proj"])  # [atoms, 2, sigma, m]
+    features_flat = descriptor._permute_output_channels(features.reshape(n_nodes, 2, -1))
+    if not descriptor.include_self_interaction:  # per atom: both spins as one [2 atoms, m] batch
+        si_terms = descriptor.self_interaction_terms(torch.cat((alpha, beta), dim=0))
+        features_flat = features_flat - si_terms.view(2, n_nodes, -1).transpose(0, 1)
+    return features_flat[:, 0], features_flat[:, 1]
+
+
+def _spin_field_features_call(descriptor, cache, alpha, beta, pbc):
+    """What ``SPIN_BATCH_EDITS`` calls (looks ``spin_field_features`` up per call)."""
+    return spin_field_features(descriptor, cache, alpha, beta, pbc)
+
+
+def _pbc_geometry_factors(k_norm2, k0_mask, volume):
+    """(None, None, volume per k, Coulomb factor): ``_pbc_geometry``'s factors without the cosines and sines."""
+    import torch
+
+    volume_per_k = volume.reshape(-1)[:1].expand(k_norm2.shape)
+    k0 = k0_mask > 0.0
+    k_factor_coulomb = torch.where(k0, 0.0, 1.0 / torch.where(k0, 1.0, k_norm2))
+    return None, None, volume_per_k, k_factor_coulomb
+
+
+def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call=None):
+    import torch
+
+    _, _, volume_per_k, k_factor_coulomb = _pbc_geometry_factors(k_norm2, k0_mask, volume)
+    single = (SHARED_GEOMETRY and call is not None and call.data is not None and "ptr" in call.data
+              and call.data["ptr"].shape[0] == 2)
+    if single:
+        kept = getattr(call, "pbc_geometry", None)
+        if kept is not None and kept[0] is k_vectors and kept[1] is node_positions:
+            return kept[2], kept[3], volume_per_k, k_factor_coulomb
+        inner_products = torch.matmul(k_vectors, node_positions.t())
+        # One graph (batch all 0): the [k, atoms] mask is the k-vectors' own column (the fixed k-set marks the ones
+        # outside the cutoff with another batch index), the same values without the [k, atoms] comparison.
+        mask_k = (k_vector_batch == 0).to(dtype=inner_products.dtype)[:, None]
+        cosines, sines = torch.cos(inner_products) * mask_k, torch.sin(inner_products) * mask_k
+        call.pbc_geometry = (k_vectors, node_positions, cosines, sines)
+        return cosines, sines, volume_per_k, k_factor_coulomb
     inner_products = torch.matmul(k_vectors, node_positions.t())
     mask_f = (k_vector_batch[:, None] == batch[None, :]).to(dtype=inner_products.dtype)
     cosines = torch.cos(inner_products) * mask_f
     sines = torch.sin(inner_products) * mask_f
-    volume_per_k = volume.reshape(-1)[:1].expand(k_norm2.shape)
-    k0 = k0_mask > 0.0
-    k_factor_coulomb = torch.where(k0, 0.0, 1.0 / torch.where(k0, 1.0, k_norm2))
     return cosines, sines, volume_per_k, k_factor_coulomb
 
 
@@ -409,10 +559,18 @@ def precompute_geometry_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, n
     from graph_longrange.features import CORRECTION_MODE_PBC
 
     node_positions, volume = _long_range_geometry(node_positions, volume)
-    cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
-        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume)
+    call = _ACTIVE[-1] if _ACTIVE else None
+    mask = _fourier_mask(k_vector_batch, node_positions, call)
+    if mask is None:
+        cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
+            k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call)
+        fused = {}
+    else:  # the fused sums recompute the phases: no cosines and sines
+        cosines = sines = None
+        _, _, volume_per_k, k_factor_coulomb = _pbc_geometry_factors(k_norm2, k0_mask, volume)
+        fused = {"fourier_mask": mask}
     k_factor_proj = torch.where(k0_mask > 0.0, 0.5, 1.0).to(k_norm2.dtype)
-    return {"mode": "pbc", "k_vectors": k_vectors, "k_norm2": k_norm2, "k_vector_batch": k_vector_batch,
+    return {**fused, "mode": "pbc", "k_vectors": k_vectors, "k_norm2": k_norm2, "k_vector_batch": k_vector_batch,
             "k0_mask": k0_mask, "volume_per_k": volume_per_k, "k_factor_coulomb": k_factor_coulomb,
             "k_factor_proj": k_factor_proj, "volumes": volume.reshape(-1), "batch": batch,
             "node_positions": node_positions, "pbc": pbc, "cosines": cosines, "sines": sines,
@@ -434,11 +592,18 @@ def coulomb_energy_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, source
     from graph_longrange.features import apply_coulomb_kernel_batch, assemble_fourier_series_batch
 
     node_positions, volume = _long_range_geometry(node_positions, volume)
-    cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
-        k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume)
-    density = assemble_fourier_series_batch(source_feats=source_feats, cosines=cosines, sines=sines,
-                                            density_basis_fs=self.density_basis(k_vectors, k_norm2, k0_mask),
-                                            volume_per_k=volume_per_k)
+    call = _ACTIVE[-1] if _ACTIVE else None
+    mask = _fourier_mask(k_vector_batch, node_positions, call)
+    if mask is None:
+        cosines, sines, volume_per_k, k_factor_coulomb = _pbc_geometry(
+            k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, batch, volume, call)
+        density = assemble_fourier_series_batch(source_feats=source_feats, cosines=cosines, sines=sines,
+                                                density_basis_fs=self.density_basis(k_vectors, k_norm2, k0_mask),
+                                                volume_per_k=volume_per_k)
+    else:
+        _, _, volume_per_k, k_factor_coulomb = _pbc_geometry_factors(k_norm2, k0_mask, volume)
+        density = _fused_density(source_feats, k_vectors, node_positions, mask,
+                                 self.density_basis(k_vectors, k_norm2, k0_mask), volume_per_k)
     potential = apply_coulomb_kernel_batch(k_norm2=k_norm2, density=density, k_factor_coulomb=k_factor_coulomb)
     per_k = 2.0 * torch.sum(density * potential, dim=-1)
     energy = 0.5 * volume.reshape(-1) * per_k.sum().reshape(1) / (2 * math.pi) ** 6
@@ -763,6 +928,36 @@ GRAPH_SUM_EDITS = (
 )
 
 
+# MACE 0.3.16's PolarMACE.forward recursion: the alpha and beta field features in one call (``SPIN_BATCHED``).
+SPIN_BATCH_EDITS = ((
+    """            field_feats_alpha = self.electric_potential_descriptor.forward_dynamic(
+                cache=field_feature_cache,
+                source_feats=source_feats_alpha.unsqueeze(-2),
+                pbc=data["pbc"].view(-1, 3),
+            )
+            field_feats_beta = self.electric_potential_descriptor.forward_dynamic(
+                cache=field_feature_cache,
+                source_feats=source_feats_beta.unsqueeze(-2),
+                pbc=data["pbc"].view(-1, 3),
+            )
+""",
+    """            field_feats_alpha, field_feats_beta = _fastmace_spin_field_features(
+                self.electric_potential_descriptor, field_feature_cache,
+                source_feats_alpha, source_feats_beta, data["pbc"].view(-1, 3),
+            )
+"""),
+)
+
+
+def spin_batched_source(source):
+    """``source`` with ``SPIN_BATCH_EDITS``; refuses another source (``PolarUnavailableError``)."""
+    for old, new in SPIN_BATCH_EDITS:
+        if source.count(old) != 1:
+            raise PolarUnavailableError("PolarMACE.forward is not MACE 0.3.16's; the spin batching does not apply")
+        source = source.replace(old, new)
+    return source
+
+
 def graph_sums_source(source, stabilise=False):
     """``source`` with ``GRAPH_SUM_EDITS`` (after PR 1762's edits when ``stabilise``); refuses another source."""
     import re
@@ -776,15 +971,16 @@ def graph_sums_source(source, stabilise=False):
     return source
 
 
-def polar_forward(original_forward, stabilise=False, float64_energy=False, graph_sums=False):
-    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``), the float64 energy reduction and/or the
-    one-graph sums (``graph_sums``, ``GRAPH_SUM_EDITS``).
+def polar_forward(original_forward, stabilise=False, float64_energy=False, graph_sums=False, spin_batched=False):
+    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``), the float64 energy reduction, the
+    one-graph sums (``graph_sums``, ``GRAPH_SUM_EDITS``) and/or one field-feature call for both spins
+    (``spin_batched``, ``SPIN_BATCH_EDITS``).
 
     None: ``original_forward`` itself. Otherwise built from its source like ``pr1762_forward``.
     An unqualified source raises ``PolarUnavailableError`` (PR 1762, graph sums) or
     ``fastmace.model.energy.EnergyReductionError``.
     """
-    if not float64_energy and not graph_sums:
+    if not float64_energy and not graph_sums and not spin_batched:
         return pr1762_forward(original_forward) if stabilise else original_forward
     import mace.modules.extensions as extensions
 
@@ -800,13 +996,16 @@ def polar_forward(original_forward, stabilise=False, float64_energy=False, graph
         source = energy.apply_edits(source, FLOAT64_ENERGY_EDITS, "PolarMACE.forward")
     if graph_sums:
         source = graph_sums_source(source, stabilise)
+    if spin_batched:
+        source = spin_batched_source(source)
     namespace = dict(vars(extensions))
     namespace.update(_fastmace_normalise_fukui=_model_normalise_fukui,
                      _fastmace_cap_charge_dipole=_model_cap_charge_dipole,
                      _fastmace_coulomb_energy_float64=coulomb_energy_float64,
                      _fastmace_graph_sum=graph_sum, _fastmace_graph_mean=graph_mean,
-                     _fastmace_graph_gather=graph_gather)
-    what = ", ".join(name for name, on in (("float64 energy", float64_energy), ("graph sums", graph_sums)) if on)
+                     _fastmace_graph_gather=graph_gather, _fastmace_spin_field_features=_spin_field_features_call)
+    what = ", ".join(name for name, on in (("PR 1762", stabilise), ("float64 energy", float64_energy),
+                                           ("graph sums", graph_sums), ("spin batched", spin_batched)) if on)
     return energy.compile_forward(source, namespace, f"<fastmace PolarMACE.forward, {what}>")
 
 
@@ -911,15 +1110,16 @@ def install():
     original_internal = gto_utils.GTOInternalFieldtoFeaturesBlock.forward
     original_radial = gto_utils.RadialIntegralDirect.forward
     original_moduli = gto_utils.GTOBasis._prepare_k_moduli
+    original_dynamic = features.GTOElectrostaticFeatures._pbc_forward_dynamic
     rewritten = {}  # (PR 1762, float64 energy, strain path, graph sums) -> forward, built on first use
 
     def model_forward(holder):
         key = (stabilised(holder.config), bool(holder.float64_energy), holder.single_graph_strain,
-               bool(holder.graph_sums))
-        if key == (False, False, None, False):
+               bool(holder.graph_sums), bool(SPIN_BATCHED))
+        if key == (False, False, None, False, False):
             return original_forward
         if key not in rewritten:
-            function = polar_forward(original_forward, *key[:2], graph_sums=key[3])
+            function = polar_forward(original_forward, *key[:2], graph_sums=key[3], spin_batched=key[4])
             if key[2] is not None:
                 # After install(): the module functions it replaced are in the copied globals.
                 from fastmace.rewrites import engine as engine_rewrites
@@ -976,6 +1176,11 @@ def install():
     def moduli(self, *args, **kwargs):
         return (prepare_k_moduli if _ACTIVE else original_moduli)(self, *args, **kwargs)
 
+    def dynamic(self, source_feats, cache):
+        if not _ACTIVE:
+            return original_dynamic(self, source_feats, cache)
+        return pbc_forward_dynamic(self, original_dynamic, source_feats, cache)
+
     replacements = (
         (gto_utils.RadialIntegralDirect, "forward", radial),
         (gto_utils.GTOBasis, "_prepare_k_moduli", moduli),
@@ -986,6 +1191,7 @@ def install():
         (extensions, "compute_k_vectors_flat", k_vectors),
         (extensions, "_permute_to_e3nn_convention", permute),
         (features.GTOElectrostaticFeatures, "precompute_geometry", geometry),
+        (features.GTOElectrostaticFeatures, "_pbc_forward_dynamic", dynamic),
         (energy.GTOElectrostaticEnergy, "forward", coulomb),
     )
     targets = ["e3nn.o3._irreps:Irrep.__len__"]
@@ -1164,7 +1370,7 @@ def no_sync_check():
 
 __all__ = [
     "FLOAT64_ENERGY_EDITS", "GRAPH_SUM_EDITS", "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS",
-    "SOURCE_HASHES",
+    "SOURCE_HASHES", "SPIN_BATCH_EDITS", "spin_batched_source", "spin_field_features",
     "ZERO_FORCE_REASON", "PolarHolder", "PolarState", "PolarUnavailableError", "cap_charge_dipole",
     "compute_k_vectors_fixed", "configure", "coulomb_energy_float64", "coulomb_energy_pbc", "disable", "enable",
     "frozen_kset", "get_config", "get_state", "graph_gather", "graph_mean", "graph_sum",

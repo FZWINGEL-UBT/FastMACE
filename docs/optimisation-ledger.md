@@ -407,6 +407,17 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-fx-e3nn](#model-fx-e3nn) | TorchScript e3nn `Linear` back to fx | `fx_e3nn_linear` | FM | DEFAULT (scoped: POLAR-1-S/M/L, hybrid float32, not reproducible) | decision 58 | with graph sums NaCl 0.7634 / 0.7589, NbCl5 0.8225 / 0.8231 | [opt4-T02](validation/speed/opt4-T02.md) |
 | [model-polar-graph-sums](#model-polar-graph-sums) | Deterministic per-graph sums for PolarMACE | `polar_graph_sums` | FM | DEFAULT (scoped: as `fx_e3nn_linear`) | decision 58 | alone −8 / −9 %; none on top | [opt4-T02](validation/speed/opt4-T02.md) |
 | [model-ffwd-polar](#model-ffwd-polar) | `fused_folded_forward` on POLAR-1-S | explicit on | FM | REJECTED | decision 64 scope | b/a 1.004 | [opt8-T02](validation/speed/opt8-T02.md) |
+| [model-polar-wprime](#model-polar-wprime) | `wprime_backward` + `fused_folded_forward` on POLAR-1 | `POLAR_DECISION_66_WPRIME_GPUS` | FM | DEFAULT (scoped: POLAR-1-M/L, RTX 4000 Ada) | owner 2026-11-05 (d66) | M with `gate_epilogue`: NaCl 0.966 / 0.966, NbCl5 0.957 / 0.958 | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-polar-gate-epilogue](#model-polar-gate-epilogue) | `gate_epilogue` on POLAR-1 | `POLAR_DECISION_66_GATE_EPILOGUE_GPUS` | FM | DEFAULT (scoped: POLAR-1, RTX 4000 Ada) | owner 2026-11-05 (d66) | NbCl5 0.989–0.994, NaCl neutral | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-polar-one-interaction](#model-polar-one-interaction) | Plan-time refusal of the second-interaction records on one-interaction models | none (fix) | FM | DEFAULT | owner 2026-11-05 | POLAR-1-S built with `wprime_backward=on` failed; now refused or off | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-polar-species-tables](#model-polar-species-tables) | `species_tables` on PolarMACE (`PolarMACE.forward` pinned) | `species_tables` | FM | DEFAULT (scoped: as MH-1, class rule) | owner 2026-11-05 | tiny PolarMACE within float64 rounding; GPU A/B pending | [polar-reuse](validation/polar/polar-reuse.md) |
+| [model-mh1-edge-sh](#model-mh1-edge-sh) | EDGE_SH for MH-1's class (MH-1, POLAR-1) | `EDGE_SH_MH1_GPUS` (empty), `EDGE_SH` | FM | REJECTED (POLAR-1, A100-SXM4-80GB: tie) | off-polar-alex 2026-11-06 | S, M, L within 0.4 % | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-mh1-fused-first](#model-mh1-fused-first) | FUSED_FIRST_BACKWARD (tabled outer sum) in MH-1's first interaction | `FUSED_FIRST_MH1_GPUS` (empty), `FUSED_FIRST_BACKWARD` | FM | REJECTED (POLAR-1, A100-SXM4-80GB: slower) | off-polar-alex 2026-11-06 | S NaCl 1.006 / 1.006, M NaCl 1.005 / 1.004 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-tf32x3-a100](#model-polar-tf32x3-a100) | `tf32x3_gemms` on POLAR-1 on the A100 | `DECISION_66_TF32X3_MODEL_GPUS` | FM | DEFAULT (scoped: POLAR-1-S/M/L, A100) | off-polar-alex 2026-11-06 (d66) | NbCl5 0.792–0.847, NaCl 0.906–0.940 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-wprime-a100](#model-polar-wprime-a100) | `wprime_backward` + `fused_folded_forward` on POLAR-1 on the A100 | `POLAR_DECISION_66_WPRIME_LABEL_GPUS` | FM | DEFAULT (scoped: POLAR-1-M, A100); L REJECTED (NbCl5 slower) | off-polar-alex 2026-11-06 (d66) | M on tf32x3: NaCl 0.976 / 0.977, NbCl5 0.920 / 0.920 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-tf32x3-a100](#model-off-tf32x3-a100) | `tf32x3_gemms` on MACE-OFF on the A100 | `DECISION_66_TF32X3_MODEL_GPUS` | FM | DEFAULT (scoped: OFF23-medium/-large, OFF23b-medium, OFF24-medium, A100); OFF23-small REJECTED (gate) | off-polar-alex 2026-11-06 (d66) | 0.963–0.981 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-grouped-a100](#model-off-grouped-a100) | `grouped_launch` on MACE-OFF23-small on the A100 | `DECISION_66_GROUPED_LAUNCH_MODEL_GPUS` | FM | DEFAULT (scoped: OFF23-small, A100) | off-polar-alex 2026-11-06 (d66) | 0.989 / 0.995 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-screens-a100](#model-off-screens-a100) | Species GEMM, chunked fused forward, EDGE_SH/HEAD_SLICE/GRAPH_SUM off on MACE-OFF | A/B constants | FM | REJECTED (A100) | off-polar-alex 2026-11-06 | species GEMM 1.009–1.020; chunked forward 1.12–1.14 on medium | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-ffwd-omol](#model-ffwd-omol) | `fused_folded_forward` on OMOL-0 XL | explicit on | FM | REJECTED | decision 64 scope | b/a 1.035 | [opt8-T02](validation/speed/opt8-T02.md) |
 | [model-gate-t03d](#model-gate-t03d) | Gate tool applies rule 13 (OMOL-0 on A100) | tooling | FM | DEFAULT | 2026-10-24 (`3e06d243`) | tooling | [opt4-T03](validation/speed/opt4-T03.md) §9 |
 | [model-other-models](#model-other-models) | Benchmark models, MACE-OFF, POLAR, OMOL on the GPU engine | `--model` | RE | MEASUREMENT | 2026-10-15/16 | 2.9–12.2× vs stock ASE (ten models) | `ResearchModule:LT/studies/other_models/README.md` |
@@ -3717,8 +3728,126 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - What: A/B on POLAR-1-S NbCl5.
 - Status: REJECTED (off for non-MH-1 by decision 64).
 - Measured: b/a 1.004 (pairs 0.99–1.01); the probe saw the kernel only in self-checks (not investigated).
-- Why: neutral.
+- Why: neutral. POLAR-1-S has one interaction, which is reassociated, so the kernel had nothing to act on ([model-polar-one-interaction](#model-polar-one-interaction)).
 - Sources: [opt8-T02](validation/speed/opt8-T02.md) "MH-1 family".
+
+<a id="model-polar-wprime"></a>
+#### model-polar-wprime: `wprime_backward` + `fused_folded_forward` on POLAR-1
+- Switch: `planner.fixed.POLAR_DECISION_66_WPRIME_GPUS` ("NVIDIA RTX 4000 Ada Generation")
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: MH-1's decision-66 pair for the POLAR-1 checkpoints with a second interaction (M, L); both act on the interactions after the reassociated first one.
+- Status: DEFAULT (scoped: POLAR-1-M and -L on the RTX 4000 Ada). Owner: "yes turn it on for 2 interaction models".
+- Measured (leto, POLAR-1-M, MD step b/a both orders): wprime alone NaCl 0.968 / 0.967, NbCl5 0.978 / 0.978; with the fused forward 0.963 / 0.965, 0.970 / 0.971; with `gate_epilogue` too 0.966 / 0.966, 0.957 / 0.958. Force gate passed.
+- Why: same kernels as MH-1; only the label gate kept POLAR-1 out. RTX 5060 Ti and A100 not measured.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-polar-gate-epilogue"></a>
+#### model-polar-gate-epilogue: `gate_epilogue` on POLAR-1
+- Switch: `planner.fixed.POLAR_DECISION_66_GATE_EPILOGUE_GPUS` ("NVIDIA RTX 4000 Ada Generation")
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- Status: DEFAULT (scoped: every POLAR-1 checkpoint on the RTX 4000 Ada).
+- Measured (leto): POLAR-1-S NaCl 0.998 / 1.001, NbCl5 0.994 / 0.993; POLAR-1-M NaCl 1.002 / 0.999, NbCl5 0.989 / 0.989.
+- Why: as for MH-1 (NbCl5 faster, NaCl neutral).
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-polar-one-interaction"></a>
+#### model-polar-one-interaction: second-interaction records on one-interaction models
+- Switch: none (planner rule; `SECOND_INTERACTION_RECORDS`)
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: `fused_folded_forward`, `wprime_backward` and `w_tables` skip the reassociated first interaction; on POLAR-1-S (one interaction) an explicit "on" passed the planner and the build raised. Now refused at plan time (explicit) or off with the reason (auto).
+- Status: DEFAULT. Also explains [model-ffwd-polar](#model-ffwd-polar)'s neutral 1.004.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-polar-species-tables"></a>
+#### model-polar-species-tables: `species_tables` on PolarMACE
+- Switch: `species_tables` (class rule, `on_unless_reproducible_if_model_supports`)
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: `PolarMACE.forward` pinned (the polar path's hash) next to `ScaleShiftMACE.forward`: its embedding feeds only the first interaction. `fold_readout_tail` and `fold_product_linear` stay refused (the long-range heads read every layer's features).
+- Status: DEFAULT (scoped: as MH-1). CPU: whole tiny PolarMACE within float64 rounding. GPU A/B on leto pending.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md).
+
+<a id="model-mh1-edge-sh"></a>
+#### model-mh1-edge-sh: EDGE_SH for MH-1's class
+- Switch: `rewrites.generic.modules.EDGE_SH_MH1_GPUS` (empty), A/B constant `EDGE_SH`
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: round 5's Triton edge harmonics, attached by MH-1's streaming record as by `generic_streaming`.
+- Status: REJECTED for POLAR-1 on the A100-SXM4-80GB (off-polar-alex, 6 November 2026): a tie. S NaCl
+  0.996 / 0.999, NbCl5 1.000 / 1.000; M 1.000 / 0.999, 1.000 / 1.001; L 0.998 / 1.000, 1.001 / 1.000. Other GPUs not
+  measured.
+- Sources: [polar-reuse](validation/polar/polar-reuse.md), [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-mh1-fused-first"></a>
+#### model-mh1-fused-first: FUSED_FIRST_BACKWARD in MH-1's first interaction
+- Switch: `rewrites.mh1.modules.FUSED_FIRST_MH1_GPUS` (empty), A/B constant `generic.modules.FUSED_FIRST_BACKWARD`
+- Engine: FM
+- Date/round: 5 November 2026, polar-T01
+- What: the tabled outer sum in MH-1's reassociated first interaction; the folded weight [W, b] reads the table's leading h + 1 columns. CPU test (fallback path) on tiny MH-1 and PolarMACE.
+- Status: REJECTED for POLAR-1 on the A100-SXM4-80GB (off-polar-alex, 6 November 2026): slower. S NaCl
+  1.006 / 1.006, NbCl5 1.002 / 1.001; M NaCl 1.005 / 1.004; L NaCl 1.002 / 1.003 (one L NbCl5 order read 0.970, the
+  other 1.000: noise).
+- Sources: [polar-reuse](validation/polar/polar-reuse.md), [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-tf32x3-a100"></a>
+#### model-polar-tf32x3-a100: `tf32x3_gemms` on POLAR-1 on the A100
+- Switch: `planner.fixed.DECISION_66_TF32X3_MODEL_GPUS` (labels `polar1-s`, `polar1-m`, `polar1-l`; A100 as `GPUModels`)
+- Engine: FM
+- Date/round: 6 November 2026, branch `fastmace/off-polar-alex` (NHR@FAU Alex)
+- What: the CUTLASS 3xTF32 GEMMs that MH-1 and OMAT-0 take on the A100. A precision change: adopted under the owner's
+  request for the fastest A100 speed, with the force/stress gate as the guard.
+- Status: DEFAULT (scoped: POLAR-1-S/M/L on the A100).
+- Measured (A100-SXM4-80GB, NaCl / NbCl5 3x3x3, MD step b/a both orders): S 0.940 / 0.938, 0.847 / 0.847; M 0.931 /
+  0.930, 0.842 / 0.843; L 0.906 / 0.907, 0.792 / 0.793. Gates pass (S, M, L; energy ratios above 2 are under the
+  10 meV floor).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-wprime-a100"></a>
+#### model-polar-wprime-a100: `wprime_backward` + `fused_folded_forward` on POLAR-1 on the A100
+- Switch: `planner.fixed.POLAR_DECISION_66_WPRIME_LABEL_GPUS` (`polar1-m`: A100)
+- Engine: FM
+- Date/round: 6 November 2026, branch `fastmace/off-polar-alex`
+- Status: DEFAULT (scoped: POLAR-1-M on the A100). POLAR-1-L REJECTED by the mixed-cell rule.
+- Measured (A100-SXM4-80GB, on top of `tf32x3_gemms`): M NaCl 0.976 / 0.977, NbCl5 0.920 / 0.920; the pair and
+  tf32x3 together against neither: M 0.909 / 0.909, 0.775 / 0.775. L NaCl 0.956 / 0.957, NbCl5 1.003 / 1.002 (slower
+  in both orders). Gate of tf32x3 + pair passes for M and L.
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-tf32x3-a100"></a>
+#### model-off-tf32x3-a100: `tf32x3_gemms` on MACE-OFF on the A100
+- Switch: `planner.fixed.DECISION_66_TF32X3_MODEL_GPUS` (`off23-medium`, `off23-large`, `off23b-medium`, `off24-medium`)
+- Engine: FM
+- Date/round: 6 November 2026, branch `fastmace/off-polar-alex`
+- Status: DEFAULT (scoped: those four on the A100). OFF23-small REJECTED: 0.974 / 0.977, but the gate fails on
+  paracetamol (forces 2.19 against the default's 1.36).
+- Measured (A100-SXM4-80GB, water 648 atoms): medium 0.968 / 0.966, large 0.967 / 0.963, 23b-medium 0.980 / 0.976,
+  24-medium 0.980 / 0.981. Gates pass on urea, naphthalene, paracetamol (2x2x2 for large) and water.
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-grouped-a100"></a>
+#### model-off-grouped-a100: `grouped_launch` on MACE-OFF23-small on the A100
+- Switch: `planner.fixed.DECISION_66_GROUPED_LAUNCH_MODEL_GPUS` (`off23-small`)
+- Engine: FM
+- Date/round: 6 November 2026, branch `fastmace/off-polar-alex`
+- Status: DEFAULT (scoped: OFF23-small on the A100). Exact. OFF23-large slower (1.008 / 1.009); the other models take
+  `tf32x3_gemms`, which excludes it.
+- Measured (A100-SXM4-80GB, water): 0.989 / 0.995.
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-screens-a100"></a>
+#### model-off-screens-a100: other switches on MACE-OFF on the A100
+- Switch: A/B constants `SPECIES_GEMM`, `EDGE_SH`, `HEAD_SLICE`, `GRAPH_SUM`; `chunked_conv_backward` +
+  `fused_folded_forward`
+- Engine: FM
+- Date/round: 6 November 2026, branch `fastmace/off-polar-alex`
+- Status: REJECTED (defaults unchanged). Species GEMM slower on all five (1.009–1.020). EDGE_SH off slower (keep on).
+  HEAD_SLICE off a tie or slower. GRAPH_SUM off: OFF23-small 0.995 / 0.999, medium 0.997 / 0.998, a tie elsewhere;
+  left on (under 0.5 %, flagged). Chunked fused forward: medium models 1.12–1.14 slower; OFF23-small 0.989 / 0.989
+  (gate and stack with `grouped_launch` measured separately, see the results README).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
 
 <a id="model-ffwd-omol"></a>
 #### model-ffwd-omol: `fused_folded_forward` on OMOL-0 XL

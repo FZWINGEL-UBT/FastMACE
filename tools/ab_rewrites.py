@@ -72,6 +72,9 @@ def parse_args(argv=None):
     p.add_argument("--block", type=int, default=300)
     p.add_argument("--blocks", type=int, default=12)
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
+    p.add_argument("--stop-after", type=int, default=None, metavar="BLOCKS",
+                   help="End a structure's run after this many blocks per side when b/a is beyond --stop-beyond")
+    p.add_argument("--stop-beyond", type=float, default=0.03, help="Early stop when |b/a - 1| exceeds this")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order")
     p.add_argument("--a-tf32", action="store_true",
                    help="Side a builds and steps with PyTorch's TF32 matmul mode (TF32 screen); IEEE otherwise")
@@ -243,7 +246,8 @@ def main(argv=None):
                 tf32_sides={"a": args.a_tf32, "b": args.b_tf32},
                 recapture_sides={"a": args.a_recapture, "b": args.b_recapture}, timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
-                prepare=args.prepare, load=list(os.getloadavg()), structures={})
+                prepare=args.prepare, stop_after=args.stop_after, stop_beyond=args.stop_beyond,
+                load=list(os.getloadavg()), structures={})
     import importlib
     defaults = {key: getattr(importlib.import_module(key[0]), key[1]) for key in {**args.a_constant, **args.b_constant}}
     for spec in args.structures:
@@ -284,7 +288,8 @@ def main(argv=None):
 
         counters_before = engine_counters()
         counted = ab_step_time.compile_counters(counters)
-        result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern)
+        result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern,
+                           stop_after=args.stop_after, stop_beyond=args.stop_beyond)
         changes, recompiled = ab_step_time.compile_changes(counted, ab_step_time.compile_counters(counters))
         medians = {side: result.statistics[side].median_ms for side in sides}
         blocks = {side: result.statistics[side].block_ms for side in sides}
@@ -300,7 +305,8 @@ def main(argv=None):
         entry["valid"] = not recompiled and not entry["other_gpu_processes"]
         meta["structures"][name] = entry
         print(name, " ".join(f"{s} {medians[s]:.4f} ms" for s in sides), f"b/a {entry['ratio_b_over_a']:.4f}",
-              "valid" if entry["valid"] else "INVALID", flush=True)
+              "valid" if entry["valid"] else "INVALID",
+              f"(stopped after {result.stopped_after} blocks)" if result.stopped_after else "", flush=True)
         args.output.with_suffix(".json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
         sides = None
         ab_step_time.set_tf32(torch, False)

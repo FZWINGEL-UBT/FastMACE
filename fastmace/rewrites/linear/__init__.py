@@ -16,6 +16,10 @@ extraction's rounding, not the rewrite).
   and whose ``linear_1`` and ``linear_res`` are block linears. It requires ``density_first``,
   so it acts only where that rewrite applies.
 
+With ``E3NN_BLOCK_LINEAR`` (an A/B constant, off-polar-alex 6 November 2026; ``e3nn_block_linear_default``)
+``block_linear`` also replaces the larger e3nn ``o3.Linear``s the cuEquivariance conversion leaves (MACE-POLAR's
+field blocks: 512x0e+512x1o products that otherwise run as plain FP32 GEMMs under ``tf32x3_gemms``).
+
 No source is pinned: these records rely on cuEquivariance's ``Linear`` (its ``f``, the layout
 transposes and the ir_mul core layout), not on MACE's code, and the self-check covers that.
 The research engine's in-place variant (``INPLACE_BLOCK_LINEAR``; opt-in, slower) is not ported.
@@ -23,6 +27,7 @@ The research engine's in-place variant (``INPLACE_BLOCK_LINEAR``; opt-in, slower
 
 from __future__ import annotations
 
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.model.capabilities import FACTORED_INTERACTIONS
 from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.registry import Rewrite, Support, check_tensors
@@ -31,6 +36,24 @@ MACE_VERSIONS = ">=0.3.16,<0.3.17"
 # Set by a forward function that reads interaction.residual_linear (1a-T07's folded forward).
 READS_RESIDUAL_LINEAR = "fastmace_residual_linear"
 _PROBE_ROWS = 7
+# e3nn o3.Linear -> BlockLinear too (modules.e3nn_block_linear): None follows E3NN_BLOCK_LINEAR_GPUS (none measured
+# yet, decision 66), True/False forces it (the A/B).
+E3NN_BLOCK_LINEAR = None
+E3NN_BLOCK_LINEAR_GPUS = GPUModels(())
+
+
+def e3nn_block_linear_default(device=None):
+    """``E3NN_BLOCK_LINEAR`` on ``device`` (a torch.device, a device name or None): the constant when set, else on
+    for ``E3NN_BLOCK_LINEAR_GPUS``."""
+    if E3NN_BLOCK_LINEAR is not None:
+        return bool(E3NN_BLOCK_LINEAR)
+    import torch
+
+    if isinstance(device, torch.device):
+        if device.type != "cuda":
+            return False
+        device = torch.cuda.get_device_name(device)
+    return device is not None and device in E3NN_BLOCK_LINEAR_GPUS
 
 
 def _modules(model):
@@ -51,9 +74,13 @@ def block_linears(model):
     """Replace the applicable cuEquivariance Linear layers of ``model``; returns the replaced names."""
     lm = _block_type()
     replaced = []
+    parameter = next(iter(model.parameters()), None) if hasattr(model, "parameters") else None
+    e3nn = parameter is not None and e3nn_block_linear_default(parameter.device)
     for name, module in _modules(model):
         for child_name, child in list(module.named_children()):
             replacement = lm.block_linear(child)
+            if replacement is None and e3nn:
+                replacement = lm.e3nn_block_linear(child)
             if replacement is not None:
                 setattr(module, child_name, replacement)
                 replaced.append(f"{name}.{child_name}" if name else child_name)
@@ -247,4 +274,5 @@ RECORDS = {
         selfcheck=_merged_residual_selfcheck, resident_memory=memory_terms.merged_residual_resident),
 }
 
-__all__ = ["READS_RESIDUAL_LINEAR", "RECORDS", "block_linears", "group_linears", "merge_residual_linears"]
+__all__ = ["E3NN_BLOCK_LINEAR", "E3NN_BLOCK_LINEAR_GPUS", "READS_RESIDUAL_LINEAR", "RECORDS", "block_linears",
+           "e3nn_block_linear_default", "group_linears", "merge_residual_linears"]

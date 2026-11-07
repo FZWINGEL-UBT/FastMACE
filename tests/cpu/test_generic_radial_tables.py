@@ -19,7 +19,7 @@ pytest.importorskip("mace")
 
 from test_rewrites_mh1 import context, energy_and_forces, tiny  # noqa: E402
 
-FAMILIES = ("residual", "density")
+FAMILIES = ("residual", "density", "off")  # off: MACE-OFF, a stock first block (StockTableWeights)
 
 
 def _registry():
@@ -71,6 +71,11 @@ def test_generic_tables_are_certified_and_the_forces_follow_the_network(family):
     assert all(0.0 <= table.certificate["worst"] <= 1.0 for table in tables), [t.certificate for t in tables]
     assert all(table.single for table in tables)  # no distance transform: one table per interaction
     assert type(model.radial_embedding).__name__ == "LengthsEmbedding"
+    if family == "off":  # the stock forward calls conv_tp_weights(edge_feats): the table stands in for the network
+        first = model.interactions[0]
+        assert type(first).__name__ == "RealAgnosticInteractionBlock"
+        assert type(first.conv_tp_weights).__name__ == "StockTableWeights"
+        assert first.radial_original is not None
     energy, forces = energy_and_forces(without, batch)
     new_energy, new_forces = energy_and_forces(model, batch)
     assert float((new_forces - forces).abs().max() / forces.abs().max()) < 1e-4
@@ -128,3 +133,22 @@ def test_the_planner_keeps_generic_tables_to_measured_gpus_and_float32(monkeypat
         plan_for("omat0-medium", precision=PrecisionConfig(dtype="float64"),
                  rewrites=RewriteConfig(radial_tables="on"))
     assert plan_for("mh1-r2scan").rewrites.radial_tables == "on"  # MH-1's default (decision 62) unchanged
+
+
+def test_the_planner_keeps_stock_first_tables_off_until_measured(monkeypatch):
+    """MACE-OFF's tables (the stock first block's too): "auto" on only on the GPUs decision 66 lists (the A100,
+    off-polar-alex, 7 November 2026); an explicit "on" still plans them elsewhere."""
+    from test_planner import GPU, plan_for
+
+    from fastmace.config import RewriteConfig
+    from fastmace.planner import fixed
+
+    assert fixed.DECISION_66_STOCK_FIRST_TABLES_GPUS == ("NVIDIA A100-SXM4-80GB",)
+    assert GPU.name not in fixed.DECISION_66_STOCK_FIRST_TABLES_GPUS
+    assert GPU.name in fixed.DECISION_66_GENERIC_RADIAL_TABLES_GPUS  # the generic family's GPU, not OFF's
+    _, choice, why = plan_for("off23-medium").decision("RewriteConfig.radial_tables")
+    assert choice == "off" and "stock first block not measured" in str(why)
+    assert plan_for("off23-medium", rewrites=RewriteConfig(radial_tables="on")).rewrites.radial_tables == "on"
+    monkeypatch.setattr(fixed, "DECISION_66_STOCK_FIRST_TABLES_GPUS", fixed.GPUModels((GPU.name,)))
+    assert plan_for("off23-medium").rewrites.radial_tables == "on"
+    assert plan_for("omat0-medium").rewrites.radial_tables == "on"  # the generic family unchanged

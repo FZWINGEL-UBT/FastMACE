@@ -254,7 +254,8 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            # (generic_chunked_conv_backward; decision 66: this file's GPU is measured)
            "chunked_conv_backward": LABELS,
            "radial_tables": (*FACTORED_LABELS, *GENERIC_FAMILY_LABELS),  # generic: decision 66 (this file's GPU)
-           "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
+           # species_tables: PolarMACE.forward pinned too (polar-T01); the folds stay MH-1's
+           "species_tables": (*MH1_LABELS, *fixed.POLAR_GRAPH_LABELS), "fold_product_linear": MH1_LABELS,
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
@@ -1051,11 +1052,13 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
                                                    model_label="mh1-r2scan")
         assert plan.rewrites.wprime_backward == "off", hardware.name
         assert dict(plan.auto_options_off)["wprime_backward"] == f"not a measured GPU, decision 66 ({hardware.name})"
-    for label in ("polar1-s", "omol0-xl"):
-        plan = plan_for(label)
-        assert plan.rewrites.wprime_backward == "off", label
-        assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured model, decision 66"), \
-            label
+    plan = plan_for("omol0-xl")
+    assert plan.rewrites.wprime_backward == "off"
+    assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured model, decision 66")
+    # POLAR-1-M/L: measured on the RTX 4000 Ada only (polar-T01), not on this file's GPU; POLAR-1-S: one interaction.
+    plan = plan_for("polar1-m")
+    assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured GPU, decision 66")
+    assert dict(plan_for("polar1-s").auto_options_off)["wprime_backward"] == fixed.SECOND_INTERACTION
     float64 = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
     item, choice, reason = decision(float64, "RewriteConfig.wprime_backward")
     assert choice == "off" and "float64 plans keep the chained backward" in reason
@@ -1156,3 +1159,50 @@ def test_decision_65_explicit_requests_override(monkeypatch):
     assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == "dynamic"
     with pytest.raises(PlanRefused, match="w-tables|needs float64"):
         float64_plan(monkeypatch, ADA, dtype="float32", rewrites=RewriteConfig(w_tables="on"))
+
+
+def test_decision_66_mace_off_on_the_a100():
+    """MACE-OFF on the A100 (fastmace/off-polar-alex, 6 November 2026): tf32x3_gemms is on for OFF23 medium and
+    large, OFF23b medium and OFF24 medium (their force gates pass); OFF23-small fails its gate and takes
+    grouped_launch instead (exact). Every A100 model; never on another GPU."""
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+    def plan(hardware, label, **configs):
+        return planner(engine=EngineConfig(), **configs).plan(traits(label), nacl(), IntegratorConfig(), hardware,
+                                                              model_label=label)
+
+    for hardware in (a100_80, A100):
+        for label in ("off23-medium", "off23-large", "off23b-medium", "off24-medium"):
+            p = plan(hardware, label)
+            assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("on", "off"), (label, hardware.name)
+            assert f"{label} on a measured GPU, decision 66 ({hardware.name})" in \
+                decision(p, "RewriteConfig.tf32x3_gemms")[2]
+        p = plan(hardware, "off23-small")
+        assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("off", "on"), hardware.name
+        assert dict(p.auto_options_off)["tf32x3_gemms"] == "not a measured model, decision 66 (label off23-small)"
+    for hardware in (GPU, ADA, L4):
+        for label in ("off23-small", "off23-medium", "off24-medium"):
+            p = plan(hardware, label)
+            assert (p.rewrites.tf32x3_gemms, p.rewrites.grouped_launch) == ("off", "off"), (label, hardware.name)
+    p = plan(a100_80, "off23-medium", precision=PrecisionConfig(dtype="float64"))
+    assert p.rewrites.tf32x3_gemms == "off"
+
+
+def test_decision_66_polar1_tf32x3_on_the_a100():
+    """POLAR-1 on the A100 (fastmace/off-polar-alex, 6 November 2026): tf32x3_gemms is on for S, M and L (force
+    gates pass); not on other GPUs."""
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+    def plan(hardware, label):
+        return planner(engine=EngineConfig()).plan(traits(label), nacl(), IntegratorConfig(), hardware,
+                                                   model_label=label)
+
+    for label in fixed.POLAR_GRAPH_LABELS:
+        for hardware in (a100_80, A100):
+            p = plan(hardware, label)
+            assert p.rewrites.tf32x3_gemms == "on", (label, hardware.name)
+            assert p.rewrites.gate_epilogue == "off" and p.rewrites.grouped_launch == "off"
+            pair = (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward)
+            assert pair == (("on", "on") if label == "polar1-m" else ("off", "off")), (label, hardware.name)
+        for hardware in (GPU, ADA, L4):
+            assert plan(hardware, label).rewrites.tf32x3_gemms == "off", (label, hardware.name)
