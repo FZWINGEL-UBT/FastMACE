@@ -74,6 +74,7 @@ the class-level wrappers and the record of the installed patch, not switches.
 from __future__ import annotations
 
 import contextlib
+import functools
 import hashlib
 import inspect
 import math
@@ -348,6 +349,7 @@ def compute_k_vectors_fixed(call, cutoff, cell_vectors, r_cell_vectors):
         cell_vectors = _strained_cell(call, cell_vectors)
         r_cell_vectors, call.volume = _reciprocal(cell_vectors)
     k_vectors, k_norm2, included, max_ns = _included(state, cutoff, cell_vectors, r_cell_vectors)
+    call.k_lattice = (k_vectors, r_cell_vectors[0])  # PHASE_RECURRENCE: k = state.integer @ r_cell
     state.overflow |= (max_ns > state.bounds_t).any()
     deformation = torch.matmul(state.inverse_cell0, cell_vectors[0]) - torch.eye(3, dtype=cell_vectors.dtype,
                                                                                device=cell_vectors.device)
@@ -422,6 +424,14 @@ SPIN_BATCHED = False
 # tests/cpu/test_kspace_megakernel.py, tests/gpu/test_kspace_megakernel_cuda.py.
 MEGAKERNEL = None
 MEGAKERNEL_GPUS = ()
+
+# A/B constant (polar-megakernel, 7 November 2026): the dense [k, atoms] cosines and sines from per-atom phase tables
+# along the three reciprocal axes (``PhaseFactors``): k = n1 b1 + n2 b2 + n3 b3 with integer n, so
+# exp(i k . r) = exp(i n1 b1 . r) exp(i n2 b2 . r) exp(i n3 b3 . r), and only the (2 M + 1) x 3 angles m b_i . r per
+# atom go through cos and sin (M the largest |n|); each [k, atoms] entry is two complex products. The backward is the
+# dense formula (the phase gradient from the kept cosines and sines; no transcendentals). Rounding (the phase from
+# three angles instead of one product). One graph with the fixed k-set only. tests/cpu/test_polar_phase_recurrence.py.
+PHASE_RECURRENCE = False
 
 
 def megakernel_on(tensor):
@@ -596,6 +606,62 @@ def _spin_field_features_call(descriptor, cache, alpha, beta, pbc):
     return spin_field_features(descriptor, cache, alpha, beta, pbc)
 
 
+def recurrence_phases(node_positions, basis, integer, span):
+    """``(cos, sin)`` [k, atoms] of ``(integer @ basis) . r`` as two complex products of per-axis phases
+    ``exp(i m b_i . r)``, ``|m| <= span``. Not differentiable (``phase_factors`` adds the dense backward)."""
+    import torch
+
+    theta = node_positions @ basis.t()  # [atoms, 3]: b_i . r
+    m = torch.arange(-span, span + 1, device=theta.device, dtype=theta.dtype)
+    angles = m[:, None, None] * theta[None]  # [2 span + 1, atoms, 3]
+    table_cos, table_sin = torch.cos(angles), torch.sin(angles)
+    index = integer + span
+    c1, s1 = table_cos[index[:, 0], :, 0], table_sin[index[:, 0], :, 0]
+    c2, s2 = table_cos[index[:, 1], :, 1], table_sin[index[:, 1], :, 1]
+    c3, s3 = table_cos[index[:, 2], :, 2], table_sin[index[:, 2], :, 2]
+    c12, s12 = c1 * c2 - s1 * s2, c1 * s2 + s1 * c2
+    return c12 * c3 - s12 * s3, c12 * s3 + s12 * c3
+
+
+@functools.cache
+def phase_factors():
+    """The ``PHASE_RECURRENCE`` autograd function: ``apply(k, r, basis, integer, span)`` gives ``(cos, sin)`` [k,
+    atoms] of ``k . r`` with ``k = integer @ basis``; the backward is the dense one (to ``k`` and ``r``)."""
+    import torch
+
+    class _PhaseFactors(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, k_vectors, node_positions, basis, integer, span):
+            cos, sin = recurrence_phases(node_positions, basis.detach(), integer, span)
+            ctx.save_for_backward(k_vectors, node_positions, cos, sin)
+            return cos, sin
+
+        @staticmethod
+        def backward(ctx, grad_cos, grad_sin):
+            k_vectors, node_positions, cos, sin = ctx.saved_tensors
+            dtheta = torch.zeros_like(cos)
+            if grad_sin is not None:
+                dtheta = dtheta + cos * grad_sin
+            if grad_cos is not None:
+                dtheta = dtheta - sin * grad_cos
+            return dtheta @ node_positions, dtheta.t() @ k_vectors, None, None, None
+
+    return _PhaseFactors
+
+
+def _phases(k_vectors, node_positions, call):
+    """``(cos, sin)`` [k, atoms] of ``k . r``: from per-axis phase tables with ``PHASE_RECURRENCE`` when the call
+    built these k-vectors from its lattice (``compute_k_vectors_fixed``), else dense."""
+    import torch
+
+    lattice = getattr(call, "k_lattice", None) if PHASE_RECURRENCE and call is not None else None
+    if lattice is not None and lattice[0] is k_vectors and call.state is not None:
+        return phase_factors().apply(k_vectors, node_positions, lattice[1], call.state.integer,
+                                     max(call.state.bounds))
+    inner_products = torch.matmul(k_vectors, node_positions.t())
+    return torch.cos(inner_products), torch.sin(inner_products)
+
+
 def _pbc_geometry_factors(k_norm2, k0_mask, volume):
     """(None, None, volume per k, Coulomb factor): ``_pbc_geometry``'s factors without the cosines and sines."""
     import torch
@@ -616,17 +682,17 @@ def _pbc_geometry(k_vectors, k_norm2, k_vector_batch, k0_mask, node_positions, b
         kept = getattr(call, "pbc_geometry", None)
         if kept is not None and kept[0] is k_vectors and kept[1] is node_positions:
             return kept[2], kept[3], volume_per_k, k_factor_coulomb
-        inner_products = torch.matmul(k_vectors, node_positions.t())
+        cos, sin = _phases(k_vectors, node_positions, call)
         # One graph (batch all 0): the [k, atoms] mask is the k-vectors' own column (the fixed k-set marks the ones
         # outside the cutoff with another batch index), the same values without the [k, atoms] comparison.
-        mask_k = (k_vector_batch == 0).to(dtype=inner_products.dtype)[:, None]
-        cosines, sines = torch.cos(inner_products) * mask_k, torch.sin(inner_products) * mask_k
+        mask_k = (k_vector_batch == 0).to(dtype=cos.dtype)[:, None]
+        cosines, sines = cos * mask_k, sin * mask_k
         call.pbc_geometry = (k_vectors, node_positions, cosines, sines)
         return cosines, sines, volume_per_k, k_factor_coulomb
-    inner_products = torch.matmul(k_vectors, node_positions.t())
-    mask_f = (k_vector_batch[:, None] == batch[None, :]).to(dtype=inner_products.dtype)
-    cosines = torch.cos(inner_products) * mask_f
-    sines = torch.sin(inner_products) * mask_f
+    cos, sin = _phases(k_vectors, node_positions, call)
+    mask_f = (k_vector_batch[:, None] == batch[None, :]).to(dtype=cos.dtype)
+    cosines = cos * mask_f
+    sines = sin * mask_f
     return cosines, sines, volume_per_k, k_factor_coulomb
 
 
