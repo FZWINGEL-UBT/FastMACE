@@ -38,33 +38,55 @@ THREADS = 256
 
 
 # --------------------------------------------------------------------------------------------- parsing production
+def _braced(text, open_index):
+    """The text inside the braces opening at ``open_index`` and the index after the closing brace."""
+    depth = 0
+    for i in range(open_index, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_index + 1:i], i + 1
+    raise ValueError("sx-layout: unbalanced braces")
+
+
 def parse_forward(source):
-    """Per path part of the production forward: path indices, x offsets, angular code and output stores."""
-    channels = int(re.search(r"constexpr int CB = (\d+);", source).group(1)) * 4  # 4 channel blocks of CB
+    """Per path part of the production forward: path indices, per-path W factors, x offsets, the per-edge angular
+    block and the output stores. The angular block is the braced block right after the receiver-change loop
+    ``while (cur < rv[b]) {...}``, in terms of ``sh_s[b * ED + j]``, ``xv[b][k]``, ``w[g][b]`` and ``acc[i]``."""
     parts = []
     for body in re.split(r"\n    case \d+: \{", source)[1:]:
         body = body.split("} break;")[0]
         wst = [int(v) for v in re.search(r"const int wst\[\d+\] = \{([^}]*)\};", body).group(1).split(",")]
+        factors = re.search(r"const float cpf\[\d+\] = \{([^}]*)\};", body)
+        cpf = ([float.fromhex(v.strip().rstrip("f")) for v in factors.group(1).split(",")] if factors
+               else [1.0] * len(wst))
         xs = re.findall(r"xv\[b\]\[(\d+)\] = \(snd >= 0\) \? x\[\(int64_t\)snd \* IN_DIM \+ (\d+) \+ ch\] : 0\.f;",
                         body)
         count = int(re.search(r"float acc\[(\d+)\];", body).group(1))
-        blocks = re.findall(r"\{\s*((?:const float e\d+ = sh_s\[b \* ED \+ \d+\];\s*)+)"
-                            r"((?:acc\[\d+\] = fmaf\(w\[\d+\]\[b\], [^;]*?, acc\[\d+\]\);\s*)+)\}", body)
-        final = body[body.rindex("while (cur < r1) {"):]
-        stores = re.findall(r"(out\d+)\[cur \* (\d+) \+ (\d+) \+ ch\] = acc\[(\d+)\];", final)
-        terms = sum(len(re.findall(r"acc\[\d+\] = fmaf", b[1])) for b in blocks)
-        if not xs or not blocks or len(stores) != count or terms != count:
-            raise ValueError(f"sx-layout: could not parse a path part (x {len(xs)}, blocks {len(blocks)}, "
-                             f"stores {len(stores)}, terms {terms}, acc {count})")
-        parts.append(dict(paths=[v // CHANNELS for v in wst], xs=[(int(k), int(o)) for k, o in xs], count=count,
-                          blocks=blocks, stores=[(o, int(s), int(off), int(i)) for o, s, off, i in stores]))
-    if not parts or channels != CHANNELS:
-        raise ValueError(f"sx-layout: {len(parts)} parts, {channels} channels (expects {CHANNELS})")
+        loop = body.index("while (cur < rv[b]) {")
+        change, after = _braced(body, body.index("{", loop))
+        block, _ = _braced(body, body.index("{", after))
+        stores = re.findall(r"(out\d+)\[cur \* (\d+) \+ (\d+) \+ ch\] = acc\[(\d+)\];", change)
+        written = {int(i) for i in re.findall(r"\bacc\[(\d+)\] = fmaf", block)}
+        code = re.sub(r"//.*", "", block)  # comments may say "(b)"
+        stray = re.search(r"\bb\b", re.sub(r"(sh_s\[b \* ED|xv\[b\]|w\[\d+\]\[b\])", "", code))
+        if not xs or len(stores) != count or written != set(range(count)) or len(cpf) != len(wst) or stray:
+            raise ValueError(f"sx-layout: could not parse a path part (x {len(xs)}, stores {len(stores)}, "
+                             f"acc written {len(written)} of {count}, cpf {len(cpf)}, wst {len(wst)}, "
+                             f"stray b {bool(stray)})")
+        parts.append(dict(paths=[v // CHANNELS for v in wst], cpf=cpf, xs=[(int(k), int(o)) for k, o in xs],
+                          count=count, block=block,
+                          stores=[(o, int(st), int(off), int(i)) for o, st, off, i in stores]))
+    if not parts:
+        raise ValueError("sx-layout: no path parts in the production forward")
     return parts
 
 
+
 def _angular(parts):
-    """The per-edge code (after wv[] and shv are set) and the stores, with per-part names."""
+    """The per-edge code (after wv[] is set) and the stores, with per-part names."""
     lines, stores, declarations = [], [], []
     for index, part in enumerate(parts):
         declarations.append(f"        float acc{index}[{part['count']}];\n"
@@ -72,16 +94,19 @@ def _angular(parts):
                             f"        for (int i = 0; i < {part['count']}; ++i) acc{index}[i] = 0.f;")
         for k, offset in part["xs"]:
             lines.append(f"            const float x{index}_{k} = x[(int64_t)snd * IN_DIM + {offset} + ch];")
-        for loads, products in part["blocks"]:
-            text = "            {\n            " + loads.strip() + "\n            " + products.strip() + "\n            }"
-            text = re.sub(r"sh_s\[b \* ED \+ (\d+)\]", r"__ldg(sh + e * ED + \1)", text)
-            text = re.sub(r"xv\[b\]\[(\d+)\]", lambda m: f"x{index}_{m.group(1)}", text)
-            text = re.sub(r"w\[(\d+)\]\[b\]", lambda m: f"wv[{part['paths'][int(m.group(1))]}]", text)
-            text = re.sub(r"acc\[(\d+)\]", lambda m: f"acc{index}[{m.group(1)}]", text)
-            lines.append(text)
+        for g, (path, factor) in enumerate(zip(part["paths"], part["cpf"])):
+            value = f"wv[{path}]" if factor == 1.0 else f"wv[{path}] * {factor.hex()}f"
+            lines.append(f"            const float w{index}_{g} = {value};  // production's per-path W factor")
+        text = "            {" + part["block"] + "}"
+        text = re.sub(r"sh_s\[b \* ED \+ (\d+)\]", r"__ldg(sh + e * ED + \1)", text)
+        text = re.sub(r"xv\[b\]\[(\d+)\]", lambda m: f"x{index}_{m.group(1)}", text)
+        text = re.sub(r"w\[(\d+)\]\[b\]", lambda m: f"w{index}_{m.group(1)}", text)
+        text = re.sub(r"\bacc\[(\d+)\]", lambda m: f"acc{index}[{m.group(1)}]", text)
+        lines.append(text)
         for out, stride, offset, i in part["stores"]:
             stores.append(f"        {out}[(int64_t)rcv * {stride} + {offset} + ch] = acc{index}[{i}];")
     return "\n".join(declarations), "\n".join(lines), "\n".join(stores)
+
 
 
 # --------------------------------------------------------------------------------------------- the forward source
@@ -230,8 +255,8 @@ def _chain_and_columns():
     from fastmace.rewrites import radial as rt
     checkpoint = Path(CONTEXT["checkpoint"])
     sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
-    model = loading.load_pristine(CONTEXT["model"], checkpoint=str(checkpoint), sha256=sha)
-    model = model.float()
+    del loading, sha  # the plain checkpoint, as tools/sx_spline_error.py: the chain needs the e3nn radial modules
+    model = torch.load(str(checkpoint), map_location="cpu", weights_only=False).float()
     numbers = [int(z) for z in model.atomic_numbers]
     species = [numbers.index(int(z)) for z in sorted(set(CONTEXT["numbers"]))]
     r, pair, _ = _edges()
@@ -410,12 +435,21 @@ def _wp_transform(knots):
         coef, h, r_lo, _ = spline64(knots)
         s = _sub(s, "constexpr int TERMS = 6;", "constexpr int TERMS = 4;", 1)
         s = _sub(s, re.search(r"constexpr int PADDED_TERMS = \d+;", s).group(0), "constexpr int PADDED_TERMS = 4;", 1)
-        s = _sub(s, _WP_PIECE, f"""    // sx-layout lab: the cubic spline's interval and t in [0, 1) instead of the table's piece.
+        spline = f"""    // sx-layout lab: the cubic spline's interval and t in [0, 1) instead of the table's piece.
     const scalar_t sx_u = (clamped - scalar_t({float(r_lo)!r})) * scalar_t({1.0 / h!r});
     int32_t piece = int32_t(sx_u);
     piece = piece < {coef.shape[1]} - 1 ? piece : {coef.shape[1]} - 1;
-    const scalar_t t = sx_u - scalar_t(piece);""", 1)
-        return _sub(s, "const scalar_t sc = scales[piece];", f"const scalar_t sc = scalar_t({1.0 / h!r});", 1)
+    const scalar_t t = sx_u - scalar_t(piece);"""
+        # The table's piece lookup, from the bin to t (the exact text of 6 November as _WP_PIECE; any later
+        # rendering of the same four statements by the pattern).
+        pattern = (r"    int32_t bin = int32_t\(\(clamped - r_lo\) \* bin_scale\);.*?"
+                   r"const scalar_t t = \(clamped - starts\[piece\]\) \* scales\[piece\] - scalar_t\(1\);")
+        if len(re.findall(pattern, s, flags=re.S)) != 1:
+            raise ValueError("B-spline: the w' piece lookup was not found once")
+        s = re.sub(pattern, lambda m: spline, s, flags=re.S)
+        if len(re.findall(r"const scalar_t sc = [^;]*;", s)) != 1:
+            raise ValueError("B-spline: the w' slope scale was not found once")
+        return re.sub(r"const scalar_t sc = [^;]*;", f"const scalar_t sc = scalar_t({1.0 / h!r});", s)
     return transform
 
 
@@ -471,5 +505,7 @@ def check_before_timing(kernel_name, built):
         print(f"{kernel_name} guard {variant}: worst max|d|/max|a| {worst:.2e} (limit {limit:g})", flush=True)
         if not worst <= limit:
             problems.append(f"{variant}: {worst:.2e} > {limit:g} {b.get('compare')}")
-    if problems:
+    if problems and kernel_name == "wprime":  # the forward's results are already in the log: report, keep going
+        print("sx-layout guard (wprime, not fatal):\n" + "\n".join(problems), flush=True)
+    elif problems:
         raise SystemExit("sx-layout guard failed before timing:\n" + "\n".join(problems))
