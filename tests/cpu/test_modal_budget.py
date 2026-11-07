@@ -205,7 +205,7 @@ def test_ledger_records_profile_batch_and_idea(tmp_path):
     budget.record(ledger, _check("1.00"), commit="abc", gpu="H200", timeout_s=1800, wall_s=900,
                   estimated_cost=Decimal("1.2"), metered_after=None, exit_code=0, profile="fourth",
                   batch="b7", idea="i41+i42")
-    (row,) = csv.DictReader(ledger.open())
+    (row,) = csv.DictReader(ledger.read_text().splitlines())
     assert (row["profile"], row["batch"], row["idea"]) == ("fourth", "b7", "i41+i42")
 
 
@@ -218,7 +218,7 @@ def test_an_old_ledger_gets_the_new_columns_once(tmp_path):
         writer.writerow(["2026-11-01T00:00:00+00:00", "x", "L4"] + ["1"] * 9 + ["0"])
     budget.record(ledger, _check("1.00"), commit="abc", gpu="L4", timeout_s=60, wall_s=1, estimated_cost=0,
                   metered_after=None, exit_code=0, profile="third", batch="b1", idea="i1")
-    rows = list(csv.DictReader(ledger.open()))
+    rows = list(csv.DictReader(ledger.read_text().splitlines()))
     assert tuple(rows[0]) == budget.LEDGER_FIELDS and len(rows) == 2
     assert rows[0]["commit"] == "x" and rows[0]["profile"] == "" and rows[1]["profile"] == "third"
     assert ledger.read_text().count("date_utc") == 1

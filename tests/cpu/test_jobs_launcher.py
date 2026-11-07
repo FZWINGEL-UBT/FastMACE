@@ -28,6 +28,7 @@ slim_tar = _load("fastmace_jobs_slim_tar", JOBS / "slim_tar.py")
 P90 = launch.load_p90(JOBS / "p90.json")
 T = "fastmace.kernels.triton.tabled_outer_sum"
 HEADER = "idea,switch,gpu,profile,timeout\n"
+HEADER7 = "idea,switch,gpu,profile,timeout,kind,name\n"
 
 
 def _manifest(*rows, header=HEADER):
@@ -79,20 +80,27 @@ def test_bad_headers_are_refused(header, match):
     (f"i1,{T}:CHUNK=8,H200,Fourth!,", "profile"),
     (f"i1,{T}:CHUNK=8,H200,fourth,0", "timeout"),
     (f"i1,{T}:CHUNK=8,H200,fourth,1.5", "timeout"),
-    (f"i1,{T}:CHUNK=8,H200,fourth,,ab,a/b", "name"),
-    (f"i1,{T}:CHUNK=8,H200,fourth,,bench,", "kind"),
     ("i1,CHUNK=8,H200,fourth,", "MODULE:NAME=VALUE"),
     ("i1,,H200,fourth,", "empty switch"),
     (f"i1,{T}:CHUNK=8;rm -rf ~,H200,fourth,", "separators or shell"),
     (f"i1,{T}:CHUNK=$(id),H200,fourth,", "separators or shell"),
     (f"i1,{T}:CHUNK=8|x,H200,fourth,", "separators or shell"),
-    ("i1,--b radial_tables=off,H200,fourth,,gate,", "MODULE:NAME=VALUE"),
     (f"i1,{T}:CHUNK=8,H200,fourth", "fields"),
 ])
 def test_bad_rows_are_refused_with_their_line(row, match):
     with pytest.raises(launch.ManifestError, match=match) as error:
         launch.parse_manifest(_manifest(f"i0,{T}:CHUNK=4,H200,fourth,", row))
     assert "line 3" in str(error.value)
+
+
+@pytest.mark.parametrize("row, match", [
+    (f"i1,{T}:CHUNK=8,H200,fourth,,ab,a/b", "name"),
+    (f"i1,{T}:CHUNK=8,H200,fourth,,bench,", "kind"),
+    ("i1,--b radial_tables=off,H200,fourth,,gate,", "MODULE:NAME=VALUE"),
+])
+def test_bad_kind_and_name_are_refused(row, match):
+    with pytest.raises(launch.ManifestError, match=match):
+        launch.parse_manifest(_manifest(row, header=HEADER7))
 
 
 def test_duplicate_switches_are_refused():
