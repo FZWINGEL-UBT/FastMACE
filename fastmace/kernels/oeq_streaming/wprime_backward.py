@@ -317,15 +317,21 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const scalar_t r = lengths[e];
     const bool sloped = r < r_max && r >= r_lo;
     const scalar_t clamped = r > r_lo ? r : r_lo;
+    {%- if spline %}
+    // SPLINE_W: the cubic spline's interval and t in [0, 1) (rewrites.radial.spline; pieces = its intervals).
+{{ spline }}
+    const int32_t piece = iv;
+    {%- else %}
     int32_t bin = int32_t((clamped - r_lo) * bin_scale);
     bin = bin < n_bins - 1 ? bin : n_bins - 1;
     const int32_t piece = bins[bin];
     const scalar_t t = (clamped - starts[piece]) * scales[piece] - scalar_t(1);
+    {%- endif %}
     const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;
     {%- if horner %}
     // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
     const bool inside = r < r_max;
-    const scalar_t sc = scales[piece];
+    const scalar_t sc = {{ "sx_inv" if spline else "scales[piece]" }};
     {%- if estrin %}
     // ESTRIN: the powers of t shared by every weight of the edge.
     const scalar_t t2 = t * t, t4 = t2 * t2, two_t = t + t, four_t = two_t + two_t;
@@ -662,7 +668,7 @@ def factored_paths(schedule, scale=False):
 
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
-           table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False):
+           table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -677,7 +683,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     (``TABLE_PAIRS``, with ``table_w`` and vector 2): the value table interleaved by term pair (``pair_table``).
     ``hoist_scale`` (``HOIST_SCALE``, with ``horner``): the piece scale applied once per edge. ``stage_dout``
     (``STAGE_DOUT``; ``stage_dout_supported``): a block per ``STAGE_DOUT_CHUNK`` edges, each receiver's dout row in
-    shared memory (launch ``ceil(edges / STAGE_DOUT_CHUNK)`` blocks)."""
+    shared memory (launch ``ceil(edges / STAGE_DOUT_CHUNK)`` blocks). ``spline`` (``SPLINE_W``): the spline's grid
+    ``[(start, end, intervals)]``; the table is ``spline_table``'s (4 power-basis terms per interval, HORNER)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -704,6 +711,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("table_pairs interleaves TABLE_W's value table by float2: it needs table_w and vector 2")
     if hoist_scale and not horner:
         raise ValueError("hoist_scale moves HORNER's piece scale: it needs horner")
+    if spline is not None and not (horner and int(terms) == 4 and not table_pairs and not estrin):
+        raise ValueError("spline evaluates the spline's four power-basis terms by HORNER: it needs horner and terms 4, "
+                         "without table_pairs or estrin")
     if fold_alpha and not (factored and scale and table_w):
         raise ValueError("fold_alpha folds FACTORED_SCALE's alpha into the value table: it needs factored, scale and "
                          "table_w")
@@ -728,7 +738,14 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             estrin=bool(estrin), fold_alpha=bool(fold_alpha),
                                             stage_rows=stage_rows, stage_offsets=stage_offsets,
                                             stage_total=stage_total,
-                                            butterfly_steps=int(schedule.edge_dim).bit_length() - 1)
+                                            butterfly_steps=int(schedule.edge_dim).bit_length() - 1,
+                                            spline=None if spline is None else _spline_lookup(spline, scalar))
+
+
+def _spline_lookup(grid, scalar):
+    from fastmace.kernels.oeq_streaming.spline_forward import lookup_code
+
+    return lookup_code(grid, "clamped", "scalar_t" if scalar != "float" else "float", "    ")
 
 
 def _stage_layout(schedule, blocks):
@@ -871,7 +888,7 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False, table_pairs=False, fold_alpha=False):
+                 horner=False, table_pairs=False, fold_alpha=False, spline=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -898,12 +915,14 @@ class WPrimeBackward:
         self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
         self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
+        self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
-                             stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha)
+                             stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
+                             spline=self.spline)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1061,6 +1080,52 @@ class _WPrimeBlockConvolution(torch.autograd.Function):
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
         return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
                 None, None, None, None, None)
+
+
+class _SplineBlockConvolution(torch.autograd.Function):
+    """SPLINE_W: ``_WPrimeBlockConvolution`` with the message from ``spline_forward`` (w from the cubic spline, no
+    a.W product) and the edge density alone from the radial table (its density column, ``columns=0``); the w'
+    backward reads the same spline table. Returns the groups, then the edge density."""
+
+    @staticmethod
+    def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id):
+        from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
+        from fastmace.kernels.triton.radial_table import radial_table_forward
+
+        _, density = radial_table_forward(r, pair, density_coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
+                                          0)
+        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, table, spline_id)
+        ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
+                              bins)
+        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
+        return (*groups, density)
+
+    @staticmethod
+    def backward(ctx, *grads):
+        (x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
+         bins) = ctx.saved_tensors
+        kernel = _REGISTRY[ctx.wprime_id]
+        from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
+        shapes = block_shapes(kernel.blocks, kernel.channels, x.shape[0])
+        douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
+        # The spline kernel's piece count is spline_starts' length (its intervals); scales and bins are not read.
+        dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
+                                                            spline_starts, scales, bins, *ctx.constants,
+                                                            ctx.wprime_id)
+        if grads[-1] is not None:
+            dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 5
+
+
+def spline_table(coef, row_scale=None):
+    """SPLINE_W's q-major table ``[pairs * intervals, Q, 4]`` float32 of ``rewrites.radial.spline``'s ``coef [P, I,
+    4, Q]``; ``row_scale`` ``[Q]`` (FOLD_ALPHA's ``alpha_rows``) multiplies each weight's row in float64."""
+    c = coef.to(torch.float64)
+    if row_scale is not None:
+        c = c * row_scale.to(device=c.device, dtype=torch.float64)
+    pairs, intervals, terms, q = c.shape
+    return c.permute(0, 1, 3, 2).reshape(pairs * intervals, q, terms).to(torch.float32).contiguous()
 
 
 def block_spec(linear, schedule):
@@ -1304,10 +1369,33 @@ class WPrime(torch.nn.Module):
                                      factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
+        self.spline = None  # SPLINE_W (attach_spline): dict(grid, r_max, certificate, path_scale)
+        self.spline_block = None  # SPLINE_W with BLOCK_MESSAGE: (fused id, SplineForward, spline WPrimeBackward)
         self.kernels = kernels
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
         self.rebuild = None
+
+    def attach_spline(self, spline, certificate, table):
+        """SPLINE_W: keep ``rewrites.radial.spline``'s spline (``dict(grid, coef [P, I, 4, Q])``, certified) as the
+        q-major table both spline kernels read, and the radial table's density column for the forward; the kernels
+        are compiled with the block layout (``prepare_blocks``). Returns False where the w' kernel cannot read it
+        (needs TABLE_W, HORNER, float2 loads, no TABLE_PAIRS)."""
+        if not (self.table_w and self.horner and self.vector == 2 and not self.table_pairs):
+            return False
+        weights = int(spline["coef"].shape[-1])
+        scale = alpha_rows(self.kernels.schedule, weights) if self.fold_alpha else None
+        device = self.gprime.device
+        self.register_buffer("spline_table", spline_table(spline["coef"], scale).to(device), persistent=False)
+        intervals = int(spline["coef"].shape[1])
+        self.register_buffer("spline_starts", torch.zeros(intervals, dtype=torch.float32, device=device),
+                             persistent=False)
+        self.register_buffer("density_coef", table.coef[..., -1:].contiguous(), persistent=False)
+        self.spline = dict(grid=[tuple(g) for g in spline["grid"]], r_max=float(table.r_max),
+                           certificate=certificate,
+                           path_scale=None if scale is None else [float(scale[p.weight_start])
+                                                                  for p in self.kernels.schedule.paths])
+        return True
 
     def prepare_blocks(self, interaction):
         """Compile the block-layout kernels (``BLOCK_MESSAGE``) for ``interaction``'s fused forward and linear_1,
@@ -1328,6 +1416,17 @@ class WPrime(torch.nn.Module):
                       WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
                                      horner=self.horner, table_pairs=self.table_pairs,
                                      factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha))
+        self.spline_block = None
+        from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, spline_w_default
+        if self.spline is not None and spline_w_default(device):
+            grid = self.spline["grid"]
+            self.spline_block = (
+                fused.id,
+                SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
+                              self.spline["path_scale"]),
+                WPrimeBackward(self.kernels, 4, device, vector=self.vector, table_w=True, blocks=blocks,
+                               horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
+                               spline=grid))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1353,6 +1452,13 @@ class WPrime(torch.nn.Module):
         chip; otherwise the backward builds it again in chunks of that many edges."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
+        if (self.spline_block is not None and fused is not None and linear is not None
+                and self.spline_block[0] == fused.id and BLOCK_MESSAGE is not False):  # SPLINE_W
+            *groups, density = _SplineBlockConvolution.apply(
+                lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
+                float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
+                x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id)
+            return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
             *groups, density = _WPrimeBlockConvolution.apply(
@@ -1383,6 +1489,9 @@ class WPrime(torch.nn.Module):
         vector = f", q-major float{self.vector}" if self.vector else ""
         table = ", value table (w from the table)" if self.table_w else ""
         table += ", power basis (Horner)" if self.horner else ""
+        if self.spline is not None:
+            table += f", spline ({sum(g[2] for g in self.spline['grid'])} intervals"
+            table += ", in use)" if self.spline_block is not None else ", not compiled)"
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
@@ -1392,7 +1501,7 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
-           "render", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "stage_dout_default", "stage_dout_supported",
+           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table",
            "wprime_arguments",

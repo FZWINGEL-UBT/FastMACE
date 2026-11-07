@@ -894,11 +894,45 @@ def attach_generic_wprime(model):
             raise RewriteError(f"generic_wprime_backward: interactions.{index} would hold {size / 2**30:.1f} GiB of "
                                f"tables (more than W_TABLE_MAX_BYTES)")
         interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels, generic=True)
-        names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB)")
+        note = _attach_spline(model, index, interaction, table, weight)
+        names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB{note})")
     if not names:
         raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the "
                            "chunked streaming convolution")
     return names
+
+
+def _attach_spline(model, index, interaction, table, weight):
+    """SPLINE_W (``kernels.oeq_streaming.spline_forward``): fit (or load) and certify the cubic spline of the
+    interaction's w (``rewrites.radial.spline``) and attach it to its ``wprime_backward``; a spline that fails its
+    certificate is not used. Returns a note for the record's names."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.spline_forward import spline_w_default
+    from fastmace.rewrites.radial import spline as sp
+
+    if not spline_w_default(table.coef.device):
+        return ""
+    wprime = interaction.wprime_backward
+    if not (wprime.table_w and wprime.horner and wprime.vector == 2 and not wprime.table_pairs):
+        return "; spline: needs TABLE_W, HORNER and float2 tables"
+    radial = getattr(model.radial_embedding, "original", model.radial_embedding)
+    columns = table.columns.tolist()
+    pairs = [(s, t) for s in range(len(columns)) for t in range(len(columns))]
+    r_max = float(table.r_max)
+    key = sp.cache_key(cache_key(model, f"generic-{index}", columns, table.coef.dtype, r_max))
+    cached = sp.load_cached(key)
+    if cached is None:
+        chain64 = _GenericChain(model, interaction, columns, torch.float64, torch.device("cpu"), radial=radial)
+        chain32 = _GenericChain(model, interaction, columns, torch.float32, table.coef.device, radial=radial)
+        cached = sp.fit(chain64, chain32, weight, pairs, R_LO, r_max, CERTIFY_POINTS, R_PHYSICAL, seed=index)
+        sp.store_cached(key, *cached)
+    spline, certificate = cached
+    if not certificate.get("worst", float("inf")) <= 1.0:
+        return f"; spline not used: certificate {certificate.get('worst'):.2f} > 1"
+    if not wprime.attach_spline(spline, certificate, table):
+        return "; spline not attached"
+    return f"; spline {certificate['intervals']} intervals, certificate {certificate['worst']:.2f}"
 
 
 def _generic_wprime_selfcheck(original, rewritten, context):

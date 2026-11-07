@@ -1,0 +1,190 @@
+"""SPLINE_W: a generic interaction's message with ``w`` from a cubic spline in r, in Symmetrix-XL's layout.
+
+sx-layout lab (7 November 2026, results/sx-layout-lab-20261107): one thread per (receiver, channel), the receiver's
+CSR edges walked serially, every output accumulator in registers and stored once; ``w`` per edge and path from the
+piecewise-uniform cubic spline of ``rewrites.radial.spline`` (power basis of t, one float4 per weight from the
+q-major table ``[pairs * intervals, Q, 4]`` that the w' backward reads too) instead of the a.W tensor-core product of
+``fused_forward``. The angular code is generated from the schedule's paths as ``fused_forward._part``'s, with the
+w' table's per-path FOLD_ALPHA factors divided out of the CG coefficients. The message is written in the block
+layout (``wprime_backward.BLOCK_MESSAGE``).
+
+Lab (H200, OMAT-0 medium, SrTiO3 10x10x10): forward 0.875 of today's, w' 0.894; MD step about -310 us.
+"""
+from __future__ import annotations
+
+import ctypes
+
+import torch
+
+from fastmace.kernels.gpu_models import GPUModels
+
+# None: on for SPLINE_W_GPUS (decision 66); True / False: forced (an A/B side). Empty until its MD A/B and gate pass.
+SPLINE_W = None
+SPLINE_W_GPUS = GPUModels(())
+THREADS = 256
+
+_REGISTRY = {}
+
+
+def spline_w_default(device):
+    """``SPLINE_W`` on ``device``: the constant when set, else on for ``SPLINE_W_GPUS``."""
+    if SPLINE_W is not None:
+        return bool(SPLINE_W)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in SPLINE_W_GPUS
+
+
+def lookup_code(grid, r, scalar="float", indent="    "):
+    """C code defining ``iv`` (the global interval), ``t`` in [0, 1) and ``sx_inv`` (1 / h) from length ``r``: one
+    compare per band edge (an edge is one warp's for every channel, so the branch is uniform), then one multiply."""
+    def lit(v):
+        return f"{float(v).hex()}f" if scalar == "float" else f"{scalar}({float(v).hex()})"
+
+    lines = [f"{indent}int iv; {scalar} t, sx_inv;"]
+    offset = 0
+    for k, (a, b, n) in enumerate(grid):
+        head = "if" if k == 0 else "else if"
+        cond = f"{head} ({r} < {lit(b)}) " if k < len(grid) - 1 else ("else " if k else "")
+        body = (f"{{ sx_inv = {lit(n / (b - a))}; {scalar} u = ({r} - {lit(a)}) * sx_inv; "
+                f"u = u > {lit(0)} ? u : {lit(0)}; int il = (int)u; il = il < {n - 1} ? il : {n - 1}; "
+                f"t = u - ({scalar})il; iv = {offset} + il; }}")
+        lines.append(f"{indent}{cond}{body}")
+        offset += n
+    return "\n".join(lines)
+
+
+def render(schedule, blocks, grid, r_max, path_scale=None):
+    """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
+    ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here."""
+    from fastmace.kernels.oeq_streaming.fused_forward import _lit, _node, block_map
+
+    if schedule.layout != "ir_mul":
+        raise ValueError("spline_forward writes the block layout: it needs ir_mul")
+    paths, C = schedule.paths, schedule.channels
+    if any(p.edge_mul != 1 for p in paths):
+        raise ValueError("spline_forward: one weight per path and channel (edge_mul 1)")
+    scale = [1.0] * len(paths) if path_scale is None else [float(v) for v in path_scale]
+    bmap = block_map(blocks, C)
+    slots = {s.name: s for s in schedule.output_slots}
+    names = list(dict.fromkeys(o.accumulator.name for p in paths for o in p.outputs))
+    si = {n: i for i, n in enumerate(names)}
+    xkeys = sorted({(p.input_start, t.input_component, p.input_irrep_dim) for p in paths for o in p.outputs
+                    for t in o.terms})
+    xi = {key: i for i, key in enumerate(xkeys)}
+    body = [f"            const float x{i} = __ldg(x + (int64_t)snd * IN_DIM + {_node('ir_mul', C, s, c, d)});"
+            for (s, c, d), i in xi.items()]
+    for g, p in enumerate(paths):
+        body.append("            {")
+        for j in range(p.edge_irrep_dim):
+            body.append(f"                const float e{j} = __ldg(sh + e * ED + {p.edge_start + j});")
+        body.append(f"                const float4 c = __ldg(tq + {p.weight_start});")
+        body.append("                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);")
+        for o in p.outputs:
+            terms = " + ".join(f"x{xi[(p.input_start, t.input_component, p.input_irrep_dim)]} * e{t.edge_component}"
+                               f" * {_lit(t.coefficient / scale[g])}" for t in o.terms) or "0.f"
+            body.append(f"                acc[{si[o.accumulator.name]}] = fmaf(w, {terms}, acc[{si[o.accumulator.name]}]);")
+        body.append("            }")
+    stores = []
+    for name, i in si.items():
+        slot = slots[name]
+        group, width, base, stride = bmap[slot.start]
+        stores.append(f"        out{group}[(int64_t)rcv * {width} + {base + slot.component * stride} + ch] = acc[{i}];")
+    outs = ", ".join(f"float* __restrict__ out{g}" for g in range(len(blocks)))
+    n = len(names)
+    nl = "\n"
+    return f"""// spline_forward (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
+using int64_t = long long;
+constexpr int C = {C};
+constexpr int64_t Q = {len(paths) * C};
+constexpr int IN_DIM = {schedule.input_dim};
+constexpr int ED = {schedule.edge_dim};
+constexpr float R_MAX = {_lit(r_max)};
+
+extern "C" __global__ void __launch_bounds__({THREADS}) spline_forward(
+    int64_t N, int64_t E, const float* __restrict__ x, const float* __restrict__ sh,
+    const int* __restrict__ senders, const int* __restrict__ row_ptr, const float* __restrict__ lengths,
+    const int* __restrict__ pairs, const float4* __restrict__ table, int intervals, {outs}) {{
+    const int64_t owners = N * C;
+    const int64_t stride = (int64_t)blockDim.x * gridDim.x;
+    for (int64_t owner = (int64_t)blockIdx.x * blockDim.x + threadIdx.x; owner < owners; owner += stride) {{
+        const int rcv = (int)(owner / C), ch = (int)(owner % C);
+        float acc[{n}];
+        #pragma unroll
+        for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
+        int64_t eb = row_ptr[rcv], ee = row_ptr[rcv + 1];
+        eb = eb < 0 ? 0 : eb;
+        ee = ee > E ? E : ee;
+        for (int64_t e = eb; e < ee; ++e) {{
+            const float re = lengths[e];
+            if (!(re < R_MAX)) continue;  // w = 0 at and beyond the cutoff (and the padding edges)
+            const int snd = senders[e];
+            if (snd < 0 || snd >= N) continue;
+{lookup_code(grid, "re", "float", "            ")}
+            const float4* tq = table + ((int64_t)pairs[e] * intervals + iv) * Q + ch;
+{nl.join(body)}
+        }}
+{nl.join(stores)}
+    }}
+}}
+"""
+
+
+class SplineForward:
+    """The compiled ``spline_forward`` of one interaction (its schedule, block layout and spline grid)."""
+
+    def __init__(self, schedule, blocks, grid, r_max, device, path_scale=None):
+        from cuda.bindings import driver
+
+        from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
+        device = torch.device(device)
+        self.blocks, self.channels, self.grid = blocks, schedule.channels, [tuple(g) for g in grid]
+        self.intervals = sum(int(g[2]) for g in self.grid)
+        self.source = render(schedule, blocks, self.grid, r_max, path_scale)
+        cubin = compile_cubin(self.source, torch.cuda.get_device_capability(device), ())
+        self._module = _check(driver.cuModuleLoadData(cubin))
+        self._function = _check(driver.cuModuleGetFunction(self._module, b"spline_forward"))
+        self.registers = int(_check(driver.cuFuncGetAttribute(
+            driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, self._function)))
+        self.id = content_id("SplineForward", self.source, _device_key(device))
+        _REGISTRY[self.id] = self
+
+    def __call__(self, x, sh, senders, row_ptr, lengths, pairs, table, outs):
+        from cuda.bindings import driver
+
+        from fastmace.kernels.oeq_streaming.runtime import _check
+        nodes, edges = x.shape[0], sh.shape[0]
+        blocks = (nodes * self.channels + THREADS - 1) // THREADS
+        if not blocks:
+            return
+        p = ctypes.c_void_p
+        values = (nodes, edges, x.data_ptr(), sh.data_ptr(), senders.data_ptr(), row_ptr.data_ptr(),
+                  lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *[o.data_ptr() for o in outs])
+        types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * 7 + (ctypes.c_int,) + (p,) * len(outs)
+        stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
+        _check(driver.cuLaunchKernel(self._function, blocks, 1, 1, THREADS, 1, 1, 0, stream, (values, types), 0))
+
+
+@torch.library.custom_op("fastmace::spline_message_blocks", mutates_args=())
+def spline_message_blocks(x: torch.Tensor, sh: torch.Tensor, senders: torch.Tensor, row_ptr: torch.Tensor,
+                          lengths: torch.Tensor, pairs: torch.Tensor, table: torch.Tensor,
+                          spline_id: int) -> list[torch.Tensor]:
+    """The message groups ``[N * dim, P * C]`` (block layout) of a ``SplineForward``; edges receiver-sorted
+    (``row_ptr``), ``lengths`` ``[E]``, ``pairs`` ``[E]`` int32, ``table`` the q-major spline table."""
+    from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
+
+    kernel = _REGISTRY[spline_id]
+    outs = [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
+    kernel(x.contiguous(), sh.contiguous(), senders, row_ptr, lengths.reshape(-1).contiguous(), pairs, table, outs)
+    return outs
+
+
+@spline_message_blocks.register_fake
+def _(x, sh, senders, row_ptr, lengths, pairs, table, spline_id):
+    from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
+
+    kernel = _REGISTRY[spline_id]
+    return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
+
+
+__all__ = ["SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "lookup_code", "render", "spline_message_blocks",
+           "spline_w_default"]
