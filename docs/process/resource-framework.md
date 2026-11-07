@@ -1,7 +1,9 @@
 # Resource framework: faster results from the same resources
 
 Written 7 November 2026 from the session history of 7 October – 7 November 2026. Times are CET unless marked UTC.
-This is a proposal. Nothing in it is adopted until the owner or the conductor says so.
+Adopted as rules (owner, 7 November 2026: "write some rules into the agents.md"): see AGENTS.md, "Using resources".
+The tooling of §3.4 (`tools/jobs/` templates, prebuilt Modal image, cache Volume) and the queue file of §3.8 are
+not built yet.
 
 ## Summary
 

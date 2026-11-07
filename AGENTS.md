@@ -143,6 +143,75 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
   into a directory outside both checkouts (WSL: `~/fastmace-baseline/`;
   workstations: `/mnt/homes/zwingel/fastmace-baseline/`).
 
+## Using resources (owner, 7 November 2026)
+
+The owner asked for rules that make the work faster with the same resources. The evidence is in
+[docs/process/resource-framework.md](docs/process/resource-framework.md). In short: most paid GPU time went to
+container start and compiling, the budget guard reserved 5.3x the real cost, the same failures came back, and
+sessions waited in the foreground.
+
+**A paid GPU only confirms.** Bounds, kernel labs and falsifiers run on free hardware first. Each resource has one
+job:
+
+| Resource | Use it for | Not for |
+| --- | --- | --- |
+| Modal H200 | Final H200 A/Bs and gates, packed | Labs, profiling loops, A100 work |
+| Modal A100 | A100 checks that block a decision when Alex's estimated start is more than 6 h away | Routine A100 screens |
+| Alex A100 (free, queued) | Routine A100 work: screens, finals, gates, profiles, MACE-OFF and MACE-POLAR, overnight batches | Anything needed within the hour |
+| Workstations (RTX 4000 Ada) | CPU suites on leto; Ada A/Bs; drifts; gates that need no A100 | Jobs without the idle check |
+| Local RTX 5060 Ti | Building and smoke-testing kernels; quick falsifiers; 5060 Ti A/Bs | CPU suites; two GPU jobs at once |
+| WSL | Launching Modal clients | Many clients at once; long jobs without a system unit |
+
+**Idea triage.** An idea stops at the first stage it fails, and the stop goes into the
+[optimisation ledger](docs/optimisation-ledger.md) with its bound, so no one repeats it.
+
+1. **Ledger check** (a subagent, 10 min). Stop if the ledger already closed it, or it is out of scope.
+2. **Bound** from a profile or breakdown on file (30 min). Stop below 1 % of the step on the target GPU. A switch
+   that only removes work is exempt (decision 66): one not-slower A/B on any GPU decides it.
+3. **Lab or falsifier** on free hardware. Stop if the kernel-level gain is under twice what the bound needs.
+4. **Packed A/B** on the target GPU, both build orders. Stop if it is not faster in both.
+5. **Gate** (rounding switches only), packed. Stop if it fails `tools/force_stress_gate.py`.
+6. **Adopt** at the next merge batch.
+
+An idea comes back only with new evidence. When the five largest open bounds of a round add up to under 3 %, report
+that to the owner instead of starting another revision.
+
+**Jobs.**
+- **Pack A/Bs.** One container carries one baseline and 4–8 switches, so the model load, compile and container start
+  are paid once. Pack gates the same way. Do not launch single-switch jobs unless one switch blocks a decision.
+- **Slim source.** Modal jobs use the slim code-only tarball, never `--commit` clients (each holds about 9 GB in WSL).
+- **Data-based timeouts:** twice the template's p90 wall time, about 20 min for an H200 A/B and 25 min for an A100
+  A/B. A long timeout reserves budget that other jobs then cannot use.
+- **WSL limits.** At most 6 Modal clients at once, launched about 25 s apart, run as a `systemd-run` system unit
+  with the Windows keep-alive.
+- **Retries.** A failed job is retried once. A second failure gets looked at, not relaunched.
+- **Running scripts stay unchanged.** Copy a job script into its batch folder before launching, and never edit a
+  script a running job uses.
+- **No inline multi-line shell.** Every remote command, and every `wsl` call from Git Bash that needs `$`, goes
+  through a script file. Check computed paths before any `cp -r` or `rm`.
+- **Clear stale reservations.** After a crash, remove the budget guard's stale in-flight entries before the next
+  launch.
+
+**Batches and budget.**
+- **Cycle.** Launch a batch about every 2 h in the daytime, or sooner once 4 switches are ready. Overnight, one Alex
+  batch and one Modal H200 batch.
+- **Pacing.** Each Modal profile spends at most about $8 a week. Unused money carries over, and the last week of the
+  month may spend what is left. Pause a profile that runs more than $5 ahead of its pace.
+- **Alex.** One job array per batch, and one poller at most every 15 min over a single ssh connection.
+
+**Sessions and waiting.**
+- **New session** only for work that owns a branch, runs longer than about 2 h, and needs no conductor input along
+  the way. Read-only and short work (ledger lookups, transcript searches, reviews, profile reading) goes to a
+  subagent. Work a few tool calls settle stays inline. Aim for at most 4 standing lanes plus the conductor.
+- **One conductor at a time.** A new conductor stops the old one first. The conductor's handoff stays current:
+  running jobs, budget left per profile, open decisions, lane states. Hand off before the account's weekly limit is
+  reached, not after.
+- **Waits run in the background.** Any wait over 60 s uses a background command or a monitor, never a foreground
+  `sleep` or poll loop.
+- **CPU suites:** one leto suite per merge batch, not one per branch.
+- **Lessons go into tools.** A failure that costs over 30 min gets a fix in a script, template or guard. A memory
+  note alone is not enough.
+
 ## Recording results
 
 - Every GPU result names the machine, GPU, environment, backend, precision,
