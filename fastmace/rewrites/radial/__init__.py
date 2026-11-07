@@ -202,6 +202,13 @@ def _table_module(tables, columns, device, single=False):
             # dtype): the tabled outer sum's backward takes a and its slope from it by dual Horner
             # (tabled_outer_sum.POWER_BACKWARD, idea 40).
             self.register_buffer("pcoef", power_basis(self.coef), persistent=False)
+            # coef and pcoef packed per adjacent channel pair, two terms per 16-byte load in the tabled outer sum
+            # (tabled_outer_sum.PACKED_COEF, idea 3); None where the switch is off on this device.
+            from fastmace.kernels.triton.tabled_outer_sum import packed_coef, packed_coef_default
+
+            packed = packed_coef_default(device)
+            self.register_buffer("coef_pairs", packed_coef(self.coef) if packed else None, persistent=False)
+            self.register_buffer("pcoef_pairs", packed_coef(self.pcoef) if packed else None, persistent=False)
             self.register_buffer("columns", torch.as_tensor(columns, dtype=torch.long, device=device),
                                  persistent=False)
             self.species = len(columns)
