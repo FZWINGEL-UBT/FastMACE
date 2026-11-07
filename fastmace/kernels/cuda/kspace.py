@@ -30,6 +30,14 @@ ITEMS_PER_BLOCK = 2  # work items per resident block (each sum is split until it
 _KERNELS: dict = {}  # device index -> _Kernels
 
 
+def cubin_for(capability):
+    """The cubin for a compute capability: SASS runs on its own major version at the same or a higher minor one, so
+    sm_86/87 (RTX A4000, A10, Orin) load the sm_80 cubin and sm_121 the sm_120 one. None without a cubin."""
+    major, minor = capability
+    fits = [c for c in CUBINS if c[0] == major and c[1] <= minor]
+    return CUBINS[max(fits)] if fits else None
+
+
 class _Kernels:
     def __init__(self, index):
         import numpy as np
@@ -40,7 +48,8 @@ class _Kernels:
         with torch.cuda.device(index):
             torch.zeros(1, device=f"cuda:{index}")
             self.context = _check(driver.cuCtxGetCurrent())
-            self.module = _check(driver.cuModuleLoadData(CUBINS[torch.cuda.get_device_capability(index)].read_bytes()))
+            cubin = cubin_for(torch.cuda.get_device_capability(index))
+            self.module = _check(driver.cuModuleLoadData(cubin.read_bytes()))
             pointer, size = _check(driver.cuModuleGetGlobal(self.module, b"fm_kspace_info"))
             info = np.zeros(size // 4, dtype=np.int32)
             _check(driver.cuMemcpyDtoH(info, pointer, size))
@@ -80,12 +89,12 @@ def _index(device):
 
 
 def available(device) -> bool:
-    """Whether the cubin loads on ``device`` (CUDA, a capability in ``CUBINS``, the file present)."""
+    """Whether the cubin loads on ``device`` (CUDA, a cubin for its capability, the file present)."""
     device = torch.device(device)
     if device.type != "cuda":
         return False
     index = _index(device)
-    cubin = CUBINS.get(tuple(torch.cuda.get_device_capability(index)))
+    cubin = cubin_for(tuple(torch.cuda.get_device_capability(index)))
     if cubin is None or not cubin.is_file():
         return False
     try:
