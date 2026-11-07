@@ -16,7 +16,7 @@ plan. §3.8 lists each change with its evidence. In short:
   A100 (decision 66, 5 November). MD step b/a on the A100-SXM4-80GB 0.993 / 0.993 (SrTiO3), 0.981 / 0.983 (NbCl5).
   Row in §3.6.
 - **More A100 defaults** (5–6 November), in the fused forward, the w′ backward, the first interaction, the
-  GEMM epilogues, the energy sums and the neighbour-list rebuild (§3.8.1).
+  GEMM epilogues, the energy sums, the Langevin noise draw and the neighbour-list rebuild (§3.8.1).
 - **Candidates measured and kept off** on the A100 (§3.8.2).
 - **Three rule changes** (7 November): a GPU entry covers its whole family, pure work removal goes on for every GPU,
   and the accuracy gate's ratio is 3 (§3.8.3).
@@ -25,7 +25,7 @@ plan. §3.8 lists each change with its evidence. In short:
 and step (`results/research-answers-20261105/README.md:402`). The profiled run gave 2.79–2.95 µs per atom and step. The switches after
 `ff4d1a89` were timed only inside their A/B jobs. Their base steps were about 10.33 ms after `STAGE_DOUT`
 (`results/research-answers-20261105/README.md:731`) and about 9.67–9.71 ms after `FOLD_ALPHA`
-(`results/ideas-queue-20261106/README.md`). `RECEIVER_SUM` then saved about 0.3 % (`results/ideas-queue2-20261106/README.md`).
+(`results/ideas-queue-20261106/README.md:71`). `RECEIVER_SUM` then saved about 0.3 % (`results/ideas-queue2-20261106/README.md:92`).
 These come from different jobs and cards, so they are not A/B comparisons.
 
 **Profiles.** The per-kernel times in §2 are still those of `4b70e3f2`. Newer A100 records:
@@ -256,11 +256,12 @@ flowchart TB
 | Hybrid cuEq + OEq backend | OpenEquivariance for the convolution; cuEquivariance for the symmetric contraction and the rest. | **COPIED** (MACE 0.3.16, OEq, cuEq) | "MACE 0.3.16 can run a model with two accelerated backends at once" (`RM:LT/studies/remaining_optimizations/proposal.md:96`). Adopting it was the user's decision of 9 October (`RM:LT/docs/status.md:7`). |
 | Symmetric contraction | cuEquivariance's kernel, unchanged (0.40 ms). | **COPIED** (cuEquivariance) | No rewrite. |
 | Float32 with TF32 off, energy summed in float64 | The precision policy. Tensor cores are used only as error-compensated 3×TF32, in the atom GEMMs (§3.6) and the fused forward (§3.5). | **OWN** (decision) | Float32 with TF32 off: the user's production decision of 9 October (`RM:LT/docs/status.md:7`). Float64 energy sum: FastMACE 1b-T01/T03 (`docs/optimisation-ledger.md:406`). |
-| Accepted gate exception on the A100 (after this run) | With both 3×TF32 parts on, OMAT-0 NbCl5's stress error (1.8e-7 eV/Å³) exceeded the gate's 2 × ASE float32 limit (1.2–1.5e-7); every other check passes, and the energy error stays under the 10 meV floor. Since 7 November the limit is 3 × (§3.8.3). | **OWN** (decision) | Bisection on the A100-SXM4-80GB: tf32x3 off r1.30, tensor-core forward off r1.63, both off r0.42, default r2.6–3.0 ([omat0-tp-backward.md](../validation/omat0/omat0-tp-backward.md) §3.1). The owner kept both (5 November: "keep it its fine"). Later A100 gates gave 2.34 (`plans/ideas-20261105-round2.md:830-836`), 2.42 (`results/research-answers-20261105/README.md:626`) and 2.60 (`:400`). |
+| Accepted gate exception on the A100 (after this run) | With both 3×TF32 parts on, OMAT-0 NbCl5's stress error (1.8e-7 eV/Å³) exceeded the gate's 2 × ASE float32 limit (1.2–1.5e-7); every other check passes, and the energy error stays under the 10 meV floor. Since 7 November the limit is 3 × (§3.8.3). | **OWN** (decision) | Bisection on the A100-SXM4-80GB: tf32x3 off r1.30, tensor-core forward off r1.63, both off r0.42, default r2.6–3.0 ([omat0-tp-backward.md](../validation/omat0/omat0-tp-backward.md) §3.1). The owner kept both (5 November: "keep it its fine"). Later A100 gates gave 2.34 (`plans/ideas-20261105-round2.md:835`), 2.42 (`results/research-answers-20261105/README.md:626`) and 2.60 (`:399`). |
 
 **Not on the A100:** the species GEMM (`SPECIES_GEMM`, every atom's skip-product rows through its own species'
 matrix) is a default only on the RTX 5060 Ti and RTX 4000 Ada (owner, `results/omat0-kernel-lab-20261103/README.md:409`). On the A100-SXM4-80GB
-it measured 0.992 / 0.991, and 0.993 / 0.992 as a gathered CUTLASS kernel (`:381`, `:418`).
+it measured 0.992 / 0.991, and 0.993 / 0.992 as a gathered CUTLASS kernel (`:381`, `:418`). Round 5 tried it again
+(§3.8.2).
 
 **On in the plan but running no kernels of their own here:**
 - `fused_folded_backward` is a prerequisite of the radial tables (`docs/validation/omat0/generic-radial-tables.md:25-26`).
@@ -285,7 +286,7 @@ the Modal A100-SXM4-80GB. A switch whose set names only that card is on for ever
 
 | Part | What it does | Verdict | Evidence |
 | --- | --- | --- | --- |
-| `HORNER` + `SCALAR_PATHS` (w′ backward) | HORNER: the value table in the power basis, w and its slope by dual Horner. SCALAR_PATHS: l₁ = 0 paths add their edge gradient per term, without the v_j sums. Rounding. | **OWN** (round 1) with **EXTERNAL IDEA** (outside list, item 3) | R2:198 names both sources. SrTiO3 0.986 / 0.983, NbCl5 0.994 / 0.978; gate: the A100 exception only (R2:350). |
+| `HORNER` + `SCALAR_PATHS` (w′ backward) | HORNER: the value table in the power basis, w and its slope by dual Horner. SCALAR_PATHS: l₁ = 0 paths add their edge gradient per term, without the v_j sums. Rounding. | **EXTERNAL IDEA** (two outside lists the owner passed on: round 1 item 2 and round 2 item 3), **OWN CODE** | R2:198 names both; round 1's list is "an outside idea list the owner passed on" (`plans/ideas-20261105-a100.md:5`). SrTiO3 0.986 / 0.983, NbCl5 0.994 / 0.978; gate: the A100 exception only (R2:350). |
 | `FUSED_FIRST_BACKWARD` + `TABLED_FORWARD` (first interaction) | The first interaction's table and outer sums with one fused backward (no `grad_a [E, h c]`); the forward evaluates the table inside the segmented sum's walk. Rounding. | **OWN** | "Own: the fused first-interaction pipeline" (R2:88). Backward alone SrTiO3 0.969 / 0.966, NbCl5 0.983 / 0.984; both 0.966 / 0.962, 0.970 / 0.982 (R2:356, :359). |
 | `edge_outer_sum.BACKWARD_WALK` | Each program walks consecutive edges and loads a slot's gradient block once per run of equal keys, not once per edge. Rounding. | **EXTERNAL IDEA** (outside list, item 2), **OWN CODE** | "Outside 2: slot-batched `edge_outer_sum` backward" (R2:57). SrTiO3 0.995 / 0.987, NbCl5 0.995 / 0.996 (R2:351). |
 | `VEC_SH`, `VEC_A`, `TC_WFRAG` (fused forward staging) | sh and a staged with float4 loads; the W slice stored in mma fragment order. Bitwise. | **OWN** | From our kernel lab of the A100 forward (R2:456, :489). VEC_SH + VEC_A 0.973 / 0.976, 0.976 / 0.981; + TC_WFRAG 0.960 / 0.954, 0.970 / 0.969 (R2:518-519). |
@@ -293,18 +294,18 @@ the Modal A100-SXM4-80GB. A switch whose set names only that card is on for ever
 | `energy.HEAD_SLICE`, `energy.GRAPH_SUM` | The one-head readout as a slice (bitwise); one-graph energy sums as reductions (rounding). | **OWN** | From the `2a016fd4` profile (R2:652-657). HEAD_SLICE SrTiO3 0.992 / 0.987, NbCl5 0.975 / 0.979; GRAPH_SUM 0.997 / 0.998, 0.992 / 0.998 (D:71-72). |
 | `SEGMENT_ROWS` | BlockLinear's 1:1 products read and written in place through CUTLASS's gathered 3×TF32 entry. | **OWN** | The round-5 profile's "GEMM layout glue" (R2:589-593). SrTiO3 0.985 / 0.984, NbCl5 0.981 / 0.988 (D:73). |
 | `FOLD_FIRST_DENSITY_LINEAR` | With the generic fold, the first interaction's `linear` is composed into its species skip. Rounding. | **OWN** (a Claude answer to our research prompt) | Round 6: "Claude ranked (1) folding interaction 1's linear" (R2:812-816). SrTiO3 0.9784 / 0.9772, NbCl5 0.9542 / 0.9561; NbCl5 stress ratio 2.34, as the default (R2:830-836). |
-| `langevin.NOISE_DRAW_AHEAD` (every GPU) | The next Langevin noise batch is drawn on a background thread. Host-only, bitwise. | **OWN** | Round 6. A100 80GB PCIe with draw-ahead off: SrTiO3 1.0298 / 1.0276, NbCl5 1.0412 / 1.0410 (R2:826-828). |
-| `DEGREE_PARTS` (fused forward) | One path part per input irrep dimension, so each part gathers only its own x rows. Bitwise. | **OWN** (H idea 2) | 0.9920 / 0.9932; gate passes (`results/h200-ideas-20261105/README.md:30-39`). In `DEGREE_PARTS_GPUS`; D has no row for it. |
+| `langevin.NOISE_DRAW_AHEAD` (every GPU) | The next Langevin noise batch is drawn on a background thread. Host-only, bitwise. | **OWN** (a Claude answer to our research prompt) | Round 6: Claude ranked "(2) the Langevin noise refill" (R2:816-817). A100 80GB PCIe with draw-ahead off: SrTiO3 1.0298 / 1.0276, NbCl5 1.0412 / 1.0410 (R2:826-828). |
+| `DEGREE_PARTS` (fused forward) | One path part per input irrep dimension, so each part gathers only its own x rows. Bitwise. | **OWN** (H idea 2) | 0.9920 / 0.9932; the gate passed on an A100 80GB PCIe under the SXM4 plan (`results/h200-ideas-20261105/README.md:30-39`). In `DEGREE_PARTS_GPUS`; D has no row for it. |
 | `WFRAG_REGION` + `W_GROUP` (fused forward) | A fragment-sized W region frees shared memory for 12 warps; warp pairs then share W fragments. Bitwise. | **OWN** (H ideas 21 and 17) | WFRAG_REGION 0.9871 / 0.9887; with W_GROUP 0.9718 / 0.9734 (RA:389-390). |
 | `X_LATE` (fused forward) | W_GROUP's x gathers move after the k-loop. Bitwise. | **OWN** (H idea 27) | 0.9937 / 0.9937 (RA:571). |
 | `CG_FOLD` (fused forward) | The message kernel's CG factors folded into W. Rounding. | **OWN** (H idea 24) | 0.9877 / 0.9898; NbCl5 stress ratio 2.38 against the default's 2.42 (RA:619, :626-627). |
 | `A_LD128` + `TP_NOFLUSH` (fused forward) | a read with one LDS.128 per k-step; the TP without flush checks for full in-row batches. Bitwise. | **OWN** (H ideas 17(ii) and 29) | Together 0.9909 / 0.9923; TP_NOFLUSH alone 0.9936 / 0.9954; A_LD128 alone 0.9995 / 1.0001 (RA:661). |
-| `LINEAR_DIV` (CUTLASS epilogue) | The interaction linear's division by (density + 1) in the GEMM epilogue. Bitwise at kernel level. | **OWN** (H idea 31, from the owner's first idea batch, H:368-371) | 0.9896 / 0.9891 (RA:685). |
-| `SKIP_SELECT` (CUTLASS epilogue) | The species-skip products with the own-species select in the epilogue. Bitwise at kernel level. | **OWN** (H idea 31) | On top of LINEAR_DIV 0.9843 / 0.9858 (RA:720). |
-| `STAGE_DOUT` (w′ backward) | The receiver's dout row in shared memory. dsh and dL/dr bitwise. | **EXTERNAL IDEA** (a Codex review the owner ran, H:225-228, idea 38), **OWN CODE** | 0.9896 / 0.9920 (RA:716). |
-| `FOLD_ALPHA` (w′ backward) | FACTORED_SCALE's per-path α folded into the value table's rows at build. Rounding. | **OWN** (H idea 34, the owner's third batch, H:465) | 0.9911 / 0.9863 (slow card), 0.9895 / 0.9893; gate worst ratio to the default 1.049 (Q1). |
-| `RECEIVER_SUM` | The generic density sums as a segmented sum over receiver-sorted edges. Rounding. | **OWN** (H idea 5(b)) | 0.9998 / 0.9918, repeat 0.9990 / 0.9985; gate worst ratio to the default 1.036 (Q2). |
-| `BINNED_SCREEN`, from 10,000 atoms | The rebuild's pair screen as a cell list instead of all tile pairs. Bitwise candidate list. | **EXTERNAL IDEA** (the cell list of the MD literature; ChatGPT's round-6 answer ranked it first, R2:814), **OWN CODE** | SrTiO3 16×16×16 0.9765 / 0.9776; 10×10×10 1.0038 / 1.0044, hence the threshold, so the timing case is unchanged (Q2). |
+| `LINEAR_DIV` (CUTLASS epilogue) | The interaction linear's division by (density + 1) in the GEMM epilogue. Bitwise at kernel level. | **UNCLEAR** (H idea 31, one of the four ideas the owner sent on 6 November, H:370-371; the plan does not say who wrote them) | 0.9896 / 0.9891 (RA:685). |
+| `SKIP_SELECT` (CUTLASS epilogue) | The species-skip products with the own-species select in the epilogue. Bitwise at kernel level. | **UNCLEAR** (H idea 31, as LINEAR_DIV) | On top of LINEAR_DIV 0.9843 / 0.9858 (RA:720). |
+| `STAGE_DOUT` (w′ backward) | The receiver's dout row in shared memory. dsh and dL/dr bitwise; dx differs only in the atomics' order. | **EXTERNAL IDEA** (a Codex review the owner ran, H:225-228, idea 38), **OWN CODE** | 0.9896 / 0.9920 (RA:716). |
+| `FOLD_ALPHA` (w′ backward) | FACTORED_SCALE's per-path α folded into the value table's rows at build. Rounding. | **UNCLEAR** (H idea 34, from the owner's third idea batch, H:465; the plan does not say who wrote it) | 0.9911 / 0.9863 (slow card), 0.9895 / 0.9893; gate worst ratio to the default 1.049 (Q1:45, :86). |
+| `RECEIVER_SUM` | The generic density sums as a segmented sum over receiver-sorted edges. Rounding. | **OWN** (H idea 5(b)) | 0.9998 / 0.9918, repeat 0.9990 / 0.9985; gate worst ratio to the default 1.036 (Q2:49). |
+| `BINNED_SCREEN`, from 10,000 atoms | The rebuild's pair screen as a cell list instead of all tile pairs. Bitwise candidate list. | **EXTERNAL IDEA** (the cell list of the MD literature; ChatGPT's round-6 answer ranked it first, R2:814), **OWN CODE** | SrTiO3 16×16×16 0.9765 / 0.9776; 10×10×10 1.0038 / 1.0044, hence the threshold, so the timing case is unchanged (Q2:156). |
 | `FUSED_FIRST_CONSTANT_NAME` (every GPU) | The fused first backward's device check as a compile-time constant, so interaction 1's graph no longer breaks. Bitwise. | **OWN** | Side b = the old traced call: 0.9997 / 1.0004 (RA:727). |
 
 #### 3.8.2 Measured on the A100 and kept off
@@ -318,18 +319,18 @@ the Modal A100-SXM4-80GB. A switch whose set names only that card is on for ever
 | Species GEMM, again | SrTiO3 0.979–0.996, but NbCl5 2.6–5.8 % slower | R2:585 |
 | w from the value table in the forward | lab bound 1.333 of the forward | R2:586 |
 | `SH_LDS4` | 1.0008 / 0.9949 | D:54 |
-| `SEGMENT_GROUPED` | neutral | `results/h200-ideas-20261105/README.md:18` |
+| `SEGMENT_GROUPED` | 0.9987 / 1.0004, neutral | `results/h200-ideas-20261105/README.md:92` |
 | 14(A), the receiver-owner pass | 1.0664 / 1.0656 | RA:305 |
 | `K_PIPE` on top of X_LATE | 0.9980 / 0.9990, within noise | RA:574 |
 | 22(iii), the TP inside the next k-loop | forward lab 1.029–1.091 | RA:606-609 |
 | `FIRST_DIV` | 1.0349 / 1.0337; density gradient not bitwise | RA:722 |
-| `ESTRIN` | alone 0.9961 / 0.9963, but FOLD_ALPHA is faster than ESTRIN: 0.9967 / 0.9902, 0.9884 / 0.9907 | Q1 |
-| `POWER_BACKWARD` | 1.0020 / 0.9977, a tie | Q1 |
-| `LANE_INDICES`, radial-table forward at 8 warps (H200 switches) | 0.9969 / 1.0001; 1.0051 / 0.9949 | Q1 |
-| Tabled `CHUNK` 8 or 32, `FORWARD_CHUNK` 16 or 64, w′ `STAGE_DOUT_CHUNK` 16 | ties or slower; e.g. STAGE_DOUT_CHUNK 16 1.0082 / 1.0011 | Q1 |
-| G1, 3×TF32 GEMMs with pre-split weights | ceiling 0.915 of the GEMMs, about 1.5–2 % of the step; a real kernel about half that. Not built. | Q2 |
-| 28, `rcfold` | rc-all 0.944 of round 13's forward base, about 0.35 % of the step. Not ported. | Q2 |
-| 5(d) ZBL forward, 13 S zero fill, 35 chunked S in L2 | bounded at about 0.1 %, at most 0.34 %, and not attempted | Q2 |
+| `ESTRIN` | alone 0.9961 / 0.9963, but FOLD_ALPHA is faster than ESTRIN: 0.9967 / 0.9902, 0.9884 / 0.9907 | Q1:47 |
+| `POWER_BACKWARD` | 1.0020 / 0.9977, a tie | Q1:46 |
+| `LANE_INDICES`, radial-table forward at 8 warps (H200 switches) | 0.9969 / 1.0001; 1.0051 / 0.9949 | Q1:61-62 |
+| Tabled `CHUNK` 8 or 32, `FORWARD_CHUNK` 16 or 64, w′ `STAGE_DOUT_CHUNK` 16 | ties or slower; e.g. STAGE_DOUT_CHUNK 16 1.0082 / 1.0011 | Q1:54-58 |
+| G1, 3×TF32 GEMMs with pre-split weights | ceiling 0.915 of the GEMMs, about 1.5–2 % of the step; a real kernel about half that. Not built. | Q2:61-68 |
+| 28, `rcfold` | rc-all 0.944 of round 13's forward base, about 0.35 % of the step. Not ported. | Q2:74-79 |
+| 5(d) ZBL forward, 13 S zero fill, 35 chunked S in L2 | bounded at about 0.1 %, at most 0.34 %, and not attempted | Q2:83-90 |
 
 #### 3.8.3 Rule changes (7 November)
 
@@ -549,3 +550,4 @@ the tiled state on the device only.
 | The outside idea lists of the capacity round (§4.1, §4.2) | Source of "free h1", host state, per-tile lists and shift codes; the conductor's assessment is kept, the lists are not. | `plans/capacity-ideas-20261030.md:3` names them as passed on by the owner |
 | mace-million (§4.1) | Its three-pass recomputation resembles our three sweeps. The earliest mention in the repository is the 27 October chat, which dismissed it for small cells (`docs/design/research/2026-10-27-radial-tables-proposal.md:152`). No document says we took anything from it; the records credit Symmetrix-XL. | Whether the outside review or idea lists mentioned it |
 | Kept tile lists (§4.2), wavefront groups (§5) | Built without a recorded proposer. | The capacity-round sessions of 1–3 November |
+| `LINEAR_DIV`, `SKIP_SELECT` and `FOLD_ALPHA` (§3.8.1) | Ideas 31 and 34 came in idea batches the owner sent on 6 November (`plans/h200-ideas-20261105.md:370`, `:465`). The plan does not say whether the owner wrote them or passed them on. | The owner, or the chat behind the batches |
