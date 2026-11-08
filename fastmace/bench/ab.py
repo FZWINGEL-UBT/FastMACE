@@ -108,6 +108,7 @@ class ABResult:
     order: tuple[str, ...]
     statistics: Mapping[str, BlockStatistics]
     pattern: str
+    stopped_after: int | None = None  # blocks per side when ``run_ab`` stopped early, else None
 
     @property
     def ratio(self) -> float:
@@ -125,13 +126,19 @@ class ABResult:
         a, b = self.names
         return dict(names=list(self.names), pattern=self.pattern, order=list(self.order),
                     sides={name: self.statistics[name].as_dict() for name in self.names},
-                    ratio_b_over_a=self.ratio, pair_ratios_b_over_a=list(self.pair_ratios))
+                    ratio_b_over_a=self.ratio, pair_ratios_b_over_a=list(self.pair_ratios),
+                    stopped_after=self.stopped_after)
 
 
 def run_ab(sides: Mapping[str, TimedEngine], protocol: TimingProtocol = TimingProtocol(), pattern: str = "abab",
            clock: Callable[[], float] = time.perf_counter,
-           before: Callable[[str], None] | None = None) -> ABResult:
+           before: Callable[[str], None] | None = None, stop_after: int | None = None,
+           stop_beyond: float = 0.03) -> ABResult:
     """Warm up both sides, then time ``protocol.blocks`` blocks of each, alternating by ``pattern``.
+
+    ``stop_after``, if given, ends the run once both sides have that many blocks and their medians differ
+    by more than ``stop_beyond`` (0.03: b/a below 0.97 or above 1.03). A clear result needs no more blocks;
+    one near the noise still gets them all. ``ABResult.stopped_after`` records the stop.
 
     ``before(name)``, if given, runs ahead of each side's warm-up and each of its blocks, outside the
     clock: two FastMACE versions in one process put their own process-wide patches back there
@@ -139,14 +146,27 @@ def run_ab(sides: Mapping[str, TimedEngine], protocol: TimingProtocol = TimingPr
     """
     names = tuple(sides)
     order = block_order(names, protocol.blocks, pattern)
+    if stop_after is not None and not 1 <= stop_after <= protocol.blocks:
+        raise ValueError(f"stop_after must lie between 1 and {protocol.blocks} blocks, not {stop_after}")
+    if not stop_beyond > 0:
+        raise ValueError(f"stop_beyond must be positive, not {stop_beyond}")
     for name in names:
         if before is not None:
             before(name)
         warm_up(sides[name], protocol.warmup)
     blocks = {name: [] for name in names}
+    done, stopped = [], None
     for name in order:
         if before is not None:
             before(name)
         blocks[name].append(time_block(sides[name], protocol.block, clock))
-    return ABResult(names=names, order=tuple(order), pattern=pattern,
-                    statistics={name: BlockStatistics.from_blocks(blocks[name]) for name in names})
+        done.append(name)
+        counts = {len(blocks[side]) for side in names}
+        if stop_after is not None and counts == {stop_after}:
+            a, b = (BlockStatistics.from_blocks(blocks[side]).median_ms for side in names)
+            if abs(b / a - 1) > stop_beyond:
+                stopped = stop_after
+                break
+    return ABResult(names=names, order=tuple(done), pattern=pattern,
+                    statistics={name: BlockStatistics.from_blocks(blocks[name]) for name in names},
+                    stopped_after=stopped)

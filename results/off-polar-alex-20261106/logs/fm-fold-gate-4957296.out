@@ -1,0 +1,98 @@
+### Starting TaskPrologue of job 4957296 on a0534 at Sat Nov  7 08:58:45 PM CET 2026
+Running on cores 48-63 with governor schedutil
+Sat Nov  7 20:58:45 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:4F:00.0 Off |                    0 |
+| N/A   45C    P0             70W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB
+node a0534 commit ab43a54e1baf6f76b58485117bb6d1e3311d9cb3
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-fold-polar1-l-4957296/gate-candidate.log
+   NaCl energy 2.72 forces 0.92 stress 1.20 PASS
+   NbCl5 energy 0.56 forces 0.46 stress 0.59 PASS
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-fold-polar1-l-4957296/gate-default.log
+   NaCl energy 2.51 forces 0.86 stress 1.16 PASS
+   NbCl5 energy 0.52 forces 0.43 stress 0.45 PASS
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-fold-polar1-m-4957296/gate-candidate.log
+   NaCl energy 6.86 forces 0.96 stress 1.06 PASS
+   NbCl5 energy 8.60 forces 0.91 stress 1.25 PASS
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-fold-polar1-m-4957296/gate-default.log
+   NaCl energy 6.48 forces 1.02 stress 1.09 PASS
+   NbCl5 energy 7.15 forces 0.89 stress 1.03 PASS
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-fold-polar1-s-4957296/gate-candidate.log
+   NaCl energy 1.72 forces 0.66 stress 1.61 PASS
+   NbCl5 energy 0.87 forces 0.66 stress 0.83 PASS
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-fold-polar1-s-4957296/gate-default.log
+   NaCl energy 2.23 forces 0.75 stress 1.71 PASS
+   NbCl5 energy 0.80 forces 0.59 stress 0.80 PASS
+=== JOB_STATISTICS ===
+=== current date     : Sun Nov  8 00:51:45 CET 2026
+= Job-ID             : 4957296 on alex
+= Job-Name           : fm-fold-gate
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-offpolar/jobs/fold-gate.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-offpolar
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 06:00:00
+= Elapsed runtime    : 03:54:29
+= Total RAM usage    : 12.2 GiB of assigned  GiB (%)
+= Node list          : a0534
+= Subm/Elig/Start/End: 2026-11-07T20:16:09 / 2026-11-07T20:16:09 / 2026-11-07T20:57:16 / 2026-11-08T00:51:45
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             575.3M   104.9G   209.7G        N/A     893      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            29.2G     0.0K     0.0K        N/A     338K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 366870, 3 %, 2 %, 2358 MiB, 24935 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 368398, 1 %, 0 %, 1458 MiB, 20885 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 368604, 10 %, 9 %, 19354 MiB, 19599 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 368910, 5 %, 4 %, 9954 MiB, 20956 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 369933, 1 %, 0 %, 4418 MiB, 749413 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 388934, 4 %, 2 %, 2358 MiB, 20050 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 389694, 1 %, 0 %, 1458 MiB, 21207 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 390636, 10 %, 9 %, 19354 MiB, 19558 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 391729, 5 %, 4 %, 9954 MiB, 20662 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 392010, 0 %, 0 %, 4446 MiB, 640850 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 408065, 4 %, 2 %, 2858 MiB, 29580 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 409131, 1 %, 0 %, 1706 MiB, 28765 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 410247, 10 %, 9 %, 19382 MiB, 28791 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 412020, 6 %, 4 %, 9988 MiB, 29720 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 413163, 0 %, 0 %, 5224 MiB, 1225111 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 428739, 5 %, 2 %, 2858 MiB, 29070 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 430031, 1 %, 0 %, 1706 MiB, 28897 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 431072, 10 %, 9 %, 19382 MiB, 28969 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 431963, 6 %, 4 %, 9988 MiB, 29485 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 433017, 0 %, 0 %, 5254 MiB, 3373033 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 507660, 2 %, 1 %, 3362 MiB, 68727 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 515670, 1 %, 0 %, 1972 MiB, 72103 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 522791, 6 %, 5 %, 26050 MiB, 67027 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 529805, 4 %, 2 %, 13154 MiB, 67859 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 533635, 0 %, 0 %, 5576 MiB, 3447365 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 592488, 4 %, 2 %, 3362 MiB, 44750 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 593678, 1 %, 0 %, 1972 MiB, 43204 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 594820, 10 %, 9 %, 26050 MiB, 42941 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 596419, 6 %, 4 %, 13154 MiB, 44237 ms
+NVIDIA A100-SXM4-80GB, 00000000:4F:00.0, 597880, 0 %, 0 %, 5546 MiB, 2365333 ms

@@ -348,3 +348,45 @@ def test_radial_table_warps(monkeypatch):
     assert rt.forward_warps("cuda:0") is None
     monkeypatch.setattr(rt, "WARPS", 2)
     assert rt.forward_warps("cuda:0") == 2
+
+
+def test_dynamo_constant_is_torchs_assume_constant_result():
+    """``dynamo_constant`` sets the same attributes as ``torch.compiler.assume_constant_result`` (a torch upgrade
+    that changes the decorator fails here) and returns the function itself."""
+    import torch
+
+    from fastmace.kernels.gpu_models import dynamo_constant
+
+    def ours(index):
+        return index
+
+    def torchs(index):
+        return index
+
+    assert dynamo_constant(ours) is ours
+    assert torch.compiler.assume_constant_result(torchs) is torchs
+    assert vars(ours) == vars(torchs) == {"_dynamo_marked_constant": True}
+
+
+def test_dynamo_calls_a_dynamo_constant_at_trace_time():
+    """A marked function runs once while tracing and becomes a constant: under ``fullgraph=True`` its body (a
+    ``print``, which Dynamo cannot trace) causes no graph break."""
+    import torch
+
+    from fastmace.kernels.gpu_models import dynamo_constant
+
+    calls = []
+
+    @dynamo_constant
+    def listed(index: int) -> bool:
+        calls.append(index)
+        print("not traceable")
+        return index == 0
+
+    @torch.compile(fullgraph=True, backend="eager")
+    def scaled(x):
+        return x * 2 if listed(0) else x
+
+    x = torch.ones(3)
+    assert torch.equal(scaled(x), 2 * x) and torch.equal(scaled(x), 2 * x)
+    assert calls == [0]

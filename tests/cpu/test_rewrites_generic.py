@@ -229,6 +229,9 @@ def test_fused_radial_backward_matches_the_original(family):
     rewritten, applied = rewrite(model, batch, ["generic_fused_radial_backward"])
     flags = [getattr(i, "fused_radial_backward", False) for i in rewritten.interactions]
     assert flags == ([False, True] if family == "off" else [True, True])
+    # MACE-OFF's radial products are the ones eligible for RADIAL_TF32X3_GPUS (off-polar-alex, 7 November 2026)
+    assert [getattr(i, "radial_tf32x3", None) for i, flag in zip(rewritten.interactions, flags) if flag] == (
+        [True] if family == "off" else [False, False])
     assert applied[0].detail == [f"interactions.{i}" for i, flag in enumerate(flags) if flag]
     assert_same_physics(model, rewritten)
 
@@ -355,6 +358,43 @@ def test_mace_off_first_block_is_not_rewritten():
         assert generic.apply_reassociate(rewritten, context(batch)) == []
     assert generic.apply_species_skip(rewritten, context(batch)) == ["interactions.1"]
     assert not hasattr(rewritten.interactions[0], "generic_kind")
+
+
+@pytest.mark.parametrize("cueq", [False, True])
+def test_mace_off_first_block_species_skip(monkeypatch, cueq):
+    """STOCK_FIRST_SKIP: MACE-OFF's stock first block keeps its own forward, and its skip_tp (called once as
+    skip_tp(message, node_attrs)) becomes a SpeciesSkip. Exact; off unless the device is listed or the constant set."""
+    model, batch = model_and_batch("off", z_values=(8, 11, 17), cueq=cueq)
+    assert generic.apply_species_skip(copy.deepcopy(model), context(batch)) == ["interactions.1"]  # CPU: not listed
+    monkeypatch.setattr(gm, "STOCK_FIRST_SKIP", True)
+    rewritten, applied = rewrite(model, batch, ["generic_species_skip"])
+    assert applied[0].detail == ["interactions.0", "interactions.1"]
+    assert isinstance(rewritten.interactions[0].skip_tp, gm.SpeciesSkip)
+    assert len(rewritten.interactions[0].skip_tp.columns) == 2  # Na and Cl only
+    assert not hasattr(rewritten.interactions[0], "generic_kind")  # the stock forward stays
+    assert applied[0].result.modules == 2
+    assert_same_physics(model, rewritten, z_values=(8, 11, 17))
+
+
+def test_mace_off_first_block_species_skip_needs_the_pinned_forward(monkeypatch):
+    """A stock first block whose forward source differs from the pin keeps its skip_tp."""
+    model, batch = model_and_batch("off")
+    monkeypatch.setattr(gm, "STOCK_FIRST_SKIP", True)
+    monkeypatch.setattr(gm, "STOCK_SKIP_INTERACTIONS", {"RealAgnosticInteractionBlock": "0" * 64})
+    assert generic.apply_species_skip(copy.deepcopy(model), context(batch)) == ["interactions.1"]
+
+
+def test_stock_first_skip_default_by_device(monkeypatch):
+    assert gm.STOCK_FIRST_SKIP is None
+    assert gm.STOCK_FIRST_SKIP_GPUS == ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                       "NVIDIA RTX 4000 Ada Generation")
+    assert gm.stock_first_skip_default("NVIDIA A100 80GB PCIe")  # the family (off-polar-alex, 7 November 2026)
+    assert not gm.stock_first_skip_default(torch.device("cpu"))
+    assert not gm.stock_first_skip_default("NVIDIA L4")
+    monkeypatch.setattr(gm, "STOCK_FIRST_SKIP_GPUS", gm.GPUModels(("NVIDIA A100-SXM4-80GB",)))
+    assert gm.stock_first_skip_default("NVIDIA A100-SXM4-40GB")
+    monkeypatch.setattr(gm, "STOCK_FIRST_SKIP", False)
+    assert not gm.stock_first_skip_default("NVIDIA A100-SXM4-80GB")
 
 
 # --------------------------------------------------------------------------- baseline (bitwise)

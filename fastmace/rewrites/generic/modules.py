@@ -88,16 +88,20 @@ FUSED_FIRST_BACKWARD_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX
 FUSED_FIRST_CONSTANT_NAME = True
 
 
-def fused_first_backward(device):
-    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``FUSED_FIRST_BACKWARD_GPUS``."""
+def fused_first_backward(device, gpus=None):
+    """``FUSED_FIRST_BACKWARD`` on ``device``: the constant when set, else on for ``gpus`` (default
+    ``FUSED_FIRST_BACKWARD_GPUS``, the generic family's; MH-1's class passes its own list)."""
     if FUSED_FIRST_BACKWARD is not None:
         return bool(FUSED_FIRST_BACKWARD)
     device = torch.device(device)
     if device.type != "cuda":
         return False
+    index = device.index if device.index is not None else torch.cuda.current_device()
+    if gpus is not None:  # MH-1's class: its own list, the name as a Dynamo constant
+        return _device_name(index) in gpus
     if not FUSED_FIRST_CONSTANT_NAME:  # the A/B side with the graph break
         return torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
-    return _fused_first_listed(device.index if device.index is not None else torch.cuda.current_device())
+    return _fused_first_listed(index)
 
 
 @torch.compiler.assume_constant_result
@@ -106,6 +110,12 @@ def _fused_first_listed(index: int) -> bool:
     ``tabled_outer_sum._listed``). Traced as a plain call, ``torch.cuda.get_device_name`` broke interaction 1's graph
     inside ``fused_first_applies`` on every backend (found by idea 31's Inductor dump, 6 November 2026)."""
     return torch.cuda.get_device_name(index) in FUSED_FIRST_BACKWARD_GPUS
+
+
+@torch.compiler.assume_constant_result
+def _device_name(index: int) -> str:
+    """``torch.cuda.get_device_name(index)`` as a compile-time constant for Dynamo (see ``_fused_first_listed``)."""
+    return torch.cuda.get_device_name(index)
 
 
 def _first_inputs(augmented, last):
@@ -128,12 +138,12 @@ def bias_free(linear):
                 if "bias" in name and tensor.numel() > 0]
 
 
-def fused_first_applies(self, edge_feats):
+def fused_first_applies(self, edge_feats, gpus=None):
     """Whether ``fused_first_message`` serves this tabled, reassociated interaction (``FUSED_FIRST_BACKWARD``)."""
     table, reassociation = getattr(self, "radial_table", None), getattr(self, "first_reassociation", None)
     return (table is not None and reassociation is not None and not FIRST_FULL_ROWS and reassociation.segmented
             and table.coef.dtype == torch.float32 and edge_feats.dtype == torch.float32
-            and fused_first_backward(table.coef.device))
+            and fused_first_backward(table.coef.device, gpus))
 
 
 def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None,
@@ -338,7 +348,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         pass
     elif tabled and reassociation is None:
         from fastmace.kernels.triton.skinny_linear import folded_linear
-        tp_weights = folded_linear(augmented[:, :-1].contiguous(), fc_last_weight(self.radial_last).contiguous())
+        tp_weights = folded_linear(augmented[:, :-1].contiguous(), fc_last_weight(self.radial_last).contiguous(),
+                                   tf32x3=getattr(self, "radial_tf32x3", False))
     elif chunked:
         hidden = self.radial_hidden(edge_feats)
         augmented = (torch.cat([hidden, torch.ones_like(hidden[:, :1])], dim=1) if cutoff is None
@@ -346,7 +357,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     elif reassociation is None:
         if getattr(self, "fused_radial_backward", False):
             from fastmace.kernels.triton.skinny_linear import folded_linear
-            tp_weights = folded_linear(self.radial_hidden(edge_feats), fc_last_weight(self.radial_last).contiguous())
+            tp_weights = folded_linear(self.radial_hidden(edge_feats), fc_last_weight(self.radial_last).contiguous(),
+                                       tf32x3=getattr(self, "radial_tf32x3", False))
         else:
             tp_weights = self.conv_tp_weights(edge_feats)
         if cutoff is not None:
@@ -464,6 +476,40 @@ SPECIES_GEMM = None
 SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
 
 
+# MACE-OFF's first block is the stock RealAgnosticInteractionBlock (not generic: its forward stays). Its skip_tp is
+# the same one-hot fully connected TP, called once as skip_tp(message, node_attrs) after the linear, and e3nn runs
+# it as per-atom [channels, channels] matrices built from the 10-element one-hot and batched products: on the A100
+# about 0.8 ms of OFF23-small's 2.57 ms water step and 1.1 ms of OFF24-medium's 6.1 ms (module profile,
+# results/off-polar-alex-20261106). generic_species_skip replaces it by a SpeciesSkip as for the generic blocks
+# (exact) where the class's forward source matches the pin below. None: on for STOCK_FIRST_SKIP_GPUS (decision 66);
+# True / False: an A/B side's choice on every device. A100-SXM4-80GB (off-polar-alex, 7 November 2026,
+# results/off-polar-alex-20261106): MD step b/a (b = on), water_216, abab / abba: OFF23-small, -medium, OFF23b,
+# OFF24 and OFF23-large all faster in both orders (OFF23b 0.832 / 0.821, OFF23-large 0.707 / 0.714).
+STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
+    "RealAgnosticInteractionBlock": "0a9b26328a7533f380b45af53e78f60e98ffed022cb9b7c136f781ddefefdf97",
+})
+# RTX 5060 Ti (local, 7 November 2026, ~/fm-runs/offlocal-ab-20261107): with the OFF tables, MD step b/a in both
+# orders, water_216: OFF23-small 0.677 / 0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811.
+# RTX 4000 Ada (murphy, 8 November 2026, results/off-polar-alex-20261106), the skip and the tables together, MD
+# step b/a, water_216, abab / abba: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725,
+# OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
+STOCK_FIRST_SKIP = None
+STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                   "NVIDIA RTX 4000 Ada Generation"))
+
+
+def stock_first_skip_default(device=None):
+    """``STOCK_FIRST_SKIP`` on ``device`` (a torch.device, a device name or None): the constant when set, else on
+    for ``STOCK_FIRST_SKIP_GPUS``."""
+    if STOCK_FIRST_SKIP is not None:
+        return bool(STOCK_FIRST_SKIP)
+    if isinstance(device, torch.device):
+        if device.type != "cuda":
+            return False
+        device = torch.cuda.get_device_name(device)
+    return device is not None and device in STOCK_FIRST_SKIP_GPUS
+
+
 # Round 5 (5 November 2026): the edge spherical harmonics (e3nn, l <= 3, normalised, component) by
 # fastmace.kernels.triton.edge_sh.edge_sh3, one Triton kernel each way, instead of Inductor's compiled e3nn
 # polynomials, which save about 16 per-edge intermediates for autograd (A100 profile at 5b6c5550: about 230 µs of
@@ -478,18 +524,34 @@ EDGE_SH = None
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 EDGE_SH_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                           "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
+# MH-1's interaction class (MH-1, POLAR-1): applied by MH-1's streaming record (fastmace.rewrites.mh1
+# streaming_convolutions) on these GPUs; none measured yet (decision 66), EDGE_SH=True for the A/B (polar-T01).
+EDGE_SH_MH1_GPUS = GPUModels(())
 
 
-def edge_sh_default(device=None):
+def edge_sh_default(device=None, gpus=None):
     """``EDGE_SH`` on ``device`` (a torch.device, a device name or None): the constant when set, else on for
-    ``EDGE_SH_GPUS``."""
+    ``gpus`` (default ``EDGE_SH_GPUS``, the generic family's)."""
     if EDGE_SH is not None:
         return bool(EDGE_SH)
     if isinstance(device, torch.device):
         if device.type != "cuda":
             return False
         device = torch.cuda.get_device_name(device)
-    return device is not None and device in EDGE_SH_GPUS
+    return device is not None and device in (EDGE_SH_GPUS if gpus is None else gpus)
+
+
+def attach_edge_sh(model, gpus=None):
+    """Replace ``model.spherical_harmonics`` by ``EdgeSH`` where it is e3nn's l <= 3 component harmonics and
+    ``edge_sh_default`` holds for the model's device and ``gpus``; True if it did."""
+    sh = getattr(model, "spherical_harmonics", None)
+    if not edge_sh_replaceable(sh):
+        return False
+    parameter = next(model.parameters(), None)
+    if not edge_sh_default(parameter.device if parameter is not None else None, gpus):
+        return False
+    model.spherical_harmonics = EdgeSH(sh)
+    return True
 
 
 class EdgeSH(torch.nn.Module):
@@ -513,7 +575,7 @@ def edge_sh_replaceable(module):
         return False
     if getattr(module, "normalization", None) != "component":
         return False
-    return [int(l) for l in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
+    return [int(ell) for ell in getattr(module, "_ls_list", [])] == [0, 1, 2, 3]
 
 
 class SpeciesSkip(torch.nn.Module):
@@ -696,5 +758,6 @@ def species_skip(skip, columns):
     raise ValueError(f"generic_species_skip: replacement of {type(skip).__name__} does not reproduce it")
 
 
-__all__ = ["GENERIC_INTERACTIONS", "SpeciesSkip", "bias_free", "fc_last_weight", "fc_split",
-           "generic_interaction_forward", "irrep_segments", "scalar_second_input", "source_hashes", "species_skip"]
+__all__ = ["GENERIC_INTERACTIONS", "STOCK_SKIP_INTERACTIONS", "SpeciesSkip", "bias_free", "fc_last_weight", "fc_split",
+           "generic_interaction_forward", "irrep_segments", "scalar_second_input", "source_hashes", "species_skip",
+           "stock_first_skip_default"]

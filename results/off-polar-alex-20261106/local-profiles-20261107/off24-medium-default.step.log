@@ -1,0 +1,56 @@
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671/fastmace/model/loading.py:766: ModelLicenceWarning: off24-medium (MACE-OFF24_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+USDT:2026-11-07 17:08:30 54293:54293 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-11-07 17:08:31 54293:54293 SyncActivityProfilerHandler.cpp:46] profiler_stop
+{"model": "off24-medium", "structure": "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1", "natoms": 648, "gpu": "NVIDIA GeForce RTX 5060 Ti", "wall_ms_per_step": 10.209, "traced_span_ms_per_step": 10.461, "kernels_per_step": 329.12, "kernel_busy_ms_per_step": 10.254, "idle_gaps_ms_per_step": 0.207, "gaps_over_20us_ms_per_step": 0.115, "kernels_under_5us_per_step": 134.56, "kernels_under_10us_per_step": 176.94, "time_in_kernels_under_10us_ms_per_step": 0.537}
+    2.138 ms   37.7x  oeq_projected_backward
+    2.095 ms   11.2x  void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3
+    1.991 ms   38.1x  Kernel
+    0.996 ms   17.3x  void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl
+    0.863 ms    1.0x  backward(float*, float*, float*, float*, float*, float*, float*, ConvD
+    0.781 ms    1.0x  oeq_projected_forward
+    0.732 ms    1.0x  forward(float*, float*, float*, float*, ConvData, void*)
+    0.431 ms    3.1x  void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_tn_align1>(cutla
+    0.362 ms    8.2x  void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, 
+    0.351 ms    3.1x  void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nt_align1>(cutla
+    0.295 ms    5.1x  triton_poi_fused_mul_silu_backward_9
+    0.210 ms    5.1x  triton_poi_fused_mul_silu_30
+    0.086 ms    1.0x  triton_poi_fused_mul_silu_backward_8
+    0.067 ms    8.2x  void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutla
+    0.062 ms   10.2x  void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl

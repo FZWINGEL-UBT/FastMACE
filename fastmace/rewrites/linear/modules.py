@@ -11,6 +11,9 @@ blocks of MH-1). Exact up to rounding.
   linear_1 after the convolution: several 128x1o paths -> one 1024x1o block) concatenated along
   the channels and multiplied by their stacked weights in one product, instead of one product per
   segment plus an addition of the (wide) outputs. Same terms; exact up to rounding.
+- ``e3nn_block_linear``: an e3nn ``o3.Linear`` (MACE-POLAR's field blocks keep them after the cuEquivariance
+  conversion) as the same ``BlockLinear``, with ``LayoutTranspose`` between e3nn's mul_ir layout and the ir_mul
+  core, so that ``tf32x3_gemms`` reaches its products. Exact up to rounding.
 - ``ResidualBlockLinear``: linear_1(message / density) + linear_res(linear_up output) of the
   factored MH-1-class interaction as one product per output segment over both inputs (grouped as
   above), instead of two products and an addition of the wide [atoms, 4096 + ...] outputs. Exact
@@ -296,6 +299,70 @@ def segments(irreps):
         out.append((offset, int(mul), int(ir.dim), ir))
         offset += int(mul) * int(ir.dim)
     return out, offset
+
+
+class LayoutTranspose(torch.nn.Module):
+    """e3nn's mul_ir layout to the ir_mul core layout (``to_ir_mul``) or back, per segment ``(offset, mul, dim)``
+    of rows ``[n, width]``; scalar segments are copied as they are."""
+
+    def __init__(self, segments, to_ir_mul):
+        super().__init__()
+        self.segments = tuple((int(o), int(m), int(d)) for o, m, d in segments)
+        self.to_ir_mul = bool(to_ir_mul)
+
+    def forward(self, x):
+        n = x.shape[0]
+        parts = []
+        for offset, mul, dim in self.segments:
+            part = x[:, offset:offset + mul * dim]
+            if dim > 1:
+                shape = (n, mul, dim) if self.to_ir_mul else (n, dim, mul)
+                part = part.reshape(shape).transpose(1, 2).reshape(n, mul * dim)
+            parts.append(part)
+        return parts[0] if len(parts) == 1 else torch.cat(parts, dim=1)
+
+
+# e3nn Linears below this many weights stay as they are (a readout to a few channels gains nothing from
+# per-segment products and pays the layout transposes).
+E3NN_MIN_WEIGHTS = 1 << 14
+
+
+def is_e3nn_linear(module):
+    """An e3nn ``o3.Linear`` with internal shared weights, no bias and no extra feature dimensions, of at least
+    ``E3NN_MIN_WEIGHTS`` weights (what ``e3nn_block_linear`` takes)."""
+    if type(module).__name__ != "Linear" or not type(module).__module__.startswith("e3nn"):
+        return False
+    weight = getattr(module, "weight", None)
+    return (bool(getattr(module, "internal_weights", False)) and getattr(module, "bias_numel", 1) == 0
+            and weight is not None and weight.dim() == 1 and weight.numel() >= E3NN_MIN_WEIGHTS)
+
+
+def e3nn_block_linear(linear, grouped=False):
+    """The BlockLinear of one e3nn ``o3.Linear``, or None if it does not apply: each instruction's weights
+    ``[mul_in, mul_out]`` read off the module (its path normalisation included) by its response to channel basis
+    rows at component 0, mul_ir layout transposes around the ir_mul core."""
+    if not is_e3nn_linear(linear):
+        return None
+    segments_in, dim_in = segments(linear.irreps_in)
+    segments_out, _ = segments(linear.irreps_out)
+    device, dtype = linear.weight.device, linear.weight.dtype
+    blocks = []
+    with torch.no_grad():
+        for instruction in linear.instructions:
+            i, j = int(instruction.i_in), int(instruction.i_out)
+            offset, mul, dim, _ = segments_in[i]
+            offset_out, mul_out, dim_out, _ = segments_out[j]
+            basis = torch.zeros((mul, dim_in), device=device, dtype=dtype)
+            basis[torch.arange(mul), offset + torch.arange(mul) * dim] = 1  # mul_ir: channel u, component 0
+            # The response of instruction (i, j) alone: the other instructions read other input segments or
+            # write other output segments, and those of this pair add to the same block.
+            response = linear(basis)
+            blocks.append((i, j, response[:, offset_out:offset_out + mul_out * dim_out:dim_out].clone()))
+    blocks = list({(i, j): (i, j, w) for i, j, w in blocks}.values())  # one block per pair
+    core_in = [(o, m, d) for o, m, d, _ in segments_in]
+    core_out = [(o, m, d) for o, m, d, _ in segments_out]
+    return BlockLinear(LayoutTranspose(core_in, True), LayoutTranspose(core_out, False), core_in, core_out, blocks,
+                       grouped=grouped)
 
 
 def is_cueq_linear(module):

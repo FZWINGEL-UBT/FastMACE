@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum
 from fastmace.kernels.triton.fused_radial import run_hidden_plan
 from fastmace.kernels.triton.skinny_linear import folded_linear
@@ -295,6 +296,41 @@ def identity_species_feats(model, interaction, attrs, count, joint=None):
         return interaction.linear_up(feats)[:count]
 
 
+# The generic family's FUSED_FIRST_BACKWARD (tabled outer sum: the table read inside the reassociation's per-slot
+# sums, one fused backward; kernels.triton.tabled_outer_sum) in MH-1's reassociated first interaction (polar-T01):
+# the folded weight [W, b] reads the table's leading h + 1 columns, the bias column included. Switched by
+# generic.modules.FUSED_FIRST_BACKWARD (the A/B constant) or, when it is None, on for these GPUs; none measured on
+# MH-1 or POLAR-1 yet (decision 66).
+FUSED_FIRST_MH1_GPUS = GPUModels(())
+
+
+def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
+    """``(message, edge density)`` of a tabled, reassociated, segmented float32 first interaction through the
+    tabled outer sum, or None where it does not apply (``generic.modules.fused_first_applies``)."""
+    from fastmace.rewrites.generic import modules as gm
+
+    if not gm.fused_first_applies(self, edge_feats, FUSED_FIRST_MH1_GPUS):
+        return None
+    from fastmace.kernels.triton import tabled_outer_sum as tos
+
+    table = self.radial_table
+    weight = self.conv_tp_weights.folded_weight()
+    width = weight.shape[-1]
+    pair = table.pair(node_attrs, edge_index)
+    density = []
+
+    def summed_fn(key, slots):
+        summed, edge_density = tos.tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts,
+                                                    table.scales, table.bins, table.r_lo, table.bin_scale,
+                                                    table.r_max, width, edge_attrs.contiguous(), key, slots)
+        density.append(edge_density)
+        return summed, width
+
+    message = self.first_reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, rows=rows,
+                                       summed_fn=summed_fn)
+    return message, density[0]
+
+
 def first_table_region(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index, rows=None):
     """``(message, edge density)`` of a reassociated interaction with a radial table: the table, then the
     reassociation. ``recompute_first_table`` runs it under non-reentrant checkpoint, so the backward keeps the
@@ -349,6 +385,10 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
             self, "recompute_first_table", False):  # recompute_first_table: the table's output is not kept
         message, edge_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
                                                        n_real)  # the tiles' receivers only (n_real rows)
+    elif (table is not None and edge_feats.shape[-1] == 1 and reassociation is not None
+          and (fused := fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,
+                                            n_real)) is not None):
+        message, edge_density = fused  # FUSED_FIRST_BACKWARD on MH-1's class
     elif table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
         if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
@@ -593,6 +633,7 @@ def probe_first_tensor_product(interaction):
 
 __all__ = [
     "FactoredRadialMLP", "FirstInteractionReassociation", "ProjectedEmbedding", "attach_streaming_kernels",
-    "cutoff_folded_forward", "first_table_region", "identity_attrs", "recomputed_first_table", "identity_species_feats",
+    "cutoff_folded_forward", "first_table_region", "fused_first_message", "identity_attrs", "recomputed_first_table",
+    "identity_species_feats",
     "probe_first_tensor_product", "streaming_message",
 ]

@@ -120,6 +120,12 @@ def apply_species_skip(model, context):
     """Restrict every generic skip connection to the structure's species; returns the changed names."""
     columns = _columns(context, "generic_species_skip")
     changed = []
+    first = _stock_first(model)
+    if first is not None:  # MACE-OFF's first block: only its skip_tp (gm.STOCK_FIRST_SKIP)
+        replacement = gm.species_skip(first.skip_tp, columns.to(_device(first)))
+        if replacement is not None:
+            first.skip_tp = replacement
+            changed.append("interactions.0")
     for index, interaction, kind in _generic_interactions(model):
         _prepare(interaction, kind)
         replacement = gm.species_skip(interaction.skip_tp, columns.to(_device(interaction)))
@@ -127,6 +133,29 @@ def apply_species_skip(model, context):
             interaction.skip_tp = replacement
             changed.append(f"interactions.{index}")
     return changed
+
+
+def stock_first_block(model):
+    """MACE-OFF's first interaction: a stock block of ``gm.STOCK_SKIP_INTERACTIONS`` whose forward matches the pin,
+    with only generic interactions after it; else None."""
+    interactions = list(getattr(model, "interactions", ()))
+    if not interactions or len(_generic_interactions(model)) != len(interactions) - 1:
+        return None
+    first = interactions[0]
+    digest = gm.STOCK_SKIP_INTERACTIONS.get(type(first).__name__)
+    if digest is None or hashlib.sha256(inspect.getsource(type(first).forward).encode()).hexdigest() != digest:
+        return None
+    return first
+
+
+def _stock_first(model):
+    """``stock_first_block`` with a one-hot skip_tp, on a device where ``gm.stock_first_skip_default`` holds."""
+    first = stock_first_block(model)
+    if first is None or not gm.stock_first_skip_default(_device(first)):
+        return None
+    if gm.scalar_second_input(getattr(first, "skip_tp", None)) is None:
+        return None
+    return first
 
 
 def apply_reassociate(model, context):
@@ -164,14 +193,17 @@ def apply_segmented_first_sum(model, context):
 
 
 def apply_fused_radial_backward(model, context):
-    """Route the last radial layer of every non-reassociated generic interaction through folded_linear."""
+    """Route the last radial layer of every non-reassociated generic interaction through folded_linear; on a
+    MACE-OFF model (``stock_first_block``) mark it eligible for ``skinny_linear.RADIAL_TF32X3_GPUS``."""
     changed = []
+    off = stock_first_block(model) is not None
     for index, interaction, kind in _generic_interactions(model):
         if getattr(interaction, "first_reassociation", None) is not None:
             continue
         _prepare(interaction, kind)
         interaction.radial_hidden, interaction.radial_last = gm.fc_split(interaction.conv_tp_weights)
         interaction.fused_radial_backward = True
+        interaction.radial_tf32x3 = off
         changed.append(f"interactions.{index}")
     return changed
 
@@ -257,9 +289,7 @@ def apply_streaming(model, context):
         _prepare(interaction, kind)
         attach_streaming_kernels(interaction)
         changed.append(f"interactions.{index}")
-    sh = getattr(model, "spherical_harmonics", None)
-    if changed and gm.edge_sh_replaceable(sh) and gm.edge_sh_default(_device(model.interactions[0])):
-        model.spherical_harmonics = gm.EdgeSH(sh)  # EDGE_SH (round 5)
+    if changed and gm.attach_edge_sh(model):  # EDGE_SH (round 5)
         changed.append("spherical_harmonics")
     return changed
 
@@ -510,4 +540,4 @@ RECORDS = {
 __all__ = ["NODE_ATTRS", "RECORDS", "apply_chunked_conv_backward", "apply_fused_folded_forward",
            "apply_fused_radial_backward", "apply_reassociate",
            "apply_recompute_conv_weights", "apply_species_skip",
-           "apply_streaming"]
+           "apply_streaming", "stock_first_block"]

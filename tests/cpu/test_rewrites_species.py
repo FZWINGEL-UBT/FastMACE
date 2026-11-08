@@ -365,18 +365,20 @@ def _stand_in(label):
 
 
 def test_which_of_the_19_labels_each_record_applies_to():
-    """species_tables and fold_product_linear: the three MH-1 labels. fold_readout_tail: those and
-    OMOL-0 (MH-1 class). POLAR-1 (PolarMACE, external fields) is refused by all three, the residual, density
-    and OFF labels by their element-dependent skip (and the first interaction's class)."""
+    """species_tables: the three MH-1 labels and POLAR-1 (PolarMACE.forward pinned, polar-T01). fold_product_linear:
+    the MH-1 labels. fold_readout_tail: those and OMOL-0 (MH-1 class). POLAR-1 is refused by both folds (its
+    long-range heads read every layer's features), the residual, density and OFF labels by their element-dependent
+    skip (and the first interaction's class)."""
     import test_planner as tp
 
     applies = {name: {label for label in tp.LABELS if species.RECORDS[name].applies_to(_stand_in(label))[0]}
                for name in NAMES}
     mh1_labels = {"mh1-omat", "mh1-mp", "mh1-r2scan"}
     polar = {"polar1-s", "polar1-m", "polar1-l"}
-    assert applies["species_tables"] == applies["fold_product_linear"] == mh1_labels
+    assert applies["species_tables"] == mh1_labels | polar
+    assert applies["fold_product_linear"] == mh1_labels
     assert applies["fold_readout_tail"] == mh1_labels | {"omol0-xl"}
-    assert not polar & set().union(*applies.values())
+    assert not polar & (applies["fold_product_linear"] | applies["fold_readout_tail"])
 
 
 def test_fold_readout_tail_refuses_an_unpinned_last_interaction():
@@ -447,10 +449,11 @@ def test_an_explicit_product_fold_without_tables_is_refused_in_float64():
         _default_plan(precision="float64", rewrites=RewriteConfig(fold_product_linear="on", species_tables="off"))
 
 
-@pytest.mark.parametrize(("label", "tables", "tail"), [
-    ("mh1-omat", "on", "on"), ("omol0-xl", "off", "on"), ("polar1-s", "off", "off"), ("mp0-medium", "off", "off"),
-    ("off23-small", "off", "off")])
-def test_default_plans_follow_each_records_scope(label, tables, tail):
+@pytest.mark.parametrize(("label", "tables", "product", "tail"), [
+    ("mh1-omat", "on", "on", "on"), ("omol0-xl", "off", "off", "on"),
+    ("polar1-s", "on", "off", "off"),  # PolarMACE: the tables, not the folds (polar-T01)
+    ("mp0-medium", "off", "off", "off"), ("off23-small", "off", "off", "off")])
+def test_default_plans_follow_each_records_scope(label, tables, product, tail):
     plan = _default_plan(label)
     assert (plan.rewrites.species_tables, plan.rewrites.fold_product_linear, plan.rewrites.fold_readout_tail) == (
-        tables, tables, tail)
+        tables, product, tail)

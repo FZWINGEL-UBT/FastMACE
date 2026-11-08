@@ -22,6 +22,7 @@ from fastmace.model.capabilities import (
     ALL_ELECTRON,
     PSEUDOPOTENTIAL,
     SMALL,
+    STOCK_FIRST_TABLES,
     UNKNOWN,
     ModelTraits,
     RewriteSupport,
@@ -42,7 +43,7 @@ GENERIC_FOLD = "ok (generic: no skip term in the first product)"
 NOT_BOTH_GENERIC = ("the first two interactions are not both generic (RealAgnosticInteractionBlock, "
                     "RealAgnosticResidualInteractionBlock)")
 JOINT = "a joint embedding (charge/spin) is added to the first input, which is then not species-only"
-NOT_SCALE = "PolarMACE: only ScaleShiftMACE\'s forward is pinned"
+LAYER_FEATURES = "PolarMACE: its long-range heads read every layer's features"
 FIRST_NOT_FACTORED = "the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)"
 LAST_NOT_FACTORED = ("the last interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',) (its skip_tp is "
                      "element-dependent)")
@@ -184,8 +185,9 @@ EXPECTED = {
                  "streaming_conv": (True, "ok"), "species_skip": (False, NOT_GENERIC),
                  "fused_folded_backward": (True, "ok"), "chunked_conv_backward": (True, "ok"),
                  "radial_tables": (True, "ok"),
-                 "species_tables": (False, NOT_SCALE), "fold_readout_tail": (False, NOT_SCALE),
-                 "fold_product_linear": (False, NOT_SCALE)}),
+                 # PolarMACE's forward is pinned for the species tables (polar-T01); the two folds stay refused
+                 "species_tables": (True, "ok"), "fold_readout_tail": (False, LAYER_FEATURES),
+                 "fold_product_linear": (False, LAYER_FEATURES)}),
     "residual": dict(
         interactions=("RealAgnosticResidualInteractionBlock",) * 2, apply_cutoff=True, joint=(), polar=False,
         exact=True, species_only=True,
@@ -223,7 +225,7 @@ EXPECTED = {
                  "reassociate_first": (True, "ok (GENERIC_REASSOCIATE)"), "streaming_conv": (True, "ok"),
                  "species_skip": (True, "ok"), "fused_folded_backward": (True, "ok"),
                  "chunked_conv_backward": (True, GENERIC_FOLDED),
-                 "radial_tables": (False, "not every interaction is generic"),
+                 "radial_tables": (True, STOCK_FIRST_TABLES),
                  "species_tables": (False, FIRST_NOT_FACTORED), "fold_readout_tail": (False, LAST_NOT_FACTORED),
                  "fold_product_linear": (False, NOT_BOTH_GENERIC)}),
 }

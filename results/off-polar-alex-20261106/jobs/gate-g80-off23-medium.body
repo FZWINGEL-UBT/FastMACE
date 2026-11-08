@@ -1,0 +1,4 @@
+R=$B/runs/gate-g80-off23-medium-$SLURM_JOB_ID
+OUT=$R MODEL=off23-medium CKPT=MACE-OFF23_medium.model STRUCTS=x GATE_STRUCTS="$ORG/urea_cod1008787.cif $ORG/naphthalene_cod2311090.cif $ORG/paracetamol_cod2104364.cif $ORG/water_216.extxyz@1x1x1" GATE_NAME=default GATE_ARGS="--seed 20261015" bash tools/offpolar_ab.sh
+OUT=$R MODEL=off23-medium CKPT=MACE-OFF23_medium.model STRUCTS=x GATE_STRUCTS="$ORG/urea_cod1008787.cif $ORG/naphthalene_cod2311090.cif $ORG/paracetamol_cod2104364.cif $ORG/water_216.extxyz@1x1x1" GATE_NAME=candidate GATE_ARGS="--seed 20261015 --rewrites tf32x3_gemms=on" bash tools/offpolar_ab.sh
+cat $R/run.log

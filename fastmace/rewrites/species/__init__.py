@@ -13,7 +13,7 @@
 
   The step loses their products and backward: 4.1 % of NaCl's B stage, 2.1 % of NbCl5's (2-T20a
   profiles). Pinned sources:
-  - ``ScaleShiftMACE.forward``: the embedding is read only by the first interaction;
+  - ``ScaleShiftMACE.forward`` and ``PolarMACE.forward``: the embedding is read only by the first interaction;
   - the MH-1-class interaction forward: the first interaction reads it only through ``skip_tp`` and
     ``linear_up``.
 
@@ -90,9 +90,36 @@ def _one_hot_rows(model):
 # --------------------------------------------------------------------------- species_tables
 
 
+# PolarMACE (POLAR-1, polar-T01): its forward reads the embedding only in the first interaction, as
+# ScaleShiftMACE's; pinned by the polar path's own hash (fastmace.longrange.polar.SOURCE_HASHES), checked here and
+# not in the records' source_hashes, so that the records stay available without graph_longrange.
+POLAR_FORWARD = "mace.modules.extensions:PolarMACE.forward"
+LAYER_FEATURES_READ = "PolarMACE: its long-range heads read every layer's features"
+
+
+def _forward_pinned(model):
+    """None where the model's forward is pinned (ScaleShiftMACE's, PolarMACE's), else why not."""
+    kind = type(model).__name__
+    if kind == "ScaleShiftMACE":
+        return None
+    if kind != "PolarMACE":
+        return f"{kind}: only ScaleShiftMACE's and PolarMACE's forwards are pinned"
+    # The polar path's install() replaces PolarMACE.forward; its own record of the original is what is pinned.
+    from fastmace.longrange.polar import SOURCE_HASHES, _original, source_digest
+
+    try:
+        found = source_digest(_original(POLAR_FORWARD))
+    except Exception as error:  # graph_longrange missing or MACE changed: not pinned
+        return f"PolarMACE.forward cannot be read ({type(error).__name__}: {error})"
+    if found != SOURCE_HASHES[POLAR_FORWARD]:
+        return "PolarMACE.forward is not MACE 0.3.16's (its pin fails)"
+    return None
+
+
 def _tables_support(model):
-    if type(model).__name__ != "ScaleShiftMACE":
-        return Support(False, f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned")
+    reason = _forward_pinned(model)
+    if reason is not None:
+        return Support(False, reason)
     if hasattr(model, "joint_embedding"):
         return Support(False, "a joint (charge/spin) embedding is added to the first input, which is then not "
                               "species-only")
@@ -181,6 +208,8 @@ def _readout_first(readout):
 
 
 def _tail_support(model):
+    if type(model).__name__ == "PolarMACE":
+        return Support(False, LAYER_FEATURES_READ)
     if type(model).__name__ != "ScaleShiftMACE":
         return Support(False, f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned")
     interactions, products, readouts = (getattr(model, n, ()) for n in ("interactions", "products", "readouts"))
@@ -300,6 +329,8 @@ def _consumers(model):
 
 
 def _product_support(model):
+    if type(model).__name__ == "PolarMACE":
+        return Support(False, LAYER_FEATURES_READ)
     supported, reason = _tables_support(model)
     if not supported:
         return Support(False, reason)

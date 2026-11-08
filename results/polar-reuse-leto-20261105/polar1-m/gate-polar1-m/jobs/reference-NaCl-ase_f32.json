@@ -1,0 +1,37 @@
+{
+  "kind": "reference",
+  "name": "reference-NaCl-ase_f32",
+  "structure": "NaCl",
+  "reference": "ase_f32",
+  "dtype": "float32",
+  "keys": [
+    "hydrostatic-0",
+    "hydrostatic-1",
+    "hydrostatic-2",
+    "full-0",
+    "full-1",
+    "full-2"
+  ],
+  "implementation": "fastmace.reference",
+  "model": "polar1-m",
+  "label": "polar1-m",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+  "checkpoint_sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+  "baseline": null,
+  "backend": "auto",
+  "md_dtype": "auto",
+  "main_args": "",
+  "rewrites": {
+    "wprime_backward": "on",
+    "fused_folded_forward": "on",
+    "gate_epilogue": "on"
+  },
+  "production_constants": [],
+  "engine_config": {},
+  "production_tf32": false,
+  "tiled_receivers": 0,
+  "tiled_mode": "eager",
+  "values": "/mnt/homes/zwingel/fm-tiled/runs/leto-polar-reuse-m/gate-polar1-m/values/reference-NaCl-ase_f32.npz",
+  "result": "/mnt/homes/zwingel/fm-tiled/runs/leto-polar-reuse-m/gate-polar1-m/values/reference-NaCl-ase_f32.json",
+  "configurations": "/mnt/homes/zwingel/fm-tiled/runs/leto-polar-reuse-m/gate-polar1-m/configs/NaCl.npz"
+}

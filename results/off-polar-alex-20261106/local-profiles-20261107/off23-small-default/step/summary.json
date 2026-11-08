@@ -1,0 +1,142 @@
+{
+ "model": "off23-small",
+ "structure": "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1",
+ "natoms": 648,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 4.036345039785374,
+ "traced_span_ms_per_step": 3.7581667968750003,
+ "kernels_per_step": 237.5,
+ "kernel_busy_ms_per_step": 3.4705721447656357,
+ "idle_gaps_ms_per_step": 0.287593583984375,
+ "gaps_over_20us_ms_per_step": 0.19475975585937502,
+ "kernels_under_5us_per_step": 146.74,
+ "kernels_under_10us_per_step": 178.32,
+ "time_in_kernels_under_10us_ms_per_step": 0.49403435999999973,
+ "top": [
+  [
+   "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3",
+   11.22,
+   0.5324743799999997
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   14.28,
+   0.38792558
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_tn_align1>(cutla",
+   3.06,
+   0.3660654399999999
+  ],
+  [
+   "backward(float*, float*, float*, float*, float*, float*, float*, ConvD",
+   1.02,
+   0.32601425999999994
+  ],
+  [
+   "forward(float*, float*, float*, float*, ConvData, void*)",
+   1.02,
+   0.2562173
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nt_align1>(cutla",
+   3.06,
+   0.24708317999999996
+  ],
+  [
+   "oeq_projected_backward",
+   1.02,
+   0.23823634
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, ",
+   8.16,
+   0.18082693999999988
+  ],
+  [
+   "Kernel",
+   1.32,
+   0.13985802000000006
+  ],
+  [
+   "oeq_projected_forward",
+   1.02,
+   0.13087802
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   16.32,
+   0.10819832
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_9",
+   5.1,
+   0.09643086000000001
+  ],
+  [
+   "triton_poi_fused_mul_silu_10",
+   5.1,
+   0.03587381999999997
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_transpose",
+   1.02,
+   0.024133439999999996
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_1",
+   2.04,
+   0.01998168
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_8",
+   1.02,
+   0.019292480000000004
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunc",
+   8.0,
+   0.01892390000000002
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_inde",
+   3.04,
+   0.017805080000000008
+  ],
+  [
+   "void at::native::radixSortKVInPlace<-2, -1, 32, 32, long, long, unsign",
+   1.02,
+   0.017782700000000002
+  ],
+  [
+   "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepK",
+   2.4,
+   0.017175919999999997
+  ],
+  [
+   "triton_poi_fused__to_copy__unsafe_view_bmm_cat_clone_mm_permute_sum_vi",
+   1.02,
+   0.015516900000000005
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_div_mm_permute_slice_backward_",
+   1.02,
+   0.015296259999999997
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_transpose_view_14",
+   1.02,
+   0.014546720000000003
+  ],
+  [
+   "Memcpy HtoD (Pinned -> Device)",
+   0.02,
+   0.01174224
+  ],
+  [
+   "gemm",
+   2.04,
+   0.0111081
+  ]
+ ]
+}

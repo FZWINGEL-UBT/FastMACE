@@ -1,0 +1,172 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-08T01:51:06.497163+00:00",
+  "host": "murphy",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "657c80b3",
+  "model": "off23-large",
+  "checkpoint_sha256": "a29e397dbf3e7a24ac50a9b0dfc919bd5a62efa346f5895a6237b0950c1d76f4",
+  "sides": {
+    "a": {},
+    "b": {
+      "radial_tables": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 500,
+    "block": 1000,
+    "blocks": 16
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    1.00439453125,
+    1.16357421875,
+    1.2265625
+  ],
+  "structures": {
+    "water_216": {
+      "natoms": 648,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 26.289278864045627,
+            "mean_ms": 26.311407377303112,
+            "min_ms": 26.08716771611944,
+            "max_ms": 26.579904065001756,
+            "stdev_ms": 0.21310153445969734,
+            "spread": 0.018742862876935183,
+            "block_ms": [
+              26.579904065001756,
+              26.08716771611944,
+              26.20901818620041,
+              26.369539541890845
+            ]
+          },
+          "b": {
+            "median_ms": 19.684424616978504,
+            "mean_ms": 19.78501979552675,
+            "min_ms": 19.65910792700015,
+            "max_ms": 20.112122021149844,
+            "stdev_ms": 0.21840512698771816,
+            "spread": 0.0230138346923767,
+            "block_ms": [
+              20.112122021149844,
+              19.65910792700015,
+              19.681783220963553,
+              19.687066012993455
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.7487624410991276,
+        "pair_ratios_b_over_a": [
+          0.7566664639558215,
+          0.7535930362747909,
+          0.7509546172670604,
+          0.7465836095362393
+        ],
+        "stopped_after": 4
+      },
+      "ratio_b_over_a": 0.7487624410991276,
+      "pair_ratios": [
+        0.7566664639558215,
+        0.7535930362747909,
+        0.7509546172670604,
+        0.7465836095362393
+      ],
+      "setup_s": {
+        "a": 58.3884429030586,
+        "b": 31.467845087870955
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.radial_tables = off  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: off, tables with a stock first block not measured on this GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+        ],
+        "b": [
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: on, generic radial tables (explicit))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 308.72356289579085,
+          "potential_eV_atom": -693.8403744130003,
+          "kinetic_eV_atom": 0.03990559386533527
+        },
+        "b": {
+          "temperature_K": 336.6802245700397,
+          "potential_eV_atom": -693.8371964971741,
+          "kinetic_eV_atom": 0.0435192706969276
+        }
+      },
+      "load_after": [
+        1.06640625,
+        1.251953125,
+        1.26123046875
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 950,
+          "pipelined_redos": 65,
+          "pipelined_early_rebuilds": 885
+        },
+        "b": {
+          "rebuilds": 964,
+          "pipelined_redos": 59,
+          "pipelined_early_rebuilds": 905
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

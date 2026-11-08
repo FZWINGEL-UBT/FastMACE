@@ -227,10 +227,13 @@ def test_planner_resolution():
     # Owner decision 64: on for MH-1 in float32 plans that are not reproducible; off for every other model.
     assert plan_for("mh1-r2scan").rewrites.fused_folded_forward == "on"
     assert plan_for("mh1-omat").rewrites.fused_folded_forward == "on"
-    for label in ("polar1-s", "omol0-xl"):
+    for label in ("polar1-m", "omol0-xl"):  # POLAR-1-M: with wprime_backward on the RTX 4000 Ada only (polar-T01)
         plan = plan_for(label)
         assert plan.rewrites.fused_folded_forward == "off" and plan.rewrites.chunked_conv_backward == "on", label
         assert "not MH-1, decision 64" in dict(plan.auto_options_off)["fused_folded_forward"]
+    # POLAR-1-S: one, reassociated interaction, nothing for the fused forward to act on.
+    assert "no interaction after the reassociated first one" in dict(
+        plan_for("polar1-s").auto_options_off)["fused_folded_forward"]
     assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.fused_folded_forward == "off"
     assert plan_for("omol0-xl", rewrites=RewriteConfig(fused_folded_forward="on")).rewrites.fused_folded_forward == "on"
     plan = plan_for("mh1-r2scan", rewrites=RewriteConfig(fused_folded_forward="on"))

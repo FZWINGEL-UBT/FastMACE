@@ -1,0 +1,3 @@
+R=$B/runs/stack-s80-polar1-l-$SLURM_JOB_ID
+OUT=$R MODEL=polar1-l CKPT=MACE-POLAR-1-L.model STRUCTS="NaCl NbCl5" SETS_FILE=$B/sets/polar_stack.tsv BLOCK=400 BLOCKS=12 bash tools/offpolar_ab.sh
+cat $R/run.log

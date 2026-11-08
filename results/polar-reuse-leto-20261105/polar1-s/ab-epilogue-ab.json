@@ -1,0 +1,326 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-05T12:26:00.017916+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "1ff585fa",
+  "model": "polar1-s",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "sides": {
+    "a": {},
+    "b": {
+      "gate_epilogue": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 300,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    2.45361328125,
+    1.8984375,
+    2.1083984375
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 2.668700144859031,
+            "mean_ms": 2.6678391862515127,
+            "min_ms": 2.6607784553198144,
+            "max_ms": 2.6703600049950182,
+            "stdev_ms": 0.003081203814282731,
+            "spread": 0.0035903432964028213,
+            "block_ms": [
+              2.6607784553198144,
+              2.6668959500966594,
+              2.6687836600467563,
+              2.669367864727974,
+              2.6686166296713054,
+              2.6677239750279114,
+              2.670186950126663,
+              2.6703600049950182
+            ]
+          },
+          "b": {
+            "median_ms": 2.6645274023758247,
+            "mean_ms": 2.664229293659446,
+            "min_ms": 2.655687215155922,
+            "max_ms": 2.6688643998932093,
+            "stdev_ms": 0.0039615668922734345,
+            "spread": 0.004945411604901503,
+            "block_ms": [
+              2.655687215155922,
+              2.6633707247674465,
+              2.664382039802149,
+              2.6646727649495006,
+              2.6657675398746505,
+              2.663468520040624,
+              2.667621144792065,
+              2.6688643998932093
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9984364138881453,
+        "pair_ratios_b_over_a": [
+          0.9980865599111743,
+          0.9986781541555511,
+          0.9983507017408334,
+          0.9982411192400595,
+          0.9989323720144074,
+          0.9984048368470194,
+          0.9990390915008868,
+          0.9994399237934168
+        ]
+      },
+      "ratio_b_over_a": 0.9984364138881453,
+      "pair_ratios": [
+        0.9980865599111743,
+        0.9986781541555511,
+        0.9983507017408334,
+        0.9982411192400595,
+        0.9989323720144074,
+        0.9984048368470194,
+        0.9990390915008868,
+        0.9994399237934168
+      ],
+      "setup_s": {
+        "a": 30.10217399802059,
+        "b": 47.89344152796548
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.gate_epilogue = off  (auto (on_with_segment_gemm_for_mh1_on_decision_66_gpus): stage 1: on (with segment_gemm); stage 2: supported (ok); stage 2: off, not MH-1, decision 66 (label polar1-s))"
+        ],
+        "b": [
+          "RewriteConfig.gate_epilogue = on  (requested 'on': stage 1: on (with segment_gemm); stage 2: supported (ok))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 229.235155564939,
+          "potential_eV_atom": -8471.394323539633,
+          "kinetic_eV_atom": 0.02963092590609684
+        },
+        "b": {
+          "temperature_K": 229.23516363367852,
+          "potential_eV_atom": -8471.394323521607,
+          "kinetic_eV_atom": 0.029630926949061748
+        }
+      },
+      "load_after": [
+        1.3681640625,
+        1.67333984375,
+        2.0
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 60,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 60
+        },
+        "b": {
+          "rebuilds": 60,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 60
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 22.390085319930222,
+            "mean_ms": 22.4041522142943,
+            "min_ms": 22.03262060007546,
+            "max_ms": 23.04576572496444,
+            "stdev_ms": 0.31357410339511393,
+            "spread": 0.04524972149110758,
+            "block_ms": [
+              22.03262060007546,
+              22.137951014447026,
+              22.22840825037565,
+              23.04576572496444,
+              22.594325399841182,
+              22.380331674939953,
+              22.39983896492049,
+              22.413976084790193
+            ]
+          },
+          "b": {
+            "median_ms": 22.24513985478552,
+            "mean_ms": 22.28650090371957,
+            "min_ms": 21.952586935367435,
+            "max_ms": 22.934696454904042,
+            "stdev_ms": 0.3018290378928439,
+            "spread": 0.04414939739411569,
+            "block_ms": [
+              21.952586935367435,
+              22.061767095001414,
+              22.129008379997686,
+              22.934696454904042,
+              22.44893727474846,
+              22.22520725452341,
+              22.26507245504763,
+              22.274731380166486
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9935263549435571,
+        "pair_ratios_b_over_a": [
+          0.9963674922670002,
+          0.9965586734112883,
+          0.9955282506395263,
+          0.9951804912283699,
+          0.9935652814359421,
+          0.9930687166450602,
+          0.9939835946997694,
+          0.9937875946642865
+        ]
+      },
+      "ratio_b_over_a": 0.9935263549435571,
+      "pair_ratios": [
+        0.9963674922670002,
+        0.9965586734112883,
+        0.9955282506395263,
+        0.9951804912283699,
+        0.9935652814359421,
+        0.9930687166450602,
+        0.9939835946997694,
+        0.9937875946642865
+      ],
+      "setup_s": {
+        "a": 68.90772143099457,
+        "b": 56.621909162029624
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.gate_epilogue = off  (auto (on_with_segment_gemm_for_mh1_on_decision_66_gpus): stage 1: on (with segment_gemm); stage 2: supported (ok); stage 2: off, not MH-1, decision 66 (label polar1-s))"
+        ],
+        "b": [
+          "RewriteConfig.gate_epilogue = on  (requested 'on': stage 1: on (with segment_gemm); stage 2: supported (ok))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 257.93754537036006,
+          "potential_eV_atom": -10694.875870667733,
+          "kinetic_eV_atom": 0.033340995522410176
+        },
+        "b": {
+          "temperature_K": 257.9349847837441,
+          "potential_eV_atom": -10694.875866040977,
+          "kinetic_eV_atom": 0.033340664541099276
+        }
+      },
+      "load_after": [
+        1.31787109375,
+        1.7138671875,
+        1.96728515625
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 60,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 60
+        },
+        "b": {
+          "rebuilds": 60,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 60
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
