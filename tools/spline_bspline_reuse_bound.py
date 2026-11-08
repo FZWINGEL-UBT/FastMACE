@@ -48,7 +48,12 @@ def main(argv=None):
     p.add_argument("--resident", type=int, default=6)
     p.add_argument("--l1-slabs", type=int, nargs="*", default=[5, 10])
     args = p.parse_args(argv)
-    grid = [tuple(g) for g in json.loads(args.grid_from.read_text())["certify"]["grid"]]
+    source = json.loads(args.grid_from.read_text())
+    if "c2_refined" in source:  # tools/spline_c2_certificate.py: the C2 spline's refined grid
+        grid = [tuple(g) for g in source["c2_refined"][-1]["grid"]]
+    else:
+        grid = [tuple(g) for g in source["certify"]["grid"]]
+    print(f"grid: {sum(int(g[2]) for g in grid)} intervals from {args.grid_from}", flush=True)
     atoms, i, j, d = base.structure(args.sigma, args.seed)
     order_edges = np.lexsort((j, i))
     i, j, d = i[order_edges], j[order_edges], d[order_edges]

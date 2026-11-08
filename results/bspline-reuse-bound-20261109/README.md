@@ -46,3 +46,44 @@ Both have costs the model does not count:
 passes the bound stage. Its next step is the CPU falsifier the report names: a cubic B-spline fit on the production
 knots (or up to about 750) that must pass the radial certificate at ≤ 0.5. If it passes, the step after that is a
 5060 Ti kernel lab of the four-load forward against `tools/spline_table_bound.py`'s real and one-slab variants.
+
+## Certificate fit of the C2 spline (9 November 2026)
+
+**Question.** A cubic B-spline table holds a C2 cubic spline. Production's Hermite spline is only C1: it has exact
+values and exact slopes at each knot. The B-spline keeps the exact values but takes its interior slopes from C2
+continuity, so it is less accurate on the same knots. How many knots does it need to pass production's certificate?
+
+**Fit** ([`tools/spline_c2_certificate.py`](../../tools/spline_c2_certificate.py), CPU, WSL `fastmace_cpu`, OMAT-0
+medium, interaction 2, the 9 ordered SrTiO3 pairs; [`c2_certificate.json`](c2_certificate.json)). The C2 spline is
+the clamped interpolant of the exact knot values, with the exact end slopes. It is scored with production's own
+certificate (`spline._Scorer`), which passes at ≤ 1, with a per-band target of 0.5.
+
+| Spline | Intervals | Certificate | Worst part |
+| --- | ---: | ---: | --- |
+| Hermite (production fit) | 736 | 0.490 | |
+| C2 on production's grid | 736 | 0.635 | slope, whole domain; values 0.010 |
+| C2 refined by production's band rule | 838 | 0.522 | |
+| **C2 refined** | **851** | **0.471** | |
+
+On production's grid the C2 spline still certifies (0.635 ≤ 1), but it misses the per-band target of 0.5. To meet
+the target it needs 851 intervals, 16 % more knots. The values are 50× inside the limit. Only the slopes, which give
+the forces, bind.
+
+**The bound again at 851 intervals** ([`bspline_reuse_bound_c2grid.json`](bspline_reuse_bound_c2grid.json), L1 205 KB):
+
+| Receiver order | B-spline KB/edge (851 intervals) | Today's Hermite slabs (736) | Ratio |
+| --- | ---: | ---: | ---: |
+| species (BLOCK_ORDER), production | 2.37 | 6.06 | 0.391 |
+| species + Morton, SM-compact | 1.96 | 5.19 | 0.378 |
+
+The finer grid costs little reuse: the ratio goes from 0.373 to 0.391. The ceiling on the H200 forward's 170 µs table
+share is still about **(1 − 0.391) × 170 ≈ 104 µs** (3.0 % of the step), above the 68 µs bar.
+
+**Next.** This step only changes accuracy at the rounding and fit level, and the certificate passes. The next step
+is a kernel lab of the B-spline read path:
+
+- First on the local 5060 Ti against `tools/spline_table_bound.py`'s real and one-slab variants.
+- Then the H200 microbenchmark the conductor asked for.
+
+The open costs are four load instructions per weight instead of one float4, and the B-spline basis weights at
+non-uniform band edges. Then comes the 3× float32 force/stress gate (it is a rounding-class change) before any MD A/B.
