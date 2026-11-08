@@ -213,6 +213,14 @@ STAGE_SH = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9955 / 0.9950 (ab / ba), with STAGE_EDGES 0.9819 / 0.9811;
 # forces and energy within the build's spread; bitwise, faster in both orders (decision 66).
 STAGE_SH_GPUS = GPUModels(("NVIDIA H200",))
+# STAGE_EDGES (w'; Codex H200 round-6 report, 8 November 2026; bitwise): with STAGE_DOUT, STAGE_SH and SPLINE_W,
+# the block's chunk of edges is staged once at block entry: the features of all its edges (one coalesced float4 copy
+# by the whole block), and per edge (warp 0, a lane per edge) sender, receiver, spline interval, t, 1 / h and the
+# inside / sloped flags. The receiver runs and every edge body then read them from shared memory instead of a
+# dependent chain of global loads and the band compares per edge. The same values in the same arithmetic. None: on
+# for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
+STAGE_EDGES = None
+STAGE_EDGES_GPUS = GPUModels(())
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
@@ -298,12 +306,63 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     __shared__ __align__(16) scalar_t stage_row[{{ stage_total }}];
     const int64_t stage_c0 = int64_t(blockIdx.x) * {{ stage_chunk }};
     const int64_t stage_c1 = stage_c0 + {{ stage_chunk }} < edge_count ? stage_c0 + {{ stage_chunk }} : edge_count;
+    {%- if stage_edges %}
+    // STAGE_EDGES: the chunk's edge features (the whole block, float4 where aligned) and per edge (warp 0, a lane per
+    // edge) sender, receiver, spline interval, t, 1 / h and the inside / sloped flags, once per block.
+    __shared__ __align__(16) scalar_t stage_esh[{{ stage_chunk }}][EDGE_DIM];
+    __shared__ int32_t stage_snd[{{ stage_chunk }}], stage_rcv[{{ stage_chunk }}], stage_slab[{{ stage_chunk }}];
+    __shared__ float stage_t[{{ stage_chunk }}], stage_sx[{{ stage_chunk }}];
+    __shared__ unsigned stage_flag[{{ stage_chunk }}];
+    const int stage_n = int(stage_c1 - stage_c0);
+    {
+        const scalar_t* src = sh + stage_c0 * EDGE_DIM;
+        scalar_t* dst = &stage_esh[0][0];
+        if (EDGE_DIM % 4 == 0 && (reinterpret_cast<unsigned long long>(src) & 15) == 0) {
+            for (int i = threadIdx.x; i < stage_n * (EDGE_DIM / 4); i += blockDim.x)
+                reinterpret_cast<float4*>(dst)[i] = __ldg(reinterpret_cast<const float4*>(src) + i);
+        } else {
+            for (int i = threadIdx.x; i < stage_n * EDGE_DIM; i += blockDim.x) dst[i] = __ldg(src + i);
+        }
+    }
+    if (threadIdx.x < {{ stage_chunk }}) {
+        const int k = threadIdx.x;
+        int32_t snd_k = -1, rcv_k = -1, slab_k = 0;
+        float t_k = 0.f, sx_k = 0.f;
+        unsigned flag_k = 0u;
+        if (k < stage_n) {
+            const int64_t e = stage_c0 + k;
+            snd_k = senders[e];
+            rcv_k = receivers[e];
+            const scalar_t r = lengths[e];
+            const scalar_t clamped = r > r_lo ? r : r_lo;
+{{ spline }}
+            t_k = t;
+            sx_k = sx_inv;
+            slab_k = int32_t(int64_t(pairs[e]) * pieces + iv);
+            flag_k = (r < r_max ? 1u : 0u) | (r < r_max && r >= r_lo ? 2u : 0u);
+        }
+        stage_snd[k] = snd_k;
+        stage_rcv[k] = rcv_k;
+        stage_slab[k] = slab_k;
+        stage_t[k] = t_k;
+        stage_sx[k] = sx_k;
+        stage_flag[k] = flag_k;
+    }
+    __syncthreads();
+    {%- endif %}
     for (int64_t stage_s = stage_c0; stage_s < stage_c1;) {
     int64_t stage_t1 = stage_c1;
     {
+        {%- if stage_edges %}
+        const int32_t stage_r = stage_rcv[stage_s - stage_c0];
+        const int64_t stage_i = stage_s + 1 + lane;
+        const unsigned stage_b = __ballot_sync(FULL_MASK,
+                                               stage_i < stage_c1 && stage_rcv[stage_i - stage_c0] != stage_r);
+        {%- else %}
         const int32_t stage_r = receivers[stage_s];
         const int64_t stage_i = stage_s + 1 + lane;
         const unsigned stage_b = __ballot_sync(FULL_MASK, stage_i < stage_c1 && receivers[stage_i] != stage_r);
+        {%- endif %}
         if (stage_b) stage_t1 = stage_s + __ffs(stage_b);
         if (stage_r >= 0 && stage_r < node_count) {
             {%- if stage_quads %}
@@ -347,8 +406,15 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     if (e >= edge_count) return;
 {%- endif %}
 
+    {%- if stage_edges %}
+    // STAGE_EDGES: the edge's staged sender, receiver, features and spline interval.
+    const int stage_k = int(e - stage_c0);
+    const int32_t sender = stage_snd[stage_k];
+    const int32_t receiver = stage_rcv[stage_k];
+    {%- else %}
     const int32_t sender = senders[e];
     const int32_t receiver = receivers[e];
+    {%- endif %}
     if (sender < 0 || sender >= node_count
         || receiver < 0 || receiver >= node_count) {
         // An edge with an out-of-range index contributes nothing: its dsh row and dr are written as zeros (the
@@ -362,7 +428,9 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;
     const int64_t edge_base = e * EDGE_DIM;
     const int64_t weight_base = e * WEIGHT_DIM;
-    {%- if stage_sh %}
+    {%- if stage_edges %}
+    const scalar_t* sh_edge = stage_esh[stage_k];
+    {%- elif stage_sh %}
     // STAGE_SH: the edge's features in shared memory once per edge; the channel passes read them from there.
     __shared__ __align__(16) scalar_t stage_sh[{{ stage_sh }}][EDGE_DIM];
     __syncwarp();  // the previous edge's reads are done
@@ -372,10 +440,18 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     {%- endif %}
 
     // The radial tables' piece of r and its Chebyshev argument; no slope at or beyond the cutoff, below r_lo.
+    {%- if stage_edges %}
+    const unsigned stage_f = stage_flag[stage_k];
+    const bool sloped = (stage_f & 2u) != 0u;
+    const float t = stage_t[stage_k], sx_inv = stage_sx[stage_k];
+    __syncwarp();  // the warp is converged for the end-of-edge reduction
+    {%- else %}
     const scalar_t r = lengths[e];
     const bool sloped = r < r_max && r >= r_lo;
     const scalar_t clamped = r > r_lo ? r : r_lo;
-    {%- if spline and shared_locator %}
+    {%- endif %}
+    {%- if stage_edges %}
+    {%- elif spline and shared_locator %}
     // SHARED_LOCATOR: the slab, t and 1 / h from spline_locator's record (passed as bins), the same lookup.
     const int4 loc = __ldg(reinterpret_cast<const int4*>(bins) + e);
     const float t = __int_as_float(loc.y), sx_inv = __int_as_float(loc.z);
@@ -392,7 +468,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const scalar_t* g = gprime + {{ slab }} * PADDED_TERMS * WEIGHT_DIM;
     {%- if horner %}
     // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
-    const bool inside = r < r_max;
+    const bool inside = {{ "(stage_f & 1u) != 0u" if stage_edges else "r < r_max" }};
     const scalar_t sc = {{ "sx_inv" if spline else "scales[piece]" }};
     {%- if estrin %}
     // ESTRIN: the powers of t shared by every weight of the edge.
@@ -746,7 +822,7 @@ def factored_paths(schedule, scale=False):
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
            table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
-           stage_quads=False, shared_locator=False, stage_sh=0):
+           stage_quads=False, shared_locator=False, stage_sh=0, stage_edges=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -766,7 +842,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     ``stage_quads`` (``STAGE_QUADS``; with ``stage_dout`` and ``blocks``): the staged row as component quartets.
     ``shared_locator`` (``spline_forward.SHARED_LOCATOR``; with ``spline``): the slab, t and 1 / h read from
     ``spline_locator``'s per-edge int4 record, passed in the ``bins`` argument. ``stage_sh`` (``STAGE_SH``; float32,
-    32-lane cohorts): the block's cohort count; each cohort copies its edge's features to shared memory once."""
+    32-lane cohorts): the block's cohort count; each cohort copies its edge's features to shared memory once.
+    ``stage_edges`` (``STAGE_EDGES``; with ``stage_dout``, ``stage_sh`` and ``spline``, not ``shared_locator``): the
+    block's chunk of edges staged once at block entry (features, sender, receiver, spline interval)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -810,6 +888,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("shared_locator reads the spline locator's records: it needs spline")
     if stage_sh and (scalar != "float" or schedule.launch_config.logical_cohort_width != 32):
         raise ValueError("stage_sh synchronises a warp per edge: it needs float32 and 32-lane cohorts")
+    if stage_edges and not (stage_dout and stage_sh and spline is not None and not shared_locator):
+        raise ValueError("stage_edges stages STAGE_DOUT's chunk for SPLINE_W: it needs stage_dout, stage_sh and "
+                         "spline, without shared_locator")
     stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
     quads, quad_of = (None, None)
     if stage_quads:
@@ -833,7 +914,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1,
                                             spline=None if spline is None else _spline_lookup(spline, scalar),
                                             shared_locator=bool(shared_locator), stage_sh=int(stage_sh),
+                                            stage_edges=bool(stage_edges),
                                             slab="int64_t(loc.x)" if shared_locator
+                                            else "int64_t(stage_slab[stage_k])" if stage_edges
                                             else "(int64_t(pairs[e]) * pieces + piece)")
 
 
@@ -1042,6 +1125,8 @@ class WPrimeBackward:
         self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
+        self.stage_edges = (self.stage_dout and bool(self.stage_sh) and self.spline is not None
+                            and not self.shared_locator and stage_edges_default(device))
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
@@ -1049,7 +1134,7 @@ class WPrimeBackward:
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
-                             stage_sh=self.stage_sh)
+                             stage_sh=self.stage_sh, stage_edges=self.stage_edges)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1475,6 +1560,11 @@ def stage_sh_default(device):
     return bool(STAGE_SH) if STAGE_SH is not None else _device_name(device) in STAGE_SH_GPUS
 
 
+def stage_edges_default(device):
+    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
+    return bool(STAGE_EDGES) if STAGE_EDGES is not None else _device_name(device) in STAGE_EDGES_GPUS
+
+
 def stage_quads_default(device):
     """``STAGE_QUADS`` on ``device``: the constant when set, else on for ``STAGE_QUADS_GPUS``."""
     return bool(STAGE_QUADS) if STAGE_QUADS is not None else _device_name(device) in STAGE_QUADS_GPUS
@@ -1678,7 +1768,8 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
-           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS",
+           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS", "STAGE_EDGES",
+           "STAGE_EDGES_GPUS", "stage_edges_default",
            "stage_quad_layout", "stage_quads_default", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",
            "streaming_conv_wprime_backward_recompute", "scalar_paths_default", "table_w_default", "value_table",

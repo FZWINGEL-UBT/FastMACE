@@ -77,6 +77,10 @@ def main(argv=None) -> int:
                              wprime_stage_quads=getattr(obj.spline_block[2], "stage_quads", None)
                              if obj.spline_block else None,
                              wprime_stage_sh=getattr(obj.spline_block[2], "stage_sh", None)
+                             if obj.spline_block else None,
+                             wprime_stage_edges=getattr(obj.spline_block[2], "stage_edges", None)
+                             if obj.spline_block else None,
+                             forward_prefetch=getattr(obj.spline_block[1], "prefetch", None)
                              if obj.spline_block else None))
             if args.sources and obj.spline_block:
                 args.sources.mkdir(parents=True, exist_ok=True)
@@ -86,10 +90,11 @@ def main(argv=None) -> int:
     used = any(r["in_use"] for r in rows)
     from fastmace.rewrites.mh1.modules import FirstInteractionReassociation
 
-    composed = [getattr(obj, "compose_skip", None) is not None for obj in gc.get_objects()
-                if issubclass(type(obj), FirstInteractionReassociation)]
+    reassociations = [obj for obj in gc.get_objects() if issubclass(type(obj), FirstInteractionReassociation)]
+    composed = [getattr(obj, "compose_skip", None) is not None for obj in reassociations]
+    joined = [bool(getattr(obj, "joined_layout", False)) for obj in reassociations]
     record = dict(constants=args.constant, structure=args.structure, wprime=rows, spline_in_use=used,
-                  compose_skip=composed, compose_skip_in_use=any(composed))
+                  compose_skip=composed, compose_skip_in_use=any(composed), joined_layout_in_use=any(joined))
     if args.compare_constant is not None:  # forces of this build against a build with the other constants
         import torch
 

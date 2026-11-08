@@ -44,6 +44,13 @@ COUNT_PLAN = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108, round 3): MD step b/a 0.9831 / 0.9818 against the
 # H200 defaults of round 2 (ab / ba); bitwise (the same order), faster in both orders (decision 66).
 COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200",))
+# JOINED_LAYOUT (Codex H200 round-6 report, 8 November 2026; bitwise): with COMPOSE_FAST the tabled outer sum writes
+# the per-slot sums d-major (its ``inner`` layout with the slots of a receiver as one group), so each path's input is
+# a row group of one [atoms * 16, slots * K] matrix: ``species_gemm.species_mm_rows`` reads it in place (no per-path
+# transpose copy) and its gradient comes back in the same layout for the outer sum's backward (no repack). The same
+# products and sums. None: on for JOINED_LAYOUT_GPUS; True / False: an A/B side's choice.
+JOINED_LAYOUT = None
+JOINED_LAYOUT_GPUS = GPUModels(())
 
 
 def compose_fast_default(name=None) -> bool:
@@ -51,6 +58,14 @@ def compose_fast_default(name=None) -> bool:
     on = COMPOSE_FAST
     if on is None:
         on = name in COMPOSE_FAST_GPUS
+    return bool(on)
+
+
+def joined_layout_default(name=None) -> bool:
+    """``JOINED_LAYOUT`` (None: ``name`` in ``JOINED_LAYOUT_GPUS``)."""
+    on = JOINED_LAYOUT
+    if on is None:
+        on = name in JOINED_LAYOUT_GPUS
     return bool(on)
 
 
@@ -79,5 +94,6 @@ def composed(right, ws, linear=None):
     return c.contiguous(), c.transpose(1, 2).contiguous()
 
 
-__all__ = ["COMPOSE_FAST", "COMPOSE_FAST_GPUS", "COMPOSE_SKIP", "COMPOSE_SKIP_GPUS", "COUNT_PLAN", "COUNT_PLAN_GPUS",
+__all__ = ["COMPOSE_FAST", "COMPOSE_FAST_GPUS", "COMPOSE_SKIP", "COMPOSE_SKIP_GPUS", "COUNT_PLAN", "COUNT_PLAN_GPUS", "JOINED_LAYOUT",
+           "JOINED_LAYOUT_GPUS", "joined_layout_default",
            "compose_fast_default", "compose_skip_default", "composed", "count_plan_default"]

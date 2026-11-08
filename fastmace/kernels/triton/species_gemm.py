@@ -495,5 +495,120 @@ def _joined_backward(ctx, grad):
 species_mm_joined.register_autograd(_joined_backward, setup_context=_joined_setup)
 
 
+def _rows_cutlass(x, ws, out):
+    """Whether ``species_mm_rows`` fits the CUTLASS launch (one contiguous row base, rows ``K`` floats apart)."""
+    from fastmace.kernels.cutlass import tf32x3
+    if out.shape[-1] % 4 or out.data_ptr() % 16 or not out.is_contiguous():
+        return False
+    if not x.is_contiguous() or x.shape[1] % 4 or x.data_ptr() % 16:
+        return False
+    if any(not w.is_contiguous() or w.data_ptr() % 16 for w in ws):
+        return False
+    return tf32x3.available(out.device, family=CUTLASS_FAMILY)
+
+
+def _rows_views(x, sizes):
+    """Path p's ``[atoms, size_p, K]`` view of ``species_mm_rows``' row base ``x [atoms * sum(sizes), K]``."""
+    total = sum(sizes)
+    rows = x.view(-1, total, x.shape[1])
+    views, offset = [], 0
+    for size in sizes:
+        views.append(rows[:, offset:offset + size])
+        offset += size
+    return views
+
+
+@torch.library.custom_op("fastmace::species_mm_rows", mutates_args=())
+def species_mm_rows(x: torch.Tensor, sizes: list[int], ws: list[torch.Tensor], w_ts: list[torch.Tensor],
+                    index: torch.Tensor, order: torch.Tensor, counts: torch.Tensor, rows: list[torch.Tensor],
+                    precision: str) -> torch.Tensor:
+    """``species_mm_joined`` of paths that are row groups of one input: ``x [atoms * R, K]`` (R = sum of
+    ``sizes``) holds atom a's path-p rows at ``a R + offset_p + j``, the layout of the joined output, so ``rows``
+    (``joined_rows``' scatters) index the input and the output alike (``compose_skip.JOINED_LAYOUT``: the first
+    interaction's per-slot sums in the d-major ``inner`` layout). No per-path copy of the input; the gradient is one
+    ``[atoms * R, K]`` tensor. Each output row is the same product as ``species_mm``'s (bitwise)."""
+    total = sum(sizes)
+    atoms, n = x.shape[0] // total, ws[0].shape[2]
+    if x.device.type != "cuda" or x.dtype != torch.float32:
+        return torch.cat([_reference(v, w, index) for v, w in zip(_rows_views(x, sizes), ws)], dim=1)
+    out = x.new_empty((atoms, total, n))
+    if not out.numel():
+        return out
+    if precision == "tf32x3-cutlass" and _rows_cutlass(x, ws, out):
+        from fastmace.kernels.cutlass import tf32x3
+        for w, row, size in zip(ws, rows, sizes):
+            tf32x3.species_into(x, x.shape[1], row, w, out, row, counts, size, tiles(atoms, size, counts.shape[0]))
+        return out
+    offset = 0
+    for v, w, size in zip(_rows_views(x, sizes), ws, sizes):
+        block = x.new_empty((atoms, size, n))
+        _launch(v.contiguous(), w, order, counts, block, precision)
+        out[:, offset:offset + size] = block
+        offset += size
+    return out
+
+
+@species_mm_rows.register_fake
+def _(x, sizes, ws, w_ts, index, order, counts, rows, precision):
+    return x.new_empty((x.shape[0] // sum(sizes), sum(sizes), ws[0].shape[2]))
+
+
+@torch.library.custom_op("fastmace::species_mm_rows_grad", mutates_args=())
+def species_mm_rows_grad(grad: torch.Tensor, sizes: list[int], w_ts: list[torch.Tensor], index: torch.Tensor,
+                         order: torch.Tensor, counts: torch.Tensor, rows: list[torch.Tensor],
+                         precision: str) -> torch.Tensor:
+    """The input gradient of ``species_mm_rows``: ``[atoms * R, K]``, path p's rows ``grad[rows of p] @
+    w_t[species]`` written in place (CUTLASS: the same ``rows`` index both sides)."""
+    total = sum(sizes)
+    atoms, k = grad.shape[0], w_ts[0].shape[2]
+    if grad.device.type != "cuda" or grad.dtype != torch.float32:
+        out, offset = [], 0
+        for size, w_t in zip(sizes, w_ts):
+            out.append(_reference(grad[:, offset:offset + size], w_t, index))
+            offset += size
+        return torch.cat(out, dim=1).reshape(atoms * total, k)
+    gx = grad.new_empty((atoms * total, k))
+    if not grad.numel():
+        return gx
+    if precision == "tf32x3-cutlass" and grad.is_contiguous() and _rows_cutlass(gx, w_ts, grad.view(-1, grad.shape[2])):
+        from fastmace.kernels.cutlass import tf32x3
+        for w_t, row, size in zip(w_ts, rows, sizes):
+            tf32x3.species_into(grad, grad.shape[2], row, w_t, gx, row, counts, size,
+                                tiles(atoms, size, counts.shape[0]))
+        return gx
+    views, offset = _rows_views(gx, sizes), 0
+    for v, w_t, size in zip(views, w_ts, sizes):
+        block = grad.new_empty((atoms, size, k))
+        _launch(grad[:, offset:offset + size].contiguous(), w_t, order, counts, block, precision)
+        v.copy_(block)
+        offset += size
+    return gx
+
+
+@species_mm_rows_grad.register_fake
+def _(grad, sizes, w_ts, index, order, counts, rows, precision):
+    return grad.new_empty((grad.shape[0] * sum(sizes), w_ts[0].shape[2]))
+
+
+def _rows_setup(ctx, inputs, output):
+    x, sizes, ws, w_ts, index, order, counts, rows, precision = inputs
+    ctx.sizes, ctx.paths, ctx.precision = list(sizes), len(ws), precision
+    ctx.save_for_backward(*w_ts, index, order, counts, *rows)
+
+
+def _rows_backward(ctx, grad):
+    p = ctx.paths
+    saved = ctx.saved_tensors
+    w_ts, (index, order, counts), rows = list(saved[:p]), saved[p:p + 3], list(saved[p + 3:])
+    gx = None
+    if ctx.needs_input_grad[0]:
+        gx = species_mm_rows_grad(grad.contiguous(), ctx.sizes, w_ts, index, order, counts, rows, ctx.precision)
+    nothing = [None] * p
+    return gx, None, list(nothing), list(nothing), None, None, None, list(nothing), None
+
+
+species_mm_rows.register_autograd(_rows_backward, setup_context=_rows_setup)
+
+
 __all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "CUTLASS", "TENSOR_CORES", "joined_rows", "species_mm",
-           "species_mm_joined", "species_plan", "tc_supported", "tile_rows", "tiles"]
+           "species_mm_joined", "species_mm_rows", "species_plan", "tc_supported", "tile_rows", "tiles"]
