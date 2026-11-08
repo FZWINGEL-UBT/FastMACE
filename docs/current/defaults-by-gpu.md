@@ -193,6 +193,23 @@ Both pass that test, so both stay on:
 `LANE_INDICES` (idea 15a, bitwise) joined the H200 set on 6 November 2026: MD step 0.9897 / 0.9913 (b = on)
 ([ledger: ideas-r3](../optimisation-ledger.md#ideas-r3)).
 
+### OMAT-0 small (`omat0-small`, 8 November 2026)
+
+OMAT-0 small has had a label since 8 November 2026 (`labels.EXTRA_LABELS`: in the table, recognised by SHA-256, but
+not one of the 19 acceptance labels). It runs medium's per-GPU switches as they are.
+
+Of medium's two label-keyed decision 66 defaults, small has its own GPU list. 3×TF32 GEMMs are in
+`DECISION_66_TF32X3_MODEL_GPUS`, and the generic w′ backward with its fused forward is in
+`DECISION_66_GENERIC_WPRIME_LABEL_GPUS`. Both lists hold the **NVIDIA H200 only**.
+
+| Measurement (H200, Benchmark_loup, b = without the pair) | Result |
+| --- | --- |
+| MD step b/a, ab / ba | 2.360 / 2.370 (5.41 → 2.29 ms per step) |
+| Force/stress gate (3× rule), worst ratio | force 1.01 (NbCl5), stress 1.22 (NbCl5) |
+
+On the A100 family and the other GPUs, small keeps the pair off until it has its own A/B there. Source:
+[h200-omat0-small](../../results/h200-omat0-small-20261108/README.md).
+
 ### Tiled (capacity) mode
 
 | Switch | 5060 Ti | Ada | A100 | Evidence | Report |

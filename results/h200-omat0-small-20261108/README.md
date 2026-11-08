@@ -69,8 +69,37 @@ at 2.2–3.1 ms, and `tools/step_breakdown.py` gave 2.3 ms. The settings were id
   result (`diag/run.log`) compared two plans that both had the pair off. The order-ba pack ratios (0.9975–1.0010)
   compared each switch on the pair-off plan.
 
+## The label `omat0-small` and its H200 defaults (`979785a7`, `a229d577`)
+
+OMAT-0 small is now in the label table as `omat0-small` (checkpoint `small-omat-0`, head `omat_pbe`, ASL, PBE). It is
+recognised by its SHA-256, as medium is, and listed in `labels.EXTRA_LABELS`: it is in the table but not one of the 19
+acceptance labels of SPEC §12.5. Decision 66 gives it medium's pair **on the H200 only**:
+
+- `DECISION_66_TF32X3_MODEL_GPUS["omat0-small"]` holds the 3×TF32 GEMMs.
+- The new `DECISION_66_GENERIC_WPRIME_LABEL_GPUS["omat0-small"]` holds the generic w′ backward, with the fused forward
+  and the chunked carrier.
+- On every other GPU the pair stays off for small until that GPU has its own A/B (the A100: Alex, packed).
+- The readout-tail fold stays on, as for every model on the H200. Turning it off makes small slower (1.0131 / 1.0173,
+  the `notail` row above), so it is not excluded per model. `979785a7` briefly excluded it on a misread of that row,
+  and `a229d577` restored it.
+
+Gate (`gate/`, `tools/modal/omat0_small_gate.sh`, the plan's defaults, no constants): the 3× force/stress gate
+passes on all three structures. Each figure is the ratio to the float32 calculator's error, against a limit of 3.
+
+| | SrTiO3 3×3×3 | NaCl | NbCl5 |
+| --- | ---: | ---: | ---: |
+| Force | 0.97 | 0.99 | 1.01 |
+| Stress | 0.50 | 1.20 | 1.22 |
+| Energy | 5.30 (1.4 meV, under the 10 meV floor) | 0.37 | 1.22 |
+
+With these defaults and no constants, the step breakdown gives Benchmark_loup **2.29 ms per step**, with the force
+graph at 2.20 ms per replay. That matches the A/B's 2.29 ms.
+
+The first gate run (`gate-tailoff/`, the tail fold off) also passed, with a worst force ratio of 1.00 and stress of
+1.39. Its breakdown was 2.34 ms per step (kernel time 2.07 against 2.03 ms per force call with the fold on).
+
+Modal `sixth`: $0.76 for the fixed A/B, then $0.62 and $0.38 for the two gate runs.
+
 ## Not done
 
-- OMAT-0 small has no FastMACE label, so a plain run (`fastmace` without the forced label tuples) gets the 5.4 ms
-  plan on the H200. Giving small the medium defaults by label or SHA-256 is a planner decision (decision 66) and is
-  left open.
+- The A100 family: small keeps the pair off there until an Alex A/B (packed) measures it.
