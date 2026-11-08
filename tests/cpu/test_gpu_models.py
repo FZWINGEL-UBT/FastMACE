@@ -322,6 +322,10 @@ def test_h200_defaults():
     a100 = ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
     assert all(g in spline_forward.SPLINE_W_GPUS and g in spline_forward.R128_GPUS for g in a100)
     assert all(g in spline_forward.STAGE_EDGES_GPUS and g in wprime_backward.STAGE_SH_GPUS for g in a100)
+    # round 6 on the A100 (Alex pack6, 8 November 2026): JOINED_LAYOUT, w' STAGE_EDGES and PREFETCH_AHEAD on
+    from fastmace.kernels.triton import compose_skip
+    assert all(g in compose_skip.JOINED_LAYOUT_GPUS and g in wprime_backward.STAGE_EDGES_GPUS
+               and g in spline_forward.PREFETCH_AHEAD_GPUS for g in a100)
     assert spline_forward.PARTS is False
     assert spline_forward.MIN_BLOCKS is None  # R128's cap stays 6; cap 5 0.9925 / 0.9937, not combined with vec4
     # SPLINE_VECTOR (7 November 2026): the spline w' table as one float4 per weight, MD H200 0.9739 / 0.9793

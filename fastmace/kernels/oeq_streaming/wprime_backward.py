@@ -231,7 +231,10 @@ STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
 STAGE_EDGES = None
 # NVIDIA H200 (8 November 2026, round 6): MD step b/a 0.9969 / 1.0010, a tie: off.
-STAGE_EDGES_GPUS = GPUModels(())
+# A100 family (8 November 2026, results/h200-fastpath-20261108/round6-a100, NHR Alex A100-SXM4-80GB job 4963944;
+# OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9643 / 0.9853;
+# all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS

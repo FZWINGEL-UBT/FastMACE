@@ -69,7 +69,10 @@ JOINED_LAYOUT = None
 # defaults (OMAT-0 medium, SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's spread.
 # NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set
 # 1.0006 / 0.9986, a tie: off.
-JOINED_LAYOUT_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/h200-fastpath-20261108/round6-a100, NHR Alex A100-SXM4-80GB job 4963944;
+# OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9782 / 0.9784;
+# all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
+JOINED_LAYOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 def compose_fast_default(name=None) -> bool:

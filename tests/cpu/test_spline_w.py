@@ -375,7 +375,9 @@ def test_stage_sh_reads_the_edge_features_from_shared_memory():
 
 
 def test_wprime_stage_edges_is_off_without_a_listed_gpu():
-    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == []
+    # on for the A100 family (Alex pack6, 8 November 2026: 0.9643 / 0.9853), off on the H200 (0.9969 / 1.0010)
+    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == ["NVIDIA A100-SXM4-80GB"]
+    assert "NVIDIA A100 80GB PCIe" in wp.STAGE_EDGES_GPUS and "NVIDIA H200" not in wp.STAGE_EDGES_GPUS
     assert wp.stage_edges_default("cpu") is False
 
 
@@ -410,7 +412,9 @@ def test_wprime_stage_edges_source_compiles_with_nvrtc():
 def test_prefetch_ahead_hints_the_staged_rows_and_keeps_the_arithmetic():
     """PREFETCH_AHEAD: with STAGE_EDGES the loop hints edge k + 2's first rows into L1 from the staged slab offsets;
     off by default, and the loads and FMAs are those of STAGE_EDGES alone."""
-    assert sf.PREFETCH_AHEAD is None and list(sf.PREFETCH_AHEAD_GPUS) == [] and sf.prefetch_ahead_default("cpu") == 0
+    assert sf.PREFETCH_AHEAD is None and sf.prefetch_ahead_default("cpu") == 0
+    # on for the A100 family (Alex pack6: 0.9810 / 0.9943), off on the H200 (1.0046 / 1.0067)
+    assert list(sf.PREFETCH_AHEAD_GPUS) == ["NVIDIA A100-SXM4-80GB"] and "NVIDIA H200" not in sf.PREFETCH_AHEAD_GPUS
     blocks = [(1, [0]), (3, [64])]
     staged = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True)
     hinted = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True, prefetch=2)
