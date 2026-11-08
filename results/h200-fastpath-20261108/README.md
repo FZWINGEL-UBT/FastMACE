@@ -69,7 +69,30 @@ species plan as an int64 radix sort of 5,000 atoms per force call: 8 onesweep pa
 Breakdown of the round-2 defaults ([round3/breakdown/](round3/breakdown/ops.csv)): 3.44 ms of kernel time per force
 call (3.51 before STAGE_EDGES / STAGE_SH); w′ 1,091 µs, spline forward 808 µs (860 before STAGE_EDGES).
 
+## Round 4 (`tools/modal/fastpath4_job.sh`, source `978dbef5`, [round4/](round4/run.log))
+
+a = the H200 defaults on main `65923679` (rounds 1-3 adopted; 3.65 ms per MD step). Two existing w′ switches never
+measured on the H200:
+
+| Switch | What | MD step b/a (ab / ba) | Check | Decision |
+| --- | --- | --- | --- | --- |
+| `wprime_backward.BLOCK_LDG` | the block kernel's gradient read through `__ldg` | 1.0012 / 1.0001 | forces 2.9e-6 against same-build 2.7e-6 eV/Å (bitwise) | tie: closed, stays off |
+| `wprime_backward.REDUX` | end-of-edge reduction in fixed point with `redux.sync` (deterministic, rounding) | 1.0206 / 1.0202 | gate run ([round4/gate-redux/](round4/gate-redux/)) | slower: closed, stays off |
+
+Breakdown of the main defaults ([round4/breakdown/](round4/breakdown/ops.csv)): 3.40 ms of kernel time per force
+call; w′ 1,099 µs, spline forward 806 µs, tabled outer-sum backward 214 µs, the 3×TF32 GEMMs (18 launches) about
+515 µs at 18 % occupancy; the species plan's radix sort is gone (COUNT_PLAN).
+
+## Round 5 (`tools/modal/fastpath5_job.sh`, source `32dff94a`, [round5/](round5/run.log))
+
+| Switch | What | MD step b/a (ab / ba) | Check | Decision |
+| --- | --- | --- | --- | --- |
+| `cutlass.tf32x3.TILE` = `"32x64"` | two-warp output tile, twice the blocks (632 instead of 316 per product on 132 SMs) | 1.0023 / 1.0030 | forces 3.0e-6 against same-build 2.8e-6 eV/Å (bitwise) | slower: closed |
+| `TILE` = `"64x32"` | | 1.0014 / 1.0035 | 2.7e-6 against 2.6e-6 | slower: closed |
+
+As on the A100 (1.4-1.7 % slower there), the 64x64 tile stays.
+
 ## Total
 
 MD step on the H200, OMAT-0 medium SrTiO3 10x10x10: 4.018 ms (main `909bc8cd` H200 defaults, round 1's a side) →
-3.816 (round 1) → 3.704 (round 2) → about 3.65 ms (round 3): about −9 %.
+3.816 (round 1) → 3.704 (round 2) → about 3.65 ms (round 3): about −9 %. Rounds 4 and 5 found nothing more among the existing switches.
