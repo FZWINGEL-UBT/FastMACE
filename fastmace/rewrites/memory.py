@@ -152,6 +152,15 @@ def generic_recompute_conv_weights(dims, width):
     return -weights * width, 0
 
 
+def generic_wprime_backward(dims, width):
+    """generic_wprime_backward with generic_fused_folded_forward: the folded forward builds the per-edge weights on
+    chip and the w' backward builds them again from the tables, so no per-edge weights are stored, the same as
+    ``generic_recompute_conv_weights`` (whose term ``planner.memory.CONTEXT_TERMS`` drops while this one is on). The
+    measured peak at SrTiO3 34,295 atoms (RTX 5060 Ti, 2.66 M edges) is 3.54 GiB, where the stored weights alone
+    would be 13.6 GB (results/omat0-ada-capacity-20261108)."""
+    return generic_recompute_conv_weights(dims, width)
+
+
 def chunked_conv_backward(dims, width):
     """The chunked convolution backward keeps no per-edge weight gradient of the whole edge set (measured)."""
     return -round(_CHUNKED_BACKWARD_SHARE * _stock_edge_floats(dims)) * width, 0

@@ -92,7 +92,24 @@ call; w′ 1,099 µs, spline forward 806 µs, tabled outer-sum backward 214 µs,
 
 As on the A100 (1.4-1.7 % slower there), the 64x64 tile stays.
 
+## Round 6 (`tools/modal/fastpath6_job.sh`, source `3c1b2b09`, [round6/](round6/run.log))
+
+Codex round-6 reports (8 November): the three items found feasible, each bitwise by construction, against the H200
+defaults (about 3.71 ms per step in this job). Each `tools/spline_w_check.py` record shows the switch in use and forces
+within the build's own spread (2.6–2.9e-6 against 2.4–2.7e-6 eV/Å).
+
+| Switch | What | MD step b/a (ab / ba) | Decision |
+| --- | --- | --- | --- |
+| `compose_skip.JOINED_LAYOUT` | the first interaction's sums written d-major (`tabled_outer_sum` `inner` = slots), so COMPOSE_FAST's four paths are row groups of one matrix: `species_gemm.species_mm_rows` reads them in place and returns one gradient tensor (no per-path transposes, no repack) | **0.9805 / 0.9815** (3.718 → 3.646 ms) | adopted on the H200 |
+| `wprime_backward.STAGE_EDGES` | the w′ block stages its STAGE_DOUT chunk's edges (features, sender, receiver, spline interval and flags) once | 0.9969 / 1.0010 | a tie: off |
+| `spline_forward.PREFETCH_AHEAD` = 2 | the forward hints edge k + 2's first four table rows into L1 from STAGE_EDGES' staged offsets | 1.0046 / 1.0067 | slower: off |
+| all three | | 0.9834 / 0.9849 | |
+
+Step breakdown with all three (`round6/breakdown/`): edge elementwise kernels 2.38 ms of 3.32 ms kernel time per force
+call (72 %).
+
 ## Total
 
 MD step on the H200, OMAT-0 medium SrTiO3 10x10x10: 4.018 ms (main `909bc8cd` H200 defaults, round 1's a side) →
 3.816 (round 1) → 3.704 (round 2) → about 3.65 ms (round 3): about −9 %. Rounds 4 and 5 found nothing more among the existing switches.
+Round 6's JOINED_LAYOUT takes another 1.9 % (about 3.58 ms).

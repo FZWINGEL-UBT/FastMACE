@@ -1,0 +1,222 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-08T14:39:38.457869+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "73e421ea9d475a57eeb3c1795fc84f7481e4288f",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "tf32x3_gemms": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.kernels.oeq_streaming.wprime_backward:HORNER": true,
+      "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W": true,
+      "fastmace.kernels.oeq_streaming.spline_forward:R128": true,
+      "fastmace.kernels.oeq_streaming.spline_forward:STAGE_EDGES": true,
+      "fastmace.kernels.oeq_streaming.wprime_backward:SPLINE_VECTOR": 4,
+      "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_SH": true,
+      "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP": true,
+      "fastmace.kernels.triton.compose_skip:COMPOSE_FAST": true,
+      "fastmace.kernels.triton.compose_skip:COUNT_PLAN": true,
+      "fastmace.kernels.triton.compose_skip:JOINED_LAYOUT": true,
+      "fastmace.rewrites.cueq_projection:CUEQ_PROJECTED": true,
+      "fastmace.rewrites.species:GENERIC_FOLD_READOUT_TAIL": true,
+      "fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          0
+        ]
+      ]
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 256,
+    "blocks": 6
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": null,
+  "stop_beyond": 0.03,
+  "load": [
+    1.34423828125,
+    1.4013671875,
+    1.6123046875
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 21.62572591987555,
+            "mean_ms": 21.60026354128301,
+            "min_ms": 21.45525999549136,
+            "max_ms": 21.68700155834813,
+            "stdev_ms": 0.08078879901951734,
+            "spread": 0.010716013127854454,
+            "block_ms": [
+              21.45525999549136,
+              21.56909834320686,
+              21.612803195239394,
+              21.6387695109006,
+              21.638648644511704,
+              21.68700155834813
+            ]
+          },
+          "a": {
+            "median_ms": 26.398722976409772,
+            "mean_ms": 26.39675796535812,
+            "min_ms": 26.382540258055087,
+            "max_ms": 26.411221796479367,
+            "stdev_ms": 0.011380335505551368,
+            "spread": 0.0010864744650682606,
+            "block_ms": [
+              26.382540258055087,
+              26.405135237837385,
+              26.384204546957335,
+              26.398120886369725,
+              26.39932506644982,
+              26.411221796479367
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.2207092180035217,
+        "pair_ratios_b_over_a": [
+          1.2296537195820116,
+          1.2242113609794738,
+          1.2207673529720073,
+          1.219945564514266,
+          1.220008028234498,
+          1.2178364872350327
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.8191959110749625,
+      "pair_ratios": [
+        0.8132370797364997,
+        0.8168524095381,
+        0.8191568996053669,
+        0.8197087059357114,
+        0.8196667373141169,
+        0.8211282963531441
+      ],
+      "setup_s": {
+        "a": 11.77557488414459,
+        "b": 11.930007650051266
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+        ],
+        "b": [
+          "RewriteConfig.tf32x3_gemms = on  (requested 'on': stage 1: on (with block_linear))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 291.40789677888034,
+          "potential_eV_atom": -7.952237149163627,
+          "kinetic_eV_atom": 0.03766737164125961
+        },
+        "a": {
+          "temperature_K": 297.9049621912439,
+          "potential_eV_atom": -7.95199763543263,
+          "kinetic_eV_atom": 0.03850718202447229
+        }
+      },
+      "load_after": [
+        1.15625,
+        1.48779296875,
+        1.62109375
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 108,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 108
+        },
+        "a": {
+          "rebuilds": 122,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 122
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  },
+  "pack": {
+    "name": "allk",
+    "entries": [
+      "all",
+      "allk",
+      "nt3"
+    ],
+    "shared_a": true
+  }
+}

@@ -117,7 +117,12 @@ FACTORED_SCALE = False
 HORNER = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.046 / 1.046 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
-HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200"))
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): alone a tie (1.004 / 1.001
+# above), but the
+# spline's w' reads the spline only with HORNER (WPrime.attach_spline), so it is on with SPLINE_W_GPUS' Ada entry:
+# SPLINE_W with HORNER 0.8396 / 0.8304, both off again from the Ada set 1.2003 / 1.2015.
+HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200",
+                         "NVIDIA RTX 4000 Ada Generation"))
 SCALAR_PATHS = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.030 / 1.030 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
@@ -215,6 +220,9 @@ STAGE_SH = None
 # forces and energy within the build's spread; bitwise, faster in both orders (decision 66).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0079 / 1.0077 (b = off).
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set
+# 0.9903 / 0.9905 (b = off):
+# slower there, off.
 STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # STAGE_EDGES (w'; Codex H200 round-6 report, 8 November 2026; bitwise): with STAGE_DOUT, STAGE_SH and SPLINE_W,
 # the block's chunk of edges is staged once at block entry: the features of all its edges (one coalesced float4 copy
@@ -223,11 +231,16 @@ STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # dependent chain of global loads and the band compares per edge. The same values in the same arithmetic. None: on
 # for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
 STAGE_EDGES = None
-STAGE_EDGES_GPUS = GPUModels(())
-# A model label's own GPUs for STAGE_EDGES, instead of STAGE_EDGES_GPUS (the label reaches the kernel through the
+# NVIDIA H200 (8 November 2026, round 6): MD step b/a 0.9969 / 1.0010, a tie: off.
+# A100 family (8 November 2026, results/h200-fastpath-20261108/round6-a100, NHR Alex A100-SXM4-80GB job 4963944;
+# OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9643 / 0.9853;
+# all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# A model label's own extra GPUs for STAGE_EDGES, on top of STAGE_EDGES_GPUS (the label reaches the kernel through the
 # rewrites' context: WPrime's model_label). OMAT-0 small on the H200 (9 November 2026, results/h200-omat0-small-20261108,
 # Benchmark_loup, ab / ba): alone on small's defaults 0.9857 / 0.9825 (b = on); with JOINED_LAYOUT, removing it from the
-# screen's combined set 0.9913 / 0.9900 against 0.9829 / 0.9850 with it. Medium measured a tie (0.9969 / 1.0010).
+# screen's combined set 0.9913 / 0.9900 against 0.9829 / 0.9850 with it; as the default, off 1.0072 / 1.0114. Medium
+# measured a tie on the H200 (above).
 STAGE_EDGES_MODEL_GPUS = MappingProxyType({
     "omat0-small": GPUModels(("NVIDIA H200",)),
 })
@@ -240,6 +253,9 @@ SPLINE_VECTOR = None
 # against the H200 defaults with SPLINE_W and R128 on).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): 2 again from all ten H200 switches 1.0122 / 1.0115 (b = 2).
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): 2 again from the Ada set 0.9918
+# / 0.9906 (b = 2):
+# float4 is slower there, so the Ada keeps 2.
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
@@ -1574,11 +1590,12 @@ def stage_sh_default(device):
 
 
 def stage_edges_default(device, model_label=None):
-    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_MODEL_GPUS[model_label]``
-    for a listed label and for ``STAGE_EDGES_GPUS`` otherwise."""
+    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS`` (every model) and
+    for ``STAGE_EDGES_MODEL_GPUS[model_label]`` (that label's extra GPUs)."""
     if STAGE_EDGES is not None:
         return bool(STAGE_EDGES)
-    return _device_name(device) in STAGE_EDGES_MODEL_GPUS.get(model_label, STAGE_EDGES_GPUS)
+    name = _device_name(device)
+    return name in STAGE_EDGES_GPUS or name in STAGE_EDGES_MODEL_GPUS.get(model_label, ())
 
 
 def stage_quads_default(device):

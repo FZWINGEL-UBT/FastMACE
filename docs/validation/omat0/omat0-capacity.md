@@ -229,6 +229,33 @@ rewrites; side b adds the rung.
 The memory the rung frees is not measured yet. The capacity scan with the rung, and the rung's points in rule 12's
 matrix, are still to do. The merge tier runs before any merge.
 
+## Third round: two capacity fixes and the new Ada defaults (8 November 2026, branch `fastmace/omat0-ada-capacity`)
+
+A rescan on the 5060 Ti found the limit lower than on 2 November: SrTiO3 34,295 atoms (was 53,240), NaCl 64,000 (was
+85,184), with only 3.5 GiB in use at the last passing size. Two bugs, both since `generic_wprime_backward`
+(3 November):
+- `attach_generic_wprime` raised when rule 12 took rung (B), `generic_recompute_conv_weights`: every interaction is
+  then on the recompute path and none is a candidate. The planner fell back to the rewrites-off terminal plan, which
+  ran out of memory. It now applies to none and returns no names.
+- Rule 12 had no memory term for `generic_wprime_backward` (which, with the fused folded forward, stores no
+  [E, 1280] weights). It predicted about 20.8 GiB at SrTiO3 40,000 (real about 4.1 GiB) and took (B) beyond about
+  35,000 atoms. The term is now (B)'s, with a `CONTEXT_TERMS` entry.
+
+**5060 Ti with both fixes** (`capacity_scan.py scan`, as above):
+
+| Crystal | 2 November: atoms, ms/step | 8 November: atoms, ms/step, µs/atom/step | Peak, estimate (GiB) | Rung |
+|---|---|---|---|---|
+| SrTiO3 | 53,240, 840 | **163,840**, 1,286, 7.85 | 14.59, 17.47 | recompute_first_table |
+| NaCl | 85,184, 623 | **195,112**, 809, 4.15 | 14.11, 17.01 | recompute_first_table |
+
+At 53,240 SrTiO3 the step is now 291 ms (5.47 µs per atom). First failures: SrTiO3 179,685, NaCl 216,000. The
+estimate is 1.18–1.21 of the peak where the near-limit probe corrected it.
+
+**RTX 4000 Ada with the new defaults** (spline w and the composed skip on for OMAT-0 medium, ledger `ada-omat0-best`):
+pending. The scan and an old/new peak comparison at the same sizes are queued on leto.
+
+[Results](../../../results/omat0-ada-capacity-20261108/README.md).
+
 ## Records
 
 `results/omat0-capacity-20261102/`:

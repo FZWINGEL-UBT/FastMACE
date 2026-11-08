@@ -181,8 +181,8 @@ From small's defaults today (2.29 ms), JOINED_LAYOUT plus w′ STAGE_EDGES make 
 
 Owner, 9 November 2026: "Yes, add it".
 - `wprime_backward.STAGE_EDGES_MODEL_GPUS` is a new per-model GPU list, `{"omat0-small": NVIDIA H200}`.
-  `stage_edges_default(device, model_label)` reads it. With no label, or for any other label, the default falls back
-  to `STAGE_EDGES_GPUS`, which is still empty, and the `STAGE_EDGES` constant still overrides either way.
+  `stage_edges_default(device, model_label)` turns STAGE_EDGES on for `STAGE_EDGES_GPUS` (every model; the A100
+  family since main's round-6 adoption) plus the label's own GPUs. The `STAGE_EDGES` constant still overrides both.
 - The rewrites get the label from `Context.inputs["model_label"]` (`forces._table_label`). A path load finds the
   label by SHA-256 and head, as the planner's `label_of` does. The generic w′ (`attach_generic_wprime`) passes it to
   `WPrimeBackward`.

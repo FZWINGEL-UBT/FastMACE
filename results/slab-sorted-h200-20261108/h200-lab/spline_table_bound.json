@@ -1,0 +1,89 @@
+{
+  "tool": "spline_table_bound",
+  "created_utc": "2026-11-08T15:24:43Z",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "34fd6b1703b0f642ebe0cb13562b0dc05efdb644",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "rounds": 31,
+  "constants": {},
+  "kernels": {
+    "forward": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 717.2160148620605,
+          "warm": 717.3119783401489
+        },
+        "one-slab": {
+          "flush": 430.9439957141876,
+          "warm": 432.5439929962158
+        },
+        "slab-sorted": {
+          "flush": 681.5360188484192,
+          "warm": 680.5760264396667
+        },
+        "species-blocks": {
+          "flush": 624.6399879455566,
+          "warm": 623.1039762496948
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 602.4640202522278,
+          "warm": 601.5999913215637
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.6008566272701948,
+          "warm": 0.6030067893151837
+        },
+        "slab-sorted": {
+          "flush": 0.950252092432008,
+          "warm": 0.948786646522356
+        },
+        "species-blocks": {
+          "flush": 0.8709230901176841,
+          "warm": 0.8686652322348635
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 0.8400035801878983,
+          "warm": 0.8386866656174607
+        }
+      },
+      "registers": [
+        80
+      ]
+    },
+    "wprime": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 1086.9120359420776,
+          "warm": 1083.5520029067993
+        },
+        "one-slab": {
+          "flush": 1063.3280277252197,
+          "warm": 1059.775948524475
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.9783018244007055,
+          "warm": 0.9780573019859303
+        }
+      },
+      "registers": null
+    }
+  }
+}

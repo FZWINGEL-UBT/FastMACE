@@ -94,14 +94,16 @@ def test_switch_is_off_without_a_listed_gpu(monkeypatch):
     assert sf.spline_w_default("cpu")
 
 
-def test_wprime_stage_edges_is_on_for_omat0_small_on_the_h200_only(monkeypatch):
-    """w' STAGE_EDGES (9 November 2026): off for medium and every other model (STAGE_EDGES_GPUS empty), on for
-    OMAT-0 small on the H200 (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""
+def test_wprime_stage_edges_adds_the_h200_for_omat0_small(monkeypatch):
+    """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family) for every model, plus the H200 for OMAT-0
+    small (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""
     monkeypatch.setattr(wp, "_device_name", lambda device: device)
     assert wp.STAGE_EDGES is None
-    assert wp.stage_edges_default("NVIDIA H200", "omat0-small")
+    for device, label in (("NVIDIA H200", "omat0-small"), ("NVIDIA A100-SXM4-80GB", "omat0-small"),
+                          ("NVIDIA A100-SXM4-80GB", "omat0-medium"), ("NVIDIA A100-SXM4-80GB", None)):
+        assert wp.stage_edges_default(device, label), (device, label)
     for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None),
-                          ("NVIDIA A100-SXM4-80GB", "omat0-small"), (None, "omat0-small")):
+                          ("NVIDIA RTX 4000 Ada Generation", "omat0-small")):
         assert not wp.stage_edges_default(device, label), (device, label)
     monkeypatch.setattr(wp, "STAGE_EDGES", False)
     assert not wp.stage_edges_default("NVIDIA H200", "omat0-small")
@@ -340,7 +342,8 @@ def test_factor_w_and_cursor32_render_and_compile():
 
 
 def test_stage_edges_is_off_without_a_listed_gpu():
-    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB"]
+    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB",
+                                                                     "NVIDIA RTX 4000 Ada Generation"]
 
 
 def test_stage_edges_source_stages_the_tile_and_keeps_the_arithmetic():
@@ -389,7 +392,9 @@ def test_stage_sh_reads_the_edge_features_from_shared_memory():
 
 
 def test_wprime_stage_edges_is_off_without_a_listed_gpu():
-    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == []
+    # on for the A100 family (Alex pack6, 8 November 2026: 0.9643 / 0.9853), off on the H200 (0.9969 / 1.0010)
+    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == ["NVIDIA A100-SXM4-80GB"]
+    assert "NVIDIA A100 80GB PCIe" in wp.STAGE_EDGES_GPUS and "NVIDIA H200" not in wp.STAGE_EDGES_GPUS
     assert wp.stage_edges_default("cpu") is False
 
 
@@ -424,7 +429,9 @@ def test_wprime_stage_edges_source_compiles_with_nvrtc():
 def test_prefetch_ahead_hints_the_staged_rows_and_keeps_the_arithmetic():
     """PREFETCH_AHEAD: with STAGE_EDGES the loop hints edge k + 2's first rows into L1 from the staged slab offsets;
     off by default, and the loads and FMAs are those of STAGE_EDGES alone."""
-    assert sf.PREFETCH_AHEAD is None and list(sf.PREFETCH_AHEAD_GPUS) == [] and sf.prefetch_ahead_default("cpu") == 0
+    assert sf.PREFETCH_AHEAD is None and sf.prefetch_ahead_default("cpu") == 0
+    # on for the A100 family (Alex pack6: 0.9810 / 0.9943), off on the H200 (1.0046 / 1.0067)
+    assert list(sf.PREFETCH_AHEAD_GPUS) == ["NVIDIA A100-SXM4-80GB"] and "NVIDIA H200" not in sf.PREFETCH_AHEAD_GPUS
     blocks = [(1, [0]), (3, [64])]
     staged = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True)
     hinted = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True, prefetch=2)
@@ -440,3 +447,42 @@ def test_prefetch_ahead_hints_the_staged_rows_and_keeps_the_arithmetic():
         from fastmace.kernels.oeq_streaming.runtime import compile_cubin
         for capability in ((9, 0), (8, 0), (12, 0)):
             assert compile_cubin(hinted, capability)
+
+
+@pytest.mark.parametrize("kind", ["cursor", "cursor32", "staged", "located"])
+def test_block_order_reads_each_owners_receiver_from_the_order(kind):
+    blocks = [(1, [0]), (3, [64])]
+    options = dict(cursor=dict(), cursor32=dict(cursor32=True), located=dict(shared_locator=True),
+                   staged=dict(stage_edges=True, threads=64, min_blocks=6))[kind]
+    plain = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], **options)
+    ordered = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], block_order=True, **options)
+    assert "order[" not in plain and ordered.count("const int* __restrict__ order") == 1
+    assert ordered.count("const int rcv = order[") == 1
+    assert ordered.replace("const int* __restrict__ order, ", "").count("\n") == plain.count("\n")
+    if kind == "staged":
+        assert ordered.index("if (blockIdx.x >= N) return;") < ordered.index("order[blockIdx.x]")
+
+
+def test_block_order_refuses_a_source_without_its_lines():
+    with pytest.raises(ValueError, match="BLOCK_ORDER"):
+        sf.ordered_source("extern \"C\" __global__ void f() {}")
+
+
+def test_receiver_order_groups_species_stably():
+    order = sf.receiver_order(torch.tensor([2, 0, 1, 0, 2, 1]))
+    assert order.dtype == torch.int32 and order.tolist() == [1, 3, 2, 5, 0, 4]
+    assert sf.BLOCK_ORDER is None and not sf.block_order_default("cpu")
+    assert "NVIDIA H200" in sf.BLOCK_ORDER_GPUS and "NVIDIA A100-SXM4-80GB" in sf.BLOCK_ORDER_GPUS
+    assert "NVIDIA GeForce RTX 5060 Ti" not in sf.BLOCK_ORDER_GPUS
+
+
+def test_block_order_sources_compile_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    blocks = [(1, [0]), (3, [64])]
+    for options in (dict(), dict(stage_edges=True, threads=64, min_blocks=6)):
+        assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], block_order=True, **options),
+                             (9, 0))

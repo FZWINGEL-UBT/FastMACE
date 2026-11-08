@@ -1,0 +1,32 @@
+{
+ "step_us": 3563.7,
+ "kernel_sum_us": 3325.3,
+ "launches": 98,
+ "gap_per_launch_us": 2.43,
+ "edge_walks_us": {
+  "spline_forward": 816.6,
+  "wprime": 1089.2
+ },
+ "sets": {
+  "beside spline forward (43)": {
+   "kernels": {
+    "void gemv2T_kernel_val<int, int, float, float, float, float,": 2.6,
+    "fm_tf32x3_remap_select_rr_64x64": 7.3
+   },
+   "kernel_us": 9.9,
+   "with_gaps_us": 14.8
+  },
+  "beside w' (73)": {
+   "kernels": {
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 3.2,
+    "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_al": 3.7,
+    "triton_poi_fused_mul_t_tf32x3_mm_unsqueeze_view_8": 1.9,
+    "fm_tf32x3_rc_64x64": 4.7
+   },
+   "kernel_us": 13.5,
+   "with_gaps_us": 23.2
+  }
+ },
+ "ceiling_us": 38.0,
+ "ceiling_share_of_step": 0.0107
+}

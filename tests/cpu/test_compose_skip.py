@@ -203,9 +203,9 @@ def test_count_plan_is_on_for_the_h200_and_the_a100():
     assert compose_skip.count_plan_default("NVIDIA A100-SXM4-80GB")  # A100 family, 8 November 2026
 
 
-def test_joined_layout_is_off_without_a_listed_gpu():
-    assert compose_skip.JOINED_LAYOUT is None and list(compose_skip.JOINED_LAYOUT_GPUS) == []
-    assert not compose_skip.joined_layout_default("NVIDIA H200")
+def test_joined_layout_is_on_for_the_listed_gpus_only():
+    assert compose_skip.JOINED_LAYOUT is None and compose_skip.joined_layout_default("NVIDIA H200")  # 0.9805 / 0.9815
+    assert not compose_skip.joined_layout_default("NVIDIA GeForce RTX 5060 Ti")
 
 
 def test_species_mm_rows_equals_the_joined_product_of_the_row_groups():

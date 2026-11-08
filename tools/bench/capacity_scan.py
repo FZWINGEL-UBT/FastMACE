@@ -63,6 +63,9 @@ def parse_args(argv=None):
         q.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                        help="RewriteConfig overrides on the default plan (candidates; the scan itself takes none)")
         q.add_argument("--tag", default="", help="suffix of the point files (a candidate's points)")
+        q.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
+                       help="module constants set before the build, as tools/ab_rewrites.py --a-constant takes them "
+                            "(e.g. a default switch turned off, to compare its peak)")
         q.add_argument("--neighbours", nargs="*", default=[], metavar="FIELD=VALUE",
                        help="NeighbourConfig overrides on the default plan, e.g. edge_bucket_fraction=0.15")
         q.add_argument("--engine", nargs="*", default=[], metavar="FIELD=VALUE",
@@ -310,6 +313,11 @@ def run_point(args):
     frontends = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(frontends)
     frontends.thermalize(atoms, args.temperature_K, args.seed)
+    from ab_rewrites import constant_overrides
+
+    for (module, name_), value in constant_overrides(args.constant).items():
+        importlib.import_module(module)
+        setattr(sys.modules[module], name_, value)
     record = dict(tool="capacity_scan", created_utc=datetime.now(timezone.utc).isoformat(),
                   host=os.uname().nodename, python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(),
                   torch=torch.__version__, gpu=torch.cuda.get_device_name(), model=args.model, structure=name,
@@ -319,6 +327,7 @@ def run_point(args):
     free, total = torch.cuda.mem_get_info()
     record["start"] = dict(cuda_free_bytes=int(free), cuda_total_bytes=int(total), windows=windows_memory())
     record["rewrites"] = dict(item.split("=", 1) for item in args.rewrites)
+    record["constants"] = list(args.constant)
     record["engine"] = {key: _value(value) for key, value in (item.split("=", 1) for item in args.engine)}
     record["neighbours"] = {key: _value(value) for key, value in (item.split("=", 1) for item in args.neighbours)}
     record["environment"] = {key: os.environ.get(key) for key in ("CUDA_LAUNCH_BLOCKING", "PYTORCH_CUDA_ALLOC_CONF")}
@@ -523,6 +532,8 @@ def scan(args):
                    "--repeat", repeat_text(sizes[index][1]), f"--tag={args.tag}"]
         if args.rewrites:
             command += ["--rewrites", *args.rewrites]
+        if args.constant:
+            command += ["--constant", *args.constant]
         if args.engine:
             command += ["--engine", *args.engine]
         with open(log, "a") as stream:

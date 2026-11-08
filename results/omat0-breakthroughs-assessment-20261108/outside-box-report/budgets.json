@@ -1,0 +1,73 @@
+{
+  "source_commit": "b9f647ac5e36ce845ee76daeaf4a46090ffcdf93",
+  "CUDA_VISIBLE_DEVICES": "",
+  "inputs": {
+    "H200_step_us": 3422.145282226591,
+    "A100_step_us": 7089.911169941843,
+    "H200_interaction2_lab_sum_us": 1685.151994228363,
+    "H200_small_rounded_step_us": 2290.0,
+    "warning": "Step and kernel lab are different measurement contexts. No current A100 kernel split is inferred.",
+    "sources": [
+      "plans/notes/omat0-ideas-round7/profile-arithmetic.json",
+      "results/slab-sorted-h200-20261108/h200-order/ab-order-ab.json",
+      "results/slab-sorted-h200-20261108/h200-order/ab-order-ba.json",
+      "results/slab-sorted-h200-20261108/h200-lab/spline_table_bound.json",
+      "results/h200-omat0-small-20261108/README.md"
+    ]
+  },
+  "20pct": {
+    "H200_us": 684.4290564453182,
+    "A100_us": 1417.9822339883685,
+    "interaction2_replacement_budget_H200_us": 1000.7229377830448
+  },
+  "bottleneck_operator": {
+    "channels_old": 128,
+    "channels_student": 32,
+    "edge_work_ratio_assumption": 0.25,
+    "encoder_forward_backward_semantic_flops": 327680000,
+    "decoder_forward_backward_semantic_flops": 3276800000,
+    "old_decoder_forward_backward_semantic_flops": 13107200000,
+    "all_in_replacement_targets_us": [
+      500,
+      800
+    ],
+    "conditional_net_savings_us": [
+      885.151994228363,
+      1185.151994228363
+    ],
+    "conditional_step_fraction_saved": [
+      0.2586541251844358,
+      0.3463184337566328
+    ],
+    "warning": "Replacement targets are engineering goals, NOT measurements or predicted timings."
+  },
+  "certified_skip": {
+    "minimum_saved_cost_fraction_no_overhead": 0.4061527142889687,
+    "minimum_saved_cost_fraction_overhead_100us": 0.46549454241040794,
+    "minimum_saved_cost_fraction_overhead_200us": 0.5248363705318471,
+    "hypothetical_skip_fractions": [
+      0.55,
+      0.7
+    ],
+    "hypothetical_overhead_us": 150,
+    "conditional_net_savings_us": [
+      776.8335968255998,
+      1029.6063959598541
+    ],
+    "warning": "Fractions are cost-weighted work, not unweighted edge counts. No successful certificate or skip fraction has been observed."
+  },
+  "exact_correction_rejection": {
+    "original_radial_fmas_per_edge": 81920,
+    "rank62_residual_fmas_per_edge": 83328,
+    "rank62_residual_over_original": 1.0171875,
+    "warning": "99 percent residual squared norm retained is not force-gate accuracy; exact residual requires rank64."
+  },
+  "surrogate_HMC_separate_objective": {
+    "teacher_endpoint_cost_budget_us": 3422.145282226591,
+    "teacher_endpoint_cost_status": "Budget assumption based on whole-step time, not an energy-only measurement.",
+    "proposal_32steps_us": 76702.14528222659,
+    "cost_per_proposed_inner_step_us": 2396.942040069581,
+    "acceptance_needed_for_20pct_per_accepted_pathlength_proxy": 0.8755261109597128,
+    "warning": "This is NOT physical MD time or effective-sample-size speed. Reversibility, mixing and target-energy accuracy must be verified."
+  }
+}

@@ -1,0 +1,196 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-08T14:18:41.062336+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "73e421ea9d475a57eeb3c1795fc84f7481e4288f",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "tf32x3_gemms": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 256,
+    "blocks": 6
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": null,
+  "stop_beyond": 0.03,
+  "load": [
+    1.03564453125,
+    1.55126953125,
+    1.990234375
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 26.168412804054242,
+            "mean_ms": 26.069523379950017,
+            "min_ms": 25.58795735512831,
+            "max_ms": 26.302199230485712,
+            "stdev_ms": 0.2657582582309194,
+            "spread": 0.027294046479072104,
+            "block_ms": [
+              25.58795735512831,
+              25.946190011381987,
+              26.137647046198254,
+              26.19917856191023,
+              26.243968074595614,
+              26.302199230485712
+            ]
+          },
+          "b": {
+            "median_ms": 27.313451944792178,
+            "mean_ms": 27.24919789049333,
+            "min_ms": 26.818518179425155,
+            "max_ms": 27.50409572308854,
+            "stdev_ms": 0.24696953104692024,
+            "spread": 0.025100362453238104,
+            "block_ms": [
+              26.818518179425155,
+              27.13233064423548,
+              27.260280362497724,
+              27.36662352708663,
+              27.41333890662645,
+              27.50409572308854
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0437565376743267,
+        "pair_ratios_b_over_a": [
+          1.0480914051566612,
+          1.0457154068606282,
+          1.042950817811382,
+          1.044560365219759,
+          1.0445576990761087,
+          1.0456956652966785
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 1.0437565376743267,
+      "pair_ratios": [
+        1.0480914051566612,
+        1.0457154068606282,
+        1.042950817811382,
+        1.044560365219759,
+        1.0445576990761087,
+        1.0456956652966785
+      ],
+      "setup_s": {
+        "a": 28.748228158103302,
+        "b": 20.41042995103635
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+        ],
+        "b": [
+          "RewriteConfig.tf32x3_gemms = on  (requested 'on': stage 1: on (with block_linear))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 291.4081889834922,
+          "potential_eV_atom": -7.952237875195887,
+          "kinetic_eV_atom": 0.03766740941161461
+        },
+        "b": {
+          "temperature_K": 291.40794227708125,
+          "potential_eV_atom": -7.952236770125777,
+          "kinetic_eV_atom": 0.037667377522355015
+        }
+      },
+      "load_after": [
+        1.052734375,
+        1.376953125,
+        1.861328125
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 108,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 108
+        },
+        "b": {
+          "rebuilds": 108,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 108
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  },
+  "pack": {
+    "name": "t3",
+    "entries": [
+      "t3",
+      "t3c",
+      "t3ck",
+      "tail"
+    ],
+    "shared_a": true
+  }
+}

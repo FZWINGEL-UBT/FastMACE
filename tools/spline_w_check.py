@@ -29,6 +29,8 @@ def main(argv=None) -> int:
                    help="the checkpoint's SHA-256 instead of --model's (any other checkpoint)")
     p.add_argument("--steps", type=int, default=20)
     p.add_argument("--output", type=Path, default=None)
+    p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="RewriteConfig fields, as tools/ab_rewrites.py --a takes them (default: the auto plan)")
     p.add_argument("--sources", type=Path, default=None, help="write each spline kernel's CUDA source here")
     p.add_argument("--compare-constant", nargs="*", default=None, metavar="MODULE:NAME=VALUE",
                    help="also build a second force field with these constants and compare its forces")
@@ -41,7 +43,7 @@ def main(argv=None) -> int:
     from fastmace.config import NeighbourConfig
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from ab_rewrites import constant_overrides
+    from ab_rewrites import constant_overrides, rewrite_overrides
     from ase.io import read
 
     for (module, name), value in constant_overrides(args.constant).items():
@@ -51,7 +53,11 @@ def main(argv=None) -> int:
     path, repeat = args.structure.split("@")
     atoms = read(path).repeat(tuple(int(n) for n in repeat.split("x")))
     loaded = fm.load(str(args.checkpoint), sha256=args.sha256 or MODEL_SHA256[args.model])
-    field = fm.ForceField(loaded, atoms, precision="float32", rewrites="auto")
+    overrides = rewrite_overrides(args.rewrites)
+    if overrides:
+        from fastmace.config import RewriteConfig
+    field = fm.ForceField(loaded, atoms, precision="float32",
+                          rewrites=RewriteConfig(**overrides) if overrides else "auto")
     sim = fm.Simulation(atoms, field, integrator=fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0,
                                                                          friction_per_fs=0.002),
                         workload=fm.Workload(max_temperature_K=300.0), output=None, seed=1,
@@ -81,6 +87,10 @@ def main(argv=None) -> int:
                              forward_min_blocks=obj.spline_block[1].min_blocks if obj.spline_block else None,
                              forward_parts=obj.spline_block[1].parts if obj.spline_block else None,
                              forward_stage_edges=getattr(obj.spline_block[1], "stage_edges", None)
+                             if obj.spline_block else None,
+                             forward_block_order=getattr(obj.spline_block[1], "block_order", None)
+                             if obj.spline_block else None,
+                             forward_order_bound=(getattr(obj.spline_block[1], "order", None) is not None)
                              if obj.spline_block else None,
                              wprime=resources(obj.spline_block[2]) if obj.spline_block else None,
                              wprime_stage_quads=getattr(obj.spline_block[2], "stage_quads", None)
