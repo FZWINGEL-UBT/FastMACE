@@ -111,6 +111,7 @@ STAGE_TILE = 32
 # values and their arithmetic are unchanged. None: PREFETCH_AHEAD_DISTANCE on PREFETCH_AHEAD_GPUS, else 0 (off);
 # an int: an A/B side's distance (0 off).
 PREFETCH_AHEAD = None
+# NVIDIA H200 (8 November 2026, round 6): MD step b/a 1.0046 / 1.0067 (b = 2): off.
 PREFETCH_AHEAD_GPUS = GPUModels(())
 PREFETCH_AHEAD_DISTANCE = 2
 PREFETCH_PATHS = 4

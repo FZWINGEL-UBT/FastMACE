@@ -57,7 +57,9 @@ COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # transpose copy) and its gradient comes back in the same layout for the outer sum's backward (no repack). The same
 # products and sums. None: on for JOINED_LAYOUT_GPUS; True / False: an A/B side's choice.
 JOINED_LAYOUT = None
-JOINED_LAYOUT_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108 round 6): MD step b/a 0.9805 / 0.9815 against the H200
+# defaults (OMAT-0 medium, SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's spread.
+JOINED_LAYOUT_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def compose_fast_default(name=None) -> bool:

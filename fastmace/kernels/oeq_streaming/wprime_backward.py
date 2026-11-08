@@ -222,6 +222,7 @@ STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # dependent chain of global loads and the band compares per edge. The same values in the same arithmetic. None: on
 # for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
 STAGE_EDGES = None
+# NVIDIA H200 (8 November 2026, round 6): MD step b/a 0.9969 / 1.0010, a tie: off.
 STAGE_EDGES_GPUS = GPUModels(())
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
