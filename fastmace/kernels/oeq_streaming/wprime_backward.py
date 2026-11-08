@@ -116,10 +116,12 @@ FACTORED_SCALE = False
 HORNER = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.046 / 1.046 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): alone a tie (1.004 / 1.001 above), but the
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): alone a tie (1.004 / 1.001
+# above), but the
 # spline's w' reads the spline only with HORNER (WPrime.attach_spline), so it is on with SPLINE_W_GPUS' Ada entry:
 # SPLINE_W with HORNER 0.8396 / 0.8304, both off again from the Ada set 1.2003 / 1.2015.
-HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200", "NVIDIA RTX 4000 Ada Generation"))
+HORNER_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200",
+                         "NVIDIA RTX 4000 Ada Generation"))
 SCALAR_PATHS = None
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.030 / 1.030 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
@@ -217,7 +219,8 @@ STAGE_SH = None
 # forces and energy within the build's spread; bitwise, faster in both orders (decision 66).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0079 / 1.0077 (b = off).
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set 0.9903 / 0.9905 (b = off):
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set
+# 0.9903 / 0.9905 (b = off):
 # slower there, off.
 STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # STAGE_EDGES (w'; Codex H200 round-6 report, 8 November 2026; bitwise): with STAGE_DOUT, STAGE_SH and SPLINE_W,
@@ -238,7 +241,8 @@ SPLINE_VECTOR = None
 # against the H200 defaults with SPLINE_W and R128 on).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): 2 again from all ten H200 switches 1.0122 / 1.0115 (b = 2).
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): 2 again from the Ada set 0.9918 / 0.9906 (b = 2):
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): 2 again from the Ada set 0.9918
+# / 0.9906 (b = 2):
 # float4 is slower there, so the Ada keeps 2.
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 

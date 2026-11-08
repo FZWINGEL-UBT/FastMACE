@@ -426,10 +426,12 @@ DECISION_66_TF32X3_LABELS = ("omat0-medium",)  # and every MH-1 label (_mh1)
 # MH-1 included; this entry stays for the record.
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.068 / 1.069 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto; Triton backend, sm_89 has no CUTLASS
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto; Triton backend, sm_89 has
+# no CUTLASS
 # tf32x3): alone 1.0438 / 1.0400 (slower, as before), but it carries COMPOSE_SKIP and COMPOSE_FAST
 # (rewrites.precision routes them): with them 0.9902 / 0.9898 against the Ada defaults, and tf32x3 with the compose
-# group off again from the Ada set 1.0117 / 1.0124 (b = off); gate passes. OMAT-0 medium only (DECISION_66_TF32X3_LABELS).
+# group off again from the Ada set 1.0117 / 1.0124 (b = off); gate passes. OMAT-0 medium only
+# (DECISION_66_TF32X3_LABELS).
 DECISION_66_TF32X3_OMAT0_GPUS = GPUModels(("NVIDIA A100 80GB PCIe", "NVIDIA H200", "NVIDIA RTX 4000 Ada Generation"))
 # MACE-OFF and POLAR-1 on the A100 (branch fastmace/off-polar-alex, 6 November 2026; owner: "bring all mace off and
 # mace polar models up to current speeds ... fastest speed on a100"): MD step b/a in both build orders, NHR@FAU Alex

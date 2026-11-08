@@ -21,7 +21,8 @@ CUEQ_PROJECTED = None
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): MD step b/a 0.9480 / 0.9945 against the A100 defaults, off again from all ten H200
 # switches 1.0010 / 1.0020 (b = off); gate passes.
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set 0.9992 / 0.9987 (b = off):
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set
+# 0.9992 / 0.9987 (b = off):
 # slower there, off.
 CUEQ_PROJECTED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 

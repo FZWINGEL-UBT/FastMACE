@@ -25,7 +25,8 @@ SPLINE_W = None
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): MD step b/a 0.8654 / 0.8661 against the A100 defaults; all ten H200 switches together
 # 0.7471 / 0.7469 (9.85 -> 7.36 ms), force/stress gate passes.
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto; OMAT-0 medium, Benchmark_loup, ab / ba): with
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto; OMAT-0 medium,
+# Benchmark_loup, ab / ba): with
 # wprime_backward.HORNER, which the spline's w' needs (WPrime.attach_spline), 0.8396 / 0.8304 against the Ada defaults;
 # SPLINE_W and HORNER off again from the Ada set 1.2003 / 1.2015 (b = off); gate passes.
 SPLINE_W_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
@@ -48,7 +49,8 @@ R128 = None
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): on top of SPLINE_W 0.981 / 0.978; off again from all ten (with STAGE_EDGES) 1.0325 /
 # 1.0311 (b = off).
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): on top of SPLINE_W 0.8328 / 0.8312 against the
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): on top of SPLINE_W 0.8328
+# / 0.8312 against the
 # Ada defaults (SPLINE_W alone 0.8396 / 0.8304); off again from the Ada set, with STAGE_EDGES, 1.0017 / 1.0004.
 R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 # Codex H200 follow-up, item 4 (7 November 2026). FACTOR_W: a path whose terms all share one input component x_k
@@ -107,7 +109,8 @@ STAGE_EDGES = None
 # CUEQ_PROJECTED and GENERIC_FOLD_READOUT_TAIL (ab / ba); forces and energy within the build's spread (decision 66).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0050 / 1.0044 (b = off).
-# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): off again from the Ada set 1.0018 / 1.0028.
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): off again from the Ada
+# set 1.0018 / 1.0028.
 STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 STAGE_TILE = 32
 # PREFETCH_AHEAD (Codex H200 round-6 report item 2, 8 November 2026; bitwise): with STAGE_EDGES the channel loop hints
