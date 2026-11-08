@@ -139,6 +139,45 @@ So small's kernels are close to tuned already. Beyond JOINED_LAYOUT (3–4 %), f
 0.5–1.7 %, and they have not been combined yet. Each is a per-GPU module constant today. Giving small its own values
 needs a per-model default in the kernels, and a combined A/B and gate first.
 
+## Combined: the screen's four wins together (`combined/`, `3bc94302`)
+
+Owner, 9 November 2026: "Yes, combine them" (`tools/modal/omat0_small_combined.sh`, Benchmark_loup, both orders).
+- a is small's defaults with JOINED_LAYOUT on, about 2.23 ms per step.
+- "all" is a with four changes: w′ `STAGE_EDGES` on, the spline forward at 128 threads with `MIN_BLOCKS` 8 instead
+  of R128, w′ `FOLD_ALPHA` off, and tf32x3 `TILE` 64x32.
+- Each "no…" row is all four minus one.
+- Modal `sixth` cost $0.89.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| all four | 0.9829 | 0.9850 |
+| without w′ STAGE_EDGES | 0.9913 | 0.9900 |
+| without MIN_BLOCKS 8 | 0.9893 | 0.9842 |
+| without FOLD_ALPHA off | 0.9802 | 0.9841 |
+| without TILE 64x32 | 0.9833 | 0.9829 |
+
+- **Together the four gain about 1.6 %** (2.23 → 2.19 ms), less than their separate gains added up.
+- **Most of it is w′ `STAGE_EDGES`:** dropping it costs about 0.7 % in both orders.
+- **`MIN_BLOCKS` 8 adds about 0.5 % in order ab** and nothing in order ba.
+- **`FOLD_ALPHA` off and `TILE` 64x32 add nothing on top.** The "without" rows are as fast as "all" or faster.
+- So the setting worth having is w′ STAGE_EDGES on (with MIN_BLOCKS 8 as a marginal extra), worth about 1–1.5 % on
+  top of JOINED_LAYOUT.
+- Gate with all four and JOINED_LAYOUT on: passes. Ratios against the 3× limit:
+
+  | | SrTiO3 | NaCl | NbCl5 |
+  | --- | ---: | ---: | ---: |
+  | Force | 0.87 | 0.95 | 1.00 |
+  | Stress | 0.49 | 1.32 | 1.23 |
+
+- Step breakdown with all of them: 2.18 ms per step, force graph 2.10 ms.
+
+From small's defaults today (2.29 ms), JOINED_LAYOUT plus w′ STAGE_EDGES make about 4.5 % (to about 2.19 ms).
+
+**Open:**
+- JOINED_LAYOUT reaches small through the H200 adoption on fastmace/joined-layout.
+- w′ STAGE_EDGES stays off for medium (a tie there) and is a per-GPU constant today. Giving it to small alone needs
+  a per-model default in the w′ kernel, which is not built.
+
 ## Not done
 
 - The A100 family: small keeps the pair off there until an Alex A/B (packed) measures it.
