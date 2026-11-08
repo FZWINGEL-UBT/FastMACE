@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # OMAT-0 small's own H200 defaults (8 November 2026): the label omat0-small takes medium's 3xTF32 GEMMs and generic
-# w' on the H200 (decision 66 tables) and keeps GENERIC_FOLD_READOUT_TAIL off. No constants: the plan's defaults.
+# w' on the H200 (decision 66 tables); every other H200 default as is (GENERIC_FOLD_READOUT_TAIL on: b = off measured
+# 1.0131 / 1.0173, a win). No constants: the plan's defaults.
 #   1. tools/force_stress_gate.py (3x rule, selfcheck.RATIO) on SrTiO3 3x3x3, NaCl, NbCl5, as medium's H200 gates;
 #   2. tools/step_breakdown.py on Benchmark_loup (SrTiO3 10x10x10, 300 K, 1 fs, skin 0.5): about 2.3 ms expected.
 set -uo pipefail

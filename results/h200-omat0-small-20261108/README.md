@@ -31,8 +31,9 @@ H200 default is per GPU and applies as is.
   `tf32x3_gemms` (label `None`). The conv backward is then the streaming one (0.98 ms per call), and the radial
   networks run as GEMMs (0.73 ms plus 0.67 ms for the folded last layer's input gradient). That makes 5.27 ms of
   kernel time per force call, against 2.03 ms with the pair.
-- JOINED_LAYOUT gains 3 % on small (medium: 2 %). The spline and composed skip are each worth 13–19 %. CUEQ_PROJECTED
-  is a tie on small, and the tail fold costs 1.3–1.7 %. Small's defaults are not adjusted here.
+- Each row's b is a with one change, so b/a above 1 means the change is slower. JOINED_LAYOUT on gains 3 % on small
+  (medium: 2 %). Turning SPLINE_W or COMPOSE_SKIP off costs 13–19 %, and turning the tail fold off costs 1.3–1.7 %, so
+  both stay on for small. CUEQ_PROJECTED is a tie on small.
 - In-use record (`fix/check.json`, `tools/spline_w_check.py --model omat0-small`):
   - The spline is in use: 723 intervals, certificate 0.48, forward 70 registers, w′ 64 registers, no local memory.
   - The composed skip is in use. JOINED_LAYOUT is off by default.

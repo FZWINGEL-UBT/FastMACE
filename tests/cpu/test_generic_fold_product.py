@@ -96,18 +96,6 @@ def test_readout_tail_fold_matches_the_stock_density_model(monkeypatch):
     assert relative(_stress(rewritten, batch), _stress(model, batch)) <= 1e-10
 
 
-def test_readout_tail_fold_default_is_per_gpu_and_per_listed_model():
-    """GENERIC_FOLD_READOUT_TAIL's default: the listed GPUs, except for a model with its own list (OMAT-0 small,
-    measured slower on the H200, 8 November 2026)."""
-    from fastmace.rewrites import species
-
-    assert species.generic_fold_readout_tail_default("NVIDIA H200")
-    assert species.generic_fold_readout_tail_default("NVIDIA H200", "omat0-medium")
-    assert not species.generic_fold_readout_tail_default("NVIDIA H200", "omat0-small")
-    assert not species.generic_fold_readout_tail_default("NVIDIA A100-SXM4-80GB", "omat0-small")
-    assert not species.generic_fold_readout_tail_default("NVIDIA L4")
-
-
 def test_readout_tail_fold_is_off_on_the_cpu_by_default():
     model, batch = tiny_cueq("density")
     rewritten, _ = _rewrite(model, batch)
