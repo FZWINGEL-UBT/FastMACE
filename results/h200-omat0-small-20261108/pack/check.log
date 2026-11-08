@@ -1,0 +1,16 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Traceback (most recent call last):
+  File "/tmp/fastmace-src/tools/spline_w_check.py", line 132, in <module>
+    raise SystemExit(main())
+  File "/tmp/fastmace-src/tools/spline_w_check.py", line 44, in main
+    loaded = fm.load(str(args.checkpoint), sha256=args.sha256)
+  File "/tmp/fastmace-src/fastmace/model/loading.py", line 766, in load_pristine
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+  File "/tmp/fastmace-src/fastmace/model/loading.py", line 672, in load
+    trust = check_trust(resolved, digest, sha256, trusted)
+  File "/tmp/fastmace-src/fastmace/model/loading.py", line 259, in check_trust
+    raise CheckpointTrustError(
+fastmace.errors.CheckpointTrustError: /__modal/volumes/vo-4AvnRSqwjTBUKJJdNFtTo4/models/mace-omat-0-small.model has SHA-256 0abfde07862cf1e93b8b4d03cb702f29ce9c344ff2fc4de2ec0d7166d6c113a5, not the expected d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a
+Why: the file is not the one whose hash was given, so it was not unpickled
+Next: Pass sha256= with the file's published hash, or trusted=True for a file you trust; a checkpoint is a pickle and runs code when loaded.
