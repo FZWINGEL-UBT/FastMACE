@@ -57,6 +57,16 @@ LANE_GPUS = ("NVIDIA RTX 4000 Ada Generation",)
 # wavefront, R 8,192: x4 -10.5 % on the RTX 5060 Ti, -3.2 % on the RTX 4000 Ada; the RTX PRO 6000's tiles do not
 # chunk). A tile's backward runs eagerly, one launch pair per chunk: the L2 rule's chunks were launch-bound there.
 TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Generation": 4}
+# Tiled speed (results/tiled-speed-20261108; True / False are the A/B sides).
+# TILE_PREFETCH_DEVICE (exact): TileConfig.prefetch also with the state on the device, where it builds the next tile's
+# graph on the side stream while the current tile runs (its rows are read in the body, as before). Without it a
+# device-state call built each graph after the previous body had drained the GPU (torch.unique and the edge counts
+# wait for it): 1.2 s of 8.6 s idle at 975,560 SrTiO3 atoms on the RTX 5060 Ti.
+TILE_PREFETCH_DEVICE = True
+# TILE_VIRIAL (rounding): the strain gradient of sweeps 2 and 3 from the edge vectors and their gradient,
+# sym(V^T dE/dV), summed elementwise, instead of a strain leaf in the autograd graph. The leaf's backward is a
+# [3, E] x [E, 3] product that cuBLAS runs as a split-K GEMM (sgemm_largek, about 0.3 us per atom per call).
+TILE_VIRIAL = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -721,6 +731,17 @@ def lane_steps(steps, counts):
     return items, peak
 
 
+def _virial(vectors, gradient, mask=None):
+    """``TILE_VIRIAL``: dE/d(strain) [3, 3] of edge vectors ``vectors`` [E, 3] strained as ``v + v sym(eps)``, from
+    their gradient ``gradient`` [E, 3] at eps = 0: sym(V^T G), as one elementwise product and a column sum (the strain
+    leaf's backward is the same product as a split-K GEMM). ``mask`` [E] (a padded slot's edge mask) drops the padding
+    edges, as the forces' scatter does."""
+    if mask is not None:
+        gradient = gradient * mask.unsqueeze(1)
+    outer = (vectors.unsqueeze(2) * gradient.unsqueeze(1)).reshape(-1, 9).sum(dim=0).reshape(3, 3)
+    return 0.5 * (outer + outer.transpose(0, 1))
+
+
 def _split_streams(device):
     """Two CUDA streams of two green contexts holding disjoint halves of ``device``'s SMs (one split of its SM
     resource, rounded to the split's granularity: 2 SMs before sm_90, 8 from it), with the contexts that keep them
@@ -1188,13 +1209,14 @@ class TiledForceField:
         import torch
 
         model = self.model
-        nodes, local, r, vectors, recv_mask, _ = tile
+        nodes, local, r, vectors, recv_mask, _, edge_mask = tile
         attrs = self._attrs(nodes)
         receivers = nodes[:r]
+        virial = adjoint and strain is not None and TILE_VIRIAL
         with torch.enable_grad() if adjoint else torch.no_grad():
             leaf = vectors.detach().requires_grad_(adjoint)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
-                   if adjoint and strain is not None else None)
+                   if adjoint and strain is not None and not virial else None)
             es, x, sc = self._forward(3 if adjoint else 1)(leaf, eps, attrs, local, r)
             heads = self.heads[:r]
             if not adjoint:
@@ -1204,6 +1226,8 @@ class TiledForceField:
                          + (self._masked(state.rows("gsc", receivers), recv_mask) * sc).sum())
             wanted = [leaf] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
+        if virial:
+            return self._masked(es.detach(), recv_mask), grads[0], _virial(vectors, grads[0], edge_mask)
         return self._masked(es.detach(), recv_mask), grads[0], grads[1] if eps is not None else None
 
     def _second(self, tile, state, strain):
@@ -1213,12 +1237,13 @@ class TiledForceField:
 
         model = self.model
         interaction = model.interactions[1]
-        nodes, local, r, vectors, recv_mask, node_mask = tile
+        nodes, local, r, vectors, recv_mask, node_mask, edge_mask = tile
         attrs = self._attrs(nodes)
+        virial = strain is not None and TILE_VIRIAL
         with torch.enable_grad():
             leaf = vectors.detach().requires_grad_(True)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
-                   if strain is not None else None)
+                   if strain is not None and not virial else None)
             x = state.rows("x", nodes).detach().requires_grad_(True)
             sc = state.rows("sc", nodes[:r]).detach().requires_grad_(True)
             modules = interaction._modules
@@ -1233,8 +1258,9 @@ class TiledForceField:
                 holder_x.value = holder_sc.value = None
             wanted = [leaf, x, sc] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
+        g_eps = _virial(vectors, grads[0], edge_mask) if virial else grads[3] if eps is not None else None
         return (self._masked(es.detach(), recv_mask), grads[0], self._masked(grads[1], node_mask),
-                self._masked(grads[2], recv_mask), grads[3] if eps is not None else None)
+                self._masked(grads[2], recv_mask), g_eps)
 
     def _first_forward(self, leaf, eps, attrs, local, r):
         """Interaction 0's forward on a tile: ``(es, x, sc)`` (sweeps 1 and 3; compiled in mode "compiled")."""
@@ -1331,7 +1357,7 @@ class TiledForceField:
         nodes, ei = slot["nodes"], slot["ei"]
         vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + slot["shifts"]
         vectors = torch.where(slot["edge_mask"].unsqueeze(1) > 0, vectors, self._far)
-        tile = (nodes, slot["local"], receivers, vectors, slot["recv_mask"], slot["node_mask"])
+        tile = (nodes, slot["local"], receivers, vectors, slot["recv_mask"], slot["node_mask"], slot["edge_mask"])
         strain = True if g["stress"] else None
         if sweep == 1:
             values = self._first(tile, g["state"])
@@ -1581,7 +1607,7 @@ class TiledForceField:
 
             # TileConfig.prefetch: the next tile's graph (and, within a run of sweep 2 or 3, its host rows) on a side
             # stream; the tiles' receivers on the host (the pool's assign and release index with them, no sync).
-            ahead = self.config.prefetch and padded and state.host
+            ahead = self.config.prefetch and padded and (state.host or TILE_PREFETCH_DEVICE)
             prep = None
             if ahead and self.device.type == "cuda":
                 if self._prep_stream is None:
@@ -1597,7 +1623,8 @@ class TiledForceField:
                 """Build tile ``order[position]``'s graph ahead; fetch its rows when the sweep before it is its own."""
                 sweep, index, lane = order[position]
                 slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]]
-                rows = position > 0 and order[position - 1][0] == sweep and sweep in (2, 3)
+                # (device state, TILE_PREFETCH_DEVICE: the graph only; the body reads its rows)
+                rows = state.host and position > 0 and order[position - 1][0] == sweep and sweep in (2, 3)
                 with torch.cuda.stream(prep) if prep is not None else contextlib.nullcontext():
                     piece = self._tile_graph(tiles[index], source, local_of, slot["sizes"][0])
                     nodes = piece[0].cpu()  # waits for the prefetch stream only
@@ -2104,7 +2131,7 @@ class TiledForceField:
             self._bind_tables(self.field.species_tables(nodes.shape[0]))
         state = g["state"]
         vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
-        tile = (nodes, local, r, vectors, None, None)
+        tile = (nodes, local, r, vectors, None, None, None)
         receivers = nodes[:r]
         strain = True if g["stress"] else None
         g_eps = None
