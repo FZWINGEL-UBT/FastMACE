@@ -273,6 +273,12 @@ Rules that follow:
 - **Keep the compile cache warm.** A cold cache costs 160–260 s per build instead of about 150 s, and Dynamo tracing
   is paid either way. `CACHE` defaults to `$FM_ROOT/cache` on `$WORK`, which stays warm between jobs. Do not copy a
   large cache to `$TMPDIR`: `fm-offpolar/cache` is 7.8 GB, and copying it from `$WORK` did not finish within an hour.
+- **One OEq cache per staged job.** Every process points `<cache>/oeq/cuda-runtime` (OpenEquivariance's stand-in CUDA
+  home) at its own environment. With a staged environment that is node-local `$TMPDIR`, so two staged jobs sharing
+  a cache leave each other links into another node's `/tmp`, and the OEq host-extension build fails with
+  "cuda_runtime_api.h: No such file" (4963282–83, 8 November). `alex_ab_pack.sh` v2 therefore gives each staged job
+  a node-local cache that links every entry of the shared cache except `oeq/`, which is the job's own (one extension
+  build, about 1 min). Hand-written job scripts that stage the env must do the same, or run unstaged (`STAGE=0`).
 - Profile with `cProfile` only to find where time goes. It inflates setup to about 1.7× (250–270 s per build in
   4955075).
 
