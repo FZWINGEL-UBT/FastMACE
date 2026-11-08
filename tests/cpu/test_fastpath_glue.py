@@ -12,7 +12,7 @@ def test_switch_defaults():
     assert linear_div.LINEAR_DIV_SPLIT is None and not linear_div.LINEAR_DIV_SPLIT_GPUS
     assert not linear_div.linear_div_split_default("NVIDIA H200")
     assert cueq_projection.CUEQ_PROJECTED is None and cueq_projection.cueq_projected_default("NVIDIA H200")
-    assert not cueq_projection.cueq_projected_default("NVIDIA A100-SXM4-80GB")
+    assert cueq_projection.cueq_projected_default("NVIDIA A100-SXM4-80GB")  # A100 family, 8 November 2026
 
 
 def test_divided_blocks_equal_the_sliced_division():

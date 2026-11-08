@@ -1,0 +1,59 @@
+### Starting TaskPrologue of job 4963392 on a0633 at Sun Nov  8 12:16:55 PM CET 2026
+Running on cores 112-127 with governor schedutil
+Sun Nov  8 12:16:56 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:CC:00.0 Off |                    0 |
+| N/A   32C    P0             58W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-08T12:16:57+0100 gate all job 4963392 on a0633; NVIDIA A100-SXM4-80GB, 615.71.10; source 1bd4f3be7391bb785ee834b8a0682079e6bb552b; set up in 0 s
+2026-11-08T12:21:44+0100 check exit=0 "spline_in_use": true "compose_skip_in_use": true "max_abs": 1.0013580322265625e-05 "max_force": 7.066776275634766 "same_build_max_abs": 2.384185791015625e-06 
+2026-11-08T12:33:54+0100 gate exit=0 
+=== JOB_STATISTICS ===
+=== current date     : Sun Nov  8 12:33:56 CET 2026
+= Job-ID             : 4963392 on alex
+= Job-Name           : fm-a100g-all
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-a100omat/jobs/gate.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-a100omat/jobs
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 05:00:00
+= Elapsed runtime    : 00:17:09
+= Total RAM usage    : 8.2 GiB of assigned  GiB (%)
+= Node list          : a0633
+= Subm/Elig/Start/End: 2026-11-08T12:16:13 / 2026-11-08T12:16:13 / 2026-11-08T12:16:46 / 2026-11-08T12:33:55
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             587.0M   104.9G   209.7G        N/A     990      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            37.4G     0.0K     0.0K        N/A     380K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 687917, 0 %, 0 %, 3086 MiB, 279641 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 696275, 1 %, 0 %, 1486 MiB, 24878 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 696988, 1 %, 0 %, 1036 MiB, 26649 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 697370, 1 %, 0 %, 1302 MiB, 24747 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 698088, 1 %, 0 %, 938 MiB, 27620 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 698720, 2 %, 1 %, 5852 MiB, 25097 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 700611, 2 %, 0 %, 3248 MiB, 27028 ms
+NVIDIA A100-SXM4-80GB, 00000000:CC:00.0, 701146, 0 %, 0 %, 2130 MiB, 476042 ms

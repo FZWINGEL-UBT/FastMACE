@@ -1,9 +1,9 @@
-# How FastMACE runs OMAT-0, and where each part came from (4 November 2026, updated 7 November)
+# How FastMACE runs OMAT-0, and where each part came from (4 November 2026, updated 8 November)
 
-Source: main `3e8046cb` (7 November 2026). Where this file and the code disagree, the code's `*_GPUS` sets are the
+Source: main `3e8046cb` (7 November 2026); §3.8.4 on main `1bd4f3be` (8 November). Where this file and the code disagree, the code's `*_GPUS` sets are the
 authority. The A100 column of [defaults-by-gpu.md](defaults-by-gpu.md) is the live state.
 
-**Since the profiled run (5–7 November).** §1–§3.7 describe source `4b70e3f2`. Main has since changed the A100
+**Since the profiled run (5–8 November).** §1–§3.7 describe source `4b70e3f2`. Main has since changed the A100
 plan. §3.8 lists each change with its evidence. In short:
 - **Factored w′ backward** (`wprime_backward.FACTORED`) and **mirror species pairs** (`radial.SYMMETRIC_PAIRS`), both
   default on the RTX 4000 Ada and every A100 (owner, 4 November, decision 66; main `65a4228c`). Benchmark_loup MD
@@ -20,6 +20,11 @@ plan. §3.8 lists each change with its evidence. In short:
 - **Candidates measured and kept off** on the A100 (§3.8.2).
 - **Three rule changes** (7 November): a GPU entry covers its whole family, pure work removal goes on for every GPU,
   and the accuracy gate's ratio is 3 (§3.8.3).
+- **The H200's spline and composed-skip path on the A100** (8 November, decision 66): `SPLINE_W`, `R128`,
+  `STAGE_EDGES`, `SPLINE_VECTOR`, `STAGE_SH`, `COMPOSE_SKIP`, `COMPOSE_FAST`, `COUNT_PLAN`, `CUEQ_PROJECTED` and
+  `GENERIC_FOLD_READOUT_TAIL` now default on the A100 family. Together MD step b/a 0.7471 / 0.7469 on NHR Alex's
+  A100-SXM4-80GB, **9.85 → 7.36 ms** per Benchmark_loup step; each is faster in both orders when turned off again
+  from the other nine; the force/stress gate passes at or below the old plan's ratios (§3.8.4).
 
 **Speed now.** Benchmark_loup on the A100-SXM4-80GB at `ff4d1a89` (Langevin): 10.85 ms per step, 2.169 µs per atom
 and step (`results/research-answers-20261105/README.md:402`). The profiled run gave 2.79–2.95 µs per atom and step. The switches after
@@ -27,6 +32,8 @@ and step (`results/research-answers-20261105/README.md:402`). The profiled run g
 (`results/research-answers-20261105/README.md:731`) and about 9.67–9.71 ms after `FOLD_ALPHA`
 (`results/ideas-queue-20261106/README.md:71`). `RECEIVER_SUM` then saved about 0.3 % (`results/ideas-queue2-20261106/README.md:92`).
 These come from different jobs and cards, so they are not A/B comparisons.
+On 8 November (main `1bd4f3be`, Alex A100-SXM4-80GB, Langevin, inside the A/B jobs) the A100 plan before §3.8.4 ran at
+9.80–9.95 ms per step and the plan with §3.8.4 at **7.33–7.44 ms (1.47 µs per atom and step)**, same process.
 
 **Profiles.** The per-kernel times in §2 are still those of `4b70e3f2`. Newer A100 records:
 `results/omat0-a100-profile-5b6c5550/` (A100 80GB PCIe), `results/omat0-a100-profile-2a016fd4/` (A100-SXM4-80GB),
@@ -325,7 +332,7 @@ the Modal A100-SXM4-80GB. A switch whose set names only that card is on for ever
 | 22(iii), the TP inside the next k-loop | forward lab 1.029–1.091 | RA:606-609 |
 | `FIRST_DIV` | 1.0349 / 1.0337; density gradient not bitwise | RA:722 |
 | `ESTRIN` | alone 0.9961 / 0.9963, but FOLD_ALPHA is faster than ESTRIN: 0.9967 / 0.9902, 0.9884 / 0.9907 | Q1:47 |
-| `POWER_BACKWARD` | 1.0020 / 0.9977, a tie | Q1:46 |
+| `POWER_BACKWARD` | 1.0020 / 0.9977, a tie; on the 8 November defaults alone 0.9919 / 0.9969, on top of §3.8.4's ten 1.0006 / 1.0028 | Q1:46, B |
 | `LANE_INDICES`, radial-table forward at 8 warps (H200 switches) | 0.9969 / 1.0001; 1.0051 / 0.9949 | Q1:61-62 |
 | Tabled `CHUNK` 8 or 32, `FORWARD_CHUNK` 16 or 64, w′ `STAGE_DOUT_CHUNK` 16 | ties or slower; e.g. STAGE_DOUT_CHUNK 16 1.0082 / 1.0011 | Q1:54-58 |
 | G1, 3×TF32 GEMMs with pre-split weights | ceiling 0.915 of the GEMMs, about 1.5–2 % of the step; a real kernel about half that. Not built. | Q2:61-68 |
@@ -346,7 +353,34 @@ the Modal A100-SXM4-80GB. A switch whose set names only that card is on for ever
 - **The accuracy gate's ratio is 3.** `planner.selfcheck.RATIO`, read by `tools/force_stress_gate.py`, went from 2 to
   3 times the float32 calculator's error. SPEC says earlier verdicts stand. The A100's recorded NbCl5 stress ratios
   are 2.34–3.0 (§3.7); no A100 gate at the new ratio is recorded yet (SPEC §19, "The accuracy gate's ratio is 3 ×
-  float32 rounding").
+  float32 rounding"). The first A100 gate at ratio 3 is §3.8.4's (8 November): the plan before §3.8.4 has NbCl5
+  stress 2.74, the plan with it 0.97.
+
+#### 3.8.4 The H200 switches on the A100 (8 November)
+
+Owner, via the conductor (8 November): "Get a best configuration on a100 now for omat-0-medium based on the h200
+results." **B** = [results/a100-omat0-best-20261108](../../results/a100-omat0-best-20261108/README.md). NHR Alex
+A100-SXM4-80GB, main `1bd4f3be`, `tools/jobs/alex_ab_pack.sh`; pack 1 = each switch group against the A100 defaults,
+pack 2 = all ten on, then one turned off again (b = off, so above 1 means the switch helps).
+
+| Part | What it does | Pack 1 (b = on) | Pack 2 (b = off from all ten) |
+| --- | --- | --- | --- |
+| `SPLINE_W` (spline forward + w′) | Interaction 2's message in Symmetrix-XL's layout with w from a per-model certified cubic spline; the w′ backward on the same spline. Rounding (certificate 0.48). | 0.8654 / 0.8661 | – (the base of the others) |
+| `R128` | One receiver per 128-thread block, `__launch_bounds__(128, 6)`. | with SPLINE_W 0.8491 / 0.8469 | with STAGE_EDGES 1.0325 / 1.0311 |
+| `STAGE_EDGES` | The forward stages 32-edge tiles in shared memory. Bitwise. | – | 1.0050 / 1.0044 |
+| `SPLINE_VECTOR` 4 | The w′ reads the spline's four terms as one float4. Bitwise. | – | 1.0122 / 1.0115 |
+| `STAGE_SH` | Each w′ cohort's edge features in shared memory once. Bitwise. | – | 1.0079 / 1.0077 |
+| `COMPOSE_SKIP` | Interaction 1's projection, first linear and species skip composed per species. Rounding. | 0.8027 / 0.9546 | – |
+| `COMPOSE_FAST` | The composed weights bound once per table, the four products one joined `species_mm`. Bitwise. | – | 1.0240 / 1.0235 |
+| `COUNT_PLAN` | COMPOSE_SKIP's species plan by a counting sort. Bitwise. | – | 1.0115 / 1.0130 |
+| `CUEQ_PROJECTED` | cuEq's weight × projection kept as a buffer. Rounding. | 0.9480 / 0.9945 | 1.0010 / 1.0020 |
+| `GENERIC_FOLD_READOUT_TAIL` | The generic product's species skip composed with the readout linear. Rounding. | 0.9861 / 0.9908 | 1.0097 / 1.0072 |
+| All ten | | **0.7471 / 0.7469** (9.85 → 7.36 ms) | |
+
+Gate (`tools/force_stress_gate.py`, SrTiO3 3×3×3, NaCl, NbCl5; ratio to the ASE float32 error, limit 3): the plan
+before §3.8.4 forces 1.04 / 0.83 / 1.02, stress 1.17 / 1.19 / 2.74; with all ten forces 0.97 / 0.89 / 0.97, stress
+0.69 / 1.04 / 0.97. Energy under the 10 meV floor in both. Forces on a rattled SrTiO3 10×10×10 differ from the old
+plan by at most 1.0e-5 eV/Å (same build twice: 2.4e-6).
 
 ## 4. Tiled streaming (capacity mode)
 

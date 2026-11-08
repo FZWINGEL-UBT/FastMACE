@@ -1,5 +1,5 @@
 #!/bin/bash -l
-# alex_ab_pack v1: A/B packs on one NHR@FAU Alex A100 (docs/nhr-cluster.md §6.3). The Modal ab_pack starts one
+# alex_ab_pack v2: A/B packs on one NHR@FAU Alex A100 (docs/nhr-cluster.md §6.3). The Modal ab_pack starts one
 # process per switch and order. Here one process runs each model and build order: tools/ab_rewrites.py --pack
 # builds side a (the GPU's default plan) once per structure, and each switch once, instead of a and b for every
 # switch. On Alex a build of POLAR-1-M is about 4 min of CPU-bound Dynamo tracing, Inductor and graph capture.
@@ -18,7 +18,8 @@
 #   MODELS      "label=checkpoint ..." (checkpoint relative to $FM_ROOT/models; default polar1-m=MACE-POLAR-1-M.model)
 #   STRUCTURES  default "NaCl NbCl5"; WARMUP 200, BLOCK 256, BLOCKS 6 (per side); ORDERS default "ab ba"
 #   EXTRA       more tools/ab_rewrites.py arguments (e.g. "--timestep-fs 1 --precision float64")
-#   CACHE       FASTMACE_CACHE (default $FM_ROOT/cache). A warm cache saves Inductor's compile, not Dynamo's tracing
+#   CACHE       FASTMACE_CACHE (default $FM_ROOT/cache). A warm cache saves Inductor's compile, not Dynamo's tracing.
+#               With STAGE=1 the job reads it through a node-local directory whose oeq/ is its own (concurrent jobs)
 #   STAGE       1 (default): copy the interpreter, venv and source to node-local $TMPDIR first; 0: run them from $WORK
 #   ENV_TAR     with STAGE=1: a tar holding uv-python/<interpreter>/ and env/ (as made by `tar -cf X -C <root>
 #               uv-python env`), unpacked instead of copying the venv file by file (docs/nhr-cluster.md §6.3)
@@ -59,8 +60,22 @@ export FASTMACE_CACHE=${CACHE:-$root/cache} FASTMACE_MODELS=$root/models FASTMAC
 # Thread pools sized to the job's cores (16 per A100; Alex refuses more per GPU)
 n=$(nproc); export OMP_NUM_THREADS=$n MKL_NUM_THREADS=$n TORCHINDUCTOR_COMPILE_THREADS=$n
 mkdir -p "$FASTMACE_CACHE"
+if [ "${STAGE:-1}" = 1 ]; then
+  # The staged env is node-local, and every process points <cache>/oeq/cuda-runtime (OEq's stand-in CUDA home: links
+  # to the env's nvidia/cu13 headers and libraries) at its own env. Concurrent staged jobs sharing one cache would leave
+  # links into another node's $TMPDIR, and OEq's host-extension build fails ("cuda_runtime_api.h: No such file";
+  # 4963282, 8 November 2026). So the job gets a node-local cache: links to the shared cache's entries (Inductor,
+  # Triton, radial tables stay warm and shared) except oeq/, which is the job's own (its extension build, about 1 min).
+  shared=$FASTMACE_CACHE local_cache=$TMPDIR/fm/cache
+  mkdir -p "$local_cache/oeq" "$shared/inductor" "$shared/triton" "$shared/radial-tables"
+  for entry in "$shared"/* "$shared"/.[!.]*; do
+    [ -e "$entry" ] && [ "$(basename "$entry")" != oeq ] && ln -sfn "$entry" "$local_cache/$(basename "$entry")"
+  done
+  export FASTMACE_CACHE=$local_cache
+  note "cache $shared shared through $local_cache, oeq/ per job"
+fi
 cd "$src" || exit 4
-note "alex_ab_pack v1 job ${SLURM_JOB_ID:-?} on $(hostname) ($(nproc) cores, $(lscpu | sed -n 's/^Model name: *//p'));" \
+note "alex_ab_pack v2 job ${SLURM_JOB_ID:-?} on $(hostname) ($(nproc) cores, $(lscpu | sed -n 's/^Model name: *//p'));" \
   "$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader); source $(cat .source_commit 2>/dev/null)"
 failed=0
 for model in ${MODELS:-polar1-m=MACE-POLAR-1-M.model}; do

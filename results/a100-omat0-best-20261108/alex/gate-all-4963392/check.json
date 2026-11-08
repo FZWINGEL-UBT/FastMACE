@@ -1,0 +1,101 @@
+{
+ "constants": [
+  "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=True",
+  "fastmace.kernels.oeq_streaming.spline_forward:R128=True",
+  "fastmace.kernels.oeq_streaming.spline_forward:STAGE_EDGES=True",
+  "fastmace.kernels.oeq_streaming.wprime_backward:SPLINE_VECTOR=4",
+  "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_SH=True",
+  "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP=True",
+  "fastmace.kernels.triton.compose_skip:COMPOSE_FAST=True",
+  "fastmace.kernels.triton.compose_skip:COUNT_PLAN=True",
+  "fastmace.rewrites.cueq_projection:CUEQ_PROJECTED=True",
+  "fastmace.rewrites.species:GENERIC_FOLD_READOUT_TAIL=True"
+ ],
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "wprime": [
+  {
+   "repr": "groups=5616, terms=6, outputs=1280, q-major float2, value table (w from the table), power basis (Horner), spline (731 intervals, in use)",
+   "attached": true,
+   "in_use": true,
+   "intervals": 731,
+   "certificate": 0.4829565241304134,
+   "grid": [
+    [
+     0.3,
+     0.5,
+     157
+    ],
+    [
+     0.5,
+     0.75,
+     112
+    ],
+    [
+     0.75,
+     1.0,
+     87
+    ],
+    [
+     1.0,
+     1.5,
+     124
+    ],
+    [
+     1.5,
+     2.0,
+     54
+    ],
+    [
+     2.0,
+     2.5,
+     31
+    ],
+    [
+     2.5,
+     6.0,
+     166
+    ]
+   ],
+   "forward_registers": [
+    80
+   ],
+   "forward_local_bytes": [
+    8
+   ],
+   "forward_threads": 128,
+   "forward_min_blocks": 6,
+   "forward_parts": [
+    null
+   ],
+   "forward_stage_edges": true,
+   "wprime": {
+    "registers": 96,
+    "local_bytes": 0,
+    "shared_bytes": 20736
+   },
+   "wprime_stage_quads": false,
+   "wprime_stage_sh": 4
+  }
+ ],
+ "spline_in_use": true,
+ "compose_skip": [
+  true
+ ],
+ "compose_skip_in_use": true,
+ "compare": {
+  "constants": [
+   "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=False",
+   "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP=False",
+   "fastmace.rewrites.cueq_projection:CUEQ_PROJECTED=False",
+   "fastmace.rewrites.species:GENERIC_FOLD_READOUT_TAIL=False"
+  ],
+  "rattle": 0.05,
+  "max_abs": 1.0013580322265625e-05,
+  "max_force": 7.066776275634766,
+  "bitwise": false,
+  "same_build_max_abs": 2.384185791015625e-06,
+  "energy": -39724.421875,
+  "energy_diff": 0.011835575103759766,
+  "same_build_energy_diff": -3.218650817871094e-05
+ }
+}

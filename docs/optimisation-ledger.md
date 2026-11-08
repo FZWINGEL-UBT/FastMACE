@@ -4912,6 +4912,20 @@ Five ideas from the Codex H200 report after COMPOSE_SKIP. Item 1, `COMPOSE_FAST`
 
 Rounds 4 and 5 (main `65923679`, same night) measured the existing switches never timed on the H200: w′ `BLOCK_LDG` (tie, 1.0012 / 1.0001), `REDUX` (1.0206 / 1.0202) and the CUTLASS 3×TF32 `TILE` 32x64 / 64x32 (1.0023 / 1.0030, 1.0014 / 1.0035). All closed, off. What is left is in the kernels themselves: w′ 1.10 ms and the spline forward 0.81 ms of 3.40 ms kernel time per force call.
 
+<a id="a100-omat0-best"></a>
+#### a100-omat0-best: the H200 switches of 7–8 November on the A100 (A100 family)
+- Switches: `SPLINE_W`, `R128`, `STAGE_EDGES` (spline forward), `SPLINE_VECTOR`, `STAGE_SH` (w′), `COMPOSE_SKIP`, `COMPOSE_FAST`, `COUNT_PLAN` (compose_skip), `CUEQ_PROJECTED`, `GENERIC_FOLD_READOUT_TAIL`; candidate `POWER_BACKWARD`.
+- Engine: FM
+- Date/round: 8 November 2026 (owner, via the conductor: "Get a best configuration on a100 now for omat-0-medium based on the h200 results").
+- What: each H200-only switch measured on the A100 against the A100 defaults (pack 1), and each one turned off again from all ten (pack 2, leave-one-out), so every switch has its own same-process A/B in both build orders.
+- Status: ADOPTED on the A100 family (decision 66; `NVIDIA A100-SXM4-80GB` added to the ten `*_GPUS`, which covers the A100 80GB PCIe). `POWER_BACKWARD` stays H200-only.
+- Measured (NHR Alex A100-SXM4-80GB, main `1bd4f3be`, OMAT-0 medium, Benchmark_loup SrTiO3 10×10×10, `alex_ab_pack.sh` jobs 4963389 / 4963390), b/a ab / ba:
+  - against the A100 defaults: `SPLINE_W` 0.8654 / 0.8661, with `R128` 0.8491 / 0.8469, `COMPOSE_SKIP` 0.8027 / 0.9546, `CUEQ_PROJECTED` 0.9480 / 0.9945, `GENERIC_FOLD_READOUT_TAIL` 0.9861 / 0.9908, `POWER_BACKWARD` 0.9919 / 0.9969; all ten 0.7471 / 0.7469 (9.85 → 7.36 ms per MD step); all ten plus `POWER_BACKWARD` 0.7471 / 0.7492;
+  - off again from all ten (b = off, above 1 means the switch helps): `R128` (with `STAGE_EDGES`) 1.0325 / 1.0311, `STAGE_EDGES` 1.0050 / 1.0044, `SPLINE_VECTOR` (2) 1.0122 / 1.0115, `STAGE_SH` 1.0079 / 1.0077, `COMPOSE_FAST` 1.0240 / 1.0235, `COUNT_PLAN` 1.0115 / 1.0130, `CUEQ_PROJECTED` 1.0010 / 1.0020, `GENERIC_FOLD_READOUT_TAIL` 1.0097 / 1.0072;
+  - force/stress gate (jobs 4963391 / 4963392) with all ten on: passes, every ratio at or below the A100 default's (forces 0.97 / 0.89 / 0.97, stress 0.69 / 1.04 / 0.97 for SrTiO3 / NaCl / NbCl5; default stress 1.17 / 1.19 / 2.74); forces against the default build 1.0e-5 eV/Å (rounding), same build 2.4e-6.
+- Why: the H200's spline layout and the composed first-interaction skip carry over to the A100 at larger gains (the A100's w′ and forward were further from their bound); `POWER_BACKWARD` gains nothing once the spline w′ is on.
+- Sources: [a100-omat0-best](../results/a100-omat0-best-20261108/README.md).
+
 <a id="sx-layout-spline"></a>
 #### sx-layout-spline: Symmetrix-XL's interaction 2 forward layout with spline w, and the spline w′ (H200, lab)
 - Switch: `fastmace.kernels.oeq_streaming.spline_forward.SPLINE_W` (None: on for `SPLINE_W_GPUS`); launch shape `R128` (None: on for `R128_GPUS`), A/B overrides `THREADS`, `MIN_BLOCKS`, `PARTS` (lab variants in `tools/sx_layout_lab.py`)

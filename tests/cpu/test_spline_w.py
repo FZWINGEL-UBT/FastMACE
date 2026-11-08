@@ -325,7 +325,7 @@ def test_factor_w_and_cursor32_render_and_compile():
 
 
 def test_stage_edges_is_off_without_a_listed_gpu():
-    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200"]
+    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB"]
 
 
 def test_stage_edges_source_stages_the_tile_and_keeps_the_arithmetic():
@@ -355,7 +355,7 @@ def test_stage_edges_source_compiles_with_nvrtc():
 
 
 def test_stage_sh_reads_the_edge_features_from_shared_memory():
-    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200"]
+    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB"]
     blocks = [(1, [0]), (3, [64])]
     kwargs = dict(vector=4, table_w=True, factored=True, scale=True, horner=True, blocks=blocks, spline=GRID)
     plain = wp.render(_schedule(), "float", 4, **kwargs)

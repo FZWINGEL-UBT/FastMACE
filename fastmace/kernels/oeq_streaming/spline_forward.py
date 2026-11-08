@@ -22,7 +22,10 @@ from fastmace.kernels.gpu_models import GPUModels
 SPLINE_W = None
 # NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107): MD step b/a 0.8789 / 0.8775 (b = on; OMAT-0 medium,
 # SrTiO3 10x10x10, Benchmark_loup settings, ab / ba), force/stress gate passes. The A100 is not measured.
-SPLINE_W_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): MD step b/a 0.8654 / 0.8661 against the A100 defaults; all ten H200 switches together
+# 0.7471 / 0.7469 (9.85 -> 7.36 ms), force/stress gate passes.
+SPLINE_W_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # Launch shape (SX improvement screen, 7 November 2026; plans/notes/sx-layout-opportunities-20261107). THREADS: one
 # owner per (receiver, channel); 128 threads with 128 channels is one receiver per block, so receivers of different
 # degree retire independently instead of in pairs. MIN_BLOCKS: __launch_bounds__' minimum blocks per SM (a register
@@ -39,7 +42,10 @@ PARTS = False  # H200 on top of SPLINE_W with MIN_BLOCKS 4: 0.9938 / 0.9904 (und
 R128 = None
 # NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107): MD step b/a 0.9838 / 0.9848 on top of SPLINE_W
 # (80 registers, 8 bytes local memory).
-R128_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): on top of SPLINE_W 0.981 / 0.978; off again from all ten (with STAGE_EDGES) 1.0325 /
+# 1.0311 (b = off).
+R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # Codex H200 follow-up, item 4 (7 November 2026). FACTOR_W: a path whose terms all share one input component x_k
 # (scalar-input paths) or one edge component e_j (scalar-edge paths) multiplies w by it once (wf = w * x_k) and
 # accumulates fmaf(wf, rest, acc): fewer multiplies, rounding-class (the products associate differently; gate).
@@ -94,7 +100,9 @@ def shared_locator_default(device):
 STAGE_EDGES = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9864 / 0.9856 against the H200 defaults with COMPOSE_FAST,
 # CUEQ_PROJECTED and GENERIC_FOLD_READOUT_TAIL (ab / ba); forces and energy within the build's spread (decision 66).
-STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0050 / 1.0044 (b = off).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 STAGE_TILE = 32
 # PREFETCH_AHEAD (Codex H200 round-6 report item 2, 8 November 2026; bitwise): with STAGE_EDGES the channel loop hints
 # the table rows of the edge PREFETCH_AHEAD positions later (its first PREFETCH_PATHS paths) into L1 with

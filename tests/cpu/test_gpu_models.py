@@ -314,12 +314,14 @@ def test_h200_defaults():
     assert "NVIDIA H200" not in wprime_backward.BUTTERFLY_GPUS  # on 5 Nov; 0.9659 / 0.9677 off at d599cc70 (6 Nov)
     assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured
     # SPLINE_W (7 November 2026, results/spline-w-h200-20261107): MD H200 0.8789 / 0.8775, gate passes; R128 on top
-    # 0.9838 / 0.9848; PARTS off (0.9938 / 0.9904, under 1 %); the A100 not measured
+    # 0.9838 / 0.9848; PARTS off (0.9938 / 0.9904, under 1 %). The A100 family from 8 November 2026 (Alex, results/
+    # a100-omat0-best-20261108): all ten H200 switches 0.7471 / 0.7469, each faster in both orders, gate passes
     from fastmace.kernels.oeq_streaming import spline_forward
     assert "NVIDIA H200" in spline_forward.SPLINE_W_GPUS and "NVIDIA H200 NVL" in spline_forward.SPLINE_W_GPUS
     assert "NVIDIA H200" in spline_forward.R128_GPUS
-    assert "NVIDIA A100-SXM4-80GB" not in spline_forward.SPLINE_W_GPUS
-    assert "NVIDIA A100-SXM4-80GB" not in spline_forward.R128_GPUS
+    a100 = ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")
+    assert all(g in spline_forward.SPLINE_W_GPUS and g in spline_forward.R128_GPUS for g in a100)
+    assert all(g in spline_forward.STAGE_EDGES_GPUS and g in wprime_backward.STAGE_SH_GPUS for g in a100)
     assert spline_forward.PARTS is False
     assert spline_forward.MIN_BLOCKS is None  # R128's cap stays 6; cap 5 0.9925 / 0.9937, not combined with vec4
     # SPLINE_VECTOR (7 November 2026): the spline w' table as one float4 per weight, MD H200 0.9739 / 0.9793
@@ -327,7 +329,7 @@ def test_h200_defaults():
     from fastmace.kernels.triton import compose_skip, tabled_outer_sum as tos
 
     assert "NVIDIA H200" in compose_skip.COMPOSE_SKIP_GPUS  # 0.9698 / 0.9738, gate passes (7 November 2026)
-    assert "NVIDIA A100-SXM4-80GB" not in compose_skip.COMPOSE_SKIP_GPUS
+    assert all(g in compose_skip.COMPOSE_SKIP_GPUS and g in compose_skip.COUNT_PLAN_GPUS for g in a100)
     # measured and closed on the H200 (results/h200-compose-quads-20261107): none clears 1 %
     assert not wprime_backward.STAGE_QUADS_GPUS and not tos.PACKED_COEF_GPUS
     assert not spline_forward.FACTOR_W_GPUS and not spline_forward.CURSOR32_GPUS
@@ -339,7 +341,10 @@ def test_h200_defaults():
     # LINEAR_DIV_SPLIT 0.9972 / 1.0025 stays off
     assert "NVIDIA H200" in compose_skip.COMPOSE_FAST_GPUS and "NVIDIA H200" in cueq_projection.CUEQ_PROJECTED_GPUS
     assert not linear_div.LINEAR_DIV_SPLIT_GPUS
-    assert "NVIDIA A100-SXM4-80GB" not in wprime_backward.SPLINE_VECTOR_GPUS
+    assert all(g in wprime_backward.SPLINE_VECTOR_GPUS and g in compose_skip.COMPOSE_FAST_GPUS for g in a100)
+    assert all(g in cueq_projection.CUEQ_PROJECTED_GPUS for g in a100)
+    # POWER_BACKWARD on the A100: alone 0.9919 / 0.9969, on top of the ten 1.0006 / 1.0028 (b = on): stays H200-only
+    assert "NVIDIA A100-SXM4-80GB" not in tos.POWER_BACKWARD_GPUS
     assert wprime_backward.SPLINE_VECTOR is None and wprime_backward.spline_vector_default("cpu") == 2
 
 

@@ -419,7 +419,10 @@ FOLD_FIRST_DENSITY_LINEAR = True
 GENERIC_FOLD_READOUT_TAIL = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9855 / 0.9901 (ab / ba); force/stress gate passes (force
 # ratios 0.848 / 0.920 / 0.968, stress 0.437 / 0.824 / 1.043; decision 66).
-GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): MD step b/a 0.9861 / 0.9908 against the A100 defaults, off again from all ten H200
+# switches 1.0097 / 1.0072 (b = off); gate passes.
+GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 def generic_fold_readout_tail_default(name=None) -> bool:
