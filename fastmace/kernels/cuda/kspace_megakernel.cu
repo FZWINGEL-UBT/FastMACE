@@ -14,6 +14,9 @@
 // - every sum over pairs is split both ways: a work item is 32 rows (one per lane) times a chunk of the other
 //   index, its 8 warps striding the chunk; the chunks are sized so there are at least two items per resident block.
 //   Each item writes its own partial sums; a later phase adds them in chunk order (deterministic, no atomics);
+// - the narrow per-entry factors of the strided index (positions and sources, or k-vectors and the per-k glue) are
+//   staged in shared memory, FM_STAGE entries at a time, so each loop step reads them with a broadcast shared load
+//   instead of an L2 round trip (__ldcg, ~300 cycles at 16 warps per SM);
 // - each pair's phase is one precise sincosf (not the approximate __sincosf: |theta| reaches ~100 rad), then plain
 //   FFMA with the narrow factors as warp-broadcast loads; nothing [k, atoms] leaves the registers;
 // - the phases of one direction are separated by a grid barrier (an arrival counter; the grid is at most the
@@ -29,6 +32,7 @@
 #define FM_THREADS 256
 #define FM_WARPS 8
 #define FM_ROWS 32
+#define FM_STAGE 64  // entries of the strided index staged per step (8 per warp)
 
 extern "C" __device__ int fm_kspace_info[3] = {FM_THREADS, FM_ROWS, FM_WARPS};
 
@@ -72,16 +76,26 @@ __device__ void ksum(const float* __restrict__ k, const float* __restrict__ r, c
         float ac[W], as[W];
 #pragma unroll
         for (int w = 0; w < W; ++w) ac[w] = as[w] = 0.f;
-        const int n1 = min(N, (s + 1) * chunk);
-        for (int n = s * chunk + warp; n < n1; n += FM_WARPS) {
-            float sn, cs;
-            sincosf(dot3(kx, ky, kz, r[n * 3], r[n * 3 + 1], r[n * 3 + 2]), &sn, &cs);
-#pragma unroll
-            for (int w = 0; w < W; ++w) {
-                const float v = x[(size_t)n * W + w];
-                ac[w] = fmaf(cs, v, ac[w]);
-                as[w] = fmaf(sn, v, as[w]);
+        const int n0 = s * chunk, n1 = min(N, (s + 1) * chunk);
+        constexpr int E = 3 + W;  // staged per atom: r, x
+        for (int base = n0; base < n1; base += FM_STAGE) {
+            const int count = min(FM_STAGE, n1 - base);
+            for (int idx = threadIdx.x; idx < count * E; idx += FM_THREADS) {
+                const int e = idx / E, col = idx % E;
+                smem[idx] = col < 3 ? r[(base + e) * 3 + col] : x[(size_t)(base + e) * W + col - 3];
             }
+            __syncthreads();
+            for (int e = warp; e < count; e += FM_WARPS) {
+                const float* st = smem + e * E;
+                float sn, cs;
+                sincosf(dot3(kx, ky, kz, st[0], st[1], st[2]), &sn, &cs);
+#pragma unroll
+                for (int w = 0; w < W; ++w) {
+                    ac[w] = fmaf(cs, st[3 + w], ac[w]);
+                    as[w] = fmaf(sn, st[3 + w], as[w]);
+                }
+            }
+            __syncthreads();
         }
         float* mine = smem + (warp * FM_ROWS + lane) * 2 * W;
 #pragma unroll
@@ -121,13 +135,25 @@ __device__ void nsum(const float* __restrict__ k, const float* __restrict__ r, c
         float acc[W];
 #pragma unroll
         for (int w = 0; w < W; ++w) acc[w] = 0.f;
-        const int k1 = min(K, (s + 1) * chunk);
-        for (int kk = s * chunk + warp; kk < k1; kk += FM_WARPS) {
-            float sn, cs;
-            sincosf(dot3(k[kk * 3], k[kk * 3 + 1], k[kk * 3 + 2], rx, ry, rz), &sn, &cs);
+        const int k0 = s * chunk, k1 = min(K, (s + 1) * chunk);
+        constexpr int E = 3 + 2 * W;  // staged per k-vector: k, a, b
+        for (int base = k0; base < k1; base += FM_STAGE) {
+            const int count = min(FM_STAGE, k1 - base);
+            for (int idx = threadIdx.x; idx < count * E; idx += FM_THREADS) {
+                const int e = idx / E, col = idx % E, kk = base + e;
+                if (col < 3) smem[idx] = k[kk * 3 + col];
+                else if (col < 3 + W) smem[idx] = __ldcg(a + (size_t)kk * W + col - 3);
+                else smem[idx] = __ldcg(b + (size_t)kk * W + col - 3 - W);
+            }
+            __syncthreads();
+            for (int e = warp; e < count; e += FM_WARPS) {
+                const float* st = smem + e * E;
+                float sn, cs;
+                sincosf(dot3(st[0], st[1], st[2], rx, ry, rz), &sn, &cs);
 #pragma unroll
-            for (int w = 0; w < W; ++w)
-                acc[w] = fmaf(cs, __ldcg(a + (size_t)kk * W + w), fmaf(sn, __ldcg(b + (size_t)kk * W + w), acc[w]));
+                for (int w = 0; w < W; ++w) acc[w] = fmaf(cs, st[3 + w], fmaf(sn, st[3 + W + w], acc[w]));
+            }
+            __syncthreads();
         }
         float* mine = smem + (warp * FM_ROWS + lane) * W;
 #pragma unroll
@@ -175,45 +201,63 @@ __device__ void phase_backward(const float* __restrict__ k, const float* __restr
             for (int f = 0; f < CF; ++f) gn[f] = valid ? s0 * g[(size_t)atom * CF + f] : 0.f;
         }
         float grx = 0.f, gry = 0.f, grz = 0.f;
-        const int k1 = min(K, (s + 1) * chunk);
-        for (int kk = s * chunk + warp; kk < k1; kk += FM_WARPS) {
-            const float kx = k[kk * 3], ky = k[kk * 3 + 1], kz = k[kk * 3 + 2];
-            float sn, cs;
-            sincosf(dot3(kx, ky, kz, rx, ry, rz), &sn, &cs);
-            float p = 0.f, q = 0.f;
-#pragma unroll
-            for (int j = 0; j < CJ; ++j) {
-                const float vc = __ldcg(dyc + (size_t)kk * CJ + j), vs = __ldcg(dys + (size_t)kk * CJ + j);
-                p = fmaf(xn[j], vs, p);
-                q = fmaf(xn[j], vc, q);
-                dx[j] = fmaf(cs, vc, fmaf(sn, vs, dx[j]));
+        const int k0 = s * chunk, k1 = min(K, (s + 1) * chunk);
+        constexpr int E = 3 + 2 * CJ + (HAS_G ? 2 * CF : 0);  // staged per k-vector: k, dyc, dys (, a, b)
+        for (int base = k0; base < k1; base += FM_STAGE) {
+            const int count = min(FM_STAGE, k1 - base);
+            for (int idx = threadIdx.x; idx < count * E; idx += FM_THREADS) {
+                const int e = idx / E, col = idx % E, kk = base + e;
+                float v;
+                if (col < 3) v = k[kk * 3 + col];
+                else if (col < 3 + CJ) v = __ldcg(dyc + (size_t)kk * CJ + col - 3);
+                else if (col < 3 + 2 * CJ) v = __ldcg(dys + (size_t)kk * CJ + col - 3 - CJ);
+                else if (col < 3 + 2 * CJ + CF) v = __ldcg(a + (size_t)kk * CF + col - 3 - 2 * CJ);
+                else v = __ldcg(b + (size_t)kk * CF + col - 3 - 2 * CJ - CF);
+                smem[idx] = v;
             }
-            if (HAS_G) {
+            __syncthreads();
+            for (int e = warp; e < count; e += FM_WARPS) {
+                const int kk = base + e;
+                const float* st = smem + e * E;
+                const float kx = st[0], ky = st[1], kz = st[2];
+                float sn, cs;
+                sincosf(dot3(kx, ky, kz, rx, ry, rz), &sn, &cs);
+                float p = 0.f, q = 0.f;
 #pragma unroll
-                for (int f = 0; f < CF; ++f) {
-                    p = fmaf(gn[f], __ldcg(b + (size_t)kk * CF + f), p);
-                    q = fmaf(gn[f], __ldcg(a + (size_t)kk * CF + f), q);
+                for (int j = 0; j < CJ; ++j) {
+                    const float vc = st[3 + j], vs = st[3 + CJ + j];
+                    p = fmaf(xn[j], vs, p);
+                    q = fmaf(xn[j], vc, q);
+                    dx[j] = fmaf(cs, vc, fmaf(sn, vs, dx[j]));
+                }
+                if (HAS_G) {
+#pragma unroll
+                    for (int f = 0; f < CF; ++f) {
+                        p = fmaf(gn[f], st[3 + 2 * CJ + CF + f], p);
+                        q = fmaf(gn[f], st[3 + 2 * CJ + f], q);
+                    }
+                }
+                const float dth = fmaf(cs, p, -sn * q);
+                grx = fmaf(dth, kx, grx);
+                gry = fmaf(dth, ky, gry);
+                grz = fmaf(dth, kz, grz);
+                if (GK) {
+                    float ex = dth * rx, ey = dth * ry, ez = dth * rz;
+#pragma unroll
+                    for (int off = 16; off > 0; off >>= 1) {
+                        ex += __shfl_xor_sync(0xffffffffu, ex, off);
+                        ey += __shfl_xor_sync(0xffffffffu, ey, off);
+                        ez += __shfl_xor_sync(0xffffffffu, ez, off);
+                    }
+                    if (lane == 0) {
+                        float* dst = gk_part + ((size_t)tile * K + kk) * 3;
+                        dst[0] = ex;
+                        dst[1] = ey;
+                        dst[2] = ez;
+                    }
                 }
             }
-            const float dth = fmaf(cs, p, -sn * q);
-            grx = fmaf(dth, kx, grx);
-            gry = fmaf(dth, ky, gry);
-            grz = fmaf(dth, kz, grz);
-            if (GK) {
-                float ex = dth * rx, ey = dth * ry, ez = dth * rz;
-#pragma unroll
-                for (int off = 16; off > 0; off >>= 1) {
-                    ex += __shfl_xor_sync(0xffffffffu, ex, off);
-                    ey += __shfl_xor_sync(0xffffffffu, ey, off);
-                    ez += __shfl_xor_sync(0xffffffffu, ez, off);
-                }
-                if (lane == 0) {
-                    float* dst = gk_part + ((size_t)tile * K + kk) * 3;
-                    dst[0] = ex;
-                    dst[1] = ey;
-                    dst[2] = ez;
-                }
-            }
+            __syncthreads();
         }
         float* mine = smem + (warp * FM_ROWS + lane) * WP;
 #pragma unroll
