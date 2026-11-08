@@ -5,10 +5,10 @@
 TILE_PREFETCH_DEVICE`` (the next tile's graph built ahead with the state on the device): each switch on against off
 on the same tiled force field, and the tiled call against the whole-system call of the same plan, on SrTiO3 6x6x6
 (1,080 atoms, rattled and strained) in tiles of 256 receivers, eager and padded. The forces are summed with atomics
-on the GPU, so the sides agree to float32 rounding, not bitwise; the energy, a forward only, is bitwise wherever the
-switch leaves the forward as it was (all but TILE_BLOCK_ROWS). Needs ``FASTMACE_MODELS`` (the checkpoint) and the hybrid backend's kernels; the
-w' path is on only where decision 66 lists the GPU for OMAT-0 medium (otherwise the test skips). Runs in a fresh
-interpreter (the OEq runtime is prepared before MACE is imported).
+on the GPU, and so are the forward's sums: the sides agree to float32 rounding, not bitwise, energy included. Needs
+``FASTMACE_MODELS`` (the checkpoint) and the hybrid backend's kernels; the w' path is on only where decision 66 lists
+the GPU for OMAT-0 medium (otherwise the test skips). Runs in a fresh interpreter (the OEq runtime is prepared before
+MACE is imported).
 """
 
 import json
@@ -115,9 +115,10 @@ def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
                           "padded-prefetch"}
     for name, case in cases.items():
         assert case["tiles"] > 1, name  # halos on every tile
-        # TILE_BLOCK_ROWS multiplies linear_1 on the block layout, as the whole-system call does (rounding: 4e-10
-        # relative on the 5060 Ti); the other switches leave the forward as it was.
-        assert case["energy_rel"] <= (1e-8 if name.endswith("block_rows") else 1e-12), (name, case)
+        # The forward's sums are float32 atomics too, so even an exact switch moves the energy by rounding (1.9e-9
+        # relative seen for the virial, which leaves the forward as it was); TILE_BLOCK_ROWS also multiplies
+        # linear_1 on the block layout, as the whole-system call does.
+        assert case["energy_rel"] <= 1e-8, (name, case)
         assert case["forces"] <= 1e-5, (name, case)  # atomics' order (float32)
         assert case["stress"] <= 1e-5, (name, case)  # the virial: another summation order
         assert case["whole_energy_rel"] <= 1e-6, (name, case)

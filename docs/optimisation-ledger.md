@@ -649,6 +649,58 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 - Measured: MD step A100-SXM4-80GB 1.0018 / 0.9993 (Modal, 31799fb6), RTX 5060 Ti 1.002; bitwise (`test_leading_columns_bit_for_bit`).
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15.
 
+### Tiled call: whole-system rewrites in the tile bodies (8 November 2026)
+
+OMAT-0 medium, SrTiO3 975,560 atoms, RTX 5060 Ti, same-process A/B of the tiled call (`tools/bench/tiled_ab.py`), b/a
+ab / ba. "Device" is the plain schedule with the state on the device; "wave" the wavefront with the state on the host.
+
+| ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [tiled-prefetch-device](#tiled-prefetch-device) | Prefetch the next tile's graph with the state on the device | `tiled.TILE_PREFETCH_DEVICE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.939 / 0.941 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-block-rows](#tiled-block-rows) | w′ block message narrowed to a tile's receivers, `linear_1` on the block layout | `generic.TILE_BLOCK_ROWS` | FM | DEFAULT (scoped: off under the wavefront) | decision 66, 2026-11-08 | device 0.918 / 0.921; wave 1.030 / 1.060 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-virial](#tiled-virial) | Strain gradient as sym(Vᵀ ∂E/∂V) instead of a strain leaf | `tiled.TILE_VIRIAL` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.970 / 0.955; wave 0.994 / 0.959 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-graph-cache](#tiled-graph-cache) | Tile graphs kept on the device for the call | `tiled.TILE_GRAPH_CACHE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, not under the wavefront) | decision 66, 2026-11-08 | device 0.948 / 0.960 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+
+<a id="tiled-prefetch-device"></a>
+#### tiled-prefetch-device: TileConfig.prefetch with the state on the device
+- Switch: `fastmace.model.tiled.TILE_PREFETCH_DEVICE` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: with the state on the device, the next tile's graph is built on the side stream while the current body runs. Before, it was built after the body had drained the GPU, because `torch.unique` and the edge counts sync with it (1.2 s of 8.6 s idle).
+- Status: DEFAULT (scoped). Exact.
+- Measured: 0.939 / 0.941 (cfec5551, the other switches on).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-block-rows"></a>
+#### tiled-block-rows: the w′ block message for a tile's receivers
+- Switch: `fastmace.rewrites.generic.modules.TILE_BLOCK_ROWS` (None: the module's `tile_block_rows`, set per tiled call to `not wave`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: the w′ convolution's BLOCK_MESSAGE groups are narrowed to the tile's receivers (a view; the w′ backward reads the message gradient at receivers only) and `linear_1` multiplies them as on the whole system. Before, a tile densified the message to `[R + H, width]`, sliced the receivers and padded the gradient back.
+- Status: DEFAULT (scoped: plain schedule only). Rounding (energy 4e-10 relative); the force/stress gate passed with it on.
+- Measured: device 0.918 / 0.921; wavefront 1.030 / 1.060 (slower; the cause was not found, so it is off there).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-virial"></a>
+#### tiled-virial: the tile's strain gradient from its edges
+- Switch: `fastmace.model.tiled.TILE_VIRIAL` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: sweeps 2 and 3 compute dE/dε as sym(Vᵀ ∂E/∂V) over the tile's edges (padding edges masked), instead of a strain leaf whose backward was a split-K `sgemm_largek` (about 0.3 µs/atom per call).
+- Status: DEFAULT (scoped). Rounding (stress within 8.6e-8 eV/Å³ of 0.029); force/stress gate passed.
+- Measured: device 0.970 / 0.955; wavefront 0.994 / 0.959.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-graph-cache"></a>
+#### tiled-graph-cache: tile graphs kept for the call
+- Switch: `fastmace.model.tiled.TILE_GRAPH_CACHE` (None: `TILE_GRAPH_CACHE_FRACTION` 0.25 on `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: the slot-key pass keeps each tile's local edge index (int32) and shifts on the device until the call ends (20 bytes per edge), so the sweeps gather it instead of building it again (four builds per tile and call before). The budget is the fraction of the free memory less the tiles' predicted workspace, and a measuring call keeps nothing (the first version lowered the receiver cap from 16,384 to 8,192). Off under the wavefront.
+- Status: DEFAULT (scoped). Exact.
+- Measured: 0.948 / 0.960 (887b6b1d).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
 ### Alternative backends and external comparisons
 
 | ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
@@ -698,6 +750,7 @@ are not A/B comparisons.
 | 2026-11-03 | Benchmark_loup on the A100; CUTLASS; BF16×3 | Generic radial tables on the A100, generic fused forward + wprime backward, CUTLASS 3×TF32, BF16×3 (FACTO), cuBLASDx INT8, OMAT-0 kernel lab | Generic radial tables on the A100s; generic fused forward + wprime on 5060 Ti, Ada, A100; `tf32x3_gemms` (CUTLASS) on the A100-SXM4-80GB | A100 OMAT-0 3.64 µs/atom/step (NVE) |
 | 2026-11-04 | OMAT-0 kernel round; TP backward | Tensor-core fused forward, `TABLE_W`, `BLOCK_MESSAGE` (+ `BLOCK_LDG`), degree-5 tables, zero-column skip, species GEMM, `FACTORED`, `FACTORED_SCALE`, `SYMMETRIC_PAIRS`, stress bisection | All per GPU under d66 (see defaults-by-gpu); every A100 model counts as one (owner); NbCl5 stress excess accepted | A100 OMAT-0 2.73–2.97 µs/atom/step (NVE, `4b70e3f2`) |
 | 2026-11-05 | A100 rounds 1–5 (OMAT-0; not to be confused with opt round 5 of 26 October) | Round 1: five outside ideas assessed; round 2: fused first interaction, tabled forward, Horner, scalar paths, run-walking outer-sum backward, `generic_fold_product_linear`; round 3: w′ backward attribution, M-precontraction (dropped); round 4: `PREFETCH` (rejected), `VEC_SH`, `VEC_A`, `TC_WFRAG`, `TC_TP` (rejected), 3×FP16 (rejected on accuracy); round 5: `EDGE_SH` | Round 2 and 4 switches and `EDGE_SH` per GPU (d66); `BLOCK_LDG` dropped; `FACTORED` on the 5060 Ti | – |
+| 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 
 ## Closed directions
 

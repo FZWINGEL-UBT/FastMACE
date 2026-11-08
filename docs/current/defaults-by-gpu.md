@@ -220,6 +220,10 @@ On the A100 family and the other GPUs, small keeps the pair off until it has its
 | --- | --- | --- | --- | --- | --- |
 | `TileConfig.lanes` `auto` (`tiled.LANE_GPUS`, exact): two sweep-2 tiles on disjoint SM halves | – (1.05× per pair) | on (1.09× per pair) | – | under `cudaMallocAsync` | [tiled-concurrent-tiles](../validation/tiled/tiled-concurrent-tiles.md) |
 | `TileConfig.backward_chunk_scale` `auto` (`tiled.TILE_CHUNK_SCALE`, exact) | ×4 | ×4 | ×1 | 1.08M SrTiO3, wavefront, R 8,192: 5060 Ti −10.5 %, Ada −3.2 %; RTX PRO 6000 tiles do not chunk | `results/tiled-ideas-20261102` |
+| `tiled.TILE_PREFETCH_DEVICE` (`TILED_SPEED_GPUS`, exact): prefetch with the state on the device | on | – | – | OMAT-0 SrTiO3 975,560, device state: 0.939 / 0.941 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `generic.TILE_BLOCK_ROWS` (every GPU, rounding): w′ block message for the receivers only | on, off under the wavefront | on, off under the wavefront | on, off under the wavefront | 5060 Ti device state 0.918 / 0.921; wavefront 1.030 / 1.060 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_VIRIAL` (`TILED_SPEED_GPUS`, rounding): strain gradient from the edge gradients | on | – | – | 0.970 / 0.955; wavefront 0.994 / 0.959; gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_GRAPH_CACHE` (`TILED_SPEED_GPUS`, exact): tile graphs kept for the call (25 % of free memory less the workspace; not under the wavefront) | on | – | – | 0.948 / 0.960; all four 0.795 / 0.787 (8.38 → 6.66 s) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 
 ## 2. Default MH-1 float32 plan (GPU-independent)
 
