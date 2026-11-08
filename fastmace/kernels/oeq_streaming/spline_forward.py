@@ -253,8 +253,9 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
 BLOCK_ORDER = None
 # NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`, on
 # top of SORT_BY_LENGTH): MD step b/a 0.9753 / 0.9724 (3.514 -> 3.42 ms); forces 2.6e-6 against the same build's
-# 3.3e-6 eV/A (bitwise forward; w' atomics).
-BLOCK_ORDER_GPUS = GPUModels(("NVIDIA H200",))
+# 3.3e-6 eV/A (bitwise forward; w' atomics). NVIDIA A100-SXM4-80GB (Alex pack 7, job 4965032, against the A100
+# defaults of 59c1034e, SORT_BY_LENGTH off): MD step b/a 0.9953 / 0.9945 (7.37 -> 7.34 ms).
+BLOCK_ORDER_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 def block_order_default(device):
