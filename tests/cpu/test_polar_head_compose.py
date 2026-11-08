@@ -172,7 +172,7 @@ def test_uvu_revert_undoes_the_composition(monkeypatch, layout):
     assert uvu.revert(rewritten) == names
     for module in (rewritten.update, rewritten.readout):
         assert not getattr(module, head_compose.MARKER, False)
-        assert not any(key.startswith("_head_") for _, tp in module.named_modules() for key in tp._buffers)
+        assert not any(name.rsplit(".", 1)[-1].startswith("_head_") for name, _ in module.named_buffers())
         assert all("forward" not in sub.__dict__ for sub in module.modules())
     _check(holder.update, rewritten.update)
     _check(holder.readout, rewritten.readout)
