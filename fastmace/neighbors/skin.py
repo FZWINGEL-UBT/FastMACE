@@ -14,6 +14,7 @@ import numpy as np
 import torch
 
 from ..config import DEFAULT_SKIN_A, NeighbourConfig
+from ..kernels.gpu_models import GPUModels
 from .buckets import edge_capacity
 from .pair_search import decode_codes, screen_codes
 
@@ -30,6 +31,32 @@ BUILD_CHUNK = 1 << 18
 # to this many candidates (about 150k MH-1 atoms) compact in one chunk, as before; the result is the same for any
 # chunk size (elementwise tests, offsets from exact integer counts).
 COMPACT_CHUNK = 1 << 22
+# SORT_BY_LENGTH (8 November 2026): with sort_receivers, each receiver's candidates (within its sender group) are
+# ordered by their length at the build, in LENGTH_BINS bins of (cutoff + skin), then by sender and image. Compaction
+# keeps the order, so between rebuilds every receiver walks its edges nearly by length; neighbouring receivers then
+# read the same spline-table slabs at about the same time (SPLINE_W forward: one 20 KB slab per edge, about 45 % of
+# its time on the H200; lab: 792 -> 680 us, results/omat0-breakthroughs-assessment-20261108). Only the summation
+# order within a receiver changes (rounding). None: on for SORT_BY_LENGTH_GPUS (none until the MD A/B).
+SORT_BY_LENGTH = None
+SORT_BY_LENGTH_GPUS = GPUModels(())
+LENGTH_BINS = 4096
+
+
+def sort_by_length_default(device):
+    """``SORT_BY_LENGTH`` on ``device``: the constant when set, else on for ``SORT_BY_LENGTH_GPUS``."""
+    if SORT_BY_LENGTH is not None:
+        return bool(SORT_BY_LENGTH)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in SORT_BY_LENGTH_GPUS
+
+
+def length_bins(length2, reach):
+    """Bin in ``[0, LENGTH_BINS)`` of each squared length (float64) of a pair within ``reach``."""
+    if torch.is_tensor(length2):
+        b = torch.floor(torch.sqrt(length2) * (LENGTH_BINS / reach)).to(torch.int64)
+        return torch.clamp(b, 0, LENGTH_BINS - 1)
+    b = np.floor(np.sqrt(length2) * (LENGTH_BINS / reach)).astype(np.int64)
+    return np.clip(b, 0, LENGTH_BINS - 1)
 
 
 def times_3x3(rows, matrix):
@@ -139,6 +166,7 @@ class SkinNeighbourList:
         self.edge_multiple = config.edge_multiple
         self.headroom = config.capacity_headroom
         self.sort_receivers = _resolved(sort_receivers, config.sort_receivers, "sort_receivers")
+        self.sort_by_length = bool(self.sort_receivers) and sort_by_length_default(self.device)
         self.gpu_build = _resolved(gpu_build, config.gpu_neighbour_list, "gpu_neighbour_list")
         # Optional per-atom group (sender species, segmented first sum): secondary sort key. A device
         # tensor at a fixed address that its owner refreshes in place (a derived buffer of the species,
@@ -292,10 +320,13 @@ class SkinNeighbourList:
         # reproducible order after its cutoff partition. Padding is appended below, after
         # this permutation.
         if self.sort_receivers and len(receiver) > 1:
+            keys = [receiver]  # np.lexsort: the last key is the primary one
             if self.sender_groups is not None:  # by receiver, then sender group (stable)
-                order = np.lexsort((self.sender_groups.cpu().numpy()[sender], receiver))
-            else:
-                order = np.argsort(receiver, kind="stable")
+                keys.insert(0, self.sender_groups.cpu().numpy()[sender])
+            if self.sort_by_length:  # then by length (SORT_BY_LENGTH)
+                vectors = positions[receiver] - positions[sender] + unit_shifts @ self.cell
+                keys.insert(0, length_bins((vectors * vectors).sum(axis=1), self.cutoff + self.skin))
+            order = np.lexsort(tuple(keys)) if len(keys) > 1 else np.argsort(receiver, kind="stable")
             sender = sender[order]
             receiver = receiver[order]
             unit_shifts = unit_shifts[order]
@@ -374,12 +405,13 @@ class SkinNeighbourList:
             image, sender, receiver = decode_codes(codes[start:stop], natoms)
             vectors = wrapped[receiver] - wrapped[sender] + image_vectors[image]
             unit_shifts = images[image] - offsets[receiver] + offsets[sender]
-            keep = ((vectors * vectors).sum(dim=1) < r * r) & ~(
+            length2 = (vectors * vectors).sum(dim=1)
+            keep = (length2 < r * r) & ~(
                 (sender == receiver) & (unit_shifts == 0).all(dim=1))
             del vectors, unit_shifts
             # The screen returns pairs in scheduling order; a unique key makes the order
             # deterministic. Rejected pairs get the largest key and are cut off after the sort.
-            key[start:stop] = torch.where(keep, self._sort_key(image, sender, receiver, natoms, constants),
+            key[start:stop] = torch.where(keep, self._sort_key(image, sender, receiver, natoms, constants, length2),
                                           torch.iinfo(torch.int64).max)
             kept += keep.sum()
             del image, sender, receiver, keep
@@ -407,13 +439,23 @@ class SkinNeighbourList:
         self.rebuilds += 1
         return grew
 
-    def _sort_key(self, image, sender, receiver, natoms, constants):
-        """The unique int64 order key of screened pairs: receiver (and sender group), sender, image if sorted."""
+    def _length_sorted(self, natoms, constants):
+        """Whether the key can hold the length bins (SORT_BY_LENGTH) without overflowing int64."""
+        if not self.sort_by_length:
+            return False
+        groups = constants["group_count"] if constants["groups"] is not None else 1
+        return natoms * groups * LENGTH_BINS * natoms * len(constants["images"]) < 2 ** 62
+
+    def _sort_key(self, image, sender, receiver, natoms, constants, length2=None):
+        """The unique int64 order key of screened pairs: receiver (and sender group), the length bin
+        (SORT_BY_LENGTH), sender, image if sorted."""
         nimages = len(constants["images"])
         if self.sort_receivers:
             primary = receiver
             if constants["groups"] is not None:  # receiver, then sender group
                 primary = receiver * constants["group_count"] + constants["groups"][sender]
+            if length2 is not None and self._length_sorted(natoms, constants):
+                primary = primary * LENGTH_BINS + length_bins(length2, self.cutoff + self.skin)
             return (primary * natoms + sender) * nimages + image
         return (image * natoms + sender) * natoms + receiver
 
@@ -460,16 +502,10 @@ class SkinNeighbourList:
         sender, receiver = rest // natoms, rest % natoms
         vectors = wrapped[receiver] - wrapped[sender] + image_vectors[image]
         unit_shifts = images[image] - offsets[receiver] + offsets[sender]
-        keep = valid & ((vectors * vectors).sum(dim=1) < r * r) & ~(
+        length2 = (vectors * vectors).sum(dim=1)
+        keep = valid & (length2 < r * r) & ~(
             (sender == receiver) & (unit_shifts == 0).all(dim=1))
-        nimages = len(images)
-        if self.sort_receivers:
-            primary = receiver
-            if constants["groups"] is not None:
-                primary = receiver * constants["group_count"] + constants["groups"][sender]
-            key = (primary * natoms + sender) * nimages + image
-        else:
-            key = (image * natoms + sender) * natoms + receiver
+        key = self._sort_key(image, sender, receiver, natoms, constants, length2)  # build_gpu's key
         key = torch.where(keep, key, torch.iinfo(torch.int64).max)
         n = keep.sum()
         k = min(slots, self.capacity)
