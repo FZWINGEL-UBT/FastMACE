@@ -428,8 +428,12 @@ STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
 })
 # RTX 5060 Ti (local, 7 November 2026, ~/fm-runs/offlocal-ab-20261107): with the OFF tables, MD step b/a in both
 # orders, water_216: OFF23-small 0.677 / 0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811.
+# RTX 4000 Ada (murphy, 8 November 2026, results/off-polar-alex-20261106), the skip and the tables together, MD
+# step b/a, water_216, abab / abba: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725,
+# OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
 STOCK_FIRST_SKIP = None
-STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti"))
+STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                   "NVIDIA RTX 4000 Ada Generation"))
 
 
 def stock_first_skip_default(device=None):

@@ -386,7 +386,8 @@ def test_mace_off_first_block_species_skip_needs_the_pinned_forward(monkeypatch)
 
 def test_stock_first_skip_default_by_device(monkeypatch):
     assert gm.STOCK_FIRST_SKIP is None
-    assert gm.STOCK_FIRST_SKIP_GPUS == ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti")
+    assert gm.STOCK_FIRST_SKIP_GPUS == ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                       "NVIDIA RTX 4000 Ada Generation")
     assert gm.stock_first_skip_default("NVIDIA A100 80GB PCIe")  # the family (off-polar-alex, 7 November 2026)
     assert not gm.stock_first_skip_default(torch.device("cpu"))
     assert not gm.stock_first_skip_default("NVIDIA L4")
