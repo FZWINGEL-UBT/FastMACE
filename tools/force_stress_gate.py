@@ -628,8 +628,13 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                 entry["configs"].append(assemble_row(key, entry["natoms"], references[structure, "f64"][where],
                                                      references[structure, "ase_f32"][where], production[where],
                                                      extra))
-            meta["summary"][structure] = summarize(entry["configs"], gated=gated)
-            print(structure, "summary", json.dumps(meta["summary"][structure]), flush=True)
+            summary = summarize(entry["configs"], gated=gated)
+            # Rule 13 revisions of the production plan, on the summary line: a revised plan is not the plan the
+            # run asked for (8 November 2026: a float32 self-check failure re-planned polar_uvu off, and gates of
+            # POLAR candidates passed on a model without them). With --production-constant the gate fails.
+            mark_revisions(summary, production_info, structure)
+            meta["summary"][structure] = summary
+            print(structure, "summary", json.dumps(summary), flush=True)
         meta["passed"] = all(s["passed"] for s in meta["summary"].values())
         meta["status"] = "complete"
     except Exception as exc:
@@ -839,6 +844,20 @@ def fastmace_values(engine, atoms):
     out = field(x)
     return (float(out.energy.detach().reshape(-1)[0]), out.forces.detach().double().cpu().numpy(),
             out.stress.detach().double().cpu().numpy(), dict(edges=count, padded_edges=padded))
+
+
+def mark_revisions(summary, production_info, structure):
+    """Put the production plan's rule 13 revisions for ``structure`` on its summary; a run with
+    ``--production-constant`` (a candidate) then fails, since the plan it gated is not the candidate's."""
+    revisions = [text for where, plan in (production_info.get("plans") or {}).items()
+                 if where.split("/")[0] == structure and isinstance(plan, dict)
+                 for text in plan.get("rule13_revisions") or []]
+    if revisions:
+        summary["rule13_revisions"] = revisions
+        if production_info.get("production_constants"):
+            summary["passed"] = False
+            summary["failed_because"] = "rule 13 revised the candidate's plan"
+    return summary
 
 
 def build_with_rule13(build, plan, limit=8):

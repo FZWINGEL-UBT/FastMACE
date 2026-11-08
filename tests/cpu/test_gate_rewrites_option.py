@@ -65,3 +65,15 @@ def test_the_gate_applies_rule_13_as_production_does():
     assert getattr(final.rewrites, failed) in ("off", False) and revisions == [final.reason]
     assert revisions[0].startswith("rule 13:")
     assert gate.build_with_rule13(lambda candidate: "first", plan) == ("first", plan, [])
+
+
+def test_a_revised_candidate_plan_fails_the_gate():
+    """Rule 13 revisions show on the summary; with --production-constant the gate fails (8 November 2026: POLAR
+    candidates passed with polar_uvu re-planned off by a float32 self-check failure)."""
+    info = {"plans": {"NaCl/fixed": {"rule13_revisions": ["rule 13: polar_uvu off"]}, "NbCl5/fixed": {}},
+            "production_constants": ["fastmace.longrange.polar:MEGAKERNEL=True"]}
+    summary = gate.mark_revisions({"passed": True}, info, "NaCl")
+    assert summary["passed"] is False and summary["rule13_revisions"] == ["rule 13: polar_uvu off"]
+    assert gate.mark_revisions({"passed": True}, info, "NbCl5") == {"passed": True}
+    default = gate.mark_revisions({"passed": True}, {"plans": info["plans"]}, "NaCl")
+    assert default["passed"] is True and default["rule13_revisions"]  # the default plan: reported, not failed
