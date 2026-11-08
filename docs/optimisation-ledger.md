@@ -3981,8 +3981,11 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
   on any cell, gate passes for S, M and L). `False` keeps MACE's head projections; `uvu.revert` undoes it.
 - Measured (MD step b/a, abab / abba, RTX 5060 Ti, on the `FOLD_UPDATE` + `SPIN_BATCHED` baseline): NaCl S 0.906 /
   0.909, M 0.876 / 0.872, L 0.883 / 0.879; NbCl5 S 1.001 / 1.005, M 0.997 / 1.000, L 1.002 / 0.998. Gates (3×):
-  pass on S and M (NaCl, NbCl5), L NaCl (RTX A4000) and L NbCl5 (Modal A100-80GB, $0.81; the float64 reference
-  does not fit 16–20 GB).
+  pass on S and M (NaCl, NbCl5), L NaCl (RTX A4000) and L NbCl5 (Modal A100-80GB on 2baa8634, $0.79,
+  `RewriteConfig.polar_uvu = on`, no rule-13 revision; energy 0.86, forces 0.58, stress 1.01; the float64
+  reference does not fit 16–20 GB). The first L NbCl5 gate (690d43d0, $0.81) does not count: the float32 fold
+  self-check failed there, so rule 13 re-planned `polar_uvu` off and the gate measured MACE's forward
+  (fixed in 49de3662; `force_stress_gate` now fails a gate whose candidate plan was revised, 2baa8634).
 - Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
 
 <a id="model-polar-dead-degrees"></a>
