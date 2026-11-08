@@ -52,8 +52,8 @@ def _run(block, node_attrs, node_feats, potential, charges):
     return out.detach(), gx, gp
 
 
-def test_the_constant_is_off():
-    assert update_fold.FOLD_UPDATE is False
+def test_the_fold_is_the_default():
+    assert update_fold.FOLD_UPDATE is True
 
 
 @pytest.mark.parametrize("lmax", [0, 1, 2])
@@ -93,6 +93,7 @@ def test_a_replaced_source_embedding_is_folded_as_it_runs():
 def test_uvu_apply_folds_only_with_the_constant(monkeypatch):
     holder = torch.nn.Module()
     holder.block = _block(1)
+    monkeypatch.setattr(update_fold, "FOLD_UPDATE", False)
     uvu.apply(holder)
     assert not getattr(holder.block, update_fold.MARKER, False)
     holder = torch.nn.Module()
@@ -113,3 +114,29 @@ def test_float32_constants_follow_the_model():
     block = _block(2).float()
     update_fold.apply(block)
     assert block._fold_out.dtype == torch.float32 and block._fold_species.dtype == torch.float32
+
+
+def test_revert_restores_mace_and_drops_the_buffers():
+    block = _block(1)
+    folded = copy.deepcopy(block)
+    update_fold.apply(folded)
+    assert update_fold.revert(folded) == [""] and update_fold.revert(folded) == []
+    assert "forward" not in folded.__dict__ and not getattr(folded, update_fold.MARKER, False)
+    assert not any(key.startswith("_fold_") for key, _ in folded.named_buffers())
+    inputs = _inputs(block)
+    for expected, got in zip(_run(block, *inputs), _run(folded, *inputs)):
+        assert torch.equal(got, expected)
+
+
+def test_the_selfcheck_passes_and_catches_a_wrong_fold():
+    holder = torch.nn.Module()
+    holder.block = _block(2)
+    folded = copy.deepcopy(holder)
+    update_fold.apply(folded)
+    worst, checked, detail = update_fold.selfcheck(holder, folded, 1e-10)
+    assert checked == 1 and worst <= 1e-12 and detail == []
+    with torch.no_grad():
+        folded.block._fold_out.mul_(1.001)
+    worst, checked, detail = update_fold.selfcheck(holder, folded, 1e-10)
+    assert worst > 1e-4 and "relative error" in detail[0]
+    assert update_fold.selfcheck(folded, folded, 1e-10)[0] == float("inf")  # the original must be unfolded
