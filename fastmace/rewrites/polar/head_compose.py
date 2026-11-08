@@ -29,15 +29,20 @@ from __future__ import annotations
 import math
 import types
 
-# COMPOSE_HEADS: True composes every supported head of a PolarMACE model when polar_uvu is applied (an A/B side's
-# choice; per GPU through decision 66 once measured).
-COMPOSE_HEADS = False
+# COMPOSE_HEADS: True composes every supported head of a PolarMACE model when polar_uvu is applied. Default on
+# (polar-megakernel, 8 November 2026) under the pure-removal rule (decision 66; the products are reassociated, as
+# in FOLD_UPDATE): MD step b/a, abab / abba, RTX 5060 Ti, on the FOLD_UPDATE + SPIN_BATCHED baseline: NaCl S
+# 0.906 / 0.909, M 0.876 / 0.872, L 0.883 / 0.879; NbCl5 S 1.001 / 1.005, M 0.997 / 1.000, L 1.002 / 0.998.
+# tools/force_stress_gate.py passes on S and M (NaCl, NbCl5; RTX 4000 Ada and RTX A4000), L NaCl (A4000) and L
+# NbCl5 (Modal A100-80GB). False: MACE's head projections.
+COMPOSE_HEADS = True
 UPDATE_CLASS = "AgnosticEmbeddedOneBodyVariableUpdate"
 READOUT_CLASS = "OneBodyMLPFieldReadout"
 EMBEDDING_CLASS = "AgnosticChargeBiasedLinearPotentialEmbedding"
 MARKER = "_fastmace_head_compose"
 _TAG = "fastmace_head_compose"
 _READOUT_TRANSPOSES = ("_q_to_mul_ir", "_v_to_mul_ir", "_up_from_mul_ir")
+_SAVED = "_head_compose_transposes"  # the readout's transposes that apply removed (ir_mul), for revert
 
 
 def _irrep_entries(irreps):
@@ -263,12 +268,47 @@ def apply(model, context=None):
                 up.forward = types.MethodType(_up_forward, up)
             # ir_mul: the sources are gathered in their own layout and the result is never transposed back, so the
             # readout's layout transposes (permutations) go; its forward skips a None transpose.
+            saved = {}
             for wrapper in _READOUT_TRANSPOSES:
                 if getattr(module, wrapper, None) is not None:
+                    saved[wrapper] = getattr(module, wrapper)
                     setattr(module, wrapper, None)
+            module.__dict__[_SAVED] = saved  # for revert
         setattr(module, MARKER, True)
         names.append(name)
     return names
 
 
-__all__ = ["COMPOSE_HEADS", "apply", "composed_dot", "support"]
+def _uninstall(tp):
+    """Drop a dot product's composed plans; it runs ``uvu_forward`` again when uvu is still applied."""
+    from fastmace.rewrites.polar import uvu
+
+    for key in [key for key in tp._buffers if key.startswith("_head_")]:
+        tp._buffers.pop(key)
+    tp.__dict__.pop("_head_plans", None)
+    if tp.__dict__.get(uvu.MARKER):
+        tp.forward = types.MethodType(uvu.uvu_forward, tp)
+    else:
+        tp.__dict__.pop("forward", None)
+
+
+def revert(model):
+    """Undo ``apply``: MACE's head projections and layout transposes again; returns the module names."""
+    names = []
+    for name, module in model.named_modules():
+        if not module.__dict__.pop(MARKER, None):
+            continue
+        if type(module).__name__ == UPDATE_CLASS:
+            module.potential_embedding.__dict__.pop("forward", None)
+            _uninstall(module.dot_products)
+        else:
+            for up, tp in ((module.linear_up_q, module.dot_products_q), (module.linear_up_v, module.dot_products_v)):
+                up.__dict__.pop("forward", None)
+                _uninstall(tp)
+            for wrapper, transpose in module.__dict__.pop(_SAVED, {}).items():
+                setattr(module, wrapper, transpose)
+        names.append(name)
+    return names
+
+
+__all__ = ["COMPOSE_HEADS", "apply", "composed_dot", "revert", "support"]

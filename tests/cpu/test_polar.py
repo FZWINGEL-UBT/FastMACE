@@ -182,7 +182,8 @@ def test_uvu_on_a_tiny_polar_model():
     assert names and uvu.is_applied(rewritten) and not uvu.is_applied(model)
     assert uvu.is_applied(copy.deepcopy(rewritten))  # a deep copy stays rewritten
     result = uvu.selfcheck(model, rewritten)
-    checked = [name for name in names if not name.endswith("(dead degrees pruned)")]  # pruning: inside the checks
+    checked = [name for name in names  # pruning and composition: inside the uvu checks
+               if not name.endswith(("(dead degrees pruned)", "(head composed)"))]
     assert result["passed"] and result["modules"] == len(checked) and result["max_relative_error"] <= 1e-10
     assert uvu.revert(rewritten) == names and not uvu.is_applied(rewritten)
 

@@ -103,7 +103,7 @@ def apply(model, context=None):
         names += [f"{name} (update MLP folded)" for name in update_fold.apply(model)]
     from fastmace.rewrites.polar import head_compose
 
-    if head_compose.COMPOSE_HEADS:  # the head projections composed into the dot products (polar-megakernel, P1)
+    if head_compose.COMPOSE_HEADS:  # the head projections composed into the dot products (P1; default on)
         names += [f"{name} (head composed)" for name in head_compose.apply(model)]
     return names
 
@@ -115,11 +115,13 @@ def revert(model):
         if module.__dict__.pop("forward", None) is not None:
             names.append(name)
         module.__dict__.pop(MARKER, None)
-    from fastmace.rewrites.polar import head_liveness, update_fold
+    from fastmace.rewrites.polar import head_compose, head_liveness, update_fold
 
+    composed = head_compose.revert(model)
     folded = update_fold.revert(model)
     names += [f"{name} (dead degrees pruned)" for name in head_liveness.revert(model)]  # apply's order
     names += [f"{name} (update MLP folded)" for name in folded]
+    names += [f"{name} (head composed)" for name in composed]
     return names
 
 

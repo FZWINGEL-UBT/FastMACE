@@ -16,7 +16,17 @@ import torch
 field_blocks = pytest.importorskip("mace.modules.field_blocks")
 from e3nn import o3  # noqa: E402
 
-from fastmace.rewrites.polar import head_compose, update_fold, uvu  # noqa: E402
+from fastmace.rewrites.polar import head_compose, head_liveness, update_fold, uvu  # noqa: E402
+
+SHIPPED = head_compose.COMPOSE_HEADS  # the default, before the fixture below pins it
+
+
+@pytest.fixture(autouse=True)
+def _plain_uvu(monkeypatch):
+    """uvu.apply alone: no pruning, fold or composition unless a test asks (all three are on by default)."""
+    monkeypatch.setattr(head_liveness, "PRUNE_DEAD_DEGREES", False)
+    monkeypatch.setattr(update_fold, "FOLD_UPDATE", False)
+    monkeypatch.setattr(head_compose, "COMPOSE_HEADS", False)
 
 POTENTIAL = o3.Irreps("2x0e+2x1o+2x0e+2x1o")  # field_irreps * 2 (two spins), as PolarMACE builds it
 CHARGES = o3.Irreps("1x0e+1x1o+1x0e+1x1o")
@@ -90,8 +100,8 @@ def _check(block, composed):
         torch.testing.assert_close(got, expected, rtol=1e-11, atol=1e-12)
 
 
-def test_the_constant_is_off():
-    assert head_compose.COMPOSE_HEADS is False
+def test_the_constant_is_on():
+    assert SHIPPED is True
 
 
 @pytest.mark.parametrize("layout", ["mul_ir", "ir_mul"])
@@ -149,3 +159,23 @@ def test_uvu_apply_composes_only_with_the_constant(monkeypatch):
     monkeypatch.setattr(head_compose, "COMPOSE_HEADS", True)
     names = uvu.apply(holder)
     assert "update (head composed)" in names and "readout (head composed)" in names
+
+
+@pytest.mark.parametrize("layout", ["mul_ir", "ir_mul"])
+def test_uvu_revert_undoes_the_composition(monkeypatch, layout):
+    holder = torch.nn.Module()
+    holder.update, holder.readout = _update(1, layout=layout), _readout(1, layout=layout)
+    monkeypatch.setattr(head_compose, "COMPOSE_HEADS", True)
+    rewritten = copy.deepcopy(holder)
+    names = uvu.apply(rewritten)
+    assert "update (head composed)" in names and "readout (head composed)" in names
+    assert uvu.revert(rewritten) == names
+    for module in (rewritten.update, rewritten.readout):
+        assert not getattr(module, head_compose.MARKER, False)
+        assert not any(key.startswith("_head_") for _, tp in module.named_modules() for key in tp._buffers)
+        assert all("forward" not in sub.__dict__ for sub in module.modules())
+    _check(holder.update, rewritten.update)
+    _check(holder.readout, rewritten.readout)
+    uvu.apply(rewritten)  # and composes again
+    assert getattr(rewritten.readout, head_compose.MARKER, False)
+    _check(holder.readout, rewritten.readout)

@@ -24,9 +24,10 @@ SHIPPED = head_liveness.PRUNE_DEAD_DEGREES  # the default, before the fixture be
 
 @pytest.fixture(autouse=True)
 def _plain_uvu(monkeypatch):
-    """uvu.apply alone: no pruning and no fold unless a test asks (both are on by default)."""
+    """uvu.apply alone: no pruning, fold or composition unless a test asks (all three are on by default)."""
     monkeypatch.setattr(head_liveness, "PRUNE_DEAD_DEGREES", False)
     monkeypatch.setattr(update_fold, "FOLD_UPDATE", False)
+    monkeypatch.setattr(head_compose, "COMPOSE_HEADS", False)
 
 
 def _check_close(block, rewritten, rtol=1e-11):

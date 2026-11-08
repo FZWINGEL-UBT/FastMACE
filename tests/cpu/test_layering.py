@@ -119,7 +119,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                    "PHASE_RECURRENCE": "k-space phases from per-axis tables; A/B"},
     "fastmace/kernels/triton/kspace_megakernel.py": {"CUDA": "k-space megakernel in CUDA C++, not Triton; A/B"},
     "fastmace/rewrites/polar/update_fold.py": {"FOLD_UPDATE": "POLAR update MLP folded at setup; default on"},
-    "fastmace/rewrites/polar/head_compose.py": {"COMPOSE_HEADS": "POLAR head maps composed at setup; A/B"},
+    "fastmace/rewrites/polar/head_compose.py": {"COMPOSE_HEADS": "POLAR head maps composed at setup; default on"},
     "fastmace/rewrites/polar/head_liveness.py": {"PRUNE_DEAD_DEGREES": "dead POLAR head degrees pruned; default on"},
     "fastmace/rewrites/inductor.py": {"SMALL_MATMULS": "small mm/addmm as fused multiply-sum; rejected, A/B"},
     "fastmace/rewrites/linear/__init__.py": {"E3NN_BLOCK_LINEAR": "e3nn Linears as BlockLinear (POLAR); A/B"},
