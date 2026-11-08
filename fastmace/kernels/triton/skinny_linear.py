@@ -53,9 +53,12 @@ RADIAL_TF32X3_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 _ALIGN = 4  # cutlass.tf32x3.ALIGNMENT: K and N padded to it
 # SPLIT_COLUMNS: None follows SPLIT_COLUMNS_GPUS; True / False: an A/B side's choice. RTX 5060 Ti (36 SMs), MD step
 # b/a, water_216, abab / abba: MACE-OFF23-large 0.951 / 0.953 (16-column tiles; 32-column tiles 1.07 / 1.06);
-# the kernel alone on [512, 3808] @ [3808, 65] 0.88x, on 896 rows (the split grid over one wave) 1.07x.
+# the kernel alone on [512, 3808] @ [3808, 65] 0.88x, on 896 rows (the split grid over one wave) 1.07x. With the
+# one-wave rule, 8 November: OFF23-large 0.950 / 0.954; OFF23-small, -medium, OFF23b and OFF24 0.993-1.006 (their
+# chunks are over 576 rows, so the split never fires). Exact (tests/gpu/test_folded_tiles_cuda.py, bitwise), so on
+# by decision 66 on the 5060 Ti; the A100 and the Ada are not measured.
 SPLIT_COLUMNS = None
-SPLIT_COLUMNS_GPUS = GPUModels(())
+SPLIT_COLUMNS_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 SPLIT_BLOCK_P = 16
 
 
