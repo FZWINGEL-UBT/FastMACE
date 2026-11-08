@@ -199,7 +199,7 @@ def selfcheck(original, rewritten, threshold, atoms=7, seed=0):
         reference = originals.get(name)
         if reference is None or reference.__dict__.get(MARKER):
             return math.inf, checked, [f"{name}: no unfolded block in the original"]
-        device = next(iter(module.buffers())).device
+        device = module._fold_out.device  # the weights' device (apply); a submodule's first buffer may be on the CPU
         test = copy.deepcopy(module).double()
         ref = copy.deepcopy(reference).double()
         species = module.node_attrs_irreps.dim
