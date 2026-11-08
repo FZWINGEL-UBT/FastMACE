@@ -652,6 +652,70 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
     assert kept.last["list_reused"] is False and kept.list_rebuilds == 3
 
 
+@pytest.mark.parametrize("reach", [20.0, 900.0], ids=["small-cell", "large-coordinates"])
+def test_filter32_keeps_exactly_the_float64_tests_edges(reach):
+    """``TILE_FILTER32``: the float32 test with the float64 one in its band keeps the same edges, units and shifts as
+    the float64 test, also for pairs within 1e-7 A of the cutoff and coordinates up to 900 A."""
+    from fastmace.model.tiled import _filter32, _filter32_band
+    from fastmace.neighbors.skin import times_3x3
+
+    torch.manual_seed(3)
+    cutoff, n, e = 5.0, 4000, 60000
+    cell = torch.tensor([[11.3, 0.0, 0.0], [0.4, 12.1, 0.0], [0.2, -0.3, 10.7]], dtype=torch.float64)
+    positions64 = (torch.rand(n, 3, dtype=torch.float64) * 2 - 1) * (reach - 15)
+    sender, receiver = torch.randint(0, n, (e,)), torch.randint(0, n // 2, (e,))
+    codes = torch.randint(0, 27, (e,))
+    table = torch.stack([torch.arange(27) // 9, torch.arange(27) // 3 % 3, torch.arange(27) % 3], 1).double() - 1
+    shifts27 = times_3x3(table, cell)
+    unit = table[codes]
+    # the first n / 2 pairs: each its own sender (atoms n / 2 .. n - 1, never a receiver), placed at the cutoff
+    # +- up to 1e-7 A from its receiver along a random direction
+    near = torch.arange(n // 2)
+    sender[near] = near + n // 2
+    direction = torch.nn.functional.normalize(torch.randn(n // 2, 3, dtype=torch.float64), dim=1)
+    length = cutoff + (torch.rand(n // 2, dtype=torch.float64) * 2 - 1) * 1e-7
+    positions64 = positions64.clone()
+    positions64[sender[near]] = positions64[receiver[near]] + shifts27[codes[near]] - direction * length.unsqueeze(1)
+    reach_now = float(positions64.abs().max()) + float(shifts27.abs().max())
+    band = _filter32_band(cutoff, reach_now)
+    got = _filter32(positions64.float(), positions64, shifts27, band, cutoff, sender, receiver, unit, codes,
+                    torch.float32)
+    vectors = positions64[receiver] - positions64[sender] + times_3x3(unit, cell)
+    keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
+    expected = sender[keep], receiver[keep], unit[keep], times_3x3(unit, cell)[keep].to(torch.float32)
+    lengths = vectors.norm(dim=1)
+    assert int(((lengths - cutoff).abs() < 1e-6).sum()) > 1000  # many pairs at the cutoff
+    for a, b in zip(got, expected):
+        assert torch.equal(a, b)
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_filter32_tiled_call_is_bitwise_the_float64_filter(mode, monkeypatch):
+    """``TILE_FILTER32`` in the tiled call: a call reusing its kept lists gives bitwise the call with the float64
+    filter (the same edges in the same order)."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    x0 = field._prepare_one_off(atoms).clone()
+    rng = np.random.default_rng(7)
+    direction = torch.tensor(rng.normal(size=(len(atoms), 3)), dtype=x0.dtype)
+    direction /= direction.norm(dim=1, keepdim=True)
+    x1 = x0 + 0.4 * field.neighbours.skin * direction
+    results = {}
+    for fast in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_FILTER32", fast)
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse=True))
+        tiled(x0)
+        tiled(x0)  # TorchScript's first call in a process rounds differently
+        results[fast] = tiled(x1)
+        assert tiled.last["list_reused"] is True
+    assert torch.equal(results[True].energy, results[False].energy)
+    assert torch.equal(results[True].forces, results[False].forces)
+    assert torch.equal(results[True].stress, results[False].stress)
+
+
 def test_tile_lists_not_kept_below_the_host_floor():
     """``list_reuse`` is the default for tile lists; a host with less than ``list_reuse_floor`` available keeps
     nothing (neither the kept lists nor the list cache: the later sweeps search again), says why in the call's

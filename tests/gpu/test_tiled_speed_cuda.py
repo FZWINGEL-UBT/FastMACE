@@ -124,3 +124,44 @@ def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
         assert case["whole_energy_rel"] <= 1e-6, (name, case)
         assert case["whole_forces"] <= 1e-4, (name, case)
         assert case["whole_stress"] <= 1e-4, (name, case)
+
+
+@pytest.mark.parametrize("reach", [60.0, 900.0], ids=["small-cell", "large-coordinates"])
+def test_filter32_keeps_exactly_the_float64_tests_edges_on_cuda(reach):
+    """``model.tiled.TILE_FILTER32`` on CUDA: the float32 test with the float64 one in its band keeps the same edges
+    and shifts as the float64 test (CUDA's own float64 kernels), with a quarter of the pairs within 1e-7 A of the
+    cutoff."""
+    import torch
+
+    from fastmace.model.tiled import _filter32, _filter32_band
+    from fastmace.neighbors.skin import times_3x3
+
+    if not torch.cuda.is_available():
+        pytest.skip("needs CUDA")
+    device = torch.device("cuda")
+    generator = torch.Generator(device="cpu").manual_seed(11)
+    cutoff, n, e = 6.0, 200_000, 4_000_000
+    cell = torch.tensor([[23.3, 0.0, 0.0], [0.4, 22.1, 0.0], [0.2, -0.3, 21.7]], dtype=torch.float64, device=device)
+    positions64 = ((torch.rand(n, 3, dtype=torch.float64, generator=generator) * 2 - 1) * (reach - 25)).to(device)
+    sender = torch.randint(0, n, (e,), generator=generator).to(device)
+    receiver = torch.randint(0, n // 2, (e,), generator=generator).to(device)
+    codes = torch.randint(0, 27, (e,), generator=generator).to(device)
+    index = torch.arange(27, device=device)
+    table = torch.stack([index // 9, index // 3 % 3, index % 3], 1).double() - 1
+    shifts27 = times_3x3(table, cell)
+    unit = table[codes]
+    near = torch.arange(n // 2, device=device)
+    sender[near] = near + n // 2
+    direction = torch.nn.functional.normalize(torch.randn(n // 2, 3, dtype=torch.float64, generator=generator), dim=1)
+    length = cutoff + (torch.rand(n // 2, dtype=torch.float64, generator=generator) * 2 - 1) * 1e-7
+    positions64[sender[near]] = (positions64[receiver[near]] + shifts27[codes[near]]
+                                 - direction.to(device) * length.to(device).unsqueeze(1))
+    band = _filter32_band(cutoff, float(positions64.abs().max()) + float(shifts27.abs().max()))
+    got = _filter32(positions64.float(), positions64, shifts27, band, cutoff, sender, receiver, unit, codes,
+                    torch.float32)
+    vectors = positions64[receiver] - positions64[sender] + times_3x3(unit, cell)
+    keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
+    expected = sender[keep], receiver[keep], unit[keep], times_3x3(unit, cell)[keep].to(torch.float32)
+    assert int(((vectors.norm(dim=1) - cutoff).abs() < 1e-6).sum()) > 50_000
+    for a, b in zip(got, expected):
+        assert torch.equal(a, b)

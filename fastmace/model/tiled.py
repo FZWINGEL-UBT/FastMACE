@@ -80,6 +80,12 @@ TILE_VIRIAL = None
 # call without.
 TILE_GRAPH_CACHE = None
 TILE_GRAPH_CACHE_FRACTION = 0.25
+# TILE_FILTER32 (exact): the kept lists' per-call cutoff test (list_reuse) in float32, with the float64 test again
+# only for the edges whose float32 squared length lies within a bound of the cutoff's (``_filter32_band``: four times
+# the float32 error for coordinates up to the call's largest), and the float64 shifts of the one-byte unit shifts
+# from a 27-row table (``times_3x3`` per row: bitwise the per-edge product). The same edges, shifts and order as the
+# float64 test. The RTX 5060 Ti runs float64 at 1/64 of float32: the test took about 0.2 us per atom per call.
+TILE_FILTER32 = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -798,6 +804,34 @@ def _pack_units(unit):
     return None
 
 
+def _filter32_band(cutoff, reach):
+    """``TILE_FILTER32``'s band: a bound on |d2_32 - d2_64| near the cutoff, for float32 copies of coordinates and
+    shifts up to ``reach`` in magnitude, times four. Each vector component carries at most 6 * reach * 2^-24 (the
+    inputs' rounding and the subtraction's and addition's), and d2 = |v|^2 near |v| = cutoff moves by at most
+    2 sqrt(3) cutoff e + 3 e^2 for a component error e, plus the float32 sum's 4 d2 2^-24."""
+    e = 6.0 * (abs(reach) + cutoff) * 2.0 ** -24
+    return 4.0 * (2.0 * 3.0 ** 0.5 * cutoff * e + 3.0 * e * e + 4.0 * cutoff * cutoff * 2.0 ** -24)
+
+
+def _filter32(positions32, positions64, shifts27, band, cutoff, sender, receiver, unit, codes, float_dtype):
+    """``TILE_FILTER32``: the kept lists' cutoff test of the float64 one (``positions64[receiver] -
+    positions64[sender] + shift`` squared and summed below cutoff^2), decided in float32 except within ``band``,
+    where the float64 test runs on those edges alone. Returns ``(sender, receiver, unit, shifts)`` as the float64
+    path does: the shifts are ``shifts27`` rows (``times_3x3`` of the one-byte codes) in ``float_dtype``."""
+    import torch
+
+    shift = shifts27[codes]  # float64 [E, 3], each row bitwise times_3x3 of its unit shift
+    v32 = positions32[receiver] - positions32[sender] + shift.to(torch.float32)
+    d2 = (v32 * v32).sum(dim=1)
+    limit = cutoff ** 2
+    keep = d2 < limit
+    close = ((d2 - limit).abs() <= band).nonzero().squeeze(1)
+    if close.numel():
+        v = positions64[receiver[close]] - positions64[sender[close]] + shift[close]
+        keep[close] = (v * v).sum(dim=1) < limit
+    return sender[keep], receiver[keep], unit[keep], shift[keep].to(float_dtype)
+
+
 def _unpack_units(packed, dtype, device):
     """The float unit shifts [E, 3] of ``_pack_units``' result, exactly."""
     import torch
@@ -1100,6 +1134,16 @@ class TiledForceField:
                 bins.bin(positions)
             # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device).
             positions64 = positions.to(device=self.device, dtype=torch.float64) if kept is not None else None
+            # TILE_FILTER32: float32 positions (12 bytes per atom) and the band of squared lengths tested again
+            # in float64; the float64 shifts of the 27 one-byte unit codes
+            fast = kept is not None and self._reusing and self._speed(TILE_FILTER32)
+            if fast:
+                positions32 = positions64.to(torch.float32)
+                codes = torch.arange(27, device=self.device)
+                units27 = torch.stack([codes // 9, codes // 3 % 3, codes % 3], dim=1).to(torch.float64) - 1
+                shifts27 = times_3x3(units27, bins.cell.to(device=self.device, dtype=torch.float64))
+                reach = float(positions64.abs().max()) + float(shifts27.abs().max()) if n else 0.0
+                band = _filter32_band(cutoff, reach)
             # With kept lists, the cache holds the tiles' filtered lists from their sweep 1 (under the wavefront until
             # their sweep 3: the band), so sweeps 2 and 3 skip the superset's copy and float64 filter. At the host
             # limit (the floor reached while it fills) the cache is dropped for this and later calls: the later sweeps
@@ -1136,6 +1180,9 @@ class TiledForceField:
                     sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
+                    if fast and packed.dtype == torch.uint8:
+                        return _filter32(positions32, positions64, shifts27, band, cutoff, sender, receiver, unit,
+                                         packed.long(), bins.float_dtype)
                 shifts64 = times_3x3(unit.to(torch.float64), bins.cell)
                 vectors = positions64[receiver] - positions64[sender] + shifts64
                 keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
