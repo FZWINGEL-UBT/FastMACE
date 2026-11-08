@@ -127,89 +127,6 @@ PREFETCH_AHEAD = None
 PREFETCH_AHEAD_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 PREFETCH_AHEAD_DISTANCE = 2
 PREFETCH_PATHS = 4
-# BULK_SLAB (8 November 2026, lab): with STAGE_EDGES each live edge's table slab (Q float4, contiguous: 20 KB for
-# OMAT-0 medium) is copied into a ring of BULK_SLAB shared-memory buffers by one cp.async.bulk (TMA, sm_90+) issued
-# BULK_SLAB edges ahead and completed on an mbarrier, so the channel loop reads the slab from shared memory instead of
-# waiting on L2. The same values in the same arithmetic: bitwise. 0: off; an int: the number of buffers. Off until
-# measured (BULK_SLAB_GPUS empty).
-BULK_SLAB = 0
-BULK_SLAB_GPUS = GPUModels(())
-BULK_SLAB_BUFFERS = 2
-
-
-def bulk_slab_default(device):
-    """``BULK_SLAB`` on ``device``: the constant when set, else ``BULK_SLAB_BUFFERS`` on ``BULK_SLAB_GPUS`` and 0."""
-    if BULK_SLAB:
-        return int(BULK_SLAB)
-    device = torch.device(device)
-    listed = device.type == "cuda" and torch.cuda.get_device_name(device) in BULK_SLAB_GPUS
-    return int(BULK_SLAB_BUFFERS) if listed else 0
-
-
-_BULK_HELPERS = r"""
-__device__ __forceinline__ void bulk_issue(float4* dst, const float4* src, unsigned long long* bar, unsigned bytes) {
-    const unsigned b = (unsigned)__cvta_generic_to_shared(bar), d = (unsigned)__cvta_generic_to_shared(dst);
-    asm volatile("fence.proxy.async.shared::cta;" ::: "memory");  // the generic reads of the slot come first
-    asm volatile("mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;" :: "r"(b), "r"(bytes) : "memory");
-    asm volatile("cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes [%0], [%1], %2, [%3];"
-                 :: "r"(d), "l"(src), "r"(bytes), "r"(b) : "memory");
-}
-__device__ __forceinline__ void bulk_wait(unsigned long long* bar, unsigned parity) {
-    const unsigned b = (unsigned)__cvta_generic_to_shared(bar);
-    unsigned done = 0u;
-    do {
-        asm volatile("{ .reg .pred p; mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2; selp.u32 %0, 1, 0, p; }"
-                     : "=r"(done) : "r"(b), "r"(parity) : "memory");
-    } while (!done);
-}
-"""
-_BULK_SWAPS = (
-    ("constexpr float R_MAX = ", "constexpr int NBUF = {nbuf};\n{helpers}constexpr float R_MAX = "),
-    ("    __shared__ __align__(16) float s_sh[TILE * ED];\n",
-     "    __shared__ __align__(16) float s_sh[TILE * ED];\n"
-     "    __shared__ __align__(128) float4 s_slab[NBUF][Q];  // BULK_SLAB: the ring of slabs\n"
-     "    __shared__ __align__(8) unsigned long long s_bar[NBUF];\n"),
-    ("    for (int64_t base = eb; base < ee; base += TILE) {\n",
-     "    if (ch == 0) {  // BULK_SLAB: one arrival (the issuer's expect_tx) per phase\n"
-     "        for (int j = 0; j < NBUF; ++j)\n"
-     "            asm volatile(\"mbarrier.init.shared::cta.b64 [%0], 1;\" :: "
-     "\"r\"((unsigned)__cvta_generic_to_shared(&s_bar[j])));\n"
-     "        asm volatile(\"fence.mbarrier_init.release.cluster;\" ::: \"memory\");\n"
-     "    }\n"
-     "    __syncthreads();\n"
-     "    unsigned parity = 0u;  // bit j: the phase buffer j waits for next\n"
-     "    for (int64_t base = eb; base < ee; base += TILE) {\n"),
-    ("        const int count = s_count;\n        for (int k = 0; k < count; ++k) {\n",
-     "        const int count = s_count;\n"
-     "        if (ch == 0)  // the ring is free: the previous tile ended with a barrier after its last read\n"
-     "            for (int j = 0; j < NBUF && j < count; ++j)\n"
-     "                bulk_issue(s_slab[j], table + s_tq[j], &s_bar[j], (unsigned)(Q * sizeof(float4)));\n"
-     "        for (int k = 0; k < count; ++k) {\n"
-     "            const int slot = k % NBUF;\n"
-     "            bulk_wait(&s_bar[slot], (parity >> slot) & 1u);\n"
-     "            parity ^= 1u << slot;\n"),
-    ("            const float4* tq = table + s_tq[k] + ch;\n", "            const float4* tq = s_slab[slot] + ch;\n"),
-    ("__ldg(tq + ", "*(tq + "),
-    ("        }\n        __syncthreads();\n    }\n",
-     "            __syncthreads();  // BULK_SLAB: every thread is done with this slot\n"
-     "            if (ch == 0 && k + NBUF < count)\n"
-     "                bulk_issue(s_slab[slot], table + s_tq[k + NBUF], &s_bar[slot], (unsigned)(Q * sizeof(float4)));\n"
-     "        }\n        __syncthreads();\n    }\n"),
-)
-
-
-def bulk_source(source, buffers):
-    """``spline_forward``'s STAGE_EDGES source with BULK_SLAB: each live edge's slab copied ahead into one of
-    ``buffers`` shared-memory slots (cp.async.bulk + mbarrier) and read from there."""
-    if "she = s_sh" not in source:
-        raise ValueError("BULK_SLAB reads STAGE_EDGES' staged slab offsets: it needs stage_edges")
-    for old, new in _BULK_SWAPS:
-        new = new.format(nbuf=int(buffers), helpers=_BULK_HELPERS) if "{nbuf}" in new else new
-        count = source.count(old)
-        if count == 0 or (count > 1 and old != "__ldg(tq + "):
-            raise ValueError(f"BULK_SLAB: the forward source holds {count} of {old.strip()[:60]!r}")
-        source = source.replace(old, new)
-    return source
 
 
 def prefetch_ahead_default(device):
@@ -310,7 +227,7 @@ def _factor(p, xi):
 
 def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
            name="spline_forward", factor_w=False, cursor32=False, shared_locator=False, stage_edges=False,
-           prefetch=0, block_order=False, bulk=0):
+           prefetch=0, block_order=False):
     """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
     ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here. ``part``:
     the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds.
@@ -318,10 +235,7 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
     (``SHARED_LOCATOR``): the edge's slab and t read from ``spline_locator``'s record. ``stage_edges``
     (``STAGE_EDGES``): the edges staged per tile, for a launch of one block per receiver with ``threads`` = C.
     ``prefetch`` (``PREFETCH_AHEAD``; with ``stage_edges``): hint the table rows of the edge that many positions on.
-    ``block_order`` (``BLOCK_ORDER``): the receiver of owner row k is ``order[k]`` (an int32 permutation argument).
-    ``bulk`` (``BULK_SLAB``; with ``stage_edges``, not ``prefetch``): the number of shared-memory slab buffers."""
-    if bulk and (not stage_edges or prefetch):
-        raise ValueError("BULK_SLAB needs STAGE_EDGES and replaces PREFETCH_AHEAD")
+    ``block_order`` (``BLOCK_ORDER``): the receiver of owner row k is ``order[k]`` (an int32 permutation argument)."""
     if stage_edges and shared_locator:
         raise ValueError("STAGE_EDGES and SHARED_LOCATOR are alternatives")
     if prefetch and not stage_edges:
@@ -329,7 +243,6 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
     source = _render(schedule, blocks, grid, r_max, path_scale, part, threads, min_blocks, name, factor_w, cursor32,
                      stage_edges, int(prefetch))
     source = located_source(source, grid) if shared_locator else source
-    source = bulk_source(source, bulk) if bulk else source
     return ordered_source(source) if block_order else source
 
 
@@ -677,19 +590,15 @@ class SplineForward:
         # STAGE_EDGES: only where a block is one receiver (thread = channel) and nothing else changes the edge head
         self.stage_edges = (stage_edges_default(device) and self.threads == self.channels and not self.shared_locator
                             and not self.cursor32)
-        # BULK_SLAB: cp.async.bulk and its mbarrier need sm_90 or later
-        sm90 = device.type == "cuda" and torch.cuda.get_device_capability(device) >= (9, 0)
-        self.bulk = bulk_slab_default(device) if self.stage_edges and sm90 else 0
-        self.prefetch = prefetch_ahead_default(device) if self.stage_edges and not self.bulk else 0  # PREFETCH_AHEAD
+        self.prefetch = prefetch_ahead_default(device) if self.stage_edges else 0  # PREFETCH_AHEAD
         self.block_order = block_order_default(device) if block_order is None else bool(block_order)
         # BLOCK_ORDER: the receivers' order the owning force field binds before its calls (``bind_order``; any
         # permutation of [0, N) gives the same message); a call with another row count walks them in index order.
         self.order, self._identity = None, {}
-        self.dynamic_shared = 0  # bytes of unused dynamic shared memory per block (a lab's occupancy control)
         self.init_args = (schedule, blocks, grid, r_max, device, path_scale, shared_locator)
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
-                               self.stage_edges, self.prefetch, self.block_order, self.bulk)
+                               self.stage_edges, self.prefetch, self.block_order)
                         for k, part in enumerate(self.parts)]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
@@ -737,8 +646,7 @@ class SplineForward:
         types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * 7 + (ctypes.c_int,) + (p,) * (len(ordered) + len(outs))
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         for function in self._functions:  # PARTS: each part writes its own output slots
-            _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.threads, 1, 1, self.dynamic_shared, stream,
-                                         (values, types), 0))
+            _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.threads, 1, 1, 0, stream, (values, types), 0))
 
     def locate(self, lengths, pairs):
         """SHARED_LOCATOR: ``spline_locator``'s records ``int32 [E, 4]`` of ``lengths`` ``[E]`` and ``pairs``."""

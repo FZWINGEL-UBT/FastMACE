@@ -102,3 +102,40 @@ No load-side lever for w′ is left above 1 % of the step. A further w′ gain n
 fewer bytes.
 
 Caveat: this is the 5060 Ti. The H200 has a larger L2 and higher L2 bandwidth, and its w′ runs 72 registers in the H200 build. The stall mix should be confirmed there before anyone builds a lever on it. An H200 ncu run is a few minutes on Modal `sixth`.
+
+## BULK_SLAB: the forward's slabs bulk-copied into shared memory (rejected in the lab)
+
+**The idea.** With STAGE_EDGES, each live edge's table slab (1,280 float4 = 20 KB, contiguous) is copied into a ring
+of 1 or 2 shared-memory buffers by one `cp.async.bulk` (TMA, sm_90+). The copy is issued 1–2 edges ahead and
+completes on an mbarrier. The channel loop then reads the slab with LDS.128 instead of waiting on L2.
+
+Target: the forward's table latency. That is 169 µs on the H200 (601 µs real against 433 µs one-slab), and on the
+5060 Ti the one-slab variant runs at 0.37×. Stop rule: recover at least 40 % of the one-slab gap.
+
+Run details:
+
+- **Lab:** `tools/spline_table_bound.py`, 21 alternating rounds, RTX 5060 Ti with the H200 switch set (the same set as above).
+- **Code:** `spline_forward.bulk_source`; the kernel uses 80 registers and no local memory.
+- **Files:** [bulk-slab/](bulk-slab/stb-bulk.log).
+- **Control:** the real kernel launched with the same shared memory, unused (`real-smem-N`), so it runs the same blocks per SM. The 5060 Ti has 100 KB of shared memory per SM, so the ring costs occupancy there.
+
+| Forward variant | Warm (µs) | × real | × its control |
+| --- | ---: | ---: | ---: |
+| real | 3,421 | 1.000 | |
+| one-slab (bound) | 1,262 | 0.369 | |
+| real + 20 KB unused (control 1) | 3,759 | 1.099 | |
+| **bulk, 1 buffer** | 5,047 | 1.475 | **1.343** |
+| real + 40 KB unused (control 2) | 4,285 | 1.253 | |
+| **bulk, 2 buffers** | 4,828 | 1.411 | **1.127** |
+
+**Rejected.** At equal occupancy the copy pipeline is 13–34 % *slower* than the plain loads, so the H200's larger
+shared memory would not rescue it. Two likely reasons:
+
+- Each block copies its own whole slab. The L1 sharing between co-resident blocks that SORT_BY_LENGTH and BLOCK_ORDER created is lost.
+- One `__syncthreads` per edge serialises the block's four warps.
+
+The output also differs from the real kernel at 3.75e-8 relative. That is not bitwise, because the compiler fuses
+differently once the loads come from shared memory.
+
+No H200 run was made. The lab code is in this branch's history (commit "BULK_SLAB lab") and is reverted from the
+production source.

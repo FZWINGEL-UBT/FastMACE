@@ -145,42 +145,6 @@ def slab_sorted(args):
     return args
 
 
-def bulk_slab_buffers(kernel):
-    """The BULK_SLAB buffer counts to time for a captured forward (STAGE_EDGES on, sm_90+, the slab ring fitting
-    the device's shared memory per block), or none."""
-    import torch
-    if not getattr(kernel, "stage_edges", False) or torch.cuda.get_device_capability() < (9, 0):
-        return []
-    q = kernel.channels * len(kernel.init_args[0].paths)
-    limit = torch.cuda.get_device_properties(0).shared_memory_per_block
-    return [b for b in (1, 2) if b * q * 16 + 4096 <= limit]
-
-
-def bulk_kernel(kernel, buffers):
-    """BULK_SLAB's variant of a captured forward: the same switches with ``buffers`` slab buffers, the captured
-    kernel's receiver order bound (BLOCK_ORDER). Returns (kernel, keyword arguments)."""
-    from fastmace.kernels.oeq_streaming import spline_forward as sf
-    saved = sf.BULK_SLAB
-    sf.BULK_SLAB = buffers
-    try:
-        bulk = sf.SplineForward(*kernel.init_args, block_order=kernel.block_order)
-    finally:
-        sf.BULK_SLAB = saved
-    bulk.order = kernel.order
-    print(f"bulk-slab-{buffers}: registers {bulk.registers}, local {bulk.local_bytes}", flush=True)
-    return bulk, {}
-
-
-def occupancy_control(kernel, buffers):
-    """A second copy of the captured forward launched with ``buffers`` slabs' worth of unused dynamic shared
-    memory: BULK_SLAB's blocks per SM without its copies."""
-    from fastmace.kernels.oeq_streaming import spline_forward as sf
-    control = sf.SplineForward(*kernel.init_args, block_order=kernel.block_order)
-    control.order = kernel.order
-    control.dynamic_shared = buffers * kernel.channels * len(kernel.init_args[0].paths) * 16
-    return control
-
-
 def species_blocks(kernel, numbers):
     """BLOCK_ORDER's variant of a captured forward: the same kernel rendered with an order argument, and the receivers
     grouped by species (the structure's atomic numbers). Returns (kernel, order, microseconds of the order's
@@ -245,12 +209,6 @@ def main(argv=None):
                 variants["species-blocks"] = real
                 variants["slab-sorted+species-blocks"] = sorted_args
                 kernels["species-blocks"] = kernels["slab-sorted+species-blocks"] = (ordered, dict(order=order))
-            for buffers in bulk_slab_buffers(kernel):  # BULK_SLAB: the same kernel with its slabs bulk-copied ahead
-                variants[f"bulk-slab-{buffers}"] = real
-                kernels[f"bulk-slab-{buffers}"] = bulk = bulk_kernel(kernel, buffers)
-                # the control: the real kernel holding the same shared memory unused, so the same blocks per SM
-                variants[f"real-smem-{buffers}"] = real
-                kernels[f"real-smem-{buffers}"] = (occupancy_control(kernel, buffers), {})
 
         def run(label, a):
             k, extra = kernels.get(label, (kernel, {}))
