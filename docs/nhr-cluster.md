@@ -214,6 +214,56 @@ Rules for working sessions:
 - Each `srun --overlap` step starts a fresh login shell: load modules and activate the environment in the command
   (or in a `jobs/env.sh` it sources).
 
+### 6.3 Setup time and packed A/Bs
+
+Most of a FastMACE A/B job on Alex goes to setup before the GPU does any work: Dynamo tracing, Inductor
+compiling and CUDA-graph capture of each side's engine. Two A/Bs timed out at 1.5–1.75 h. The measurements
+below are from 7–8 November 2026, on POLAR-1-M with NaCl and NbCl5 (`tools/ab_rewrites.py`, one side a and one side b
+per structure).
+
+What a job gets: 16 cores per A100 (`Cpus_allowed_list` 16 cores, `nproc` 16, SMT off), AMD EPYC 7713 (2.0 GHz
+base, 3.7 GHz boost, `schedutil` governor). `torch.get_num_threads()` is 16, and `OMP_NUM_THREADS` is unset.
+`sbatch` refuses more than 16 CPUs per GPU ("Too many tasks/CPUs per GPU requested").
+
+Setup is single-threaded Python work. In job 4955075's profile, symbolic-shape tracing alone made 3.6 M `SymNode`
+calls. A pure-Python microbenchmark (dict and small-object loops, the same uv-built Python 3.10.12) takes
+**1.52 s on an Alex A100 node and 0.38 s on the PC (Core Ultra 7 270K)**, so tracing runs about 4× slower than on
+the PC. More cores and thread settings do not help much (table).
+
+SETUP_TABLE
+
+Rules that follow:
+
+- **Pack switches into one process.** `tools/jobs/alex_ab_pack.sh` runs `tools/ab_rewrites.py --pack`. Each
+  structure builds side a once and each switch once, so a pack of N switches costs 1 + N builds per structure and
+  build order. One process per switch costs 2N. Model loading and imports, about 4 s, are not worth packing across
+  models, so the template runs one process per model and order.
+- **Stage the environment on the node.** `$WORK` (`/home/atuin`) can get very slow. On the evening of 7 November,
+  stat-ing about 100 files took 21 s, and starting Python from the venv took 13 min. Copying the venv file by file
+  (54 k files, 6.1 GB) takes about 3.5 min; unpacking one tar of it takes 27–55 s. Make the tar once
+  (`tar -cf $WORK/<dir>/env-py310.tar -C $WORK/<dir> uv-python env`) and pass it as `ENV_TAR`.
+- **Keep the compile cache warm.** A cold cache costs 160–260 s per build instead of about 150 s, and Dynamo tracing
+  is paid either way. Do not copy a large cache to `$TMPDIR`: `fm-offpolar/cache` is 7.8 GB, and copying it
+  from `$WORK` did not finish within an hour.
+- Profile with `cProfile` only to find where time goes. It inflates setup to about 1.7× (250–270 s per build in
+  4955075).
+
+Usage:
+
+```bash
+cat > $WORK/<dir>/jobs/<run>.env <<'EOF'
+FM_ROOT=$WORK/<dir>                      # env/, uv-python/, models/, baseline/, cache/
+SRC=$WORK/<dir>/src-<sha>                # tools/jobs/slim_tar.py output, unpacked
+OUT=$WORK/<dir>/runs/<run>-$SLURM_JOB_ID
+ENV_TAR=$WORK/<dir>/env-py310.tar
+PACK="geo|fastmace.longrange.polar:SHARED_GEOMETRY=False;fold|fastmace.rewrites.polar.update_fold:FOLD_UPDATE=True"
+MODELS="polar1-m=MACE-POLAR-1-M.model"
+EOF
+sbatch --output=$WORK/<dir>/logs/%x-%j.out --time=03:00:00 $SRC/tools/jobs/alex_ab_pack.sh $WORK/<dir>/jobs/<run>.env
+```
+
+Plan the wall time as about 150 s per build: 2 orders × structures × (1 + switches) builds, plus the timed blocks.
+
 ## 7. Help
 
 `ssh -vv alex` output to hpc-support@fau.de. Docs: [SSH](https://doc.nhr.fau.de/access/ssh-command-line/),

@@ -19,8 +19,9 @@
 #   STRUCTURES  default "NaCl NbCl5"; WARMUP 200, BLOCK 256, BLOCKS 6 (per side); ORDERS default "ab ba"
 #   EXTRA       more tools/ab_rewrites.py arguments (e.g. "--timestep-fs 1 --precision float64")
 #   CACHE       FASTMACE_CACHE (default $FM_ROOT/cache). A warm cache saves Inductor's compile, not Dynamo's tracing
-#   STAGE       0 (default): run Python from $WORK. 1: copy uv-python, env and source to node-local $TMPDIR first
-#               (measured on 7 November 2026: setup no faster; costs the copy; docs/nhr-cluster.md §6.3)
+#   STAGE       1 (default): copy the interpreter, venv and source to node-local $TMPDIR first; 0: run them from $WORK
+#   ENV_TAR     with STAGE=1: a tar holding uv-python/<interpreter>/ and env/ (as made by `tar -cf X -C <root>
+#               uv-python env`), unpacked instead of copying the venv file by file (docs/nhr-cluster.md §6.3)
 # Results: $OUT/run.log (one b/a line per switch, model, structure and order; SETUP lines), $OUT/ab-<model>-<order>.log
 # and $OUT/ab-<model>-<order>-<name>.json (tools/ab_rewrites.py's format, setup_s.a the shared build).
 # ba holds every switch's engine and side a on the GPU at once: keep packs of large models small.
@@ -37,10 +38,14 @@ IFS=';' read -r -a entries <<< "${PACK:?set PACK}"
 [ "${#entries[@]}" -le 8 ] || { note "PACK has ${#entries[@]} entries, at most 8"; exit 2; }
 py_dir=$(readlink -f "$root/env/bin/python"); py_dir=${py_dir%/bin/*}  # .../uv-python/cpython-X-linux-x86_64-gnu
 env_dir=$root/env
-if [ "${STAGE:-0}" = 1 ]; then
+if [ "${STAGE:-1}" = 1 ]; then
   local_root=$TMPDIR/fm; mkdir -p "$local_root/uv-python"; t0=$(date +%s)
-  cp -a "$py_dir" "$local_root/uv-python/" && cp -a "$env_dir" "$local_root/" && cp -a "$src" "$local_root/src" ||
-    { note "STAGE copy failed"; exit 4; }
+  if [ -n "${ENV_TAR:-}" ]; then  # one sequential read instead of ~54k small files
+    tar -xf "$ENV_TAR" -C "$local_root" && cp -a "$src" "$local_root/src" || { note "STAGE tar failed"; exit 4; }
+  else
+    cp -a "$py_dir" "$local_root/uv-python/" && cp -a "$env_dir" "$local_root/" && cp -a "$src" "$local_root/src" ||
+      { note "STAGE copy failed"; exit 4; }
+  fi
   ln -sfn "$local_root/uv-python/$(basename "$py_dir")/bin/$(basename "$(readlink -f "$root/env/bin/python")")" \
     "$local_root/env/bin/python"
   sed -i "s#^home = .*#home = $local_root/uv-python/$(basename "$py_dir")/bin#" "$local_root/env/pyvenv.cfg"
