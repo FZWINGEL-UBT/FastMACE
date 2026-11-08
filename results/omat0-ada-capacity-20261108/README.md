@@ -148,3 +148,12 @@ other users' jobs on 8 November; the results follow in a second merge request.
    [E, 1280] weights. Without the term the planner predicted about 20.8 GiB at SrTiO3 40,000 (real about 4.1 GiB) and
    took rung (B) beyond about 35,000 atoms: twice the step cost, with the w′ backward off. Fix:
    `rewrites.memory.generic_wprime_backward` (B's term) and a `CONTEXT_TERMS` entry (B saves nothing beside it).
+
+## CPU suite
+
+trillian, merge `706b5ef0` (main `a557ea55` merged; the later commit `b10d9345` only rewraps comments),
+[jobs/suite.sh](jobs/suite.sh): `tests/cpu -n 8 -m "not acceptance"`, `CUDA_VISIBLE_DEVICES=` empty: 5,470 passed,
+203 skipped, 4 failed. The four failures (`test_output_chunks.py::test_crash_between_restart_and_flush`) were the
+script's missing PYTHONPATH (the child process could not import `fastmace`); with it the file passes, 25 of 25. The
+branch adds no ruff findings (each changed file has as many as on main).
+[logs/suite-trillian/summary.txt](logs/suite-trillian/summary.txt).
