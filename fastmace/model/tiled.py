@@ -67,6 +67,13 @@ TILE_PREFETCH_DEVICE = True
 # sym(V^T dE/dV), summed elementwise, instead of a strain leaf in the autograd graph. The leaf's backward is a
 # [3, E] x [E, 3] product that cuBLAS runs as a split-K GEMM (sgemm_largek, about 0.3 us per atom per call).
 TILE_VIRIAL = True
+# TILE_GRAPH_CACHE (exact): a call without the wavefront keeps each tile's graph on the device from its first build
+# (the slot-key pass) to the end of the call, as its local edge index (int32, halo rows after the receivers) and edge
+# shifts (20 bytes per edge), so sweeps 1-3 take it back with one gather instead of building it again from the list
+# cache (copy, unpack, torch.unique; four builds per tile and call). The pieces take at most this fraction of the
+# device memory free when the call starts (the allocator's unused reserve included); tiles past it are built
+# again as before. The same edges in the same order: bitwise the call without.
+TILE_GRAPH_CACHE = 0.25
 
 
 @dataclasses.dataclass(frozen=True)
@@ -964,6 +971,7 @@ class TiledForceField:
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
+        self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0  # TILE_GRAPH_CACHE (one call)
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
 
@@ -993,6 +1001,51 @@ class TiledForceField:
         local_of[receivers] = -1
         local_of[halo] = -1
         return torch.cat([receivers, halo]), ei, shifts, local, r, halo.shape[0]
+
+    def _piece(self, index, receivers, source, local_of, halo_start=None):
+        """``_tile_graph`` of tile ``index``, from the call's graph cache (``TILE_GRAPH_CACHE``) when it holds it;
+        a first build is kept there while the cache's budget allows."""
+        import torch
+
+        cache = self._pieces
+        entry = cache.get(index) if cache is not None else None
+        if entry is None:
+            piece = self._tile_graph(receivers, source, local_of, halo_start)
+            if cache is not None:
+                nodes, ei, shifts, local, r, h = piece
+                size = nodes.numel() * nodes.element_size() + local.numel() * 4 + shifts.numel() * shifts.element_size()
+                if self._piece_bytes + size <= self._piece_budget and local.numel() < 2**31:
+                    start = r if halo_start is None else int(halo_start)
+                    # local relative to a halo start of r: halo row r + k (int32: every index is below R + H)
+                    relative = (local if start == r else torch.where(local >= start, local - (start - r), local))
+                    cache[index] = (nodes, relative.to(torch.int32), shifts, r, h)
+                    self._piece_bytes += size
+            return piece
+        nodes, relative, shifts, r, h = entry
+        local = relative.long()
+        ei = nodes[local]  # the global (sender, receiver) pairs, as the list gave them
+        start = r if halo_start is None else int(halo_start)
+        if start != r:
+            local = torch.where(local >= r, local + (start - r), local)
+        return nodes, ei, shifts, local, r, h
+
+    def _graph_budget(self, wave):
+        """The call's graph cache (``TILE_GRAPH_CACHE``): empty with its byte budget, or None (off, under the
+        wavefront, or off a CUDA device)."""
+        self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0
+        free = self._free_bytes() if TILE_GRAPH_CACHE and not wave else None
+        if free is not None:
+            self._pieces, self._piece_budget = {}, int(float(TILE_GRAPH_CACHE) * free)
+
+    def _free_bytes(self):
+        """Device memory free for the graph cache: the driver's free memory and the allocator's unused reserve
+        (None off a CUDA device)."""
+        import torch
+
+        if self.device.type != "cuda":
+            return None
+        free, _ = torch.cuda.mem_get_info(self.device)
+        return free + torch.cuda.memory_reserved(self.device) - torch.cuda.memory_allocated(self.device)
 
     def _source(self, positions, n):
         """``(source, row_ptr, edges per atom)`` of this call's edges: the force field's list, or (neighbours
@@ -1555,6 +1608,7 @@ class TiledForceField:
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
         wave = self._wavefront_on(grid, n)
+        self._graph_budget(wave)
         started = time.perf_counter()  # the search pass before the sweeps (its syncs make the wall time its cost)
         if wave:
             keys, steps, pool_rows, first, last = self._wavefront(tiles, source, local_of, n, padded)
@@ -1626,7 +1680,7 @@ class TiledForceField:
                 # (device state, TILE_PREFETCH_DEVICE: the graph only; the body reads its rows)
                 rows = state.host and position > 0 and order[position - 1][0] == sweep and sweep in (2, 3)
                 with torch.cuda.stream(prep) if prep is not None else contextlib.nullcontext():
-                    piece = self._tile_graph(tiles[index], source, local_of, slot["sizes"][0])
+                    piece = self._piece(index, tiles[index], source, local_of, slot["sizes"][0])
                     nodes = piece[0].cpu()  # waits for the prefetch stream only
                     fetched = {}
                     if rows:  # the slot's layout (_fill): receivers, then the halo after the receiver slots
@@ -1655,7 +1709,7 @@ class TiledForceField:
                 ready = prepared.pop(position, None)
                 host_nodes, fetched = None, {}
                 if ready is None:
-                    piece = self._tile_graph(receivers, source, local_of, slot["sizes"][0] if padded else None)
+                    piece = self._piece(index, receivers, source, local_of, slot["sizes"][0] if padded else None)
                 else:
                     piece, host_nodes, fetched, event = ready
                     if event is not None:
@@ -1742,6 +1796,9 @@ class TiledForceField:
                     strain_grad.add_(part)
             state.flush()
             stats["tiles_s"] = time.perf_counter() - loop_started  # the host's time in the sweeps (queued work aside)
+            stats["graph_cache"] = dict(tiles=len(self._pieces or {}), bytes=self._piece_bytes,
+                                        budget=self._piece_budget)
+            self._pieces = None
             if measure:
                 stats["tiles_peak"] = int(torch.cuda.max_memory_allocated(self.device))
             source = None  # the tile lists' cell bins (per-atom device arrays) before the energy's transients
@@ -2074,7 +2131,7 @@ class TiledForceField:
         tiled-1m-speed.md, "Slots in MD")."""
         sizes = []
         for index, receivers in enumerate(tiles):
-            piece = self._tile_graph(receivers, source, local_of)
+            piece = self._piece(index, receivers, source, local_of)
             _, ei, _, _, r, h = piece
             sizes.append((r, h, int(ei.shape[1])))
             if visit is not None:  # the wavefront's search pass
