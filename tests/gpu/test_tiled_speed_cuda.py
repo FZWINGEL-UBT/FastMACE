@@ -59,7 +59,7 @@ if "generic_wprime_backward" not in applied:
 whole = field.evaluate(atoms, stress=True)
 
 
-def run(mode, **switches):
+def run(mode, switches):
     saved = {}
     for (module, name), value in switches.items():
         saved[(module, name)] = getattr(module, name)
@@ -89,8 +89,8 @@ for mode in ("eager", "padded"):
     for name, (module, constant) in cases.items():
         if name == "prefetch" and mode == "eager":
             continue  # prefetch builds padded tiles' graphs only
-        off = run(mode, **{(module, constant): False})
-        on = run(mode, **{(module, constant): True})
+        off = run(mode, {(module, constant): False})
+        on = run(mode, {(module, constant): True})
         report[f"{mode}-{name}"] = dict(
             tiles=on[3], energy_bitwise=on[0] == off[0], energy_rel=abs(on[0] - off[0]) / abs(off[0]),
             forces=relative(on[1], off[1]), stress=relative(on[2], off[2]),
