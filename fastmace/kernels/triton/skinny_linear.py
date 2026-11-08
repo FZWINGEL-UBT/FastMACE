@@ -38,7 +38,7 @@ from functools import cache
 
 import torch
 
-from fastmace.kernels.gpu_models import GPUModels
+from fastmace.kernels.gpu_models import GPUModels, dynamo_constant
 
 # One fixed configuration for every crystal and GPU (no autotuning).
 BLOCK_M, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 32, 4, 3
@@ -59,7 +59,7 @@ SPLIT_COLUMNS_GPUS = GPUModels(())
 SPLIT_BLOCK_P = 16
 
 
-@torch.compiler.assume_constant_result
+@dynamo_constant
 def _tf32x3_listed(index: int) -> bool:
     """Whether CUDA device ``index`` is one of ``RADIAL_TF32X3_GPUS`` (a Dynamo constant, as
     ``receiver_sum._listed``)."""
@@ -77,7 +77,7 @@ def radial_tf32x3_default(device, eligible: bool = False) -> bool:
     return bool(eligible) and _tf32x3_listed(device.index if device.index is not None else torch.cuda.current_device())
 
 
-@torch.compiler.assume_constant_result
+@dynamo_constant
 def _split_listed(index: int) -> bool:
     """Whether CUDA device ``index`` is one of ``SPLIT_COLUMNS_GPUS`` (a Dynamo constant)."""
     return torch.cuda.get_device_name(index) in SPLIT_COLUMNS_GPUS

@@ -47,6 +47,14 @@ class GPUModels(tuple):
         return GPUModels(tuple(self) + tuple(other))
 
 
+def dynamo_constant(fn):
+    """``torch.compiler.assume_constant_result`` without importing ``torch._dynamo`` (and with it Triton) when a
+    module defines a device-list check: the decorator only marks the function, and Dynamo reads the mark while
+    tracing. tests/cpu/test_gpu_models.py checks that torch's decorator still sets exactly this mark."""
+    fn._dynamo_marked_constant = True
+    return fn
+
+
 def lookup(table, name, default=None):
     """``table[name]`` for a per-GPU dict, matching by family as ``GPUModels`` does (an exact name wins)."""
     if name in table:
@@ -58,4 +66,4 @@ def lookup(table, name, default=None):
     return default
 
 
-__all__ = ["GPUModels", "family", "is_a100", "lookup"]
+__all__ = ["GPUModels", "dynamo_constant", "family", "is_a100", "lookup"]
