@@ -325,7 +325,8 @@ def test_factor_w_and_cursor32_render_and_compile():
 
 
 def test_stage_edges_is_off_without_a_listed_gpu():
-    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB"]
+    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB",
+                                                                     "NVIDIA RTX 4000 Ada Generation"]
 
 
 def test_stage_edges_source_stages_the_tile_and_keeps_the_arithmetic():

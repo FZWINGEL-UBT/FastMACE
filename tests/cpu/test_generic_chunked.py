@@ -164,3 +164,32 @@ def test_the_generic_tables_term_matches_the_estimate_s_count():
                   for block in dims.interactions)
     assert counted == 2 * ((10 + 64 * 3) + 10)  # OMAT-0 medium: two interactions, the radial net and the density's
     assert terms.generic_radial_tables(dims, 4) == (-counted * 4, 0)
+
+
+def test_generic_wprime_stands_aside_on_the_rescue_rung(monkeypatch):
+    """generic_wprime_backward is not on the recompute path (its docstring): where rule 12 took
+    generic_recompute_conv_weights for every candidate interaction, it applies to none and the build goes on.
+    Raising there sent every cell that needs the rung to the fallback's rewrites-off plan, which ran out of memory
+    (5060 Ti SrTiO3 40,000 atoms, results/omat0-ada-capacity-20261108). Without any candidate it still raises."""
+    import torch
+
+    from fastmace.rewrites import radial
+    from fastmace.rewrites.registry import RewriteError
+
+    class Interaction:
+        radial_table = object()
+        generic_folded = object()
+        first_reassociation = None
+        chunked_backward_edges = 256
+        generic_recompute = object()
+
+    monkeypatch.setattr(radial, "_generic_interactions", lambda model: [(1, Interaction()), (2, Interaction())])
+    assert radial.attach_generic_wprime(torch.nn.Module()) == []
+
+    class Unchunked(Interaction):
+        chunked_backward_edges = 0
+        generic_recompute = None
+
+    monkeypatch.setattr(radial, "_generic_interactions", lambda model: [(1, Unchunked())])
+    with pytest.raises(RewriteError, match="no generic interaction"):
+        radial.attach_generic_wprime(torch.nn.Module())

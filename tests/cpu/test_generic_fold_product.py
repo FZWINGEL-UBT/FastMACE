@@ -75,7 +75,8 @@ def test_readout_tail_fold_matches_the_stock_density_model(monkeypatch):
 
     assert species.GENERIC_FOLD_READOUT_TAIL is None and "NVIDIA H200" in species.GENERIC_FOLD_READOUT_TAIL_GPUS
     assert species.generic_fold_readout_tail_default("NVIDIA A100-SXM4-80GB")  # 8 November 2026
-    assert not species.generic_fold_readout_tail_default("NVIDIA RTX 4000 Ada Generation")
+    assert species.generic_fold_readout_tail_default("NVIDIA RTX 4000 Ada Generation")  # 8 November 2026
+    assert not species.generic_fold_readout_tail_default("NVIDIA RTX A4000")
     monkeypatch.setattr(species, "GENERIC_FOLD_READOUT_TAIL", True)
     model, batch = tiny_cueq("density")
     rewritten, applied = _rewrite(model, batch)

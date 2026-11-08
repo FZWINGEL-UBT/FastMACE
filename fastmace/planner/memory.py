@@ -73,6 +73,8 @@ MEMORY_RESCUE = ("recompute_conv_weights", "generic_recompute_conv_weights", "re
 RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights", "generic_recompute_first_table")
 # The rungs the rescue turns off rather than on.
 RESCUE_OFF = ("gate_epilogue",)
+# generic_recompute_conv_weights saves nothing beside generic_wprime_backward, which stores no per-edge weights either
+# (the rung's interactions then run without w'; rewrites.radial.attach_generic_wprime).
 # Records whose term depends on another enabled record, in priority order: (record, other record, the term's name in
 # ``fastmace.rewrites.memory``, "" for none). The first whose other record is enabled replaces the record's own term.
 # Inside recompute_node_region's chunks gate_epilogue's extra buffers are rebuilt per chunk (0.5 kB per atom); with
@@ -80,7 +82,8 @@ RESCUE_OFF = ("gate_epilogue",)
 CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
                  ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"),
                  ("generic_recompute_first_table", "generic_recompute_conv_weights",
-                  "generic_recompute_first_table_with_weights"))
+                  "generic_recompute_first_table_with_weights"),
+                 ("generic_recompute_conv_weights", "generic_wprime_backward", ""))
 
 
 # The caching allocator's reserve above the live peak differs per stage of the memory rescue (the graph pool's packing

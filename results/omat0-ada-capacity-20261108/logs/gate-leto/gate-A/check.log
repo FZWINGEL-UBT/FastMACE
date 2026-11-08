@@ -1,0 +1,150 @@
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/homes/zwingel/fm-ada-capacity/src-73e421ea/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-ada-capacity/src-73e421ea/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-ada-capacity/src-73e421ea/fastmace/model/loading.py:766: ModelLicenceWarning: mace-omat-0-medium.model (SHA-256 d4b14be9afa2…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/homes/zwingel/fm-ada-capacity/src-73e421ea/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+W1108 16:33:15.664000 875324 torch/_inductor/utils.py:1806] [0/0] Not enough SMs to use max_autotune_gemm mode
+{
+ "constants": [
+  "fastmace.kernels.oeq_streaming.wprime_backward:HORNER=True",
+  "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=True",
+  "fastmace.kernels.oeq_streaming.spline_forward:R128=True",
+  "fastmace.kernels.oeq_streaming.spline_forward:STAGE_EDGES=True",
+  "fastmace.kernels.oeq_streaming.wprime_backward:SPLINE_VECTOR=4",
+  "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_SH=True",
+  "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP=True",
+  "fastmace.kernels.triton.compose_skip:COMPOSE_FAST=True",
+  "fastmace.rewrites.species:GENERIC_FOLD_READOUT_TAIL=True"
+ ],
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+ "wprime": [
+  {
+   "repr": "groups=5616, terms=6, outputs=1280, q-major float2, value table (w from the table), power basis (Horner), spline (731 intervals, in use)",
+   "attached": true,
+   "in_use": true,
+   "intervals": 731,
+   "certificate": 0.4829565241814643,
+   "grid": [
+    [
+     0.3,
+     0.5,
+     157
+    ],
+    [
+     0.5,
+     0.75,
+     112
+    ],
+    [
+     0.75,
+     1.0,
+     87
+    ],
+    [
+     1.0,
+     1.5,
+     124
+    ],
+    [
+     1.5,
+     2.0,
+     54
+    ],
+    [
+     2.0,
+     2.5,
+     31
+    ],
+    [
+     2.5,
+     6.0,
+     166
+    ]
+   ],
+   "forward_registers": [
+    80
+   ],
+   "forward_local_bytes": [
+    0
+   ],
+   "forward_threads": 128,
+   "forward_min_blocks": 6,
+   "forward_parts": [
+    null
+   ],
+   "forward_stage_edges": true,
+   "wprime": {
+    "registers": 96,
+    "local_bytes": 0,
+    "shared_bytes": 256
+   },
+   "wprime_stage_quads": false,
+   "wprime_stage_sh": 4,
+   "wprime_stage_edges": false,
+   "forward_prefetch": 0
+  }
+ ],
+ "spline_in_use": true,
+ "compose_skip": [
+  true
+ ],
+ "compose_skip_in_use": true,
+ "joined_layout_in_use": false,
+ "compare": {
+  "constants": [
+   "fastmace.kernels.oeq_streaming.wprime_backward:HORNER=False",
+   "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=False",
+   "fastmace.kernels.oeq_streaming.spline_forward:R128=False",
+   "fastmace.kernels.oeq_streaming.spline_forward:STAGE_EDGES=False",
+   "fastmace.kernels.oeq_streaming.wprime_backward:SPLINE_VECTOR=2",
+   "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_SH=False",
+   "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP=False",
+   "fastmace.kernels.triton.compose_skip:COMPOSE_FAST=False",
+   "fastmace.kernels.triton.compose_skip:COUNT_PLAN=False",
+   "fastmace.kernels.triton.compose_skip:JOINED_LAYOUT=False",
+   "fastmace.rewrites.cueq_projection:CUEQ_PROJECTED=False",
+   "fastmace.rewrites.species:GENERIC_FOLD_READOUT_TAIL=False"
+  ],
+  "rattle": 0.05,
+  "max_abs": 1.0013580322265625e-05,
+  "max_force": 7.066781044006348,
+  "bitwise": false,
+  "same_build_max_abs": 2.205371856689453e-06,
+  "energy": -39724.42578125,
+  "energy_diff": -0.0032925606064964086,
+  "same_build_energy_diff": 1.478195918025449e-05
+ }
+}
