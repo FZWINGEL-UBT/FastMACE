@@ -133,6 +133,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                          "MIN_BLOCKS": "spline forward register cap; A/B",
                                                          "PARTS": "spline forward degree parts; A/B",
                                                          "R128": "spline forward one receiver per block; per GPU, A/B",
+                                                         "STAGE_EDGES": "spline forward edges staged per tile; A/B",
                                                          "FACTOR_W": "spline forward w x common factor; A/B",
                                                          "CURSOR32": "spline forward int loop state; A/B",
                                                          "SHARED_LOCATOR": "idea 5: one spline locator per edge; A/B"},

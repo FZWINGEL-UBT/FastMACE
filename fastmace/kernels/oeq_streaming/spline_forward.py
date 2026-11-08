@@ -84,6 +84,25 @@ def shared_locator_default(device):
     return device.type == "cuda" and torch.cuda.get_device_name(device) in SHARED_LOCATOR_GPUS
 
 
+# STAGE_EDGES (Codex H200 report item 2, 8 November 2026; bitwise): where one block owns one receiver with one thread
+# per channel (R128 with C = 128), the block walks the receiver's edges in tiles of 32: all threads copy the tile's
+# edge features into shared memory (coalesced), warp 0 reads the lengths, senders and pairs of the 32 edges at once,
+# runs the lookup and compacts the live edges in order (ballot), and the channel loop then reads sender, t and slab
+# offset from shared memory: no dependent per-edge load chain and no branch in it. Same edges in the same order, same
+# arithmetic. None: on for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
+STAGE_EDGES = None
+STAGE_EDGES_GPUS = GPUModels(())
+STAGE_TILE = 32
+
+
+def stage_edges_default(device):
+    """``STAGE_EDGES`` on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
+    if STAGE_EDGES is not None:
+        return bool(STAGE_EDGES)
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in STAGE_EDGES_GPUS
+
+
 def shared_locator_supported(grid, r_lo):
     """Whether the w' kernel's own locator equals the record's for every r: it locates max(r, r_lo) in float32, the
     record r. ``lookup_code`` maps every r below the grid's first start a to t = 0 in interval 0, as it maps a (u is
@@ -163,13 +182,17 @@ def _factor(p, xi):
 
 
 def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
-           name="spline_forward", factor_w=False, cursor32=False, shared_locator=False):
+           name="spline_forward", factor_w=False, cursor32=False, shared_locator=False, stage_edges=False):
     """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
     ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here. ``part``:
     the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds.
     ``factor_w``: ``FACTOR_W``; ``cursor32``: ``CURSOR32`` (the launch checks the ranges). ``shared_locator``
-    (``SHARED_LOCATOR``): the edge's slab and t read from ``spline_locator``'s record."""
-    source = _render(schedule, blocks, grid, r_max, path_scale, part, threads, min_blocks, name, factor_w, cursor32)
+    (``SHARED_LOCATOR``): the edge's slab and t read from ``spline_locator``'s record. ``stage_edges``
+    (``STAGE_EDGES``): the edges staged per tile, for a launch of one block per receiver with ``threads`` = C."""
+    if stage_edges and shared_locator:
+        raise ValueError("STAGE_EDGES and SHARED_LOCATOR are alternatives")
+    source = _render(schedule, blocks, grid, r_max, path_scale, part, threads, min_blocks, name, factor_w, cursor32,
+                     stage_edges)
     return located_source(source, grid) if shared_locator else source
 
 
@@ -256,7 +279,7 @@ def locator_reference(r, pair, grid, r_max):
 
 
 def _render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
-            name="spline_forward", factor_w=False, cursor32=False):
+            name="spline_forward", factor_w=False, cursor32=False, stage_edges=False):
     from fastmace.kernels.oeq_streaming.fused_forward import _lit, _node, block_map
 
     if schedule.layout != "ir_mul":
@@ -282,6 +305,9 @@ def _render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=N
             continue
         body.append("            {")
         for j in range(p.edge_irrep_dim):
+            if stage_edges:  # STAGE_EDGES: the tile's copy in shared memory
+                body.append(f"                const float e{j} = she[{p.edge_start + j}];")
+                continue
             edge = "(int64_t)e" if cursor32 else "e"  # CURSOR32: the offset widened before it multiplies
             body.append(f"                const float e{j} = __ldg(sh + {edge} * ED + {p.edge_start + j});")
         body.append(f"                const float4 c = __ldg(tq + {p.weight_start});")
@@ -328,6 +354,10 @@ def _render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=N
         eb = eb < 0 ? 0 : eb;
         ee = ee > E ? E : ee;
         for (int64_t e = eb; e < ee; ++e) {"""
+    if stage_edges:
+        if threads != C:
+            raise ValueError(f"STAGE_EDGES needs one thread per channel ({threads} threads, C = {C})")
+        return _staged(name, bounds, C, len(paths) * C, schedule, r_max, outs, n, grid, body, stores)
     return f"""// {name} (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
 using int64_t = long long;
 constexpr int C = {C};
@@ -359,6 +389,84 @@ extern "C" __global__ void __launch_bounds__({bounds}) {name}(
 """
 
 
+def _staged(name, bounds, C, q, schedule, r_max, outs, n, grid, body, stores):
+    """``spline_forward``'s source with STAGE_EDGES: one block per receiver, thread = channel."""
+    from fastmace.kernels.oeq_streaming.fused_forward import _lit
+
+    nl = "\n"
+    tile = STAGE_TILE
+    return f"""// {name} (SPLINE_W + STAGE_EDGES, 8 November 2026): one receiver per block, its edges staged per tile.
+using int64_t = long long;
+constexpr int C = {C};
+constexpr int64_t Q = {q};
+constexpr int IN_DIM = {schedule.input_dim};
+constexpr int ED = {schedule.edge_dim};
+constexpr int TILE = {tile};
+constexpr float R_MAX = {_lit(r_max)};
+
+extern "C" __global__ void __launch_bounds__({bounds}) {name}(
+    int64_t N, int64_t E, const float* __restrict__ x, const float* __restrict__ sh,
+    const int* __restrict__ senders, const int* __restrict__ row_ptr, const float* __restrict__ lengths,
+    const int* __restrict__ pairs, const float4* __restrict__ table, int intervals, {outs}) {{
+    __shared__ int s_snd[TILE], s_k[TILE], s_count;
+    __shared__ float s_t[TILE];
+    __shared__ int64_t s_tq[TILE];
+    __shared__ __align__(16) float s_sh[TILE * ED];
+    const int rcv = blockIdx.x, ch = threadIdx.x;
+    if (rcv >= N) return;  // the whole block
+    float acc[{n}];
+    #pragma unroll
+    for (int i = 0; i < {n}; ++i) acc[i] = 0.f;
+    int64_t eb = row_ptr[rcv], ee = row_ptr[rcv + 1];
+    eb = eb < 0 ? 0 : eb;
+    ee = ee > E ? E : ee;
+    for (int64_t base = eb; base < ee; base += TILE) {{
+        const int count_in = (int)(ee - base < TILE ? ee - base : TILE);
+        for (int i = ch; i < count_in * ED; i += C) s_sh[i] = __ldg(sh + base * ED + i);
+        if (ch < 32) {{  // warp 0: the tile's edges at once, the live ones compacted in order
+            bool ok = false;
+            int snd_k = 0;
+            float t_k = 0.f;
+            int64_t tq_k = 0;
+            if (ch < count_in) {{
+                const int64_t e = base + ch;
+                const float re = lengths[e];
+                if (re < R_MAX) {{  // w = 0 at and beyond the cutoff (and the padding edges)
+                    snd_k = senders[e];
+                    if (snd_k >= 0 && snd_k < N) {{
+{lookup_code(grid, "re", "float", "                        ")}
+                        t_k = t;
+                        tq_k = ((int64_t)pairs[e] * intervals + iv) * Q;
+                        ok = true;
+                    }}
+                }}
+            }}
+            const unsigned live = __ballot_sync(0xffffffffu, ok);
+            if (ok) {{
+                const int slot = __popc(live & ((1u << ch) - 1u));
+                s_snd[slot] = snd_k;
+                s_t[slot] = t_k;
+                s_tq[slot] = tq_k;
+                s_k[slot] = ch;
+            }}
+            if (ch == 0) s_count = __popc(live);
+        }}
+        __syncthreads();
+        const int count = s_count;
+        for (int k = 0; k < count; ++k) {{
+            const int snd = s_snd[k];
+            const float t = s_t[k];
+            const float* she = s_sh + s_k[k] * ED;
+            const float4* tq = table + s_tq[k] + ch;
+{nl.join(body)}
+        }}
+        __syncthreads();
+    }}
+{nl.join(line[4:] for line in stores)}
+}}
+"""
+
+
 class SplineForward:
     """The compiled ``spline_forward`` of one interaction (its schedule, block layout and spline grid);
     ``shared_locator`` (SHARED_LOCATOR): it reads ``spline_locator``'s records, compiled alongside (``locate``)."""
@@ -374,8 +482,12 @@ class SplineForward:
         self.parts = (spline_parts(schedule) if PARTS else None) or [None]
         self.factor_w, self.cursor32 = factor_w_default(device), cursor32_default(device)
         self.shared_locator = bool(shared_locator)
+        # STAGE_EDGES: only where a block is one receiver (thread = channel) and nothing else changes the edge head
+        self.stage_edges = (stage_edges_default(device) and self.threads == self.channels and not self.shared_locator
+                            and not self.cursor32)
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
-                               f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator)
+                               f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
+                               self.stage_edges)
                         for k, part in enumerate(self.parts)]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
@@ -487,7 +599,7 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
+__all__ = ["STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
            "cursor32_default", "factor_w_default", "located_source", "locator_reference", "lookup_code", "r128_default",
            "render", "render_locator", "shared_locator_default", "shared_locator_supported", "spline_locate",

@@ -322,3 +322,33 @@ def test_factor_w_and_cursor32_render_and_compile():
 
     both = sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], threads=128, min_blocks=6, factor_w=True, cursor32=True)
     assert compile_cubin(both, (9, 0))
+
+
+def test_stage_edges_is_off_without_a_listed_gpu():
+    assert sf.STAGE_EDGES is None and not sf.STAGE_EDGES_GPUS
+
+
+def test_stage_edges_source_stages_the_tile_and_keeps_the_arithmetic():
+    blocks = [(1, [0]), (3, [64])]
+    plain = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6)
+    staged = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True)
+    assert "__ballot_sync" in staged and "s_sh[TILE * ED]" in staged and "she[" in staged
+    assert "__ldg(sh + e * ED" in plain and "__ldg(sh + e * ED" not in staged
+    fma = [line.strip() for line in plain.splitlines() if "acc[" in line and "fmaf" in line]
+    assert fma == [line.strip() for line in staged.splitlines() if "acc[" in line and "fmaf" in line]
+    with pytest.raises(ValueError, match="one thread per channel"):
+        sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 128, 6, stage_edges=True)
+    with pytest.raises(ValueError, match="alternatives"):
+        sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, shared_locator=True, stage_edges=True)
+
+
+def test_stage_edges_source_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    blocks = [(1, [0]), (3, [64])]
+    for capability in ((9, 0), (8, 0), (12, 0)):
+        assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6,
+                                       stage_edges=True), capability)
