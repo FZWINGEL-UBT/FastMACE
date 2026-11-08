@@ -175,3 +175,28 @@ def test_joined_product_and_gradient_equal_the_per_path_products():
     got = torch.autograd.grad(joined, xs, up)
     want = torch.autograd.grad(expected, xs, up)
     assert all(torch.equal(a, b) for a, b in zip(got, want))
+
+
+@pytest.mark.parametrize("species", [1, 3, 5])
+def test_counting_plan_equals_the_stable_sort(species):
+    from fastmace.kernels.triton.species_gemm import species_plan
+    g = torch.Generator().manual_seed(species)
+    for atoms in (1, 7, 1000):
+        index = torch.randint(0, species, (atoms,), generator=g)
+        order, counts = species_plan(index, species)
+        counted, counted_counts = species_plan(index, species, counting=True)
+        assert counted.dtype == order.dtype == torch.int32 and counted_counts.dtype == torch.int32
+        assert torch.equal(counted, order) and torch.equal(counted_counts, counts)
+
+
+def test_counting_plan_compiles_to_the_same_order():
+    from fastmace.kernels.triton.species_gemm import species_plan
+    index = torch.randint(0, 3, (500,), generator=torch.Generator().manual_seed(0))
+    compiled = torch.compile(lambda i: species_plan(i, 3, counting=True), fullgraph=True)
+    order, counts = compiled(index)
+    assert torch.equal(order, species_plan(index, 3)[0]) and torch.equal(counts, species_plan(index, 3)[1])
+
+
+def test_count_plan_is_off_by_default():
+    assert compose_skip.COUNT_PLAN is None and not compose_skip.COUNT_PLAN_GPUS
+    assert not compose_skip.count_plan_default("NVIDIA H200")

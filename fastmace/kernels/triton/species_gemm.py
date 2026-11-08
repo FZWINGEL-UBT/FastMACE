@@ -233,9 +233,19 @@ def tiles(atoms, size, species):
     return -(-atoms * size // BLOCK_M) + species
 
 
-def species_plan(index, species):
+def species_plan(index, species, counting=False):
     """(order [atoms] int32: the atoms sorted by species, stable; counts [species] int32) of the atoms' species
-    ``index`` ([atoms], values in ``range(species)``); fixed shapes, on ``index``'s device, no host sync."""
+    ``index`` ([atoms], values in ``range(species)``); fixed shapes, on ``index``'s device, no host sync.
+    ``counting`` (``compose_skip.COUNT_PLAN``): the same order by a counting sort over the few species (one-hot
+    prefix sums and a scatter, which a compiled caller fuses) instead of a radix sort of the int64 index."""
+    if counting:
+        onehot = (index[:, None] == torch.arange(species, device=index.device)[None, :]).to(torch.int32)
+        counts = onehot.sum(dim=0, dtype=torch.int32)
+        rank = (torch.cumsum(onehot, dim=0, dtype=torch.int32) - 1).gather(1, index.long()[:, None])[:, 0]
+        start = torch.cumsum(counts, dim=0, dtype=torch.int32) - counts
+        position = (start[index.long()] + rank).long()
+        atoms = torch.arange(index.shape[0], dtype=torch.int32, device=index.device)
+        return torch.empty_like(atoms).scatter(0, position, atoms), counts
     order = torch.argsort(index, stable=True).to(torch.int32)
     counts = torch.zeros(species, dtype=torch.int32, device=index.device)  # no bincount: it syncs (max)
     return order, counts.index_add(0, index.long(), torch.ones_like(index, dtype=torch.int32))

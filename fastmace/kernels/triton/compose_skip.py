@@ -37,6 +37,11 @@ COMPOSE_FAST = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9614 / 0.9656 against the H200 defaults (OMAT-0 medium,
 # SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's run-to-run spread (decision 66).
 COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200",))
+# COUNT_PLAN (8 November 2026, round 3; bitwise): COMPOSE_SKIP's species plan by a counting sort (one-hot prefix
+# sums) instead of an int64 radix sort per force call (8 onesweep passes and 10 memsets, ~57 us on the H200). The
+# order is the same stable order. None: on for COUNT_PLAN_GPUS; True / False: an A/B side's choice.
+COUNT_PLAN = None
+COUNT_PLAN_GPUS = GPUModels(())
 
 
 def compose_fast_default(name=None) -> bool:
@@ -44,6 +49,14 @@ def compose_fast_default(name=None) -> bool:
     on = COMPOSE_FAST
     if on is None:
         on = name in COMPOSE_FAST_GPUS
+    return bool(on)
+
+
+def count_plan_default(name=None) -> bool:
+    """``COUNT_PLAN`` (None: ``name`` in ``COUNT_PLAN_GPUS``)."""
+    on = COUNT_PLAN
+    if on is None:
+        on = name in COUNT_PLAN_GPUS
     return bool(on)
 
 
@@ -64,5 +77,5 @@ def composed(right, ws, linear=None):
     return c.contiguous(), c.transpose(1, 2).contiguous()
 
 
-__all__ = ["COMPOSE_FAST", "COMPOSE_FAST_GPUS", "COMPOSE_SKIP", "COMPOSE_SKIP_GPUS", "compose_fast_default",
-           "compose_skip_default", "composed"]
+__all__ = ["COMPOSE_FAST", "COMPOSE_FAST_GPUS", "COMPOSE_SKIP", "COMPOSE_SKIP_GPUS", "COUNT_PLAN", "COUNT_PLAN_GPUS",
+           "compose_fast_default", "compose_skip_default", "composed", "count_plan_default"]

@@ -168,6 +168,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         # (``bind`` composes the weights once per table), and the products through one joined species product
         self.compose_radial = None
         self.compose_joined = False
+        self.count_plan = False  # compose_skip.COUNT_PLAN: the species plan by a counting sort
 
     def bind(self, species_feats):
         """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address).
@@ -298,7 +299,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         linear, linear_products, skip, products = self.compose_skip
         onehot = node_attrs[:nodes, skip.columns]
         kind = onehot.argmax(dim=1)
-        order, counts = species_plan(kind, onehot.shape[1])
+        order, counts = species_plan(kind, onehot.shape[1], counting=self.count_plan)
         if not self.tf32x3:
             precision = "ieee"
         else:

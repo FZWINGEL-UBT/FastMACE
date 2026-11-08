@@ -81,7 +81,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/kernels/triton/compose_skip.py": {"COMPOSE_SKIP": "first projection composed with the species skip; "
                                                                "per GPU, A/B",
                                                 "COMPOSE_FAST": "COMPOSE_SKIP's cached weights and joined product; "
-                                                                "per GPU, A/B"},
+                                                                "per GPU, A/B",
+                                                "COUNT_PLAN": "COMPOSE_SKIP's species plan by counting; per GPU, A/B"},
     "fastmace/kernels/cutlass/skip_select.py": {"SKIP_SELECT": "idea 31: species-skip selection in the epilogue; A/B"},
     "fastmace/rewrites/cueq_projection.py": {"CUEQ_PROJECTED": "cuEq projected weight kept; per GPU, A/B"},
     "fastmace/kernels/triton/divided_blocks.py": {},

@@ -89,6 +89,7 @@ def _route_compose_skip(model):
         reassociation.compose_skip = None
         reassociation.compose_radial = None
         reassociation.compose_joined = False
+        reassociation.count_plan = False
         device = reassociation.columns.device
         if device.type != "cuda" or not compose_skip.compose_skip_default(torch.cuda.get_device_name(device)):
             continue
@@ -96,6 +97,7 @@ def _route_compose_skip(model):
         if products is not None:
             linear, skip = products
             reassociation.compose_skip = (module.linear, linear, module.skip_tp, skip)
+            reassociation.count_plan = compose_skip.count_plan_default(torch.cuda.get_device_name(device))
             if not compose_skip.compose_fast_default(torch.cuda.get_device_name(device)):
                 continue
             reassociation.compose_joined = True
