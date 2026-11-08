@@ -237,9 +237,12 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
 # BLOCK_ORDER (8 November 2026): the owner rows walk the receivers in a given order (an int32 permutation of [0, N),
 # argument ``order`` after ``intervals``), so the blocks resident at one time hold receivers of one species and read
 # the same spline-table slabs (results/omat0-breakthroughs-assessment-20261108: modelled L1 hits 0.54 -> 0.70 with
-# SORT_BY_LENGTH). The same arithmetic per receiver: bitwise. None: on for BLOCK_ORDER_GPUS (none until measured).
+# SORT_BY_LENGTH). The same arithmetic per receiver: bitwise. None: on for BLOCK_ORDER_GPUS (decision 66).
 BLOCK_ORDER = None
-BLOCK_ORDER_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`, on
+# top of SORT_BY_LENGTH): MD step b/a 0.9753 / 0.9724 (3.514 -> 3.42 ms); forces 2.6e-6 against the same build's
+# 3.3e-6 eV/A (bitwise forward; w' atomics).
+BLOCK_ORDER_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def block_order_default(device):

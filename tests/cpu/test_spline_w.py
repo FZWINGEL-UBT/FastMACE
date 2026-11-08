@@ -450,6 +450,7 @@ def test_receiver_order_groups_species_stably():
     order = sf.receiver_order(torch.tensor([2, 0, 1, 0, 2, 1]))
     assert order.dtype == torch.int32 and order.tolist() == [1, 3, 2, 5, 0, 4]
     assert sf.BLOCK_ORDER is None and not sf.block_order_default("cpu")
+    assert "NVIDIA H200" in sf.BLOCK_ORDER_GPUS and "NVIDIA GeForce RTX 5060 Ti" not in sf.BLOCK_ORDER_GPUS
 
 
 def test_block_order_sources_compile_with_nvrtc():
