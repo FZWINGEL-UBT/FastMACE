@@ -114,3 +114,25 @@ def test_the_mask_follows_the_megakernel(monkeypatch):
     monkeypatch.setattr(polar, "megakernel_on", lambda tensor: True)
     assert torch.equal(polar._fourier_mask(k_batch, positions, one), torch.tensor([1.0, 0.0, 1.0]))
     assert math.isclose(mk.S0, 2.0 / (2.0 * math.pi) ** 3)
+
+
+def test_kspace_field_compiles_in_one_graph():
+    """torch.compile traces the autograd.Function in one graph (the production path compiles the POLAR forward;
+    a mark_non_differentiable on saved tensors made Dynamo assert, torch 2.14)."""
+    generator = torch.Generator().manual_seed(4)
+    K, N, C, J, F = 11, 7, 2, 4, 8
+    k, r = torch.randn((K, 3), generator=generator), 5.0 * torch.rand((N, 3), generator=generator)
+    mask = (torch.rand(K, generator=generator) > 0.2).float()
+    x = torch.randn((N, C, J), generator=generator)
+    dr, di, pr, pi = (torch.randn(shape, generator=generator) for shape in ((K, J), (K, J), (K, F), (K, F)))
+    w = torch.rand(K, generator=generator) + 0.1
+
+    def energy(r, x):
+        return (mk.kspace_field(k, r, mask, x, dr, di, w, pr, pi) ** 2).sum()
+
+    leaves = [t.clone().requires_grad_() for t in (r, x)]
+    expected = torch.autograd.grad(energy(*leaves), leaves)
+    compiled = torch.compile(energy, backend="aot_eager", fullgraph=True)
+    got = torch.autograd.grad(compiled(*leaves), leaves)
+    for g, e in zip(got, expected):
+        torch.testing.assert_close(g, e)

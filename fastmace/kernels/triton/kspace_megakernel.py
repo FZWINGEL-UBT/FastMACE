@@ -478,8 +478,9 @@ class _KspaceField(torch.autograd.Function):
     @staticmethod
     def forward(ctx, k, r, mask, x, dr, di, w, pr, pi):
         out, yc, ys, a, b = kspace_field_forward(k, r, mask, x, dr, di, w, pr, pi)
+        # yc, ys, a, b are saved, never outputs: no mark_non_differentiable (Dynamo's autograd.Function tracing
+        # asserts on it when the forward returns one tensor, torch 2.14)
         ctx.save_for_backward(k, r, mask, x, yc, ys, a, b, dr, di, w, pr, pi)
-        ctx.mark_non_differentiable(yc, ys, a, b)
         return out
 
     @staticmethod
