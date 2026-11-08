@@ -1,0 +1,174 @@
+{
+  "source_commit": "0d0eefaebf7d1e0152a8cdf80f2cb89f6239b284",
+  "profile_commit": "978dbef52fbe3f202dfb1f2017d408d01861acc7",
+  "N": 5000,
+  "E_padded": 373760,
+  "channels": 128,
+  "counts": {
+    "i2_forward_ops_channel": 248,
+    "i2_backward_ops_channel_parts": {
+      "u": 150,
+      "v": 116,
+      "wg": 34,
+      "dx": 44,
+      "dsh": 84,
+      "dr": 20,
+      "radial": 130
+    }
+  },
+  "direct_work_estimates_flop": {
+    "i2_forward": 11864637440,
+    "i2_backward": 27652259840,
+    "i1_forward": 1052508160,
+    "i1_backward": 2057175040
+  },
+  "dominant_semantic_node_gemm_flop": {
+    "compose_both": 7864320000,
+    "interaction2_linear_both": 13107200000,
+    "interaction2_up_both": 1310720000
+  },
+  "gpu": {
+    "H200": {
+      "fp32_TF": 67,
+      "tf32_dense_TF": 494.5,
+      "hbm_TB": 4.8,
+      "tf32x3_semantic_TF": 164.83333333333334,
+      "explicit_work_ideal_us": {
+        "i2_forward": 177.08414089552238,
+        "i2_backward": 412.720296119403,
+        "i1_forward": 15.709077014925374,
+        "i1_backward": 30.704105074626867
+      },
+      "dominant_gemm_ideal_us": 135.18042467138523,
+      "explicit_work_sum_ideal_us_excluding_SC_geometry": 771.3980437758629,
+      "bytes_over_rated_HBM_us_NOT_physical_floor": {
+        "x_node": 2.1333333333333333,
+        "raw_message": 21.333333333333332,
+        "projected_message": 8.533333333333333,
+        "first_outer_S": 12.8,
+        "edge_SH": 4.983466666666667,
+        "positions_and_forces": 0.025,
+        "one_requested_spline_pass": 1594.7093333333332,
+        "spline_allocation": 28.0704,
+        "weight_and_slope_tape": 797.3546666666666,
+        "raw_message_fwd_write_bwd_read": 42.666666666666664,
+        "dx_atomic_payload_no_RMW_assumption": 159.47093333333333,
+        "SH_dr_backward_output": 5.294933333333334,
+        "dominant_node_GEMM_min_A_C_accesses": 110.93333333333334,
+        "SC_separate_kernel_input_output_accesses": 56.53333333333333
+      },
+      "two_pass_logical_spline_HBM_us_NOT_floor": 3189.4186666666665
+    },
+    "A100_SXM80": {
+      "fp32_TF": 19.5,
+      "tf32_dense_TF": 156,
+      "hbm_TB": 2.039,
+      "tf32x3_semantic_TF": 52.0,
+      "explicit_work_ideal_us": {
+        "i2_forward": 608.4429456410256,
+        "i2_backward": 1418.0646071794872,
+        "i1_forward": 53.97477743589744,
+        "i1_backward": 121.44324923076923
+      },
+      "dominant_gemm_ideal_us": 428.50461538461536,
+      "explicit_work_sum_ideal_us_excluding_SC_geometry": 2630.430194871795,
+      "bytes_over_rated_HBM_us_NOT_physical_floor": {
+        "x_node": 5.022069641981362,
+        "raw_message": 50.22069641981363,
+        "projected_message": 20.08827856792545,
+        "first_outer_S": 30.132417851888178,
+        "edge_SH": 11.731554683668463,
+        "positions_and_forces": 0.0588523786169691,
+        "one_requested_spline_pass": 3754.0974987739082,
+        "spline_allocation": 66.08039234919077,
+        "weight_and_slope_tape": 1877.0487493869541,
+        "raw_message_fwd_write_bwd_read": 100.44139283962726,
+        "dx_atomic_payload_no_RMW_assumption": 375.4097498773908,
+        "SH_dr_backward_output": 12.464776851397742,
+        "dominant_node_GEMM_min_A_C_accesses": 261.14762138303087,
+        "SC_separate_kernel_input_output_accesses": 133.08484551250612
+      },
+      "two_pass_logical_spline_HBM_us_NOT_floor": 7508.1949975478165
+    }
+  },
+  "array_or_logical_bytes": {
+    "x_node": 10240000,
+    "raw_message": 102400000,
+    "projected_message": 40960000,
+    "first_outer_S": 61440000,
+    "edge_SH": 23920640,
+    "positions_and_forces": 120000,
+    "one_requested_spline_pass": 7654604800,
+    "spline_allocation": 134737920,
+    "weight_and_slope_tape": 3827302400,
+    "raw_message_fwd_write_bwd_read": 204800000,
+    "dx_atomic_payload_no_RMW_assumption": 765460480,
+    "SH_dr_backward_output": 25415680,
+    "dominant_node_GEMM_min_A_C_accesses": 532480000,
+    "SC_separate_kernel_input_output_accesses": 271360000
+  },
+  "measured_H200": {
+    "step_us": 3643.695045000186,
+    "kernel_us": 3399.1600000000003,
+    "i2_forward_us": 806.4,
+    "i2_backward_us": 1099.0,
+    "all_tf32_us": 547.0,
+    "all_tf32_launches": 22.0
+  },
+  "measured_A100": {
+    "step_us": 7360,
+    "current_kernel_profile_available": false
+  },
+  "profile_scope": {
+    "eager_kernels": 103.0,
+    "replay_kernels": 148.0,
+    "replay_gaps_us": 64.36179999999396,
+    "rebuild_calls": 15,
+    "instrumented_steps": 200,
+    "rebuild_us_per_step_already_amortized": 327.3803162574768,
+    "rebuild_us_per_call": 4365.070883433024,
+    "stage_durations_can_overlap": true
+  },
+  "thresholds": {
+    "H200_twenty_percent_us": 728.7390090000372,
+    "H200_twofold_target_us": 1821.847522500093,
+    "i2_reduction_for_twenty_percent": 0.38245985567336893,
+    "i2_time_allowed_for_twofold_if_rest_fixed_us": 83.55247749990713
+  },
+  "spatial_examples": {
+    "box_A": 39.05,
+    "density_atoms_A3": 0.08396666220390855,
+    "FFT_grids": [
+      {
+        "spacing_A": 0.5,
+        "m": 79,
+        "grid_cells": 493039,
+        "input_1536_real_field_bytes": 3029231616,
+        "output_15360_real_field_bytes": 30292316160,
+        "scalar_real_FFT_work_proxy_1536": 71608544785.1633
+      },
+      {
+        "spacing_A": 0.25,
+        "m": 157,
+        "grid_cells": 3869893,
+        "input_1536_real_field_bytes": 23776622592,
+        "output_15360_real_field_bytes": 237766225920,
+        "scalar_real_FFT_work_proxy_1536": 650405416868.1323
+      }
+    ]
+  },
+  "cache_floor_formula": "max(F_SIMT/P_SIMT,3*F_MMA/P_TF32,B_HBM/BW_HBM,B_L2/BW_L2); physical cache bytes/BW_L2 unknown",
+  "limitations": [
+    "Arithmetic estimates omit fixed CG scale cost and some factoring; not irreducible FLOPs.",
+    "Symmetric-contraction operation count, physical DRAM/L2 sectors and calibratedL2BW unavailable.",
+    "Kernel-boundary arrays can be avoided by a different execution plan; not unavoidable model traffic.",
+    "Actualactiveedges may be below paddedE; counts based onpaddedE are upper work budgets.",
+    "A100I1backwardreferenceadjustedfornonPOWERClenshaw; stillapproximateoperationcounts.",
+    "A100has no currentpost-ten kernelprofile; no scaledH200times are measurements."
+  ],
+  "source_sha256": {
+    "results\\h200-fastpath-20261108\\round4\\breakdown\\ops.csv": "17e5ce6170b964bbd252fe95d6ce37f4debeed4d015e7371c172b519839aa363",
+    "results\\h200-fastpath-20261108\\round4\\breakdown\\summary.json": "6019ee4d22ef9b62cdff29b02619a2217c1bb259b13f5eafc122e67265e5fffc",
+    "docs\\optimisation-ledger.md": "802e0bae08a364e7049c4d5315899d2b5ab6ecc8340af21f92356bccfc9151ce"
+  }
+}

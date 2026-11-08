@@ -1,0 +1,789 @@
+{
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "checkpoint": "/home/fzwin/models/mace-omat-0-medium.model",
+  "torch": "2.14.1+cpu",
+  "cuda_visible_devices": "",
+  "model_class": "ScaleShiftMACE",
+  "r_max_A": 6.0,
+  "num_interactions": 2,
+  "atomic_numbers": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94
+  ],
+  "parameters": 9063204,
+  "radial_embedding_class": "RadialEmbeddingBlock",
+  "radial_embedding_repr": "RadialEmbeddingBlock(\n  (bessel_fn): BesselBasis(r_max=6.0, num_basis=10, trainable=False)\n  (distance_transform): AgnesiTransform(a=1.0805, q=0.9183, p=4.5791)\n  (cutoff_fn): PolynomialCutoff(p=5.0, r_max=6.0)\n)",
+  "node_embedding_repr": "LinearNodeEmbeddingBlock(\n  (linear): Linear(89x0e -> 128x0e | 11392 weights)\n)",
+  "interactions": [
+    {
+      "index": 0,
+      "class": "RealAgnosticDensityInteractionBlock",
+      "linear_up_in": "128x0e",
+      "linear_up_out": "128x0e",
+      "conv_input1": "128x0e",
+      "conv_input2": "1x0e+1x1o+1x2e+1x3o",
+      "conv_output": "128x0e+128x1o+128x2e+128x3o",
+      "conv_weight_numel": 512,
+      "linear_in": "128x0e+128x1o+128x2e+128x3o",
+      "linear_out": "128x0e+128x1o+128x2e+128x3o",
+      "channels": 128,
+      "paths": [
+        {
+          "input1_index": 0,
+          "input2_index": 0,
+          "output_index": 0,
+          "l1": 0,
+          "l2": 0,
+          "lo": 0,
+          "CG_nonzero": 1,
+          "output_components": 1,
+          "mode": "uvu",
+          "path_weight": 1.0
+        },
+        {
+          "input1_index": 0,
+          "input2_index": 1,
+          "output_index": 1,
+          "l1": 0,
+          "l2": 1,
+          "lo": 1,
+          "CG_nonzero": 3,
+          "output_components": 3,
+          "mode": "uvu",
+          "path_weight": 1.7320508075688772
+        },
+        {
+          "input1_index": 0,
+          "input2_index": 2,
+          "output_index": 2,
+          "l1": 0,
+          "l2": 2,
+          "lo": 2,
+          "CG_nonzero": 5,
+          "output_components": 5,
+          "mode": "uvu",
+          "path_weight": 2.23606797749979
+        },
+        {
+          "input1_index": 0,
+          "input2_index": 3,
+          "output_index": 3,
+          "l1": 0,
+          "l2": 3,
+          "lo": 3,
+          "CG_nonzero": 7,
+          "output_components": 7,
+          "mode": "uvu",
+          "path_weight": 2.6457513110645907
+        }
+      ],
+      "CG_nonzero_total": 16,
+      "unique_input_SH_component_products": 16,
+      "within_output_sum_adds": 0,
+      "output_components_per_channel": 16,
+      "radial_hidden_repr": "Sequential(\n  (0): Layer(10->64, act=normalize2mom)\n  (1): Layer(64->64, act=normalize2mom)\n  (2): Layer(64->64, act=normalize2mom)\n)",
+      "radial_last_rank": {
+        "shape": [
+          512,
+          64
+        ],
+        "rank_relative_1e12": 64,
+        "smax": 27.661360226000976,
+        "smin": 1.891333990493108,
+        "relative_smin": 0.06837458371679431
+      },
+      "radial_path_matrix_ranks": [
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 3.9963729958522225,
+          "smin": 0.20434811137227543,
+          "relative_smin": 0.05113339310028502
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 12.02226944616121,
+          "smin": 0.42882491341471435,
+          "relative_smin": 0.03566921497934327
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 18.520399443015684,
+          "smin": 0.5180009201064519,
+          "relative_smin": 0.027969208855362877
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 18.22972416763413,
+          "smin": 0.4974950261458627,
+          "relative_smin": 0.027290321102561587
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "class": "RealAgnosticDensityResidualInteractionBlock",
+      "linear_up_in": "128x0e+128x1o",
+      "linear_up_out": "128x0e+128x1o",
+      "conv_input1": "128x0e+128x1o",
+      "conv_input2": "1x0e+1x1o+1x2e+1x3o",
+      "conv_output": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+      "conv_weight_numel": 1280,
+      "linear_in": "256x0e+384x1o+384x2e+256x3o",
+      "linear_out": "128x0e+128x1o+128x2e+128x3o",
+      "channels": 128,
+      "paths": [
+        {
+          "input1_index": 0,
+          "input2_index": 0,
+          "output_index": 0,
+          "l1": 0,
+          "l2": 0,
+          "lo": 0,
+          "CG_nonzero": 1,
+          "output_components": 1,
+          "mode": "uvu",
+          "path_weight": 1.0
+        },
+        {
+          "input1_index": 1,
+          "input2_index": 1,
+          "output_index": 1,
+          "l1": 1,
+          "l2": 1,
+          "lo": 0,
+          "CG_nonzero": 3,
+          "output_components": 1,
+          "mode": "uvu",
+          "path_weight": 1.0
+        },
+        {
+          "input1_index": 0,
+          "input2_index": 1,
+          "output_index": 2,
+          "l1": 0,
+          "l2": 1,
+          "lo": 1,
+          "CG_nonzero": 3,
+          "output_components": 3,
+          "mode": "uvu",
+          "path_weight": 1.7320508075688772
+        },
+        {
+          "input1_index": 1,
+          "input2_index": 0,
+          "output_index": 3,
+          "l1": 1,
+          "l2": 0,
+          "lo": 1,
+          "CG_nonzero": 3,
+          "output_components": 3,
+          "mode": "uvu",
+          "path_weight": 1.7320508075688772
+        },
+        {
+          "input1_index": 1,
+          "input2_index": 2,
+          "output_index": 4,
+          "l1": 1,
+          "l2": 2,
+          "lo": 1,
+          "CG_nonzero": 11,
+          "output_components": 3,
+          "mode": "uvu",
+          "path_weight": 1.7320508075688772
+        },
+        {
+          "input1_index": 0,
+          "input2_index": 2,
+          "output_index": 5,
+          "l1": 0,
+          "l2": 2,
+          "lo": 2,
+          "CG_nonzero": 5,
+          "output_components": 5,
+          "mode": "uvu",
+          "path_weight": 2.23606797749979
+        },
+        {
+          "input1_index": 1,
+          "input2_index": 1,
+          "output_index": 6,
+          "l1": 1,
+          "l2": 1,
+          "lo": 2,
+          "CG_nonzero": 11,
+          "output_components": 5,
+          "mode": "uvu",
+          "path_weight": 2.23606797749979
+        },
+        {
+          "input1_index": 1,
+          "input2_index": 3,
+          "output_index": 7,
+          "l1": 1,
+          "l2": 3,
+          "lo": 2,
+          "CG_nonzero": 21,
+          "output_components": 5,
+          "mode": "uvu",
+          "path_weight": 2.23606797749979
+        },
+        {
+          "input1_index": 0,
+          "input2_index": 3,
+          "output_index": 8,
+          "l1": 0,
+          "l2": 3,
+          "lo": 3,
+          "CG_nonzero": 7,
+          "output_components": 7,
+          "mode": "uvu",
+          "path_weight": 2.6457513110645907
+        },
+        {
+          "input1_index": 1,
+          "input2_index": 2,
+          "output_index": 9,
+          "l1": 1,
+          "l2": 2,
+          "lo": 3,
+          "CG_nonzero": 21,
+          "output_components": 7,
+          "mode": "uvu",
+          "path_weight": 2.6457513110645907
+        }
+      ],
+      "CG_nonzero_total": 86,
+      "unique_input_SH_component_products": 62,
+      "within_output_sum_adds": 46,
+      "output_components_per_channel": 40,
+      "radial_hidden_repr": "Sequential(\n  (0): Layer(10->64, act=normalize2mom)\n  (1): Layer(64->64, act=normalize2mom)\n  (2): Layer(64->64, act=normalize2mom)\n)",
+      "radial_last_rank": {
+        "shape": [
+          1280,
+          64
+        ],
+        "rank_relative_1e12": 64,
+        "smax": 31.364710070099687,
+        "smin": 3.0620751748813153,
+        "relative_smin": 0.09762804017756327
+      },
+      "radial_path_matrix_ranks": [
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 3.321193023531057,
+          "smin": 0.330218738045867,
+          "relative_smin": 0.09942774650742278
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 6.116449651674682,
+          "smin": 0.4044485673832305,
+          "relative_smin": 0.06612472764694345
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 7.849423610647973,
+          "smin": 0.4537532707087957,
+          "relative_smin": 0.05780720893866221
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 13.518756754917685,
+          "smin": 0.4950915611483703,
+          "relative_smin": 0.036622565974365355
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 12.773310615211075,
+          "smin": 0.4825180646069086,
+          "relative_smin": 0.03777548978041
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 8.026654995748626,
+          "smin": 0.43730245788473016,
+          "relative_smin": 0.05448128244160868
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 13.335865448702956,
+          "smin": 0.476676035079523,
+          "relative_smin": 0.035743914552308596
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 11.756536170326108,
+          "smin": 0.4272169542879709,
+          "relative_smin": 0.03633867561827274
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 7.2658875333988195,
+          "smin": 0.45131398877232537,
+          "relative_smin": 0.06211408953108455
+        },
+        {
+          "shape": [
+            128,
+            64
+          ],
+          "rank_relative_1e12": 64,
+          "smax": 13.231551951165734,
+          "smin": 0.4392787720306914,
+          "relative_smin": 0.03319933849422628
+        }
+      ],
+      "Gaunt_two_output_path_row_rank_channel0": {
+        "shape": [
+          2,
+          64
+        ],
+        "rank_relative_1e12": 2,
+        "smax": 2.6430824868614957,
+        "smin": 1.0869563370436868,
+        "relative_smin": 0.4112457111901881
+      },
+      "Gaunt_path_indices": [
+        1,
+        6
+      ],
+      "Gaunt_sampled_radial_pair_rank_channel0": {
+        "shape": [
+          2,
+          128
+        ],
+        "rank_relative_1e12": 2,
+        "smax": 31.367300254374694,
+        "smin": 3.3650021586997596,
+        "relative_smin": 0.10727739178734243
+      },
+      "Gaunt_sampled_points": {
+        "pair_indices": [
+          0,
+          0
+        ],
+        "domain_A": [
+          1.0,
+          5.8
+        ],
+        "points": 128
+      }
+    }
+  ],
+  "products": [
+    {
+      "index": 0,
+      "class": "EquivariantProductBasisBlock",
+      "symmetric_contraction": "SymmetricContraction(\n  (contractions): ModuleList(\n    (0): Contraction(\n      (contractions_weighting): ModuleList(\n        (0-1): 2 x GraphModule()\n      )\n      (contractions_features): ModuleList(\n        (0-1): 2 x GraphModule()\n      )\n      (weights): ParameterList(\n          (0): Parameter containing: [torch.float64 of size 89x4x128]\n          (1): Parameter containing: [torch.float64 of size 89x1x128]\n      )\n      (graph_opt_main): GraphModule()\n    )\n    (1): Contraction(\n      (contractions_weighting): ModuleList(\n        (0-1): 2 x GraphModule()\n      )\n      (contractions_features): ModuleList(\n        (0-1): 2 x GraphModule()\n      )\n      (weights): ParameterList(\n          (0): Parameter containing: [torch.float64 of size 89x6x128]\n          (1): Parameter containing: [torch.float64 of size 89x1x128]\n      )\n      (graph_opt_main): GraphModule()\n    )\n  )\n)",
+      "correlations": [
+        3,
+        3
+      ],
+      "linear_in": "128x0e+128x1o",
+      "linear_out": "128x0e+128x1o"
+    },
+    {
+      "index": 1,
+      "class": "EquivariantProductBasisBlock",
+      "symmetric_contraction": "SymmetricContraction(\n  (contractions): ModuleList(\n    (0): Contraction(\n      (contractions_weighting): ModuleList(\n        (0-1): 2 x GraphModule()\n      )\n      (contractions_features): ModuleList(\n        (0-1): 2 x GraphModule()\n      )\n      (weights): ParameterList(\n          (0): Parameter containing: [torch.float64 of size 89x4x128]\n          (1): Parameter containing: [torch.float64 of size 89x1x128]\n      )\n      (graph_opt_main): GraphModule()\n    )\n  )\n)",
+      "correlations": [
+        3
+      ],
+      "linear_in": "128x0e",
+      "linear_out": "128x0e"
+    }
+  ],
+  "readouts": [
+    {
+      "index": 0,
+      "class": "LinearReadoutBlock",
+      "repr": "LinearReadoutBlock(\n  (linear): Linear(128x0e+128x1o -> 1x0e | 128 weights)\n)",
+      "activations": []
+    },
+    {
+      "index": 1,
+      "class": "NonLinearReadoutBlock",
+      "repr": "NonLinearReadoutBlock(\n  (linear_1): Linear(128x0e -> 16x0e | 2048 weights)\n  (non_linearity): Activation [x] (16x0e -> 16x0e)\n  (linear_2): Linear(16x0e -> 1x0e | 16 weights)\n)",
+      "activations": [
+        {
+          "name": "non_linearity.acts.0",
+          "wrapper": "normalize2mom",
+          "function": "silu"
+        }
+      ]
+    }
+  ],
+  "node_linear_matrices": {
+    "interactions.0.linear_up": {
+      "in": "128x0e",
+      "out": "128x0e",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 45.99259481117736,
+          "smin": 0.004149285063182733,
+          "relative_smin": 9.021637244468652e-05
+        }
+      ]
+    },
+    "interactions.0.linear": {
+      "in": "128x0e+128x1o+128x2e+128x3o",
+      "out": "128x0e+128x1o+128x2e+128x3o",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 10.161113292163224,
+          "smin": 0.04246392971229432,
+          "relative_smin": 0.004179062715996356
+        },
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 6.322585940935193,
+          "smin": 0.018155431674522302,
+          "relative_smin": 0.002871519951508461
+        },
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 6.5339525870940705,
+          "smin": 0.003460494309132739,
+          "relative_smin": 0.00052961729718822
+        },
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 6.256102448998251,
+          "smin": 0.00019150530825501097,
+          "relative_smin": 3.061096102824778e-05
+        }
+      ]
+    },
+    "interactions.1.linear_up": {
+      "in": "128x0e+128x1o",
+      "out": "128x0e+128x1o",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 47.444388390457185,
+          "smin": 0.06497313296109589,
+          "relative_smin": 0.0013694587529800338
+        },
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 79.6077351687524,
+          "smin": 0.020491216417929357,
+          "relative_smin": 0.00025740232873717734
+        }
+      ]
+    },
+    "interactions.1.linear": {
+      "in": "256x0e+384x1o+384x2e+256x3o",
+      "out": "128x0e+128x1o+128x2e+128x3o",
+      "matrices": [
+        {
+          "shape": [
+            256,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 20.162581950593992,
+          "smin": 1.0133826649083133,
+          "relative_smin": 0.05026056024925215
+        },
+        {
+          "shape": [
+            384,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 18.394820015931884,
+          "smin": 1.2090927173757455,
+          "relative_smin": 0.065730065112273
+        },
+        {
+          "shape": [
+            384,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 20.654447393586604,
+          "smin": 1.1701327838972377,
+          "relative_smin": 0.056652824527301304
+        },
+        {
+          "shape": [
+            256,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 16.80998887599643,
+          "smin": 0.7361846996434468,
+          "relative_smin": 0.0437944786920514
+        }
+      ]
+    },
+    "products.0.linear": {
+      "in": "128x0e+128x1o",
+      "out": "128x0e+128x1o",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 15.663300217591036,
+          "smin": 0.03611406622450459,
+          "relative_smin": 0.0023056486004109046
+        },
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 8.341477743736808,
+          "smin": 0.016879691824852112,
+          "relative_smin": 0.002023585309872248
+        }
+      ]
+    },
+    "products.1.linear": {
+      "in": "128x0e",
+      "out": "128x0e",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            128
+          ],
+          "rank_relative_1e12": 128,
+          "smax": 16.81660312607129,
+          "smin": 0.0008070942940179523,
+          "relative_smin": 4.799389555472648e-05
+        }
+      ]
+    },
+    "readouts.0.linear": {
+      "in": "128x0e+128x1o",
+      "out": "1x0e",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            1
+          ],
+          "rank_relative_1e12": 1,
+          "smax": 23.65314727049057,
+          "smin": 23.65314727049057,
+          "relative_smin": 1.0
+        }
+      ]
+    },
+    "readouts.1.linear_1": {
+      "in": "128x0e",
+      "out": "16x0e",
+      "matrices": [
+        {
+          "shape": [
+            128,
+            16
+          ],
+          "rank_relative_1e12": 16,
+          "smax": 39.041587150020156,
+          "smin": 3.546538121217813,
+          "relative_smin": 0.09084000882417974
+        }
+      ]
+    },
+    "readouts.1.linear_2": {
+      "in": "16x0e",
+      "out": "1x0e",
+      "matrices": [
+        {
+          "shape": [
+            16,
+            1
+          ],
+          "rank_relative_1e12": 1,
+          "smax": 14.380874080610024,
+          "smin": 14.380874080610024,
+          "relative_smin": 1.0
+        }
+      ]
+    }
+  },
+  "radial_hyperparameters": {
+    "num_bessel": 10,
+    "cutoff_p": 5.0,
+    "Agnesi_a": 1.0805,
+    "Agnesi_q": 0.9183,
+    "Agnesi_p": 4.5791
+  }
+}
