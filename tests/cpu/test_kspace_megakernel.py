@@ -101,17 +101,32 @@ def test_only_the_asked_gradients_and_no_k_gradient_in_nvt():
 def test_the_switch_is_off_without_a_listed_gpu(monkeypatch):
     assert polar.MEGAKERNEL is None and tuple(polar.MEGAKERNEL_GPUS) == ()
     cpu = torch.zeros(2, 3)
-    assert not polar.megakernel_on(cpu)
+    assert not polar.megakernel_on(cpu, 10**7)
     monkeypatch.setattr(polar, "MEGAKERNEL", True)
-    assert not polar.megakernel_on(cpu)  # CUDA float32 only
-    assert not polar.megakernel_on(cpu.double())
+    assert not polar.megakernel_on(cpu, 10**7)  # CUDA float32 only
+    assert not polar.megakernel_on(cpu.double(), 10**7)
+
+
+def test_listed_gpus_take_only_large_cells(monkeypatch):
+    """MEGAKERNEL None: a listed GPU takes the megakernel from MEGAKERNEL_MIN_WORK atoms x k-vectors; True ignores it."""
+    import types
+
+    monkeypatch.setattr(polar, "_megakernel_listed", lambda index: True)
+    positions = types.SimpleNamespace(is_cuda=True, dtype=torch.float32, shape=(1944, 3),
+                                      device=types.SimpleNamespace(index=0))
+    small = types.SimpleNamespace(**{**vars(positions), "shape": (216, 3)})
+    assert polar.megakernel_on(positions, 2989)  # NbCl5
+    assert not polar.megakernel_on(small, 243)  # NaCl
+    assert polar.megakernel_on(small, polar.MEGAKERNEL_MIN_WORK // 216 + 1)
+    monkeypatch.setattr(polar, "MEGAKERNEL", True)
+    assert polar.megakernel_on(small, 243)
 
 
 def test_the_mask_follows_the_megakernel(monkeypatch):
     k_batch = torch.tensor([0, 1, 0])
     positions = torch.zeros(4, 3)
     one = polar._Call(None, {"ptr": torch.tensor([0, 4])})
-    monkeypatch.setattr(polar, "megakernel_on", lambda tensor: True)
+    monkeypatch.setattr(polar, "megakernel_on", lambda tensor, n_k: True)
     assert torch.equal(polar._fourier_mask(k_batch, positions, one), torch.tensor([1.0, 0.0, 1.0]))
     assert math.isclose(mk.S0, 2.0 / (2.0 * math.pi) ** 3)
 

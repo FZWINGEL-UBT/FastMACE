@@ -426,6 +426,10 @@ SPIN_BATCHED = True
 # tests/cpu/test_kspace_megakernel.py, tests/gpu/test_kspace_megakernel_cuda.py.
 MEGAKERNEL = None
 MEGAKERNEL_GPUS = ()
+# With MEGAKERNEL None, the listed GPUs take the megakernel only for cells with atoms x k-vectors at least this
+# (RTX 5060 Ti, 7-8 November 2026: NbCl5, 1944 x 2989 = 5.8 M, MD step 0.89-0.96 in both orders; NaCl,
+# 216 x 243 = 52 k, 0.998-1.012; nothing measured in between). True / False ignore it (the A/Bs).
+MEGAKERNEL_MIN_WORK = 1_000_000
 
 # A/B constant (polar-megakernel, 7 November 2026): the dense [k, atoms] cosines and sines from per-atom phase tables
 # along the three reciprocal axes (``PhaseFactors``): k = n1 b1 + n2 b2 + n3 b3 with integer n, so
@@ -436,14 +440,17 @@ MEGAKERNEL_GPUS = ()
 PHASE_RECURRENCE = False
 
 
-def megakernel_on(tensor):
-    """``MEGAKERNEL`` for float32 CUDA ``tensor``: the constant when set, else on for ``MEGAKERNEL_GPUS``."""
+def megakernel_on(tensor, n_k):
+    """``MEGAKERNEL`` for float32 CUDA ``tensor`` (positions, [atoms, 3]) and ``n_k`` k-vectors: the constant when
+    set, else on for ``MEGAKERNEL_GPUS`` when atoms x ``n_k`` reaches ``MEGAKERNEL_MIN_WORK``."""
     import torch
 
     if not (tensor.is_cuda and tensor.dtype == torch.float32):
         return False
     if MEGAKERNEL is not None:
         return bool(MEGAKERNEL)
+    if tensor.shape[0] * n_k < MEGAKERNEL_MIN_WORK:
+        return False
     index = tensor.device.index if tensor.device.index is not None else torch.cuda.current_device()
     return _megakernel_listed(index)
 
@@ -488,7 +495,7 @@ def _megakernel_features(cache, source):
 def _fourier_mask(k_vector_batch, node_positions, call):
     """The kept k-vectors as a [k] 0/1 column when ``FUSED_FOURIER`` or the megakernel takes this call (one
     graph), else None."""
-    if not ((FUSED_FOURIER or megakernel_on(node_positions)) and call is not None and call.data is not None
+    if not ((FUSED_FOURIER or megakernel_on(node_positions, k_vector_batch.shape[0])) and call is not None and call.data is not None
             and "ptr" in call.data and call.data["ptr"].shape[0] == 2):
         return None
     return (k_vector_batch == 0).to(dtype=node_positions.dtype)
@@ -504,7 +511,7 @@ def _fused_density(source_feats, k_vectors, node_positions, mask, density_basis_
     n_nodes, n_sigma, m_dim = source_feats.size(0), density_basis_fs.size(1), density_basis_fs.size(2)
     sm_dim = n_sigma * m_dim
     sources = source_feats.reshape(n_nodes, sm_dim)
-    if kspace_megakernel.CUDA and megakernel_on(node_positions):
+    if kspace_megakernel.CUDA and megakernel_on(node_positions, k_vectors.shape[0]):
         from fastmace.kernels.cuda import kspace as cuda_kspace
 
         if cuda_kspace.supports_sf(k_vectors, node_positions, mask, sources, width=sm_dim):
@@ -543,7 +550,7 @@ def pbc_forward_dynamic(self, original, source_feats, cache):
     mask = cache.get("fourier_mask")
     if mask is None or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC:
         return original(self, source_feats, cache)
-    if cache.get("node_positions") is not None and megakernel_on(cache["node_positions"]):
+    if cache.get("node_positions") is not None and megakernel_on(cache["node_positions"], cache["k_vectors"].shape[0]):
         n_nodes = source_feats.size(0)
         features = _megakernel_features(cache, source_feats.reshape(n_nodes, 1, -1))
         features_flat = self._permute_output_channels(features.reshape(n_nodes, -1))
@@ -582,7 +589,7 @@ def spin_field_features(descriptor, cache, alpha, beta, pbc):
 
     if (cache.get("mode") != "realspace" and cache.get("correction_mode", CORRECTION_MODE_MIXED) == CORRECTION_MODE_PBC
             and cache.get("fourier_mask") is not None and cache.get("node_positions") is not None
-            and megakernel_on(cache["node_positions"])):
+            and megakernel_on(cache["node_positions"], cache["k_vectors"].shape[0])):
         n_nodes = alpha.size(0)
         features = _megakernel_features(cache, torch.stack((alpha, beta), dim=1))  # [atoms, 2 spins, sigma * m]
         features_flat = descriptor._permute_output_channels(features)
