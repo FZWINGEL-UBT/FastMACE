@@ -134,29 +134,33 @@ def slab_sorted(args):
     return args
 
 
-def species_blocks(kernel, args):
+def species_blocks(kernel, args, r_max):
     """BLOCK_ORDER's variant of a captured forward: the same kernel rendered with an order argument, and the receivers
     grouped by species (the receiver's species from its first edge's pair, sender x S + receiver; H200 tables are
     not SYMMETRIC_PAIRS). Returns (kernel, order, seconds of the order's construction per call) or None."""
     import torch
 
     from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, receiver_order
-    row_ptr, pair, table = args[3], args[5], args[6]
+    row_ptr, r, pair, table = args[3], args[4], args[5], args[6]
     species = int(round((table.shape[0] / kernel.intervals) ** 0.5))
     counts = (row_ptr[1:] - row_ptr[:-1]).long()
-    first = row_ptr[:-1].long().clamp(0, pair.numel() - 1)
-    receiver_species = torch.where(counts > 0, pair[first].long() % species, species)
-    every = torch.repeat_interleave(receiver_species, counts)
-    if not torch.equal(every, pair[:every.numel()].long() % species):
+    edges = int(counts.sum())
+    receiver = torch.repeat_interleave(torch.arange(counts.numel(), device=r.device), counts)
+    inside = r.reshape(-1)[:edges] < r_max  # padding and edges past the cutoff carry no species information
+    own = pair[:edges].long() % species
+    receiver_species = torch.full((counts.numel(),), species, dtype=torch.long, device=r.device)
+    receiver_species.scatter_reduce_(0, receiver[inside], own[inside], "amin", include_self=True)
+    if not torch.equal(receiver_species[receiver[inside]], own[inside]):
         print("species-blocks: pair % S differs within a receiver (symmetric tables?); skipped", flush=True)
         return None
+    first = row_ptr[:-1].long().clamp(0, pair.numel() - 1)
     ordered = SplineForward(*kernel.init_args, block_order=True)
     order = receiver_order(receiver_species)
     torch.cuda.synchronize()
     start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     start.record()
     for _ in range(20):
-        receiver_order(torch.where(counts > 0, pair[first].long() % species, species))
+        receiver_order(torch.where(counts > 0, pair[first].long() % species, species))  # the per-call cost
     end.record()
     end.synchronize()
     return ordered, order, start.elapsed_time(end) / 20 * 1000.0
@@ -196,7 +200,7 @@ def main(argv=None):
         kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "forward":
             variants["slab-sorted"] = sorted_args = slab_sorted(real)
-            blocks = species_blocks(kernel, real)
+            blocks = species_blocks(kernel, real, r_max)
             if blocks is not None:
                 ordered, order, build_us = blocks
                 print(f"species-blocks: the order costs {build_us:.1f} us per call (eager torch)", flush=True)
