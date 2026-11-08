@@ -66,11 +66,13 @@ confirm them (8-22 % slower without).
 | | OFF23-medium | pass (paracetamol stress 2.48; default 2.66) |
 | | OFF23b-medium | pass (paracetamol stress 1.04; default 1.10) |
 | | OFF24-medium | pass (paracetamol stress 1.96; default 2.97) |
-| | POLAR-1-L | see the final section |
+| | POLAR-1-L | pass (branch tip b4ec7053, where it is the default: NaCl forces 0.88, stress 1.16; NbCl5 0.38, 0.28) |
 | MEGAKERNEL on | POLAR-1-S | pass (NaCl stress 1.56, NbCl5 0.72) |
 | | POLAR-1-M | pass (NbCl5 forces 1.21, stress 1.74) |
 
-The POLAR-1-L megakernel gate passed on the A100-80GB before (polar-megakernel, NbCl5).
+The POLAR-1-L megakernel gate passed on the A100-80GB before (polar-megakernel, NbCl5). No gate here had a rule-13
+revision of its plan. The first POLAR-1-L gate (4966344) died on the Alex group file quota (Inductor cache write);
+after cleaning `fm-offpolar` (about 125K files) it was rerun as 4967061.
 
 ## Before and after (branch tip b4ec7053, A100-SXM4-80GB)
 
@@ -104,5 +106,7 @@ family, which neither OFF (stock first block) nor POLAR (MH-1-class interactions
 - `runs/h200a100-off-4963396`, `runs/h200a100-polsm-4963397`, `runs/h200a100-poll-4963398`: round 1 packs
   (`cueqproj`, `stagesh`, `mega`, `headsoff`, `pruneoff`, `ctrl`).
 - `runs/h200a100-pols-ba-4964663`, `runs/h200a100-poll-ba-4964664`: the ba order for S and L.
-- `runs/gate-cueq-*-4964665`, `runs/gate-mega-*-4964666`: gates (default and candidate).
+- `runs/gate-cueq-*-4964665`, `runs/gate-mega-*-4964666`: gates (default and candidate);
+  `runs/gate-cueq-polar1-l-4967061` (and the failed 4966344).
+- `runs/final-*-49663*`: before and after.
 - `runs/jobs/`, `runs/logs/`: job files and Slurm logs.
