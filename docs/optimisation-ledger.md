@@ -421,6 +421,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-off-stock-skip-a100](#model-off-stock-skip-a100) | Species skip in MACE-OFF's stock first block | `STOCK_FIRST_SKIP_GPUS`, `STOCK_FIRST_SKIP` | FM | DEFAULT (scoped: A100, 5060 Ti, Ada) | off-polar-alex 2026-11-07/08 (d66) | 0.707–0.826, every OFF model; Ada with tables 0.59–0.75 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-off-stock-tables-a100](#model-off-stock-tables-a100) | Radial tables with MACE-OFF's stock first block | `DECISION_66_STOCK_FIRST_TABLES_GPUS` | FM | DEFAULT (scoped: A100, 5060 Ti, Ada) | off-polar-alex 2026-11-07/08 (d66) | 0.923–0.977 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-off-radial-tf32x3-a100](#model-off-radial-tf32x3-a100) | Radial last layer as 3xTF32 on MACE-OFF | `RADIAL_TF32X3_GPUS` (eligible products), `RADIAL_TF32X3` | FM | DEFAULT (scoped: MACE-OFF, A100) | off-polar-alex 2026-11-07 (d66) | 0.914–0.971; with the two rows above 0.563–0.645 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-split-columns](#model-off-split-columns) | Column-split input gradient of the folded radial layer (Codex R1) | `kernels.triton.skinny_linear.SPLIT_COLUMNS_GPUS`, `SPLIT_COLUMNS` | FM | DEFAULT (scoped: 5060 Ti) | off-polar-alex 2026-11-08 (d66) | OFF23-large 0.950–0.954; others 0.993–1.006 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-spin-batched](#model-polar-spin-batched) | POLAR-1's α and β field features in one call | `longrange.polar.SPIN_BATCHED` | FM | DEFAULT (pure removal, every GPU) | off-polar-alex 2026-11-07 | A100 S 0.912–0.943, M 0.961–0.971, L 0.976–0.985 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-update-fold](#model-polar-update-fold) | POLAR-1's field-update MLP folded at setup | `rewrites.polar.update_fold.FOLD_UPDATE` | FM | DEFAULT (pure removal, every GPU) | off-polar-alex 2026-11-08 | A100 NaCl 0.965–0.972, NbCl5 1.000; Ada NaCl 0.966–0.977 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-small-matmuls](#model-small-matmuls) | Small mm/addmm as an Inductor-fused multiply-sum | `rewrites.inductor.SMALL_MATMULS` | FM | REJECTED | off-polar-alex 2026-11-07 | 5060 Ti POLAR-S NaCl 0.951, NbCl5 1.00; OFF23-small 1.045–1.07 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
@@ -3907,6 +3908,21 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Measured: A100-SXM4-80GB: S NaCl 0.943 / 0.942, NbCl5 0.912 / 0.913; M 0.971 / 0.969, 0.961 / 0.962; L 0.979 /
   0.985, 0.976 / 0.977. RTX 5060 Ti S: 0.943 / 0.945, 0.885 / 0.882 (conductor rerun: S 0.951 / 0.938, 0.886 / 0.885; M NaCl 0.977 / 0.971, NbCl5
   0.949 / 0.951; L 0.994 / 0.987, 0.966 / 0.975). RTX 4000 Ada: S NaCl 0.953 / 0.953, NbCl5 0.897 / 0.897; M 0.983 / 0.982, 0.957 / 0.953; L 0.995 / 0.994, 0.975 / 0.975. Gates: S and M pass (leto); L passes on Modal A100-SXM4-80GB (NbCl5 forces 0.56, stress 0.66, energy 0.78; NaCl at the floors; default 0.42 / 0.41 / 0.55).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-split-columns"></a>
+#### model-off-split-columns: column-split input gradient of the folded radial layer
+- Switch: `kernels.triton.skinny_linear.SPLIT_COLUMNS_GPUS` (RTX 5060 Ti); A/B constant `SPLIT_COLUMNS`
+- Engine: FM
+- Date/round: 7–8 November 2026, branch `fastmace/off-polar-alex` (Codex idea R1; R7 folded into it)
+- What: the folded radial layer's input gradient with a second grid axis over 16-column tiles of P, used where the
+  one-axis grid leaves SMs idle and the split grid still fits in one wave (`split_columns`: on 36 SMs, chunks of at
+  most 576 rows). Every output keeps its BLOCK_K reduction order, so it is bitwise the one-axis kernel.
+- Status: DEFAULT (scoped: RTX 5060 Ti, decision 66). A100 (108 SMs, chunks up to 1728 rows) and Ada not measured.
+- Measured (MD step b/a, water_216, abab / abba, RTX 5060 Ti): OFF23-large 0.950 / 0.954 (lab 0.951 / 0.953;
+  32-column tiles 1.07 / 1.06; the split forced on every chunk, before the one-wave rule, OFF24 1.07 / 1.08);
+  OFF23-small 1.004 / 1.006, OFF23-medium 0.993 / 1.005, OFF23b 0.999 / 0.999, OFF24 1.002 / 1.005, where the
+  split never fires; POLAR-L NbCl5 1.000 / 1.000. GPU test `tests/gpu/test_folded_tiles_cuda.py`: 10 passed.
 - Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
 
 <a id="model-polar-update-fold"></a>
