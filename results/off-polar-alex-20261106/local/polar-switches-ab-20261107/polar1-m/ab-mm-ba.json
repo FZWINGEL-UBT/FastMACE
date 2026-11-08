@@ -1,0 +1,239 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-07T21:11:07.228223+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": null,
+  "model": "polar1-m",
+  "checkpoint_sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+  "sides": {
+    "a": {},
+    "b": {}
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.inductor:SMALL_MATMULS": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 300,
+    "block": 400,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    1.13623046875,
+    1.13720703125,
+    1.18505859375
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 5.866916528739239,
+            "mean_ms": 29.231577581240344,
+            "min_ms": 5.77717523497995,
+            "max_ms": 99.41530203250295,
+            "stdev_ms": 46.78917197393433,
+            "spread": 15.960364586548023,
+            "block_ms": [
+              5.845673274998262,
+              5.77717523497995,
+              99.41530203250295,
+              5.888159782480216
+            ]
+          },
+          "a": {
+            "median_ms": 6.1514856750000035,
+            "mean_ms": 6.174770742500186,
+            "min_ms": 6.083268455004145,
+            "max_ms": 6.312843164996593,
+            "stdev_ms": 0.10790171871453258,
+            "spread": 0.03732020557658995,
+            "block_ms": [
+              6.083268455004145,
+              6.094884917511081,
+              6.312843164996593,
+              6.208086432488926
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0485040386831475,
+        "pair_ratios_b_over_a": [
+          1.0406446218987415,
+          1.0549939493971803,
+          0.06349971318230935,
+          1.0543338940904132
+        ],
+        "stopped_after": 4
+      },
+      "ratio_b_over_a": 0.9537397693345414,
+      "pair_ratios": [
+        0.9609428415393315,
+        0.9478727347880964,
+        15.748102627313822,
+        0.9484661411390101
+      ],
+      "setup_s": {
+        "b": 77.45741619299224,
+        "a": 58.122623260002
+      },
+      "plan_lines": {
+        "b": [],
+        "a": []
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            3,
+            4
+          ],
+          "aot_autograd.ok": [
+            12,
+            13
+          ],
+          "aot_autograd.total": [
+            12,
+            13
+          ],
+          "frames.ok": [
+            78,
+            79
+          ],
+          "frames.total": [
+            85,
+            86
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x7ab258d95120>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            11,
+            12
+          ],
+          "inductor.async_compile_cache_hit": [
+            1227,
+            1720
+          ],
+          "inductor.async_compile_cache_miss": [
+            1972,
+            2716
+          ],
+          "inductor.decompose_mm": [
+            93,
+            124
+          ],
+          "inductor.extern_calls": [
+            671,
+            859
+          ],
+          "inductor.fxgraph_cache_hit": [
+            16,
+            18
+          ],
+          "inductor.pad_rewritten_as_cat": [
+            6,
+            8
+          ],
+          "inductor.pattern_matcher_count": [
+            4028,
+            5461
+          ],
+          "inductor.pattern_matcher_nodes": [
+            4262,
+            5773
+          ],
+          "inductor.removed_pointless_view_pair": [
+            18,
+            24
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            487,
+            732
+          ],
+          "stats.calls_captured": [
+            7440,
+            9906
+          ],
+          "stats.unique_graphs": [
+            12,
+            13
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 241.11845396351922,
+          "potential_eV_atom": -8471.289962972161,
+          "kinetic_eV_atom": 0.03116696052304119
+        },
+        "a": {
+          "temperature_K": 241.11844357087406,
+          "potential_eV_atom": -8471.289962981846,
+          "kinetic_eV_atom": 0.031166959179688345
+        }
+      },
+      "load_after": [
+        1.09375,
+        1.19189453125,
+        1.201171875
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 59,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 59
+        },
+        "a": {
+          "rebuilds": 59,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 59
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    }
+  }
+}

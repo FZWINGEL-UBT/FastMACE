@@ -1,0 +1,8 @@
+export PYTHONPATH=$B/src-527adb70; cd $PYTHONPATH
+for p in polar1-s:MACE-POLAR-1-S.model polar1-m:MACE-POLAR-1-M.model polar1-l:MACE-POLAR-1-L.model; do
+  m=${p%%:*}; c=${p#*:}
+  R=$B/runs/gate-e3nn-$m-$SLURM_JOB_ID
+  OUT=$R MODEL=$m CKPT=$c STRUCTS=x GATE_STRUCTS="NaCl NbCl5" GATE_NAME=default GATE_ARGS="--seed 20261015" bash tools/offpolar_ab.sh
+  OUT=$R MODEL=$m CKPT=$c STRUCTS=x GATE_STRUCTS="NaCl NbCl5" GATE_NAME=candidate GATE_ARGS="--seed 20261015 --production-constant fastmace.rewrites.linear:E3NN_BLOCK_LINEAR=True" bash tools/offpolar_ab.sh
+done
+python $B/jobs/gatesum.py $B/runs/gate-e3nn-*-$SLURM_JOB_ID/gate-*.log

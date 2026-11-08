@@ -1,0 +1,142 @@
+{
+ "model": "off23-large",
+ "structure": "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1",
+ "natoms": 648,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 21.25397185998736,
+ "traced_span_ms_per_step": 20.3689840234375,
+ "kernels_per_step": 396.12,
+ "kernel_busy_ms_per_step": 19.57708722093776,
+ "idle_gaps_ms_per_step": 0.7918945507812499,
+ "gaps_over_20us_ms_per_step": 0.633972392578125,
+ "kernels_under_5us_per_step": 144.18,
+ "kernels_under_10us_per_step": 169.14,
+ "time_in_kernels_under_10us_ms_per_step": 0.4236739399999999,
+ "top": [
+  [
+   "Kernel",
+   75.56,
+   9.368130699999991
+  ],
+  [
+   "oeq_projected_backward",
+   74.2,
+   6.22854266
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3",
+   2.12,
+   2.93350804
+  ],
+  [
+   "oeq_projected_forward",
+   1.06,
+   1.6103869399999997
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   25.44,
+   1.31674588
+  ],
+  [
+   "backward(float*, float*, float*, float*, float*, float*, float*, ConvD",
+   1.06,
+   0.9916735
+  ],
+  [
+   "triton_poi_fused__to_copy__unsafe_view_add_clone_slice_slice_backward_",
+   1.06,
+   0.7703646799999998
+  ],
+  [
+   "forward(float*, float*, float*, float*, ConvData, void*)",
+   1.06,
+   0.7567916200000002
+  ],
+  [
+   "gemm",
+   10.6,
+   0.25466363999999975
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   10.6,
+   0.17031362000000017
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_35",
+   1.06,
+   0.13257864
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_4",
+   1.06,
+   0.1294643
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_36",
+   1.06,
+   0.12451128000000006
+  ],
+  [
+   "backward",
+   2.12,
+   0.08806332000000004
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_34",
+   1.06,
+   0.08151104000000002
+  ],
+  [
+   "forward",
+   2.12,
+   0.06571136
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_transpose",
+   1.06,
+   0.061461140000000004
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_transpose_view_23",
+   1.06,
+   0.039363199999999994
+  ],
+  [
+   "void at::native::radixSortKVInPlace<-2, -1, 32, 32, long, long, unsign",
+   2.12,
+   0.03625029999999997
+  ],
+  [
+   "segmented_polynomial_split1_of_2_algo1_4",
+   1.06,
+   0.031966699999999994
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_div_mm_slice_slice_backward_vi",
+   6.36,
+   0.02918464000000001
+  ],
+  [
+   "segmented_polynomial_split2_of_2_algo1_4",
+   1.06,
+   0.022956159999999993
+  ],
+  [
+   "triton_poi_fused_add_div_slice_backward_view_19",
+   1.06,
+   0.022611200000000005
+  ],
+  [
+   "triton_poi_fused_radial_table_backward_slice_backward_21",
+   1.06,
+   0.02167806000000001
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_inde",
+   3.12,
+   0.021054659999999992
+  ]
+ ]
+}

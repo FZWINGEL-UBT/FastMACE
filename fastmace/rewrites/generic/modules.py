@@ -167,7 +167,9 @@ def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, ed
         summed, edge_density = tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts, table.scales,
                                                 table.bins, table.r_lo, table.bin_scale, table.r_max, width,
                                                 edge_attrs.contiguous(), key, slots,
-                                                pcoef=getattr(table, "pcoef", None))
+                                                pcoef=getattr(table, "pcoef", None),
+                                                packed=getattr(table, "coef_pairs", None),
+                                                ppacked=getattr(table, "pcoef_pairs", None))
         density.append(edge_density)
         return summed, width
 
@@ -215,12 +217,67 @@ def first_div_applies(self, kind, n_real):
     reassociation = getattr(self, "first_reassociation", None)
     skip = getattr(self, "skip_tp", None)
     if (kind != "density" or n_real is not None or not getattr(reassociation, "first_div", False)
+            or getattr(reassociation, "compose_skip", None) is not None
             or not isinstance(self.linear, torch.nn.Identity) or not isinstance(skip, SpeciesSkip)
             or skip.layout != "ir_mul" or len(skip.segments_in) != len(reassociation.ls)):
         return False
     c = reassociation.channels
     return all(mul == c and dim == c * (2 * degree + 1)
                for (_, mul, dim), degree in zip(skip.segments_in, reassociation.ls))
+
+
+def _linear_products(linear, ls, c):
+    """Per path, the index of ``linear``'s product that takes it alone (a ``BlockLinear`` without layout transposes,
+    path k's segment to output segment k, ``c`` channels in), or [] for the identity; None otherwise."""
+    from fastmace.rewrites.linear.modules import BlockLinear, _identity
+
+    if isinstance(linear, torch.nn.Identity):
+        return []
+    if (type(linear) is not BlockLinear or not _identity(linear.transpose_in) or not _identity(linear.transpose_out)
+            or len(linear.segments_in) != len(ls) or len(linear.block_ends) != len(ls)):
+        return None
+    products = []
+    for path, degree in enumerate(ls):
+        index = [k for k, (i, j) in enumerate(linear.block_ends) if i in (path, (path,))]
+        if len(index) != 1 or linear.block_ends[index[0]][1] != path:
+            return None
+        _, mul, dim = linear.segments_in[path]
+        if mul != c or dim != 2 * degree + 1 or getattr(linear, f"weight_{index[0]}").shape[0] != c:
+            return None
+        products.append(index[0])
+    return products
+
+
+def compose_skip_products(self):
+    """``(linear products, skip products)``: per reassociated path, the index of the linear's product (none for the
+    identity: the generic fold) and of the ``SpeciesSkip`` product that take it, where interaction ``self`` can
+    compose the reassociation, the linear and the skip (``kernels.triton.compose_skip``): a density interaction,
+    the reassociation in ir_mul, the linear the identity or a per-path ``BlockLinear``, the skip a ``SpeciesSkip`` in
+    ir_mul with one product per path, path k's input segment to output segment k, the output blocks side by side in
+    path order. Else None."""
+    reassociation = getattr(self, "first_reassociation", None)
+    skip = getattr(self, "skip_tp", None)
+    if (getattr(self, "generic_kind", None) != "density" or reassociation is None or not reassociation.ir_mul
+            or getattr(self, "density_before_linear", False) or not isinstance(skip, SpeciesSkip)
+            or skip.layout != "ir_mul" or not skip._select_layout()
+            or len(skip.pairs) != len(reassociation.ls) or len(skip.segments_in) != len(reassociation.ls)):
+        return None
+    c = reassociation.channels
+    linear = _linear_products(self.linear, reassociation.ls, c)
+    if linear is None:
+        return None
+    products = []
+    for path, degree in enumerate(reassociation.ls):
+        index = [k for k, (i, j) in enumerate(skip.pairs) if i == path]
+        if len(index) != 1 or skip.pairs[index[0]][1] != path:
+            return None
+        _, mul_in, dim_in = skip.segments_in[path]
+        _, mul_out, dim_out = skip.segments_out[path]
+        mul_mid = getattr(self.linear, f"weight_{linear[path]}").shape[1] if linear else c
+        if mul_in != mul_mid or dim_in != mul_in * (2 * degree + 1) or dim_out != mul_out * (2 * degree + 1):
+            return None
+        products.append(index[0])
+    return linear, products
 
 
 def _density_sum(edge_density: torch.Tensor, receivers: torch.Tensor, num_nodes: int) -> torch.Tensor:
@@ -351,6 +408,11 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         sc = self.truncate_ghosts(sc, n_real)
         message = self.linear(message) / self.avg_num_neighbors
         return self.reshape(message), sc
+    # kernels.triton.compose_skip: the reassociation composed its products with the linear and the skip where it ran
+    # on every row (no tiles, or first_table_region, which always does); only the division is left
+    if (kind == "density" and getattr(reassociation, "compose_skip", None) is not None
+            and (n_real is None or recompute_table)):
+        return self.reshape(message / (density + 1)), None
     divided = None
     if early_density is not None and isinstance(message, tuple):
         pass  # first_div: the blocks are divided already (the linear is the identity)
@@ -426,8 +488,14 @@ SPECIES_GEMM_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generati
 STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
     "RealAgnosticInteractionBlock": "0a9b26328a7533f380b45af53e78f60e98ffed022cb9b7c136f781ddefefdf97",
 })
+# RTX 5060 Ti (local, 7 November 2026, ~/fm-runs/offlocal-ab-20261107): with the OFF tables, MD step b/a in both
+# orders, water_216: OFF23-small 0.677 / 0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811.
+# RTX 4000 Ada (murphy, 8 November 2026, results/off-polar-alex-20261106), the skip and the tables together, MD
+# step b/a, water_216, abab / abba: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725,
+# OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
 STOCK_FIRST_SKIP = None
-STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                   "NVIDIA RTX 4000 Ada Generation"))
 
 
 def stock_first_skip_default(device=None):

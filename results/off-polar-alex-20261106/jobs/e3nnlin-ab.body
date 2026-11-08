@@ -1,0 +1,6 @@
+export PYTHONPATH=$B/src-527adb70; cd $PYTHONPATH
+for p in polar1-s:MACE-POLAR-1-S.model polar1-m:MACE-POLAR-1-M.model polar1-l:MACE-POLAR-1-L.model; do
+  m=${p%%:*}; c=${p#*:}
+  OUT=$B/runs/e3nnlin-m80-$m-$SLURM_JOB_ID MODEL=$m CKPT=$c STRUCTS="NaCl NbCl5" SETS_FILE=$B/sets/e3nnlin.tsv BLOCK=400 BLOCKS=12 bash tools/offpolar_ab.sh
+done
+grep -h "end ab" $B/runs/e3nnlin-m80-*-$SLURM_JOB_ID/run.log

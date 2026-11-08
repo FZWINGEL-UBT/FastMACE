@@ -1,0 +1,379 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-06T14:57:49.635491+00:00",
+  "host": "a0537",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "ab43a54e1baf6f76b58485117bb6d1e3311d9cb3",
+  "model": "polar1-m",
+  "checkpoint_sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+  "sides": {
+    "a": {},
+    "b": {
+      "wprime_backward": "on",
+      "fused_folded_forward": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 300,
+    "block": 400,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    16.63,
+    16.44,
+    16.12
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 6.162893378750596,
+            "mean_ms": 6.262603830412748,
+            "min_ms": 6.14392373499868,
+            "max_ms": 7.363027917454019,
+            "stdev_ms": 0.3467407918344892,
+            "spread": 0.19781360921458754,
+            "block_ms": [
+              6.14392373499868,
+              6.148062985012075,
+              7.363027917454019,
+              6.193068067514105,
+              6.164781127445167,
+              6.161210637510521,
+              6.162982882524375,
+              6.162803874976817,
+              6.164937715002452,
+              6.161763870040886,
+              6.163162517477758,
+              6.161520634996123
+            ]
+          },
+          "a": {
+            "median_ms": 6.301966863757116,
+            "mean_ms": 6.399936627082449,
+            "min_ms": 6.293521054976736,
+            "max_ms": 7.461499119963264,
+            "stdev_ms": 0.334459268470101,
+            "spread": 0.18533548180070897,
+            "block_ms": [
+              6.293521054976736,
+              6.294705522523145,
+              7.461499119963264,
+              6.333859834994655,
+              6.299948202504311,
+              6.302285350029706,
+              6.302680340013467,
+              6.304170942530618,
+              6.3031953675090335,
+              6.300699529965641,
+              6.3016483774845256,
+              6.301025882494287
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.022566264976454,
+        "pair_ratios_b_over_a": [
+          1.0243488243719368,
+          1.0238518274566413,
+          1.0133737374913139,
+          1.0227337671644652,
+          1.0219256892118018,
+          1.0228972390036948,
+          1.0226671824588731,
+          1.0229387581402358,
+          1.022426447581154,
+          1.022548033786279,
+          1.0224699348125323,
+          1.022641366598012
+        ]
+      },
+      "ratio_b_over_a": 0.9779317333757596,
+      "pair_ratios": [
+        0.9762299484388379,
+        0.9767038287992398,
+        0.98680275894615,
+        0.9777715688145364,
+        0.9785447323193208,
+        0.9776153086247483,
+        0.9778352304174143,
+        0.9775756290807283,
+        0.9780654660937125,
+        0.977949169094005,
+        0.9780238674532253,
+        0.9778599151789327
+      ],
+      "setup_s": {
+        "b": 273.5137277379981,
+        "a": 55.76805709299515
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.fused_folded_forward = on  (requested 'on': stage 1: on (with chunked_conv_backward); stage 2: supported (ok))",
+          "RewriteConfig.wprime_backward = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok))"
+        ],
+        "a": [
+          "RewriteConfig.fused_folded_forward = off  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok); stage 2: off, not MH-1, decision 64 (label polar1-m))",
+          "RewriteConfig.wprime_backward = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok); stage 2: off, not a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 300.6404380782984,
+          "potential_eV_atom": -8471.284212835555,
+          "kinetic_eV_atom": 0.03886076951469591
+        },
+        "a": {
+          "temperature_K": 300.640608754981,
+          "potential_eV_atom": -8471.284213806157,
+          "kinetic_eV_atom": 0.038860791576356225
+        }
+      },
+      "load_after": [
+        14.24,
+        15.08,
+        15.61
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 207,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 207
+        },
+        "a": {
+          "rebuilds": 207,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 207
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 26.380844234990946,
+            "mean_ms": 26.50106034167038,
+            "min_ms": 26.367971830040915,
+            "max_ms": 27.617743607479497,
+            "stdev_ms": 0.35778703284520436,
+            "spread": 0.047374214650072244,
+            "block_ms": [
+              27.617743607479497,
+              26.607098360036616,
+              26.38336016498215,
+              26.39109247000306,
+              26.38220147251559,
+              26.38096359500196,
+              26.380124572460772,
+              26.374281015014276,
+              26.367971830040915,
+              26.380724874979933,
+              26.375937330012675,
+              26.371224807517137
+            ]
+          },
+          "a": {
+            "median_ms": 28.28154653252568,
+            "mean_ms": 28.4053102929344,
+            "min_ms": 28.27644597753533,
+            "max_ms": 29.540236070024548,
+            "stdev_ms": 0.36246972781054004,
+            "spread": 0.044686031969141886,
+            "block_ms": [
+              29.540236070024548,
+              28.492385952558834,
+              28.28081994499371,
+              28.295205345057184,
+              28.288087647524662,
+              28.28640152743901,
+              28.28135073003068,
+              28.27644597753533,
+              28.280521447522915,
+              28.28174233502068,
+              28.280744042494916,
+              28.279782495010295
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.07204857739214,
+        "pair_ratios_b_over_a": [
+          1.0696107723305968,
+          1.0708565649290749,
+          1.0719188067079493,
+          1.0721498315091882,
+          1.0722413623061209,
+          1.0722277609601056,
+          1.0720704010455915,
+          1.0721219646305504,
+          1.0725330575218166,
+          1.072060850073294,
+          1.0722175932043483,
+          1.072372735867358
+        ]
+      },
+      "ratio_b_over_a": 0.9327935516062108,
+      "pair_ratios": [
+        0.9349195294855525,
+        0.9338318807115238,
+        0.9329064792427474,
+        0.9327054583335354,
+        0.9326258388775939,
+        0.9326376693554075,
+        0.9327745631487437,
+        0.9327297014613414,
+        0.9323721940194452,
+        0.9327828732218255,
+        0.9326465134856402,
+        0.9325115853408736
+      ],
+      "setup_s": {
+        "b": 59.846657494985266,
+        "a": 49.952580396988196
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.fused_folded_forward = on  (requested 'on': stage 1: on (with chunked_conv_backward); stage 2: supported (ok))",
+          "RewriteConfig.wprime_backward = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok))"
+        ],
+        "a": [
+          "RewriteConfig.fused_folded_forward = off  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok); stage 2: off, not MH-1, decision 64 (label polar1-m))",
+          "RewriteConfig.wprime_backward = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok); stage 2: off, not a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 300.41672732560545,
+          "potential_eV_atom": -10694.770470897322,
+          "kinetic_eV_atom": 0.03883185267285676
+        },
+        "a": {
+          "temperature_K": 300.4049542205728,
+          "potential_eV_atom": -10694.770473382314,
+          "kinetic_eV_atom": 0.03883033088182935
+        }
+      },
+      "load_after": [
+        18.9,
+        16.31,
+        15.83
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 201,
+          "pipelined_redos": 5,
+          "pipelined_early_rebuilds": 201
+        },
+        "a": {
+          "rebuilds": 201,
+          "pipelined_redos": 5,
+          "pipelined_early_rebuilds": 201
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

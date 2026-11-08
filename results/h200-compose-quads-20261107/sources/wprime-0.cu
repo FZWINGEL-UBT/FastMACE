@@ -1,0 +1,1759 @@
+// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored
+// oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).
+using int64_t = signed long long;
+using int32_t = int;
+using scalar_t = float;
+using acc_t = float;
+
+constexpr int INPUT_DIM = 512;
+constexpr int EDGE_DIM = 16;
+constexpr int OUTPUT_DIM = 5120;
+constexpr int WEIGHT_DIM = 1280;
+constexpr int CHANNEL_DIM = 128;
+constexpr int LOGICAL_GROUP_SIZE =
+    32;
+constexpr int TERMS = 4;
+constexpr int PADDED_TERMS = 4;  // a q-major G' row: TERMS, then zero terms (SLOPE_VECTOR)
+constexpr unsigned int FULL_MASK = 0xffffffffu;
+
+
+
+// One logical thread group owns an edge; each lane owns channels separated by LOGICAL_GROUP_SIZE.
+// dx and dsh as in oeq_projected_backward; in place of dweights, dr[e] = sum over the edge's weights of
+// dweights * w'(r_e), w' from the derivative table gprime [pairs * pieces, TERMS, WEIGHT_DIM] (q-major with
+// SLOPE_VECTOR: [pairs * pieces, WEIGHT_DIM, PADDED_TERMS]).
+extern "C" __global__ void oeq_projected_backward_wprime(
+    int64_t node_count,
+    int64_t edge_count,
+    const scalar_t* x,
+    const scalar_t* sh,
+    const scalar_t* weights,
+    const int32_t* senders,
+    const int32_t* receivers,
+    const scalar_t* __restrict__ dout0,
+    const scalar_t* __restrict__ dout1,
+    const scalar_t* __restrict__ dout2,
+    const scalar_t* __restrict__ dout3,
+    scalar_t* dx,
+    scalar_t* dsh,
+    const scalar_t* lengths,
+    const int32_t* pairs,
+    const scalar_t* __restrict__ gprime,
+    const scalar_t* starts,
+    const scalar_t* scales,
+    const int32_t* bins,
+    scalar_t r_lo,
+    scalar_t bin_scale,
+    scalar_t r_max,
+    int32_t n_bins,
+    int32_t pieces,
+    scalar_t* dr) {
+
+    const int lane = threadIdx.x % LOGICAL_GROUP_SIZE;
+    const int logical_group = threadIdx.x / LOGICAL_GROUP_SIZE;
+    // STAGE_DOUT: this block's edges [c0, c1), walked by runs of equal receiver; per run the receiver's dout row is
+    // copied to shared memory once, then the warps take the run's edges.
+    __shared__ __align__(16) scalar_t stage_row[5120];
+    const int64_t stage_c0 = int64_t(blockIdx.x) * 32;
+    const int64_t stage_c1 = stage_c0 + 32 < edge_count ? stage_c0 + 32 : edge_count;
+    for (int64_t stage_s = stage_c0; stage_s < stage_c1;) {
+    int64_t stage_t1 = stage_c1;
+    {
+        const int32_t stage_r = receivers[stage_s];
+        const int64_t stage_i = stage_s + 1 + lane;
+        const unsigned stage_b = __ballot_sync(FULL_MASK, stage_i < stage_c1 && receivers[stage_i] != stage_r);
+        if (stage_b) stage_t1 = stage_s + __ffs(stage_b);
+        if (stage_r >= 0 && stage_r < node_count) {
+            // STAGE_QUADS: quartet q of channel c at float4 q * CHANNEL_DIM + c.
+            for (int c = threadIdx.x; c < CHANNEL_DIM; c += blockDim.x) {
+                {
+                    float4 v;
+                    v.x = __ldg(dout0 + int64_t(stage_r) * 256 + 0 + c);
+                    v.y = __ldg(dout0 + int64_t(stage_r) * 256 + 128 + c);
+                    v.z = __ldg(dout1 + int64_t(stage_r) * 1152 + 0 + c);
+                    v.w = __ldg(dout1 + int64_t(stage_r) * 1152 + 384 + c);
+                    reinterpret_cast<float4*>(stage_row)[0 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout1 + int64_t(stage_r) * 1152 + 768 + c);
+                    v.y = __ldg(dout1 + int64_t(stage_r) * 1152 + 128 + c);
+                    v.z = __ldg(dout1 + int64_t(stage_r) * 1152 + 512 + c);
+                    v.w = __ldg(dout1 + int64_t(stage_r) * 1152 + 896 + c);
+                    reinterpret_cast<float4*>(stage_row)[128 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout1 + int64_t(stage_r) * 1152 + 256 + c);
+                    v.y = __ldg(dout1 + int64_t(stage_r) * 1152 + 640 + c);
+                    v.z = __ldg(dout1 + int64_t(stage_r) * 1152 + 1024 + c);
+                    v.w = __ldg(dout2 + int64_t(stage_r) * 1920 + 0 + c);
+                    reinterpret_cast<float4*>(stage_row)[256 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout2 + int64_t(stage_r) * 1920 + 384 + c);
+                    v.y = __ldg(dout2 + int64_t(stage_r) * 1920 + 768 + c);
+                    v.z = __ldg(dout2 + int64_t(stage_r) * 1920 + 1152 + c);
+                    v.w = __ldg(dout2 + int64_t(stage_r) * 1920 + 1536 + c);
+                    reinterpret_cast<float4*>(stage_row)[384 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout2 + int64_t(stage_r) * 1920 + 128 + c);
+                    v.y = __ldg(dout2 + int64_t(stage_r) * 1920 + 512 + c);
+                    v.z = __ldg(dout2 + int64_t(stage_r) * 1920 + 896 + c);
+                    v.w = __ldg(dout2 + int64_t(stage_r) * 1920 + 1280 + c);
+                    reinterpret_cast<float4*>(stage_row)[512 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout2 + int64_t(stage_r) * 1920 + 1664 + c);
+                    v.y = __ldg(dout2 + int64_t(stage_r) * 1920 + 256 + c);
+                    v.z = __ldg(dout2 + int64_t(stage_r) * 1920 + 640 + c);
+                    v.w = __ldg(dout2 + int64_t(stage_r) * 1920 + 1024 + c);
+                    reinterpret_cast<float4*>(stage_row)[640 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout2 + int64_t(stage_r) * 1920 + 1408 + c);
+                    v.y = __ldg(dout2 + int64_t(stage_r) * 1920 + 1792 + c);
+                    v.z = __ldg(dout3 + int64_t(stage_r) * 1792 + 0 + c);
+                    v.w = __ldg(dout3 + int64_t(stage_r) * 1792 + 256 + c);
+                    reinterpret_cast<float4*>(stage_row)[768 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout3 + int64_t(stage_r) * 1792 + 512 + c);
+                    v.y = __ldg(dout3 + int64_t(stage_r) * 1792 + 768 + c);
+                    v.z = __ldg(dout3 + int64_t(stage_r) * 1792 + 1024 + c);
+                    v.w = __ldg(dout3 + int64_t(stage_r) * 1792 + 1280 + c);
+                    reinterpret_cast<float4*>(stage_row)[896 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout3 + int64_t(stage_r) * 1792 + 1536 + c);
+                    v.y = __ldg(dout3 + int64_t(stage_r) * 1792 + 128 + c);
+                    v.z = __ldg(dout3 + int64_t(stage_r) * 1792 + 384 + c);
+                    v.w = __ldg(dout3 + int64_t(stage_r) * 1792 + 640 + c);
+                    reinterpret_cast<float4*>(stage_row)[1024 + c] = v;
+                }
+                {
+                    float4 v;
+                    v.x = __ldg(dout3 + int64_t(stage_r) * 1792 + 896 + c);
+                    v.y = __ldg(dout3 + int64_t(stage_r) * 1792 + 1152 + c);
+                    v.z = __ldg(dout3 + int64_t(stage_r) * 1792 + 1408 + c);
+                    v.w = __ldg(dout3 + int64_t(stage_r) * 1792 + 1664 + c);
+                    reinterpret_cast<float4*>(stage_row)[1152 + c] = v;
+                }
+            }
+        }
+    }
+    __syncthreads();
+    for (int64_t e = stage_s + logical_group; e < stage_t1; e += blockDim.x / LOGICAL_GROUP_SIZE) {
+
+    const int32_t sender = senders[e];
+    const int32_t receiver = receivers[e];
+    if (sender < 0 || sender >= node_count
+        || receiver < 0 || receiver >= node_count) {
+        // An edge with an out-of-range index contributes nothing: its dsh row and dr are written as zeros (the
+        // wrappers allocate dsh with empty_like, so a skipped row would hold garbage; kernel review, 5 November 2026).
+        for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);
+        if (lane == 0) dr[e] = scalar_t(0);
+        continue;
+    }
+
+    const int64_t input_base = int64_t(sender) * INPUT_DIM;
+    const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;
+    const int64_t edge_base = e * EDGE_DIM;
+    const int64_t weight_base = e * WEIGHT_DIM;
+
+    // The radial tables' piece of r and its Chebyshev argument; no slope at or beyond the cutoff, below r_lo.
+    const scalar_t r = lengths[e];
+    const bool sloped = r < r_max && r >= r_lo;
+    const scalar_t clamped = r > r_lo ? r : r_lo;
+    // SPLINE_W: the cubic spline's interval and t in [0, 1) (rewrites.radial.spline; pieces = its intervals).
+    int iv; float t, sx_inv;
+    if (clamped < 0x1.0000000000000p-1f) { sx_inv = 0x1.8880000000000p+9f; float u = (clamped - 0x1.3333333333333p-2f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 156 ? il : 156; t = u - (float)il; iv = 0 + il; }
+    else if (clamped < 0x1.8000000000000p-1f) { sx_inv = 0x1.c000000000000p+8f; float u = (clamped - 0x1.0000000000000p-1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 111 ? il : 111; t = u - (float)il; iv = 157 + il; }
+    else if (clamped < 0x1.0000000000000p+0f) { sx_inv = 0x1.5c00000000000p+8f; float u = (clamped - 0x1.8000000000000p-1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 86 ? il : 86; t = u - (float)il; iv = 269 + il; }
+    else if (clamped < 0x1.8000000000000p+0f) { sx_inv = 0x1.f000000000000p+7f; float u = (clamped - 0x1.0000000000000p+0f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 123 ? il : 123; t = u - (float)il; iv = 356 + il; }
+    else if (clamped < 0x1.0000000000000p+1f) { sx_inv = 0x1.b000000000000p+6f; float u = (clamped - 0x1.8000000000000p+0f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 53 ? il : 53; t = u - (float)il; iv = 480 + il; }
+    else if (clamped < 0x1.4000000000000p+1f) { sx_inv = 0x1.f000000000000p+5f; float u = (clamped - 0x1.0000000000000p+1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 30 ? il : 30; t = u - (float)il; iv = 534 + il; }
+    else { sx_inv = 0x1.7b6db6db6db6ep+5f; float u = (clamped - 0x1.4000000000000p+1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 165 ? il : 165; t = u - (float)il; iv = 565 + il; }
+    const int32_t piece = iv;
+    const scalar_t* g = gprime + (int64_t(pairs[e]) * pieces + piece) * PADDED_TERMS * WEIGHT_DIM;
+    // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
+    const bool inside = r < r_max;
+    const scalar_t sc = sx_inv;
+
+    acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};
+    acc_t radial_gradient = acc_t(0);
+    for (int channel = lane; channel < CHANNEL_DIM;
+         channel += LOGICAL_GROUP_SIZE) {
+            acc_t input_gradient_0_0 = acc_t(0);
+            acc_t input_gradient_128_0 = acc_t(0);
+            acc_t input_gradient_128_1 = acc_t(0);
+            acc_t input_gradient_128_2 = acc_t(0);
+        float4 sq0, sq1, sq2, sq3, sq4, sq5, sq6, sq7, sq8, sq9;
+
+        
+             {
+                const int weight_index =
+                    0 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.
+                const scalar_t weighted_input =
+                    radial_weight * x[input_base + 0 + channel];
+
+                 {
+                    sq0 = reinterpret_cast<const float4*>(stage_row)[0 + channel];
+                    const scalar_t output_gradient = sq0.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 0];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[0]
+                            += weighted_input * scaled;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 0 + channel] * u_0;
+                input_gradient_0_0 += scaled_weight * u_0;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    128 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                acc_t u_1 = acc_t(0);
+                acc_t u_2 = acc_t(0);
+                acc_t v_0 = acc_t(0);
+                acc_t v_1 = acc_t(0);
+                acc_t v_2 = acc_t(0);
+
+                 {
+                    const scalar_t output_gradient = sq0.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 1];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 2];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 3];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 128 + channel] * u_0;
+                input_gradient_128_0 += scaled_weight * u_0;
+                weight_gradient +=
+                    x[input_base + 256 + channel] * u_1;
+                input_gradient_128_1 += scaled_weight * u_1;
+                weight_gradient +=
+                    x[input_base + 384 + channel] * u_2;
+                input_gradient_128_2 += scaled_weight * u_2;
+                edge_gradient[1] +=
+                    scaled_weight * v_0;
+                edge_gradient[2] +=
+                    scaled_weight * v_1;
+                edge_gradient[3] +=
+                    scaled_weight * v_2;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    256 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.
+                const scalar_t weighted_input =
+                    radial_weight * x[input_base + 0 + channel];
+
+                 {
+                    const scalar_t output_gradient = sq0.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 1];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[1]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq0.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 2];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[2]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    sq1 = reinterpret_cast<const float4*>(stage_row)[128 + channel];
+                    const scalar_t output_gradient = sq1.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 3];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[3]
+                            += weighted_input * scaled;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 0 + channel] * u_0;
+                input_gradient_0_0 += scaled_weight * u_0;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    384 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                acc_t u_1 = acc_t(0);
+                acc_t u_2 = acc_t(0);
+                acc_t v_0 = acc_t(0);
+
+                 {
+                    const scalar_t output_gradient = sq1.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 0];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq1.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 0];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq1.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 0];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 128 + channel] * u_0;
+                input_gradient_128_0 += scaled_weight * u_0;
+                weight_gradient +=
+                    x[input_base + 256 + channel] * u_1;
+                input_gradient_128_1 += scaled_weight * u_1;
+                weight_gradient +=
+                    x[input_base + 384 + channel] * u_2;
+                input_gradient_128_2 += scaled_weight * u_2;
+                edge_gradient[0] +=
+                    scaled_weight * v_0;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    512 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                acc_t u_1 = acc_t(0);
+                acc_t u_2 = acc_t(0);
+                acc_t v_2 = acc_t(0);
+                acc_t v_4 = acc_t(0);
+                acc_t v_1 = acc_t(0);
+                acc_t v_0 = acc_t(0);
+                acc_t v_3 = acc_t(0);
+
+                 {
+                    sq2 = reinterpret_cast<const float4*>(stage_row)[256 + channel];
+                    const scalar_t output_gradient = sq2.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.279a745903946p-1f);
+                        u_0 -= scaled * edge_value;
+                        v_2 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient;
+                        u_0 -= scaled * edge_value;
+                        v_4 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq2.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.279a745903947p+0f);
+                        u_1 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_3 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq2.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_3 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.279a745903946p-1f);
+                        u_2 -= scaled * edge_value;
+                        v_2 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 128 + channel] * u_0;
+                input_gradient_128_0 += scaled_weight * u_0;
+                weight_gradient +=
+                    x[input_base + 256 + channel] * u_1;
+                input_gradient_128_1 += scaled_weight * u_1;
+                weight_gradient +=
+                    x[input_base + 384 + channel] * u_2;
+                input_gradient_128_2 += scaled_weight * u_2;
+                edge_gradient[6] +=
+                    scaled_weight * v_2;
+                edge_gradient[8] +=
+                    scaled_weight * v_4;
+                edge_gradient[5] +=
+                    scaled_weight * v_1;
+                edge_gradient[4] +=
+                    scaled_weight * v_0;
+                edge_gradient[7] +=
+                    scaled_weight * v_3;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    640 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.
+                const scalar_t weighted_input =
+                    radial_weight * x[input_base + 0 + channel];
+
+                 {
+                    const scalar_t output_gradient = sq2.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[4]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    sq3 = reinterpret_cast<const float4*>(stage_row)[384 + channel];
+                    const scalar_t output_gradient = sq3.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[5]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq3.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[6]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq3.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[7]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq3.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[8]
+                            += weighted_input * scaled;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 0 + channel] * u_0;
+                input_gradient_0_0 += scaled_weight * u_0;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    768 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                acc_t u_2 = acc_t(0);
+                acc_t u_1 = acc_t(0);
+                acc_t v_2 = acc_t(0);
+                acc_t v_0 = acc_t(0);
+                acc_t v_1 = acc_t(0);
+
+                 {
+                    sq4 = reinterpret_cast<const float4*>(stage_row)[512 + channel];
+                    const scalar_t output_gradient = sq4.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 3];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 1];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq4.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 2];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 1];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq4.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 1];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.279a74590261dp-1f);
+                        u_0 -= scaled * edge_value;
+                        v_0 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 2];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.279a74590261dp+0f);
+                        u_1 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 3];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.279a74590261dp-1f);
+                        u_2 -= scaled * edge_value;
+                        v_2 -= scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq4.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 3];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 2];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    }
+                } {
+                    sq5 = reinterpret_cast<const float4*>(stage_row)[640 + channel];
+                    const scalar_t output_gradient = sq5.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 1];
+                        const scalar_t scaled = output_gradient;
+                        u_0 -= scaled * edge_value;
+                        v_0 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 3];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 128 + channel] * u_0;
+                input_gradient_128_0 += scaled_weight * u_0;
+                weight_gradient +=
+                    x[input_base + 384 + channel] * u_2;
+                input_gradient_128_2 += scaled_weight * u_2;
+                weight_gradient +=
+                    x[input_base + 256 + channel] * u_1;
+                input_gradient_128_1 += scaled_weight * u_1;
+                edge_gradient[3] +=
+                    scaled_weight * v_2;
+                edge_gradient[1] +=
+                    scaled_weight * v_0;
+                edge_gradient[2] +=
+                    scaled_weight * v_1;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    896 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                acc_t u_1 = acc_t(0);
+                acc_t u_2 = acc_t(0);
+                acc_t v_4 = acc_t(0);
+                acc_t v_6 = acc_t(0);
+                acc_t v_1 = acc_t(0);
+                acc_t v_0 = acc_t(0);
+                acc_t v_2 = acc_t(0);
+                acc_t v_3 = acc_t(0);
+                acc_t v_5 = acc_t(0);
+
+                 {
+                    const scalar_t output_gradient = sq5.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 13];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362485537p-2f);
+                        u_0 -= scaled * edge_value;
+                        v_4 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 15];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14092cf4p+0f);
+                        u_0 -= scaled * edge_value;
+                        v_6 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 10];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 9];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14092cf4p+0f);
+                        u_2 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 11];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362485537p-2f);
+                        u_2 -= scaled * edge_value;
+                        v_2 -= scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq5.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 12];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.8c97ef43f812bp-1f);
+                        u_0 -= scaled * edge_value;
+                        v_3 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 14];
+                        const scalar_t scaled = output_gradient;
+                        u_0 -= scaled * edge_value;
+                        v_5 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 11];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362485537p+0f);
+                        u_1 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 10];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq5.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 11];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.186f174f88efap+0f);
+                        u_0 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 12];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.5775c544fff49p+0f);
+                        u_1 += scaled * edge_value;
+                        v_3 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 13];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.186f174f88efap+0f);
+                        u_2 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    }
+                } {
+                    sq6 = reinterpret_cast<const float4*>(stage_row)[768 + channel];
+                    const scalar_t output_gradient = sq6.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 10];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 13];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362485537p+0f);
+                        u_1 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 12];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.8c97ef43f812bp-1f);
+                        u_2 -= scaled * edge_value;
+                        v_3 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 14];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_5 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq6.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 9];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14092cf4p+0f);
+                        u_0 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 11];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362485537p-2f);
+                        u_0 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 14];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_5 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 13];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362485537p-2f);
+                        u_2 -= scaled * edge_value;
+                        v_4 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 15];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14092cf4p+0f);
+                        u_2 += scaled * edge_value;
+                        v_6 += scaled * input_value;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 128 + channel] * u_0;
+                input_gradient_128_0 += scaled_weight * u_0;
+                weight_gradient +=
+                    x[input_base + 256 + channel] * u_1;
+                input_gradient_128_1 += scaled_weight * u_1;
+                weight_gradient +=
+                    x[input_base + 384 + channel] * u_2;
+                input_gradient_128_2 += scaled_weight * u_2;
+                edge_gradient[13] +=
+                    scaled_weight * v_4;
+                edge_gradient[15] +=
+                    scaled_weight * v_6;
+                edge_gradient[10] +=
+                    scaled_weight * v_1;
+                edge_gradient[9] +=
+                    scaled_weight * v_0;
+                edge_gradient[11] +=
+                    scaled_weight * v_2;
+                edge_gradient[12] +=
+                    scaled_weight * v_3;
+                edge_gradient[14] +=
+                    scaled_weight * v_5;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    1024 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.
+                const scalar_t weighted_input =
+                    radial_weight * x[input_base + 0 + channel];
+
+                 {
+                    const scalar_t output_gradient = sq6.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 9];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[9]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq6.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 10];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[10]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    sq7 = reinterpret_cast<const float4*>(stage_row)[896 + channel];
+                    const scalar_t output_gradient = sq7.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 11];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[11]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq7.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 12];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[12]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq7.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 13];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[13]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    const scalar_t output_gradient = sq7.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 14];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[14]
+                            += weighted_input * scaled;
+                    }
+                } {
+                    sq8 = reinterpret_cast<const float4*>(stage_row)[1024 + channel];
+                    const scalar_t output_gradient = sq8.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 0 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 15];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        edge_gradient[15]
+                            += weighted_input * scaled;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 0 + channel] * u_0;
+                input_gradient_0_0 += scaled_weight * u_0;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+             {
+                const int weight_index =
+                    1152 + channel;
+                const int64_t radial_weight_index = weight_base + weight_index;
+                scalar_t gv[PADDED_TERMS];
+                if (inside) {
+                    const float4* gq =
+                        reinterpret_cast<const float4*>(g + weight_index * PADDED_TERMS);
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS / 4; ++k) {
+                        const float4 v = __ldg(gq + k);
+                        gv[4 * k + 0] = v.x;
+                        gv[4 * k + 1] = v.y;
+                        gv[4 * k + 2] = v.z;
+                        gv[4 * k + 3] = v.w;
+                    }
+                } else {
+                    #pragma unroll
+                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);
+                }
+                scalar_t radial_weight = gv[TERMS - 1];
+                scalar_t radial_dt = scalar_t(0);
+                #pragma unroll
+                for (int k = TERMS - 2; k >= 0; --k) {
+                    radial_dt = radial_dt * t + radial_weight;
+                    radial_weight = radial_weight * t + gv[k];
+                }
+                acc_t weight_gradient = acc_t(0);
+                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient
+                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
+                acc_t u_0 = acc_t(0);
+                acc_t u_2 = acc_t(0);
+                acc_t u_1 = acc_t(0);
+                acc_t v_4 = acc_t(0);
+                acc_t v_0 = acc_t(0);
+                acc_t v_3 = acc_t(0);
+                acc_t v_1 = acc_t(0);
+                acc_t v_2 = acc_t(0);
+
+                 {
+                    const scalar_t output_gradient = sq8.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14091337p+0f);
+                        u_0 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14091337p+0f);
+                        u_2 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq8.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient;
+                        u_0 += scaled * edge_value;
+                        v_3 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_0 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq8.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.186f174f877f5p+0f);
+                        u_0 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362483aa3p-2f);
+                        u_0 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362483aa3p+0f);
+                        u_1 += scaled * edge_value;
+                        v_1 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362483aa3p-2f);
+                        u_2 -= scaled * edge_value;
+                        v_0 -= scaled * input_value;
+                    }
+                } {
+                    sq9 = reinterpret_cast<const float4*>(stage_row)[1152 + channel];
+                    const scalar_t output_gradient = sq9.x; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.8c97ef43f609cp-1f);
+                        u_0 -= scaled * edge_value;
+                        v_1 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.5775c544fe318p+0f);
+                        u_1 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.8c97ef43f609cp-1f);
+                        u_2 -= scaled * edge_value;
+                        v_3 -= scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq9.y; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362483aa3p-2f);
+                        u_0 -= scaled * edge_value;
+                        v_0 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362483aa3p+0f);
+                        u_1 += scaled * edge_value;
+                        v_3 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 6];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.186f174f877f5p+0f);
+                        u_2 += scaled * edge_value;
+                        v_2 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.43d1362483aa3p-2f);
+                        u_2 -= scaled * edge_value;
+                        v_4 -= scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq9.z; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 5];
+                        const scalar_t scaled = output_gradient;
+                        u_0 -= scaled * edge_value;
+                        v_1 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 256 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient;
+                        u_1 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 7];
+                        const scalar_t scaled = output_gradient;
+                        u_2 += scaled * edge_value;
+                        v_3 += scaled * input_value;
+                    }
+                } {
+                    const scalar_t output_gradient = sq9.w; {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 128 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 4];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14091337p+0f);
+                        u_0 -= scaled * edge_value;
+                        v_0 -= scaled * input_value;
+                    } {
+                        const scalar_t input_value =
+                            x[input_base
+                              + 384 + channel];
+                        const scalar_t edge_value =
+                            sh[edge_base
+                               + 8];
+                        const scalar_t scaled = output_gradient * static_cast<scalar_t>(0x1.3988e14091337p+0f);
+                        u_2 += scaled * edge_value;
+                        v_4 += scaled * input_value;
+                    }
+                }
+                const scalar_t scaled_weight = radial_weight;
+                weight_gradient +=
+                    x[input_base + 128 + channel] * u_0;
+                input_gradient_128_0 += scaled_weight * u_0;
+                weight_gradient +=
+                    x[input_base + 384 + channel] * u_2;
+                input_gradient_128_2 += scaled_weight * u_2;
+                weight_gradient +=
+                    x[input_base + 256 + channel] * u_1;
+                input_gradient_128_1 += scaled_weight * u_1;
+                edge_gradient[8] +=
+                    scaled_weight * v_4;
+                edge_gradient[4] +=
+                    scaled_weight * v_0;
+                edge_gradient[7] +=
+                    scaled_weight * v_3;
+                edge_gradient[5] +=
+                    scaled_weight * v_1;
+                edge_gradient[6] +=
+                    scaled_weight * v_2;
+                if (sloped) {
+                    acc_t slope = acc_t(0);
+                    slope = radial_dt * sc;
+                    radial_gradient += weight_gradient * slope;
+                }
+            }
+            atomicAdd(
+                dx + input_base + 0 + channel,
+                scalar_t(input_gradient_0_0));
+            atomicAdd(
+                dx + input_base + 128 + channel,
+                scalar_t(input_gradient_128_0));
+            atomicAdd(
+                dx + input_base + 256 + channel,
+                scalar_t(input_gradient_128_1));
+            atomicAdd(
+                dx + input_base + 384 + channel,
+                scalar_t(input_gradient_128_2));
+    }
+    // Reduce within the logical 32-thread edge owner. Lane 0 writes dsh[e, :] and dr[e].
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        for (int component = 0; component < EDGE_DIM; ++component)
+            edge_gradient[component] +=
+                __shfl_down_sync(FULL_MASK, edge_gradient[component], offset, 32);
+        radial_gradient += __shfl_down_sync(FULL_MASK, radial_gradient, offset, 32);
+    }
+
+    if (lane == 0) {
+        for (int component = 0; component < EDGE_DIM; ++component)
+            dsh[edge_base + component] = scalar_t(edge_gradient[component]);
+        dr[e] = scalar_t(radial_gradient);
+    }
+    }  // STAGE_DOUT: the run's edges
+    __syncthreads();  // every warp is done with the row before the next copy
+    stage_s = stage_t1;
+    }  // STAGE_DOUT: the runs
+}

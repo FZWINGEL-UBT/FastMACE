@@ -1,0 +1,173 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-07T13:14:49.467619+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "d8817540f6494d8462c42ad66200c891e6ddabcc",
+  "model": "off23-medium",
+  "checkpoint_sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+  "sides": {
+    "a": {},
+    "b": {
+      "radial_tables": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP": true,
+      "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 500,
+    "block": 1000,
+    "blocks": 16
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "water_216": {
+      "natoms": 648,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 4.367004438500004,
+            "mean_ms": 4.3755392555000014,
+            "min_ms": 4.339612924999983,
+            "max_ms": 4.428535220000015,
+            "stdev_ms": 0.03777200391038491,
+            "spread": 0.020362309279121103,
+            "block_ms": [
+              4.428535220000015,
+              4.362808419000032,
+              4.371200457999976,
+              4.339612924999983
+            ]
+          },
+          "b": {
+            "median_ms": 2.613435826500023,
+            "mean_ms": 2.6176508495000235,
+            "min_ms": 2.601510574000031,
+            "max_ms": 2.642221171000017,
+            "stdev_ms": 0.01916921619679374,
+            "spread": 0.015577423630296964,
+            "block_ms": [
+              2.642221171000017,
+              2.6235014740000224,
+              2.601510574000031,
+              2.6033701790000237
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.5984504626236873,
+        "pair_ratios_b_over_a": [
+          0.5966354651685503,
+          0.6013331831337523,
+          0.5951478544615502,
+          0.5999083844557481
+        ],
+        "stopped_after": 4
+      },
+      "ratio_b_over_a": 0.5984504626236873,
+      "pair_ratios": [
+        0.5966354651685503,
+        0.6013331831337523,
+        0.5951478544615502,
+        0.5999083844557481
+      ],
+      "setup_s": {
+        "a": 56.62358655100002,
+        "b": 30.368198983000013
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.radial_tables = off  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: off, tables with a stock first block not measured on this GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+        ],
+        "b": [
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: on, generic radial tables (explicit))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 305.24846582725223,
+          "potential_eV_atom": -693.8392582358194,
+          "kinetic_eV_atom": 0.03945640297443288
+        },
+        "b": {
+          "temperature_K": 296.5393031003541,
+          "potential_eV_atom": -693.8412260632984,
+          "kinetic_eV_atom": 0.03833065699175898
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 954,
+          "pipelined_redos": 40,
+          "pipelined_early_rebuilds": 914
+        },
+        "b": {
+          "rebuilds": 946,
+          "pipelined_redos": 45,
+          "pipelined_early_rebuilds": 902
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

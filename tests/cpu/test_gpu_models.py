@@ -313,6 +313,28 @@ def test_h200_defaults():
     assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
     assert "NVIDIA H200" not in wprime_backward.BUTTERFLY_GPUS  # on 5 Nov; 0.9659 / 0.9677 off at d599cc70 (6 Nov)
     assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured
+    # SPLINE_W (7 November 2026, results/spline-w-h200-20261107): MD H200 0.8789 / 0.8775, gate passes; R128 on top
+    # 0.9838 / 0.9848; PARTS off (0.9938 / 0.9904, under 1 %); the A100 not measured
+    from fastmace.kernels.oeq_streaming import spline_forward
+    assert "NVIDIA H200" in spline_forward.SPLINE_W_GPUS and "NVIDIA H200 NVL" in spline_forward.SPLINE_W_GPUS
+    assert "NVIDIA H200" in spline_forward.R128_GPUS
+    assert "NVIDIA A100-SXM4-80GB" not in spline_forward.SPLINE_W_GPUS
+    assert "NVIDIA A100-SXM4-80GB" not in spline_forward.R128_GPUS
+    assert spline_forward.PARTS is False
+    assert spline_forward.MIN_BLOCKS is None  # R128's cap stays 6; cap 5 0.9925 / 0.9937, not combined with vec4
+    # SPLINE_VECTOR (7 November 2026): the spline w' table as one float4 per weight, MD H200 0.9739 / 0.9793
+    assert "NVIDIA H200" in wprime_backward.SPLINE_VECTOR_GPUS
+    from fastmace.kernels.triton import compose_skip, tabled_outer_sum as tos
+
+    assert "NVIDIA H200" in compose_skip.COMPOSE_SKIP_GPUS  # 0.9698 / 0.9738, gate passes (7 November 2026)
+    assert "NVIDIA A100-SXM4-80GB" not in compose_skip.COMPOSE_SKIP_GPUS
+    # measured and closed on the H200 (results/h200-compose-quads-20261107): none clears 1 %
+    assert not wprime_backward.STAGE_QUADS_GPUS and not tos.PACKED_COEF_GPUS
+    assert not spline_forward.FACTOR_W_GPUS and not spline_forward.CURSOR32_GPUS
+    assert not spline_forward.SHARED_LOCATOR_GPUS
+    assert spline_forward.FACTOR_W is False and spline_forward.CURSOR32 is False
+    assert "NVIDIA A100-SXM4-80GB" not in wprime_backward.SPLINE_VECTOR_GPUS
+    assert wprime_backward.SPLINE_VECTOR is None and wprime_backward.spline_vector_default("cpu") == 2
 
 
 def test_radial_table_warps(monkeypatch):
@@ -326,3 +348,45 @@ def test_radial_table_warps(monkeypatch):
     assert rt.forward_warps("cuda:0") is None
     monkeypatch.setattr(rt, "WARPS", 2)
     assert rt.forward_warps("cuda:0") == 2
+
+
+def test_dynamo_constant_is_torchs_assume_constant_result():
+    """``dynamo_constant`` sets the same attributes as ``torch.compiler.assume_constant_result`` (a torch upgrade
+    that changes the decorator fails here) and returns the function itself."""
+    import torch
+
+    from fastmace.kernels.gpu_models import dynamo_constant
+
+    def ours(index):
+        return index
+
+    def torchs(index):
+        return index
+
+    assert dynamo_constant(ours) is ours
+    assert torch.compiler.assume_constant_result(torchs) is torchs
+    assert vars(ours) == vars(torchs) == {"_dynamo_marked_constant": True}
+
+
+def test_dynamo_calls_a_dynamo_constant_at_trace_time():
+    """A marked function runs once while tracing and becomes a constant: under ``fullgraph=True`` its body (a
+    ``print``, which Dynamo cannot trace) causes no graph break."""
+    import torch
+
+    from fastmace.kernels.gpu_models import dynamo_constant
+
+    calls = []
+
+    @dynamo_constant
+    def listed(index: int) -> bool:
+        calls.append(index)
+        print("not traceable")
+        return index == 0
+
+    @torch.compile(fullgraph=True, backend="eager")
+    def scaled(x):
+        return x * 2 if listed(0) else x
+
+    x = torch.ones(3)
+    assert torch.equal(scaled(x), 2 * x) and torch.equal(scaled(x), 2 * x)
+    assert calls == [0]

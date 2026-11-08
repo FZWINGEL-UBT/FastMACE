@@ -1,4 +1,4 @@
-"""``polar.SPIN_BATCHED`` (A/B constant, off): both spin channels' field features in one call.
+"""``polar.SPIN_BATCHED`` (default on since off-polar-alex): both spin channels' field features in one call.
 
 PolarMACE's charge recursion calls the field-feature descriptor twice per step, once for the alpha and once for
 the beta spin density, so each [k-vectors, atoms] product with the cosines and sines runs twice with a handful of
@@ -109,6 +109,7 @@ def test_enabled_path_with_spin_batching(monkeypatch, stress):
     atoms = nacl(repeat=1, rattle=0.05, seed=3)
     model = copy.deepcopy(calc.models[0])
     polar.enable(model, atoms.cell.array, PolarConfig(), variable_cell=stress)
+    monkeypatch.setattr(polar, "SPIN_BATCHED", False)
     expected = _evaluate(calc, model, atoms, stress)
     batched = []
     real = polar.spin_field_features
@@ -124,3 +125,8 @@ def test_enabled_path_with_spin_batching(monkeypatch, stress):
     assert set(got) == set(expected)
     for key in got:
         torch.testing.assert_close(got[key], expected[key], rtol=1e-11, atol=1e-12)
+
+
+def test_spin_batching_is_the_default():
+    # Pure removal of launches, faster on the A100 and the RTX 5060 Ti, gate passed (off-polar-alex).
+    assert polar.SPIN_BATCHED is True

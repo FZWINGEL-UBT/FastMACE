@@ -415,9 +415,17 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-mh1-fused-first](#model-mh1-fused-first) | FUSED_FIRST_BACKWARD (tabled outer sum) in MH-1's first interaction | `FUSED_FIRST_MH1_GPUS` (empty), `FUSED_FIRST_BACKWARD` | FM | REJECTED (POLAR-1, A100-SXM4-80GB: slower) | off-polar-alex 2026-11-06 | S NaCl 1.006 / 1.006, M NaCl 1.005 / 1.004 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-tf32x3-a100](#model-polar-tf32x3-a100) | `tf32x3_gemms` on POLAR-1 on the A100 | `DECISION_66_TF32X3_MODEL_GPUS` | FM | DEFAULT (scoped: POLAR-1-S/M/L, A100) | off-polar-alex 2026-11-06 (d66) | NbCl5 0.792–0.847, NaCl 0.906–0.940 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-wprime-a100](#model-polar-wprime-a100) | `wprime_backward` + `fused_folded_forward` on POLAR-1 on the A100 | `POLAR_DECISION_66_WPRIME_LABEL_GPUS` | FM | DEFAULT (scoped: POLAR-1-M, A100); L REJECTED (NbCl5 slower) | off-polar-alex 2026-11-06 (d66) | M on tf32x3: NaCl 0.976 / 0.977, NbCl5 0.920 / 0.920 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
-| [model-off-tf32x3-a100](#model-off-tf32x3-a100) | `tf32x3_gemms` on MACE-OFF on the A100 | `DECISION_66_TF32X3_MODEL_GPUS` | FM | DEFAULT (scoped: OFF23-medium/-large, OFF23b-medium, OFF24-medium, A100); OFF23-small REJECTED (gate) | off-polar-alex 2026-11-06 (d66) | 0.963–0.981 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
-| [model-off-grouped-a100](#model-off-grouped-a100) | `grouped_launch` on MACE-OFF23-small on the A100 | `DECISION_66_GROUPED_LAUNCH_MODEL_GPUS` | FM | DEFAULT (scoped: OFF23-small, A100) | off-polar-alex 2026-11-06 (d66) | 0.989 / 0.995 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-tf32x3-a100](#model-off-tf32x3-a100) | `tf32x3_gemms` on MACE-OFF on the A100 | `DECISION_66_TF32X3_MODEL_GPUS` | FM | DEFAULT (scoped: every OFF model, A100; OFF23-small since 7 Nov under the 3× rule) | off-polar-alex 2026-11-06/07 (d66) | 0.947–0.981 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-grouped-a100](#model-off-grouped-a100) | `grouped_launch` on MACE-OFF23-small on the A100 | `DECISION_66_GROUPED_LAUNCH_MODEL_GPUS` (empty) | FM | SUPERSEDED (7 Nov: OFF23-small takes `tf32x3_gemms`) | off-polar-alex 2026-11-06 (d66) | 0.989 / 0.995 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-off-screens-a100](#model-off-screens-a100) | Species GEMM, chunked fused forward, EDGE_SH/HEAD_SLICE/GRAPH_SUM off on MACE-OFF | A/B constants | FM | REJECTED (A100) | off-polar-alex 2026-11-06 | species GEMM 1.009–1.020; chunked forward 1.12–1.14 on medium | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-stock-skip-a100](#model-off-stock-skip-a100) | Species skip in MACE-OFF's stock first block | `STOCK_FIRST_SKIP_GPUS`, `STOCK_FIRST_SKIP` | FM | DEFAULT (scoped: A100, 5060 Ti, Ada) | off-polar-alex 2026-11-07/08 (d66) | 0.707–0.826, every OFF model; Ada with tables 0.59–0.75 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-stock-tables-a100](#model-off-stock-tables-a100) | Radial tables with MACE-OFF's stock first block | `DECISION_66_STOCK_FIRST_TABLES_GPUS` | FM | DEFAULT (scoped: A100, 5060 Ti, Ada) | off-polar-alex 2026-11-07/08 (d66) | 0.923–0.977 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-off-radial-tf32x3-a100](#model-off-radial-tf32x3-a100) | Radial last layer as 3xTF32 on MACE-OFF | `RADIAL_TF32X3_GPUS` (eligible products), `RADIAL_TF32X3` | FM | DEFAULT (scoped: MACE-OFF, A100) | off-polar-alex 2026-11-07 (d66) | 0.914–0.971; with the two rows above 0.563–0.645 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-spin-batched](#model-polar-spin-batched) | POLAR-1's α and β field features in one call | `longrange.polar.SPIN_BATCHED` | FM | DEFAULT (pure removal, every GPU) | off-polar-alex 2026-11-07 | A100 S 0.912–0.943, M 0.961–0.971, L 0.976–0.985 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-update-fold](#model-polar-update-fold) | POLAR-1's field-update MLP folded at setup | `rewrites.polar.update_fold.FOLD_UPDATE` | FM | DEFAULT (pure removal, every GPU) | off-polar-alex 2026-11-08 | A100 NaCl 0.965–0.972, NbCl5 1.000; Ada NaCl 0.966–0.977 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-small-matmuls](#model-small-matmuls) | Small mm/addmm as an Inductor-fused multiply-sum | `rewrites.inductor.SMALL_MATMULS` | FM | REJECTED | off-polar-alex 2026-11-07 | 5060 Ti POLAR-S NaCl 0.951, NbCl5 1.00; OFF23-small 1.045–1.07 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-shared-geometry](#model-polar-shared-geometry) | One unmasked k-space geometry per POLAR call | `longrange.polar.SHARED_GEOMETRY` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.990–1.006 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-e3nn-block-linear](#model-polar-e3nn-block-linear) | e3nn Linears as BlockLinear on POLAR-1 | `rewrites.linear.E3NN_BLOCK_LINEAR` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.991–1.010 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-ffwd-omol](#model-ffwd-omol) | `fused_folded_forward` on OMOL-0 XL | explicit on | FM | REJECTED | decision 64 scope | b/a 1.035 | [opt8-T02](validation/speed/opt8-T02.md) |
 | [model-gate-t03d](#model-gate-t03d) | Gate tool applies rule 13 (OMOL-0 on A100) | tooling | FM | DEFAULT | 2026-10-24 (`3e06d243`) | tooling | [opt4-T03](validation/speed/opt4-T03.md) §9 |
 | [model-other-models](#model-other-models) | Benchmark models, MACE-OFF, POLAR, OMOL on the GPU engine | `--model` | RE | MEASUREMENT | 2026-10-15/16 | 2.9–12.2× vs stock ASE (ten models) | `ResearchModule:LT/studies/other_models/README.md` |
@@ -500,6 +508,13 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [fusion-receiver-local](#fusion-receiver-local) | Receiver-local forward + backward of the last interaction (dout, sh, x on chip; no message store) | none (lab bounds `F-no-out`, `F-smem-*`) | FM | REJECTED (fusion and dout staging) | 2026-11-06 | H200: F-no-out 0.994, w′ F-smem-dout 0.847 (bound), real staging 1.935–1.986, staged layout without fill 1.131; 5060 Ti 1.015, 0.825, 1.464–2.323, 1.373 | [fusion bound](../results/fusion-bound-20261106/README.md) |
 | [sx-forward-table-w](#sx-forward-table-w) | Symmetrix-XL-style interaction 2 forward: w per edge from the value table instead of the a·W tensor-core product | none (lab bound `simt-slab-edges`) | FM | REJECTED (bound) | 2026-11-06 | H200 1.207 with the real slabs (511, 15.7 MB), L1 best case 0.901; 5060 Ti 1.238 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [sx-wprime-reduction](#sx-wprime-reduction) | w′: Symmetrix-XL's Cartesian Jacobian before the reduction, or a cheaper reduction | none (lab bounds `F-no-reduce`, `F-cart3`, `F-redux16`) | FM | REJECTED (bound) | 2026-11-06 | H200 no reduction at all 0.964; F-cart3 1.081; redux 1.135 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
+| [sx-layout-spline](#sx-layout-spline) | Interaction 2 forward in Symmetrix-XL's layout (one thread per receiver and channel, edges serial, message in registers) with w from a cubic spline; w′ with the same spline | `spline_forward.SPLINE_W` (+ `THREADS`, `MIN_BLOCKS`, `PARTS`) | FM | ADOPTED on the H200 family (`SPLINE_W_GPUS`, `R128_GPUS`, w′ `SPLINE_VECTOR_GPUS` 0.974 / 0.979; conductor, decision 66); A100 not measured; `PARTS` off | 2026-11-07 | Production build (per-model knots, 731 intervals, certificate 0.48): Benchmark_loup 4.92 → 4.31 ms (−12 %), forward −310 µs, w′ −186 µs, radial table −82 µs; `r128` on top 0.984 / 0.985, `parts` 0.994 / 0.990. Lab: H200 knots dense at short r (`a695`): forward 0.875, w′ 0.894, net −310 µs (−6.3 % of the 4.93 ms step), certificate passes over the whole domain, gate 1.37; uniform 256: −345 µs, certificate fails 74x; uniform 2,048: −127 µs | [sx-layout lab](../results/sx-layout-lab-20261107/README.md), [production H200](../results/spline-w-h200-20261107/README.md) |
+| [stage-quads](#stage-quads) | w′: the STAGE_DOUT row read as float4 quartets (one LDS.128 per four staged components) | `wprime_backward.STAGE_QUADS` | FM | MEASURED, closed (H200 0.9960 / 0.9984: under 1 %) | 2026-11-07 | In use, 96 registers, no spill; SASS 10 LDS.128 and no scalar LDS left; bitwise by construction | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
+| [compose-first-skip](#compose-first-skip) | Interaction 1: the reassociated projection, the first linear and the receiver-species skip composed per species, C_l,z = R_l L_l B_l,z through species_mm | `kernels.triton.compose_skip.COMPOSE_SKIP` | FM | DEFAULT on the H200 family (`COMPOSE_SKIP_GPUS`; decision 66: 0.9698 / 0.9738, gate passed); A100 not measured | 2026-11-07 | MD 4.12 → 4.00 ms (−115 µs); lab fwd + bwd 0.960 → 0.448 ms; force ratios 0.968 / 0.847 / 0.970 | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
+| [packed-coef](#items-3-5) | First radial table: two coefficient terms per float4 load | `tabled_outer_sum.PACKED_COEF` | FM | MEASURED, closed: slower (H200 1.0072 / 1.0079) | 2026-11-07 | LDG.64 −6 / LDG.128 +3 per walk, same registers; bitwise | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
+| [factor-w](#items-3-5) | Spline forward: w times a path's common factor once | `spline_forward.FACTOR_W` | FM | MEASURED, closed (H200 0.9969 / 0.9995: under 1 %) | 2026-11-07 | Same 80 registers / 8 local bytes; gate passes | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
+| [cursor32](#items-3-5) | Spline forward: int loop state | `spline_forward.CURSOR32` | FM | MEASURED, closed: slower (H200 1.0016 / 1.0033) | 2026-11-07 | Same registers; bitwise | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
+| [shared-locator](#items-3-5) | One spline locator record per edge for the forward and w′ | `spline_forward.SHARED_LOCATOR` | FM | MEASURED, closed (H200 0.9966 / 0.9974: under 1 %) | 2026-11-07 | Producer 24 registers, 16 B per edge; bitwise | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
 | [h200-butterfly-off](#h200-butterfly-off) | w′ `BUTTERFLY` off again on the H200 | `wprime_backward.BUTTERFLY_GPUS` | FM | ADOPTED (H200 removed; branch `fastmace/sx012-profile-20261106`) | 2026-11-06 | H200 MD b/a 0.9659 / 0.9677 (b = off), w′ kernel 0.88 | [sx012 profile](../results/sx012-profile-20261106/README.md) |
 | [cx-n1-cartesian-wprime](#cx-n1-cartesian-wprime) | w′: Cartesian harmonic adjoints (node converter, then dx and the edge-vector gradient from harmonic polynomials) | none (`tools/lab_cartesian.py`) | FM | REJECTED (bound) | 2026-11-06 | H200 lab 1.060 / 1.062 with converter (kernel 1.022, 56 vs 96 registers) | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
 | [cx-n2-fp64-adjoint](#cx-n2-fp64-adjoint) | w′: receiver-tiled FP64 tensor-core matrix adjoints | none (`tools/lab_cartesian.py` skeleton bound) | FM | REJECTED (bound) | 2026-11-06 | H200 optimistic floor 2.38x the default kernel | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
@@ -3821,8 +3836,10 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Switch: `planner.fixed.DECISION_66_TF32X3_MODEL_GPUS` (`off23-medium`, `off23-large`, `off23b-medium`, `off24-medium`)
 - Engine: FM
 - Date/round: 6 November 2026, branch `fastmace/off-polar-alex`
-- Status: DEFAULT (scoped: those four on the A100). OFF23-small REJECTED: 0.974 / 0.977, but the gate fails on
-  paracetamol (forces 2.19 against the default's 1.36).
+- Status: DEFAULT (scoped: those four on the A100). OFF23-small first rejected (6 November): 0.974 / 0.977, but
+  the gate failed at 2× on paracetamol (forces 2.19 against the default's 1.36). DEFAULT for OFF23-small too since
+  7 November (3× rule): on top of the new OFF defaults (stock skip, OFF tables, radial 3xTF32) 0.966 / 0.947 (A100
+  80GB PCIe, Modal); gate on the A100-SXM4-80GB: paracetamol forces 2.55, stress 2.77 (default 1.53, 1.30).
 - Measured (A100-SXM4-80GB, water 648 atoms): medium 0.968 / 0.966, large 0.967 / 0.963, 23b-medium 0.980 / 0.976,
   24-medium 0.980 / 0.981. Gates pass on urea, naphthalene, paracetamol (2x2x2 for large) and water.
 - Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
@@ -3832,8 +3849,8 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Switch: `planner.fixed.DECISION_66_GROUPED_LAUNCH_MODEL_GPUS` (`off23-small`)
 - Engine: FM
 - Date/round: 6 November 2026, branch `fastmace/off-polar-alex`
-- Status: DEFAULT (scoped: OFF23-small on the A100). Exact. OFF23-large slower (1.008 / 1.009); the other models take
-  `tf32x3_gemms`, which excludes it.
+- Status: SUPERSEDED on 7 November 2026: OFF23-small takes `tf32x3_gemms` (faster; it excludes this), and the
+  table is empty. Was DEFAULT (scoped: OFF23-small on the A100), exact. OFF23-large slower (1.008 / 1.009).
 - Measured (A100-SXM4-80GB, water): 0.989 / 0.995.
 - Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
 
@@ -3847,6 +3864,107 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
   HEAD_SLICE off a tie or slower. GRAPH_SUM off: OFF23-small 0.995 / 0.999, medium 0.997 / 0.998, a tie elsewhere;
   left on (under 0.5 %, flagged). Chunked fused forward: medium models 1.12–1.14 slower; OFF23-small 0.989 / 0.989
   (gate and stack with `grouped_launch` measured separately, see the results README).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-stock-skip-a100"></a>
+#### model-off-stock-skip-a100: species skip in MACE-OFF's stock first block
+- Switch: `generic.modules.STOCK_FIRST_SKIP_GPUS` (A100), A/B constant `STOCK_FIRST_SKIP`
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- What: e3nn runs the stock block's one-hot skip_tp as per-atom [channels, channels] matrices; `generic_species_skip`
+  replaces it by a SpeciesSkip where the class's forward matches the pin. Exact.
+- Status: DEFAULT (scoped: A100, RTX 5060 Ti, RTX 4000 Ada; decision 66).
+- Measured: A100-SXM4-80GB, water_216: OFF23-small 0.709 / 0.714, -medium 0.749 / 0.749, OFF23b 0.826 / 0.821,
+  OFF24 0.823 / 0.826, OFF23-large 0.707 / 0.714. With the stock-first tables: RTX 5060 Ti OFF23-small 0.677 /
+  0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811; RTX 4000 Ada (murphy, 8 November) OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725, OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-stock-tables-a100"></a>
+#### model-off-stock-tables-a100: radial tables with MACE-OFF's stock first block
+- Switch: `planner.fixed.DECISION_66_STOCK_FIRST_TABLES_GPUS` (A100); `radial_tables` "auto"
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- What: the generic radial tables, and the stock first block's radial MLP as one table (`StockTableWeights`).
+  Certified.
+- Status: DEFAULT (scoped: A100, RTX 5060 Ti, RTX 4000 Ada; decision 66; the two consumer GPUs measured together
+  with the species skip above).
+- Measured: A100-SXM4-80GB, water_216: OFF23-small 0.933 / 0.929, -medium 0.942 / 0.945, OFF23b 0.923 / 0.933,
+  OFF24 0.934 / 0.938, OFF23-large 0.977 / 0.971. Gates pass.
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-off-radial-tf32x3-a100"></a>
+#### model-off-radial-tf32x3-a100: the radial last layer as 3xTF32 on MACE-OFF
+- Switch: `kernels.triton.skinny_linear.RADIAL_TF32X3_GPUS` (A100), for products marked eligible
+  (`folded_linear(..., tf32x3=True)`: MACE-OFF's generic interactions and its stock first block's table);
+  A/B constant `RADIAL_TF32X3` (every product)
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- What: the forward and the input gradient of the radial last layer ([E, 64] @ [64, 3808] on OFF23-large) as CUTLASS
+  3xTF32 products instead of SIMT FP32. Precision change.
+- Status: DEFAULT (scoped: MACE-OFF, A100, decision 66). MH-1, POLAR-1 and OMAT-0 share `folded_linear` but were not
+  measured, so they keep FP32.
+- Measured: A100-SXM4-80GB alone: OFF23-small 0.962 / 0.971, -medium 0.930 / 0.933, OFF23b 0.915 / 0.914, OFF24
+  0.916 / 0.915, OFF23-large 0.919 / 0.919. With the two rows above (all three against the 6 November defaults):
+  0.566 / 0.563, 0.599 / 0.598, 0.640 / 0.635, 0.640 / 0.645, 0.598 / 0.592. Gate alone passes at 2×; all three
+  together pass at 3× (worst OFF24-medium paracetamol stress 2.50, about 1 bar).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-spin-batched"></a>
+#### model-polar-spin-batched: POLAR-1's α and β field features in one call
+- Switch: `longrange.polar.SPIN_BATCHED`
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- What: the two `forward_dynamic` calls of the spin channels as one multichannel call (graph_longrange's
+  `*_batch_channels`): half the k-space launches. Falls back to two calls off the periodic Fourier path.
+- Status: DEFAULT (pure-removal rule: fewer launches, no new kernel, not slower on any GPU measured, gate passes
+  for S, M and L; plain `True`, `False` stays as the A/B side).
+- Measured: A100-SXM4-80GB: S NaCl 0.943 / 0.942, NbCl5 0.912 / 0.913; M 0.971 / 0.969, 0.961 / 0.962; L 0.979 /
+  0.985, 0.976 / 0.977. RTX 5060 Ti S: 0.943 / 0.945, 0.885 / 0.882 (conductor rerun: S 0.951 / 0.938, 0.886 / 0.885; M NaCl 0.977 / 0.971, NbCl5
+  0.949 / 0.951; L 0.994 / 0.987, 0.966 / 0.975). RTX 4000 Ada: S NaCl 0.953 / 0.953, NbCl5 0.897 / 0.897; M 0.983 / 0.982, 0.957 / 0.953; L 0.995 / 0.994, 0.975 / 0.975. Gates: S and M pass (leto); L passes on Modal A100-SXM4-80GB (NbCl5 forces 0.56, stress 0.66, energy 0.78; NaCl at the floors; default 0.42 / 0.41 / 0.55).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-update-fold"></a>
+#### model-polar-update-fold: POLAR-1's field-update MLP folded at setup
+- Switch: `rewrites.polar.update_fold.FOLD_UPDATE` (applied with `polar_uvu`)
+- Engine: FM
+- Date/round: 7–8 November 2026, branch `fastmace/off-polar-alex` (Codex ideas N1, N4)
+- What: the update MLP's last linear folded through `tp_out`'s per-path C x C weights, and the species half of its
+  first input folded into a [species, 64] table; constants in float64, rounded once.
+- Status: DEFAULT (pure-removal rule: fewer products, no new kernel, not slower on any cell measured, gate passes
+  for S, M and L; plain `True`, `False` keeps MACE's forward as the A/B side).
+- Measured (MD step b/a, abab / abba): A100-SXM4-80GB (Alex 4957295) S NaCl 0.965 / 0.971, NbCl5 1.000 / 1.000;
+  M 0.969 / 0.970, 1.001 / 1.000; L 0.972 / 0.971, 1.000 / 1.000. RTX 4000 Ada (murphy) S 0.966 / 0.966, 1.000 /
+  0.999; M 0.972 / 0.970, 1.001 / 1.000; L 0.977 / 0.975, 1.000 / 1.000. RTX 5060 Ti (local) S NaCl 0.948 / 0.963, NbCl5 1.002 / 0.998; M 0.974 / 0.960, 1.001 / 0.990; L 0.981 / 0.971, 1.002 / 0.997. Gates (Alex 4957296, 3×): pass on S, M
+  and L; the candidate's ratios are within the default's own spread (M NbCl5 energy 8.60 vs 7.15, forces 0.91 vs
+  0.89).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-small-matmuls"></a>
+#### model-small-matmuls: small mm/addmm as an Inductor-fused multiply-sum
+- Switch: `rewrites.inductor.SMALL_MATMULS` (a `post_grad_custom_post_pass`)
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- What: mm/addmm with an inner dimension ≤ 8, or an output of ≤ 4 rows or columns, written as broadcast multiply and
+  sum so Inductor fuses them: POLAR-S 655 → 544 kernels per step (RTX 5060 Ti).
+- Status: REJECTED. RTX 5060 Ti: POLAR-S NaCl 0.951 / 0.951 but NbCl5 1.00 / 1.00, OFF23-small 1.07 / 1.045
+  (slower); with SPIN_BATCHED it added nothing on NbCl5. POLAR-M and -L (5060 Ti): NbCl5 0.998–1.000 (tie); the
+  NaCl b side recompiles during timing (invalid, also with 1200 warm-up steps). Not sent to the A100.
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-shared-geometry"></a>
+#### model-polar-shared-geometry: one unmasked k-space geometry per POLAR call
+- Switch: `longrange.polar.SHARED_GEOMETRY`
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- Status: REJECTED (A100-SXM4-80GB tie: S NaCl 0.990 / 1.006, NbCl5 0.999 / 0.999; M and L 0.996–1.000).
+- Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-e3nn-block-linear"></a>
+#### model-polar-e3nn-block-linear: e3nn Linears as BlockLinear on POLAR-1
+- Switch: `rewrites.linear.E3NN_BLOCK_LINEAR`
+- Engine: FM
+- Date/round: 7 November 2026, branch `fastmace/off-polar-alex`
+- Status: REJECTED (A100-SXM4-80GB tie: S 1.000–1.010, M 0.998–1.002, L 0.991–1.000).
 - Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
 
 <a id="model-ffwd-omol"></a>
@@ -4650,6 +4768,39 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Measured (H200, `d599cc70`, base with `BUTTERFLY=False` 1,634 µs): F-no-reduce 0.964; F-cart3 1.081; F-redux16 1.135; F-cart3-redux 1.156; redux 1.135; butterfly 1.145.
 - Why: removing the reduction completely saves 3.6 %. The lab's butterfly result conflicts with the H200 MD A/B behind the `BUTTERFLY` default; see the recheck in the source.
 - Sources: [sx012 profile](../results/sx012-profile-20261106/README.md).
+
+<a id="stage-quads"></a>
+#### stage-quads: w′ staged output gradients as float4 quartets (H200)
+
+Codex H200 follow-up item 2. `STAGE_QUADS` interleaves the STAGE_DOUT row as `(o // 4) * 4C + 4c + o % 4`, so each lane loads four staged components with one `LDS.128` (40 instead of 160 shared loads per edge at four channels per lane). The H200 build uses it (96 registers, no spill; the SASS has only `LDS.128`), but the MD-step A/B is 0.9960 / 0.9984: the staged loads do not bound w′. Measured and closed; off. [Results](../results/h200-compose-quads-20261107/README.md).
+
+<a id="compose-first-skip"></a>
+#### compose-first-skip: interaction 1 projection composed with the first linear and the species skip (H200, DEFAULT)
+
+Codex H200 follow-up item 1. Today, per degree l: the reassociation product `[n(2l+1), 192] @ [192, 128]`, the first linear (a per-l `BlockLinear` on OMAT-0 medium), the division by density + 1, then `tf32x3_skip_select` with all three species' columns (`[., 128] @ [128, 384]`). `COMPOSE_SKIP` composes them per receiver species, `C_l,z = R_l L_l B_l,z` (float64, stored float32), and runs `species_mm` (CUTLASS launch). The interaction then skips its linear and `skip_tp`. Lab (`tools/compose_lab.py`, without the linear): 0.960 to 0.448 ms per forward + backward. H200 MD step 0.9698 / 0.9738 (4.12 to 4.00 ms), force/stress gate passed. Default on `COMPOSE_SKIP_GPUS` (H200; decision 66). [Results](../results/h200-compose-quads-20261107/README.md).
+
+<a id="items-3-5"></a>
+#### items-3-5: Codex H200 follow-up items 3–5 (H200)
+
+Item 3 packs the first radial table's coefficients two terms per float4 (`PACKED_COEF`). Triton then issues half the coefficient loads, with no register change, but the MD step is 0.7–0.8 % slower. Item 4 factors w times a common input or edge component (`FACTOR_W`, gate passes) and narrows the forward's loop state to int (`CURSOR32`); neither changes the forward's 80 registers or its 8-byte spill, and the A/Bs are 0.997 / 0.9995 and 1.002 / 1.003. Item 5 writes one spline locator record per edge for both spline kernels (`SHARED_LOCATOR`, bitwise): 0.9966 / 0.9974. None clears 1 %; all measured and closed, off. [Results](../results/h200-compose-quads-20261107/README.md).
+
+<a id="sx-layout-spline"></a>
+#### sx-layout-spline: Symmetrix-XL's interaction 2 forward layout with spline w, and the spline w′ (H200, lab)
+- Switch: `fastmace.kernels.oeq_streaming.spline_forward.SPLINE_W` (None: on for `SPLINE_W_GPUS`); launch shape `R128` (None: on for `R128_GPUS`), A/B overrides `THREADS`, `MIN_BLOCKS`, `PARTS` (lab variants in `tools/sx_layout_lab.py`)
+- Engine: FM
+- Date/round: 7 November 2026 (owner, via the conductor: copy Symmetrix-XL's whole interaction 2 forward with a 4-value spline table)
+- What: one thread per (receiver, channel), edges walked serially, message in registers, using production's angular code; w from a uniform-knot cubic Hermite spline per species pair (or our 6-term table, a w buffer, w = 1); the `TABLE_W` w′ kernel with the spline instead of the table.
+- Status: ADOPTED on the H200 family (conductor, 7 November 2026, decision 66): `SPLINE_W_GPUS` and `R128_GPUS` hold `NVIDIA H200` (which covers the H200 NVL). Off on the A100 until measured there. `PARTS` stays off: 0.994 / 0.990 alone, and 1.010 / 1.008 on top of `R128`. Follow-ups against the H200 defaults (`efd4e41d`): `SPLINE_VECTOR=4` (one float4 per weight in the w′, bitwise) 0.9739 / 0.9793, ADOPTED on the H200 family (`SPLINE_VECTOR_GPUS`; conductor, decision 66); `R128` with `MIN_BLOCKS=5` (96 registers, no spill) 0.9925 / 0.9937, measured and not combined with `SPLINE_VECTOR` (under 1 %; the cap stays 6); 128 threads without a cap 1.012 / 1.013. A full w′ layout rework was not built: receiver- and sender-owned w′ layouts lost before, and Symmetrix-XL's own backward is 2x ours.
+- Production (H200, `c23ff357`, profile `fifth`, Benchmark_loup settings): knots fitted per model (`rewrites/radial/spline.py`: 731 intervals, certificate 0.483); forward 80 registers, no spill; MD A/B b/a 0.8789 / 0.8775; Benchmark_loup 4.920 / 4.914 → 4.313 / 4.312 ms; gate passes (forces 0.92 / 0.88 / 0.98, stress 0.66 / 1.06 / 1.42); profile per force call: forward 1,269 → 959 µs, w′ 1,396 → 1,211 µs, radial table (density only) 97 → 15 µs. Launch shape on top of SPLINE_W (profile `third`): `r128` 0.9838 / 0.9848 (80 registers, 8 B local), `parts` with `MIN_BLOCKS=4` 0.9938 / 0.9904 (64 + 64 registers).
+- Measured (H200, `02166191`, profile `fourth`, Benchmark_loup SrTiO3 10×10×10):
+  - forward, production 1,270 µs: sx-wbuf 0.890, sx-table6 1.059, sx-spline256 0.871, sx-spline2048 0.979, sx-spline4096 1.152, sx-F-w1 0.395;
+  - w′, production 1,403 µs: B-spline256 0.874, B-spline2048 0.928, B-spline4096 1.067;
+  - net per step: −341 µs (256 knots, −6.0 %) and −129 µs (2,048 knots, −2.2 %);
+  - gate worst ratio: 1.81 (256 knots) and 1.14 (2,048 knots);
+  - certificate slope at r ≥ 1 Å: 74x (256 knots, fails) and 0.17 (2,048 knots, passes); whole domain 2,025x and 4.35.
+  - follow-up with piecewise-uniform knots dense at short r (`GRIDS` in the lab; `h200-knots`, `1e71246a`): `a695` (695 intervals, 85 MB) forward 0.875, w′ 0.894, net −310 µs (−6.3 %), certificate 0.54 over the whole domain and 0.63 at r ≥ 1 Å, gate worst 1.37; `p399` (dense only from 1 Å) −331 µs, certificate at r ≥ 1 Å only, gate 1.62.
+- Why: the layout alone wins 11 % (80 registers, no spill, against 154 plus spill). After that, w traffic decides: our 6-term table loses in this layout, a 256-knot spline fits in L2, and 4,096 knots does not.
+- Sources: [sx-layout lab](../results/sx-layout-lab-20261107/README.md), [production H200](../results/spline-w-h200-20261107/README.md).
 
 <a id="cx-n1-cartesian-wprime"></a>
 #### cx-n1-cartesian-wprime: Cartesian harmonic adjoints for the w′ backward (H200, bound)

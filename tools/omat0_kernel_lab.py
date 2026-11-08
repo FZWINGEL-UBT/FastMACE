@@ -649,6 +649,8 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         # H200 ideas 37 and 38 (plan revision 15): FF-dout-row0 (the dout locality bound, against maxreg72) and the
         # w' split by harmonic degree (tools/lab_ideas3738.py).
         **_ideas3738_variants(kernel),
+        # sx-layout lab: the w' with w and its slope from an N-knot cubic spline instead of the 6-term table.
+        **_sx_layout_lab().wprime_variants(kernel),
     }
 
 
@@ -1722,6 +1724,11 @@ def _arch_suffix(source, capability):
     return "a" if "// idea 30: sm_90a" in source and tuple(capability) == (9, 0) else ""
 
 
+def _sx_layout_lab():
+    import sx_layout_lab  # tools/ is on sys.path when the lab runs as a script
+    return sx_layout_lab
+
+
 def _ideas3738_variants(kernel):
     import lab_ideas3738  # tools/ is on sys.path when the lab runs as a script
     return lab_ideas3738.ideas3738_variants(kernel)
@@ -1946,6 +1953,9 @@ def forward_variants(kernel=None):
         "F-part0-only": ("falsifier", _part_only(0), ()),
         "F-part1-only": ("falsifier", _part_only(1), ()),
         "F-l1-28": ("exact", _l1_pad(kernel, 224 * 1024), ()),
+        # sx-layout lab (owner, 7 November 2026): Symmetrix-XL's whole forward layout with w from a cubic spline,
+        # from our 6-term table, from a w buffer, or w = 1 (tools/sx_layout_lab.py). Real messages.
+        **_sx_layout_lab().forward_variants(kernel),
     }
 
 
@@ -2016,6 +2026,8 @@ def _sh_lds4(s):
 
 def forward_launcher(kernel, source, extra):
     """A launch function for a variant of ``kernel`` (a FusedFoldedForward) compiled from ``source``."""
+    if "sx_layout_forward" in source:  # the sx-layout lab's own kernel and arguments
+        return _sx_layout_lab().forward_launcher(kernel, source, extra)
     import torch
     from cuda.bindings import driver
 
@@ -2283,6 +2295,13 @@ def main(argv=None):
                 constants={f"{m}:{n}": v for (m, n), v in constants.items()})
     if "wprime" in captured and captured["wprime"]:
         _WPRIME_CAPTURE["args"] = captured["wprime"][1]
+    if "wprime" in captured and "forward" in captured:  # the sx-layout lab's tables need both calls' edges
+        forward_args = list(captured["forward"][1])
+        forward_args[7] = forward_args[8] = None  # the outputs: not needed, and w is [E, Q]
+        _sx_layout_lab().CONTEXT.update(
+            checkpoint=str(args.checkpoint), model=args.model, forward_args=forward_args,
+            wprime_args=captured["wprime"][1],
+            numbers=sorted({int(z) for z in ab_step_time.read_structure(args.structure, None)[1].numbers}))
     for name in args.kernels:
         kernel, cargs = captured[name]
         if name == "wprime":
@@ -2374,6 +2393,8 @@ def main(argv=None):
             elif variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
         snapshots = None
+        if any(v.startswith(("sx-", "B-spline")) for v in built):  # the sx-layout lab: stop before any timing
+            _sx_layout_lab().check_before_timing(name, built)
         times = {v: [] for v in live}
         flush = (torch.empty(int(args.flush_l2_mb) << 18, dtype=torch.float32, device="cuda")
                  if args.flush_l2_mb else None)

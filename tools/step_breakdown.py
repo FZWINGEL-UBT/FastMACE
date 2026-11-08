@@ -193,7 +193,9 @@ def build_engine(args, base):
     from fastmace.planner import fixed, minimal
     from fastmace.planner.workload import Workload
 
-    planner = minimal.MinimalPlanner(engine=EngineConfig(backend=args.backend))
+    from fastmace.config import NeighbourConfig
+    neighbours = NeighbourConfig() if args.skin is None else NeighbourConfig(skin=args.skin)
+    planner = minimal.MinimalPlanner(engine=EngineConfig(backend=args.backend), neighbours=neighbours)
     hardware = planner.hardware()  # the allocator rule, before the first CUDA allocation
     started = time.perf_counter()
     loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha256(args.checkpoint))
@@ -698,6 +700,7 @@ def parse_args(argv=None):
                    help="Benchmark name under FASTMACE_STRUCTURES (3x3x3), or a file with PATH@NXxNYxNZ")
     p.add_argument("--backend", choices=("hybrid", "cueq"), default="hybrid")
     p.add_argument("--temperature-K", type=float, default=1000.0)
+    p.add_argument("--skin", type=float, default=None, help="Neighbour-list skin (default: the planner's auto)")
     p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
     p.add_argument("--velocity-seed", type=int, default=20261007, help="The research probe's Maxwell-Boltzmann seed")
     p.add_argument("--equilibrate-steps", type=int, default=300)

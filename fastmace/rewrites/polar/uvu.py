@@ -99,7 +99,7 @@ def apply(model, context=None):
 
     if head_liveness.PRUNE_DEAD_DEGREES:  # dead head degrees, before the fold reads the live paths (R5)
         names += [f"{name} (dead degrees pruned)" for name in head_liveness.apply(model)]
-    if update_fold.FOLD_UPDATE:  # the folded update MLP (an A/B constant, off-polar-alex lab)
+    if update_fold.FOLD_UPDATE:  # the folded update MLP (default on; False is MACE's forward)
         names += [f"{name} (update MLP folded)" for name in update_fold.apply(model)]
     from fastmace.rewrites.polar import head_compose
 
@@ -115,6 +115,9 @@ def revert(model):
         if module.__dict__.pop("forward", None) is not None:
             names.append(name)
         module.__dict__.pop(MARKER, None)
+    from fastmace.rewrites.polar import update_fold
+
+    names += [f"{name} (update MLP folded)" for name in update_fold.revert(model)]
     return names
 
 
@@ -160,6 +163,11 @@ def selfcheck(original, rewritten=None, context=None, rows=7, seed=0):
         checked += 1
         if error > threshold:
             detail.append(f"{name}: relative error {error:.3g} > {threshold:g}")
+    if checked:  # the folded update blocks (FOLD_UPDATE), against MACE's forward
+        from fastmace.rewrites.polar import update_fold
+
+        error, folded, more = update_fold.selfcheck(original, rewritten, threshold)
+        worst, checked, detail = max(worst, error), checked + folded, detail + more
     if not checked:
         return {"passed": False, "max_relative_error": math.inf, "threshold": threshold, "modules": 0,
                 "detail": f"no {CLASS_NAME} to check"}

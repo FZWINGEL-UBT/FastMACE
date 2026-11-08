@@ -1,0 +1,8 @@
+cd /mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671
+export PATH=/home/fzwin/environments/mace_cueq_oeq_polar/bin:$PATH PYTHONPATH=/mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671:/mnt/d/Margraf/FastMACE/.claude/worktrees/tc-gemm-screen-ba8671/tools:/home/fzwin/fm-runs/r1-split-20261107b/lab PYTHONDONTWRITEBYTECODE=1
+export FASTMACE_STRUCTURES=$HOME/fastmace-baseline/1a-T18 FASTMACE_MODELS=$HOME/models
+python /home/fzwin/fm-runs/r1-split-20261107b/lab/r1check.py /home/fzwin/fm-runs/r1-split-20261107b/check.json > /home/fzwin/fm-runs/r1-split-20261107b/check.log 2>&1
+OUT=/home/fzwin/fm-runs/r1-split-20261107b/off23-large MODEL=off23-large CKPT=MACE-OFF23_large.model STRUCTS="/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1"   SETS_FILE=/home/fzwin/fm-runs/r1-split-20261107b/sets/off.tsv WARMUP=300 BLOCK=500 BLOCKS=12 STOP_AFTER=4 bash tools/offpolar_ab.sh
+OUT=/home/fzwin/fm-runs/r1-split-20261107b/off24 MODEL=off24-medium CKPT=MACE-OFF24_medium.model STRUCTS="/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1"   SETS_FILE=/home/fzwin/fm-runs/r1-split-20261107b/sets/off.tsv WARMUP=300 BLOCK=1000 BLOCKS=12 STOP_AFTER=4 bash tools/offpolar_ab.sh
+OUT=/home/fzwin/fm-runs/r1-split-20261107b/polar1-l MODEL=polar1-l CKPT=MACE-POLAR-1-L.model STRUCTS="NbCl5"   SETS_FILE=/home/fzwin/fm-runs/r1-split-20261107b/sets/polar.tsv WARMUP=100 BLOCK=150 BLOCKS=8 STOP_AFTER=4 bash tools/offpolar_ab.sh
+grep -H "b/a" /home/fzwin/fm-runs/r1-split-20261107b/*/ab-*.log

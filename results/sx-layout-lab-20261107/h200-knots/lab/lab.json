@@ -1,0 +1,193 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-07T18:51:19.924018+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "1e71246a720e7f8d85c2334fe4ebe5ed6089a018",
+  "model": "omat0-medium",
+  "rounds": 15,
+  "capture_s": 43.521981442,
+  "kernels": {
+    "forward": {
+      "shapes": {
+        "edges": 373760,
+        "k": 65,
+        "rule": "LaunchRule(parts=2, warps=12, blocks_per_slice=33, shared_bytes=217216)",
+        "weight_last_column_zero": true
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 154,
+          "local_bytes": 64,
+          "median_us": 1279.5519828796387,
+          "min_us": 1277.4080038070679,
+          "max_us": 1294.7200536727905,
+          "ratio": 1.0
+        },
+        "sx-spline256": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.14e-06",
+            "out1": "max|d|/max|a| = 2.22e-06",
+            "out2": "max|d|/max|a| = 1.37e-06",
+            "out3": "max|d|/max|a| = 1.25e-06",
+            "w": "bitwise"
+          },
+          "median_us": 1103.9680242538452,
+          "min_us": 1101.631999015808,
+          "max_us": 1107.4559688568115,
+          "ratio": 0.8627770024390562
+        },
+        "sx-spline2048": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.09e-06",
+            "out1": "max|d|/max|a| = 1.91e-06",
+            "out2": "max|d|/max|a| = 1.37e-06",
+            "out3": "max|d|/max|a| = 1.37e-06",
+            "w": "bitwise"
+          },
+          "median_us": 1249.7279644012451,
+          "min_us": 1244.8320388793945,
+          "max_us": 1254.1120052337646,
+          "ratio": 0.9766918273915887
+        },
+        "sx-splinea695": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.14e-06",
+            "out1": "max|d|/max|a| = 1.85e-06",
+            "out2": "max|d|/max|a| = 1.29e-06",
+            "out3": "max|d|/max|a| = 1.04e-06",
+            "w": "bitwise"
+          },
+          "median_us": 1119.968056678772,
+          "min_us": 1114.6240234375,
+          "max_us": 1126.3359785079956,
+          "ratio": 0.8752814044789942
+        },
+        "sx-splinep399": {
+          "kind": "rounding",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "out0": "max|d|/max|a| = 1.14e-06",
+            "out1": "max|d|/max|a| = 1.85e-06",
+            "out2": "max|d|/max|a| = 1.29e-06",
+            "out3": "max|d|/max|a| = 1.00e-06",
+            "w": "bitwise"
+          },
+          "median_us": 1100.4799604415894,
+          "min_us": 1096.992015838623,
+          "max_us": 1107.807993888855,
+          "ratio": 0.8600509984478734
+        }
+      }
+    },
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          5616,
+          1280,
+          6
+        ],
+        "gprime_MB": 164.53125,
+        "species": 3,
+        "pieces": 624,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 72,
+          "local_bytes": 0,
+          "median_us": 1409.9520444869995,
+          "min_us": 1379.2320489883423,
+          "max_us": 1416.4479970932007,
+          "ratio": 1.0
+        },
+        "B-spline256": {
+          "kind": "rounding",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 2.79e-07",
+            "dr": "max|d|/max|a| = 1.31e-05",
+            "dx": "max|d|/max|a| = 3.43e-07"
+          },
+          "median_us": 1240.9600019454956,
+          "min_us": 1183.5520267486572,
+          "max_us": 1249.1199970245361,
+          "ratio": 0.8801434111165175
+        },
+        "B-spline2048": {
+          "kind": "rounding",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 2.79e-07",
+            "dr": "max|d|/max|a| = 1.58e-06",
+            "dx": "max|d|/max|a| = 3.12e-07"
+          },
+          "median_us": 1312.8000497817993,
+          "min_us": 1272.6080417633057,
+          "max_us": 1322.7839469909668,
+          "ratio": 0.9310955325856148
+        },
+        "B-splinea695": {
+          "kind": "rounding",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 2.10e-07",
+            "dr": "max|d|/max|a| = 3.16e-06",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1259.8400115966797,
+          "min_us": 1200.5759477615356,
+          "max_us": 1272.223949432373,
+          "ratio": 0.8935339443087676
+        },
+        "B-splinep399": {
+          "kind": "rounding",
+          "registers": 72,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 2.10e-07",
+            "dr": "max|d|/max|a| = 1.85e-06",
+            "dx": "max|d|/max|a| = 3.12e-07"
+          },
+          "median_us": 1257.7279806137085,
+          "min_us": 1197.4719762802124,
+          "max_us": 1267.9040431976318,
+          "ratio": 0.8920359990479843
+        }
+      }
+    }
+  },
+  "constants": {},
+  "profiled": {
+    "forward": [],
+    "wprime": []
+  }
+}

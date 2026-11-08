@@ -1,0 +1,47 @@
+#!/bin/bash -l
+#SBATCH --job-name=fm-diag2-setup
+#SBATCH -p a100 --gres=gpu:a100:1 -C a100_80
+#SBATCH --time=02:00:00
+#SBATCH --export=NONE
+#SBATCH --output=/home/atuin/v130cb/v130cb18/fm-offpolar/logs/%x-%j.out
+unset SLURM_EXPORT_ENV
+source /home/atuin/v130cb/v130cb18/fm-offpolar/jobs/env.sh
+nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader; echo node $SLURM_JOB_NODELIST commit $(cat .source_commit)
+export PYTHONPATH=$B/src-0c05a288; cd $PYTHONPATH
+R=$B/runs/diag-setup-$SLURM_JOB_ID; mkdir -p $R
+echo "CACHEDIRS inductor=${TORCHINDUCTOR_CACHE_DIR:-unset} triton=${TRITON_CACHE_DIR:-unset} tmp=$TMPDIR home=$HOME"
+python - <<'P'
+import time; t = time.time()
+import fastmace, torch  # noqa
+print("DIAG import fastmace+torch %.1f s" % (time.time() - t), flush=True)
+P
+L=${TMPDIR:-/tmp}/fmcache-$SLURM_JOB_ID; df -h ${TMPDIR:-/tmp} | tail -1 | sed 's/^/DIAG localdisk /'
+for run in 1 2 3 4; do
+  t0=$(date +%s)
+  if [ $run -ge 3 ]; then export FASTMACE_CACHE=$L; mkdir -p $L; fi  # 3: empty local cache, 4: warm local cache
+  python -m cProfile -o $R/prof$run.out tools/ab_rewrites.py --output $R/ab$run --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-M.model \
+    --model polar1-m --structures NaCl NbCl5 --warmup 20 --block 20 --blocks 2 > $R/ab$run.log 2>&1
+  echo "DIAG run$run cache=$FASTMACE_CACHE wall $(( $(date +%s) - t0 )) s"
+  python - $R/ab$run.json <<'P'
+import json, sys
+d = json.load(open(sys.argv[1]))
+for n, e in d["structures"].items():
+    print("DIAG setup", n, {k: round(v) for k, v in e["setup_s"].items()})
+P
+done
+python - $R/prof1.out $R/prof2.out $R/prof3.out $R/prof4.out <<'P' > $R/pstats.txt
+import pstats, sys
+for f in sys.argv[1:]:
+    print("=====", f)
+    s = pstats.Stats(f); s.sort_stats("cumulative").print_stats(70); s.sort_stats("tottime").print_stats(30)
+P
+python - $R/pstats.txt <<'P'
+import re, sys
+keys = ("convert_frame", "compile_fx", "fx_codegen", "autotune", "do_bench", "graph(", "capture", "_oeq", "openequivariance",
+        "load_pristine", "plan(", "build(", "torch.jit", "cpp_extension", "triton/compiler", "aot_autograd", "warm_up", "FxGraphCache", "lookup")
+lines = open(sys.argv[1]).read().split("=====")[1].splitlines()
+for l in lines:
+    if re.match(r"\s+\d", l) and any(k in l for k in keys):
+        print("DIAGP", " ".join(l.split()[:5]), l.split()[-1][-110:])
+P
+du -sh $L 2>/dev/null | sed "s/^/DIAG localcache /"; rm -rf $L

@@ -161,6 +161,10 @@ class FirstInteractionReassociation(torch.nn.Module):
         self.ir_mul = bool(ir_mul)
         self.tf32x3 = False  # tf32x3_gemms: the per-path products as 3xTF32 (OPT4-T03)
         self.first_div = False  # idea 31 (kernels.cutlass.first_div), set by precision.route
+        # kernels.triton.compose_skip: (the interaction's linear, its product index per path (empty: the identity),
+        # its SpeciesSkip, the skip's product index per path), set by precision.route; the forward then returns the
+        # skip's output before the division, and the interaction skips its linear and skip_tp
+        self.compose_skip = None
 
     def bind(self, species_feats):
         """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address)."""
@@ -196,6 +200,8 @@ class FirstInteractionReassociation(torch.nn.Module):
         blocks = []
         start = 0
         c = self.channels
+        if self.compose_skip is not None and rows is None:
+            return self._composed(summed, node_attrs, x, weight, nodes, slots, width)
         if divided_by is not None and self.tf32x3 and self.ir_mul and rows is None:
             # idea 31 (kernels.cutlass.first_div): the blocks divided by (density + 1) in the epilogue, kept apart
             lefts, rights = [], []
@@ -226,6 +232,35 @@ class FirstInteractionReassociation(torch.nn.Module):
             if not self.ir_mul:
                 block = block.transpose(1, 2)
             blocks.append(block.reshape(nodes, size * c))
+            start += size
+        return torch.cat(blocks, dim=1)
+
+    def _composed(self, summed, node_attrs, x, weight, nodes, slots, width):
+        """The message through the interaction's linear and the receivers' species skip
+        (``kernels.triton.compose_skip``): per path ``species_mm(left, right L B_z)``, joined as the skip joins its
+        output blocks (ir_mul, path order)."""
+        from fastmace.kernels.triton import compose_skip
+        from fastmace.kernels.triton.species_gemm import species_mm, species_plan
+
+        if torch.is_grad_enabled() and (weight.requires_grad or x.requires_grad):
+            raise RuntimeError("compose_skip has no gradient for the weights: inference only (frozen parameters)")
+        linear, linear_products, skip, products = self.compose_skip
+        onehot = node_attrs[:nodes, skip.columns]
+        kind = onehot.argmax(dim=1)
+        order, counts = species_plan(kind, onehot.shape[1])
+        if not self.tf32x3:
+            precision = "ieee"
+        else:
+            precision = "tf32x3-cutlass" if getattr(self, "tf32x3_backend", None) == "cutlass" else "tf32x3"
+        c = self.channels
+        blocks, start = [], 0
+        for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
+            size = 2 * l + 1
+            left = summed[:, :, start:start + size].transpose(1, 2).reshape(nodes, size, slots * width)
+            right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
+            mid = getattr(linear, f"weight_{linear_products[path]}") if linear_products else None
+            w, w_t = compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid)
+            blocks.append(species_mm(left, w, w_t, kind, order, counts, precision).reshape(nodes, -1))
             start += size
         return torch.cat(blocks, dim=1)
 

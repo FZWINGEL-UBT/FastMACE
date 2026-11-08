@@ -1,4 +1,4 @@
-"""PolarMACE's field-update MLP folded at setup (off-polar-alex lab, 7 November 2026; an A/B constant, off).
+"""PolarMACE's field-update MLP folded at setup (off-polar-alex lab, 7 November 2026; default on since 8 November).
 
 ``AgnosticEmbeddedOneBodyVariableUpdate`` (MACE 0.3.16) forms ``cat(invariants[C], source_embedding(Z)[C])``, runs
 the ``RadialMLP`` 2C -> 64 -> 64 -> 64 -> C, and mixes those C scalars into ``tp_out``'s per-degree C x C weights
@@ -16,13 +16,18 @@ other models keep MACE's code. Ideas N1 and N4 of plans/codex-off-polar-current-
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import inspect
 import math
 import types
 
-# FOLD_UPDATE: True folds every update block of a PolarMACE model when polar_uvu is applied (an A/B side's choice).
-FOLD_UPDATE = False
+# FOLD_UPDATE: True folds every update block of a PolarMACE model when polar_uvu is applied. Default on
+# (off-polar-alex, 8 November 2026) under the pure-removal rule: MD step b/a, abab / abba, A100-SXM4-80GB S NaCl
+# 0.965 / 0.971, M 0.969 / 0.970, L 0.972 / 0.971, NbCl5 1.000 / 1.000 on all three; RTX 4000 Ada S NaCl 0.966,
+# M 0.971, L 0.976, NbCl5 1.000; RTX 5060 Ti NaCl 0.95-0.98, NbCl5 0.990-1.002; tools/force_stress_gate.py
+# passes on S, M and L (A100). False: MACE's forward.
+FOLD_UPDATE = True
 CLASS_NAME = "AgnosticEmbeddedOneBodyVariableUpdate"
 MARKER = "_fastmace_update_fold"
 SOURCE_HASHES = {
@@ -163,4 +168,57 @@ def apply(model, context=None):
     return names
 
 
-__all__ = ["FOLD_UPDATE", "SOURCE_HASHES", "apply", "folded_forward", "support"]
+_BUFFERS = ("_fold_first", "_fold_species", "_fold_first_bias", "_fold_out", "_fold_out_bias")
+
+
+def revert(model):
+    """Undo ``apply`` (MACE's forward and no fold buffers again); returns the module names."""
+    names = []
+    for name, module in _targets(model):
+        if not module.__dict__.pop(MARKER, False):
+            continue
+        module.__dict__.pop("forward", None)
+        for key in _BUFFERS:
+            module._buffers.pop(key, None)
+        names.append(name)
+    return names
+
+
+def selfcheck(original, rewritten, threshold, atoms=7, seed=0):
+    """Each folded block of ``rewritten`` against the matching block of ``original`` (MACE's forward), in float64
+    on random one-hot species, node, potential and charge features. Returns (worst relative error, blocks checked,
+    details over ``threshold``); a folded block without a match is an infinite error."""
+    import torch
+
+    generator = torch.Generator().manual_seed(seed)
+    originals = dict(_targets(original))
+    worst, checked, detail = 0.0, 0, []
+    for name, module in _targets(rewritten):
+        if not module.__dict__.get(MARKER):
+            continue
+        reference = originals.get(name)
+        if reference is None or reference.__dict__.get(MARKER):
+            return math.inf, checked, [f"{name}: no unfolded block in the original"]
+        device = next(iter(module.buffers())).device
+        test = copy.deepcopy(module).double()
+        ref = copy.deepcopy(reference).double()
+        species = module.node_attrs_irreps.dim
+        node_attrs = torch.nn.functional.one_hot(
+            torch.randint(species, (atoms,), generator=generator), species).double()
+        tensors = [node_attrs] + [torch.randn(atoms, irreps.dim, generator=generator, dtype=torch.float64)
+                                  for irreps in (module.node_feats_irreps, module.potential_irreps,
+                                                 module.charges_irreps)]
+        node_attrs, node_feats, potential, charges = (t.to(device) for t in tensors)
+        with torch.no_grad():
+            expected = type(ref).forward(ref, node_attrs, node_feats, None, None, None, potential, charges)
+            got = test(node_attrs, node_feats, None, None, None, potential, charges)
+        scale = float(expected.abs().max())
+        error = float((got - expected).abs().max()) / (scale if scale > 0 else 1.0)
+        worst = max(worst, error)
+        checked += 1
+        if error > threshold:
+            detail.append(f"{name} (update MLP folded): relative error {error:.3g} > {threshold:g}")
+    return worst, checked, detail
+
+
+__all__ = ["FOLD_UPDATE", "SOURCE_HASHES", "apply", "folded_forward", "revert", "selfcheck", "support"]

@@ -1,0 +1,38 @@
+{
+  "kind": "reference",
+  "name": "reference-naphthalene_cod2311090-ase_f32",
+  "structure": "naphthalene_cod2311090",
+  "reference": "ase_f32",
+  "dtype": "float32",
+  "keys": [
+    "hydrostatic-0",
+    "hydrostatic-1",
+    "hydrostatic-2",
+    "full-0",
+    "full-1",
+    "full-2"
+  ],
+  "implementation": "fastmace.reference",
+  "model": "off23-large",
+  "label": "off23-large",
+  "checkpoint": "/__modal/volumes/vo-QuZYWI1jH3gh2H8SolNdI6/models/MACE-OFF23_large.model",
+  "checkpoint_sha256": "a29e397dbf3e7a24ac50a9b0dfc919bd5a62efa346f5895a6237b0950c1d76f4",
+  "baseline": null,
+  "backend": "auto",
+  "md_dtype": "auto",
+  "main_args": "",
+  "rewrites": {
+    "radial_tables": "on"
+  },
+  "production_constants": [
+    "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True",
+    "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3=True"
+  ],
+  "engine_config": {},
+  "production_tf32": false,
+  "tiled_receivers": 0,
+  "tiled_mode": "eager",
+  "values": "/tmp/fastmace-out/gate-offall-off23-large/gate-candidate/values/reference-naphthalene_cod2311090-ase_f32.npz",
+  "result": "/tmp/fastmace-out/gate-offall-off23-large/gate-candidate/values/reference-naphthalene_cod2311090-ase_f32.json",
+  "configurations": "/tmp/fastmace-out/gate-offall-off23-large/gate-candidate/configs/naphthalene_cod2311090.npz"
+}

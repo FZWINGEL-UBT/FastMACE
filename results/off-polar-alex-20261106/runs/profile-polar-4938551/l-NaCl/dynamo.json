@@ -1,0 +1,60 @@
+{
+ "frames": {
+  "total": 115,
+  "ok": 106
+ },
+ "unimplemented": {
+  "Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `_patched_getfile` in file `/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/torch/package/package_importer.py` should not be traced.\n  Hint: Avoid calling the function `_patched_getfile`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `_patched_getfile` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.package.package_importer, qualname: _patched_getfile, skip reason: file matches MOD_SKIPLIST (/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/torch/package)\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": 1,
+  "Attempt to trace generator\n  Explanation: Generators cannot be compiled directly with `torch.compile`.\n  Hint: Call a generator from inside of a non-generator Python function and compile that function instead.\n  Hint: This graph break is fundamental - it is unlikely that Dynamo will ever be able to trace through your code. Consider finding a workaround.\n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0003.html": 7,
+  "torch.* op returned non-Tensor\n  Explanation: torch.* ops that return a non-Tensor cannot be traced into the Dynamo FX graph output\n\n\n  Developer debug context: example_value type: str; op: call_function; target: <function get_device_name at 0x1478a2d344c0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0208.html": 1,
+  "torch.* op returned non-Tensor\n  Explanation: torch.* ops that return a non-Tensor cannot be traced into the Dynamo FX graph output\n\n\n  Developer debug context: example_value type: str; op: call_function; target: <function get_device_name at 0x1478a2d344c0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0208.html\n\n*** While handling this graph break, another graph break occurred: ***\n\ngraph break in loop\n  Explanation: torch.compile detected a graph break in a for/while loop. Skipping the frame and falling back to eager, as graph breaks in loops are not supported.\n  Hint: This graph break may have been caused by an earlier graph break. Resolving the earlier graph break may resolve this one.\n\n  Developer debug context: frame skipped: forward (<fastmace PolarMACE.forward, float64 energy, graph sums> line 1)\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb7000.html": 1
+ },
+ "graph_break": {
+  "Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `_patched_getfile` in file `/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/torch/package/package_importer.py` should not be traced.\n  Hint: Avoid calling the function `_patched_getfile`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `_patched_getfile` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.package.package_importer, qualname: _patched_getfile, skip reason: file matches MOD_SKIPLIST (/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/torch/package)\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": 1,
+  "Failed to trace builtin operator\n  Explanation: Dynamo does not know how to trace builtin operator `compile` with argument types ['str', 'str', 'str'] (has_kwargs False)\n  Hint: Avoid calling builtin `compile` with argument types ['str', 'str', 'str']. Consider using an equivalent alternative function/method to `compile`.\n  Hint: If you are attempting to call a logging function (e.g. `print`), you can try adding it to `torch._dynamo.config.reorderable_logging_functions`.\n  Hint: Please report an issue to PyTorch.\n\n  Developer debug context: builtin compile [<class 'torch._dynamo.variables.constant.ConstantVariable'>, <class 'torch._dynamo.variables.constant.ConstantVariable'>, <class 'torch._dynamo.variables.constant.ConstantVariable'>] False\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0059.html": 1,
+  "Failed to trace builtin operator\n  Explanation: Dynamo does not know how to trace builtin operator `exec` with argument types ['code', 'dict'] (has_kwargs False)\n  Hint: Avoid calling builtin `exec` with argument types ['code', 'dict']. Consider using an equivalent alternative function/method to `exec`.\n  Hint: If you are attempting to call a logging function (e.g. `print`), you can try adding it to `torch._dynamo.config.reorderable_logging_functions`.\n  Hint: Please report an issue to PyTorch.\n\n  Developer debug context: builtin exec [<class 'torch._dynamo.variables.constant.ConstantVariable'>, <class 'torch._dynamo.variables.dicts.ConstDictVariable'>] False\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0059.html": 1,
+  "Unsupported method call\n  Explanation: Dynamo does not know how to trace method `replace` of class `code`\n  Hint: Avoid calling `code.replace` in your code.\n  Hint: Please report an issue to PyTorch.\n\n  Developer debug context: call_method ConstantVariable(code: <code object prepare_graph at 0x1478150fc920, file \"/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/mace/modules/utils.py\", line 596>) replace [] {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0156.html": 1,
+  "Unsupported method call\n  Explanation: Dynamo does not know how to trace method `__new__` of class `type`\n  Hint: Avoid calling `type.__new__` in your code.\n  Hint: Please report an issue to PyTorch.\n\n  Developer debug context: call_method UserDefinedClassVariable(<class 'function'>) __new__ [UserDefinedClassVariable(<class 'function'>), ConstantVariable(code: <code object prepare_graph at 0x14786a367e10, file \"/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/mace/modules/utils.py\", line 596>), LazyVariableTracker(realized: ConstDictVariable()), LazyVariableTracker(unrealized: <class 'str'>), LazyVariableTracker(unrealized: <class 'tuple'>), LazyVariableTracker(unrealized: <class 'NoneType'>)] {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0156.html": 1,
+  "Unsupported method call\n  Explanation: Dynamo does not know how to trace method `replace` of class `code`\n  Hint: Avoid calling `code.replace` in your code.\n  Hint: Please report an issue to PyTorch.\n\n  Developer debug context: call_method ConstantVariable(code: <code object forward at 0x14786995e810, file \"<fastmace PolarMACE.forward, float64 energy, graph sums>\", line 1>) replace [] {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0156.html": 1,
+  "Unsupported method call\n  Explanation: Dynamo does not know how to trace method `__new__` of class `type`\n  Hint: Avoid calling `type.__new__` in your code.\n  Hint: Please report an issue to PyTorch.\n\n  Developer debug context: call_method UserDefinedClassVariable(<class 'function'>) __new__ [UserDefinedClassVariable(<class 'function'>), ConstantVariable(code: <code object forward at 0x1477d2720d40, file \"<fastmace PolarMACE.forward, float64 energy, graph sums>\", line 1>), LazyVariableTracker(realized: ConstDictVariable()), LazyVariableTracker(unrealized: <class 'str'>), LazyVariableTracker(unrealized: <class 'tuple'>), LazyVariableTracker(unrealized: <class 'NoneType'>)] {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0156.html": 1,
+  "torch.* op returned non-Tensor\n  Explanation: torch.* ops that return a non-Tensor cannot be traced into the Dynamo FX graph output\n\n\n  Developer debug context: example_value type: str; op: call_function; target: <function get_device_name at 0x1478a2d344c0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0208.html": 4,
+  "Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/atuin/v130cb/v130cb18/fm-offpolar/env/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x1478a44568c0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": 2
+ },
+ "resumes": {
+  "torch_dynamo_resume_in_lean_forward_at_330": 1,
+  "torch_dynamo_resume_in_compile_forward_at_267": 2,
+  "torch_dynamo_resume_in__rebound_at_291": 2,
+  "torch_dynamo_resume_in__rebound_at_294": 2,
+  "torch_dynamo_resume_in_cutoff_folded_forward_at_336": 1,
+  "torch_dynamo_resume_in_fused_first_message_at_259": 1,
+  "torch_dynamo_resume_in_fused_first_backward_at_94": 1,
+  "torch_dynamo_resume_in_get_outputs_at_197": 1,
+  "torch_dynamo_resume_in_compute_forces_at_26": 1
+ },
+ "stats": {
+  "calls_captured": 2202,
+  "unique_graphs": 37
+ },
+ "aot_autograd": {
+  "total": 37,
+  "autograd_cache_hit": 31,
+  "ok": 37,
+  "autograd_cache_miss": 2,
+  "autograd_cache_saved": 1,
+  "autograd_cache_bypass": 4
+ },
+ "inductor": {
+  "triton_bundler_load_static_autotuner": 283,
+  "async_compile_cache_miss": 977,
+  "async_compile_cache_hit": 624,
+  "fxgraph_cache_hit": 60,
+  "extern_calls": 298,
+  "fxgraph_cache_miss": 5,
+  "triton_bundler_save_kernel": 544,
+  "triton_bundler_save_static_autotuner": 5,
+  "pattern_matcher_count": 179,
+  "pattern_matcher_nodes": 184,
+  "removed_pointless_view_pair": 2,
+  "decompose_mm_pointwise": 1
+ }
+}

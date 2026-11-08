@@ -1,0 +1,5 @@
+export PYTHONPATH=$B/src-91e428a1; cd $PYTHONPATH
+R=$B/runs/final-f40-off24-medium-$SLURM_JOB_ID
+OUT=$R MODEL=off24-medium CKPT=MACE-OFF24_medium.model STRUCTS="$ORG/water_216.extxyz@1x1x1" SETS_FILE=$B/sets/off_final.tsv WARMUP=500 BLOCK=1000 BLOCKS=16 bash tools/offpolar_ab.sh
+python tools/plan_describe.py --output $R/plan --structure $ORG/water_216.extxyz@1x1x1 --models off24-medium:MACE-OFF24_medium.model
+cat $R/run.log

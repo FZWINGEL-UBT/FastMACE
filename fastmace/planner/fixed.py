@@ -486,7 +486,13 @@ DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeF
 # The same tables on MACE-OFF, whose stock first block takes one too (off-polar-alex, 6-7 November 2026,
 # results/off-polar-alex-20261106): A100-SXM4-80GB, MD step b/a (b = tables), water_216, abab / abba: OFF23b
 # 0.923 / 0.933, OFF23-large 0.977 / 0.971, every OFF model faster in both orders; force gates pass.
-DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# RTX 5060 Ti (local, 7 November 2026, ~/fm-runs/offlocal-ab-20261107): with STOCK_FIRST_SKIP, MD step b/a in both
+# orders, water_216: OFF23-small 0.677 / 0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811.
+# RTX 4000 Ada (murphy, 8 November 2026, results/off-polar-alex-20261106), the skip and the tables together, MD
+# step b/a, water_216, abab / abba: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725,
+# OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
+DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                                 "NVIDIA RTX 4000 Ada Generation"))
 # generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
 # whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
 # medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;

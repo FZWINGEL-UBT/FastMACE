@@ -26,13 +26,19 @@ to the kernels' alignment. MACE-OFF23-large's [E, 64] @ [64, 3808] and its [E, 3
 compute-bound on SIMT FP32 (1.0 and 1.3 ms of a 12.1 ms force call on the A100-SXM4-80GB). Rounding. The GPU
 list applies only where the caller marks the product eligible (``folded_linear(..., tf32x3=True)``): MACE-OFF's
 radial networks (``generic.apply_fused_radial_backward``, the stock first block's table), the only models measured.
+
+``SPLIT_COLUMNS`` (an A/B constant, Codex R1, off-polar-alex 7 November 2026; ``split_columns_default``): the input
+gradient with a second grid axis over ``SPLIT_BLOCK_P``-column tiles of P where the one-axis grid leaves SMs idle
+and the split grid still fits in one wave (``split_columns``): MACE-OFF23-large's 512-row chunks of the streamed
+backward launch 8 CTAs for a 3808-long reduction. Tile 0 also computes the last column. Every output keeps its
+BLOCK_K reduction order, so the results are bitwise the one-axis grid's.
 """
 
 from functools import cache
 
 import torch
 
-from fastmace.kernels.gpu_models import GPUModels
+from fastmace.kernels.gpu_models import GPUModels, dynamo_constant
 
 # One fixed configuration for every crystal and GPU (no autotuning).
 BLOCK_M, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 32, 4, 3
@@ -45,9 +51,15 @@ TILE_RULES = ("fixed", "waves")
 RADIAL_TF32X3 = None
 RADIAL_TF32X3_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 _ALIGN = 4  # cutlass.tf32x3.ALIGNMENT: K and N padded to it
+# SPLIT_COLUMNS: None follows SPLIT_COLUMNS_GPUS; True / False: an A/B side's choice. RTX 5060 Ti (36 SMs), MD step
+# b/a, water_216, abab / abba: MACE-OFF23-large 0.951 / 0.953 (16-column tiles; 32-column tiles 1.07 / 1.06);
+# the kernel alone on [512, 3808] @ [3808, 65] 0.88x, on 896 rows (the split grid over one wave) 1.07x.
+SPLIT_COLUMNS = None
+SPLIT_COLUMNS_GPUS = GPUModels(())
+SPLIT_BLOCK_P = 16
 
 
-@torch.compiler.assume_constant_result
+@dynamo_constant
 def _tf32x3_listed(index: int) -> bool:
     """Whether CUDA device ``index`` is one of ``RADIAL_TF32X3_GPUS`` (a Dynamo constant, as
     ``receiver_sum._listed``)."""
@@ -63,6 +75,32 @@ def radial_tf32x3_default(device, eligible: bool = False) -> bool:
     if RADIAL_TF32X3 is not None:
         return bool(RADIAL_TF32X3)
     return bool(eligible) and _tf32x3_listed(device.index if device.index is not None else torch.cuda.current_device())
+
+
+@dynamo_constant
+def _split_listed(index: int) -> bool:
+    """Whether CUDA device ``index`` is one of ``SPLIT_COLUMNS_GPUS`` (a Dynamo constant)."""
+    return torch.cuda.get_device_name(index) in SPLIT_COLUMNS_GPUS
+
+
+def split_columns_default(device) -> bool:
+    """``SPLIT_COLUMNS`` on ``device``: the constant when set, else ``SPLIT_COLUMNS_GPUS``; never off CUDA."""
+    device = torch.device(device)
+    if device.type != "cuda":
+        return False
+    if SPLIT_COLUMNS is not None:
+        return bool(SPLIT_COLUMNS)
+    return _split_listed(device.index if device.index is not None else torch.cuda.current_device())
+
+
+def split_columns(rows: int, p: int, sms: int | None, block_m: int) -> int:
+    """The column tile of the split grid (``SPLIT_BLOCK_P``) when the one-axis grid of ``rows`` rows in
+    ``block_m``-row tiles, split into ``SPLIT_BLOCK_P``-column tiles of P, still fits in one wave over ``sms``
+    SMs and P has more than one tile; else 0 (the one-axis grid)."""
+    if not sms or rows <= 0 or p <= SPLIT_BLOCK_P:
+        return 0
+    tiles = -(-int(rows) // block_m) * -(-int(p) // SPLIT_BLOCK_P)
+    return SPLIT_BLOCK_P if tiles <= sms else 0
 
 
 def _padded(t, rows=0, columns=0):
@@ -124,6 +162,40 @@ def _triton_kernel():
     return kernel
 
 
+@cache
+def _split_kernel():
+    import triton
+    import triton.language as tl
+
+    @triton.jit
+    def kernel(grad_ptr, main_ptr, last_ptr, out_ptr, rows, Q, P,
+               BLOCK_M: tl.constexpr, BLOCK_P: tl.constexpr, BLOCK_K: tl.constexpr):
+        m = tl.program_id(0) * BLOCK_M + tl.arange(0, BLOCK_M)
+        tile = tl.program_id(1)
+        row_mask = m < rows
+        m = m.to(tl.int64)
+        p = tile * BLOCK_P + tl.arange(0, BLOCK_P)
+        k = tl.arange(0, BLOCK_K)
+        acc = tl.zeros((BLOCK_M, BLOCK_P), dtype=tl.float32)
+        last = tl.zeros((BLOCK_M,), dtype=tl.float32)
+        for start in range(0, Q, BLOCK_K):
+            kk = start + k
+            g = tl.load(grad_ptr + m[:, None] * Q + kk[None, :],
+                        mask=row_mask[:, None] & (kk < Q)[None, :], other=0.0)
+            w = tl.load(main_ptr + kk[:, None] * P + p[None, :],
+                        mask=(kk < Q)[:, None] & (p < P)[None, :], other=0.0)
+            acc += tl.dot(g, w, input_precision="ieee")
+            if tile == 0:  # the last column once, in the one-axis kernel's order
+                b = tl.load(last_ptr + kk, mask=kk < Q, other=0.0)
+                last += tl.sum(g * b[None, :], axis=1)
+        tl.store(out_ptr + m[:, None] * (P + 1) + p[None, :], acc,
+                 mask=row_mask[:, None] & (p < P)[None, :])
+        if tile == 0:
+            tl.store(out_ptr + m * (P + 1) + P, last, mask=row_mask)
+
+    return kernel
+
+
 def _input_grad(grad, main, last, tile_rule, out=None):
     """The Triton input gradient [E, P + 1] from the contiguous halves ``main`` [Q, P] and ``last`` [Q]; into
     ``out`` (contiguous rows, such as a row slice) when given (``chunked_conv_backward``, opt-6 OPT6-T02)."""
@@ -136,7 +208,14 @@ def _input_grad(grad, main, last, tile_rule, out=None):
     if out is None:
         out = torch.empty((rows, p + 1), dtype=grad.dtype, device=grad.device)
     if rows:
-        block_m, block_k, warps, stages = tile_choice(rows, rules.device_sms(grad.device), tile_rule)
+        sms = rules.device_sms(grad.device)
+        block_m, block_k, warps, stages = tile_choice(rows, sms, tile_rule)
+        split = split_columns(rows, p, sms, block_m) if split_columns_default(grad.device) else 0
+        if split:
+            _split_kernel()[(triton.cdiv(rows, block_m), triton.cdiv(p, split))](
+                grad, main, last, out, rows, q, p, BLOCK_M=block_m, BLOCK_P=split, BLOCK_K=block_k,
+                num_warps=warps, num_stages=stages)
+            return out
         _triton_kernel()[(triton.cdiv(rows, block_m),)](
             grad, main, last, out, rows, q, p, BLOCK_M=block_m,
             BLOCK_P=max(16, triton.next_power_of_2(p)), BLOCK_K=block_k,

@@ -1,0 +1,142 @@
+{
+ "model": "off24-medium",
+ "structure": "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1",
+ "natoms": 648,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 10.209094699821435,
+ "traced_span_ms_per_step": 10.461153359375,
+ "kernels_per_step": 329.12,
+ "kernel_busy_ms_per_step": 10.254296782343852,
+ "idle_gaps_ms_per_step": 0.20685596679687498,
+ "gaps_over_20us_ms_per_step": 0.114643388671875,
+ "kernels_under_5us_per_step": 134.56,
+ "kernels_under_10us_per_step": 176.94,
+ "time_in_kernels_under_10us_ms_per_step": 0.5367291600000006,
+ "top": [
+  [
+   "oeq_projected_backward",
+   37.74,
+   2.138003539999999
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3",
+   11.22,
+   2.0953599999999986
+  ],
+  [
+   "Kernel",
+   38.06,
+   1.9908784800000041
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   17.34,
+   0.995784219999999
+  ],
+  [
+   "backward(float*, float*, float*, float*, float*, float*, float*, ConvD",
+   1.02,
+   0.8631114799999999
+  ],
+  [
+   "oeq_projected_forward",
+   1.02,
+   0.7813737799999998
+  ],
+  [
+   "forward(float*, float*, float*, float*, ConvData, void*)",
+   1.02,
+   0.7322318800000002
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_tn_align1>(cutla",
+   3.06,
+   0.43110646
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, ",
+   8.16,
+   0.3620124799999999
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nt_align1>(cutla",
+   3.06,
+   0.35070025999999993
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_9",
+   5.1,
+   0.29476874000000003
+  ],
+  [
+   "triton_poi_fused_mul_silu_30",
+   5.1,
+   0.2101288000000001
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_8",
+   1.02,
+   0.08557978000000001
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutla",
+   8.16,
+   0.0666392800000001
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   10.2,
+   0.06199180000000005
+  ],
+  [
+   "triton_poi_fused__to_copy__unsafe_view_add_clone_slice_slice_backward_",
+   1.02,
+   0.05555402000000001
+  ],
+  [
+   "triton_poi_fused_cat_mm_mul_ones_like_silu_32",
+   1.02,
+   0.05143936
+  ],
+  [
+   "triton_poi_fused_cat_mul_ones_like_silu_31",
+   1.02,
+   0.03310231999999999
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_51",
+   1.02,
+   0.031561780000000005
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_4",
+   1.02,
+   0.03139992
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_transpose",
+   1.02,
+   0.028860239999999995
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunc",
+   8.32,
+   0.02586115999999997
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_inde",
+   3.24,
+   0.0256546
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_50",
+   1.02,
+   0.024145839999999995
+  ],
+  [
+   "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepK",
+   2.56,
+   0.021382800000000004
+  ]
+ ]
+}

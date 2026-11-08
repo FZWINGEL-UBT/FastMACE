@@ -1,0 +1,548 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-07T20:49:16.278097+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": null,
+  "model": "polar1-m",
+  "checkpoint_sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+  "sides": {
+    "a": {},
+    "b": {}
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.inductor:SMALL_MATMULS": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 300,
+    "block": 400,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    1.05126953125,
+    1.26806640625,
+    1.314453125
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 5.966867342485784,
+            "mean_ms": 5.98237840354462,
+            "min_ms": 5.892569865027326,
+            "max_ms": 6.223082575015724,
+            "stdev_ms": 0.0852528213878445,
+            "spread": 0.05539132865164498,
+            "block_ms": [
+              5.8988940575000015,
+              5.892569865027326,
+              6.223082575015724,
+              5.960575569988578,
+              5.9396222999930615,
+              5.965737469996384,
+              5.967997214975185,
+              5.98928576502658,
+              5.941027842491167,
+              6.006568100019649,
+              5.978066774987383,
+              6.0251133075144025
+            ]
+          },
+          "b": {
+            "median_ms": 5.800116032514779,
+            "mean_ms": 19.407852635419356,
+            "min_ms": 5.729239235006389,
+            "max_ms": 169.20021264249954,
+            "stdev_ms": 47.17237423393587,
+            "spread": 28.184086747763974,
+            "block_ms": [
+              5.731148744998791,
+              5.729239235006389,
+              169.20021264249954,
+              5.8146917375052,
+              5.78264178999234,
+              5.78950709750643,
+              5.841313169985369,
+              5.759082282493182,
+              5.776867327513173,
+              5.831969422506518,
+              5.810724967523129,
+              5.8268332075022045
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9720537929872031,
+        "pair_ratios_b_over_a": [
+          0.9715632606949544,
+          0.9722819357662076,
+          27.189131849511416,
+          0.9755252104817023,
+          0.9735706241790989,
+          0.97045958301446,
+          0.978772770759354,
+          0.9615641177320956,
+          0.9723683309807284,
+          0.9709320406252349,
+          0.9720073706495848,
+          0.9670910587250023
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.9720537929872031,
+      "pair_ratios": [
+        0.9715632606949544,
+        0.9722819357662076,
+        27.189131849511416,
+        0.9755252104817023,
+        0.9735706241790989,
+        0.97045958301446,
+        0.978772770759354,
+        0.9615641177320956,
+        0.9723683309807284,
+        0.9709320406252349,
+        0.9720073706495848,
+        0.9670910587250023
+      ],
+      "setup_s": {
+        "a": 47.044163232989376,
+        "b": 88.45096312199894
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            4,
+            5
+          ],
+          "aot_autograd.ok": [
+            13,
+            14
+          ],
+          "aot_autograd.total": [
+            13,
+            14
+          ],
+          "frames.ok": [
+            79,
+            80
+          ],
+          "frames.total": [
+            86,
+            87
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x725888d7d120>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            12,
+            13
+          ],
+          "inductor.async_compile_cache_hit": [
+            1444,
+            1692
+          ],
+          "inductor.async_compile_cache_miss": [
+            2420,
+            2916
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark": [
+            391,
+            430
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark_gpu": [
+            391,
+            430
+          ],
+          "inductor.decompose_mm": [
+            124,
+            155
+          ],
+          "inductor.extern_calls": [
+            966,
+            1154
+          ],
+          "inductor.fxgraph_cache_miss": [
+            4,
+            6
+          ],
+          "inductor.pad_rewritten_as_cat": [
+            8,
+            10
+          ],
+          "inductor.pattern_matcher_count": [
+            5190,
+            6623
+          ],
+          "inductor.pattern_matcher_nodes": [
+            5502,
+            7013
+          ],
+          "inductor.removed_pointless_view_pair": [
+            24,
+            30
+          ],
+          "inductor.triton_bundler_save_kernel": [
+            5704,
+            7848
+          ],
+          "inductor.triton_bundler_save_static_autotuner": [
+            4,
+            6
+          ],
+          "stats.calls_captured": [
+            9906,
+            12372
+          ],
+          "stats.unique_graphs": [
+            13,
+            14
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 300.6405381462047,
+          "potential_eV_atom": -8471.284213728837,
+          "kinetic_eV_atom": 0.03886078244946897
+        },
+        "b": {
+          "temperature_K": 300.64050835519424,
+          "potential_eV_atom": -8471.28421372374,
+          "kinetic_eV_atom": 0.0388607785986843
+        }
+      },
+      "load_after": [
+        1.037109375,
+        1.15869140625,
+        1.24755859375
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 207,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 207
+        },
+        "b": {
+          "rebuilds": 207,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 207
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 43.711377071267634,
+            "mean_ms": 57.478532425008474,
+            "min_ms": 43.611318377516,
+            "max_ms": 208.27986053751374,
+            "stdev_ms": 47.490414513189215,
+            "spread": 3.7671780939667006,
+            "block_ms": [
+              208.27986053751374,
+              43.9082738875004,
+              43.693617757526226,
+              43.727898739998636,
+              43.77425422499073,
+              43.611318377516,
+              43.68066176000866,
+              44.265870435010584,
+              43.70161855498736,
+              43.67626068251411,
+              43.720550520010875,
+              43.702203622524394
+            ]
+          },
+          "b": {
+            "median_ms": 43.787691162488045,
+            "mean_ms": 51.916336544166676,
+            "min_ms": 43.53627276748739,
+            "max_ms": 141.7874205750195,
+            "stdev_ms": 28.30236890412817,
+            "spread": 2.2438074536275554,
+            "block_ms": [
+              141.7874205750195,
+              43.90978363000613,
+              43.60503587500716,
+              43.741327092502615,
+              43.53627276748739,
+              43.78966713749833,
+              43.823988510011986,
+              43.975197759973526,
+              43.68338711250544,
+              43.552794667484704,
+              43.805448215025535,
+              43.78571518747776
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0017458633503125,
+        "pair_ratios_b_over_a": [
+          0.6807543475836054,
+          1.000034384009483,
+          0.9979726585468238,
+          1.0003070889041301,
+          0.9945634377622937,
+          1.0040895062707913,
+          1.0032812403527858,
+          0.993433481095468,
+          0.9995828199713248,
+          0.9971731550938646,
+          1.00194182584631,
+          1.0019109234324817
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 1.0017458633503125,
+      "pair_ratios": [
+        0.6807543475836054,
+        1.000034384009483,
+        0.9979726585468238,
+        1.0003070889041301,
+        0.9945634377622937,
+        1.0040895062707913,
+        1.0032812403527858,
+        0.993433481095468,
+        0.9995828199713248,
+        0.9971731550938646,
+        1.00194182584631,
+        1.0019109234324817
+      ],
+      "setup_s": {
+        "a": 96.0054808989953,
+        "b": 55.264358482003445
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            11,
+            13
+          ],
+          "aot_autograd.ok": [
+            29,
+            31
+          ],
+          "aot_autograd.total": [
+            29,
+            31
+          ],
+          "frames.ok": [
+            117,
+            119
+          ],
+          "frames.total": [
+            126,
+            128
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x725888d7d120>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            28,
+            30
+          ],
+          "inductor.async_compile_cache_hit": [
+            3912,
+            4644
+          ],
+          "inductor.async_compile_cache_miss": [
+            6627,
+            7852
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark": [
+            875,
+            912
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark_gpu": [
+            875,
+            912
+          ],
+          "inductor.decompose_mm": [
+            341,
+            403
+          ],
+          "inductor.extern_calls": [
+            2258,
+            2626
+          ],
+          "inductor.fxgraph_cache_hit": [
+            34,
+            36
+          ],
+          "inductor.fxgraph_cache_miss": [
+            12,
+            14
+          ],
+          "inductor.pad_rewritten_as_cat": [
+            70,
+            90
+          ],
+          "inductor.pattern_matcher_count": [
+            15101,
+            17927
+          ],
+          "inductor.pattern_matcher_nodes": [
+            15959,
+            18941
+          ],
+          "inductor.removed_pointless_view_pair": [
+            66,
+            78
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            1210,
+            1452
+          ],
+          "inductor.triton_bundler_save_kernel": [
+            15688,
+            17800
+          ],
+          "inductor.triton_bundler_save_static_autotuner": [
+            12,
+            14
+          ],
+          "stats.calls_captured": [
+            27078,
+            31966
+          ],
+          "stats.unique_graphs": [
+            29,
+            31
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 300.4142058014603,
+          "potential_eV_atom": -10694.770472865235,
+          "kinetic_eV_atom": 0.038831526740759084
+        },
+        "b": {
+          "temperature_K": 300.4087189210784,
+          "potential_eV_atom": -10694.77047309645,
+          "kinetic_eV_atom": 0.03883081750684751
+        }
+      },
+      "load_after": [
+        1.07861328125,
+        1.1298828125,
+        1.18408203125
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 201,
+          "pipelined_redos": 5,
+          "pipelined_early_rebuilds": 201
+        },
+        "b": {
+          "rebuilds": 201,
+          "pipelined_redos": 5,
+          "pipelined_early_rebuilds": 201
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    }
+  }
+}
