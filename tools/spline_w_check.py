@@ -71,8 +71,12 @@ def main(argv=None) -> int:
                              forward_threads=obj.spline_block[1].threads if obj.spline_block else None,
                              forward_min_blocks=obj.spline_block[1].min_blocks if obj.spline_block else None,
                              forward_parts=obj.spline_block[1].parts if obj.spline_block else None,
+                             forward_stage_edges=getattr(obj.spline_block[1], "stage_edges", None)
+                             if obj.spline_block else None,
                              wprime=resources(obj.spline_block[2]) if obj.spline_block else None,
                              wprime_stage_quads=getattr(obj.spline_block[2], "stage_quads", None)
+                             if obj.spline_block else None,
+                             wprime_stage_sh=getattr(obj.spline_block[2], "stage_sh", None)
                              if obj.spline_block else None))
             if args.sources and obj.spline_block:
                 args.sources.mkdir(parents=True, exist_ok=True)
@@ -94,18 +98,23 @@ def main(argv=None) -> int:
         probe = atoms.copy()
         if args.rattle:
             probe.positions += args.rattle * np.random.default_rng(1).standard_normal(probe.positions.shape)
-        _, forces, _ = field.evaluate(probe)
-        _, again, _ = field.evaluate(probe)  # the same build twice: the run-to-run spread (atomics)
+        energy, forces, _ = field.evaluate(probe)
+        energy_again, again, _ = field.evaluate(probe)  # the same build twice: the run-to-run spread (atomics)
         for (module, name), value in constant_overrides(args.compare_constant).items():
             setattr(sys.modules[module], name, value)
         other = fm.ForceField(loaded, atoms, precision="float32", rewrites="auto")
-        _, forces_b, _ = other.evaluate(probe)
+        energy_b, forces_b, _ = other.evaluate(probe)
         a, b = torch.as_tensor(forces, dtype=torch.float64), torch.as_tensor(forces_b, dtype=torch.float64)
         a2 = torch.as_tensor(again, dtype=torch.float64)
         record["compare"] = dict(constants=args.compare_constant, rattle=args.rattle,
                                  max_abs=float((a - b).abs().max()),
                                  max_force=float(a.abs().max()), bitwise=bool(torch.equal(a, b)),
-                                 same_build_max_abs=float((a - a2).abs().max()))
+                                 same_build_max_abs=float((a - a2).abs().max()),
+                                 energy=float(torch.as_tensor(energy).sum()),
+                                 energy_diff=float(torch.as_tensor(energy_b, dtype=torch.float64).sum()
+                                                   - torch.as_tensor(energy, dtype=torch.float64).sum()),
+                                 same_build_energy_diff=float(torch.as_tensor(energy_again, dtype=torch.float64).sum()
+                                                              - torch.as_tensor(energy, dtype=torch.float64).sum()))
     print(json.dumps(record, indent=1, default=str))
     if args.output:
         args.output.write_text(json.dumps(record, indent=1, default=str) + "\n")

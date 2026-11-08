@@ -39,6 +39,7 @@ def _case(seed=0):
     def message():
         return reassociation(None, attrs, edge_attrs, None, edge_index, weight,
                              summed_fn=lambda key, slots: (sums, width))
+    message.radial = SimpleNamespace(weight=weight.t().clone(), h_in=1.0, var_in=1.0, var_out=1.0)
     return reassociation, linear, skip, attrs, message
 
 
@@ -80,3 +81,122 @@ def test_on_for_the_listed_gpus_only():
     assert compose_skip.COMPOSE_SKIP is None and compose_skip.compose_skip_default("NVIDIA H200")
     assert not compose_skip.compose_skip_default("NVIDIA A100-SXM4-80GB")
     assert not compose_skip.compose_skip_default("NVIDIA GeForce RTX 5060 Ti")
+
+
+def _composing(seed=0):
+    reassociation, linear, skip, attrs, message = _case(seed)
+    interaction = SimpleNamespace(generic_kind="density", first_reassociation=reassociation, linear=linear,
+                                  skip_tp=skip)
+    products = compose_skip_products(interaction)
+    reassociation.compose_skip = (linear, products[0], skip, products[1])
+    return reassociation, message
+
+
+def test_fast_is_on_for_the_listed_gpus_only():
+    assert compose_skip.COMPOSE_FAST is None and compose_skip.compose_fast_default("NVIDIA H200")
+    assert not compose_skip.compose_fast_default("NVIDIA A100-SXM4-80GB")
+    assert not compose_skip.compose_fast_default("NVIDIA GeForce RTX 5060 Ti")
+
+
+def test_bound_weights_equal_the_forwards_own_composition():
+    reassociation, message = _composing()
+    inline = message()
+    table = reassociation.species_feats
+    reassociation.compose_radial = message.radial
+    reassociation.bind(table)
+    assert reassociation._buffers.get("composed_0") is not None
+    assert torch.equal(message(), inline)  # bitwise: the same operations once instead of per call
+
+
+def test_bound_weights_follow_the_table_in_place():
+    reassociation, message = _composing()
+    table = reassociation.species_feats
+    reassociation.compose_radial = message.radial
+    reassociation.bind(table)
+    before = [reassociation._buffers[f"composed_{k}"] for k in range(6)]
+    pointers = [t.data_ptr() for t in before]
+    table.mul_(1.5)  # a refresh: same tensor, new values (forces._setup_tables' refresh)
+    reassociation.refresh_composed(table)
+    after = [reassociation._buffers[f"composed_{k}"] for k in range(6)]
+    assert [t.data_ptr() for t in after] == pointers  # captured graphs keep their addresses
+    expected = reassociation._compose_weights(table, reassociation._radial_weight())
+    assert all(torch.equal(a, b) for a, b in zip(after, expected))
+    reassociation.compose_radial = None  # the forward's own composition sees the new table too
+    for k in range(6):
+        del reassociation._buffers[f"composed_{k}"]
+    unbound = message()
+    reassociation.compose_radial = message.radial
+    reassociation.bind(table)
+    assert torch.equal(message(), unbound)
+
+
+def test_a_second_table_gets_its_own_weights():
+    reassociation, message = _composing()
+    first = reassociation.species_feats
+    second = first.clone() * 2
+    reassociation.compose_radial = message.radial
+    reassociation.bind(first)
+    w_first = reassociation._buffers["composed_0"]
+    reassociation.bind(second)
+    w_second = reassociation._buffers["composed_0"]
+    assert w_first is not w_second and not torch.equal(w_first, w_second)
+    reassociation.bind(first)
+    assert reassociation._buffers["composed_0"] is w_first
+
+
+def test_joined_rows():
+    from fastmace.kernels.triton.species_gemm import joined_rows
+
+    order = torch.tensor([2, 0, 1], dtype=torch.int32)
+    gathers, scatters = joined_rows(order, [1, 3])
+    assert gathers[0].tolist() == [2, 0, 1] and scatters[0].tolist() == [8, 0, 4]
+    assert gathers[1].tolist() == [6, 7, 8, 0, 1, 2, 3, 4, 5]
+    assert scatters[1].tolist() == [9, 10, 11, 1, 2, 3, 5, 6, 7]
+    assert gathers[0].dtype == scatters[1].dtype == torch.int32
+
+
+def test_joined_product_and_gradient_equal_the_per_path_products():
+    from fastmace.kernels.triton.species_gemm import joined_rows, species_mm, species_mm_joined, species_plan
+
+    g = torch.Generator().manual_seed(3)
+    species, atoms, k, n = 3, 7, 8, 4
+    index = torch.tensor([0, 2, 1, 1, 0, 2, 2])
+    order, counts = species_plan(index, species)
+    sizes = [1, 3, 5]
+    xs = [torch.randn(atoms, size, k, generator=g, dtype=torch.float64, requires_grad=True) for size in sizes]
+    ws = [torch.randn(species, k, n, generator=g, dtype=torch.float64) for _ in sizes]
+    w_ts = [w.transpose(1, 2).contiguous() for w in ws]
+    gathers, scatters = joined_rows(order, sizes)
+    joined = species_mm_joined(xs, ws, w_ts, index, order, counts, gathers, scatters, "tf32x3-cutlass")
+    expected = torch.cat([species_mm(x, w, w_t, index, order, counts, "ieee") for x, w, w_t in zip(xs, ws, w_ts)],
+                         dim=1)
+    assert torch.equal(joined, expected)
+    up = torch.randn(joined.shape, generator=g, dtype=torch.float64)
+    got = torch.autograd.grad(joined, xs, up)
+    want = torch.autograd.grad(expected, xs, up)
+    assert all(torch.equal(a, b) for a, b in zip(got, want))
+
+
+@pytest.mark.parametrize("species", [1, 3, 5])
+def test_counting_plan_equals_the_stable_sort(species):
+    from fastmace.kernels.triton.species_gemm import species_plan
+    g = torch.Generator().manual_seed(species)
+    for atoms in (1, 7, 1000):
+        index = torch.randint(0, species, (atoms,), generator=g)
+        order, counts = species_plan(index, species)
+        counted, counted_counts = species_plan(index, species, counting=True)
+        assert counted.dtype == order.dtype == torch.int32 and counted_counts.dtype == torch.int32
+        assert torch.equal(counted, order) and torch.equal(counted_counts, counts)
+
+
+def test_counting_plan_compiles_to_the_same_order():
+    from fastmace.kernels.triton.species_gemm import species_plan
+    index = torch.randint(0, 3, (500,), generator=torch.Generator().manual_seed(0))
+    compiled = torch.compile(lambda i: species_plan(i, 3, counting=True), fullgraph=True)
+    order, counts = compiled(index)
+    assert torch.equal(order, species_plan(index, 3)[0]) and torch.equal(counts, species_plan(index, 3)[1])
+
+
+def test_count_plan_is_on_for_the_h200_only():
+    assert compose_skip.COUNT_PLAN is None and compose_skip.count_plan_default("NVIDIA H200")
+    assert not compose_skip.count_plan_default("NVIDIA A100-SXM4-80GB")

@@ -798,6 +798,8 @@ class MACEForceField:
 
             def refresh(interaction=interaction, table=table):
                 table.copy_(m.identity_species_feats(model, interaction, attrs, count, joint))
+                if getattr(interaction.first_reassociation, "compose_radial", None) is not None:
+                    interaction.first_reassociation.refresh_composed(table)  # same addresses, new values
 
             self._tables.append((index, interaction.first_reassociation, table, refresh))
         self._bind_streaming_count()

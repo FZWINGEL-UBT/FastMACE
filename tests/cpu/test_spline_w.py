@@ -322,3 +322,52 @@ def test_factor_w_and_cursor32_render_and_compile():
 
     both = sf.render(two, blocks, GRID, R_MAX, [1.0, 0.7], threads=128, min_blocks=6, factor_w=True, cursor32=True)
     assert compile_cubin(both, (9, 0))
+
+
+def test_stage_edges_is_off_without_a_listed_gpu():
+    assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200"]
+
+
+def test_stage_edges_source_stages_the_tile_and_keeps_the_arithmetic():
+    blocks = [(1, [0]), (3, [64])]
+    plain = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6)
+    staged = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True)
+    assert "__ballot_sync" in staged and "s_sh[TILE * ED]" in staged and "she[" in staged
+    assert "__ldg(sh + e * ED" in plain and "__ldg(sh + e * ED" not in staged
+    fma = [line.strip() for line in plain.splitlines() if "acc[" in line and "fmaf" in line]
+    assert fma == [line.strip() for line in staged.splitlines() if "acc[" in line and "fmaf" in line]
+    with pytest.raises(ValueError, match="one thread per channel"):
+        sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 128, 6, stage_edges=True)
+    with pytest.raises(ValueError, match="alternatives"):
+        sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, shared_locator=True, stage_edges=True)
+
+
+def test_stage_edges_source_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    blocks = [(1, [0]), (3, [64])]
+    for capability in ((9, 0), (8, 0), (12, 0)):
+        assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6,
+                                       stage_edges=True), capability)
+
+
+def test_stage_sh_reads_the_edge_features_from_shared_memory():
+    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200"]
+    blocks = [(1, [0]), (3, [64])]
+    kwargs = dict(vector=4, table_w=True, factored=True, scale=True, horner=True, blocks=blocks, spline=GRID)
+    plain = wp.render(_schedule(), "float", 4, **kwargs)
+    staged = wp.render(_schedule(), "float", 4, stage_sh=4, **kwargs)
+    assert "stage_sh[4][EDGE_DIM]" in staged and "sh_edge[" in staged and "__syncwarp();" in staged
+    assert "sh[edge_base" in plain.replace("dsh[", "") and "sh[edge_base" not in staged.replace("dsh[", "")
+    with pytest.raises(ValueError, match="stage_sh"):
+        wp.render(_schedule(), "double", 4, stage_sh=4, **{**kwargs, "vector": 0, "table_w": False, "horner": False,
+                                                            "spline": None})
+    from fastmace.kernels import nvrtc_available
+    if nvrtc_available():
+        from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+        for capability in ((9, 0), (8, 0)):
+            assert compile_cubin(staged, capability)

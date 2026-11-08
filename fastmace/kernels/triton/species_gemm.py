@@ -233,9 +233,19 @@ def tiles(atoms, size, species):
     return -(-atoms * size // BLOCK_M) + species
 
 
-def species_plan(index, species):
+def species_plan(index, species, counting=False):
     """(order [atoms] int32: the atoms sorted by species, stable; counts [species] int32) of the atoms' species
-    ``index`` ([atoms], values in ``range(species)``); fixed shapes, on ``index``'s device, no host sync."""
+    ``index`` ([atoms], values in ``range(species)``); fixed shapes, on ``index``'s device, no host sync.
+    ``counting`` (``compose_skip.COUNT_PLAN``): the same order by a counting sort over the few species (one-hot
+    prefix sums and a scatter, which a compiled caller fuses) instead of a radix sort of the int64 index."""
+    if counting:
+        onehot = (index[:, None] == torch.arange(species, device=index.device)[None, :]).to(torch.int32)
+        counts = onehot.sum(dim=0, dtype=torch.int32)
+        rank = (torch.cumsum(onehot, dim=0, dtype=torch.int32) - 1).gather(1, index.long()[:, None])[:, 0]
+        start = torch.cumsum(counts, dim=0, dtype=torch.int32) - counts
+        position = (start[index.long()] + rank).long()
+        atoms = torch.arange(index.shape[0], dtype=torch.int32, device=index.device)
+        return torch.empty_like(atoms).scatter(0, position, atoms), counts
     order = torch.argsort(index, stable=True).to(torch.int32)
     counts = torch.zeros(species, dtype=torch.int32, device=index.device)  # no bincount: it syncs (max)
     return order, counts.index_add(0, index.long(), torch.ones_like(index, dtype=torch.int32))
@@ -363,5 +373,127 @@ def _backward(ctx, grad):
 species_mm.register_autograd(_backward, setup_context=_setup_context)
 
 
-__all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "CUTLASS", "TENSOR_CORES", "species_mm", "species_plan", "tc_supported",
-           "tile_rows", "tiles"]
+def joined_rows(order, sizes):
+    """(gathers, scatters) of ``species_mm_joined``: per path of ``sizes`` rows per atom, the int32 rows of its
+    contiguous ``[atoms, size, K]`` input in species order (``a size + j``) and of the joined ``[atoms, sum(sizes),
+    N]`` output (``a total + offset + j``), flattened. Plain tensor operations, so a compiled caller fuses them
+    instead of building them inside the opaque product."""
+    a = order.long()[:, None]
+    total = sum(sizes)
+    gathers, scatters, offset = [], [], 0
+    for size in sizes:
+        j = torch.arange(size, device=order.device)
+        gathers.append((a * size + j).to(torch.int32).flatten())
+        scatters.append((a * total + (offset + j)).to(torch.int32).flatten())
+        offset += size
+    return gathers, scatters
+
+
+def _joined_cutlass(xs, ws, out):
+    """Whether every path of ``species_mm_joined`` fits the CUTLASS launch with rows ``K`` floats apart."""
+    from fastmace.kernels.cutlass import tf32x3
+    n = out.shape[2]
+    if n % 4 or out.data_ptr() % 16 or not out.is_contiguous():
+        return False
+    for x, w in zip(xs, ws):
+        if not x.is_contiguous() or not w.is_contiguous() or x.shape[2] % 4 or x.data_ptr() % 16 or w.data_ptr() % 16:
+            return False
+    return tf32x3.available(out.device, family=CUTLASS_FAMILY)
+
+
+@torch.library.custom_op("fastmace::species_mm_joined", mutates_args=())
+def species_mm_joined(xs: list[torch.Tensor], ws: list[torch.Tensor], w_ts: list[torch.Tensor], index: torch.Tensor,
+                      order: torch.Tensor, counts: torch.Tensor, gathers: list[torch.Tensor],
+                      scatters: list[torch.Tensor], precision: str) -> torch.Tensor:
+    """``species_mm`` of every path ``x [atoms, size_p, K]`` with its ``w [species, K, N]``, joined along the rows
+    as ``[atoms, sum of sizes, N]`` (``torch.cat`` of the paths' outputs along dim 1). Precision "tf32x3-cutlass"
+    with fitting operands: one CUTLASS launch per path writes its rows straight into the joined output
+    (``joined_rows``' gathers and scatters, no index building and no join here); otherwise per path as
+    ``species_mm`` and copied in. Each output row is the same product as ``species_mm``'s (bitwise)."""
+    if xs[0].device.type != "cuda" or xs[0].dtype != torch.float32:
+        return torch.cat([_reference(x, w, index) for x, w in zip(xs, ws)], dim=1)
+    atoms, n = xs[0].shape[0], ws[0].shape[2]
+    out = xs[0].new_empty((atoms, sum(x.shape[1] for x in xs), n))
+    if not out.numel():
+        return out
+    if precision == "tf32x3-cutlass" and _joined_cutlass(xs, ws, out):
+        from fastmace.kernels.cutlass import tf32x3
+        for x, w, gather, scatter in zip(xs, ws, gathers, scatters):
+            size = x.shape[1]
+            tf32x3.species_into(x, x.shape[2], gather, w, out, scatter, counts, size,
+                                tiles(atoms, size, counts.shape[0]))
+        return out
+    offset = 0
+    for x, w in zip(xs, ws):
+        size = x.shape[1]
+        block = x.new_empty((atoms, size, n))
+        _launch(x, w, order, counts, block, precision)
+        out[:, offset:offset + size] = block
+        offset += size
+    return out
+
+
+@species_mm_joined.register_fake
+def _(xs, ws, w_ts, index, order, counts, gathers, scatters, precision):
+    return xs[0].new_empty((xs[0].shape[0], sum(x.shape[1] for x in xs), ws[0].shape[2]))
+
+
+@torch.library.custom_op("fastmace::species_mm_joined_grad", mutates_args=())
+def species_mm_joined_grad(grad: torch.Tensor, w_ts: list[torch.Tensor], index: torch.Tensor, order: torch.Tensor,
+                           counts: torch.Tensor, gathers: list[torch.Tensor], scatters: list[torch.Tensor],
+                           sizes: list[int], precision: str) -> list[torch.Tensor]:
+    """The input gradients of ``species_mm_joined``: per path ``grad[:, rows of the path] @ w_t[species]`` as a
+    contiguous ``[atoms, size, K]``; the forward's gathers and scatters swap roles (CUTLASS)."""
+    if grad.device.type != "cuda" or grad.dtype != torch.float32:
+        out, offset = [], 0
+        for size, w_t in zip(sizes, w_ts):
+            out.append(_reference(grad[:, offset:offset + size], w_t, index))
+            offset += size
+        return out
+    atoms, n = grad.shape[0], grad.shape[2]
+    outs = [grad.new_empty((atoms, size, w_t.shape[2])) for size, w_t in zip(sizes, w_ts)]
+    if not grad.numel():
+        return outs
+    if precision == "tf32x3-cutlass" and grad.is_contiguous() and _joined_cutlass(outs, w_ts, grad):
+        from fastmace.kernels.cutlass import tf32x3
+        for out, w_t, gather, scatter, size in zip(outs, w_ts, gathers, scatters, sizes):
+            tf32x3.species_into(grad, n, scatter, w_t, out, gather, counts, size, tiles(atoms, size, counts.shape[0]))
+        return outs
+    offset = 0
+    for out, w_t, size in zip(outs, w_ts, sizes):
+        _launch(grad[:, offset:offset + size], w_t, order, counts, out, precision)
+        offset += size
+    return outs
+
+
+@species_mm_joined_grad.register_fake
+def _(grad, w_ts, index, order, counts, gathers, scatters, sizes, precision):
+    return [grad.new_empty((grad.shape[0], size, w_t.shape[2])) for size, w_t in zip(sizes, w_ts)]
+
+
+def _joined_setup(ctx, inputs, output):
+    xs, ws, w_ts, index, order, counts, gathers, scatters, precision = inputs
+    ctx.paths = len(xs)
+    ctx.sizes = [x.shape[1] for x in xs]
+    ctx.precision = precision
+    ctx.save_for_backward(*w_ts, index, order, counts, *gathers, *scatters)
+
+
+def _joined_backward(ctx, grad):
+    p = ctx.paths
+    saved = ctx.saved_tensors
+    w_ts, (index, order, counts) = list(saved[:p]), saved[p:p + 3]
+    gathers, scatters = list(saved[p + 3:2 * p + 3]), list(saved[2 * p + 3:])
+    grads = None
+    if ctx.needs_input_grad[0]:
+        grads = species_mm_joined_grad(grad.contiguous(), w_ts, index, order, counts, gathers, scatters, ctx.sizes,
+                                       ctx.precision)
+    nothing = [None] * p
+    return grads, list(nothing), list(nothing), None, None, None, list(nothing), list(nothing), None
+
+
+species_mm_joined.register_autograd(_joined_backward, setup_context=_joined_setup)
+
+
+__all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "CUTLASS", "TENSOR_CORES", "joined_rows", "species_mm",
+           "species_mm_joined", "species_plan", "tc_supported", "tile_rows", "tiles"]

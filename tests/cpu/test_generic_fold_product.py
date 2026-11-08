@@ -69,6 +69,39 @@ def test_first_density_linear_fold_can_be_switched_off(monkeypatch):
     assert relative(new_energy, energy) <= 1e-10 and relative(new_forces, forces) <= 1e-10
 
 
+
+def test_readout_tail_fold_matches_the_stock_density_model(monkeypatch):
+    from fastmace.rewrites import species
+
+    assert species.GENERIC_FOLD_READOUT_TAIL is None and "NVIDIA H200" in species.GENERIC_FOLD_READOUT_TAIL_GPUS
+    assert not species.generic_fold_readout_tail_default("NVIDIA A100-SXM4-80GB")
+    monkeypatch.setattr(species, "GENERIC_FOLD_READOUT_TAIL", True)
+    model, batch = tiny_cueq("density")
+    rewritten, applied = _rewrite(model, batch)
+    for entry in applied:
+        assert entry.result.passed and entry.result.max_relative_error <= 1e-10, entry
+    attribute = "linear_1" if hasattr(rewritten.readouts[-1], "linear_1") else "linear"
+    assert isinstance(getattr(rewritten.readouts[-1], attribute), torch.nn.Identity)
+    last, product = rewritten.interactions[-1], rewritten.products[-1].linear
+    assert isinstance(product, BlockLinear) and len(product._reference) == 2
+    layer = product._reference[1]  # the readout's layer: the products now end at its width
+    assert tuple(product.segments_out) == tuple(layer.segments_out)
+    assert isinstance(last.skip_tp, SpeciesSkip) and last.skip_tp._reference[1] is layer
+    assert sum(dim for _, _, dim in last.skip_tp.segments_out) == sum(m * d for _, m, d in layer.segments_out)
+    energy_and_forces(model, batch)  # throwaway evaluation (docs/development.md)
+    energy, forces = energy_and_forces(model, batch)
+    new_energy, new_forces = energy_and_forces(rewritten, batch)
+    assert relative(new_energy, energy) <= 1e-10 and relative(new_forces, forces) <= 1e-10
+    assert relative(_stress(rewritten, batch), _stress(model, batch)) <= 1e-10
+
+
+def test_readout_tail_fold_is_off_on_the_cpu_by_default():
+    model, batch = tiny_cueq("density")
+    rewritten, _ = _rewrite(model, batch)
+    attribute = "linear_1" if hasattr(rewritten.readouts[-1], "linear_1") else "linear"
+    assert isinstance(getattr(rewritten.readouts[-1], attribute), BlockLinear)
+
+
 def test_fold_without_species_skip_is_not_applied():
     model, batch = tiny_cueq("density")
     registry = reg.default_registry()

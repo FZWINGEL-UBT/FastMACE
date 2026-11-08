@@ -33,6 +33,21 @@ LINEAR_DIV = None
 LINEAR_DIV_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
+# h200-fastpath (bitwise): the backward's divided gradient written as contiguous segment blocks in one kernel
+# (``kernels.triton.divided_blocks``) instead of Inductor's per-segment slice-divide-clone kernels.
+LINEAR_DIV_SPLIT = None
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9972 / 1.0025, not faster in both orders: off.
+LINEAR_DIV_SPLIT_GPUS = GPUModels(())
+
+
+def linear_div_split_default(name=None) -> bool:
+    """``LINEAR_DIV_SPLIT`` (None: ``name`` in ``LINEAR_DIV_SPLIT_GPUS``)."""
+    on = LINEAR_DIV_SPLIT
+    if on is None:
+        on = name in LINEAR_DIV_SPLIT_GPUS
+    return bool(on)
+
+
 def linear_div_default(name=None) -> bool:
     """``LINEAR_DIV`` (None: ``name`` in ``LINEAR_DIV_GPUS``)."""
     on = LINEAR_DIV
@@ -101,11 +116,19 @@ def _backward(ctx, grad):
     # aten's derivatives of x / (d + 1): grad / other, and -grad * ((self / other) / other) summed to other's shape
     other = density + 1
     grad_density = (-grad * (output / other)).sum(dim=1, keepdim=True)
-    grad_x = grad / other
+    widths = [(m // n) * weight_t.shape[0] for (m, _), weight_t in zip(ctx.shapes, weights_t)]
+    split = (grad.is_cuda and len(widths) <= 4 and list(ctx.offsets) == [sum(widths[:k]) for k in range(len(widths))]
+             and sum(widths) == grad.shape[1] and linear_div_split_default(torch.cuda.get_device_name(grad.device)))
     grad_lefts = []
-    for (m, _), weight_t, offset in zip(ctx.shapes, weights_t, ctx.offsets):
-        width = (m // n) * weight_t.shape[0]
-        grad_lefts.append(tf32x3_mm(grad_x[:, offset:offset + width].reshape(m, weight_t.shape[0]), weight_t))
+    if split:  # LINEAR_DIV_SPLIT: the divided blocks contiguous from one kernel, then the same products
+        from fastmace.kernels.triton.divided_blocks import divided_blocks
+
+        for (m, _), weight_t, block in zip(ctx.shapes, weights_t, divided_blocks(grad, other, widths)):
+            grad_lefts.append(tf32x3_mm(block.view(m, weight_t.shape[0]), weight_t))
+    else:
+        grad_x = grad / other
+        for (m, _), weight_t, offset, width in zip(ctx.shapes, weights_t, ctx.offsets, widths):
+            grad_lefts.append(tf32x3_mm(grad_x[:, offset:offset + width].reshape(m, weight_t.shape[0]), weight_t))
     nothing = [None] * len(weights_t)
     return grad_lefts, nothing, list(nothing), None, None, grad_density
 
