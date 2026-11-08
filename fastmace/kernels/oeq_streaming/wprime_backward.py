@@ -210,7 +210,9 @@ STAGE_QUADS_GPUS = GPUModels(())
 # the __syncwarp also tells ptxas the warp is converged at the end-of-edge reduction. None: on for STAGE_SH_GPUS;
 # True / False: an A/B side's choice.
 STAGE_SH = None
-STAGE_SH_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9955 / 0.9950 (ab / ba), with STAGE_EDGES 0.9819 / 0.9811;
+# forces and energy within the build's spread; bitwise, faster in both orders (decision 66).
+STAGE_SH_GPUS = GPUModels(("NVIDIA H200",))
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS

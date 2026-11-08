@@ -23,3 +23,34 @@ The joined species_mm is bitwise against per-path `species_mm` (`tests/gpu/test_
 compiled, ieee / tf32x3 / tf32x3-cutlass: 6 passed on the H200, [pytest-joined.log](round1/pytest-joined.log)). The
 gate ratios are SrTiO3 / NaCl / NbCl5 against the ASE float32 reference, limit 3
 ([gate-tail](round1/gate-tail/summary.txt), [gate-cueq](round1/gate-cueq/summary.txt)).
+
+## Round 2 (`tools/modal/fastpath2_job.sh`, source `61d752e6`, [round2/](round2/run.log))
+
+a = the H200 defaults with round 1's three adoptions (3.78 ms per MD step).
+
+| Switch | What | MD step b/a (ab / ba) | Build, check | Decision |
+| --- | --- | --- | --- | --- |
+| `spline_forward.STAGE_EDGES` | the spline forward (one receiver per block, thread = channel) stages its edges per 32-edge tile: warp 0 does cutoff, sender and spline lookup once per edge with a ballot compaction, all threads copy the edge features coalesced; the channel loop reads shared memory ([source](round2/spline_forward-stage-edges.cu)) | **0.9864 / 0.9856** (3.780 → 3.728 ms) | 80 registers, **0 local bytes** (8 before); forces 3.0e-6 against same-build 2.7e-6 eV/Å, energy diff 1.3e-5 against same-build 2.5e-5 eV | **adopted (H200)** |
+| `wprime_backward.STAGE_SH` | each 32-lane w′ cohort copies its edge's features to shared memory once per edge ([source](round2/wprime-stage-sh.cu)) | **0.9955 / 0.9950** | 72 registers, 0 local bytes (unchanged); forces 2.6e-6 against 2.8e-6, energy 3.7e-5 against 4.7e-5 | **adopted (H200)**: bitwise, faster in both orders |
+| both | | **0.9819 / 0.9811** (3.776 → 3.704 ms) | | |
+
+Both are bitwise by construction (same arithmetic in the same order; only where the operands are loaded from).
+
+## Step breakdown of the round-1 defaults (before STAGE_EDGES / STAGE_SH)
+
+`tools/step_breakdown.py`, 200 steps after 100 of equilibration, [round2/breakdown/](round2/breakdown/ops.csv).
+Per force call, 3.51 ms of kernel time:
+
+| Kernel | µs per call |
+| --- | ---: |
+| w′ backward (`oeq_projected_backward_wprime`, 72 registers, 44 % occupancy) | 1,106 |
+| spline forward (80 registers, 38 %) | 860 |
+| tabled outer sum backward (density) | 213 |
+| tf32x3 GEMMs in the compiled graph (6 launches) | 155 |
+| `tf32x3_linear_div` (4 launches) | 147 |
+| `species_mm_joined` + its gradient (COMPOSE_FAST) | 104 + 106 |
+| cuEq symmetric contraction (forward + backward, 4 kernels) | 167 |
+| tabled outer sum forward | 114 |
+| radix sort (8 launches) | 43 |
+
+The two streaming kernels are 56 % of the step; everything at the atom level together is about 0.8 ms.

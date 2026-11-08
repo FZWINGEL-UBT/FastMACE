@@ -91,7 +91,9 @@ def shared_locator_default(device):
 # offset from shared memory: no dependent per-edge load chain and no branch in it. Same edges in the same order, same
 # arithmetic. None: on for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
 STAGE_EDGES = None
-STAGE_EDGES_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9864 / 0.9856 against the H200 defaults with COMPOSE_FAST,
+# CUEQ_PROJECTED and GENERIC_FOLD_READOUT_TAIL (ab / ba); forces and energy within the build's spread (decision 66).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200",))
 STAGE_TILE = 32
 
 
