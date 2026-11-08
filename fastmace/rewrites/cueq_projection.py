@@ -26,11 +26,12 @@ CUEQ_PROJECTED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 _subclasses = {}
 
 
-def cueq_projected_default(name=None) -> bool:
-    """``CUEQ_PROJECTED`` (None: ``name`` in ``CUEQ_PROJECTED_GPUS``)."""
+def cueq_projected_default(name=None, config="auto") -> bool:
+    """``CUEQ_PROJECTED`` (an A/B side's choice) when set; else ``RewriteConfig.cueq_projected`` ``config`` when
+    "on" or "off" (the planner's per-model decision); else ``name`` in ``CUEQ_PROJECTED_GPUS``."""
     on = CUEQ_PROJECTED
     if on is None:
-        on = name in CUEQ_PROJECTED_GPUS
+        on = config == "on" if config in ("on", "off") else name in CUEQ_PROJECTED_GPUS
     return bool(on)
 
 
@@ -66,14 +67,14 @@ def keep_projected(module):
     return module
 
 
-def route(model) -> int:
-    """``keep_projected`` on every applicable module on a CUDA device where ``cueq_projected_default`` says so;
-    the number of modules changed."""
+def route(model, config="auto") -> int:
+    """``keep_projected`` on every applicable module on a CUDA device where ``cueq_projected_default`` says so
+    (``config``: ``RewriteConfig.cueq_projected``); the number of modules changed."""
     changed = 0
     for module in list(model.modules()):
         if not applies(module) or module.weight.device.type != "cuda":
             continue
-        if cueq_projected_default(torch.cuda.get_device_name(module.weight.device)):
+        if cueq_projected_default(torch.cuda.get_device_name(module.weight.device), config):
             keep_projected(module)
             changed += 1
     return changed

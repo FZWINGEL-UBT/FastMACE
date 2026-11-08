@@ -121,6 +121,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
+    "RewriteConfig.cueq_projected": "on_with_tf32x3_gemms_on_listed_gpus_unless_model_excluded_decision_66",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
@@ -448,6 +449,16 @@ DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
     # ab / ba): the pair with DECISION_66_GENERIC_WPRIME_LABEL_GPUS 2.294 / 2.282 ms against 5.414 / 5.408 ms
     # without (b/a 2.360 / 2.370). The A100 needs its own A/B first.
     "omat0-small": GPUModels(("NVIDIA H200",)),
+})
+# CUEQ_PROJECTED (rewrites.cueq_projection, under tf32x3_gemms) is on for its GPU list; these models are measured not
+# faster with it there and keep the per-call projection (branch fastmace/off-polar-a100, 8 November 2026,
+# results/off-polar-a100-20261108: NHR@FAU Alex A100-SXM4-80GB, MD step b/a, b = CUEQ_PROJECTED on, ab / ba;
+# OFF water_216, POLAR NaCl / NbCl5 3x3x3). The other OFF models win: OFF23-small 0.9894 / 0.9930, -medium
+# 0.9896 / 0.9997, OFF23b 0.9915 / 0.9916, OFF24 0.9932 / 0.9981.
+DECISION_66_CUEQ_PROJECTED_EXCLUDED = MappingProxyType({
+    "off23-large": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 1.0006 / 0.9996
+    "polar1-s": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # NaCl 1.0042 (ab), NbCl5 0.9983 (ab)
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # NaCl 0.9878 / 1.0058, NbCl5 0.9985 / 0.9993
 })
 # grouped_launch outside the generic family (decision 57) where measured (exact). OFF23-small on the A100-SXM4-80GB
 # won 0.9889 / 0.9953 (water_216; results/off-polar-alex-20261106) and was listed here until 7 November 2026, when
@@ -887,6 +898,8 @@ class FixedPlanner:
             book.refuse(f"RewriteConfig.inplace_block_linear=True: {NOT_CARRIED_OVER_1A}",
                         "inplace-block-linear-not-carried-over")
         book.decide("RewriteConfig.inplace_block_linear", _toggle(rewrites.inplace_block_linear), NOT_CARRIED_OVER_1A)
+        rewrite_values["cueq_projected"] = self._cueq_projected(book, rewrites.cueq_projected,
+                                                                rewrite_values["tf32x3_gemms"], model_label, hardware)
         book.decide("RewriteConfig.polar_uvu", _toggle(rewrites.polar_uvu),
                     "PolarMACE only (MACE PR 1711)" if traits.polar else "no effect: not a PolarMACE model")
 
@@ -1676,6 +1689,28 @@ class FixedPlanner:
         for name in ("sort_receivers", "gpu_neighbour_list"):
             item = f"NeighbourConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.neighbours, name), AUTO_RULES[item], v["_why"][name]))
+
+    @staticmethod
+    def _cueq_projected(book, asked, tf32x3, model_label, hardware):
+        """``RewriteConfig.cueq_projected``: as asked when "on" or "off"; auto on with tf32x3_gemms on the GPUs
+        ``cueq_projection.CUEQ_PROJECTED_GPUS`` lists, except for the models ``DECISION_66_CUEQ_PROJECTED_EXCLUDED``
+        lists there."""
+        from fastmace.rewrites.cueq_projection import CUEQ_PROJECTED_GPUS
+
+        item = "RewriteConfig.cueq_projected"
+        name = getattr(hardware, "name", None)
+        if asked != "auto":
+            choice, reason = asked, "asked for"
+        elif tf32x3 != "on":
+            choice, reason = "off", "no effect: tf32x3_gemms is off"
+        elif name not in CUEQ_PROJECTED_GPUS:
+            choice, reason = "off", f"not a listed GPU, decision 66 ({name})"
+        elif name in DECISION_66_CUEQ_PROJECTED_EXCLUDED.get(model_label, ()):
+            choice, reason = "off", f"{model_label} measured not faster on {name}, decision 66"
+        else:
+            choice, reason = "on", f"with tf32x3_gemms on a listed GPU, decision 66 ({name})"
+        book.decide(item, choice, _why(asked, AUTO_RULES[item], reason))
+        return choice
 
     # ------------------------------------------------------------------ build
 

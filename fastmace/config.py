@@ -227,6 +227,11 @@ class RewriteConfig:
     # gradients as 3xTF32 through Triton's tf32x3 (opt-4 OPT4-T03 stage 1, fastmace.rewrites.precision); rounding,
     # not IEEE-equivalent under cancellation; float32 on compute capability >= 8.0 only; opt-in, auto = off.
     tf32x3_gemms: Toggle = "auto"
+    # With tf32x3_gemms: cuEq's SymmetricContraction keeps its projected weight once instead of projecting it in
+    # every call (fastmace.rewrites.cueq_projection, CUEQ_PROJECTED); rounding; auto = on where
+    # cueq_projection.CUEQ_PROJECTED_GPUS lists the GPU, except for the models the planner's
+    # DECISION_66_CUEQ_PROJECTED_EXCLUDED lists there (decision 66: not faster for them).
+    cueq_projected: Toggle = "auto"
     # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
     # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,
     # fastmace.rewrites.codegen); auto = on for the qualified POLAR-1 checkpoints (S, M, L) in hybrid float32 plans

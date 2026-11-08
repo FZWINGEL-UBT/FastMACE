@@ -740,6 +740,7 @@ class MinimalPlanner:
                     "EngineConfig.pipelined": ("off", REFERENCE_REASONS["pipelined"]),
                     "EngineConfig.speculative_graph": ("off", REFERENCE_REASONS["pipelined"]),
                     "RewriteConfig.polar_uvu": ("off", REFERENCE_REASONS["rewrites"]),
+                    "RewriteConfig.cueq_projected": ("off", REFERENCE_REASONS["rewrites"]),
                     "RewriteConfig.inplace_block_linear": ("off", REFERENCE_REASONS["rewrites"]),
                     **{f"RewriteConfig.{name}": ("off", REFERENCE_REASONS["rewrites"]) for name in toggles}}
         for item, choice, reason in inner.decisions:
@@ -747,7 +748,7 @@ class MinimalPlanner:
         parts.update(
             tier=REFERENCE_TIER,
             rewrites=dataclasses.replace(parts["rewrites"], **dict.fromkeys(toggles, "off"), polar_uvu=False,
-                                         inplace_block_linear=False),
+                                         cueq_projected="off", inplace_block_linear=False),
             engine=dataclasses.replace(parts["engine"], compile_mode="none", pipelined="off", speculative_graph=False),
             decisions=tuple(book.decisions),
             requested=self._fixed(rewrites, precision)._requested())
