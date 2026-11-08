@@ -115,6 +115,15 @@ def one_slab(name, args, r_max):
     return args, int(inside.sum())
 
 
+def local_sender(args):
+    """w′'s arguments with every edge's sender set to its receiver: the bound on what staging the sender rows could
+    save (the x row of a receiver's edges is then one row, hot in L1). The output is wrong; dx's atomics land on the
+    receiver's row instead of the senders', so contention differs too."""
+    args = list(args)
+    args[3] = args[4].clone()
+    return args
+
+
 def slab_sorted(args):
     """The forward's arguments with every receiver's edges reordered by (pair, length): the same message up to the
     summation order, so co-resident receivers walk the same slabs at about the same time."""
@@ -187,6 +196,9 @@ def main(argv=None):
     for name, (kernel, real) in captured.items():
         slab, inside = one_slab(name, real, r_max)
         variants = {"real": real, "one-slab": slab}
+        if name == "wprime":  # sender rows: every edge's sender is its receiver, so the x row stays in L1
+            variants["local-sender"] = local_sender(real)
+            variants["one-slab+local-sender"] = local_sender(slab)
         kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "forward":
             variants["slab-sorted"] = sorted_args = slab_sorted(real)
