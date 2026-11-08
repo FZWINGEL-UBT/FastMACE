@@ -72,3 +72,56 @@ The forward's table share is the one new piece of evidence: about half the kerne
 - a receiver order that puts neighbouring receivers with the same slabs on one SM.
 
 The 64-channel spline adds 81,920 FMAs per edge and is not one of these.
+
+## The H200 measurement and the table-byte ideas (conductor, 8 November 2026)
+
+### The H200 bound
+
+Two runs of `tools/modal/spline_table_bound_job.sh` on Modal profile `sixth` (H200; sources `18f65eb0`, `e917306e`), H200 defaults, 31 rounds each. Log: [h200-run.log](h200-run.log). JSON: [first run](spline_table_bound_h200.json), [second run, with slab-sorted](spline_table_bound_h200_sorted.json).
+
+| Kernel | Real | One slab | Slab-sorted (forward) |
+| --- | --- | --- | --- |
+| spline forward | 785 / 793 µs | 433 / 432 µs (× 0.551 / 0.545) | 680 µs (× 0.858 flushed / 0.861 warm) |
+| w′ | 1,086 / 1,098 µs | 1,056 / 1,069 µs (× 0.973 / 0.974) | – |
+
+Two results come out of this:
+
+- **The forward is table-bound.** About 350 µs of its 790 µs is table traffic, roughly 10 % of the force call.
+- **w′ is not.** Its table share is under 3 % (about 30 µs). That leaves nothing for the undirected-pair idea (proposal 3).
+
+### Three ideas for reading fewer table bytes
+
+Bounds from `tools/spline_table_ideas_bound.py` (CPU, [table_ideas_bound.json](table_ideas_bound.json)) and the H200 slab-sorted variant above.
+
+| Idea | Bound | Verdict |
+| --- | --- | --- |
+| **Compressed table** (float16 or bfloat16 coefficients, float32 c0) | Fails the production certificate in every variant. Scores are slope-dominated: c2, c3 in float16 (12 B) 3.16; c1–c3 in float16 (10 B) 52; all float16 (8 B) 52; c2, c3 in bfloat16 20; c1–c3 in bfloat16 418. The certificate passes at ≤ 1; production scores 0.49. | **Rejected** |
+| **Receiver order and slab reuse** | See below. | **Next build** |
+| **Smaller knot grid per pair** | Each pair could drop to 390–563 of 736 intervals at the production target (pair worst scores 0.32–0.49). Bytes per edge stay the same (one 20 KB slab per edge), so only reuse can change. The modelled L1 hit rate rises by only 1–3 points (natural / CSR 0.061 → 0.073; slab-sorted 0.544 → 0.579). | **Dropped** (bound) |
+
+#### Receiver order and slab reuse
+
+The L1 model runs on SrTiO3 10×10×10 with σ = 0.05 Å per component, 6 resident blocks per SM, and an LRU of 10 slabs per SM. Hit rates:
+
+| Receiver order | Each receiver's edges in CSR order | Sorted by slab |
+| --- | --- | --- |
+| Natural | 0.061 | 0.544 |
+| Morton | 0.079 | 0.583 |
+| Morton, each SM a contiguous run | 0.078 | 0.571 |
+| Species + Morton, each SM a contiguous run | 0.175 | 0.747 |
+
+Receiver order alone (Morton) barely matters. The order of edges within each receiver matters a lot: co-resident receivers then walk the shells in step.
+
+Measured on the H200, slab-sorted edges take the forward from 792 to 680 µs: **−112 µs, about 3.3 % of the force call**. The change is rounding-class (message max|d|/max|a| 8.5e-7 against the real order).
+
+Grouping receivers by species per SM (a block → receiver permutation) is modelled to raise the hit rate further, from 0.54 to 0.75. It has not been measured.
+
+## Recommendation
+
+Build the slab-sorted edge order: within each receiver, sort edges by (species pair, length) when the neighbour list is rebuilt. Steps:
+
+1. MD-step A/B on the H200, both build orders. Between rebuilds lengths drift by at most the skin, so the order stays almost sorted.
+2. The force/stress gate, since the change is rounding-class.
+3. Then the species-grouped block order on top, as its own switch.
+
+Compressed tables and per-pair grids are closed. w′ has no table-traffic headroom left.
