@@ -427,6 +427,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-polar-head-compose](#model-polar-head-compose) | POLAR-1's head projections composed into their l x l -> 0 dot products (P1) | `rewrites.polar.head_compose.COMPOSE_HEADS` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | 5060 Ti NaCl 0.872–0.909, NbCl5 0.997–1.005 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-dead-degrees](#model-polar-dead-degrees) | Dead POLAR head degrees pruned at setup (R5) | `rewrites.polar.head_liveness.PRUNE_DEAD_DEGREES` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | Ada NaCl 0.973–0.974, NbCl5 1.000–1.001; 5060 Ti L NaCl 0.975–0.979 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-phase-recurrence](#model-polar-phase-recurrence) | k-space cosines and sines from per-axis phase tables | `longrange.polar.PHASE_RECURRENCE` | FM | REJECTED (5060 Ti: tie) | polar-megakernel 2026-11-08 | 0.988–1.075 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
+| [model-polar-kspace-megakernel](#model-polar-kspace-megakernel) | POLAR k-space field call as one CUDA C++ megakernel per direction | `longrange.polar.MEGAKERNEL` (+ `MEGAKERNEL_GPUS`, `MEGAKERNEL_MIN_WORK`), `kernels.triton.kspace_megakernel.CUDA` | FM | DEFAULT (RTX 5060 Ti, atoms x k >= 1e6) | polar-megakernel 2026-11-08 | 5060 Ti NbCl5 0.893–0.973; NaCl 0.998–1.012 (below the threshold: off) | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-head-rows](#model-polar-head-rows) | Irrep blocks kept as rows across the POLAR head chain (Codex R3) | none | FM | STOPPED (bound: P1 removed its target) | polar-megakernel 2026-11-08 | M NbCl5 target kernels 1070 µs → 0 with P1 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-small-matmuls](#model-small-matmuls) | Small mm/addmm as an Inductor-fused multiply-sum | `rewrites.inductor.SMALL_MATMULS` | FM | REJECTED | off-polar-alex 2026-11-07 | 5060 Ti POLAR-S NaCl 0.951, NbCl5 1.00; OFF23-small 1.045–1.07 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-shared-geometry](#model-polar-shared-geometry) | One unmasked k-space geometry per POLAR call | `longrange.polar.SHARED_GEOMETRY` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.990–1.006 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
@@ -4011,6 +4012,31 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Status: REJECTED (tie). RTX 5060 Ti S NaCl 0.997 / 1.008, NbCl5 1.075 / 0.988; M 0.994 / 0.993, 1.008 / 0.997;
   L 0.992 / 0.988, NbCl5 1.017 (ab). Gate passes. The transcendentals were not the cost on this GPU.
 - Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
+
+<a id="model-polar-kspace-megakernel"></a>
+#### model-polar-kspace-megakernel: the POLAR k-space field call as one CUDA C++ megakernel
+- Switch: `fastmace.longrange.polar.MEGAKERNEL` (None: `MEGAKERNEL_GPUS` from `MEGAKERNEL_MIN_WORK` atoms x
+  k-vectors), `fastmace.kernels.triton.kspace_megakernel.CUDA` (CUDA C++ instead of Triton; default True)
+- Engine: FM
+- Date/round: 7–8 November 2026, branch `fastmace/polar-megakernel` (the owner: "build one megakernel for the local
+  gpu for mace polar")
+- What: each field-feature call of the charge recursion (one graph, full PBC, both spins with `SPIN_BATCHED`) as one
+  persistent kernel per direction: structure factor, density, Coulomb kernel and projection with the per-k glue on
+  chip, no dense [k, atoms] cosines and sines; the Coulomb energy's structure factor too. CUDA C++ cubins for sm_80,
+  sm_89, sm_90 and sm_120, loaded with the driver API. Rounding.
+- Measured (MD step b/a, abab / abba, RTX 5060 Ti, 5e855424 defaults: `FOLD_UPDATE`, `SPIN_BATCHED`,
+  `PRUNE_DEAD_DEGREES`, `COMPOSE_HEADS`): NbCl5 (1944 atoms x 2989 k) S 0.893 / 0.896, M 0.957 / 0.957, L 0.972 /
+  0.973; NaCl (216 x 243) S 1.012 / 1.009, M 1.008 / 0.998, L 1.003 / 1.000. Kernel lab (RTX A4000): the field call
+  0.30x of dense on NbCl5, 0.70x on NaCl; the NaCl step loss is outside the kernel. Hence `MEGAKERNEL_MIN_WORK =
+  1e6`: NaCl keeps the dense path (the base code), nothing measured between 52 k and 5.8 M.
+- Gates (3x, candidate = the defaults + `MEGAKERNEL=True`, `CUDA=True`, 2baa8634 with the rule-13 guard,
+  `RewriteConfig.polar_uvu = on`): pass on S and M (NaCl, NbCl5) and L NaCl (RTX A4000, murphy job 8);
+  L NbCl5 on Modal A100-80GB (7cf2928a, $0.89, cubin loaded, no rule-13 revision): energy 0.68, forces 0.54,
+  stress 0.52.
+- Status: DEFAULT on the RTX 5060 Ti for cells from 1e6 atoms x k (decision 66: both orders win, gate passes).
+  Other GPUs not measured.
+- Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md);
+  tests/cpu/test_kspace_megakernel.py, tests/gpu/test_kspace_cuda.py, tests/gpu/test_kspace_megakernel_cuda.py.
 
 <a id="model-polar-head-rows"></a>
 #### model-polar-head-rows: irrep blocks kept as rows across the POLAR head chain (Codex R3)

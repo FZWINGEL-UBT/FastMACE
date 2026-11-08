@@ -105,7 +105,27 @@ is the glue launches between them, about 1–2 % on NaCl. Building it on `main` 
   building only after `FUSED_FOURIER`, `JOINT_BACKWARD`, `SPIN_BATCHED` and `SMALL_MATMULS` have their RTX 5060 Ti
   A/Bs. Build it on top of whichever of them win, with a bound of 1–2 % on NaCl.
 
-## 6. Reproduce
+## 6. Results (8 November 2026)
+
+What was built is the narrow one: the k-space field call (structure factor, density, Coulomb kernel, projection)
+as one persistent kernel per direction, in Triton and in CUDA C++ (`fastmace/kernels/cuda/kspace_megakernel.cu`,
+cubins for sm_80/89/90/120). The narrow heads were removed by algebra instead of fused (P1, R5). MD step b/a on
+the RTX 5060 Ti, abab / abba; gates are 3× force/stress on S, M (NaCl, NbCl5) and L NaCl (RTX A4000), with
+L NbCl5 on a Modal A100-80GB. Every gate ran with `RewriteConfig.polar_uvu = on` and no rule-13 revision.
+
+| Part | Kernel level | NaCl S / M / L | NbCl5 S / M / L | Gate | Decision |
+| --- | --- | --- | --- | --- | --- |
+| P1 `COMPOSE_HEADS` | M NbCl5 42.05 → 37.35 ms of kernels | 0.906/0.909, 0.876/0.872, 0.883/0.879 | 1.001/1.005, 0.997/1.000, 1.002/0.998 | pass (L NbCl5 0.86 / 0.58 / 1.01) | default, every GPU |
+| R5 `PRUNE_DEAD_DEGREES` | L only | L 0.979/0.975 (Ada 0.974/0.973) | L 0.998/1.000 | pass | default, every GPU |
+| `PHASE_RECURRENCE` | – | 0.988–1.008 | 0.988–1.075 | – | rejected |
+| CUDA k-space megakernel | A4000 field call 0.70× (NaCl), 0.30× (NbCl5) of dense | 1.012/1.009, 1.008/0.998, 1.003/1.000 | 0.893/0.896, 0.957/0.957, 0.972/0.973 | pass (L NbCl5 0.68 / 0.54 / 0.52) | default on the 5060 Ti from 1e6 atoms × k |
+| R3 (rows across the head) | P1 removed its four target kernels | – | – | – | stopped at the bound |
+
+The NaCl loss is outside the kernel, which is faster than dense there too. So `MEGAKERNEL_MIN_WORK` keeps NaCl
+(216 × 243 = 52 k) on the dense path, and NbCl5 (1944 × 2989 = 5.8 M) takes the megakernel. Nothing between those
+two sizes has been measured. Other GPUs are not listed.
+
+## 7. Reproduce
 
 `tools/bench/polar_profile_bound.py <profile-dir> <run> …` prints the table in §1 from the profiles' `step.log`
 and `module/sources.csv`.

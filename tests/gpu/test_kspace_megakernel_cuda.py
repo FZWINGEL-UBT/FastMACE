@@ -10,6 +10,12 @@ from fastmace.kernels.triton import kspace_megakernel as mk
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
 
 
+@pytest.fixture(autouse=True)
+def _triton(monkeypatch):
+    """The Triton kernels (``CUDA`` is on by default; tests/gpu/test_kspace_cuda.py checks the CUDA ones)."""
+    monkeypatch.setattr(mk, "CUDA", False)
+
+
 def _inputs(K, N, C, J, F, seed=0):
     generator = torch.Generator().manual_seed(seed)
 

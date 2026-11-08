@@ -1,4 +1,4 @@
-"""``polar.MEGAKERNEL`` (opt-in, ``MEGAKERNEL_GPUS`` empty): one POLAR field-feature call as one k-space kernel.
+"""``polar.MEGAKERNEL`` (None: the RTX 5060 Ti from ``MEGAKERNEL_MIN_WORK``): one POLAR field-feature call as one k-space kernel.
 
 On the CPU ``fastmace.kernels.triton.kspace_megakernel``'s custom ops are its dense formulas, so these tests check
 the hand-written backward and the per-k glue (density scale, Coulomb kernel, projection factor) against autograd
@@ -99,7 +99,8 @@ def test_only_the_asked_gradients_and_no_k_gradient_in_nvt():
 
 
 def test_the_switch_is_off_without_a_listed_gpu(monkeypatch):
-    assert polar.MEGAKERNEL is None and tuple(polar.MEGAKERNEL_GPUS) == ()
+    assert polar.MEGAKERNEL is None and tuple(polar.MEGAKERNEL_GPUS) == ("NVIDIA GeForce RTX 5060 Ti",)
+    assert mk.CUDA is True
     cpu = torch.zeros(2, 3)
     assert not polar.megakernel_on(cpu, 10**7)
     monkeypatch.setattr(polar, "MEGAKERNEL", True)

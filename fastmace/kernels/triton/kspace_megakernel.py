@@ -38,11 +38,12 @@ import torch
 
 S0 = 2.0 / (2.0 * math.pi) ** 3
 BLOCK_K, BLOCK_N, WARPS = 64, 64, 4
-# A/B constant (polar-megakernel, 7 November 2026): False, the Triton kernels below; True, the CUDA C++ kernels of
+# Constant (polar-megakernel, 7 November 2026; True since 8 November): False, the Triton kernels below; True, the CUDA C++ kernels of
 # fastmace.kernels.cuda.kspace (every sum split over both indices, one precise sincosf per pair, FFMA on the narrow
 # factors; the Coulomb energy's structure factor too), where they have an entry for the shapes and the device. The
-# same sums; rounding. tests/gpu/test_kspace_megakernel_cuda.py.
-CUDA = False
+# same sums; rounding. The megakernel's MD A/Bs and gates ran with True (polar.MEGAKERNEL).
+# tests/gpu/test_kspace_megakernel_cuda.py.
+CUDA = True
 
 _COUNTERS: dict = {}
 
