@@ -11,6 +11,7 @@ These files are the job tooling behind AGENTS.md "Using resources". The design i
 | `launch.py` | Manifest-driven launcher: packs rows, sets timeouts, launches under the WSL limits |
 | `slim_tar.py` | Builds the code-only source tarball (about 13 MB) that every job uses |
 | `p90.json` | p90 wall times per template and GPU; the launcher sets each timeout to twice the p90 |
+| `alex_ab_pack.sh` | Slurm job for NHR@FAU Alex A100s: one process per model and build order runs every switch (`tools/ab_rewrites.py --pack`), so side a is built once. Submitted by hand with `sbatch`, not by `launch.py`; see [nhr-cluster.md §6.3](../../docs/nhr-cluster.md) |
 
 Templates are versioned (`v1` in their second line). To change one, add a new version. A running batch keeps its
 own copy, because the launcher copies the templates into the batch folder before it launches anything.
