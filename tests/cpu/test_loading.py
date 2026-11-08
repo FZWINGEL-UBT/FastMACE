@@ -44,12 +44,13 @@ MIT_LABELS = {"mp0-medium", "mp0-large", "mp0b3-medium", "mpa0-medium"}  # SPEC 
 
 def test_label_table_has_the_19_acceptance_labels():
     assert len(ACCEPTANCE_LABELS) == 19
-    assert set(table.LABELS) == ACCEPTANCE_LABELS
+    assert set(table.LABELS) == ACCEPTANCE_LABELS | set(table.EXTRA_LABELS)
+    assert table.EXTRA_LABELS == ("omat0-small",) and not ACCEPTANCE_LABELS & set(table.EXTRA_LABELS)
     assert set(table.BENCHMARK_LABELS) <= ACCEPTANCE_LABELS and len(table.BENCHMARK_LABELS) == 10
     assert set(table.MACE_OFF_LABELS) == {label for label in ACCEPTANCE_LABELS if label.startswith("off")}
 
 
-@pytest.mark.parametrize("label", sorted(ACCEPTANCE_LABELS))
+@pytest.mark.parametrize("label", sorted(ACCEPTANCE_LABELS | {"omat0-small"}))
 def test_every_label_is_complete(label):
     entry = table.LABELS[label]
     checkpoint = entry.checkpoint
@@ -81,7 +82,9 @@ def test_labels_match_the_research_engine_heads_and_functionals():
         entry = table.LABELS[label]
         assert (entry.checkpoint.name, entry.head, entry.functional) == (name, head, functional)
     files = [c.file_name for c in table.CHECKPOINTS.values()]
-    assert len(files) == len(set(files)) == 17
+    assert len(files) == len(set(files)) == 18  # the research engine's 17 and OMAT-0 small (EXTRA_LABELS)
+    small = table.LABELS["omat0-small"]
+    assert (small.checkpoint.name, small.checkpoint.heads, small.functional) == ("small-omat-0", ("omat_pbe",), "pbe")
 
 
 def test_find_labels_aliases_and_heads():
@@ -590,3 +593,16 @@ def test_a_head_label_without_its_own_entry_finds_the_same_head_again():  # 3-T1
     assert labels.find(entry.label, "omol").head == "omol"
     with pytest.raises(ValueError, match="is head 'omol'"):
         labels.find(entry.label, "spice_wB97M")
+
+
+def test_omat0_small_is_recognised_by_its_hash_for_the_rewrites():
+    """A path load of OMAT-0 small (no label given) gets its table label in the rewrites' context (8 November 2026:
+    its per-model defaults, fastmace.rewrites.species.GENERIC_FOLD_READOUT_TAIL_MODEL_GPUS)."""
+    from types import SimpleNamespace
+
+    from fastmace.model.forces import _table_label
+
+    sha = table.LABELS["omat0-small"].checkpoint.sha256
+    assert _table_label(SimpleNamespace(label=None, head="omat_pbe", sha256=sha)) == "omat0-small"
+    assert _table_label(SimpleNamespace(label=None, head=None, sha256="0" * 64)) is None
+    assert _table_label(None) is None

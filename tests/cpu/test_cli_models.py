@@ -8,11 +8,11 @@ def _rows(out):
     return {line.split()[0]: line for line in out.splitlines() if line.split() and line.split()[0] in labels.LABELS}
 
 
-def test_models_lists_all_19_labels(capsys):
+def test_models_lists_all_labels(capsys):
     assert cli.main(["models"]) == 0
     out = capsys.readouterr().out
     rows = _rows(out)
-    assert len(labels.LABELS) == 19
+    assert len(labels.LABELS) == 20  # the 19 of SPEC §12.5 and labels.EXTRA_LABELS
     assert set(rows) == set(labels.LABELS)
 
 

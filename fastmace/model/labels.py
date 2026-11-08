@@ -139,6 +139,11 @@ CHECKPOINTS = MappingProxyType({c.name: c for c in (
             "75428afe3a1d7d8062e19bcaabd5c433623cabf308242ec9fb493e38604fb638", MIT, "density", "pbe", _MP_TABLE),
     _single("medium-omat-0", f"{_MP}/mace_omat_0/mace-omat-0-medium.model",
             "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a", ASL, "density", "pbe", _MP_TABLE),
+    # OMAT-0 small (8 November 2026; conductor): the same release and architecture as medium (two density
+    # interactions, r_max 6), stored head "omat_pbe". Its file is the same at both release URLs (67,630,500 bytes).
+    _single("small-omat-0", f"{_MP}/mace_omat_0/mace-omat-0-small.model",
+            "0abfde07862cf1e93b8b4d03cb702f29ce9c344ff2fc4de2ec0d7166d6c113a5", ASL, "density", "pbe", _MP_TABLE,
+            head="omat_pbe"),
     _single("mace-matpes-pbe-0", f"{_FOUNDATIONS}/mace_matpes_0/MACE-matpes-pbe-omat-ft.model",
             "e618ad582b84239905b9c3b77ce6e9ce111b0ecd1533223a1a6aac7a696b8aa0", ASL, "density", "pbe",
             _MATPES_PBE_TABLE),
@@ -215,6 +220,7 @@ LABELS = MappingProxyType({m.label: m for m in (
     _label("mp0b3-medium", "medium-0b3"),
     _label("mpa0-medium", "medium-mpa-0"),
     _label("omat0-medium", "medium-omat-0"),
+    _label("omat0-small", "small-omat-0"),
     _label("matpes-pbe", "mace-matpes-pbe-0"),
     _label("matpes-r2scan", "mace-matpes-r2scan-0"),
     _label("mh1-omat", "mh-1", "omat_pbe"),
@@ -234,6 +240,9 @@ LABELS = MappingProxyType({m.label: m for m in (
 # The ten models of the research engine's benchmark tables (common.BENCHMARK_MODELS).
 BENCHMARK_LABELS = ("mp0-medium", "mp0-large", "mp0b3-medium", "mpa0-medium", "omat0-medium", "matpes-pbe",
                     "matpes-r2scan", "mh1-omat", "mh1-mp", "mh1-r2scan")
+# Labels of the table outside the 19 of the benchmark suite (§12.5): recognised by SHA-256 for their licence and the
+# planner's per-label defaults, not in the acceptance gates. OMAT-0 small since 8 November 2026.
+EXTRA_LABELS = ("omat0-small",)
 MACE_OFF_LABELS = ("off23-small", "off23-medium", "off23-large", "off23b-medium", "off24-medium")
 # Short names for a checkpoint whose head is passed separately: fm.load("mh1", head="matpes_r2scan").
 ALIASES = MappingProxyType({"mh1": "mh-1", "omol0": "omol-0-xl"})

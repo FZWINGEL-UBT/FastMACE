@@ -444,6 +444,10 @@ DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
     "polar1-s": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9402 / 0.9381, 0.8465 / 0.8465
     "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9309 / 0.9303, 0.8422 / 0.8425
     "polar1-l": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9064 / 0.9070, 0.7922 / 0.7927
+    # OMAT-0 small with medium's H200 settings (8 November 2026, results/h200-omat0-small-20261108, Benchmark_loup,
+    # ab / ba): the pair with DECISION_66_GENERIC_WPRIME_LABEL_GPUS 2.294 / 2.282 ms against 5.414 / 5.408 ms
+    # without (b/a 2.360 / 2.370). The A100 needs its own A/B first.
+    "omat0-small": GPUModels(("NVIDIA H200",)),
 })
 # grouped_launch outside the generic family (decision 57) where measured (exact). OFF23-small on the A100-SXM4-80GB
 # won 0.9889 / 0.9953 (water_216; results/off-polar-alex-20261106) and was listed here until 7 November 2026, when
@@ -477,6 +481,18 @@ DECISION_66_GENERIC_CHUNKED_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce R
 DECISION_66_GENERIC_WPRIME_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
                                              "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
+# The same pair for a label on its own GPUs only (instead of DECISION_66_GENERIC_WPRIME_GPUS). OMAT-0 small on the
+# H200: see DECISION_66_TF32X3_MODEL_GPUS, measured together.
+DECISION_66_GENERIC_WPRIME_LABEL_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA H200",)),
+})
+
+
+def _generic_wprime_measured(model_label, name):
+    """Whether decision 66 turns generic_wprime_backward on for ``model_label`` on the GPU ``name``."""
+    if model_label in DECISION_66_GENERIC_WPRIME_LABEL_GPUS:
+        return name in DECISION_66_GENERIC_WPRIME_LABEL_GPUS[model_label]
+    return model_label in DECISION_66_GENERIC_WPRIME_LABELS and name in DECISION_66_GENERIC_WPRIME_GPUS
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 2.030 / 2.027 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeForce RTX 5060 Ti",
@@ -1310,8 +1326,7 @@ class FixedPlanner:
                 v["_why"]["fold_product_linear"] += f"; stage 2: off, {reason}"
         # generic_fused_folded_forward + generic_wprime_backward (decision 66, measured labels and GPUs only).
         generic_wprime = (not support["fold_cutoff"][0] and v["radial_tables"] and v["wprime_backward"]
-                          and model_label in DECISION_66_GENERIC_WPRIME_LABELS
-                          and getattr(hardware, "name", None) in DECISION_66_GENERIC_WPRIME_GPUS)
+                          and _generic_wprime_measured(model_label, getattr(hardware, "name", None)))
         if v["chunked_conv_backward"] and "chunked_conv_backward" not in explicit and not support["fold_cutoff"][0]:
             # The generic folded path (generic_chunked_conv_backward): decision 66, measured GPUs only.
             name = getattr(hardware, "name", None)
@@ -1407,7 +1422,8 @@ class FixedPlanner:
                                                       f"measured GPU, decision 66 ({hardware.name})")
             else:
                 reason = (f"not a measured GPU, decision 66 ({getattr(hardware, 'name', None)})"
-                          if model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                          if (model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                              or model_label in DECISION_66_GENERIC_WPRIME_LABEL_GPUS)
                           else f"not MH-1, decision 64 (label {model_label})")
                 v["fused_folded_forward"] = False
                 v["_auto_off"]["fused_folded_forward"] = reason
@@ -1424,6 +1440,7 @@ class FixedPlanner:
                 v["_why"]["wprime_backward"] += f"; stage 2: on, {model_label} on a measured GPU, decision 66 ({name})"
             else:
                 measured = (_mh1(model_label) or model_label in DECISION_66_GENERIC_WPRIME_LABELS
+                            or model_label in DECISION_66_GENERIC_WPRIME_LABEL_GPUS
                             or _qualified_polar(traits, model_label))
                 reason = (f"not a measured model, decision 66 (label {model_label})" if not measured
                           else f"not a measured GPU, decision 66 ({name})")

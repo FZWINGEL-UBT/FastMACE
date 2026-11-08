@@ -73,6 +73,7 @@ LABEL_FACTS = {
     "mp0b3-medium": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
     "mpa0-medium": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
     "omat0-medium": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
+    "omat0-small": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
     "matpes-pbe": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
     "matpes-r2scan": ("ScaleShiftMACE", (DENSITY_FIRST, DENSITY), True, ()),
     "mh1-omat": ("ScaleShiftMACE", (MH1, MH1), False, ()),
@@ -110,9 +111,9 @@ def traits(label):
     return capabilities.model_traits(stand_in(label))
 
 
-def test_the_19_labels():
+def test_the_20_labels():
     assert set(LABEL_FACTS) == set(labels.LABELS)
-    assert len(LABELS) == 19
+    assert len(LABELS) == 20  # the 19 of SPEC §12.5 and OMAT-0 small (8 November 2026)
 
 
 # --------------------------------------------------------------------------- planner helpers
@@ -342,7 +343,7 @@ def test_grouped_launch_default_is_the_generic_mace_family():
     """Owner decision 57 (OPT4-T04): auto turns grouped_launch on for the generic MACE family, and (decision 66) for
     MH-1 on the measured GPUs, in float32 plans; explicit 'on' and 'off' override it."""
     assert set(GENERIC_FAMILY_LABELS) == {"mp0-medium", "mp0-large", "mp0b3-medium", "mpa0-medium", "omat0-medium",
-                                          "matpes-pbe", "matpes-r2scan"}
+                                          "omat0-small", "matpes-pbe", "matpes-r2scan"}
     plan = plan_for("omat0-medium")
     item, choice, reason = decision(plan, "RewriteConfig.grouped_launch")
     assert choice == "on" and "generic_mace_family" in reason
@@ -1107,6 +1108,29 @@ def test_decision_66_generic_wprime_and_fused_forward_for_omat0():
         p = plan(a100_80, **configs)
         assert (p.rewrites.wprime_backward, p.rewrites.fused_folded_forward, p.rewrites.chunked_conv_backward) == \
             ("off", "off", "off"), configs
+
+
+def test_decision_66_omat0_small_takes_mediums_pair_on_the_h200_only():
+    """OMAT-0 small (8 November 2026, results/h200-omat0-small-20261108): 3xTF32 GEMMs and the generic w' (with the
+    fused forward and the chunked carrier) on the H200, where Benchmark_loup measured them (2.29 against 5.41 ms per
+    step); every other GPU waits for its own A/B. OMAT-0 medium's lists are unchanged."""
+    h200 = Hardware("NVIDIA H200", (9, 0), 141 * 2**30)
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+
+    def plan(hardware, label="omat0-small"):
+        return planner(engine=EngineConfig()).plan(traits(label), nacl(), IntegratorConfig(), hardware,
+                                                   model_label=label)
+
+    p = plan(h200)
+    assert (p.rewrites.tf32x3_gemms, p.rewrites.wprime_backward, p.rewrites.fused_folded_forward,
+            p.rewrites.chunked_conv_backward) == ("on", "on", "on", "on")
+    assert "omat0-small (generic) on a measured GPU, decision 66 (NVIDIA H200)" in         decision(p, "RewriteConfig.wprime_backward")[2]
+    for hardware in (a100_80, GPU, ADA):
+        p = plan(hardware)
+        assert (p.rewrites.tf32x3_gemms, p.rewrites.wprime_backward, p.rewrites.fused_folded_forward) ==             ("off", "off", "off"), hardware.name
+        assert dict(p.auto_options_off)["wprime_backward"] == f"not a measured GPU, decision 66 ({hardware.name})"
+    for hardware in (h200, a100_80):
+        assert plan(hardware, "omat0-medium").rewrites.wprime_backward == "on"
 
 
 def test_decision_66_gate_epilogue_on_the_measured_gpus():

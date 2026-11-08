@@ -18,7 +18,7 @@ from fastmace.model import labels
 # The parameter set every label's "d3bj" expands to, or the reason it is refused (a word of the
 # ValueError). Written out by hand from SPEC §7.7, so a label-table change fails here.
 EXPECTED = {
-    "mp0-medium": "pbe", "mp0-large": "pbe", "mp0b3-medium": "pbe", "mpa0-medium": "pbe", "omat0-medium": "pbe",
+    "mp0-medium": "pbe", "mp0-large": "pbe", "mp0b3-medium": "pbe", "mpa0-medium": "pbe", "omat0-medium": "pbe", "omat0-small": "pbe",
     "matpes-pbe": "pbe", "matpes-r2scan": "r2scan", "mh1-omat": "pbe", "mh1-mp": "pbe", "mh1-r2scan": "r2scan",
     "polar1-s": "unknown", "polar1-m": "unknown", "polar1-l": "unknown",
     "omol0-xl": "VV10",

@@ -39,6 +39,8 @@ in the model's dtype (SPEC §6.4).
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from fastmace.kernels.gpu_models import GPUModels
 from fastmace.model.capabilities import FACTORED_INTERACTIONS
 from fastmace.rewrites.registry import Rewrite, Support, check_tensors
@@ -423,13 +425,20 @@ GENERIC_FOLD_READOUT_TAIL = None
 # Benchmark_loup, ab / ba): MD step b/a 0.9861 / 0.9908 against the A100 defaults, off again from all ten H200
 # switches 1.0097 / 1.0072 (b = off); gate passes.
 GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# A label's own GPUs instead of GENERIC_FOLD_READOUT_TAIL_GPUS (as fastmace.planner.fixed's
+# DECISION_66_TF32X3_MODEL_GPUS). OMAT-0 small (8 November 2026, results/h200-omat0-small-20261108, Benchmark_loup on
+# the H200 with medium's settings, b = off, ab / ba): 1.0131 / 1.0173, the fold slower; not measured elsewhere.
+GENERIC_FOLD_READOUT_TAIL_MODEL_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(()),
+})
 
 
-def generic_fold_readout_tail_default(name=None) -> bool:
-    """``GENERIC_FOLD_READOUT_TAIL`` (None: ``name`` in ``GENERIC_FOLD_READOUT_TAIL_GPUS``)."""
+def generic_fold_readout_tail_default(name=None, label=None) -> bool:
+    """``GENERIC_FOLD_READOUT_TAIL`` (None: ``name`` in ``GENERIC_FOLD_READOUT_TAIL_MODEL_GPUS[label]`` for a listed
+    model label, else in ``GENERIC_FOLD_READOUT_TAIL_GPUS``)."""
     on = GENERIC_FOLD_READOUT_TAIL
     if on is None:
-        on = name in GENERIC_FOLD_READOUT_TAIL_GPUS
+        on = name in GENERIC_FOLD_READOUT_TAIL_MODEL_GPUS.get(label, GENERIC_FOLD_READOUT_TAIL_GPUS)
     return bool(on)
 
 
@@ -456,7 +465,7 @@ def _generic_consumers(model):
     return out
 
 
-def fold_generic_product(model):
+def fold_generic_product(model, label=None):
     """Fold ``products.0.linear`` of a generic model into the consumers of layer 0's output (``Identity`` left in its
     place). The block linears become their compositions (``modules.compose``); the second interaction's species skip
     becomes a species skip of the contraction's output (``modules.compose_species_skip``). Needs block_linear and
@@ -493,7 +502,7 @@ def fold_generic_product(model):
             first.skip_tp = m.compose_species_skip(first.linear, first.skip_tp)
             first.linear = torch.nn.Identity()
             names += ["interactions.0.linear", "interactions.0.skip_tp"]
-        names += _fold_generic_tail(model, m)
+        names += _fold_generic_tail(model, m, label)
     return ["products.0.linear", *names]
 
 
@@ -524,9 +533,10 @@ def _generic_tail_applies(model):
     return attribute, layer, product, (skip if adds_skip else None)
 
 
-def _fold_generic_tail(model, m):
+def _fold_generic_tail(model, m, label=None):
     """GENERIC_FOLD_READOUT_TAIL: the last readout's first linear folded into the last product's linear and the last
-    species skip; the replaced names (none where it is off or does not apply)."""
+    species skip; the replaced names (none where it is off or does not apply). ``label``: the model's label-table
+    label (``GENERIC_FOLD_READOUT_TAIL_MODEL_GPUS``), None outside the table."""
     import torch
 
     found = _generic_tail_applies(model)
@@ -536,7 +546,7 @@ def _fold_generic_tail(model, m):
     device = layer.weight_0.device
     on = GENERIC_FOLD_READOUT_TAIL
     if on is None:  # the listed GPUs only; an explicit True folds on any device (tests, A/B)
-        on = device.type == "cuda" and generic_fold_readout_tail_default(torch.cuda.get_device_name(device))
+        on = device.type == "cuda" and generic_fold_readout_tail_default(torch.cuda.get_device_name(device), label)
     if not on:
         return []
     index = len(model.interactions) - 1
@@ -598,7 +608,7 @@ def _generic_product_selfcheck(original, rewritten, context):
 
 
 def _apply_generic_product(model, context):
-    return fold_generic_product(model)
+    return fold_generic_product(model, context.inputs.get("model_label"))
 
 
 # --------------------------------------------------------------------------- records

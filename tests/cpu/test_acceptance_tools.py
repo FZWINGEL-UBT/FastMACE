@@ -437,16 +437,20 @@ def test_ab_tool_fastmace_integrator_follows_the_arguments(tmp_path):
 def test_gate_labels_are_the_19_labels():
     from fastmace.model.labels import LABELS, MACE_OFF_LABELS
 
+    from fastmace.model.labels import EXTRA_LABELS
+
     assert len(suites.GATE_LABELS) == 19
-    assert set(suites.GATE_LABELS) == set(LABELS)
+    assert set(suites.GATE_LABELS) == set(LABELS) - set(EXTRA_LABELS)
     assert suites.MACE_OFF_LABELS == MACE_OFF_LABELS
-    assert set(suites.CHECKPOINT_OF) == set(LABELS)
+    assert set(suites.CHECKPOINT_OF) == set(LABELS) - set(EXTRA_LABELS)
 
 
 def test_checkpoint_files_are_the_release_names():
     from fastmace.model.labels import LABELS
 
     for label, entry in LABELS.items():
+        if label not in suites.CHECKPOINT_OF:  # EXTRA_LABELS: not in the acceptance suite
+            continue
         assert suites.CHECKPOINT_FILES[suites.CHECKPOINT_OF[label]] == entry.checkpoint.url.rsplit("/", 1)[1]
 
 
