@@ -64,6 +64,7 @@ def capture(args):
         sha = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
         loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha)
         _, base = ab_step_time.read_structure(args.structure, None)
+        captured["numbers"] = base.get_atomic_numbers().tolist()
         field = ForceField(loaded, base, precision="float32", rewrites="auto")
         integrator = IntegratorConfig(temperature_K=300.0, timestep_fs=1.0)
         plan = planner.plan(field, base, integrator, Workload(max_temperature_K=300.0), planner.hardware())
@@ -81,13 +82,14 @@ def capture(args):
     finally:
         for name, cls in classes.items():
             cls.__call__ = originals[name]
+    numbers = captured.pop("numbers")
     missing = [n for n in classes if n not in captured]
     if missing:
         raise SystemExit(f"no eager call of {missing} (is SPLINE_W on?)")
     del engine, field, plan, loaded
     gc.collect()
     torch.cuda.empty_cache()
-    return captured, sha
+    return captured, sha, numbers
 
 
 def one_slab(name, args, r_max):
@@ -134,33 +136,21 @@ def slab_sorted(args):
     return args
 
 
-def species_blocks(kernel, args, r_max):
+def species_blocks(kernel, numbers):
     """BLOCK_ORDER's variant of a captured forward: the same kernel rendered with an order argument, and the receivers
-    grouped by species (the receiver's species from its first edge's pair, sender x S + receiver; H200 tables are
-    not SYMMETRIC_PAIRS). Returns (kernel, order, seconds of the order's construction per call) or None."""
+    grouped by species (the structure's atomic numbers). Returns (kernel, order, microseconds of the order's
+    construction per call)."""
     import torch
 
     from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, receiver_order
-    row_ptr, r, pair, table = args[3], args[4], args[5], args[6]
-    species = int(round((table.shape[0] / kernel.intervals) ** 0.5))
-    counts = (row_ptr[1:] - row_ptr[:-1]).long()
-    edges = int(counts.sum())
-    receiver = torch.repeat_interleave(torch.arange(counts.numel(), device=r.device), counts)
-    inside = r.reshape(-1)[:edges] < r_max  # padding and edges past the cutoff carry no species information
-    own = pair[:edges].long() % species
-    receiver_species = torch.full((counts.numel(),), species, dtype=torch.long, device=r.device)
-    receiver_species.scatter_reduce_(0, receiver[inside], own[inside], "amin", include_self=True)
-    if not torch.equal(receiver_species[receiver[inside]], own[inside]):
-        print("species-blocks: pair % S differs within a receiver (symmetric tables?); skipped", flush=True)
-        return None
-    first = row_ptr[:-1].long().clamp(0, pair.numel() - 1)
     ordered = SplineForward(*kernel.init_args, block_order=True)
-    order = receiver_order(receiver_species)
+    z = torch.as_tensor(numbers, device="cuda")
+    order = receiver_order(z)
     torch.cuda.synchronize()
     start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     start.record()
     for _ in range(20):
-        receiver_order(torch.where(counts > 0, pair[first].long() % species, species))  # the per-call cost
+        receiver_order(z)  # the per-call cost, were it rebuilt every call
     end.record()
     end.synchronize()
     return ordered, order, start.elapsed_time(end) / 20 * 1000.0
@@ -187,7 +177,7 @@ def main(argv=None):
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=True)
-    captured, sha = capture(args)
+    captured, sha, numbers = capture(args)
     flush = torch.empty(args.flush_l2_mb * 2 ** 20 // 4, dtype=torch.float32, device="cuda")
     result = dict(tool="spline_table_bound", created_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                   host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
@@ -200,7 +190,7 @@ def main(argv=None):
         kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "forward":
             variants["slab-sorted"] = sorted_args = slab_sorted(real)
-            blocks = species_blocks(kernel, real, r_max)
+            blocks = species_blocks(kernel, numbers)
             if blocks is not None:
                 ordered, order, build_us = blocks
                 print(f"species-blocks: the order costs {build_us:.1f} us per call (eager torch)", flush=True)

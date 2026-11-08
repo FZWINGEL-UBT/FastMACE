@@ -36,9 +36,12 @@ COMPACT_CHUNK = 1 << 22
 # keeps the order, so between rebuilds every receiver walks its edges nearly by length; neighbouring receivers then
 # read the same spline-table slabs at about the same time (SPLINE_W forward: one 20 KB slab per edge, about 45 % of
 # its time on the H200; lab: 792 -> 680 us, results/omat0-breakthroughs-assessment-20261108). Only the summation
-# order within a receiver changes (rounding). None: on for SORT_BY_LENGTH_GPUS (none until the MD A/B).
+# order within a receiver changes (rounding). None: on for SORT_BY_LENGTH_GPUS (decision 66).
 SORT_BY_LENGTH = None
-SORT_BY_LENGTH_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`): MD
+# step b/a 0.9807 / 0.9791 (ab / ba, 3.585 -> 3.514 ms); gate passes (forces 0.83 / 0.92 / 0.97, stress 0.48 / 0.94 /
+# 1.07 against 3).
+SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200",))
 LENGTH_BINS = 4096
 
 

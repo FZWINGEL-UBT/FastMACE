@@ -336,6 +336,8 @@ def test_sort_by_length_is_off_by_default_and_needs_sort_receivers(monkeypatch):
 
     atoms = nacl(rattle=0.05, seed=1)
     assert skin.SORT_BY_LENGTH is None and not skin.sort_by_length_default("cpu")
+    assert "NVIDIA H200" in skin.SORT_BY_LENGTH_GPUS and "NVIDIA H200 NVL" in skin.SORT_BY_LENGTH_GPUS
+    assert "NVIDIA GeForce RTX 5060 Ti" not in skin.SORT_BY_LENGTH_GPUS
     assert not make(atoms, sort=True).sort_by_length
     monkeypatch.setattr(skin, "SORT_BY_LENGTH", True)
     assert make(atoms, sort=True).sort_by_length and not make(atoms, sort=False).sort_by_length
