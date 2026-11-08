@@ -1,0 +1,8 @@
+null	--b-constant fastmace.model.energy:HEAD_SLICE=True
+tf32x3	--b tf32x3_gemms=on
+grouped	--b grouped_launch=on
+speciesgemm	--b-constant fastmace.rewrites.generic.modules:SPECIES_GEMM=True
+edgeshoff	--b-constant fastmace.rewrites.generic.modules:EDGE_SH=False
+headsliceoff	--b-constant fastmace.model.energy:HEAD_SLICE=False
+graphsumoff	--b-constant fastmace.model.energy:GRAPH_SUM=False
+chunkffwd	--b chunked_conv_backward=on fused_folded_forward=on

@@ -1,0 +1,6 @@
+export PYTHONPATH=$B/src-d2e6c1d9; cd $PYTHONPATH
+for p in polar1-s:MACE-POLAR-1-S.model polar1-m:MACE-POLAR-1-M.model polar1-l:MACE-POLAR-1-L.model; do
+  m=${p%%:*}; c=${p#*:}
+  OUT=$B/runs/fold-m80-$m-$SLURM_JOB_ID MODEL=$m CKPT=$c STRUCTS="NaCl NbCl5" SETS_FILE=$B/sets/fold.tsv BLOCK=400 BLOCKS=12 bash tools/offpolar_ab.sh
+done
+grep -h "end ab" $B/runs/fold-m80-*-$SLURM_JOB_ID/run.log

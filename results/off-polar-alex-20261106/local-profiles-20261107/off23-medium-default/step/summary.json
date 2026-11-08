@@ -1,0 +1,142 @@
+{
+ "model": "off23-medium",
+ "structure": "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1",
+ "natoms": 648,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 8.187680699920747,
+ "traced_span_ms_per_step": 7.838583349609376,
+ "kernels_per_step": 305.74,
+ "kernel_busy_ms_per_step": 7.521488505000051,
+ "idle_gaps_ms_per_step": 0.317093603515625,
+ "gaps_over_20us_ms_per_step": 0.22033807617187498,
+ "kernels_under_5us_per_step": 137.34,
+ "kernels_under_10us_per_step": 180.5,
+ "time_in_kernels_under_10us_ms_per_step": 0.5451390999999964,
+ "top": [
+  [
+   "oeq_projected_backward",
+   24.96,
+   1.4319833400000008
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3",
+   11.44,
+   1.3911843599999991
+  ],
+  [
+   "Kernel",
+   25.24,
+   1.3061426400000011
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   17.68,
+   0.9164348999999998
+  ],
+  [
+   "backward(float*, float*, float*, float*, float*, float*, float*, ConvD",
+   1.04,
+   0.57451188
+  ],
+  [
+   "oeq_projected_forward",
+   1.04,
+   0.51395144
+  ],
+  [
+   "forward(float*, float*, float*, float*, ConvData, void*)",
+   1.04,
+   0.4819753599999999
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_tn_align1>(cutla",
+   3.12,
+   0.4479004400000002
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nt_align1>(cutla",
+   3.12,
+   0.36182366000000016
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, ",
+   8.32,
+   0.24518975999999992
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_9",
+   5.2,
+   0.14123037999999988
+  ],
+  [
+   "triton_poi_fused_mul_silu_30",
+   5.2,
+   0.09409983999999996
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutla",
+   8.32,
+   0.07204941999999998
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   10.4,
+   0.06344560000000002
+  ],
+  [
+   "triton_poi_fused__to_copy__unsafe_view_add_clone_slice_slice_backward_",
+   1.04,
+   0.057529899999999995
+  ],
+  [
+   "triton_poi_fused_mul_silu_backward_8",
+   1.04,
+   0.05025383999999999
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_51",
+   1.04,
+   0.032310200000000004
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_transpose",
+   1.04,
+   0.029536299999999995
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_50",
+   1.04,
+   0.024118679999999997
+  ],
+  [
+   "segmented_polynomial_bwd_split1_of_2_algo1_4",
+   1.04,
+   0.022685999999999994
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_div_mm_permute_slice_backward_",
+   1.04,
+   0.020480740000000008
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_inde",
+   2.88,
+   0.019512719999999987
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunc",
+   5.48,
+   0.019107439999999965
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_49",
+   1.04,
+   0.01909334
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunc",
+   7.88,
+   0.018731700000000004
+  ]
+ ]
+}

@@ -1,0 +1,173 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-07T13:18:43.623277+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "d8817540f6494d8462c42ad66200c891e6ddabcc",
+  "model": "off23b-medium",
+  "checkpoint_sha256": "871653738a4fbc8124dba1ff5bc595bd0abf7b849a8538c0825dc29ebadf1680",
+  "sides": {
+    "a": {},
+    "b": {
+      "radial_tables": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP": true,
+      "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 500,
+    "block": 1000,
+    "blocks": 16
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "water_216": {
+      "natoms": 648,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 6.081436317999987,
+            "mean_ms": 6.105956325499989,
+            "min_ms": 6.034762153999964,
+            "max_ms": 6.2261905120000165,
+            "stdev_ms": 0.08443993483245321,
+            "spread": 0.03147749116988341,
+            "block_ms": [
+              6.2261905120000165,
+              6.099643138000033,
+              6.034762153999964,
+              6.0632294979999415
+            ]
+          },
+          "b": {
+            "median_ms": 3.8904553054999838,
+            "mean_ms": 3.909890519749979,
+            "min_ms": 3.845532315000014,
+            "max_ms": 4.013119152999934,
+            "stdev_ms": 0.07362693049841519,
+            "spread": 0.043076407474210175,
+            "block_ms": [
+              4.013119152999934,
+              3.909286003000034,
+              3.8716246079999337,
+              3.845532315000014
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.6397263906200772,
+        "pair_ratios_b_over_a": [
+          0.6445545065261445,
+          0.6409040520166923,
+          0.6415538026521462,
+          0.6342382910408599
+        ],
+        "stopped_after": 4
+      },
+      "ratio_b_over_a": 0.6397263906200772,
+      "pair_ratios": [
+        0.6445545065261445,
+        0.6409040520166923,
+        0.6415538026521462,
+        0.6342382910408599
+      ],
+      "setup_s": {
+        "a": 48.207200951999994,
+        "b": 28.623653253999976
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.radial_tables = off  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: off, tables with a stock first block not measured on this GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+        ],
+        "b": [
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: on, generic radial tables (explicit))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 326.7668982068986,
+          "potential_eV_atom": -693.8427583316754,
+          "kinetic_eV_atom": 0.04223787457675014
+        },
+        "b": {
+          "temperature_K": 315.2120891175106,
+          "potential_eV_atom": -693.8429090810204,
+          "kinetic_eV_atom": 0.040744300473149093
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 958,
+          "pipelined_redos": 58,
+          "pipelined_early_rebuilds": 900
+        },
+        "b": {
+          "rebuilds": 963,
+          "pipelined_redos": 72,
+          "pipelined_early_rebuilds": 891
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

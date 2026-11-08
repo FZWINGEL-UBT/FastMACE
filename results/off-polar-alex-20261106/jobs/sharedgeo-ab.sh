@@ -1,0 +1,15 @@
+#!/bin/bash -l
+#SBATCH --job-name=fm-sharedgeo-ab
+#SBATCH -p a100 --gres=gpu:a100:1 -C a100_80
+#SBATCH --time=03:00:00
+#SBATCH --export=NONE
+#SBATCH --output=/home/atuin/v130cb/v130cb18/fm-offpolar/logs/%x-%j.out
+unset SLURM_EXPORT_ENV
+source /home/atuin/v130cb/v130cb18/fm-offpolar/jobs/env.sh
+nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader; echo node $SLURM_JOB_NODELIST commit $(cat .source_commit)
+export PYTHONPATH=$B/src-ecbba373; cd $PYTHONPATH
+for p in polar1-s:MACE-POLAR-1-S.model polar1-m:MACE-POLAR-1-M.model polar1-l:MACE-POLAR-1-L.model; do
+  m=${p%%:*}; c=${p#*:}
+  OUT=$B/runs/sharedgeo-m80-$m-$SLURM_JOB_ID MODEL=$m CKPT=$c STRUCTS="NaCl NbCl5" SETS_FILE=$B/sets/sharedgeo.tsv BLOCK=400 BLOCKS=12 bash tools/offpolar_ab.sh
+done
+grep -h "end ab" $B/runs/sharedgeo-m80-*-$SLURM_JOB_ID/run.log

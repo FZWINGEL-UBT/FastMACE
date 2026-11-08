@@ -1,0 +1,8 @@
+export PYTHONPATH=$B/src-0f82e749; cd $PYTHONPATH
+python -m pytest -q -p no:cacheprovider tests/gpu/test_fourier_cuda.py 2>&1 | tail -3 | sed 's/^/FOURIERTEST /' | tee $B/runs/fourier-test-$SLURM_JOB_ID.txt
+grep -q ' failed\| error' $B/runs/fourier-test-$SLURM_JOB_ID.txt && { echo TRACEBACK fourier kernel test failed; exit 1; }
+for p in polar1-s:MACE-POLAR-1-S.model polar1-m:MACE-POLAR-1-M.model polar1-l:MACE-POLAR-1-L.model; do
+  m=${p%%:*}; c=${p#*:}
+  OUT=$B/runs/jointbw-m80-$m-$SLURM_JOB_ID MODEL=$m CKPT=$c STRUCTS="NaCl NbCl5" SETS_FILE=$B/sets/jointbw.tsv BLOCK=400 BLOCKS=12 bash tools/offpolar_ab.sh
+done
+grep -h "end ab" $B/runs/jointbw-m80-*-$SLURM_JOB_ID/run.log

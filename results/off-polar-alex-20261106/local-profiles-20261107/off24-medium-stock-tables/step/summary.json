@@ -1,0 +1,142 @@
+{
+ "model": "off24-medium",
+ "structure": "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/f88975f7f53aa3f2/90f7a089-dfeb-401d-92e7-193574c2ffdf/scratchpad/organic/water_216.extxyz@1x1x1",
+ "natoms": 648,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 7.840558460156899,
+ "traced_span_ms_per_step": 8.2037045703125,
+ "kernels_per_step": 291.38,
+ "kernel_busy_ms_per_step": 7.90464728031254,
+ "idle_gaps_ms_per_step": 0.299055947265625,
+ "gaps_over_20us_ms_per_step": 0.215336591796875,
+ "kernels_under_5us_per_step": 129.66,
+ "kernels_under_10us_per_step": 170.74,
+ "time_in_kernels_under_10us_ms_per_step": 0.5135052399999984,
+ "top": [
+  [
+   "Kernel",
+   39.08,
+   2.328241899999999
+  ],
+  [
+   "oeq_projected_backward",
+   37.74,
+   2.1615122999999956
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3",
+   2.04,
+   1.6701304400000003
+  ],
+  [
+   "backward(float*, float*, float*, float*, float*, float*, float*, ConvD",
+   1.02,
+   0.8712226400000003
+  ],
+  [
+   "oeq_projected_forward",
+   1.02,
+   0.78389984
+  ],
+  [
+   "forward(float*, float*, float*, float*, ConvData, void*)",
+   1.02,
+   0.7232336599999999
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   12.24,
+   0.22072473999999986
+  ],
+  [
+   "backward",
+   2.04,
+   0.13373354000000007
+  ],
+  [
+   "gemm",
+   10.2,
+   0.09827833999999996
+  ],
+  [
+   "forward",
+   2.04,
+   0.09747124
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutla",
+   8.16,
+   0.06763640000000007
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   10.2,
+   0.06394298000000012
+  ],
+  [
+   "triton_poi_fused__to_copy__unsafe_view_add_clone_slice_slice_backward_",
+   1.02,
+   0.055770179999999975
+  ],
+  [
+   "void at::native::radixSortKVInPlace<-2, -1, 32, 32, long, long, unsign",
+   2.04,
+   0.03487419999999999
+  ],
+  [
+   "triton_poi_fused_radial_table_backward_slice_backward_20",
+   1.02,
+   0.031942379999999986
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_34",
+   1.02,
+   0.0315065
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_2",
+   1.02,
+   0.030759680000000005
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_transpose",
+   1.02,
+   0.029297920000000005
+  ],
+  [
+   "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_inde",
+   3.24,
+   0.029240980000000003
+  ],
+  [
+   "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepK",
+   2.56,
+   0.028300780000000008
+  ],
+  [
+   "triton_poi_fused_mm_19",
+   1.02,
+   0.026688020000000003
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_33",
+   1.02,
+   0.023943100000000005
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunc",
+   8.32,
+   0.021203759999999995
+  ],
+  [
+   "triton_poi_fused_clone_slice_18",
+   1.02,
+   0.020561859999999994
+  ],
+  [
+   "triton_poi_fused__unsafe_view_cat_clone_slice_32",
+   1.02,
+   0.018737300000000002
+  ]
+ ]
+}
