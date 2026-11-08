@@ -113,6 +113,27 @@ def one_slab(name, args, r_max):
     return args, int(inside.sum())
 
 
+def slab_sorted(args):
+    """The forward's arguments with every receiver's edges reordered by (pair, length): the same message up to the
+    summation order, so co-resident receivers walk the same slabs at about the same time."""
+    import torch
+    args = list(args)
+    sh, senders, row_ptr, r, pair = args[1], args[2], args[3], args[4], args[5]
+    counts = (row_ptr[1:] - row_ptr[:-1]).long()
+    receiver = torch.repeat_interleave(torch.arange(counts.numel(), device=r.device), counts)
+    if r.dtype == torch.int32 and r.dim() == 2:  # SHARED_LOCATOR records: slab, then t
+        within = r[:, 0].double() * 2.0 + r[:, 1].view(torch.float32).double()
+    else:
+        within = pair.double() * 16.0 + r.reshape(-1).double()
+    edges = receiver.numel()
+    key = receiver.double() * 1e3 + within[:edges] / 1e2
+    order = torch.argsort(key, stable=True)
+    if r.shape[0] > edges:  # rows past row_ptr's end stay where they are
+        order = torch.cat([order, torch.arange(edges, r.shape[0], device=r.device)])
+    args[1], args[2], args[4], args[5] = sh[order], senders[order], r[order], pair[order]
+    return args
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", type=Path, required=True)
@@ -143,20 +164,34 @@ def main(argv=None):
     r_max = float(captured["wprime"][1][16])  # the cutoff; padded edges sit at or beyond it
     for name, (kernel, real) in captured.items():
         slab, inside = one_slab(name, real, r_max)
+        variants = {"real": real, "one-slab": slab}
+        if name == "forward":
+            variants["slab-sorted"] = slab_sorted(real)
 
         def launch(a):
             if name == "wprime":
                 a[6].zero_()
             kernel(*a)
 
-        times = {"real": {"flush": [], "warm": []}, "one-slab": {"flush": [], "warm": []}}
+        times = {label: {"flush": [], "warm": []} for label in variants}
         for _ in range(3):
-            launch(real)
-            launch(slab)
+            for a in variants.values():
+                launch(a)
         torch.cuda.synchronize()
+        if "slab-sorted" in variants:  # the same message up to summation order
+            outs = []
+            for a in (variants["real"], variants["slab-sorted"]):
+                o = [t.clone().zero_() for t in a[7]]
+                kernel(*a[:7], o)
+                outs.append(o)
+            torch.cuda.synchronize()
+            worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(*outs))
+            print(f"forward slab-sorted against real: max|d|/max|a| {worst:.2e}", flush=True)
+        labels = list(variants)
         for k in range(args.rounds):
-            order = (("real", real), ("one-slab", slab)) if k % 2 == 0 else (("one-slab", slab), ("real", real))
-            for label, a in order:
+            ordered = labels if k % 2 == 0 else labels[::-1]
+            for label in ordered:
+                a = variants[label]
                 for mode in ("flush", "warm"):
                     if mode == "flush":
                         flush.zero_()
@@ -172,12 +207,14 @@ def main(argv=None):
                     times[label][mode].append(start.elapsed_time(end) * 1000.0)
         med = {label: {mode: statistics.median(v) for mode, v in d.items()} for label, d in times.items()}
         entry = dict(edges=int(real[1].shape[0]), edges_inside=inside, median_us=med,
-                     one_slab_over_real={mode: med["one-slab"][mode] / med["real"][mode] for mode in ("flush", "warm")},
+                     over_real={label: {mode: med[label][mode] / med["real"][mode] for mode in ("flush", "warm")}
+                                for label in variants},
                      registers=getattr(kernel, "registers", None))
         result["kernels"][name] = entry
-        print(f"{name}: edges {entry['edges']} (inside {inside}); real flush {med['real']['flush']:.1f} / warm "
-              f"{med['real']['warm']:.1f} us; one-slab flush {med['one-slab']['flush']:.1f} / warm "
-              f"{med['one-slab']['warm']:.1f} us; ratio {entry['one_slab_over_real']}", flush=True)
+        print(f"{name}: edges {entry['edges']} (inside {inside}); " + "; ".join(
+            f"{label} flush {med[label]['flush']:.1f} / warm {med[label]['warm']:.1f} us "
+            f"(x {entry['over_real'][label]['flush']:.4f} / {entry['over_real'][label]['warm']:.4f})"
+            for label in variants), flush=True)
     (args.output / "spline_table_bound.json").write_text(json.dumps(result, indent=2) + "\n")
 
 
