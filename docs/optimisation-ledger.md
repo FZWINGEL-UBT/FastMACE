@@ -423,6 +423,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-off-radial-tf32x3-a100](#model-off-radial-tf32x3-a100) | Radial last layer as 3xTF32 on MACE-OFF | `RADIAL_TF32X3_GPUS` (eligible products), `RADIAL_TF32X3` | FM | DEFAULT (scoped: MACE-OFF, A100) | off-polar-alex 2026-11-07 (d66) | 0.914–0.971; with the two rows above 0.563–0.645 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-spin-batched](#model-polar-spin-batched) | POLAR-1's α and β field features in one call | `longrange.polar.SPIN_BATCHED` | FM | DEFAULT (pure removal, every GPU) | off-polar-alex 2026-11-07 | A100 S 0.912–0.943, M 0.961–0.971, L 0.976–0.985 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-update-fold](#model-polar-update-fold) | POLAR-1's field-update MLP folded at setup | `rewrites.polar.update_fold.FOLD_UPDATE` | FM | DEFAULT (pure removal, every GPU) | off-polar-alex 2026-11-08 | A100 NaCl 0.965–0.972, NbCl5 1.000; Ada NaCl 0.966–0.977 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
+| [model-polar-head-compose](#model-polar-head-compose) | POLAR-1's head projections composed into their l x l -> 0 dot products (P1) | `rewrites.polar.head_compose.COMPOSE_HEADS` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | 5060 Ti NaCl 0.872–0.909, NbCl5 0.997–1.005 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
+| [model-polar-dead-degrees](#model-polar-dead-degrees) | Dead POLAR head degrees pruned at setup (R5) | `rewrites.polar.head_liveness.PRUNE_DEAD_DEGREES` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | Ada NaCl 0.973–0.974, NbCl5 1.000–1.001; 5060 Ti L NaCl 0.975–0.979 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
+| [model-polar-phase-recurrence](#model-polar-phase-recurrence) | k-space cosines and sines from per-axis phase tables | `longrange.polar.PHASE_RECURRENCE` | FM | REJECTED (5060 Ti: tie) | polar-megakernel 2026-11-08 | 0.988–1.075 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-small-matmuls](#model-small-matmuls) | Small mm/addmm as an Inductor-fused multiply-sum | `rewrites.inductor.SMALL_MATMULS` | FM | REJECTED | off-polar-alex 2026-11-07 | 5060 Ti POLAR-S NaCl 0.951, NbCl5 1.00; OFF23-small 1.045–1.07 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-shared-geometry](#model-polar-shared-geometry) | One unmasked k-space geometry per POLAR call | `longrange.polar.SHARED_GEOMETRY` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.990–1.006 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-e3nn-block-linear](#model-polar-e3nn-block-linear) | e3nn Linears as BlockLinear on POLAR-1 | `rewrites.linear.E3NN_BLOCK_LINEAR` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.991–1.010 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
@@ -3946,6 +3949,46 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
   and L; the candidate's ratios are within the default's own spread (M NbCl5 energy 8.60 vs 7.15, forces 0.91 vs
   0.89).
 - Sources: [off-polar-alex](../results/off-polar-alex-20261106/README.md).
+
+<a id="model-polar-head-compose"></a>
+#### model-polar-head-compose: POLAR-1's head projections composed into their dot products (P1)
+- Switch: `rewrites.polar.head_compose.COMPOSE_HEADS` (applied with `polar_uvu`, after `FOLD_UPDATE`)
+- Engine: FM
+- Date/round: 7–8 November 2026, branch `fastmace/polar-megakernel`
+- What: in the field update and the electron readout, the o3 linears that project potentials, charges and node
+  features feed only l x l -> 0 dot products, so each dot product is computed from the composed [mul, sources]
+  maps directly (one narrow product and one square product per degree); constants composed at setup.
+- Status: DEFAULT (pure-removal rule, decision 66: the products are reassociated, as in `FOLD_UPDATE`; not slower
+  on any cell, gate passes for S, M and L). `False` keeps MACE's head projections; `uvu.revert` undoes it.
+- Measured (MD step b/a, abab / abba, RTX 5060 Ti, on the `FOLD_UPDATE` + `SPIN_BATCHED` baseline): NaCl S 0.906 /
+  0.909, M 0.876 / 0.872, L 0.883 / 0.879; NbCl5 S 1.001 / 1.005, M 0.997 / 1.000, L 1.002 / 0.998. Gates (3×):
+  pass on S and M (NaCl, NbCl5), L NaCl (RTX A4000) and L NbCl5 (Modal A100-80GB, $0.81; the float64 reference
+  does not fit 16–20 GB).
+- Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
+
+<a id="model-polar-dead-degrees"></a>
+#### model-polar-dead-degrees: dead POLAR head degrees pruned at setup (R5)
+- Switch: `rewrites.polar.head_liveness.PRUNE_DEAD_DEGREES` (applied with `polar_uvu`, before `FOLD_UPDATE`)
+- Engine: FM
+- Date/round: 7–8 November 2026, branch `fastmace/polar-megakernel`
+- What: liveness from the e3nn instructions. The update's `tp_out` paths writing degrees the readout's `linear_1`
+  never reads leave the fold; the electron readout's dot-product paths reading the structurally zero degree-two
+  expansion of charges and potentials go (bitwise exact).
+- Status: DEFAULT (pure removal, decision 66). `False` keeps every path; `uvu.revert` undoes it.
+- Measured (MD step b/a, abab / abba): RTX 4000 Ada (murphy) NaCl 0.974 / 0.973, NbCl5 1.000 / 1.001; RTX 5060 Ti
+  L NaCl 0.979 / 0.975, NbCl5 0.998 / 1.000. Gates pass (S, M, L NaCl).
+- Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
+
+<a id="model-polar-phase-recurrence"></a>
+#### model-polar-phase-recurrence: k-space cosines and sines from per-axis phase tables
+- Switch: `longrange.polar.PHASE_RECURRENCE` (A/B constant, off)
+- Engine: FM
+- Date/round: 7–8 November 2026, branch `fastmace/polar-megakernel`
+- What: exp(i k . r) as the product of three per-axis phase factors, so only (2M + 1) x 3 angles per atom go
+  through cos and sin.
+- Status: REJECTED (tie). RTX 5060 Ti S NaCl 0.997 / 1.008, NbCl5 1.075 / 0.988; M 0.994 / 0.993, 1.008 / 0.997;
+  L 0.992 / 0.988, NbCl5 1.017 (ab). Gate passes. The transcendentals were not the cost on this GPU.
+- Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
 
 <a id="model-small-matmuls"></a>
 #### model-small-matmuls: small mm/addmm as an Inductor-fused multiply-sum
