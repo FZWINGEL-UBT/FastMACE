@@ -201,3 +201,33 @@ def test_counting_plan_compiles_to_the_same_order():
 def test_count_plan_is_on_for_the_h200_and_the_a100():
     assert compose_skip.COUNT_PLAN is None and compose_skip.count_plan_default("NVIDIA H200")
     assert compose_skip.count_plan_default("NVIDIA A100-SXM4-80GB")  # A100 family, 8 November 2026
+
+
+def test_joined_layout_is_off_without_a_listed_gpu():
+    assert compose_skip.JOINED_LAYOUT is None and list(compose_skip.JOINED_LAYOUT_GPUS) == []
+    assert not compose_skip.joined_layout_default("NVIDIA H200")
+
+
+def test_species_mm_rows_equals_the_joined_product_of_the_row_groups():
+    """species_mm_rows reads each path as a row group of one [atoms * R, K] input (JOINED_LAYOUT) and returns one
+    gradient tensor; values and gradients are those of species_mm_joined on the paths' contiguous copies."""
+    from fastmace.kernels.triton.species_gemm import joined_rows, species_mm_joined, species_mm_rows, species_plan
+
+    g = torch.Generator().manual_seed(5)
+    atoms, k, n, species, sizes = 7, 12, 8, 3, [1, 3, 5, 7]
+    index = torch.randint(0, species, (atoms,), generator=g)
+    order, counts = species_plan(index, species)
+    ws = [torch.randn(species, k, n, generator=g, dtype=torch.float64) for _ in sizes]
+    w_ts = [w.transpose(1, 2).contiguous() for w in ws]
+    x = torch.randn(atoms * sum(sizes), k, generator=g, dtype=torch.float64, requires_grad=True)
+    gathers, scatters = joined_rows(order, sizes)
+    out = species_mm_rows(x, sizes, ws, w_ts, index, order, counts, scatters, "ieee")
+    views = x.detach().view(atoms, sum(sizes), k)
+    starts = [sum(sizes[:p]) for p in range(len(sizes))]
+    lefts = [views[:, s:s + size].clone().requires_grad_() for s, size in zip(starts, sizes)]
+    ref = species_mm_joined(lefts, ws, w_ts, index, order, counts, gathers, scatters, "ieee")
+    assert torch.equal(out, ref)
+    grad = torch.randn_like(out)
+    out.backward(grad)
+    ref.backward(grad)
+    assert torch.equal(x.grad.view(atoms, sum(sizes), k), torch.cat([left.grad for left in lefts], dim=1))

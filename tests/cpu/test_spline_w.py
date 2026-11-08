@@ -371,3 +371,57 @@ def test_stage_sh_reads_the_edge_features_from_shared_memory():
 
         for capability in ((9, 0), (8, 0)):
             assert compile_cubin(staged, capability)
+
+
+def test_wprime_stage_edges_is_off_without_a_listed_gpu():
+    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == []
+    assert wp.stage_edges_default("cpu") is False
+
+
+def test_wprime_stage_edges_stages_the_chunk_and_keeps_the_arithmetic():
+    """STAGE_EDGES (w'): the block's chunk of edges (features, sender, receiver, spline interval) staged once at block
+    entry; the edge body reads them from shared memory and does the same arithmetic in the same order."""
+    plain = _wprime(stage_dout=True, stage_sh=4)
+    staged = _wprime(stage_dout=True, stage_sh=4, stage_edges=True)
+    body = lambda src: [line.strip() for line in src.split("acc_t edge_gradient")[1].splitlines()  # noqa: E731
+                        if "fmaf" in line or "+=" in line]
+    assert body(plain) == body(staged)
+    assert "stage_esh[" in staged and "stage_slab[" in staged and "stage_rcv[" in staged
+    assert "lengths[e]" in plain and "lengths[e]" not in staged.split("STAGE_EDGES: the edge's staged")[1]
+    assert "receivers[stage_s]" in plain and "receivers[stage_s]" not in staged
+    assert staged.count(" u = (") == plain.count(" u = (")  # the same lookup, once per edge
+    for bad in (dict(stage_dout=True, stage_edges=True), dict(stage_sh=4, stage_edges=True),
+                dict(stage_dout=True, stage_sh=4, stage_edges=True, shared_locator=True)):
+        with pytest.raises(ValueError, match="stage_edges"):
+            _wprime(**bad)
+
+
+def test_wprime_stage_edges_source_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    for capability in ((9, 0), (8, 0), (12, 0)):
+        assert compile_cubin(_wprime(stage_dout=True, stage_sh=4, stage_edges=True), capability)
+
+
+def test_prefetch_ahead_hints_the_staged_rows_and_keeps_the_arithmetic():
+    """PREFETCH_AHEAD: with STAGE_EDGES the loop hints edge k + 2's first rows into L1 from the staged slab offsets;
+    off by default, and the loads and FMAs are those of STAGE_EDGES alone."""
+    assert sf.PREFETCH_AHEAD is None and list(sf.PREFETCH_AHEAD_GPUS) == [] and sf.prefetch_ahead_default("cpu") == 0
+    blocks = [(1, [0]), (3, [64])]
+    staged = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True)
+    hinted = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, stage_edges=True, prefetch=2)
+    assert "prefetch.global.L1" not in staged and "if (k + 2 < count)" in hinted
+    assert "s_tq[k + 2]" in hinted and 0 < hinted.count("prefetch.global.L1") <= sf.PREFETCH_PATHS
+    strip = lambda src: [line for line in src.splitlines() if "prefetch" not in line and "ahead" not in line  # noqa: E731
+                         and "PREFETCH_AHEAD" not in line and line.strip() != "}"]
+    assert strip(staged) == strip(hinted)
+    with pytest.raises(ValueError, match="stage_edges"):
+        sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, prefetch=2)
+    from fastmace.kernels import nvrtc_available
+    if nvrtc_available():
+        from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+        for capability in ((9, 0), (8, 0), (12, 0)):
+            assert compile_cubin(hinted, capability)

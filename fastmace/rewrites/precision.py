@@ -90,6 +90,7 @@ def _route_compose_skip(model):
         reassociation.compose_radial = None
         reassociation.compose_joined = False
         reassociation.count_plan = False
+        reassociation.joined_layout = False
         device = reassociation.columns.device
         if device.type != "cuda" or not compose_skip.compose_skip_default(torch.cuda.get_device_name(device)):
             continue
@@ -101,6 +102,7 @@ def _route_compose_skip(model):
             if not compose_skip.compose_fast_default(torch.cuda.get_device_name(device)):
                 continue
             reassociation.compose_joined = True
+            reassociation.joined_layout = compose_skip.joined_layout_default(torch.cuda.get_device_name(device))
             reassociation.compose_radial = getattr(module, "radial_last", None)
             table = reassociation._buffers.get("species_feats")
             if table is not None and reassociation.compose_radial is not None:

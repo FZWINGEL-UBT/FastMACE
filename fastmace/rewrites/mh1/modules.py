@@ -169,7 +169,8 @@ class FirstInteractionReassociation(torch.nn.Module):
         # (``bind`` composes the weights once per table), and the products through one joined species product
         self.compose_radial = None
         self.compose_joined = False
-        self.count_plan = False  # compose_skip.COUNT_PLAN: the species plan by a counting sort
+        self.count_plan = False
+        self.joined_layout = False  # compose_skip.JOINED_LAYOUT: the sums d-major, the paths read in place  # compose_skip.COUNT_PLAN: the species plan by a counting sort
 
     def bind(self, species_feats):
         """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address).
@@ -243,6 +244,13 @@ class FirstInteractionReassociation(torch.nn.Module):
         dim = edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
         # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
+        joined = (summed_fn is not None and self.joined_layout and self.compose_skip is not None and rows is None
+                  and self.compose_joined and self.tf32x3
+                  and getattr(self, "tf32x3_backend", None) == "cutlass")
+        if joined:  # JOINED_LAYOUT: [nodes, (l, m), slots, k]; _composed reads each path's rows in place
+            summed, width = summed_fn(key, nodes * slots, inner=slots)
+            return self._composed(summed.view(nodes, dim, slots, width), node_attrs, x, weight, nodes, slots, width,
+                                  joined=True)
         if summed_fn is not None:
             summed, width = summed_fn(key, nodes * slots)
             summed = summed.view(nodes, slots, dim, width)
@@ -288,12 +296,14 @@ class FirstInteractionReassociation(torch.nn.Module):
             start += size
         return torch.cat(blocks, dim=1)
 
-    def _composed(self, summed, node_attrs, x, weight, nodes, slots, width):
+    def _composed(self, summed, node_attrs, x, weight, nodes, slots, width, joined=False):
         """The message through the interaction's linear and the receivers' species skip
         (``kernels.triton.compose_skip``): per path ``species_mm(left, right L B_z)``, joined as the skip joins its
-        output blocks (ir_mul, path order)."""
+        output blocks (ir_mul, path order). ``joined`` (``JOINED_LAYOUT``): ``summed`` is [nodes, (l, m), slots,
+        k], and the paths are read in place as row groups (``species_mm_rows``)."""
         from fastmace.kernels.triton import compose_skip
-        from fastmace.kernels.triton.species_gemm import joined_rows, species_mm, species_mm_joined, species_plan
+        from fastmace.kernels.triton.species_gemm import (joined_rows, species_mm, species_mm_joined, species_mm_rows,
+                                                         species_plan)
 
         if torch.is_grad_enabled() and (weight.requires_grad or x.requires_grad):
             raise RuntimeError("compose_skip has no gradient for the weights: inference only (frozen parameters)")
@@ -313,7 +323,8 @@ class FirstInteractionReassociation(torch.nn.Module):
         lefts, ws, w_ts, start = [], [], [], 0
         for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
             size = 2 * l + 1
-            lefts.append(summed[:, :, start:start + size].transpose(1, 2).reshape(nodes, size, slots * width))
+            if not joined:
+                lefts.append(summed[:, :, start:start + size].transpose(1, 2).reshape(nodes, size, slots * width))
             if bound is not None:
                 w, w_t = bound[2 * path], bound[2 * path + 1]
             else:
@@ -323,6 +334,11 @@ class FirstInteractionReassociation(torch.nn.Module):
             ws.append(w)
             w_ts.append(w_t)
             start += size
+        if joined:  # JOINED_LAYOUT: the rows of every path in place, one gradient tensor back
+            sizes = [2 * l + 1 for l in self.ls]  # noqa: E741
+            _, scatters = joined_rows(order, sizes)
+            flat = summed.reshape(nodes * sum(sizes), slots * width)
+            return species_mm_rows(flat, sizes, ws, w_ts, kind, order, counts, scatters, precision).reshape(nodes, -1)
         if precision == "tf32x3-cutlass" and self.compose_joined:
             # one product per path into the joined output, its rows built here (fused by a compiled caller)
             gathers, scatters = joined_rows(order, [left.shape[1] for left in lefts])
@@ -388,10 +404,10 @@ def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, ed
     pair = table.pair(node_attrs, edge_index)
     density = []
 
-    def summed_fn(key, slots):
+    def summed_fn(key, slots, inner=1):
         summed, edge_density = tos.tabled_outer_sum(edge_feats, pair, table.coef, table.dcoef, table.starts,
                                                     table.scales, table.bins, table.r_lo, table.bin_scale,
-                                                    table.r_max, width, edge_attrs.contiguous(), key, slots)
+                                                    table.r_max, width, edge_attrs.contiguous(), key, slots, inner)
         density.append(edge_density)
         return summed, width
 

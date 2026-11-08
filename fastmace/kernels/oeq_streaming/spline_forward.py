@@ -104,6 +104,26 @@ STAGE_EDGES = None
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0050 / 1.0044 (b = off).
 STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 STAGE_TILE = 32
+# PREFETCH_AHEAD (Codex H200 round-6 report item 2, 8 November 2026; bitwise): with STAGE_EDGES the channel loop hints
+# the table rows of the edge PREFETCH_AHEAD positions later (its first PREFETCH_PATHS paths) into L1 with
+# prefetch.global.L1, from the slab offsets the tile already holds in shared memory: no extra lookup, no register
+# held across edges. ptxas sinks a hint for the next edge to the end of the current one, so the distance is 2. The
+# values and their arithmetic are unchanged. None: PREFETCH_AHEAD_DISTANCE on PREFETCH_AHEAD_GPUS, else 0 (off);
+# an int: an A/B side's distance (0 off).
+PREFETCH_AHEAD = None
+PREFETCH_AHEAD_GPUS = GPUModels(())
+PREFETCH_AHEAD_DISTANCE = 2
+PREFETCH_PATHS = 4
+
+
+def prefetch_ahead_default(device):
+    """``PREFETCH_AHEAD`` on ``device``: the constant when set, else ``PREFETCH_AHEAD_DISTANCE`` on
+    ``PREFETCH_AHEAD_GPUS`` and 0."""
+    if PREFETCH_AHEAD is not None:
+        return int(PREFETCH_AHEAD)
+    device = torch.device(device)
+    listed = device.type == "cuda" and torch.cuda.get_device_name(device) in PREFETCH_AHEAD_GPUS
+    return int(PREFETCH_AHEAD_DISTANCE) if listed else 0
 
 
 def stage_edges_default(device):
@@ -193,17 +213,21 @@ def _factor(p, xi):
 
 
 def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
-           name="spline_forward", factor_w=False, cursor32=False, shared_locator=False, stage_edges=False):
+           name="spline_forward", factor_w=False, cursor32=False, shared_locator=False, stage_edges=False,
+           prefetch=0):
     """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
     ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here. ``part``:
     the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds.
     ``factor_w``: ``FACTOR_W``; ``cursor32``: ``CURSOR32`` (the launch checks the ranges). ``shared_locator``
     (``SHARED_LOCATOR``): the edge's slab and t read from ``spline_locator``'s record. ``stage_edges``
-    (``STAGE_EDGES``): the edges staged per tile, for a launch of one block per receiver with ``threads`` = C."""
+    (``STAGE_EDGES``): the edges staged per tile, for a launch of one block per receiver with ``threads`` = C.
+    ``prefetch`` (``PREFETCH_AHEAD``; with ``stage_edges``): hint the table rows of the edge that many positions on."""
     if stage_edges and shared_locator:
         raise ValueError("STAGE_EDGES and SHARED_LOCATOR are alternatives")
+    if prefetch and not stage_edges:
+        raise ValueError("PREFETCH_AHEAD reads STAGE_EDGES' staged slab offsets: it needs stage_edges")
     source = _render(schedule, blocks, grid, r_max, path_scale, part, threads, min_blocks, name, factor_w, cursor32,
-                     stage_edges)
+                     stage_edges, int(prefetch))
     return located_source(source, grid) if shared_locator else source
 
 
@@ -290,7 +314,7 @@ def locator_reference(r, pair, grid, r_max):
 
 
 def _render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
-            name="spline_forward", factor_w=False, cursor32=False, stage_edges=False):
+            name="spline_forward", factor_w=False, cursor32=False, stage_edges=False, prefetch=0):
     from fastmace.kernels.oeq_streaming.fused_forward import _lit, _node, block_map
 
     if schedule.layout != "ir_mul":
@@ -368,7 +392,8 @@ def _render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=N
     if stage_edges:
         if threads != C:
             raise ValueError(f"STAGE_EDGES needs one thread per channel ({threads} threads, C = {C})")
-        return _staged(name, bounds, C, len(paths) * C, schedule, r_max, outs, n, grid, body, stores)
+        hints = [p.weight_start for p in mine][:PREFETCH_PATHS] if prefetch else []
+        return _staged(name, bounds, C, len(paths) * C, schedule, r_max, outs, n, grid, body, stores, prefetch, hints)
     return f"""// {name} (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
 using int64_t = long long;
 constexpr int C = {C};
@@ -400,12 +425,18 @@ extern "C" __global__ void __launch_bounds__({bounds}) {name}(
 """
 
 
-def _staged(name, bounds, C, q, schedule, r_max, outs, n, grid, body, stores):
-    """``spline_forward``'s source with STAGE_EDGES: one block per receiver, thread = channel."""
+def _staged(name, bounds, C, q, schedule, r_max, outs, n, grid, body, stores, prefetch=0, hints=()):
+    """``spline_forward``'s source with STAGE_EDGES: one block per receiver, thread = channel; ``prefetch`` > 0
+    (PREFETCH_AHEAD): the rows at the offsets ``hints`` of the edge ``prefetch`` positions on hinted into L1."""
     from fastmace.kernels.oeq_streaming.fused_forward import _lit
 
     nl = "\n"
     tile = STAGE_TILE
+    hint = ""
+    if prefetch:  # PREFETCH_AHEAD: no value is read, so nothing is held across edges
+        rows = "".join(f'                asm volatile("prefetch.global.L1 [%0];" :: "l"(ahead + {h}));\n' for h in hints)
+        hint = (f"            if (k + {prefetch} < count) {{  // PREFETCH_AHEAD\n"
+                f"                const float4* ahead = table + s_tq[k + {prefetch}] + ch;\n{rows}            }}\n")
     return f"""// {name} (SPLINE_W + STAGE_EDGES, 8 November 2026): one receiver per block, its edges staged per tile.
 using int64_t = long long;
 constexpr int C = {C};
@@ -469,7 +500,7 @@ extern "C" __global__ void __launch_bounds__({bounds}) {name}(
             const float t = s_t[k];
             const float* she = s_sh + s_k[k] * ED;
             const float4* tq = table + s_tq[k] + ch;
-{nl.join(body)}
+{hint}{nl.join(body)}
         }}
         __syncthreads();
     }}
@@ -496,9 +527,10 @@ class SplineForward:
         # STAGE_EDGES: only where a block is one receiver (thread = channel) and nothing else changes the edge head
         self.stage_edges = (stage_edges_default(device) and self.threads == self.channels and not self.shared_locator
                             and not self.cursor32)
+        self.prefetch = prefetch_ahead_default(device) if self.stage_edges else 0  # PREFETCH_AHEAD
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
-                               self.stage_edges)
+                               self.stage_edges, self.prefetch)
                         for k, part in enumerate(self.parts)]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
@@ -610,7 +642,8 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
+__all__ = ["PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_PATHS",
+           "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
            "cursor32_default", "factor_w_default", "located_source", "locator_reference", "lookup_code", "r128_default",
            "render", "render_locator", "shared_locator_default", "shared_locator_supported", "spline_locate",
