@@ -69,11 +69,14 @@ FIRST_FULL_ROWS = False
 # gradient as it is, without the zero-padded copy (OMAT-0 A100 profile, 4 November 2026: 0.11 ms per force call).
 # Bitwise: the dropped column's gradient is zero. A module constant for the A/B.
 FIRST_TABLE_COLUMNS = False
-# TILE_BLOCK_ROWS (tiled speed, results/tiled-speed-20261108; True / False are the A/B sides): on a tile (halo rows,
-# ``lammps_natoms``) the w' convolution's BLOCK_MESSAGE groups keep their block layout for the receivers' rows (a view
-# of the leading rows) and linear_1 multiplies them as on the whole system. Without it the tile turned the groups
-# into the dense [R + H, width] message, sliced the receivers' rows and padded their gradient back to R + H.
-TILE_BLOCK_ROWS = True
+# TILE_BLOCK_ROWS (tiled speed, results/tiled-speed-20261108; rounding): on a tile (halo rows, ``lammps_natoms``)
+# the w' convolution's BLOCK_MESSAGE groups keep their block layout for the receivers' rows (a view of the leading
+# rows) and linear_1 multiplies them as on the whole system. Without it the tile turned the groups into the dense
+# [R + H, width] message, sliced the receivers' rows and padded their gradient back to R + H. None: the module's
+# ``tile_block_rows`` (the tiled call sets it per call: off under the wavefront, where the A/Bs measured it slower,
+# 1.030 / 1.060 at 975,560 SrTiO3 atoms, against 0.919 / 0.921 with the state on the device); True / False are the
+# A/B sides.
+TILE_BLOCK_ROWS = None
 # The tabled first interaction's table and outer sums with one fused backward (round 2, 5 November 2026;
 # kernels.triton.tabled_outer_sum): per edge dr and the edge attributes' gradient from the slots' gradient in one walk,
 # without grad_a [E, h c], its assembled copy and the separate table backward. Rounding (regrouped sums). Needs the
@@ -107,6 +110,14 @@ def fused_first_backward(device, gpus=None):
     if not FUSED_FIRST_CONSTANT_NAME:  # the A/B side with the graph break
         return torch.cuda.get_device_name(device) in FUSED_FIRST_BACKWARD_GPUS
     return _fused_first_listed(index)
+
+
+def tile_block_rows(module):
+    """``TILE_BLOCK_ROWS`` for an interaction on a tile: the constant when set, else the module's
+    ``tile_block_rows`` (``model.tiled`` sets it per call; on where no call set it)."""
+    if TILE_BLOCK_ROWS is not None:
+        return bool(TILE_BLOCK_ROWS)
+    return bool(getattr(module, "tile_block_rows", True))
 
 
 @torch.compiler.assume_constant_result
@@ -337,7 +348,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         from fastmace.rewrites.mh1.modules import streaming_message
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,
                                                    node_attrs=node_attrs, wprime_lengths=wprime_lengths,
-                                                   block_rows=n_real if TILE_BLOCK_ROWS else None)
+                                                   block_rows=n_real if tile_block_rows(self) else None)
     elif tabled and reassociation is not None and fused_first_applies(self, edge_feats) and first_div_applies(self,
                                                                                                          kind, n_real):
         # idea 31 (kernels.cutlass.first_div): the density first, the blocks divided in the epilogue, kept apart

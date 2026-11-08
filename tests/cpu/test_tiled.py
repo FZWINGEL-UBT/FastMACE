@@ -1271,6 +1271,22 @@ def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch)
     assert tiled._speed(None) is True and tiled._speed(None, 0.25) == 0.25 and tiled._speed(False) is False
 
 
+def test_tile_block_rows_follows_the_module_unless_the_constant_is_set(monkeypatch):
+    """``TILE_BLOCK_ROWS`` at None (the default) is the module's ``tile_block_rows``, which the tiled call sets per
+    call (off under the wavefront) and which is on where no call set it; True / False win everywhere."""
+    import types
+
+    from fastmace.rewrites.generic import modules as generic
+
+    assert generic.TILE_BLOCK_ROWS is None
+    unset, off = types.SimpleNamespace(), types.SimpleNamespace(tile_block_rows=False)
+    assert generic.tile_block_rows(unset) is True and generic.tile_block_rows(off) is False
+    monkeypatch.setattr(generic, "TILE_BLOCK_ROWS", True)
+    assert generic.tile_block_rows(off) is True
+    monkeypatch.setattr(generic, "TILE_BLOCK_ROWS", False)
+    assert generic.tile_block_rows(unset) is False
+
+
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
     """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
     tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less

@@ -1051,6 +1051,14 @@ class TiledForceField:
             workspace = 1.1 * self._per_receiver * self.receivers if self._per_receiver else 0
             self._pieces, self._piece_budget = {}, int(float(fraction) * max(0.0, free - workspace))
 
+    def _block_modules(self):
+        """The interactions with the w' convolution's block message (``rewrites.generic.modules.TILE_BLOCK_ROWS``)."""
+        modules = getattr(self, "_block_list", None)
+        if modules is None:
+            modules = self._block_list = [m for m in self.model.modules()
+                                          if getattr(m, "wprime_backward", None) is not None]
+        return modules
+
     def _speed(self, value, on=True):
         """A tiled speed switch's value (``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE``, ``TILE_GRAPH_CACHE``): the
         constant when set, else ``on`` on ``TILED_SPEED_GPUS`` and off elsewhere."""
@@ -1654,6 +1662,8 @@ class TiledForceField:
             torch.cuda.empty_cache()
         self._released = True
         saved = self._bind()
+        for module in self._block_modules():  # TILE_BLOCK_ROWS at None: off under the wavefront (measured slower)
+            module.tile_block_rows = not wave
         bound = None
         try:
             g = self._globals(n, stress, pos, heads)
