@@ -12,6 +12,7 @@ captured in a CUDA graph and replayed, in alternating blocks:
 
 Eager glue: Inductor fuses some of it in the model, so ``fused`` and ``dense`` are upper bounds here; the MD-step
 A/B decides. Usage: python tools/bench/kspace_megakernel_lab.py [--sizes 243x216,2989x1944] [--stress]
+[--forward-only]
 """
 
 import argparse
@@ -50,11 +51,7 @@ def mega(k, r, mask, x, dbf, fbf, vol, kfc, kfp):
 
 
 def cuda(*args):
-    mk.CUDA = True
-    try:
-        return mega(*args)
-    finally:
-        mk.CUDA = False
+    return mega(*args)  # step_fn holds mk.CUDA for the whole step: the backward runs inside autograd.grad
 
 
 def fused(k, r, mask, x, dbf, fbf, vol, kfc, kfp):
@@ -81,14 +78,20 @@ def dense(k, r, mask, x, dbf, fbf, vol, kfc, kfp):
     return out.reshape(r.shape[0], C, -1)
 
 
-def step_fn(fn, args, stress):
+def step_fn(fn, args, stress, forward_only=False):
     want = [1, 3] + ([0, 4, 5, 6, 7, 8] if stress else [])
     leaves = [t.clone().requires_grad_(i in want) for i, t in enumerate(args)]
     weight = torch.randn((args[1].shape[0], C, F), device="cuda")
 
     def run():
-        out = fn(*leaves)
-        return torch.autograd.grad((weight * out).sum(), [leaves[i] for i in want])
+        mk.CUDA = fn is cuda
+        try:
+            out = fn(*leaves)
+            if forward_only:
+                return out
+            return torch.autograd.grad((weight * out).sum(), [leaves[i] for i in want])
+        finally:
+            mk.CUDA = False
 
     return run
 
@@ -120,15 +123,17 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--sizes", default="243x216,2989x1944")
     p.add_argument("--stress", action="store_true")
+    p.add_argument("--forward-only", action="store_true", help="the forward alone (no autograd graph kept)")
     p.add_argument("--blocks", type=int, default=7)
     p.add_argument("--reps", type=int, default=200)
     a = p.parse_args()
     fourier.JOINT_BACKWARD = True
-    print(json.dumps({"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "stress": a.stress}))
+    print(json.dumps({"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "stress": a.stress,
+                      "forward_only": a.forward_only}))
     for size in a.sizes.split(","):
         K, N = map(int, size.split("x"))
         args = inputs(K, N)
-        graphs = {name: capture(step_fn(fn, args, a.stress)) for name, fn in
+        graphs = {name: capture(step_fn(fn, args, a.stress, a.forward_only)) for name, fn in
                   (("mega", mega), ("cuda", cuda), ("fused", fused), ("dense", dense))}
         times = {name: [] for name in graphs}
         for block in range(a.blocks):
