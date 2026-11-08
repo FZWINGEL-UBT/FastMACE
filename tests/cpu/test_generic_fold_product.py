@@ -73,7 +73,8 @@ def test_first_density_linear_fold_can_be_switched_off(monkeypatch):
 def test_readout_tail_fold_matches_the_stock_density_model(monkeypatch):
     from fastmace.rewrites import species
 
-    assert species.GENERIC_FOLD_READOUT_TAIL is None and not species.GENERIC_FOLD_READOUT_TAIL_GPUS
+    assert species.GENERIC_FOLD_READOUT_TAIL is None and "NVIDIA H200" in species.GENERIC_FOLD_READOUT_TAIL_GPUS
+    assert not species.generic_fold_readout_tail_default("NVIDIA A100-SXM4-80GB")
     monkeypatch.setattr(species, "GENERIC_FOLD_READOUT_TAIL", True)
     model, batch = tiny_cueq("density")
     rewritten, applied = _rewrite(model, batch)
@@ -94,7 +95,7 @@ def test_readout_tail_fold_matches_the_stock_density_model(monkeypatch):
     assert relative(_stress(rewritten, batch), _stress(model, batch)) <= 1e-10
 
 
-def test_readout_tail_fold_is_off_by_default():
+def test_readout_tail_fold_is_off_on_the_cpu_by_default():
     model, batch = tiny_cueq("density")
     rewritten, _ = _rewrite(model, batch)
     attribute = "linear_1" if hasattr(rewritten.readouts[-1], "linear_1") else "linear"

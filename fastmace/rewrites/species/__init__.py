@@ -386,7 +386,9 @@ FOLD_FIRST_DENSITY_LINEAR = True
 # identity. Products of 128 output columns become 16 (OMAT-0 medium). Rounding, as the fold. None: on for
 # GENERIC_FOLD_READOUT_TAIL_GPUS (decision 66); True / False: an A/B side's choice.
 GENERIC_FOLD_READOUT_TAIL = None
-GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9855 / 0.9901 (ab / ba); force/stress gate passes (force
+# ratios 0.848 / 0.920 / 0.968, stress 0.437 / 0.824 / 1.043; decision 66).
+GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def generic_fold_readout_tail_default(name=None) -> bool:
