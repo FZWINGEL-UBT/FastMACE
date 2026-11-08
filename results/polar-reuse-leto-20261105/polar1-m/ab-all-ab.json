@@ -1,0 +1,336 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-05T13:50:22.270206+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "1ff585fa",
+  "model": "polar1-m",
+  "checkpoint_sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+  "sides": {
+    "a": {},
+    "b": {
+      "wprime_backward": "on",
+      "fused_folded_forward": "on",
+      "gate_epilogue": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {}
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 300,
+    "block": 200,
+    "blocks": 8
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "load": [
+    1.0,
+    1.00244140625,
+    1.27734375
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 6.149794002703857,
+            "mean_ms": 6.250045703854994,
+            "min_ms": 6.118852765066549,
+            "max_ms": 6.813139625010081,
+            "stdev_ms": 0.23343124792537046,
+            "spread": 0.11289595385443431,
+            "block_ms": [
+              6.118852765066549,
+              6.134090939885937,
+              6.139642600319348,
+              6.145237284945324,
+              6.154350720462389,
+              6.813139625010081,
+              6.273557509994134,
+              6.221494185156189
+            ]
+          },
+          "b": {
+            "median_ms": 5.939915282651782,
+            "mean_ms": 6.02667212508095,
+            "min_ms": 5.895063969655894,
+            "max_ms": 6.578496644506231,
+            "stdev_ms": 0.22814810620682482,
+            "spread": 0.11505764683991072,
+            "block_ms": [
+              5.895063969655894,
+              5.909020725521259,
+              5.916407520417124,
+              5.932964680250734,
+              5.94686588505283,
+              6.578496644506231,
+              6.041806080029346,
+              5.992751495214179
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9658722357269531,
+        "pair_ratios_b_over_a": [
+          0.9634263473884681,
+          0.9633083016586541,
+          0.9636403786939304,
+          0.9654573786410791,
+          0.9662864784875357,
+          0.9655602272346646,
+          0.9630590092470508,
+          0.9632334800717544
+        ]
+      },
+      "ratio_b_over_a": 0.9658722357269531,
+      "pair_ratios": [
+        0.9634263473884681,
+        0.9633083016586541,
+        0.9636403786939304,
+        0.9654573786410791,
+        0.9662864784875357,
+        0.9655602272346646,
+        0.9630590092470508,
+        0.9632334800717544
+      ],
+      "setup_s": {
+        "a": 49.12075448397081,
+        "b": 55.09117819392122
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.fused_folded_forward = off  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok); stage 2: off, not MH-1, decision 64 (label polar1-m))",
+          "RewriteConfig.wprime_backward = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok); stage 2: off, not a measured model, decision 66 (label polar1-m))",
+          "RewriteConfig.gate_epilogue = off  (auto (on_with_segment_gemm_for_mh1_on_decision_66_gpus): stage 1: on (with segment_gemm); stage 2: supported (ok); stage 2: off, not MH-1, decision 66 (label polar1-m))"
+        ],
+        "b": [
+          "RewriteConfig.fused_folded_forward = on  (requested 'on': stage 1: on (with chunked_conv_backward); stage 2: supported (ok))",
+          "RewriteConfig.wprime_backward = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok))",
+          "RewriteConfig.gate_epilogue = on  (requested 'on': stage 1: on (with segment_gemm); stage 2: supported (ok))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 241.11846179313386,
+          "potential_eV_atom": -8471.289962789913,
+          "kinetic_eV_atom": 0.031166961535096824
+        },
+        "b": {
+          "temperature_K": 241.11843534093396,
+          "potential_eV_atom": -8471.289962873207,
+          "kinetic_eV_atom": 0.031166958115886656
+        }
+      },
+      "load_after": [
+        1.00537109375,
+        1.00341796875,
+        1.23291015625
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 59,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 59
+        },
+        "b": {
+          "rebuilds": 59,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 59
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 50.90242845239118,
+            "mean_ms": 50.94635112742253,
+            "min_ms": 50.330948249902576,
+            "max_ms": 51.59330634458456,
+            "stdev_ms": 0.3548625892662468,
+            "spread": 0.024799565228261433,
+            "block_ms": [
+              51.59330634458456,
+              50.330948249902576,
+              51.01619674009271,
+              51.16482393001206,
+              50.81860466510989,
+              50.8420721848961,
+              50.885695075266995,
+              50.91916182951536
+            ]
+          },
+          "b": {
+            "median_ms": 48.73623880237574,
+            "mean_ms": 48.82270886497281,
+            "min_ms": 48.324059789883904,
+            "max_ms": 49.47977340023499,
+            "stdev_ms": 0.33732901558358763,
+            "spread": 0.023713639762753876,
+            "block_ms": [
+              49.47977340023499,
+              48.324059789883904,
+              48.91766489541624,
+              49.03997718996834,
+              48.66625897004269,
+              48.681459069484845,
+              48.719701584777795,
+              48.75277601997368
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9574442769063274,
+        "pair_ratios_b_over_a": [
+          0.9590347451230674,
+          0.9601261543880696,
+          0.9588653804326563,
+          0.9584705550252595,
+          0.9576465015273252,
+          0.9575034410959136,
+          0.9574341376827928,
+          0.9574544094658304
+        ]
+      },
+      "ratio_b_over_a": 0.9574442769063274,
+      "pair_ratios": [
+        0.9590347451230674,
+        0.9601261543880696,
+        0.9588653804326563,
+        0.9584705550252595,
+        0.9576465015273252,
+        0.9575034410959136,
+        0.9574341376827928,
+        0.9574544094658304
+      ],
+      "setup_s": {
+        "a": 54.08881750900764,
+        "b": 88.38344038301148
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.fused_folded_forward = off  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok); stage 2: off, not MH-1, decision 64 (label polar1-m))",
+          "RewriteConfig.wprime_backward = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok); stage 2: off, not a measured model, decision 66 (label polar1-m))",
+          "RewriteConfig.gate_epilogue = off  (auto (on_with_segment_gemm_for_mh1_on_decision_66_gpus): stage 1: on (with segment_gemm); stage 2: supported (ok); stage 2: off, not MH-1, decision 66 (label polar1-m))"
+        ],
+        "b": [
+          "RewriteConfig.fused_folded_forward = on  (requested 'on': stage 1: on (with chunked_conv_backward); stage 2: supported (ok))",
+          "RewriteConfig.wprime_backward = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok))",
+          "RewriteConfig.gate_epilogue = on  (requested 'on': stage 1: on (with segment_gemm); stage 2: supported (ok))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 254.24510200098132,
+          "potential_eV_atom": -10694.77529899278,
+          "kinetic_eV_atom": 0.03286371045842911
+        },
+        "b": {
+          "temperature_K": 254.24415229084255,
+          "potential_eV_atom": -10694.775299157945,
+          "kinetic_eV_atom": 0.03286358769893926
+        }
+      },
+      "load_after": [
+        1.00439453125,
+        1.02685546875,
+        1.162109375
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 58,
+          "pipelined_redos": 5,
+          "pipelined_early_rebuilds": 58
+        },
+        "b": {
+          "rebuilds": 58,
+          "pipelined_redos": 5,
+          "pipelined_early_rebuilds": 58
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

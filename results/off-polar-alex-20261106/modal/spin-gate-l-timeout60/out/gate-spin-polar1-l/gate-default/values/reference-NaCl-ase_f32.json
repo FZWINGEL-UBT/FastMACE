@@ -1,0 +1,58 @@
+{
+  "name": "reference-NaCl-ase_f32",
+  "kind": "reference",
+  "pid": 113,
+  "host": "modal",
+  "python": "/usr/local/bin/python",
+  "started_utc": "2026-11-07T16:18:04.792284+00:00",
+  "hybrid_launcher": false,
+  "load_s": 22.260662531999998,
+  "reference": {
+    "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+      "path": "/__modal/volumes/vo-QuZYWI1jH3gh2H8SolNdI6/models/MACE-POLAR-1-L.model",
+      "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+      "label": "polar1-l",
+      "head": "Default"
+    },
+    "patches": [
+      "single_graph_strain",
+      "polar_longrange"
+    ],
+    "corrections_active": [
+      "polar_kspace_stress"
+    ],
+    "optional_physics": [],
+    "gate_floors": {
+      "stress_eV_per_A3": 5e-07
+    },
+    "stock": true,
+    "polar": {
+      "bounds": [
+        6,
+        6,
+        6
+      ],
+      "k_vectors": 346,
+      "k_superset": 786,
+      "headroom": 0.1
+    },
+    "dispersion": null
+  },
+  "dtype": "float32",
+  "role": "yardstick",
+  "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+  "gpu": "NVIDIA A100 80GB PCIe",
+  "torch": "2.14.1+cu130",
+  "peak_memory_bytes": 1495269376,
+  "tf32_matmul": "none",
+  "status": "complete",
+  "wall_s": 43.634062524
+}

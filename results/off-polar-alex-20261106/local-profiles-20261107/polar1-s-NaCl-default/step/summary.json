@@ -1,0 +1,142 @@
+{
+ "model": "polar1-s",
+ "structure": "NaCl",
+ "natoms": 216,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 3.351201440091245,
+ "traced_span_ms_per_step": 3.015569619140625,
+ "kernels_per_step": 654.94,
+ "kernel_busy_ms_per_step": 2.5765101925000162,
+ "idle_gaps_ms_per_step": 0.43905902343750003,
+ "gaps_over_20us_ms_per_step": 0.12848048828125,
+ "kernels_under_5us_per_step": 582.42,
+ "kernels_under_10us_per_step": 598.72,
+ "time_in_kernels_under_10us_ms_per_step": 0.9796806399999728,
+ "top": [
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   26.0,
+   0.8521041599999978
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_tn_align1>(cutla",
+   60.0,
+   0.44082345999999895
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   17.0,
+   0.28815780000000024
+  ],
+  [
+   "void cublasLt::splitKreduce_kernel<32, 16, int, float, float, float, f",
+   106.0,
+   0.15892366000000002
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_32x128_8x5_nn_align1>(cutl",
+   25.0,
+   0.0748864199999999
+  ],
+  [
+   "Kernel",
+   2.02,
+   0.05279847999999999
+  ],
+  [
+   "void sgemm_largek_lds64<false, true, 6, 3, 4, 5, 2, 64>(float*, float ",
+   8.0,
+   0.05072490000000001
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutla",
+   14.0,
+   0.04147723999999995
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nt_align1>(cutla",
+   12.0,
+   0.037684299999999955
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_2",
+   1.0,
+   0.02748636
+  ],
+  [
+   "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<double, at",
+   2.02,
+   0.025210860000000005
+  ],
+  [
+   "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_75",
+   1.0,
+   0.023122120000000013
+  ],
+  [
+   "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int,",
+   12.0,
+   0.016827099999999998
+  ],
+  [
+   "void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, ",
+   7.0,
+   0.014244960000000015
+  ],
+  [
+   "segmented_polynomial_algo1_1",
+   1.0,
+   0.012222039999999997
+  ],
+  [
+   "Memset (Device)",
+   21.26,
+   0.010795559999999944
+  ],
+  [
+   "drift_kernel",
+   1.0,
+   0.010503259999999999
+  ],
+  [
+   "backward",
+   1.0,
+   0.010310540000000002
+  ],
+  [
+   "triton_poi_fused_mul_sum_view_69",
+   1.0,
+   0.01000384
+  ],
+  [
+   "forward",
+   1.0,
+   0.009872059999999998
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_clone_div_mm_mul_slice_30",
+   1.0,
+   0.009515540000000005
+  ],
+  [
+   "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunc",
+   12.02,
+   0.00936480000000003
+  ],
+  [
+   "Memset (Unknown)",
+   17.94,
+   0.009021699999999973
+  ],
+  [
+   "triton_per_fused_native_layer_norm_native_layer_norm_backward_silu_bac",
+   8.0,
+   0.00823976
+  ],
+  [
+   "triton_per_fused_native_layer_norm_silu_73",
+   6.0,
+   0.007090679999999996
+  ]
+ ]
+}

@@ -1,0 +1,2 @@
+OUT=$B/runs/screen-s80-off24-medium-$SLURM_JOB_ID MODEL=off24-medium CKPT=MACE-OFF24_medium.model STRUCTS="$ORG/water_216.extxyz@1x1x1" SETS_FILE=/home/atuin/v130cb/v130cb18/fm-offpolar/sets/off.tsv WARMUP=500 BLOCK=1000 BLOCKS=16 bash tools/offpolar_ab.sh
+cat $B/runs/screen-s80-off24-medium-$SLURM_JOB_ID/run.log

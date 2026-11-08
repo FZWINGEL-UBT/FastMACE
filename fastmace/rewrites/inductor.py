@@ -124,6 +124,8 @@ def _partitioner_class():
 def __getattr__(name):
     if name == "SaveTranscendentals":
         return _partitioner_class()
+    if name == "SmallMatmuls":
+        return _small_matmuls_class()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -149,6 +151,115 @@ def _save_selfcheck(original, rewritten, context):
                        if passed else "the custom partitioner is not save_transcendentals'")
 
 
+# A/B constant (off-polar-alex, 7 November 2026): a post-grad pass (``post_grad_custom_post_pass``) writes small
+# matrix products as a broadcast multiply and sum, which Inductor fuses with their neighbours, instead of one GEMM
+# launch each: an inner dimension up to ``SMALL_INNER`` (Inductor unrolls such sums into pointwise code), or an
+# output with at most ``SMALL_OUTER`` rows or columns and an inner dimension up to ``SMALL_OUTER_MAX_INNER`` (one
+# reduction kernel). POLAR-1 runs hundreds of launches under 5 us per MD step (results/off-polar-alex-20261106).
+# ``compile_model`` adds the pass to every model it compiles while the constant is on. Rounding (another order of
+# the sums). tests/cpu/test_small_matmuls.py.
+SMALL_MATMULS = False
+SMALL_INNER = 8
+SMALL_OUTER = 4
+SMALL_OUTER_MAX_INNER = 65536
+SMALL_MATMULS_UUID = "fastmace-small-matmuls-v1"
+
+
+def small_matmul_kind(a_shape, b_shape):
+    """"inner", "outer" or None (a library GEMM) for an [M, K] x [K, N] product."""
+    m, k = (int(d) for d in a_shape)
+    n = int(b_shape[1])
+    if k <= SMALL_INNER:
+        return "inner"
+    if min(m, n) <= SMALL_OUTER and k <= SMALL_OUTER_MAX_INNER:
+        return "outer"
+    return None
+
+
+def small_matmul(a, b, kind=None):
+    """``a @ b`` as a broadcast multiply and a sum over the inner dimension (what the pass writes)."""
+    return (a[:, :, None] * b[None, :, :]).sum(dim=1)
+
+
+def _shape(node):
+    value = getattr(node, "meta", {}).get("val")
+    if value is None or value.dim() != 2:
+        return None
+    try:
+        return tuple(int(d) for d in value.shape)
+    except TypeError:  # symbolic sizes: left to the library
+        return None
+
+
+_SMALL_MATMUL_PATTERNS = []  # the PatternMatcherPass, built on first use
+
+
+def _small_matmul_patterns():
+    if _SMALL_MATMUL_PATTERNS:
+        return _SMALL_MATMUL_PATTERNS[0]
+    import torch
+    from torch._inductor.pattern_matcher import Arg, CallFunction, PatternMatcherPass, register_graph_pattern
+
+    aten = torch.ops.aten
+    patterns = PatternMatcherPass(pass_name="fastmace_small_matmuls")
+
+    def kind_of(a, b):
+        a_shape, b_shape = _shape(a), _shape(b)
+        if a_shape is None or b_shape is None:
+            return None
+        return small_matmul_kind(a_shape, b_shape)
+
+    @register_graph_pattern(CallFunction(aten.mm, Arg(), Arg()), pass_dict=patterns)
+    def mm(match, a, b):
+        if kind_of(a, b) is not None:
+            match.replace_by_example(lambda x, y: small_matmul(x, y).to(x.dtype), [a, b])
+
+    @register_graph_pattern(CallFunction(aten.addmm, Arg(), Arg(), Arg()), pass_dict=patterns)
+    def addmm(match, bias, a, b):
+        if kind_of(a, b) is not None:
+            match.replace_by_example(lambda c, x, y: small_matmul(x, y).to(x.dtype) + c, [bias, a, b])
+
+    _SMALL_MATMUL_PATTERNS.append(patterns)
+    return patterns
+
+
+def _small_matmuls_class():
+    """The ``SmallMatmuls`` pass class, built on first use and published by name (the FX-graph cache pickles it)."""
+    cls = globals().get("SmallMatmuls")
+    if cls is not None:
+        return cls
+    from torch._inductor.custom_graph_pass import CustomGraphPass
+
+    class SmallMatmuls(CustomGraphPass):
+        """Small mm/addmm as multiply and sum (``SMALL_MATMULS``)."""
+
+        def __call__(self, graph):
+            _small_matmul_patterns().apply(graph)
+
+        def uuid(self):
+            return SMALL_MATMULS_UUID
+
+    SmallMatmuls.__module__ = __name__
+    SmallMatmuls.__qualname__ = "SmallMatmuls"
+    globals()["SmallMatmuls"] = SmallMatmuls
+    return SmallMatmuls
+
+
+def small_matmul_pass():
+    """The ``post_grad_custom_post_pass`` of ``SMALL_MATMULS``."""
+    return _small_matmuls_class()()
+
+
+def compile_options(options):
+    """``options`` (a record's Inductor options) with the passes of the A/B constants that are on."""
+    options = dict(options)
+    if SMALL_MATMULS:
+        if options.get("post_grad_custom_post_pass") is not None:
+            raise ValueError("SMALL_MATMULS: another option already set a post-grad custom pass")
+        options["post_grad_custom_post_pass"] = small_matmul_pass()
+    return options
+
+
 RECORDS = {
     "combo_kernels": Rewrite(
         name="combo_kernels", applies_to=_always, requires=(), conflicts=(), mace_versions=MACE_VERSIONS,
@@ -161,4 +272,6 @@ RECORDS = {
 }
 
 __all__ = ["COMBO_OPTIONS", "INDUCTOR_OPTIONS", "PARTITIONER_SOURCES", "RECORDS", "SAVE_TRANSCENDENTALS_UUID",
-           "TRANSCENDENTAL_OPS", "inductor_options", "save_transcendentals_partitioner", "set_options"]
+           "SMALL_MATMULS_UUID", "TRANSCENDENTAL_OPS", "compile_options", "inductor_options",
+           "save_transcendentals_partitioner", "set_options", "small_matmul", "small_matmul_kind",
+           "small_matmul_pass"]

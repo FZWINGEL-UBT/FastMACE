@@ -1,0 +1,4 @@
+fused	--b-constant fastmace.longrange.polar:FUSED_FOURIER=True
+fusedjoint	--b-constant fastmace.longrange.polar:FUSED_FOURIER=True fastmace.kernels.triton.fourier:JOINT_BACKWARD=True
+spin	--b-constant fastmace.longrange.polar:SPIN_BATCHED=True
+mm	--b-constant fastmace.rewrites.inductor:SMALL_MATMULS=True

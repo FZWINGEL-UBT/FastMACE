@@ -72,6 +72,9 @@ def parse_args(argv=None):
     p.add_argument("--block", type=int, default=300)
     p.add_argument("--blocks", type=int, default=12)
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
+    p.add_argument("--stop-after", type=int, default=None, metavar="BLOCKS",
+                   help="End a structure's run after this many blocks per side when b/a is beyond --stop-beyond")
+    p.add_argument("--stop-beyond", type=float, default=0.03, help="Early stop when |b/a - 1| exceeds this")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order")
     p.add_argument("--a-tf32", action="store_true",
                    help="Side a builds and steps with PyTorch's TF32 matmul mode (TF32 screen); IEEE otherwise")
@@ -86,6 +89,12 @@ def parse_args(argv=None):
                         "(CAP-T05's snapshot A/B)")
     p.add_argument("--precision", choices=("float32", "float64"), default="float32",
                    help="Both sides' force precision (float64: the decision 63 package by default)")
+    p.add_argument("--pack", default=None, metavar="'NAME|ITEM ...;NAME|ITEM ...'",
+                   help="Several b sides against one side a in this process (setup paid once for a): each entry's "
+                        "items (MODULE:NAME=VALUE constants, FIELD=VALUE RewriteConfig fields) are added to side "
+                        "b's. Order ab builds a first, then each b in turn (built, timed, freed); order ba builds "
+                        "every b first and a last, so all of them are on the GPU at once. Writes "
+                        "<output>-<NAME>.json per entry, each in the two-side format with setup_s.a the shared build")
     args = p.parse_args(argv)
     try:
         args.a, args.b = rewrite_overrides(args.a), rewrite_overrides(args.b)
@@ -101,11 +110,38 @@ def parse_args(argv=None):
                                                 neighbour_overrides(args.b_neighbours))
     except ValueError as exc:
         p.error(str(exc))
-    if (args.a == args.b and args.a_engine == args.b_engine and args.a_constant == args.b_constant
-            and args.a_neighbours == args.b_neighbours and args.a_tf32 == args.b_tf32
-            and args.a_recapture == args.b_recapture):
-        p.error("the two sides have the same rewrite and engine fields")
+    try:
+        args.pack = pack_entries(args.pack) if args.pack else None
+    except ValueError as exc:
+        p.error(str(exc))
+    same_rest = (args.a_engine == args.b_engine and args.a_neighbours == args.b_neighbours
+                 and args.a_tf32 == args.b_tf32 and args.a_recapture == args.b_recapture)
+    for name, fields, constants in args.pack or [(None, {}, {})]:
+        if same_rest and args.a == {**args.b, **fields} and args.a_constant == {**args.b_constant, **constants}:
+            p.error("the two sides have the same rewrite and engine fields" + (f" (pack entry {name})" if name else ""))
     return args
+
+
+def pack_entries(text):
+    """[(name, RewriteConfig fields, constants)] of ``NAME|ITEM ...;NAME|ITEM ...``: each item is a
+    ``MODULE:NAME=VALUE`` constant or a ``FIELD=VALUE`` RewriteConfig field, added to side b's own."""
+    import re
+
+    entries, names = [], set()
+    for entry in filter(None, (part.strip() for part in text.split(";"))):
+        name, bar, body = entry.partition("|")
+        items = body.split()
+        if not bar or not re.fullmatch(r"[A-Za-z0-9_.-]+", name) or not items:
+            raise ValueError(f"{entry!r}: expected NAME|ITEM ... (NAME of letters, digits, '_', '.', '-')")
+        if name in names:
+            raise ValueError(f"pack entry {name!r} appears twice")
+        names.add(name)
+        constants = [item for item in items if ":" in item.partition("=")[0]]
+        entries.append((name, rewrite_overrides([item for item in items if item not in constants]),
+                        constant_overrides(constants)))
+    if not entries:
+        raise ValueError("--pack has no entries")
+    return entries
 
 
 def constant_overrides(items):
@@ -243,38 +279,53 @@ def main(argv=None):
                 tf32_sides={"a": args.a_tf32, "b": args.b_tf32},
                 recapture_sides={"a": args.a_recapture, "b": args.b_recapture}, timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
-                prepare=args.prepare, load=list(os.getloadavg()), structures={})
+                prepare=args.prepare, stop_after=args.stop_after, stop_beyond=args.stop_beyond,
+                load=list(os.getloadavg()), structures={})
     import importlib
-    defaults = {key: getattr(importlib.import_module(key[0]), key[1]) for key in {**args.a_constant, **args.b_constant}}
-    for spec in args.structures:
-        name, base = ab_step_time.read_structure(spec, None)
-        sides, setup, lines = {}, {}, {}
-        for side in order:
-            started = time.perf_counter()
-            tf32 = args.a_tf32 if side == "a" else args.b_tf32
-            ab_step_time.set_tf32(torch, False)  # built in IEEE (tf32_after_build)
-            rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
-            with _Constants(args.a_constant if side == "a" else args.b_constant):  # rewrites read them too
-                field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
-            integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
-                          IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs))
-            planner = planners[side]
-            plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
-            with _Constants(args.a_constant if side == "a" else args.b_constant):
-                engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
-                if args.prepare:
-                    engine.prepare()
-            if tf32:
-                ab_step_time.tf32_after_build(torch, engine)
-            elif args.a_recapture if side == "a" else args.b_recapture:
-                engine.invalidate_graphs("TF32 screen control: re-capture in IEEE")
-            sides[side] = ab_step_time.Tf32Side(ab_step_time.FastMACESide(engine, torch), tf32, torch)
-            if defaults:
-                sides[side] = ConstantsSide(sides[side], {**defaults, **(args.a_constant if side == "a" else
-                                                                         args.b_constant)})
-            setup[side] = time.perf_counter() - started
-            lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()
-                           if any(f"RewriteConfig.{f} " in line for f in {**args.a, **args.b})]
+    specs = [(None, args.b, args.b_constant)] if not args.pack else [
+        (name, {**args.b, **fields}, {**args.b_constant, **constants}) for name, fields, constants in args.pack]
+    every_constant = {**args.a_constant}
+    for _, _, constants in specs:
+        every_constant.update(constants)
+    defaults = {key: getattr(importlib.import_module(key[0]), key[1]) for key in every_constant}
+    metas = {}
+    for name, fields_b, constants_b in specs:
+        entry_meta = dict(meta, sides={"a": args.a, "b": fields_b},
+                          constant_sides={side: {f"{m}:{n}": v for (m, n), v in values.items()}
+                                          for side, values in (("a", args.a_constant), ("b", constants_b))},
+                          structures={})
+        if name is not None:
+            entry_meta["pack"] = dict(name=name, entries=[entry[0] for entry in specs], shared_a=True)
+        metas[name] = entry_meta
+
+    def build(side, base, fields_side, constants_side, every_field):
+        """One side's engine (timed wrapper), its setup time and its plan lines."""
+        started = time.perf_counter()
+        tf32 = args.a_tf32 if side == "a" else args.b_tf32
+        ab_step_time.set_tf32(torch, False)  # built in IEEE (tf32_after_build)
+        rewrites = RewriteConfig(**fields_side) if fields_side else "auto"
+        with _Constants(constants_side):  # rewrites read them too
+            field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
+        integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
+                      IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs))
+        planner = planners[side]
+        plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
+        with _Constants(constants_side):
+            engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
+            if args.prepare:
+                engine.prepare()
+        if tf32:
+            ab_step_time.tf32_after_build(torch, engine)
+        elif args.a_recapture if side == "a" else args.b_recapture:
+            engine.invalidate_graphs("TF32 screen control: re-capture in IEEE")
+        timed = ab_step_time.Tf32Side(ab_step_time.FastMACESide(engine, torch), tf32, torch)
+        if defaults:
+            timed = ConstantsSide(timed, {**defaults, **constants_side})
+        lines = [line.strip() for line in plan.describe(full=True).splitlines()
+                 if any(f"RewriteConfig.{f} " in line for f in every_field)]
+        return timed, time.perf_counter() - started, lines
+
+    def measure(name, sides, setup, lines, structure, natoms):
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
             step_time.warm_up(sides[side], protocol.warmup)
 
@@ -284,11 +335,12 @@ def main(argv=None):
 
         counters_before = engine_counters()
         counted = ab_step_time.compile_counters(counters)
-        result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern)
+        result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern,
+                           stop_after=args.stop_after, stop_beyond=args.stop_beyond)
         changes, recompiled = ab_step_time.compile_changes(counted, ab_step_time.compile_counters(counters))
         medians = {side: result.statistics[side].median_ms for side in sides}
         blocks = {side: result.statistics[side].block_ms for side in sides}
-        entry = dict(natoms=len(base), ab=result.as_dict(), ratio_b_over_a=medians["b"] / medians["a"],
+        entry = dict(natoms=natoms, ab=result.as_dict(), ratio_b_over_a=medians["b"] / medians["a"],
                      pair_ratios=[b / a for a, b in zip(blocks["a"], blocks["b"])], setup_s=setup, plan_lines=lines,
                      compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      observables={side: sides[side].observables() for side in sides}, load_after=list(os.getloadavg()),
@@ -298,11 +350,45 @@ def main(argv=None):
                                             for side, now in engine_counters().items()},
                      other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()])
         entry["valid"] = not recompiled and not entry["other_gpu_processes"]
-        meta["structures"][name] = entry
-        print(name, " ".join(f"{s} {medians[s]:.4f} ms" for s in sides), f"b/a {entry['ratio_b_over_a']:.4f}",
-              "valid" if entry["valid"] else "INVALID", flush=True)
-        args.output.with_suffix(".json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
-        sides = None
+        metas[name]["structures"][structure] = entry
+        print(*([name] if name is not None else []), structure,
+              " ".join(f"{s} {medians[s]:.4f} ms" for s in sides), f"b/a {entry['ratio_b_over_a']:.4f}",
+              "valid" if entry["valid"] else "INVALID",
+              f"(stopped after {result.stopped_after} blocks)" if result.stopped_after else "", flush=True)
+        output = args.output if name is None else args.output.with_name(f"{args.output.name}-{name}")
+        output.with_suffix(".json").write_text(json.dumps(metas[name], indent=2, default=str) + "\n")
+
+    for spec in args.structures:
+        structure, base = ab_step_time.read_structure(spec, None)
+        built = {}  # side a, or the entry's name: (timed side, setup s, plan lines)
+        everything = {**args.a}
+        for _, fields_b, _ in specs:
+            everything.update(fields_b)
+
+        def build_b(index):
+            name, fields_b, constants_b = specs[index]
+            built[index] = build("b", base, fields_b, constants_b, {**args.a, **fields_b})
+
+        # order ab: a, then each b just before its pair; order ba: every b, then a
+        if order[0] == "a":
+            built["a"] = build("a", base, args.a, args.a_constant, everything)
+        else:
+            for index in range(len(specs)):
+                build_b(index)
+            built["a"] = build("a", base, args.a, args.a_constant, everything)
+        for index, (name, fields_b, _) in enumerate(specs):
+            if index not in built:
+                build_b(index)
+            a_side, a_setup, a_lines = built["a"]
+            b_side, b_setup, b_lines = built.pop(index)
+            keep = set({**args.a, **fields_b})
+            measure(name, {side: {"a": a_side, "b": b_side}[side] for side in order},
+                    {"a": a_setup, "b": b_setup},
+                    {"a": [line for line in a_lines if any(f"RewriteConfig.{f} " in line for f in keep)],
+                     "b": b_lines}, structure, len(base))
+            b_side = None
+            torch.cuda.empty_cache()
+        built = None
         ab_step_time.set_tf32(torch, False)
         torch.cuda.empty_cache()
 

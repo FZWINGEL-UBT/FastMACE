@@ -1,0 +1,85 @@
+{
+  "name": "reference-NaCl-f64",
+  "kind": "reference",
+  "pid": 1992435,
+  "host": "a0534",
+  "python": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+  "started_utc": "2026-11-06T16:43:59.301147+00:00",
+  "hybrid_launcher": false,
+  "load_s": 21.903680232004263,
+  "reference": {
+    "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+      "path": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-M.model",
+      "sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+      "label": "polar1-m",
+      "head": "Default"
+    },
+    "patches": [
+      "single_graph_strain",
+      "polar_longrange"
+    ],
+    "corrections_active": [
+      "polar_kspace_stress"
+    ],
+    "optional_physics": [],
+    "gate_floors": {
+      "stress_eV_per_A3": 5e-07
+    },
+    "stock": true,
+    "polar": {
+      "bounds": [
+        6,
+        6,
+        6
+      ],
+      "k_vectors": 346,
+      "k_superset": 786,
+      "headroom": 0.1
+    },
+    "dispersion": null
+  },
+  "fd_stress_check": {
+    "structure": "NaCl",
+    "key": "hydrostatic-0",
+    "max_abs": 8.066340681338324e-09,
+    "tolerance": 1e-06,
+    "strain": 0.0001,
+    "kset": "frozen",
+    "k_vectors_included": 231,
+    "fd_stress": [
+      [
+        -0.007492237124237067,
+        1.6147624293292602e-05,
+        -2.2030881019422714e-05
+      ],
+      [
+        1.6147624293292602e-05,
+        -0.007639071694231867,
+        1.3458171746776633e-05
+      ],
+      [
+        -2.2030881019422714e-05,
+        1.3458171746776633e-05,
+        -0.007653466265313535
+      ]
+    ],
+    "passed": true
+  },
+  "dtype": "float64",
+  "role": "reference",
+  "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "peak_memory_bytes": 2426404864,
+  "tf32_matmul": "none",
+  "status": "complete",
+  "wall_s": 47.38887977699051
+}

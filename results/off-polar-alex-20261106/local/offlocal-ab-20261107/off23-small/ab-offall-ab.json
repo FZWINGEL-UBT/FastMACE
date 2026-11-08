@@ -1,0 +1,173 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-07T17:02:58.012944+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": null,
+  "model": "off23-small",
+  "checkpoint_sha256": "165cce4cfec5a34b9c64d4ebf95de15d71106bb584b7291c8470f0749977c46f",
+  "sides": {
+    "a": {},
+    "b": {
+      "radial_tables": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP": true,
+      "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 500,
+    "block": 1000,
+    "blocks": 16
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    1.53955078125,
+    1.68896484375,
+    1.78125
+  ],
+  "structures": {
+    "water_216": {
+      "natoms": 648,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 3.5491922775036073,
+            "mean_ms": 3.5756046912501915,
+            "min_ms": 3.5022237179946387,
+            "max_ms": 3.7018104919989128,
+            "stdev_ms": 0.08700173485113136,
+            "spread": 0.0562344213553449,
+            "block_ms": [
+              3.7018104919989128,
+              3.5491534000029787,
+              3.549231155004236,
+              3.5022237179946387
+            ]
+          },
+          "b": {
+            "median_ms": 2.605384205489827,
+            "mean_ms": 2.6328168842483137,
+            "min_ms": 2.590868462008075,
+            "max_ms": 2.7296306640055263,
+            "stdev_ms": 0.06560893871723113,
+            "spread": 0.053259784758449245,
+            "block_ms": [
+              2.7296306640055263,
+              2.6171297729888465,
+              2.593638637990807,
+              2.590868462008075
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.7340780667206833,
+        "pair_ratios_b_over_a": [
+          0.737377202292053,
+          0.7373955076122238,
+          0.7307606985061844,
+          0.7397781154573407
+        ],
+        "stopped_after": 4
+      },
+      "ratio_b_over_a": 0.7340780667206833,
+      "pair_ratios": [
+        0.737377202292053,
+        0.7373955076122238,
+        0.7307606985061844,
+        0.7397781154573407
+      ],
+      "setup_s": {
+        "a": 14.307133099006023,
+        "b": 9.459835428991937
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.radial_tables = off  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: off, tables with a stock first block not measured on this GPU, decision 66 (NVIDIA GeForce RTX 5060 Ti))"
+        ],
+        "b": [
+          "RewriteConfig.radial_tables = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables, stock first block)); stage 2: on, generic radial tables (explicit))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 312.010328039894,
+          "potential_eV_atom": -693.8387473283507,
+          "kinetic_eV_atom": 0.04033044098014909
+        },
+        "b": {
+          "temperature_K": 295.0645614244519,
+          "potential_eV_atom": -693.8387331505396,
+          "kinetic_eV_atom": 0.038140031949009306
+        }
+      },
+      "load_after": [
+        1.30078125,
+        1.59716796875,
+        1.74365234375
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 973,
+          "pipelined_redos": 66,
+          "pipelined_early_rebuilds": 907
+        },
+        "b": {
+          "rebuilds": 951,
+          "pipelined_redos": 61,
+          "pipelined_early_rebuilds": 890
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

@@ -111,7 +111,11 @@ def raw_stock_output(model, atoms):
 
 
 @pytest.mark.parametrize("family", FAMILY_PARAMS)
-def test_float64_energy_equals_stock_float64(family):
+def test_float64_energy_equals_stock_float64(family, monkeypatch):
+    if family == "polar":
+        # rtol 1e-12 against the stock recursion: without SPIN_BATCHED's one-call spin recursion (default on; its
+        # regrouped k-space sums differ by ~5e-12 relative, tests/cpu/test_polar_spin_batched.py checks it).
+        monkeypatch.setattr("fastmace.longrange.polar.SPIN_BATCHED", False)
     model, atoms = model64(family), structure(family)
     calc = calculator(model)
     expected = stock(calc, atoms)

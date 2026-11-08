@@ -1,0 +1,455 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-07T22:36:09.549063+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": null,
+  "model": "polar1-m",
+  "checkpoint_sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+  "sides": {
+    "a": {},
+    "b": {}
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.rewrites.inductor:SMALL_MATMULS": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 1200,
+    "block": 400,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": 4,
+  "stop_beyond": 0.03,
+  "load": [
+    0.77587890625,
+    1.0029296875,
+    1.20947265625
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 6.067204772516561,
+            "mean_ms": 6.101979113130558,
+            "min_ms": 6.031502235018706,
+            "max_ms": 6.393213185001514,
+            "stdev_ms": 0.10347166688346864,
+            "spread": 0.059617396073608483,
+            "block_ms": [
+              6.393213185001514,
+              6.195275422469422,
+              6.134516624988464,
+              6.045107574973372,
+              6.031502235018706,
+              6.035875572524674,
+              6.046025312534766,
+              6.061610445030965,
+              6.034869230024924,
+              6.083104572498996,
+              6.089850082498742,
+              6.0727991000021575
+            ]
+          },
+          "b": {
+            "median_ms": 5.910045938762778,
+            "mean_ms": 18.611494356458326,
+            "min_ms": 5.873421579999558,
+            "max_ms": 158.13805789497565,
+            "stdev_ms": 43.93949822061974,
+            "spread": 25.76369759096179,
+            "block_ms": [
+              158.13805789497565,
+              6.026815069999429,
+              6.009858687502856,
+              5.873421579999558,
+              5.884303557504609,
+              5.90186022749549,
+              5.901130220008781,
+              5.9123481400092714,
+              5.896745492500486,
+              5.9077437375162845,
+              5.929842727491632,
+              5.955804942495888
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9740969952974577,
+        "pair_ratios_b_over_a": [
+          24.735301845708467,
+          0.9728082545194021,
+          0.9796792567196209,
+          0.9715991828359531,
+          0.9755950223048138,
+          0.977796867510122,
+          0.9760346533406691,
+          0.975375800478229,
+          0.9771123893062604,
+          0.9711724773275314,
+          0.9737255674869656,
+          0.9807347228881278
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.9740969952974577,
+      "pair_ratios": [
+        24.735301845708467,
+        0.9728082545194021,
+        0.9796792567196209,
+        0.9715991828359531,
+        0.9755950223048138,
+        0.977796867510122,
+        0.9760346533406691,
+        0.975375800478229,
+        0.9771123893062604,
+        0.9711724773275314,
+        0.9737255674869656,
+        0.9807347228881278
+      ],
+      "setup_s": {
+        "a": 65.14672027398774,
+        "b": 82.3310935729969
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            4,
+            5
+          ],
+          "aot_autograd.ok": [
+            13,
+            14
+          ],
+          "aot_autograd.total": [
+            13,
+            14
+          ],
+          "frames.ok": [
+            80,
+            81
+          ],
+          "frames.total": [
+            87,
+            88
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x78427ad81120>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            12,
+            13
+          ],
+          "inductor.async_compile_cache_hit": [
+            1245,
+            1498
+          ],
+          "inductor.async_compile_cache_miss": [
+            2243,
+            2749
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark": [
+            270,
+            284
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark_gpu": [
+            270,
+            284
+          ],
+          "inductor.decompose_mm": [
+            124,
+            155
+          ],
+          "inductor.extern_calls": [
+            926,
+            1118
+          ],
+          "inductor.fxgraph_cache_miss": [
+            6,
+            8
+          ],
+          "inductor.pad_rewritten_as_cat": [
+            32,
+            40
+          ],
+          "inductor.pattern_matcher_count": [
+            5174,
+            6591
+          ],
+          "inductor.pattern_matcher_nodes": [
+            5478,
+            6971
+          ],
+          "inductor.removed_pointless_view_pair": [
+            32,
+            40
+          ],
+          "inductor.triton_bundler_save_kernel": [
+            7112,
+            9192
+          ],
+          "inductor.triton_bundler_save_static_autotuner": [
+            6,
+            8
+          ],
+          "stats.calls_captured": [
+            9474,
+            11832
+          ],
+          "stats.unique_graphs": [
+            13,
+            14
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 309.6916825967637,
+          "potential_eV_atom": -8471.286461883452,
+          "kinetic_eV_atom": 0.04003073297437404
+        },
+        "b": {
+          "temperature_K": 309.691713575001,
+          "potential_eV_atom": -8471.286461916286,
+          "kinetic_eV_atom": 0.0400307369786196
+        }
+      },
+      "load_after": [
+        1.23388671875,
+        1.36962890625,
+        1.3359375
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 218,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 218
+        },
+        "b": {
+          "rebuilds": 218,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 218
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 44.47027593250823,
+            "mean_ms": 44.48331149625119,
+            "min_ms": 44.35759906002204,
+            "max_ms": 44.687535457487684,
+            "stdev_ms": 0.08755271121036251,
+            "spread": 0.007419256807994247,
+            "block_ms": [
+              44.687535457487684,
+              44.423254814973916,
+              44.46986124250543,
+              44.56290571750287,
+              44.40200332250242,
+              44.47069062251103,
+              44.53664016498806,
+              44.489926014975936,
+              44.52709730750939,
+              44.35759906002204,
+              44.45421581000119,
+              44.41800842003431
+            ]
+          },
+          "b": {
+            "median_ms": 44.378037976239284,
+            "mean_ms": 44.35134129604497,
+            "min_ms": 44.2441801050154,
+            "max_ms": 44.4736265975007,
+            "stdev_ms": 0.07490151933919846,
+            "spread": 0.005170271218573113,
+            "block_ms": [
+              44.25698557002761,
+              44.39486251001654,
+              44.395804897503695,
+              44.29685351999069,
+              44.30717726751027,
+              44.42865218999941,
+              44.4736265975007,
+              44.38287817247328,
+              44.262747187494824,
+              44.2441801050154,
+              44.39912975500192,
+              44.373197780005285
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9979258514966506,
+        "pair_ratios_b_over_a": [
+          0.9903653248483648,
+          0.9993608684218291,
+          0.9983346845946317,
+          0.9940297385633072,
+          0.9978643743998798,
+          0.9990546935088447,
+          0.9985851297436465,
+          0.9975938858053705,
+          0.994063162972674,
+          0.9974430772311828,
+          0.9987608361997723,
+          0.9989911605309882
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.9979258514966506,
+      "pair_ratios": [
+        0.9903653248483648,
+        0.9993608684218291,
+        0.9983346845946317,
+        0.9940297385633072,
+        0.9978643743998798,
+        0.9990546935088447,
+        0.9985851297436465,
+        0.9975938858053705,
+        0.994063162972674,
+        0.9974430772311828,
+        0.9987608361997723,
+        0.9989911605309882
+      ],
+      "setup_s": {
+        "a": 88.8302822419937,
+        "b": 55.04237203900993
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 304.3068869439297,
+          "potential_eV_atom": -10694.771253596235,
+          "kinetic_eV_atom": 0.039334694530290815
+        },
+        "b": {
+          "temperature_K": 304.33553744441434,
+          "potential_eV_atom": -10694.7712534361,
+          "kinetic_eV_atom": 0.039338397892695845
+        }
+      },
+      "load_after": [
+        1.0107421875,
+        1.08056640625,
+        1.17333984375
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 213,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 213
+        },
+        "b": {
+          "rebuilds": 213,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 213
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

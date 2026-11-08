@@ -1,0 +1,52 @@
+{
+  "name": "reference-NbCl5-f64",
+  "kind": "reference",
+  "pid": 394008,
+  "host": "leto",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "started_utc": "2026-11-07T12:20:15.834561+00:00",
+  "hybrid_launcher": false,
+  "load_s": 21.390819871099666,
+  "reference": {
+    "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+      "path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-L.model",
+      "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+      "label": "polar1-l",
+      "head": "Default"
+    },
+    "patches": [
+      "single_graph_strain",
+      "polar_longrange"
+    ],
+    "corrections_active": [
+      "polar_kspace_stress"
+    ],
+    "optional_physics": [],
+    "gate_floors": {
+      "stress_eV_per_A3": 5e-07
+    },
+    "stock": true,
+    "polar": {
+      "bounds": [
+        19,
+        18,
+        6
+      ],
+      "k_vectors": 3959,
+      "k_superset": 7986,
+      "headroom": 0.1
+    },
+    "dispersion": null
+  },
+  "status": "failed",
+  "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 3.80 GiB. GPU 0 has a total capacity of 19.54 GiB of which 1.92 GiB is free. Including non-PyTorch memory, this process has 17.62 GiB memory in use. Of the allocated memory 17.16 GiB is allocated by PyTorch, and 277.24 MiB is reserved by PyTorch but unallocated.",
+  "wall_s": 28.160506080137566
+}

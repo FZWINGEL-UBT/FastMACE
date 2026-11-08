@@ -34,6 +34,43 @@ measured slower: the cell says which).
 | `tf32x3_gemms` on CUTLASS (`DECISION_66_TF32X3_GPUS`; `…_OMAT0_GPUS` = A100 80GB PCIe, kept for the record) | – (Triton tf32x3 slower) | – (slower) | on, MH-1 and OMAT-0 | precision change (owner-approved) | A100-SXM4-80GB MH-1 NaCl 0.887 / 0.882, NbCl5 0.772 / 0.770; OMAT-0 0.948 / 0.947; A100 PCIe OMAT-0 4.61 → 3.31 µs/atom/step with the SXM4's switches | owner 3 Nov; every A100 4 Nov | [cutlass-tf32x3](../validation/omat0/cutlass-tf32x3.md) |
 | float64: D1 56 mantissa bits, D2 `w_tables`, D3 `save_transcendentals` (`DECISION_65_GPUS`, exact) | D2, D3 on; D1 suspended | D2, D3 on; D1 suspended | – (D2, D3 slower) | rounding | float64 package + D1 + D2 + D3 ABBA: local NaCl 0.806, NaNbO3 0.782, NbCl5 0.797; Ada NaCl 0.804, NbCl5 0.802. D1's `auto` is `"dynamic"` everywhere since 28 Oct (a graph re-captured during a run computed wrong energies) | d65, 28 Oct | [ideas-20261027](../../plans/ideas-20261027.md), [switch-map](switch-map.md) |
 
+### POLAR-1 (`polar1-s`, `polar1-m`, `polar1-l`) plans
+
+POLAR-1 runs MH-1's interaction class, so it takes MH-1's class-level defaults (section 2) and, since 5 November 2026,
+`species_tables`. MH-1's label-gated switches above apply to POLAR-1 only where listed here.
+
+| Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `wprime_backward` + `fused_folded_forward` (`POLAR_DECISION_66_WPRIME_GPUS`), M and L only | – (not measured) | on | – (not measured) | rounding | Ada POLAR-1-M NaCl 0.963 / 0.965, NbCl5 0.970 / 0.971; with `gate_epilogue` 0.966 / 0.966, 0.957 / 0.958; force gate passes | owner 5 Nov (d66) | [polar-reuse](../validation/polar/polar-reuse.md) |
+| `gate_epilogue` (`POLAR_DECISION_66_GATE_EPILOGUE_GPUS`) | – (not measured) | on | – (A100-SXM4-80GB tie: S 0.9996–1.0005, M 0.9987–1.0005) | rounding | Ada POLAR-1-S NbCl5 0.994 / 0.993, NaCl 0.998 / 1.001; POLAR-1-M NbCl5 0.989 / 0.989, NaCl 1.002 / 0.999 | owner 5 Nov (d66) | [polar-reuse](../validation/polar/polar-reuse.md) |
+| `longrange.polar.SPIN_BATCHED`: α and β field features in one call (plain default, every GPU) | on (S NaCl 0.943 / 0.945, NbCl5 0.885 / 0.882; M 0.977 / 0.971, 0.949 / 0.951) | on (S NaCl 0.953 / 0.953, NbCl5 0.897 / 0.897; M 0.983 / 0.982, 0.957 / 0.953; L 0.995 / 0.994, 0.975 / 0.975) | on | rounding (gate passes) | A100-SXM4-80GB S NaCl 0.943 / 0.942, NbCl5 0.912 / 0.913; M 0.971 / 0.969, 0.961 / 0.962; L 0.979 / 0.985, 0.976 / 0.977; force gates pass for S, M, L | off-polar-alex, 7 Nov (pure removal) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| `rewrites.polar.update_fold.FOLD_UPDATE`: the field-update MLP folded at setup (plain default, every GPU) | on (S NaCl 0.948 / 0.963, NbCl5 1.002 / 0.998; M 0.974 / 0.960, 1.001 / 0.990; L 0.981 / 0.971, 1.002 / 0.997) | on (S NaCl 0.966 / 0.966; M 0.972 / 0.970; L 0.977 / 0.975; NbCl5 1.000) | on | rounding (gate passes) | A100-SXM4-80GB S NaCl 0.965 / 0.971, M 0.969 / 0.970, L 0.972 / 0.971, NbCl5 1.000 on all three; force gates pass for S, M, L | off-polar-alex, 8 Nov (pure removal) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| `tf32x3_gemms` (`DECISION_66_TF32X3_MODEL_GPUS`, S, M and L) | – | – | on | precision change | A100-SXM4-80GB S NaCl 0.940 / 0.938, NbCl5 0.847 / 0.847; M 0.931 / 0.930, 0.842 / 0.843; L 0.906 / 0.907, 0.792 / 0.793; force gates pass | off-polar-alex, 6 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| `wprime_backward` + `fused_folded_forward` on the A100 (`POLAR_DECISION_66_WPRIME_LABEL_GPUS`), M only | – | (row above) | on, M | rounding | A100-SXM4-80GB on top of `tf32x3_gemms`: M NaCl 0.976 / 0.977, NbCl5 0.920 / 0.920 (gate passes). L stays off: NaCl 0.956 / 0.957 but NbCl5 1.003 / 1.002 (mixed-cell rule) | off-polar-alex, 6 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+
+POLAR-1-S (one interaction, reassociated) never takes `wprime_backward`, `fused_folded_forward` or `w_tables`: off
+with that reason, refused when asked for. `grouped_launch` and the round-5 switches (EDGE_SH, TABLE_W,
+FUSED_FIRST_BACKWARD for MH-1's class) stay off for POLAR-1: on the A100-SXM4-80GB EDGE_SH is a tie (S, M, L within
+0.4 %) and FUSED_FIRST_BACKWARD is slower (S NaCl 1.006 / 1.006, M NaCl 1.005 / 1.004).
+
+### MACE-OFF (`off23-small`, `off23-medium`, `off23-large`, `off23b-medium`, `off24-medium`) plans
+
+MACE-OFF's first interaction is the stock `RealAgnosticInteractionBlock`, so the generic family's records act on the
+later interactions only, except the species skip and the radial tables, which take the stock first block too since
+7 November 2026. Measured on NHR@FAU Alex and Modal, A100-SXM4-80GB, water box of 648 atoms (6–7 November 2026):
+
+| Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `tf32x3_gemms` (`DECISION_66_TF32X3_MODEL_GPUS`): every OFF model | – | – | on | precision change | 0.968 / 0.966, 0.967 / 0.963, 0.980 / 0.976, 0.980 / 0.981; force gates pass. OFF23-small since 7 Nov (its gate passes at 3×: paracetamol forces 2.55, stress 2.77): 0.966 / 0.947 on top of the rows below | off-polar-alex, 6–7 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| `grouped_launch` (`DECISION_66_GROUPED_LAUNCH_MODEL_GPUS`, empty since 7 Nov) | – | – | – | exact | OFF23-small 0.989 / 0.995 (on 6–7 Nov, then replaced by `tf32x3_gemms`); OFF23-large slower (1.008 / 1.009) | off-polar-alex, 6–7 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| Stock first block's species skip (`generic.modules.STOCK_FIRST_SKIP_GPUS`), every OFF model | on (with the tables row below: OFF23-small 0.677 / 0.671, -medium 0.737 / 0.735, -large 0.793 / 0.811) | on (with the tables row below: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725, OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745) | on | exact | A100-SXM4-80GB: OFF23-small 0.709 / 0.714, -medium 0.749 / 0.749, OFF23b 0.826 / 0.821, OFF24 0.823 / 0.826, OFF23-large 0.707 / 0.714 | off-polar-alex, 7 Nov (d66); Ada 8 Nov | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| Radial tables with the stock first block (`DECISION_66_STOCK_FIRST_TABLES_GPUS`), every OFF model | on (measured with the row above) | on (measured with the row above) | on | certified | A100-SXM4-80GB: 0.929–0.977 on all five; gates pass | off-polar-alex, 7 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+| Radial last layer as 3xTF32 (`skinny_linear.RADIAL_TF32X3_GPUS`), MACE-OFF's radial products only | – (Triton 3xTF32 slower: both sets against the same default, OFF23-small 0.734 / 0.742 with it vs 0.677 / 0.671 without, -medium 0.806 / 0.792 vs 0.737 / 0.735) | – | on | precision change | A100-SXM4-80GB alone: 0.914–0.971 on all five; all three rows above together 0.563–0.645 (OFF23-small 2.58 → 1.45 ms, OFF23-large 11.7 → 6.97 ms); gates pass under the 3× rule (worst: OFF24-medium paracetamol stress 2.50) | off-polar-alex, 7 Nov (d66) | [off-polar-alex](../../results/off-polar-alex-20261106/README.md) |
+
+Measured and left as they are: EDGE_SH (on; off is 0.3–1 % slower), HEAD_SLICE (on; off is a tie or slower),
+GRAPH_SUM (on; off is up to 0.5 % faster on OFF23-small and -medium, a tie elsewhere: left on, flagged), the species
+GEMM (slower, 1.009–1.020), the chunked fused forward (slower on the medium models, 1.12–1.14).
+
 ### OMAT-0 and the generic family
 
 | Switch (set) | 5060 Ti | Ada | A100 | Exactness | Evidence (MD step b/a) | Decided | Report |

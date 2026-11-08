@@ -468,8 +468,11 @@ def test_enable_refuses_other_models_and_open_boundaries(tiny_polar):
         polar.configure(copy.deepcopy(model), {"fukui_regularisation": 0.1})
 
 
-def test_pr1762_forward_with_inactive_options_is_the_released_model(tiny_polar):
+def test_pr1762_forward_with_inactive_options_is_the_released_model(tiny_polar, monkeypatch):
     calc, model, atoms = tiny_polar
+    # Bitwise against the released forward: without SPIN_BATCHED's one-call spin recursion (default on, which
+    # regroups the k-space sums; tests/cpu/test_polar_spin_batched.py).
+    monkeypatch.setattr(polar, "SPIN_BATCHED", False)
     _evaluate(calc, model, atoms)  # throwaway: the first model of a process rounds differently (docs/development.md)
     e0, f0, s0 = _evaluate(calc, model, atoms)
     # Off by default: an enabled model with the default config runs the released forward.

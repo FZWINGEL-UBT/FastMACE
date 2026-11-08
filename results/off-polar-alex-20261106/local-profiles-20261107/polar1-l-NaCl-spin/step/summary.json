@@ -1,0 +1,142 @@
+{
+ "model": "polar1-l",
+ "structure": "NaCl",
+ "natoms": 216,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "wall_ms_per_step": 11.958969999977853,
+ "traced_span_ms_per_step": 12.170597744140625,
+ "kernels_per_step": 1078.94,
+ "kernel_busy_ms_per_step": 11.394685866328487,
+ "idle_gaps_ms_per_step": 0.77591068359375,
+ "gaps_over_20us_ms_per_step": 0.08930861328124999,
+ "kernels_under_5us_per_step": 780.6,
+ "kernels_under_10us_per_step": 852.6,
+ "time_in_kernels_under_10us_ms_per_step": 1.777649399999973,
+ "top": [
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutl",
+   102.0,
+   3.9511884199999883
+  ],
+  [
+   "oeq_projected_backward",
+   2.0,
+   0.9167955199999995
+  ],
+  [
+   "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3",
+   10.0,
+   0.8543773399999998
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_nn_align1>(cutl",
+   41.0,
+   0.7289391400000007
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_tn_align1>(cutla",
+   64.0,
+   0.5607523000000016
+  ],
+  [
+   "Kernel",
+   4.02,
+   0.42964653999999997
+  ],
+  [
+   "oeq_projected_forward",
+   2.0,
+   0.36377124000000016
+  ],
+  [
+   "segmented_polynomial_bwd_algo1_2",
+   3.0,
+   0.29761111999999984
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_tn_align1>(cutl",
+   6.0,
+   0.24815775999999987
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nt_align1>(cutla",
+   15.0,
+   0.18467718000000016
+  ],
+  [
+   "void cublasLt::splitKreduce_kernel<32, 16, int, float, float, float, f",
+   108.0,
+   0.17446954000000087
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nt_align1>(cutl",
+   4.0,
+   0.17445644000000005
+  ],
+  [
+   "segmented_polynomial_algo6_4",
+   3.0,
+   0.13279548
+  ],
+  [
+   "triton_red_fused__to_copy__unsafe_view_add_clone_div_mul_neg_select_sl",
+   2.0,
+   0.13184051999999996
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_cat_clone_div_mul_slice_view_46",
+   2.0,
+   0.07224832000000002
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutla",
+   18.0,
+   0.07172673999999979
+  ],
+  [
+   "triton_poi_fused__to_copy_add_clone_copy_expand_mm_select_select_backw",
+   2.0,
+   0.06983886
+  ],
+  [
+   "triton_poi_fused_add_div_expand_mm_mul_slice_t_transpose_unsqueeze_vie",
+   8.0,
+   0.06911911999999998
+  ],
+  [
+   "void cutlass::Kernel2<cutlass_80_simt_sgemm_32x128_8x5_nn_align1>(cutl",
+   19.0,
+   0.060458739999999664
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_cat_clone_permute_slice_transpose_vi",
+   2.0,
+   0.06032832000000001
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_cat_clone_mm_mul_permute_slice_sum_v",
+   3.0,
+   0.05756934
+  ],
+  [
+   "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int,",
+   23.0,
+   0.05491049999999996
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_bmm_clone_copy_div_expand_mul_permut",
+   1.0,
+   0.04906741999999998
+  ],
+  [
+   "triton_poi_fused_mul_sum_view_90",
+   3.0,
+   0.045742839999999986
+  ],
+  [
+   "triton_poi_fused__unsafe_view_add_cat_clone_div_mul_slice_view_45",
+   2.0,
+   0.04510284000000003
+  ]
+ ]
+}

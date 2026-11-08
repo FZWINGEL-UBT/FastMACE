@@ -1,0 +1,38 @@
+{
+  "kind": "reference",
+  "name": "reference-paracetamol_cod2104364-ase_f32",
+  "structure": "paracetamol_cod2104364",
+  "reference": "ase_f32",
+  "dtype": "float32",
+  "keys": [
+    "hydrostatic-0",
+    "hydrostatic-1",
+    "hydrostatic-2",
+    "full-0",
+    "full-1",
+    "full-2"
+  ],
+  "implementation": "fastmace.reference",
+  "model": "off23b-medium",
+  "label": "off23b-medium",
+  "checkpoint": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23b_medium.model",
+  "checkpoint_sha256": "871653738a4fbc8124dba1ff5bc595bd0abf7b849a8538c0825dc29ebadf1680",
+  "baseline": null,
+  "backend": "auto",
+  "md_dtype": "auto",
+  "main_args": "",
+  "rewrites": {
+    "radial_tables": "on"
+  },
+  "production_constants": [
+    "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True",
+    "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3=True"
+  ],
+  "engine_config": {},
+  "production_tf32": false,
+  "tiled_receivers": 0,
+  "tiled_mode": "eager",
+  "values": "/tmp/fastmace-out/gate-offall-off23b-medium/gate-candidate/values/reference-paracetamol_cod2104364-ase_f32.npz",
+  "result": "/tmp/fastmace-out/gate-offall-off23b-medium/gate-candidate/values/reference-paracetamol_cod2104364-ase_f32.json",
+  "configurations": "/tmp/fastmace-out/gate-offall-off23b-medium/gate-candidate/configs/paracetamol_cod2104364.npz"
+}

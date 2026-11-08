@@ -36,6 +36,7 @@ first table; everything else is for developers and is read on GitHub.
 | Memory capacity and the rescue ladder (rule 12) | [validation/capacity/](validation/capacity/README.md) |
 | The tiled path (up to 149M atoms) | [validation/tiled/](validation/tiled/README.md) |
 | OMAT-0 and the generic family (A100 kernel rounds) | [validation/omat0/](validation/omat0/README.md) |
+| PolarMACE (POLAR-1): MH-1 and OMAT-0 reuse, POLAR-1 defaults | [validation/polar/](validation/polar/README.md) |
 | Comparisons with TorchSim, ALCHEMI, other machines | [validation/comparisons/](validation/comparisons/README.md) |
 | Phase and round plans, idea lists, future work | [../plans/README.md](../plans/README.md) |
 | Raw run records (JSON, logs, scripts) | `../results/<run-id>/` |
