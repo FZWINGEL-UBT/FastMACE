@@ -577,6 +577,9 @@ class SplineForward:
                             and not self.cursor32)
         self.prefetch = prefetch_ahead_default(device) if self.stage_edges else 0  # PREFETCH_AHEAD
         self.block_order = block_order_default(device) if block_order is None else bool(block_order)
+        # BLOCK_ORDER: the receivers' order the owning force field binds before its calls (``bind_order``; any
+        # permutation of [0, N) gives the same message); a call with another row count walks them in index order.
+        self.order, self._identity = None, {}
         self.init_args = (schedule, blocks, grid, r_max, device, path_scale, shared_locator)
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
@@ -614,8 +617,13 @@ class SplineForward:
         p = ctypes.c_void_p
         ordered = ()
         if self.block_order:  # BLOCK_ORDER: the receivers' order, a permutation of [0, N)
-            if order is None or order.dtype != torch.int32 or order.numel() != nodes:
-                raise ValueError(f"BLOCK_ORDER: an int32 order of {nodes} receivers is needed")
+            order = self.order if order is None else order
+            if order is None or order.numel() != nodes:
+                order = self._identity.get(nodes)
+                if order is None:
+                    order = self._identity[nodes] = torch.arange(nodes, dtype=torch.int32, device=x.device)
+            if order.dtype != torch.int32 or order.device != x.device:
+                raise ValueError("BLOCK_ORDER: the order must be int32 on the kernel's device")
             ordered = (order.data_ptr(),)
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), senders.data_ptr(), row_ptr.data_ptr(),
                   lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *ordered,

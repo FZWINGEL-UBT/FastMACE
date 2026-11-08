@@ -82,6 +82,10 @@ def main(argv=None) -> int:
                              forward_parts=obj.spline_block[1].parts if obj.spline_block else None,
                              forward_stage_edges=getattr(obj.spline_block[1], "stage_edges", None)
                              if obj.spline_block else None,
+                             forward_block_order=getattr(obj.spline_block[1], "block_order", None)
+                             if obj.spline_block else None,
+                             forward_order_bound=(getattr(obj.spline_block[1], "order", None) is not None)
+                             if obj.spline_block else None,
                              wprime=resources(obj.spline_block[2]) if obj.spline_block else None,
                              wprime_stage_quads=getattr(obj.spline_block[2], "stage_quads", None)
                              if obj.spline_block else None,
