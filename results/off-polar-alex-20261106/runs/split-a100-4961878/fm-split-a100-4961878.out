@@ -1,0 +1,101 @@
+### Starting TaskPrologue of job 4961878 on a0531 at Sun Nov  8 07:11:54 AM CET 2026
+Running on cores 0-15 with governor schedutil
+Sun Nov  8 07:11:54 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:96:00.0 Off |                    0 |
+| N/A   31C    P0             63W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-08T07:12:33+0100 STAGE copied to /tmp/4961878.alex/fm in 38 s
+2026-11-08T07:12:33+0100 alex_ab_pack v1 job 4961878 on a0531 (16 cores, AMD EPYC 7713 64-Core Processor); NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; source 6b0d9f5cde87b191c9600ef474e245c069a1723b
+2026-11-08T07:12:33+0100 start ab-off23-large-ab (1 switches)
+2026-11-08T07:18:49+0100 end ab-off23-large-ab exit=0 wall 376 s
+  off23-large ab split water_216 a 6.9457 ms b 6.9380 ms b/a 0.9989 valid 
+  SETUP ab-off23-large-ab-split water_216 a 135 s b 62 s
+2026-11-08T07:18:51+0100 start ab-off23-large-ba (1 switches)
+2026-11-08T07:24:55+0100 end ab-off23-large-ba exit=0 wall 364 s
+  off23-large ba split water_216 b 6.9482 ms a 6.9604 ms b/a 0.9982 valid 
+  SETUP ab-off23-large-ba-split water_216 a 73 s b 127 s
+2026-11-08T07:24:56+0100 start ab-off23-small-ab (1 switches)
+2026-11-08T07:27:39+0100 end ab-off23-small-ab exit=0 wall 163 s
+  off23-small ab split water_216 a 1.5332 ms b 1.5220 ms b/a 0.9927 valid 
+  SETUP ab-off23-small-ab-split water_216 a 97 s b 13 s
+2026-11-08T07:27:39+0100 start ab-off23-small-ba (1 switches)
+2026-11-08T07:29:47+0100 end ab-off23-small-ba exit=0 wall 128 s
+  off23-small ba split water_216 b 1.5285 ms a 1.5265 ms b/a 1.0014 valid 
+  SETUP ab-off23-small-ba-split water_216 a 24 s b 54 s
+2026-11-08T07:29:48+0100 start ab-off23-medium-ab (1 switches)
+2026-11-08T07:33:50+0100 end ab-off23-medium-ab exit=0 wall 242 s
+  off23-medium ab split water_216 a 2.6208 ms b 2.6186 ms b/a 0.9992 valid 
+  SETUP ab-off23-medium-ab-split water_216 a 144 s b 25 s
+2026-11-08T07:33:51+0100 start ab-off23-medium-ba (1 switches)
+2026-11-08T07:36:17+0100 end ab-off23-medium-ba exit=0 wall 146 s
+  off23-medium ba split water_216 b 2.6343 ms a 2.6216 ms b/a 1.0048 valid 
+  SETUP ab-off23-medium-ba-split water_216 a 25 s b 56 s
+2026-11-08T07:36:17+0100 start ab-off23b-medium-ab (1 switches)
+2026-11-08T07:39:54+0100 end ab-off23b-medium-ab exit=0 wall 217 s
+  off23b-medium ab split water_216 a 3.8965 ms b 3.8971 ms b/a 1.0002 valid 
+  SETUP ab-off23b-medium-ab-split water_216 a 99 s b 27 s
+2026-11-08T07:39:55+0100 start ab-off23b-medium-ba (1 switches)
+2026-11-08T07:42:49+0100 end ab-off23b-medium-ba exit=0 wall 174 s
+  off23b-medium ba split water_216 b 3.9031 ms a 3.8870 ms b/a 1.0041 valid 
+  SETUP ab-off23b-medium-ba-split water_216 a 31 s b 52 s
+2026-11-08T07:42:49+0100 start ab-off24-medium-ab (1 switches)
+2026-11-08T07:46:27+0100 end ab-off24-medium-ab exit=0 wall 218 s
+  off24-medium ab split water_216 a 3.8697 ms b 3.8761 ms b/a 1.0017 valid 
+  SETUP ab-off24-medium-ab-split water_216 a 102 s b 25 s
+2026-11-08T07:46:27+0100 start ab-off24-medium-ba (1 switches)
+2026-11-08T07:49:17+0100 end ab-off24-medium-ba exit=0 wall 170 s
+  off24-medium ba split water_216 b 3.8854 ms a 3.8916 ms b/a 0.9984 valid 
+  SETUP ab-off24-medium-ba-split water_216 a 27 s b 55 s
+2026-11-08T07:49:17+0100 done failed=0
+=== JOB_STATISTICS ===
+=== current date     : Sun Nov  8 07:49:18 CET 2026
+= Job-ID             : 4961878 on alex
+= Job-Name           : fm-split-a100
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-offpolar/jobs/split-a100-alex_ab_pack.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-offpolar
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 03:00:00
+= Elapsed runtime    : 00:37:31
+= Total RAM usage    : 18.9 GiB of assigned  GiB (%)
+= Node list          : a0531
+= Subm/Elig/Start/End: 2026-11-08T07:11:04 / 2026-11-08T07:11:04 / 2026-11-08T07:11:47 / 2026-11-08T07:49:18
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             578.1M   104.9G   209.7G        N/A     919      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            35.5G     0.0K     0.0K        N/A     346K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 489364, 35 %, 13 %, 3376 MiB, 334874 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 501445, 34 %, 12 %, 3376 MiB, 349561 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 503547, 15 %, 3 %, 990 MiB, 154674 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 504921, 19 %, 4 %, 990 MiB, 123529 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 506150, 19 %, 7 %, 1706 MiB, 233548 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 508261, 31 %, 11 %, 1704 MiB, 141414 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 510170, 31 %, 14 %, 2300 MiB, 210127 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 513109, 39 %, 18 %, 2300 MiB, 169396 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 515423, 31 %, 14 %, 2300 MiB, 211359 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 519198, 40 %, 18 %, 2298 MiB, 163845 ms

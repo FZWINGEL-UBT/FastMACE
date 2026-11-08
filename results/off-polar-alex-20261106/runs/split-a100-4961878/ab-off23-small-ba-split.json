@@ -1,0 +1,197 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-08T06:27:52.158084+00:00",
+  "host": "a0531",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "6b0d9f5cde87b191c9600ef474e245c069a1723b",
+  "model": "off23-small",
+  "checkpoint_sha256": "165cce4cfec5a34b9c64d4ebf95de15d71106bb584b7291c8470f0749977c46f",
+  "sides": {
+    "a": {},
+    "b": {}
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.kernels.triton.skinny_linear:SPLIT_COLUMNS": true
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 500,
+    "block": 1000,
+    "blocks": 8
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": null,
+  "stop_beyond": 0.03,
+  "load": [
+    16.24,
+    16.31,
+    22.46
+  ],
+  "structures": {
+    "water_216": {
+      "natoms": 648,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 1.528549780981848,
+            "mean_ms": 1.536476681860222,
+            "min_ms": 1.513784090988338,
+            "max_ms": 1.5995213229907677,
+            "stdev_ms": 0.028041317794005247,
+            "spread": 0.05609057229876887,
+            "block_ms": [
+              1.5995213229907677,
+              1.5457686929730698,
+              1.5347397250006907,
+              1.5400852159946226,
+              1.5151669339975342,
+              1.5223598369630054,
+              1.5203876359737478,
+              1.513784090988338
+            ]
+          },
+          "a": {
+            "median_ms": 1.5264829605002888,
+            "mean_ms": 1.5665081626284518,
+            "min_ms": 1.510273115010932,
+            "max_ms": 1.8448815980227664,
+            "stdev_ms": 0.11297492825032002,
+            "spread": 0.21920223918003637,
+            "block_ms": [
+              1.8448815980227664,
+              1.5223557790159248,
+              1.5482639989932068,
+              1.5275572320097126,
+              1.525408688990865,
+              1.5231125109712593,
+              1.5302123780129477,
+              1.510273115010932
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9986478553022776,
+        "pair_ratios_b_over_a": [
+          1.1533960638756768,
+          0.9848535462882784,
+          1.0088120961308342,
+          0.9918653955931789,
+          1.0067594895080698,
+          1.0004944126808781,
+          1.0064619981159657,
+          0.9976806626530779
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 1.0013539754684728,
+      "pair_ratios": [
+        0.8670048661686683,
+        1.0153793970370577,
+        0.9912648785986689,
+        1.0082013188916186,
+        0.9932858944181666,
+        0.9995058316422245,
+        0.9935794911998047,
+        1.0023247291781265
+      ],
+      "setup_s": {
+        "a": 23.736100656038616,
+        "b": 53.52961497998331
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 303.5911342095673,
+          "potential_eV_atom": -693.8448673746997,
+          "kinetic_eV_atom": 0.0392421763640143
+        },
+        "a": {
+          "temperature_K": 295.1504362629015,
+          "potential_eV_atom": -693.844147874891,
+          "kinetic_eV_atom": 0.03815113212676794
+        }
+      },
+      "load_after": [
+        13.46,
+        15.34,
+        21.39
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 1886,
+          "pipelined_redos": 88,
+          "pipelined_early_rebuilds": 1798
+        },
+        "a": {
+          "rebuilds": 1872,
+          "pipelined_redos": 92,
+          "pipelined_early_rebuilds": 1782
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  },
+  "pack": {
+    "name": "split",
+    "entries": [
+      "split"
+    ],
+    "shared_a": true
+  }
+}
