@@ -1,0 +1,203 @@
+// spline_forward0 (SPLINE_W, sx-layout lab 7 November 2026): Symmetrix-XL's layout, w from the cubic spline.
+using int64_t = long long;
+constexpr int C = 128;
+constexpr int64_t Q = 1280;
+constexpr int IN_DIM = 512;
+constexpr int ED = 16;
+constexpr float R_MAX = 0x1.8000000000000p+2f;
+
+extern "C" __global__ void __launch_bounds__(128, 6) spline_forward0(
+    int64_t N, int64_t E, const float* __restrict__ x, const float* __restrict__ sh,
+    const int* __restrict__ senders, const int* __restrict__ row_ptr, const float* __restrict__ lengths,
+    const int* __restrict__ pairs, const float4* __restrict__ table, int intervals, float* __restrict__ out0, float* __restrict__ out1, float* __restrict__ out2, float* __restrict__ out3) {
+    const int64_t owners = N * C;
+    const int64_t stride = (int64_t)blockDim.x * gridDim.x;
+    for (int64_t owner = (int64_t)blockIdx.x * blockDim.x + threadIdx.x; owner < owners; owner += stride) {
+        const int rcv = (int)(owner / C), ch = (int)(owner % C);
+        float acc[40];
+        #pragma unroll
+        for (int i = 0; i < 40; ++i) acc[i] = 0.f;
+        int64_t eb = row_ptr[rcv], ee = row_ptr[rcv + 1];
+        eb = eb < 0 ? 0 : eb;
+        ee = ee > E ? E : ee;
+        for (int64_t e = eb; e < ee; ++e) {
+            const float re = lengths[e];
+            if (!(re < R_MAX)) continue;  // w = 0 at and beyond the cutoff (and the padding edges)
+            const int snd = senders[e];
+            if (snd < 0 || snd >= N) continue;
+            int iv; float t, sx_inv;
+            if (re < 0x1.0000000000000p-1f) { sx_inv = 0x1.8880000000000p+9f; float u = (re - 0x1.3333333333333p-2f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 156 ? il : 156; t = u - (float)il; iv = 0 + il; }
+            else if (re < 0x1.8000000000000p-1f) { sx_inv = 0x1.c000000000000p+8f; float u = (re - 0x1.0000000000000p-1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 111 ? il : 111; t = u - (float)il; iv = 157 + il; }
+            else if (re < 0x1.0000000000000p+0f) { sx_inv = 0x1.5c00000000000p+8f; float u = (re - 0x1.8000000000000p-1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 86 ? il : 86; t = u - (float)il; iv = 269 + il; }
+            else if (re < 0x1.8000000000000p+0f) { sx_inv = 0x1.f000000000000p+7f; float u = (re - 0x1.0000000000000p+0f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 123 ? il : 123; t = u - (float)il; iv = 356 + il; }
+            else if (re < 0x1.0000000000000p+1f) { sx_inv = 0x1.b000000000000p+6f; float u = (re - 0x1.8000000000000p+0f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 53 ? il : 53; t = u - (float)il; iv = 480 + il; }
+            else if (re < 0x1.4000000000000p+1f) { sx_inv = 0x1.f000000000000p+5f; float u = (re - 0x1.0000000000000p+1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 30 ? il : 30; t = u - (float)il; iv = 534 + il; }
+            else { sx_inv = 0x1.7b6db6db6db6ep+5f; float u = (re - 0x1.4000000000000p+1f) * sx_inv; u = u > 0x0.0p+0f ? u : 0x0.0p+0f; int il = (int)u; il = il < 165 ? il : 165; t = u - (float)il; iv = 565 + il; }
+            const float4* tq = table + ((int64_t)pairs[e] * intervals + iv) * Q + ch;
+            const float x0 = __ldg(x + (int64_t)snd * IN_DIM + 0 + ch);
+            const float x1 = __ldg(x + (int64_t)snd * IN_DIM + 128 + ch);
+            const float x2 = __ldg(x + (int64_t)snd * IN_DIM + 256 + ch);
+            const float x3 = __ldg(x + (int64_t)snd * IN_DIM + 384 + ch);
+            {
+                const float e0 = __ldg(sh + e * ED + 0);
+                const float4 c = __ldg(tq + 0);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[0] = fmaf(w, x0 * e0 * 0x1.0000000000000p+0f, acc[0]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 1);
+                const float e1 = __ldg(sh + e * ED + 2);
+                const float e2 = __ldg(sh + e * ED + 3);
+                const float4 c = __ldg(tq + 128);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[1] = fmaf(w, x1 * e0 * 0x1.fffffffffe931p-1f + x2 * e1 * 0x1.fffffffffe933p-1f + x3 * e2 * 0x1.fffffffffe931p-1f, acc[1]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 1);
+                const float e1 = __ldg(sh + e * ED + 2);
+                const float e2 = __ldg(sh + e * ED + 3);
+                const float4 c = __ldg(tq + 256);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[2] = fmaf(w, x0 * e0 * 0x1.fffffffffffffp-1f, acc[2]);
+                acc[3] = fmaf(w, x0 * e1 * 0x1.0000000000000p+0f, acc[3]);
+                acc[4] = fmaf(w, x0 * e2 * 0x1.fffffffffffffp-1f, acc[4]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 0);
+                const float4 c = __ldg(tq + 384);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[5] = fmaf(w, x1 * e0 * 0x1.fffffffffffffp-1f, acc[5]);
+                acc[6] = fmaf(w, x2 * e0 * 0x1.0000000000000p+0f, acc[6]);
+                acc[7] = fmaf(w, x3 * e0 * 0x1.fffffffffffffp-1f, acc[7]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 4);
+                const float e1 = __ldg(sh + e * ED + 5);
+                const float e2 = __ldg(sh + e * ED + 6);
+                const float e3 = __ldg(sh + e * ED + 7);
+                const float e4 = __ldg(sh + e * ED + 8);
+                const float4 c = __ldg(tq + 512);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[8] = fmaf(w, x1 * e2 * -0x1.279a745903946p-1f + x1 * e4 * -0x1.0000000000555p+0f + x2 * e1 * 0x1.0000000000555p+0f + x3 * e0 * 0x1.0000000000555p+0f, acc[8]);
+                acc[9] = fmaf(w, x1 * e1 * 0x1.0000000000555p+0f + x2 * e2 * 0x1.279a745903947p+0f + x3 * e3 * 0x1.0000000000555p+0f, acc[9]);
+                acc[10] = fmaf(w, x1 * e0 * 0x1.0000000000555p+0f + x2 * e3 * 0x1.0000000000555p+0f + x3 * e2 * -0x1.279a745903946p-1f + x3 * e4 * 0x1.0000000000555p+0f, acc[10]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 4);
+                const float e1 = __ldg(sh + e * ED + 5);
+                const float e2 = __ldg(sh + e * ED + 6);
+                const float e3 = __ldg(sh + e * ED + 7);
+                const float e4 = __ldg(sh + e * ED + 8);
+                const float4 c = __ldg(tq + 640);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[11] = fmaf(w, x0 * e0 * 0x1.0000000000000p+0f, acc[11]);
+                acc[12] = fmaf(w, x0 * e1 * 0x1.0000000000000p+0f, acc[12]);
+                acc[13] = fmaf(w, x0 * e2 * 0x1.0000000000001p+0f, acc[13]);
+                acc[14] = fmaf(w, x0 * e3 * 0x1.0000000000000p+0f, acc[14]);
+                acc[15] = fmaf(w, x0 * e4 * 0x1.0000000000000p+0f, acc[15]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 1);
+                const float e1 = __ldg(sh + e * ED + 2);
+                const float e2 = __ldg(sh + e * ED + 3);
+                const float4 c = __ldg(tq + 768);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[16] = fmaf(w, x1 * e2 * 0x1.fffffffffe97cp-1f + x3 * e0 * 0x1.fffffffffe97cp-1f, acc[16]);
+                acc[17] = fmaf(w, x1 * e1 * 0x1.fffffffffe97dp-1f + x2 * e0 * 0x1.fffffffffe97dp-1f, acc[17]);
+                acc[18] = fmaf(w, x1 * e0 * -0x1.279a74590261dp-1f + x2 * e1 * 0x1.279a74590261dp+0f + x3 * e2 * -0x1.279a74590261dp-1f, acc[18]);
+                acc[19] = fmaf(w, x2 * e2 * 0x1.fffffffffe97dp-1f + x3 * e1 * 0x1.fffffffffe97dp-1f, acc[19]);
+                acc[20] = fmaf(w, x1 * e0 * -0x1.fffffffffe97cp-1f + x3 * e2 * 0x1.fffffffffe97cp-1f, acc[20]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 9);
+                const float e1 = __ldg(sh + e * ED + 10);
+                const float e2 = __ldg(sh + e * ED + 11);
+                const float e3 = __ldg(sh + e * ED + 12);
+                const float e4 = __ldg(sh + e * ED + 13);
+                const float e5 = __ldg(sh + e * ED + 14);
+                const float e6 = __ldg(sh + e * ED + 15);
+                const float4 c = __ldg(tq + 896);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[21] = fmaf(w, x1 * e4 * -0x1.43d1362485537p-2f + x1 * e6 * -0x1.3988e14092cf4p+0f + x2 * e1 * 0x1.000000000099dp+0f + x3 * e0 * 0x1.3988e14092cf4p+0f + x3 * e2 * -0x1.43d1362485537p-2f, acc[21]);
+                acc[22] = fmaf(w, x1 * e3 * -0x1.8c97ef43f812bp-1f + x1 * e5 * -0x1.000000000099cp+0f + x2 * e2 * 0x1.43d1362485537p+0f + x3 * e1 * 0x1.000000000099cp+0f, acc[22]);
+                acc[23] = fmaf(w, x1 * e2 * 0x1.186f174f88efap+0f + x2 * e3 * 0x1.5775c544fff49p+0f + x3 * e4 * 0x1.186f174f88efap+0f, acc[23]);
+                acc[24] = fmaf(w, x1 * e1 * 0x1.000000000099cp+0f + x2 * e4 * 0x1.43d1362485537p+0f + x3 * e3 * -0x1.8c97ef43f812bp-1f + x3 * e5 * 0x1.000000000099cp+0f, acc[24]);
+                acc[25] = fmaf(w, x1 * e0 * 0x1.3988e14092cf4p+0f + x1 * e2 * 0x1.43d1362485537p-2f + x2 * e5 * 0x1.000000000099dp+0f + x3 * e4 * -0x1.43d1362485537p-2f + x3 * e6 * 0x1.3988e14092cf4p+0f, acc[25]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 9);
+                const float e1 = __ldg(sh + e * ED + 10);
+                const float e2 = __ldg(sh + e * ED + 11);
+                const float e3 = __ldg(sh + e * ED + 12);
+                const float e4 = __ldg(sh + e * ED + 13);
+                const float e5 = __ldg(sh + e * ED + 14);
+                const float e6 = __ldg(sh + e * ED + 15);
+                const float4 c = __ldg(tq + 1024);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[26] = fmaf(w, x0 * e0 * 0x1.0000000000000p+0f, acc[26]);
+                acc[27] = fmaf(w, x0 * e1 * 0x1.0000000000000p+0f, acc[27]);
+                acc[28] = fmaf(w, x0 * e2 * 0x1.0000000000000p+0f, acc[28]);
+                acc[29] = fmaf(w, x0 * e3 * 0x1.0000000000001p+0f, acc[29]);
+                acc[30] = fmaf(w, x0 * e4 * 0x1.0000000000000p+0f, acc[30]);
+                acc[31] = fmaf(w, x0 * e5 * 0x1.0000000000000p+0f, acc[31]);
+                acc[32] = fmaf(w, x0 * e6 * 0x1.0000000000000p+0f, acc[32]);
+            }
+            {
+                const float e0 = __ldg(sh + e * ED + 4);
+                const float e1 = __ldg(sh + e * ED + 5);
+                const float e2 = __ldg(sh + e * ED + 6);
+                const float e3 = __ldg(sh + e * ED + 7);
+                const float e4 = __ldg(sh + e * ED + 8);
+                const float4 c = __ldg(tq + 1152);
+                const float w = fmaf(t, fmaf(t, fmaf(t, c.w, c.z), c.y), c.x);
+                acc[33] = fmaf(w, x1 * e4 * 0x1.3988e14091337p+0f + x3 * e0 * 0x1.3988e14091337p+0f, acc[33]);
+                acc[34] = fmaf(w, x1 * e3 * 0x1.fffffffffe931p-1f + x2 * e0 * 0x1.fffffffffe931p-1f + x3 * e1 * 0x1.fffffffffe931p-1f, acc[34]);
+                acc[35] = fmaf(w, x1 * e2 * 0x1.186f174f877f5p+0f + x1 * e4 * 0x1.43d1362483aa3p-2f + x2 * e1 * 0x1.43d1362483aa3p+0f + x3 * e0 * -0x1.43d1362483aa3p-2f, acc[35]);
+                acc[36] = fmaf(w, x1 * e1 * -0x1.8c97ef43f609cp-1f + x2 * e2 * 0x1.5775c544fe318p+0f + x3 * e3 * -0x1.8c97ef43f609cp-1f, acc[36]);
+                acc[37] = fmaf(w, x1 * e0 * -0x1.43d1362483aa3p-2f + x2 * e3 * 0x1.43d1362483aa3p+0f + x3 * e2 * 0x1.186f174f877f5p+0f + x3 * e4 * -0x1.43d1362483aa3p-2f, acc[37]);
+                acc[38] = fmaf(w, x1 * e1 * -0x1.fffffffffe931p-1f + x2 * e4 * 0x1.fffffffffe931p-1f + x3 * e3 * 0x1.fffffffffe931p-1f, acc[38]);
+                acc[39] = fmaf(w, x1 * e0 * -0x1.3988e14091337p+0f + x3 * e4 * 0x1.3988e14091337p+0f, acc[39]);
+            }
+        }
+        out0[(int64_t)rcv * 256 + 0 + ch] = acc[0];
+        out0[(int64_t)rcv * 256 + 128 + ch] = acc[1];
+        out1[(int64_t)rcv * 1152 + 0 + ch] = acc[2];
+        out1[(int64_t)rcv * 1152 + 384 + ch] = acc[3];
+        out1[(int64_t)rcv * 1152 + 768 + ch] = acc[4];
+        out1[(int64_t)rcv * 1152 + 128 + ch] = acc[5];
+        out1[(int64_t)rcv * 1152 + 512 + ch] = acc[6];
+        out1[(int64_t)rcv * 1152 + 896 + ch] = acc[7];
+        out1[(int64_t)rcv * 1152 + 256 + ch] = acc[8];
+        out1[(int64_t)rcv * 1152 + 640 + ch] = acc[9];
+        out1[(int64_t)rcv * 1152 + 1024 + ch] = acc[10];
+        out2[(int64_t)rcv * 1920 + 0 + ch] = acc[11];
+        out2[(int64_t)rcv * 1920 + 384 + ch] = acc[12];
+        out2[(int64_t)rcv * 1920 + 768 + ch] = acc[13];
+        out2[(int64_t)rcv * 1920 + 1152 + ch] = acc[14];
+        out2[(int64_t)rcv * 1920 + 1536 + ch] = acc[15];
+        out2[(int64_t)rcv * 1920 + 128 + ch] = acc[16];
+        out2[(int64_t)rcv * 1920 + 512 + ch] = acc[17];
+        out2[(int64_t)rcv * 1920 + 896 + ch] = acc[18];
+        out2[(int64_t)rcv * 1920 + 1280 + ch] = acc[19];
+        out2[(int64_t)rcv * 1920 + 1664 + ch] = acc[20];
+        out2[(int64_t)rcv * 1920 + 256 + ch] = acc[21];
+        out2[(int64_t)rcv * 1920 + 640 + ch] = acc[22];
+        out2[(int64_t)rcv * 1920 + 1024 + ch] = acc[23];
+        out2[(int64_t)rcv * 1920 + 1408 + ch] = acc[24];
+        out2[(int64_t)rcv * 1920 + 1792 + ch] = acc[25];
+        out3[(int64_t)rcv * 1792 + 0 + ch] = acc[26];
+        out3[(int64_t)rcv * 1792 + 256 + ch] = acc[27];
+        out3[(int64_t)rcv * 1792 + 512 + ch] = acc[28];
+        out3[(int64_t)rcv * 1792 + 768 + ch] = acc[29];
+        out3[(int64_t)rcv * 1792 + 1024 + ch] = acc[30];
+        out3[(int64_t)rcv * 1792 + 1280 + ch] = acc[31];
+        out3[(int64_t)rcv * 1792 + 1536 + ch] = acc[32];
+        out3[(int64_t)rcv * 1792 + 128 + ch] = acc[33];
+        out3[(int64_t)rcv * 1792 + 384 + ch] = acc[34];
+        out3[(int64_t)rcv * 1792 + 640 + ch] = acc[35];
+        out3[(int64_t)rcv * 1792 + 896 + ch] = acc[36];
+        out3[(int64_t)rcv * 1792 + 1152 + ch] = acc[37];
+        out3[(int64_t)rcv * 1792 + 1408 + ch] = acc[38];
+        out3[(int64_t)rcv * 1792 + 1664 + ch] = acc[39];
+    }
+}
