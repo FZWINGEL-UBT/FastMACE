@@ -747,6 +747,10 @@ class MACEForceField:
         if self._has_total["total_spin"]:
             self._spin_base = self.data["total_spin"].detach().clone()
         self._tables = []  # (FirstInteractionReassociation, its [S, C] table, its refresh)
+        # BLOCK_ORDER (spline_forward): the receivers grouped by species, made at the first bind that needs it. A
+        # later species change leaves it a permutation of the atoms, which gives the same message; only the grouping
+        # ages. Not a derived buffer: nothing reads it as species.
+        self._block_order = None
 
     def _reassociated(self):
         """``(model, [(index, interaction)])`` of the interactions with a reassociated first interaction."""
@@ -953,6 +957,22 @@ class MACEForceField:
                 module.register_buffer("streaming_count", count, persistent=False)
         for _, reassociation, table, _ in self._tables:
             reassociation.bind(table)
+        ordered = self._ordered_spline_kernels()
+        if ordered and self._block_order is None:
+            from fastmace.kernels.oeq_streaming.spline_forward import receiver_order
+            self._block_order = receiver_order(self._species_index).to(self._device)
+        for kernel in ordered:  # BLOCK_ORDER: this force field's receivers' order
+            kernel.order = self._block_order
+
+    def _ordered_spline_kernels(self):
+        """The SPLINE_W forwards (``spline_forward.SplineForward``) of the model with BLOCK_ORDER on."""
+        model = getattr(self.model, "_orig_mod", self.model)
+        kernels = []
+        for interaction in getattr(model, "interactions", ()):
+            block = getattr(getattr(interaction, "wprime_backward", None), "spline_block", None)
+            if block is not None and getattr(block[1], "block_order", False):
+                kernels.append(block[1])
+        return kernels
 
     def __call__(self, positions):
         """Energy [1], forces [N, 3] (and stress [3, 3]) at float64 ``positions`` on the current edges.

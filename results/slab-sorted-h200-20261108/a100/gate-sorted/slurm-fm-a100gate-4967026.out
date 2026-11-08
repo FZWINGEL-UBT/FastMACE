@@ -1,0 +1,60 @@
+### Starting TaskPrologue of job 4967026 on a0533 at Mon Nov  9 12:02:46 AM CET 2026
+Running on cores 16-31 with governor schedutil
+Mon Nov  9 00:02:46 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:49:00.0 Off |                    0 |
+| N/A   32C    P0             63W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-09T00:02:48+0100 job 4967026 on a0533; NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; source 59c1034ef378aae4f53ab083f856d80e0911734d
+SrTiO3 summary {"energy": {"production_max_abs": 0.002345671125820243, "ase_f32_max_abs": 0.00037099780119778756, "ratio": 6.3226011535570015, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 2.7580619829770114e-05, "ase_f32_max_abs": 2.996480562078574e-05, "ratio": 0.9204337975293996, "floor": 1e-05, "limit": 8.989441686235722e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 1.5504288243539666e-07, "ase_f32_max_abs": 2.42476482545384e-07, "ratio": 0.639414102381568, "floor": 1e-07, "limit": 7.27429447636152e-07, "passed": true, "gated": true}, "passed": true}
+NaCl summary {"energy": {"production_max_abs": 0.0002122504338541586, "ase_f32_max_abs": 0.00015835350834718324, "ratio": 1.3403582659426065, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 4.321131840429038e-06, "ase_f32_max_abs": 4.664775123397469e-06, "ratio": 0.9263322938666876, "floor": 1e-05, "limit": 1.3994325370192406e-05, "passed": true, "gated": true}, "stress": {"production_max_abs": 4.385162223098649e-08, "ase_f32_max_abs": 4.292029965637101e-08, "ratio": 1.0216988833272798, "floor": 1e-07, "limit": 1.2876089896911302e-07, "passed": true, "gated": true}, "passed": true}
+NbCl5 summary {"energy": {"production_max_abs": 0.0005369503508709273, "ase_f32_max_abs": 0.00010405893055142437, "ratio": 5.160060246876883, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 7.923274134835623e-05, "ase_f32_max_abs": 8.233218287667654e-05, "ratio": 0.9623544351670732, "floor": 1e-05, "limit": 0.0002469965486300296, "passed": true, "gated": true}, "stress": {"production_max_abs": 8.55771698678176e-08, "ase_f32_max_abs": 7.440129897243186e-08, "ratio": 1.1502106959117309, "floor": 1e-07, "limit": 2.2320389691729559e-07, "passed": true, "gated": true}, "passed": true}
+2026-11-09T00:12:14+0100 gate exit=0
+=== JOB_STATISTICS ===
+=== current date     : Mon Nov  9 00:12:14 CET 2026
+= Job-ID             : 4967026 on alex
+= Job-Name           : fm-a100gate
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-a100omat/jobs/gate-sorted.sh
+= Initial workdir    : /home/hpc/v130cb/v130cb18
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 03:00:00
+= Elapsed runtime    : 00:09:57
+= Total RAM usage    : 7.7 GiB of assigned  GiB (%)
+= Node list          : a0533
+= Subm/Elig/Start/End: 2026-11-09T00:01:44 / 2026-11-09T00:01:44 / 2026-11-09T00:02:17 / 2026-11-09T00:12:14
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             591.9M   104.9G   209.7G        N/A   1,012      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            33.5G     0.0K     0.0K        N/A     302K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2973539, 0 %, 0 %, 1486 MiB, 65446 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2973922, 1 %, 0 %, 1036 MiB, 26430 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2974271, 1 %, 0 %, 1302 MiB, 24465 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2974595, 1 %, 0 %, 938 MiB, 26476 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2974936, 2 %, 1 %, 5852 MiB, 24485 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2975414, 2 %, 0 %, 3248 MiB, 26485 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2975744, 0 %, 0 %, 2130 MiB, 276315 ms

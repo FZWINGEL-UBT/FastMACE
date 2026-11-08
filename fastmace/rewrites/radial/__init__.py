@@ -877,19 +877,22 @@ def attach_generic_wprime(model):
     """``generic_wprime_backward``: ``wprime_backward`` in every generic interaction whose tables feed the chunked
     folded streaming convolution with stored weights (``generic_chunked_conv_backward``; not on the recompute
     paths, ``generic_recompute_conv_weights`` and ``generic_recompute_first_table``); returns their names. The
-    reassociated first interaction keeps its own path."""
+    reassociated first interaction keeps its own path. Where rule 12 put every candidate on the recompute path
+    (the memory rescue), it applies to none and returns no names: the rescued plan runs without it."""
     import torch
 
     from fastmace.kernels.oeq_streaming.wprime_backward import WPrime
 
-    names = []
+    names, rescued = [], 0
     for index, interaction in _generic_interactions(model):
         table = getattr(interaction, "radial_table", None)
         folded = getattr(interaction, "generic_folded", None)
         if table is None or folded is None or getattr(interaction, "first_reassociation", None) is not None:
             continue
-        if (not getattr(interaction, "chunked_backward_edges", 0)
-                or getattr(interaction, "generic_recompute", None) is not None):
+        if not getattr(interaction, "chunked_backward_edges", 0):
+            continue
+        if getattr(interaction, "generic_recompute", None) is not None:
+            rescued += 1
             continue
         if table.coef.dtype != torch.float32:
             raise RewriteError(f"generic_wprime_backward is float32 only, interactions.{index} has {table.coef.dtype} "
@@ -903,7 +906,7 @@ def attach_generic_wprime(model):
         interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels, generic=True)
         note = _attach_spline(model, index, interaction, table, weight)
         names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB{note})")
-    if not names:
+    if not names and not rescued:
         raise RewriteError("generic_wprime_backward: no generic interaction with float32 radial tables and the "
                            "chunked streaming convolution")
     return names
@@ -1448,7 +1451,7 @@ RECORDS = {
         requires=("generic_radial_tables", "generic_chunked_conv_backward"), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_generic_wprime,
-        selfcheck=_generic_wprime_selfcheck),
+        selfcheck=_generic_wprime_selfcheck, memory=memory_terms.generic_wprime_backward),
     # plans/capacity.md CAP-T07: rounding (the rebuilt weights equal the stored ones bitwise; dsh and dL/dr are summed
     # over channel slices in another order, the sender additions are atomic); off unless memory requires it
     # (planner.memory.MEMORY_RESCUE, fallback.memory_rescue).

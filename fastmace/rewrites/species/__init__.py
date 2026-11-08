@@ -422,7 +422,10 @@ GENERIC_FOLD_READOUT_TAIL = None
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): MD step b/a 0.9861 / 0.9908 against the A100 defaults, off again from all ten H200
 # switches 1.0097 / 1.0072 (b = off); gate passes.
-GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): 0.9974 / 0.9962 against
+# the Ada defaults, off
+# again from the Ada set 1.0020 / 1.0026 (b = off); gate passes.
+GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 
 
 def generic_fold_readout_tail_default(name=None) -> bool:

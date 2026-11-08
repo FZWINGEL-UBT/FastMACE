@@ -280,6 +280,81 @@ def test_receiver_order_survives_rebuild_and_compaction():
         assert torch.equal(first_units, nl.unit_shifts[:count])
 
 
+def _lengths_by_key(nl, positions, groups):
+    """(key, length bin) of each candidate: key = receiver (then sender group)."""
+    from fastmace.neighbors import skin
+
+    n = nl.num_candidates
+    sender, receiver = nl.candidate_index[:, :n]
+    x = torch.as_tensor(positions)
+    vectors = x[receiver] - x[sender] + candidate_shifts(nl)[:n]
+    bins = skin.length_bins((vectors * vectors).sum(dim=1), nl.cutoff + nl.skin)
+    key = receiver * 3 + torch.as_tensor(groups)[sender] if groups is not None else receiver
+    return key, bins
+
+
+@pytest.mark.parametrize("gpu", [False, True], ids=["matscipy", "torch-build"])
+@pytest.mark.parametrize("groups", [False, True])
+def test_sort_by_length_orders_each_receiver_by_length(gpu, groups, monkeypatch):
+    from fastmace.neighbors import skin
+
+    monkeypatch.setattr(skin, "SORT_BY_LENGTH", True)
+    atoms = nbcl5(rattle=0.05, seed=2)
+    group = atoms.numbers % 3 if groups else None
+    nl = make(atoms, sort=True, groups=group)
+    assert nl.sort_by_length
+    (nl.build_gpu if gpu else nl.build_cpu)(torch.tensor(atoms.positions))
+    reference = make(atoms, sort=True, groups=group)
+    reference.build_cpu(atoms.positions)
+    assert candidate_set(nl) == candidate_set(reference)  # the same pairs
+    key, bins = _lengths_by_key(nl, atoms.positions, group)
+    assert bool((key[1:] >= key[:-1]).all())  # receivers (and groups) stay contiguous and ordered
+    same = key[1:] == key[:-1]
+    assert bool((bins[1:][same] >= bins[:-1][same]).all())  # by length inside each
+    nl.compact(torch.tensor(atoms.positions))
+    count = int(nl.count)
+    edges = nl.edge_index[1, :count]
+    assert bool((edges[1:] >= edges[:-1]).all())
+
+
+def test_sort_by_length_torch_and_matscipy_builds_agree_on_bins(monkeypatch):
+    from fastmace.neighbors import skin
+
+    monkeypatch.setattr(skin, "SORT_BY_LENGTH", True)
+    atoms = STRUCTURES["NaNbO3"](rattle=0.05, seed=4)
+    group = atoms.numbers % 3
+    a, b = make(atoms, sort=True, groups=group), make(atoms, sort=True, groups=group)
+    a.build_cpu(atoms.positions)
+    b.build_gpu(torch.tensor(atoms.positions))
+    ka, ba = _lengths_by_key(a, atoms.positions, group)
+    kb, bb = _lengths_by_key(b, atoms.positions, group)
+    assert torch.equal(ka, kb) and torch.equal(ba, bb)  # the same (key, bin) sequence; only ties may differ
+
+
+def test_sort_by_length_is_off_by_default_and_needs_sort_receivers(monkeypatch):
+    from fastmace.neighbors import skin
+
+    atoms = nacl(rattle=0.05, seed=1)
+    assert skin.SORT_BY_LENGTH is None and not skin.sort_by_length_default("cpu")
+    assert "NVIDIA H200" in skin.SORT_BY_LENGTH_GPUS and "NVIDIA H200 NVL" in skin.SORT_BY_LENGTH_GPUS
+    assert "NVIDIA A100-SXM4-80GB" in skin.SORT_BY_LENGTH_GPUS and "NVIDIA A100 80GB PCIe" in skin.SORT_BY_LENGTH_GPUS
+    assert "NVIDIA GeForce RTX 5060 Ti" not in skin.SORT_BY_LENGTH_GPUS
+    assert not make(atoms, sort=True).sort_by_length
+    monkeypatch.setattr(skin, "SORT_BY_LENGTH", True)
+    assert make(atoms, sort=True).sort_by_length and not make(atoms, sort=False).sort_by_length
+
+
+def test_length_bins():
+    from fastmace.neighbors import skin
+
+    reach = 6.0
+    values = np.array([0.0, 1.0, 5.999, 6.0, 7.0]) ** 2
+    expected = np.array([0, int(skin.LENGTH_BINS / reach), skin.LENGTH_BINS - 1, skin.LENGTH_BINS - 1,
+                         skin.LENGTH_BINS - 1])
+    assert np.array_equal(skin.length_bins(values, reach), expected)
+    assert torch.equal(skin.length_bins(torch.tensor(values), reach), torch.as_tensor(expected))
+
+
 # --------------------------------------------------------------------------- variable cell
 
 

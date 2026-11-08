@@ -1,0 +1,57 @@
+{
+  "tool": "spline_table_bound",
+  "created_utc": "2026-11-08T14:09:19Z",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": null,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "rounds": 21,
+  "constants": {
+    "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W": true,
+    "fastmace.kernels.oeq_streaming.spline_forward:R128": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:SPLINE_VECTOR": 4
+  },
+  "kernels": {
+    "forward": {
+      "edges": 373760,
+      "edges_inside": 370288,
+      "median_us": {
+        "real": {
+          "flush": 3935.136079788208,
+          "warm": 3926.975965499878
+        },
+        "one-slab": {
+          "flush": 2060.192108154297,
+          "warm": 2049.9520301818848
+        }
+      },
+      "one_slab_over_real": {
+        "flush": 0.5235377040036638,
+        "warm": 0.5220179721474153
+      },
+      "registers": [
+        80
+      ]
+    },
+    "wprime": {
+      "edges": 373760,
+      "edges_inside": 370288,
+      "median_us": {
+        "real": {
+          "flush": 5508.063793182373,
+          "warm": 5460.991859436035
+        },
+        "one-slab": {
+          "flush": 4630.527973175049,
+          "warm": 4566.688060760498
+        }
+      },
+      "one_slab_over_real": {
+        "flush": 0.840681616452319,
+        "warm": 0.8362378443889691
+      },
+      "registers": null
+    }
+  }
+}
