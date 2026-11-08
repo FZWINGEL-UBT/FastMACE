@@ -16,7 +16,9 @@ import torch
 from fastmace.kernels.gpu_models import GPUModels
 
 CUEQ_PROJECTED = None
-CUEQ_PROJECTED_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9902 / 0.9954 (ab / ba); force/stress gate passes
+# (force ratios 0.922 / 0.900 / 0.979, stress 0.425 / 0.852 / 1.206; decision 66).
+CUEQ_PROJECTED_GPUS = GPUModels(("NVIDIA H200",))
 
 _subclasses = {}
 

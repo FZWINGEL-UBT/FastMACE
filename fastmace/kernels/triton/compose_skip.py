@@ -34,7 +34,9 @@ COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200",))
 # products through one ``species_gemm.species_mm_joined`` (rows built outside the opaque product, written straight
 # into the joined output, no ``torch.cat``), the division's result viewed rather than copied (``reshape_view``).
 COMPOSE_FAST = None
-COMPOSE_FAST_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9614 / 0.9656 against the H200 defaults (OMAT-0 medium,
+# SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's run-to-run spread (decision 66).
+COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def compose_fast_default(name=None) -> bool:

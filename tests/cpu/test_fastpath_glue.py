@@ -8,11 +8,11 @@ from fastmace.kernels.triton.divided_blocks import divided_blocks
 from fastmace.rewrites import cueq_projection
 
 
-def test_switches_are_off_by_default():
+def test_switch_defaults():
     assert linear_div.LINEAR_DIV_SPLIT is None and not linear_div.LINEAR_DIV_SPLIT_GPUS
     assert not linear_div.linear_div_split_default("NVIDIA H200")
-    assert cueq_projection.CUEQ_PROJECTED is None and not cueq_projection.CUEQ_PROJECTED_GPUS
-    assert not cueq_projection.cueq_projected_default("NVIDIA H200")
+    assert cueq_projection.CUEQ_PROJECTED is None and cueq_projection.cueq_projected_default("NVIDIA H200")
+    assert not cueq_projection.cueq_projected_default("NVIDIA A100-SXM4-80GB")
 
 
 def test_divided_blocks_equal_the_sliced_division():

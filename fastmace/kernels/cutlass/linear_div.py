@@ -36,6 +36,7 @@ LINEAR_DIV_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # h200-fastpath (bitwise): the backward's divided gradient written as contiguous segment blocks in one kernel
 # (``kernels.triton.divided_blocks``) instead of Inductor's per-segment slice-divide-clone kernels.
 LINEAR_DIV_SPLIT = None
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9972 / 1.0025, not faster in both orders: off.
 LINEAR_DIV_SPLIT_GPUS = GPUModels(())
 
 

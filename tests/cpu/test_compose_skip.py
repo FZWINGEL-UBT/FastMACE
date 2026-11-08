@@ -92,9 +92,10 @@ def _composing(seed=0):
     return reassociation, message
 
 
-def test_fast_is_off_everywhere_by_default():
-    assert compose_skip.COMPOSE_FAST is None and not compose_skip.COMPOSE_FAST_GPUS
-    assert not compose_skip.compose_fast_default("NVIDIA H200")
+def test_fast_is_on_for_the_listed_gpus_only():
+    assert compose_skip.COMPOSE_FAST is None and compose_skip.compose_fast_default("NVIDIA H200")
+    assert not compose_skip.compose_fast_default("NVIDIA A100-SXM4-80GB")
+    assert not compose_skip.compose_fast_default("NVIDIA GeForce RTX 5060 Ti")
 
 
 def test_bound_weights_equal_the_forwards_own_composition():

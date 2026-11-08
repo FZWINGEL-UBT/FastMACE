@@ -333,6 +333,12 @@ def test_h200_defaults():
     assert not spline_forward.FACTOR_W_GPUS and not spline_forward.CURSOR32_GPUS
     assert not spline_forward.SHARED_LOCATOR_GPUS
     assert spline_forward.FACTOR_W is False and spline_forward.CURSOR32 is False
+    from fastmace.rewrites import cueq_projection
+
+    # h200-fastpath (8 November 2026): COMPOSE_FAST 0.9614 / 0.9656, CUEQ_PROJECTED 0.9902 / 0.9954 (gate passes);
+    # LINEAR_DIV_SPLIT 0.9972 / 1.0025 stays off
+    assert "NVIDIA H200" in compose_skip.COMPOSE_FAST_GPUS and "NVIDIA H200" in cueq_projection.CUEQ_PROJECTED_GPUS
+    assert not linear_div.LINEAR_DIV_SPLIT_GPUS
     assert "NVIDIA A100-SXM4-80GB" not in wprime_backward.SPLINE_VECTOR_GPUS
     assert wprime_backward.SPLINE_VECTOR is None and wprime_backward.spline_vector_default("cpu") == 2
 
