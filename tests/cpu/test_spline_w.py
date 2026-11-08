@@ -426,3 +426,41 @@ def test_prefetch_ahead_hints_the_staged_rows_and_keeps_the_arithmetic():
         from fastmace.kernels.oeq_streaming.runtime import compile_cubin
         for capability in ((9, 0), (8, 0), (12, 0)):
             assert compile_cubin(hinted, capability)
+
+
+@pytest.mark.parametrize("kind", ["cursor", "cursor32", "staged", "located"])
+def test_block_order_reads_each_owners_receiver_from_the_order(kind):
+    blocks = [(1, [0]), (3, [64])]
+    options = dict(cursor=dict(), cursor32=dict(cursor32=True), located=dict(shared_locator=True),
+                   staged=dict(stage_edges=True, threads=64, min_blocks=6))[kind]
+    plain = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], **options)
+    ordered = sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], block_order=True, **options)
+    assert "order[" not in plain and ordered.count("const int* __restrict__ order") == 1
+    assert ordered.count("const int rcv = order[") == 1
+    assert ordered.replace("const int* __restrict__ order, ", "").count("\n") == plain.count("\n")
+    if kind == "staged":
+        assert ordered.index("if (blockIdx.x >= N) return;") < ordered.index("order[blockIdx.x]")
+
+
+def test_block_order_refuses_a_source_without_its_lines():
+    with pytest.raises(ValueError, match="BLOCK_ORDER"):
+        sf.ordered_source("extern \"C\" __global__ void f() {}")
+
+
+def test_receiver_order_groups_species_stably():
+    order = sf.receiver_order(torch.tensor([2, 0, 1, 0, 2, 1]))
+    assert order.dtype == torch.int32 and order.tolist() == [1, 3, 2, 5, 0, 4]
+    assert sf.BLOCK_ORDER is None and not sf.block_order_default("cpu")
+    assert "NVIDIA H200" in sf.BLOCK_ORDER_GPUS and "NVIDIA GeForce RTX 5060 Ti" not in sf.BLOCK_ORDER_GPUS
+
+
+def test_block_order_sources_compile_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    blocks = [(1, [0]), (3, [64])]
+    for options in (dict(), dict(stage_edges=True, threads=64, min_blocks=6)):
+        assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], block_order=True, **options),
+                             (9, 0))

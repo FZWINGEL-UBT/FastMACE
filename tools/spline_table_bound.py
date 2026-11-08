@@ -64,6 +64,7 @@ def capture(args):
         sha = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
         loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha)
         _, base = ab_step_time.read_structure(args.structure, None)
+        captured["numbers"] = base.get_atomic_numbers().tolist()
         field = ForceField(loaded, base, precision="float32", rewrites="auto")
         integrator = IntegratorConfig(temperature_K=300.0, timestep_fs=1.0)
         plan = planner.plan(field, base, integrator, Workload(max_temperature_K=300.0), planner.hardware())
@@ -81,13 +82,14 @@ def capture(args):
     finally:
         for name, cls in classes.items():
             cls.__call__ = originals[name]
+    numbers = captured.pop("numbers")
     missing = [n for n in classes if n not in captured]
     if missing:
         raise SystemExit(f"no eager call of {missing} (is SPLINE_W on?)")
     del engine, field, plan, loaded
     gc.collect()
     torch.cuda.empty_cache()
-    return captured, sha
+    return captured, sha, numbers
 
 
 def one_slab(name, args, r_max):
@@ -134,6 +136,26 @@ def slab_sorted(args):
     return args
 
 
+def species_blocks(kernel, numbers):
+    """BLOCK_ORDER's variant of a captured forward: the same kernel rendered with an order argument, and the receivers
+    grouped by species (the structure's atomic numbers). Returns (kernel, order, microseconds of the order's
+    construction per call)."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, receiver_order
+    ordered = SplineForward(*kernel.init_args, block_order=True)
+    z = torch.as_tensor(numbers, device="cuda")
+    order = receiver_order(z)
+    torch.cuda.synchronize()
+    start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    start.record()
+    for _ in range(20):
+        receiver_order(z)  # the per-call cost, were it rebuilt every call
+    end.record()
+    end.synchronize()
+    return ordered, order, start.elapsed_time(end) / 20 * 1000.0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", type=Path, required=True)
@@ -155,7 +177,7 @@ def main(argv=None):
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=True)
-    captured, sha = capture(args)
+    captured, sha, numbers = capture(args)
     flush = torch.empty(args.flush_l2_mb * 2 ** 20 // 4, dtype=torch.float32, device="cuda")
     result = dict(tool="spline_table_bound", created_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                   host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
@@ -165,28 +187,44 @@ def main(argv=None):
     for name, (kernel, real) in captured.items():
         slab, inside = one_slab(name, real, r_max)
         variants = {"real": real, "one-slab": slab}
+        kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "forward":
-            variants["slab-sorted"] = slab_sorted(real)
+            variants["slab-sorted"] = sorted_args = slab_sorted(real)
+            blocks = species_blocks(kernel, numbers)
+            if blocks is not None:
+                ordered, order, build_us = blocks
+                print(f"species-blocks: the order costs {build_us:.1f} us per call (eager torch)", flush=True)
+                variants["species-blocks"] = real
+                variants["slab-sorted+species-blocks"] = sorted_args
+                kernels["species-blocks"] = kernels["slab-sorted+species-blocks"] = (ordered, dict(order=order))
 
-        def launch(a):
+        def run(label, a):
+            k, extra = kernels.get(label, (kernel, {}))
+            k(*a, **extra)
+
+        def launch(a, label="real"):
             if name == "wprime":
                 a[6].zero_()
-            kernel(*a)
+            run(label, a)
 
         times = {label: {"flush": [], "warm": []} for label in variants}
         for _ in range(3):
-            for a in variants.values():
-                launch(a)
+            for label, a in variants.items():
+                launch(a, label)
         torch.cuda.synchronize()
-        if "slab-sorted" in variants:  # the same message up to summation order
-            outs = []
-            for a in (variants["real"], variants["slab-sorted"]):
+        if name == "forward":  # the same message up to summation order (bitwise for species-blocks alone)
+            def message(label):
+                a = variants[label]
                 o = [t.clone().zero_() for t in a[7]]
-                kernel(*a[:7], o)
-                outs.append(o)
-            torch.cuda.synchronize()
-            worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(*outs))
-            print(f"forward slab-sorted against real: max|d|/max|a| {worst:.2e}", flush=True)
+                k, extra = kernels.get(label, (kernel, {}))
+                k(*a[:7], o, **extra)
+                return o
+            base = message("real")
+            for label in [v for v in variants if v not in ("real", "one-slab")]:
+                got = message(label)
+                torch.cuda.synchronize()
+                worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(got, base))
+                print(f"forward {label} against real: max|d|/max|a| {worst:.2e}", flush=True)
         labels = list(variants)
         for k in range(args.rounds):
             ordered = labels if k % 2 == 0 else labels[::-1]
@@ -196,12 +234,12 @@ def main(argv=None):
                     if mode == "flush":
                         flush.zero_()
                     else:
-                        launch(a)  # the same launch once before: its table lines are in L2
+                        launch(a, label)  # the same launch once before: its table lines are in L2
                     if name == "wprime":
                         a[6].zero_()
                     start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                     start.record()
-                    kernel(*a)
+                    run(label, a)
                     end.record()
                     end.synchronize()
                     times[label][mode].append(start.elapsed_time(end) * 1000.0)

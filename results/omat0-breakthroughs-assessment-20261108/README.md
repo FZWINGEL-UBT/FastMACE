@@ -125,3 +125,86 @@ Build the slab-sorted edge order: within each receiver, sort edges by (species p
 3. Then the species-grouped block order on top, as its own switch.
 
 Compressed tables and per-pair grids are closed. w′ has no table-traffic headroom left.
+
+## Second report (Codex): breakthrough screen after the 3.64 ms H200 step
+
+The report and its CPU evidence are copied unchanged to [codex-report/](codex-report/report.md). It was written
+read-only against main `0d0eefae`, with the round-4 H200 breakdown as its baseline. Its own conclusion: no defensible
+new ≥ 20 % same-model speedup.
+
+### The floor arithmetic checks out
+
+The buckets were recomputed from [ops.csv](../h200-fastpath-20261108/round4/breakdown/ops.csv) and every derived number
+was recomputed by hand. All agree to the last digit shown. Measured inputs:
+
+| Measured input | Value |
+| --- | --- |
+| Kernel sum | 3,399.4 µs |
+| w′ | 1,099.0 µs |
+| Forward | 806.4 µs |
+| `fm_tf32x3_*` | 547.0 µs in 22 launches |
+| Copies and fills | 28.0 µs |
+
+Derived thresholds:
+
+| Derived threshold | Value |
+| --- | --- |
+| 20 % saving | 728.7 µs (38.2 % of interaction 2) |
+| Forward alone must speed up | 10.4× |
+| w′ alone must speed up | 3.0× |
+| Forward and w′ together | 1.62× (≤ 1,176.7 µs) |
+| Another 2× | interaction 2 at 83.6 µs (22.8×) |
+| Interaction 2 twice as fast | 26 % of the step |
+
+Byte and work references:
+
+| Byte or work reference | Value |
+| --- | --- |
+| One logical table sweep | 7.655 GB (forward 9.49 TB/s, w′ 6.97 TB/s requested) |
+| w and w′ tape | 3.827 GB (≥ 1,595 µs on the H200 through HBM) |
+| Per-receiver tape | 768 KB |
+| Arithmetic references (H200) | 177 / 413 / 135 µs (FP32 67, dense TF32 494.5 TFLOP/s) |
+| Mesh at 0.5 Å | 79³ points |
+| Mesh source grids | 3.03 GB |
+| Edge-frame projection | 48.6× the work, 7.1 ms |
+
+The four corrections it lists to older records hold: 547 µs in 22 launches, 28 µs of copies, 86 CG entries, and Symmetrix-XL's 14.2 ms being NVE.
+
+Two qualifications from this session's work:
+
+- **The limiter is partly measured, contrary to §2.** The H200 one-slab bound above puts the forward at about 45 % table traffic and w′ under 3 %. w′ is therefore limited by issue and dependencies, not by bytes.
+- **The baseline has moved.** Since the report, `SORT_BY_LENGTH` and `BLOCK_ORDER` took the H200 step from 3.585 to 3.42 ms. A 20 % saving is now about 684 µs. No verdict changes.
+
+### Route 1, fast spatial operator: rejected by counting, no lab needed
+
+The bound is [spatial_operator_bound.py](spatial_operator_bound.py) (→ [json](spatial_operator_bound.json)). It counts peak FP32 work only, with no memory traffic and no accuracy requirement, so every number is a lower bound on cost.
+
+**Mesh or FFT.** At 0.5 Å the cell has 493,039 grid points: 98.6 per atom, against 74.75 edges per atom. Every grid point needs the 62 products per channel for each of the 9 species pairs. That is 11.9 pair sites per edge before any FFT.
+
+The forward alone, counted with 1,536 source FFTs and 15,360 output FFTs plus the pointwise products, is:
+
+- 464 GFLOP, which is 39× the direct forward;
+- 6.9 ms at FP32 peak, which is 5.9× the 1,176.7 µs budget for the whole replacement (forward, transpose and forces).
+
+At 0.25 Å it is 52× over the budget. Mesh accuracy for a 6 Å kernel with l ≤ 3 structure is not even assessed, because the cost already rules it out.
+
+**H²/FMM.** An admissible box pair costs rank² per field (M2L), against n² for direct work, so compression only pays when a box holds more atoms than the separation rank, p³:
+
+| p | Rank | Box side for n = rank |
+| --- | --- | --- |
+| 3 | 27 | 6.85 Å |
+| 4 | 64 | 9.13 Å |
+
+Both sides exceed the 6 Å cutoff, so no well-separated pair lies inside the cutoff. Only p = 2 (rank 8, box 4.57 Å) leaves any far field, and a 2-point interpolation of a kernel varying on the ångström scale cannot meet a force certificate.
+
+This confirms the report's doubt with a number: at 75 neighbours, a spatial operator has more sites than the edge list.
+
+### The other routes
+
+| Route | Verdict |
+| --- | --- |
+| 2. Edge-frame / expanded Gaunt | **Agree, stop.** The rank-2 falsifier (`model_probe.py`: the tied `1⊗1→0/2` filters have rank 2, s_min/s_max 0.411) and the 48.6× per-edge projection count are correct. |
+| 3. Retain radial state through the node tail | **Agree, stop.** The 768 KB tape per receiver exceeds an SM's shared memory (228 KB on Hopper, 164 KB on A100). The HBM tape costs 1,595 µs, more than the whole w′. `fusion-receiver-local` already bounds the message-only version. |
+| §4 rejects (temporal deltas, Taylor reuse, BF16/FP8, FP16×3, polynomial compile, Cartesian, persistence/TMA, neighbour-list reuse) | **Agree.** Each is either closed in the ledger already or bounded below 20 % with correct arithmetic. |
+| Next step: physical-byte/pipe profile of forward and w′ | **Agree.** The table share is now known (above). The pipe and stall profile of w′ is the open measurement. |
+| Retrain with a cheaper interaction | **Owner decision.** Outside same-model scope. |

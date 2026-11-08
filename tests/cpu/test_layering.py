@@ -67,7 +67,8 @@ SWITCH_EXEMPT_FILES = ("fastmace/config.py",)
 SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # fp32 profile screens (28-29 October 2026): A/B switches read by the screen tools, off by default; neither
     # prototype was adopted, so neither is a config field (conductor, batch-2 trial merge).
-    "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89"},
+    "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89",
+                                   "SORT_BY_LENGTH": "candidates sorted by length at the build; A/B + gate"},
     "fastmace/neighbors/pair_search.py": {"BINNED_SCREEN": "cell-list pair screen; per GPU from BINNED_MIN_ATOMS, A/B"},
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted",
                                               "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B",
@@ -155,6 +156,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                          "R128": "spline forward one receiver per block; per GPU, A/B",
                                                          "STAGE_EDGES": "spline forward edges staged per tile; A/B",
                                                          "PREFETCH_AHEAD": "forward rows hinted two edges on; A/B",
+                                                         "BLOCK_ORDER": "forward receivers grouped by species; A/B",
                                                          "FACTOR_W": "spline forward w x common factor; A/B",
                                                          "CURSOR32": "spline forward int loop state; A/B",
                                                          "SHARED_LOCATOR": "idea 5: one spline locator per edge; A/B"},

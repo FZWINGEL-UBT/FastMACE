@@ -221,21 +221,70 @@ def _factor(p, xi):
 
 def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=None, min_blocks=None,
            name="spline_forward", factor_w=False, cursor32=False, shared_locator=False, stage_edges=False,
-           prefetch=0):
+           prefetch=0, block_order=False):
     """CUDA source of ``spline_forward`` for a schedule (ir_mul), its block layout ``blocks`` and the spline's
     ``grid``; ``path_scale``: per path the factor the table's rows carry (FOLD_ALPHA), divided out here. ``part``:
     the path indices this kernel computes (``PARTS``; None: all); ``threads`` / ``min_blocks``: its launch bounds.
     ``factor_w``: ``FACTOR_W``; ``cursor32``: ``CURSOR32`` (the launch checks the ranges). ``shared_locator``
     (``SHARED_LOCATOR``): the edge's slab and t read from ``spline_locator``'s record. ``stage_edges``
     (``STAGE_EDGES``): the edges staged per tile, for a launch of one block per receiver with ``threads`` = C.
-    ``prefetch`` (``PREFETCH_AHEAD``; with ``stage_edges``): hint the table rows of the edge that many positions on."""
+    ``prefetch`` (``PREFETCH_AHEAD``; with ``stage_edges``): hint the table rows of the edge that many positions on.
+    ``block_order`` (``BLOCK_ORDER``): the receiver of owner row k is ``order[k]`` (an int32 permutation argument)."""
     if stage_edges and shared_locator:
         raise ValueError("STAGE_EDGES and SHARED_LOCATOR are alternatives")
     if prefetch and not stage_edges:
         raise ValueError("PREFETCH_AHEAD reads STAGE_EDGES' staged slab offsets: it needs stage_edges")
     source = _render(schedule, blocks, grid, r_max, path_scale, part, threads, min_blocks, name, factor_w, cursor32,
                      stage_edges, int(prefetch))
-    return located_source(source, grid) if shared_locator else source
+    source = located_source(source, grid) if shared_locator else source
+    return ordered_source(source) if block_order else source
+
+
+# BLOCK_ORDER (8 November 2026): the owner rows walk the receivers in a given order (an int32 permutation of [0, N),
+# argument ``order`` after ``intervals``), so the blocks resident at one time hold receivers of one species and read
+# the same spline-table slabs (results/omat0-breakthroughs-assessment-20261108: modelled L1 hits 0.54 -> 0.70 with
+# SORT_BY_LENGTH). The same arithmetic per receiver: bitwise. None: on for BLOCK_ORDER_GPUS (decision 66).
+BLOCK_ORDER = None
+# NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`, on
+# top of SORT_BY_LENGTH): MD step b/a 0.9753 / 0.9724 (3.514 -> 3.42 ms); forces 2.6e-6 against the same build's
+# 3.3e-6 eV/A (bitwise forward; w' atomics).
+BLOCK_ORDER_GPUS = GPUModels(("NVIDIA H200",))
+
+
+def block_order_default(device):
+    """``BLOCK_ORDER`` on ``device`` (None: on for ``BLOCK_ORDER_GPUS``)."""
+    return _switch(BLOCK_ORDER, BLOCK_ORDER_GPUS, device)
+
+
+_ORDER_SWAPS = (
+    ("const float4* __restrict__ table, int intervals, ",
+     "const float4* __restrict__ table, int intervals, const int* __restrict__ order, "),
+)
+_ORDER_RECEIVER = (  # one of these per source: staged, cursor (int64), cursor (CURSOR32)
+    ("const int rcv = blockIdx.x, ch = threadIdx.x;\n    if (rcv >= N) return;  // the whole block",
+     "if (blockIdx.x >= N) return;  // the whole block\n    const int rcv = order[blockIdx.x], ch = threadIdx.x;"),
+    ("const int rcv = (int)(owner / C), ch = (int)(owner % C);",
+     "const int rcv = order[owner / C], ch = (int)(owner % C);"),
+    ("const int rcv = owner / C, ch = owner % C;", "const int rcv = order[owner / C], ch = owner % C;"),
+)
+
+
+def ordered_source(source):
+    """``spline_forward``'s source with BLOCK_ORDER: the ``order`` argument and the owner's receiver read from it."""
+    for old, new in _ORDER_SWAPS:
+        if old not in source:
+            raise ValueError(f"BLOCK_ORDER: the forward source no longer holds {old.strip()[:60]!r}")
+        source = source.replace(old, new)
+    found = [(old, new) for old, new in _ORDER_RECEIVER if old in source]
+    if len(found) != 1:
+        raise ValueError(f"BLOCK_ORDER: expected one receiver line, found {len(found)}")
+    old, new = found[0]
+    return source.replace(old, new)
+
+
+def receiver_order(species):
+    """BLOCK_ORDER's permutation: the receivers grouped by species (stable), int32."""
+    return torch.argsort(species.to(torch.int64), stable=True).to(torch.int32)
 
 
 # SHARED_LOCATOR in the forward: the lines of _render's edge head it replaces, and their replacements. The record
@@ -520,7 +569,8 @@ class SplineForward:
     """The compiled ``spline_forward`` of one interaction (its schedule, block layout and spline grid);
     ``shared_locator`` (SHARED_LOCATOR): it reads ``spline_locator``'s records, compiled alongside (``locate``)."""
 
-    def __init__(self, schedule, blocks, grid, r_max, device, path_scale=None, shared_locator=False):
+    def __init__(self, schedule, blocks, grid, r_max, device, path_scale=None, shared_locator=False,
+                 block_order=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -535,9 +585,14 @@ class SplineForward:
         self.stage_edges = (stage_edges_default(device) and self.threads == self.channels and not self.shared_locator
                             and not self.cursor32)
         self.prefetch = prefetch_ahead_default(device) if self.stage_edges else 0  # PREFETCH_AHEAD
+        self.block_order = block_order_default(device) if block_order is None else bool(block_order)
+        # BLOCK_ORDER: the receivers' order the owning force field binds before its calls (``bind_order``; any
+        # permutation of [0, N) gives the same message); a call with another row count walks them in index order.
+        self.order, self._identity = None, {}
+        self.init_args = (schedule, blocks, grid, r_max, device, path_scale, shared_locator)
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
-                               self.stage_edges, self.prefetch)
+                               self.stage_edges, self.prefetch, self.block_order)
                         for k, part in enumerate(self.parts)]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
@@ -558,7 +613,7 @@ class SplineForward:
         self.id = content_id("SplineForward", self.source, _device_key(device))
         _REGISTRY[self.id] = self
 
-    def __call__(self, x, sh, senders, row_ptr, lengths, pairs, table, outs):
+    def __call__(self, x, sh, senders, row_ptr, lengths, pairs, table, outs, order=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check
@@ -569,9 +624,20 @@ class SplineForward:
         if not blocks:
             return
         p = ctypes.c_void_p
+        ordered = ()
+        if self.block_order:  # BLOCK_ORDER: the receivers' order, a permutation of [0, N)
+            order = self.order if order is None else order
+            if order is None or order.numel() != nodes:
+                order = self._identity.get(nodes)
+                if order is None:
+                    order = self._identity[nodes] = torch.arange(nodes, dtype=torch.int32, device=x.device)
+            if order.dtype != torch.int32 or order.device != x.device:
+                raise ValueError("BLOCK_ORDER: the order must be int32 on the kernel's device")
+            ordered = (order.data_ptr(),)
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), senders.data_ptr(), row_ptr.data_ptr(),
-                  lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *[o.data_ptr() for o in outs])
-        types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * 7 + (ctypes.c_int,) + (p,) * len(outs)
+                  lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *ordered,
+                  *[o.data_ptr() for o in outs])
+        types = (ctypes.c_longlong, ctypes.c_longlong) + (p,) * 7 + (ctypes.c_int,) + (p,) * (len(ordered) + len(outs))
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         for function in self._functions:  # PARTS: each part writes its own output slots
             _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.threads, 1, 1, 0, stream, (values, types), 0))
