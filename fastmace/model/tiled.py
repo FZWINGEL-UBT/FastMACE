@@ -35,6 +35,7 @@ import math
 import time
 from typing import Any
 
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.model.forces import ForceOutput
 
 # Compiled tiles' device memory held between calls beyond eager tiles' (their padded slots and outputs; 0.065 GiB
@@ -57,23 +58,28 @@ LANE_GPUS = ("NVIDIA RTX 4000 Ada Generation",)
 # wavefront, R 8,192: x4 -10.5 % on the RTX 5060 Ti, -3.2 % on the RTX 4000 Ada; the RTX PRO 6000's tiles do not
 # chunk). A tile's backward runs eagerly, one launch pair per chunk: the L2 rule's chunks were launch-bound there.
 TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Generation": 4}
-# Tiled speed (results/tiled-speed-20261108; True / False are the A/B sides).
+# Tiled speed (results/tiled-speed-20261108). None: on for TILED_SPEED_GPUS (decision 66: each keeps more memory
+# alive or replaces a kernel, so it is on where same-process A/Bs at 975,560 SrTiO3 atoms measured it faster in both
+# orders); True / False (TILE_GRAPH_CACHE: a fraction) are the A/B sides' choice on every device.
+TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 # TILE_PREFETCH_DEVICE (exact): TileConfig.prefetch also with the state on the device, where it builds the next tile's
 # graph on the side stream while the current tile runs (its rows are read in the body, as before). Without it a
 # device-state call built each graph after the previous body had drained the GPU (torch.unique and the edge counts
 # wait for it): 1.2 s of 8.6 s idle at 975,560 SrTiO3 atoms on the RTX 5060 Ti.
-TILE_PREFETCH_DEVICE = True
+TILE_PREFETCH_DEVICE = None
 # TILE_VIRIAL (rounding): the strain gradient of sweeps 2 and 3 from the edge vectors and their gradient,
 # sym(V^T dE/dV), summed elementwise, instead of a strain leaf in the autograd graph. The leaf's backward is a
 # [3, E] x [E, 3] product that cuBLAS runs as a split-K GEMM (sgemm_largek, about 0.3 us per atom per call).
-TILE_VIRIAL = True
+TILE_VIRIAL = None
 # TILE_GRAPH_CACHE (exact): a call without the wavefront keeps each tile's graph on the device from its first build
 # (the slot-key pass) to the end of the call, as its local edge index (int32, halo rows after the receivers) and edge
 # shifts (20 bytes per edge), so sweeps 1-3 take it back with one gather instead of building it again from the list
 # cache (copy, unpack, torch.unique; four builds per tile and call). The pieces take at most this fraction of the
-# device memory free when the call starts (the allocator's unused reserve included); tiles past it are built
-# again as before. The same edges in the same order: bitwise the call without.
-TILE_GRAPH_CACHE = 0.25
+# device memory free when the call starts (the allocator's unused reserve included; None: TILE_GRAPH_CACHE_FRACTION on
+# TILED_SPEED_GPUS, else 0); tiles past it are built again as before. The same edges in the same order: bitwise the
+# call without.
+TILE_GRAPH_CACHE = None
+TILE_GRAPH_CACHE_FRACTION = 0.25
 
 
 @dataclasses.dataclass(frozen=True)
@@ -932,6 +938,8 @@ class TiledForceField:
             name = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else None
             scale = TILE_CHUNK_SCALE.get(name, 1)
         self.backward_chunk_scale = int(scale)
+        # TILED_SPEED_GPUS: where the tiled speed switches left at None are on
+        self._speed_gpu = self.device.type == "cuda" and torch.cuda.get_device_name(self.device) in TILED_SPEED_GPUS
         for module in model.modules():  # from each module's own value: a second tiled field scales it once
             if getattr(module, "chunked_backward_edges", 0) > 0:
                 base = getattr(module, "_tile_chunk_base", module.chunked_backward_edges)
@@ -1033,9 +1041,17 @@ class TiledForceField:
         """The call's graph cache (``TILE_GRAPH_CACHE``): empty with its byte budget, or None (off, under the
         wavefront, or off a CUDA device)."""
         self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0
-        free = self._free_bytes() if TILE_GRAPH_CACHE and not wave else None
+        fraction = self._speed(TILE_GRAPH_CACHE, TILE_GRAPH_CACHE_FRACTION)
+        free = self._free_bytes() if fraction and not wave else None
         if free is not None:
-            self._pieces, self._piece_budget = {}, int(float(TILE_GRAPH_CACHE) * free)
+            self._pieces, self._piece_budget = {}, int(float(fraction) * free)
+
+    def _speed(self, value, on=True):
+        """A tiled speed switch's value (``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE``, ``TILE_GRAPH_CACHE``): the
+        constant when set, else ``on`` on ``TILED_SPEED_GPUS`` and off elsewhere."""
+        if value is not None:
+            return value
+        return on if getattr(self, "_speed_gpu", False) else type(on)(0)
 
     def _free_bytes(self):
         """Device memory free for the graph cache: the driver's free memory and the allocator's unused reserve
@@ -1265,7 +1281,7 @@ class TiledForceField:
         nodes, local, r, vectors, recv_mask, _, edge_mask = tile
         attrs = self._attrs(nodes)
         receivers = nodes[:r]
-        virial = adjoint and strain is not None and TILE_VIRIAL
+        virial = adjoint and strain is not None and self._speed(TILE_VIRIAL)
         with torch.enable_grad() if adjoint else torch.no_grad():
             leaf = vectors.detach().requires_grad_(adjoint)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
@@ -1292,7 +1308,7 @@ class TiledForceField:
         interaction = model.interactions[1]
         nodes, local, r, vectors, recv_mask, node_mask, edge_mask = tile
         attrs = self._attrs(nodes)
-        virial = strain is not None and TILE_VIRIAL
+        virial = strain is not None and self._speed(TILE_VIRIAL)
         with torch.enable_grad():
             leaf = vectors.detach().requires_grad_(True)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
@@ -1661,7 +1677,7 @@ class TiledForceField:
 
             # TileConfig.prefetch: the next tile's graph (and, within a run of sweep 2 or 3, its host rows) on a side
             # stream; the tiles' receivers on the host (the pool's assign and release index with them, no sync).
-            ahead = self.config.prefetch and padded and (state.host or TILE_PREFETCH_DEVICE)
+            ahead = self.config.prefetch and padded and (state.host or self._speed(TILE_PREFETCH_DEVICE))
             prep = None
             if ahead and self.device.type == "cuda":
                 if self._prep_stream is None:

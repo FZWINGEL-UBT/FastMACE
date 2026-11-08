@@ -1226,6 +1226,7 @@ def test_graph_cache_is_bitwise_the_call_that_builds_every_graph(mode, budget, m
         return graph(self, *args, **kwargs)
 
     monkeypatch.setattr(tiled_module.TiledForceField, "_tile_graph", counting)
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)  # None: off the speed GPUs (and off CUDA)
     results, counts = {}, {}
     for cached in (False, True):
         monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes",
@@ -1250,6 +1251,24 @@ def test_graph_cache_is_bitwise_the_call_that_builds_every_graph(mode, budget, m
         assert one[0] == two[0]
         assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch):
+    """``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE`` and ``TILE_GRAPH_CACHE`` at None (the defaults) are on only on
+    ``TILED_SPEED_GPUS`` (decision 66), the graph cache at ``TILE_GRAPH_CACHE_FRACTION``; a set value wins anywhere."""
+    from fastmace.model import tiled as tiled_module
+
+    assert tiled_module.TILE_VIRIAL is None and tiled_module.TILE_PREFETCH_DEVICE is None
+    assert tiled_module.TILE_GRAPH_CACHE is None and "NVIDIA GeForce RTX 5060 Ti" in tiled_module.TILED_SPEED_GPUS
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(5))
+    assert tiled._speed_gpu is False  # a CPU device
+    assert tiled._speed(None) is False and tiled._speed(None, 0.25) == 0.0
+    assert tiled._speed(True) is True and tiled._speed(0.5, 0.25) == 0.5
+    tiled._speed_gpu = True
+    assert tiled._speed(None) is True and tiled._speed(None, 0.25) == 0.25 and tiled._speed(False) is False
 
 
 def test_backward_chunk_scale_multiplies_each_modules_own_chunk_once():
