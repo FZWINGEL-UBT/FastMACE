@@ -75,6 +75,8 @@ def main(argv=None) -> int:
                              if obj.spline_block else None,
                              wprime=resources(obj.spline_block[2]) if obj.spline_block else None,
                              wprime_stage_quads=getattr(obj.spline_block[2], "stage_quads", None)
+                             if obj.spline_block else None,
+                             wprime_stage_sh=getattr(obj.spline_block[2], "stage_sh", None)
                              if obj.spline_block else None))
             if args.sources and obj.spline_block:
                 args.sources.mkdir(parents=True, exist_ok=True)
