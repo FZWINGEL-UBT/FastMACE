@@ -58,9 +58,10 @@ _ALIGN = 4  # cutlass.tf32x3.ALIGNMENT: K and N padded to it
 # chunks are over 576 rows, so the split never fires). Exact (tests/gpu/test_folded_tiles_cuda.py, bitwise), so on
 # by decision 66 on the 5060 Ti. A100-SXM4-80GB (Alex 4961878; OFF23-large's 640-row chunks split on 108 SMs):
 # OFF23-large 0.999 / 0.998, OFF23-small 0.993 / 1.001, -medium 0.999 / 1.005, OFF23b 1.000 / 1.004, OFF24
-# 1.002 / 0.998: not slower, so on (decision 66, conductor 8 November). The Ada is not measured.
+# 1.002 / 0.998: a tie, so measured and left off (it changes the tiling and launch grid, so decision 66 needs
+# a measured speed-up in both orders, not the pure-removal tie; conductor 8 November). The Ada is not measured.
 SPLIT_COLUMNS = None
-SPLIT_COLUMNS_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA A100-SXM4-80GB"))
+SPLIT_COLUMNS_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
 SPLIT_BLOCK_P = 16
 
 
