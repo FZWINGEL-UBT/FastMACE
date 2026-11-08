@@ -207,6 +207,14 @@ Of medium's two label-keyed decision 66 defaults, small has its own GPU list. 3�
 | MD step b/a, ab / ba | 2.360 / 2.370 (5.41 → 2.29 ms per step) |
 | Force/stress gate (3× rule), worst ratio | force 1.01 (NbCl5), stress 1.22 (NbCl5) |
 
+Small also has its own w′ default. `wprime_backward.STAGE_EDGES_MODEL_GPUS` turns w′ `STAGE_EDGES` on for
+`omat0-small` on the **NVIDIA H200 only** (9 November 2026). It reads the table label from the rewrites'
+`Context.inputs["model_label"]`. Medium and the other models keep `STAGE_EDGES_GPUS` (empty).
+
+| Measurement (H200, Benchmark_loup, b = STAGE_EDGES off) | Result |
+| --- | --- |
+| MD step b/a, ab / ba | 1.0072 / 1.0114 (step breakdown 2.27 ms per step) |
+
 On the A100 family and the other GPUs, small keeps the pair off until it has its own A/B there. Source:
 [h200-omat0-small](../../results/h200-omat0-small-20261108/README.md).
 

@@ -175,8 +175,30 @@ From small's defaults today (2.29 ms), JOINED_LAYOUT plus w′ STAGE_EDGES make 
 
 **Open:**
 - JOINED_LAYOUT reaches small through the H200 adoption on fastmace/joined-layout.
-- w′ STAGE_EDGES stays off for medium (a tie there) and is a per-GPU constant today. Giving it to small alone needs
-  a per-model default in the w′ kernel, which is not built.
+- w′ STAGE_EDGES stays off for medium (a tie there). Small now has it by default on the H200 (next section).
+
+## w′ STAGE_EDGES as small's own H200 default (`stage-edges/`, `387ec7bb`, job `c90d9292`)
+
+Owner, 9 November 2026: "Yes, add it".
+- `wprime_backward.STAGE_EDGES_MODEL_GPUS` is a new per-model GPU list, `{"omat0-small": NVIDIA H200}`.
+  `stage_edges_default(device, model_label)` reads it. With no label, or for any other label, the default falls back
+  to `STAGE_EDGES_GPUS`, which is still empty, and the `STAGE_EDGES` constant still overrides either way.
+- The rewrites get the label from `Context.inputs["model_label"]` (`forces._table_label`). A path load finds the
+  label by SHA-256 and head, as the planner's `label_of` does. The generic w′ (`attach_generic_wprime`) passes it to
+  `WPrimeBackward`.
+- On the job's H200, `stage_edges_default` returned True for small and False for medium.
+
+Confirmation (`tools/modal/omat0_small_stage_edges.sh`, Benchmark_loup, JOINED_LAYOUT not on): a = small's new
+defaults, b = `STAGE_EDGES=False`. Modal `sixth` cost $0.37.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| w′ STAGE_EDGES off | 1.0072 (2.277 → 2.294 ms) | 1.0114 (2.272 → 2.298 ms) |
+
+- The default is 0.7–1.1 % faster, matching the combined screen.
+- Step breakdown with the defaults: 2.27 ms per step (2.29 before), force graph 2.19 ms.
+- STAGE_EDGES only changes how the kernel stages edge data (results are bitwise unchanged), so no new force/stress
+  gate was run. The combined gate above had it on and passed.
 
 ## Not done
 
