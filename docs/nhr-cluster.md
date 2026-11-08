@@ -230,7 +230,35 @@ calls. A pure-Python microbenchmark (dict and small-object loops, the same uv-bu
 **1.52 s on an Alex A100 node and 0.38 s on the PC (Core Ultra 7 270K)**, so tracing runs about 4× slower than on
 the PC. More cores and thread settings do not help much (table).
 
-SETUP_TABLE
+Setup of one build, POLAR-1-M, A100-SXM4-80GB. One build is one side's engine for one structure, as in
+`setup_s` of `tools/ab_rewrites.py`:
+
+| Configuration | Job (node) | NaCl / NbCl5 setup per build |
+| --- | --- | --- |
+| Production A/B, venv on `$WORK`, warm cache on `$WORK` (fm-offpolar, 7 Nov evening) | 4957295 (a0833) | 158–261 s, mean 195 s |
+| Diagnostic under `cProfile` (venv and cache on `$WORK`) | 4955075 (a0533) | 240–274 s |
+| Node-local venv, cold cache | 4960171 (a0537) | 157–261 s |
+| Node-local venv, warm cache, compile threads 4, `OMP_NUM_THREADS` unset (fm-offpolar's settings) | 4960171 | 142–156 s |
+| As above, `OMP_NUM_THREADS` = `TORCHINDUCTOR_COMPILE_THREADS` = 16 | 4960171 | 141–155 s |
+| Venv on `$WORK` (healthy), warm cache, threads 16 | 4960171 | 150–159 s (+70 s per process start) |
+| Node-local Python 3.12.16 venv (same pins), warm cache | 4960520 (a0531) | 136–143 s (cold: 139–225 s) |
+| `alex_ab_pack.sh`, 3 switches, node-local venv, warm cache | 4960173 (a0931) | 140–157 s; side a once per structure and order |
+| For scale: Modal A100-SXM4-80GB (6 Nov) / PC RTX 5060 Ti (7 Nov) | – | 83–211 s / 39–99 s |
+
+The thread settings change nothing. User CPU time is about equal to wall time (955 s user for 835 s wall), so the
+work is single-threaded. A healthy `$WORK` costs 2–8 s per build plus about 70 s per process start. Python 3.12
+saves about 7% (its microbenchmark: 1.15 s instead of 1.52 s). Step times are the same under 3.10 and 3.12 (NaCl
+5.13 / 5.09 ms, NbCl5 20.79 / 20.78 ms on the same source). The 3.12 venv is in `fm-alexsetup/env-py312.tar`; it
+is not adopted.
+
+Setup per switch, POLAR-1-M, both structures and both build orders:
+
+| Job shape | Builds per switch | Setup per switch |
+| --- | --- | --- |
+| Before: one process per switch and order (4957295, `FOLD_UPDATE`) | 8 | 1559 s (measured) |
+| After: `alex_ab_pack.sh`, 3 switches, first process with a cold cache (4960173) | 5.3 | 915 s (measured; −41%) |
+| After: the same, warm cache (4960173's ba process, doubled) | 5.3 | 809 s (measured; −48%) |
+| After: `alex_ab_pack.sh`, 8 switches, warm cache | 4.5 | about 675 s (from 150 s per build; −57%) |
 
 Rules that follow:
 
@@ -243,7 +271,7 @@ Rules that follow:
   (54 k files, 6.1 GB) takes about 3.5 min; unpacking one tar of it takes 27–55 s. Make the tar once
   (`tar -cf $WORK/<dir>/env-py310.tar -C $WORK/<dir> uv-python env`) and pass it as `ENV_TAR`.
 - **Keep the compile cache warm.** A cold cache costs 160–260 s per build instead of about 150 s, and Dynamo tracing
-  is paid either way. Do not copy a large cache to `$TMPDIR`: `fm-offpolar/cache` is 7.8 GB, and copying it
+  is paid either way. `CACHE` defaults to `$FM_ROOT/cache` on `$WORK`, which stays warm between jobs. Do not copy a large cache to `$TMPDIR`: `fm-offpolar/cache` is 7.8 GB, and copying it
   from `$WORK` did not finish within an hour.
 - Profile with `cProfile` only to find where time goes. It inflates setup to about 1.7× (250–270 s per build in
   4955075).
@@ -256,7 +284,7 @@ FM_ROOT=$WORK/<dir>                      # env/, uv-python/, models/, baseline/,
 SRC=$WORK/<dir>/src-<sha>                # tools/jobs/slim_tar.py output, unpacked
 OUT=$WORK/<dir>/runs/<run>-$SLURM_JOB_ID
 ENV_TAR=$WORK/<dir>/env-py310.tar
-PACK="geo|fastmace.longrange.polar:SHARED_GEOMETRY=False;fold|fastmace.rewrites.polar.update_fold:FOLD_UPDATE=True"
+PACK="rows|fastmace.rewrites.generic.modules:FIRST_FULL_ROWS=True;warps|fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS=4"
 MODELS="polar1-m=MACE-POLAR-1-M.model"
 EOF
 sbatch --output=$WORK/<dir>/logs/%x-%j.out --time=03:00:00 $SRC/tools/jobs/alex_ab_pack.sh $WORK/<dir>/jobs/<run>.env
