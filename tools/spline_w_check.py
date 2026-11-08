@@ -11,13 +11,22 @@ import sys
 from pathlib import Path
 
 
+# Published SHA-256 of the mace-foundations checkpoints this check has been run on (mace_omat_0 release).
+MODEL_SHA256 = {
+    "omat0-medium": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",  # as tools/bench/loup_md.py
+    "omat0-small": "0abfde07862cf1e93b8b4d03cb702f29ce9c344ff2fc4de2ec0d7166d6c113a5",  # mace-omat-0-small.model
+}
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--structure", default="results/loup-a100-20261103/SrTiO3.cif@4x4x4")
     p.add_argument("--checkpoint", type=Path, required=True)
     p.add_argument("--constant", nargs="*", default=["fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W=True"])
-    p.add_argument("--sha256", default="d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
-                   help="OMAT-0 medium's, as tools/bench/loup_md.py")
+    p.add_argument("--model", choices=sorted(MODEL_SHA256), default="omat0-medium",
+                   help="which checkpoint --checkpoint is: its published SHA-256 is checked before unpickling")
+    p.add_argument("--sha256", default=None,
+                   help="the checkpoint's SHA-256 instead of --model's (any other checkpoint)")
     p.add_argument("--steps", type=int, default=20)
     p.add_argument("--output", type=Path, default=None)
     p.add_argument("--sources", type=Path, default=None, help="write each spline kernel's CUDA source here")
@@ -41,7 +50,7 @@ def main(argv=None) -> int:
 
     path, repeat = args.structure.split("@")
     atoms = read(path).repeat(tuple(int(n) for n in repeat.split("x")))
-    loaded = fm.load(str(args.checkpoint), sha256=args.sha256)
+    loaded = fm.load(str(args.checkpoint), sha256=args.sha256 or MODEL_SHA256[args.model])
     field = fm.ForceField(loaded, atoms, precision="float32", rewrites="auto")
     sim = fm.Simulation(atoms, field, integrator=fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0,
                                                                          friction_per_fs=0.002),

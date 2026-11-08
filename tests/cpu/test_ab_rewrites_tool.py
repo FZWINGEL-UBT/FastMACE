@@ -59,6 +59,28 @@ def test_each_step_sets_its_sides_constants():
         tile_rule.TRITON_NUM_WARPS = before
 
 
+def test_a_sides_plan_reads_its_constants_not_the_last_steps():
+    """OMAT-0 small on the H200 (8 November 2026): the plan ran outside the side's constants, so the label-keyed
+    decisions read whatever the previous side's last step had left (2.2 or 5.4 ms per step by build order)."""
+    from fastmace.planner import fixed
+
+    key = ("fastmace.planner.fixed", "DECISION_66_TF32X3_LABELS")
+    before = fixed.DECISION_66_TF32X3_LABELS
+    seen = []
+    try:
+        tool.ConstantsSide(type("Side", (), {"step": lambda self: None})(), {key: ("omat0-medium", None)}).step()
+        assert fixed.DECISION_66_TF32X3_LABELS == ("omat0-medium", None)  # a step leaves its side's value set
+        for values in ({key: before}, {key: ("omat0-medium", None)}):
+            tool.built_under(values, lambda: seen.append(("field", fixed.DECISION_66_TF32X3_LABELS)) or "field",
+                             lambda field: seen.append(("plan", fixed.DECISION_66_TF32X3_LABELS)) or "plan",
+                             lambda plan, field: seen.append(("build", fixed.DECISION_66_TF32X3_LABELS)) or "engine")
+            assert fixed.DECISION_66_TF32X3_LABELS == ("omat0-medium", None)  # restored to what it found
+        assert seen == [(stage, before) for stage in ("field", "plan", "build")] + [
+            (stage, ("omat0-medium", None)) for stage in ("field", "plan", "build")]
+    finally:
+        fixed.DECISION_66_TF32X3_LABELS = before
+
+
 def test_pack_entries_split_constants_from_rewrite_fields():
     entries = tool.pack_entries("t4|fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS=4 ;"
                                 " seg|segment_gemm=on fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS=8;")

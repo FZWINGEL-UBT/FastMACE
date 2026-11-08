@@ -182,6 +182,19 @@ class _Constants:
             setattr(importlib.import_module(module), name, value)
 
 
+def built_under(values, make_field, make_plan, make_engine, *, prepare=False):
+    """``(field, plan, engine)`` of one side, with the module constants ``values`` set over all three steps and
+    restored afterwards: the planner takes its label-keyed decisions in ``make_plan``, so a constant such as
+    ``fastmace.planner.fixed:DECISION_66_TF32X3_LABELS`` acts only if it is set there too."""
+    with _Constants(values):
+        field = make_field()
+        plan = make_plan(field)
+        engine = make_engine(plan, field)
+        if prepare:
+            engine.prepare()
+    return field, plan, engine
+
+
 class ConstantsSide:
     """A TimedEngine whose module constants are set before every step, as ``Tf32Side`` sets its matmul mode: a
     graph captured again outside the build (a new edge size in warm-up) reads the side's own values, not the other
@@ -304,16 +317,23 @@ def main(argv=None):
         tf32 = args.a_tf32 if side == "a" else args.b_tf32
         ab_step_time.set_tf32(torch, False)  # built in IEEE (tf32_after_build)
         rewrites = RewriteConfig(**fields_side) if fields_side else "auto"
-        with _Constants(constants_side):  # rewrites read them too
-            field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
         integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
                       IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs))
         planner = planners[side]
-        plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
-        with _Constants(constants_side):
-            engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
-            if args.prepare:
-                engine.prepare()
+        # Every constant either side sets, at this side's value (the default where it leaves one alone), over the
+        # whole build: the force field (rewrites read them), the plan (the planner's label-keyed decisions, such as
+        # fastmace.planner.fixed:DECISION_66_TF32X3_LABELS, are taken in plan()) and the engine. Not only this
+        # side's own constants: ConstantsSide sets them before every step and leaves them set, so a build after
+        # another side's steps would otherwise read that side's values (OMAT-0 small on the H200, 8 November
+        # 2026: the plan ran outside the side's constants and read whatever the last step had left, 2.2 or 5.4 ms
+        # per step by build order).
+        field, plan, engine = built_under(
+            {**defaults, **constants_side},
+            lambda: ForceField(loaded, base, precision=args.precision, rewrites=rewrites),
+            lambda field: planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K),
+                                       hardware),
+            lambda plan, field: planner.build(plan, field, base.copy(), temperature_K=args.temperature_K),
+            prepare=args.prepare)
         if tf32:
             ab_step_time.tf32_after_build(torch, engine)
         elif args.a_recapture if side == "a" else args.b_recapture:
