@@ -205,6 +205,12 @@ STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # True / False: an A/B side's choice. Applies only with STAGE_DOUT and the block layout.
 STAGE_QUADS = None
 STAGE_QUADS_GPUS = GPUModels(())
+# STAGE_SH (Codex H200 report item 3, 8 November 2026; bitwise): each 32-lane cohort copies its edge's features to
+# shared memory once (one coalesced load, __syncwarp) instead of every channel pass re-reading them from global memory;
+# the __syncwarp also tells ptxas the warp is converged at the end-of-edge reduction. None: on for STAGE_SH_GPUS;
+# True / False: an A/B side's choice.
+STAGE_SH = None
+STAGE_SH_GPUS = GPUModels(())
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
@@ -354,6 +360,14 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;
     const int64_t edge_base = e * EDGE_DIM;
     const int64_t weight_base = e * WEIGHT_DIM;
+    {%- if stage_sh %}
+    // STAGE_SH: the edge's features in shared memory once per edge; the channel passes read them from there.
+    __shared__ __align__(16) scalar_t stage_sh[{{ stage_sh }}][EDGE_DIM];
+    __syncwarp();  // the previous edge's reads are done
+    for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) stage_sh[logical_group][c] = __ldg(sh + edge_base + c);
+    __syncwarp();
+    const scalar_t* sh_edge = stage_sh[logical_group];
+    {%- endif %}
 
     // The radial tables' piece of r and its Chebyshev argument; no slope at or beyond the cutoff, below r_lo.
     const scalar_t r = lengths[e];
@@ -526,9 +540,14 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                         const scalar_t input_value =
                             x[input_base
                               + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }}];
+                        {%- if stage_sh %}
+                        const scalar_t edge_value =
+                            sh_edge[{{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];
+                        {%- else %}
                         const scalar_t edge_value =
                             sh[edge_base
                                + {{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];
+                        {%- endif %}
                         {%- set fp = factored[path_index] %}
                         {%- set ratio = term.coefficient / fp.alpha %}
                         {%- set op = "-=" if fp.alpha != 1.0 and ratio < 0 else "+=" %}
@@ -556,7 +575,8 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 
                         const int64_t edge_index = edge_base + edge_component_index;
                         const scalar_t input_value = x[input_index];
-                        const scalar_t edge_value = sh[edge_index];
+                        const scalar_t edge_value = {{ "sh_edge[edge_component_index]" if stage_sh
+                                                       else "sh[edge_index]" }};
 
                         weight_gradient += output_gradient * input_value
                             * edge_value * {{ cpp_scalar_literal(term.coefficient, scalar) }};
@@ -724,7 +744,7 @@ def factored_paths(schedule, scale=False):
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
            table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
-           stage_quads=False, shared_locator=False):
+           stage_quads=False, shared_locator=False, stage_sh=0):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -743,7 +763,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     ``[(start, end, intervals)]``; the table is ``spline_table``'s (4 power-basis terms per interval, HORNER).
     ``stage_quads`` (``STAGE_QUADS``; with ``stage_dout`` and ``blocks``): the staged row as component quartets.
     ``shared_locator`` (``spline_forward.SHARED_LOCATOR``; with ``spline``): the slab, t and 1 / h read from
-    ``spline_locator``'s per-edge int4 record, passed in the ``bins`` argument."""
+    ``spline_locator``'s per-edge int4 record, passed in the ``bins`` argument. ``stage_sh`` (``STAGE_SH``; float32,
+    32-lane cohorts): the block's cohort count; each cohort copies its edge's features to shared memory once."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -785,6 +806,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("stage_quads lays out STAGE_DOUT's block-layout row: it needs stage_dout and blocks")
     if shared_locator and spline is None:
         raise ValueError("shared_locator reads the spline locator's records: it needs spline")
+    if stage_sh and (scalar != "float" or schedule.launch_config.logical_cohort_width != 32):
+        raise ValueError("stage_sh synchronises a warp per edge: it needs float32 and 32-lane cohorts")
     stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
     quads, quad_of = (None, None)
     if stage_quads:
@@ -807,7 +830,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             stage_total=stage_total, stage_quads=quads, quad_of=quad_of,
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1,
                                             spline=None if spline is None else _spline_lookup(spline, scalar),
-                                            shared_locator=bool(shared_locator),
+                                            shared_locator=bool(shared_locator), stage_sh=int(stage_sh),
                                             slab="int64_t(loc.x)" if shared_locator
                                             else "(int64_t(pairs[e]) * pieces + piece)")
 
@@ -1012,6 +1035,8 @@ class WPrimeBackward:
         self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
         self.stage_quads = self.stage_dout and blocks is not None and stage_quads_default(device)
+        self.stage_sh = (self.num_threads // self.cohort if self.cohort == 32 and scalar == "float"
+                         and stage_sh_default(device) else 0)
         self.estrin = self.horner and self.terms == 6 and scalar == "float" and estrin_default(device)
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
@@ -1021,7 +1046,8 @@ class WPrimeBackward:
                              scalar_paths=self.scalar_paths, butterfly=self.butterfly,
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
-                             spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator)
+                             spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
+                             stage_sh=self.stage_sh)
         options = ()
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
@@ -1440,6 +1466,11 @@ def estrin_default(device):
 def stage_dout_default(device):
     """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS``."""
     return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
+
+
+def stage_sh_default(device):
+    """``STAGE_SH`` on ``device``: the constant when set, else on for ``STAGE_SH_GPUS``."""
+    return bool(STAGE_SH) if STAGE_SH is not None else _device_name(device) in STAGE_SH_GPUS
 
 
 def stage_quads_default(device):

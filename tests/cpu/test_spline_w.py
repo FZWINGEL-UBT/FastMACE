@@ -352,3 +352,22 @@ def test_stage_edges_source_compiles_with_nvrtc():
     for capability in ((9, 0), (8, 0), (12, 0)):
         assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6,
                                        stage_edges=True), capability)
+
+
+def test_stage_sh_reads_the_edge_features_from_shared_memory():
+    assert wp.STAGE_SH is None and not wp.STAGE_SH_GPUS
+    blocks = [(1, [0]), (3, [64])]
+    kwargs = dict(vector=4, table_w=True, factored=True, scale=True, horner=True, blocks=blocks, spline=GRID)
+    plain = wp.render(_schedule(), "float", 4, **kwargs)
+    staged = wp.render(_schedule(), "float", 4, stage_sh=4, **kwargs)
+    assert "stage_sh[4][EDGE_DIM]" in staged and "sh_edge[" in staged and "__syncwarp();" in staged
+    assert "sh[edge_base" in plain.replace("dsh[", "") and "sh[edge_base" not in staged.replace("dsh[", "")
+    with pytest.raises(ValueError, match="stage_sh"):
+        wp.render(_schedule(), "double", 4, stage_sh=4, **{**kwargs, "vector": 0, "table_w": False, "horner": False,
+                                                            "spline": None})
+    from fastmace.kernels import nvrtc_available
+    if nvrtc_available():
+        from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+        for capability in ((9, 0), (8, 0)):
+            assert compile_cubin(staged, capability)
