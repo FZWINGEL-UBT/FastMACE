@@ -199,7 +199,10 @@ def selfcheck(original, rewritten, threshold, atoms=7, seed=0):
         reference = originals.get(name)
         if reference is None or reference.__dict__.get(MARKER):
             return math.inf, checked, [f"{name}: no unfolded block in the original"]
-        device = module._fold_out.device  # the weights' device (apply); a submodule's first buffer may be on the CPU
+        # Each block runs on its own weights' device: the original (registry.apply's ``original``, the model the
+        # force field copied) may sit on the CPU while the rewritten copy is on the GPU. Errors compare on the CPU.
+        device = module._fold_out.device
+        ref_device = list(reference.nonlinearity.net)[0].weight.device
         test = copy.deepcopy(module).double()
         ref = copy.deepcopy(reference).double()
         species = module.node_attrs_irreps.dim
@@ -208,10 +211,11 @@ def selfcheck(original, rewritten, threshold, atoms=7, seed=0):
         tensors = [node_attrs] + [torch.randn(atoms, irreps.dim, generator=generator, dtype=torch.float64)
                                   for irreps in (module.node_feats_irreps, module.potential_irreps,
                                                  module.charges_irreps)]
-        node_attrs, node_feats, potential, charges = (t.to(device) for t in tensors)
         with torch.no_grad():
-            expected = type(ref).forward(ref, node_attrs, node_feats, None, None, None, potential, charges)
-            got = test(node_attrs, node_feats, None, None, None, potential, charges)
+            expected = type(ref).forward(ref, *(t.to(ref_device) for t in tensors[:2]), None, None, None,
+                                         *(t.to(ref_device) for t in tensors[2:])).cpu()
+            got = test(*(t.to(device) for t in tensors[:2]), None, None, None,
+                       *(t.to(device) for t in tensors[2:])).cpu()
         scale = float(expected.abs().max())
         error = float((got - expected).abs().max()) / (scale if scale > 0 else 1.0)
         worst = max(worst, error)
