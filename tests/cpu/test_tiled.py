@@ -1271,6 +1271,32 @@ def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch)
     assert tiled._speed(None) is True and tiled._speed(None, 0.25) == 0.25 and tiled._speed(False) is False
 
 
+def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
+    """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
+    tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less
+    the tiles' predicted workspace (the measured workspace per receiver times the cap, plus 10 %), never below 0."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(10))
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: 10_000)
+    tiled._graph_budget(False, measure=True)
+    assert tiled._pieces is None and tiled._piece_budget == 0
+    tiled._graph_budget(True)
+    assert tiled._pieces is None
+    tiled._graph_budget(False)  # no workspace measured yet
+    assert tiled._pieces == {} and tiled._piece_budget == 2_500
+    tiled._per_receiver = 400.0  # 1.1 * 400 * 10 = 4,400 bytes for the tiles
+    tiled._graph_budget(False)
+    assert tiled._piece_budget == int(0.25 * (10_000 - 4_400))
+    tiled._per_receiver = 4_000.0
+    tiled._graph_budget(False)
+    assert tiled._pieces == {} and tiled._piece_budget == 0
+
+
 def test_backward_chunk_scale_multiplies_each_modules_own_chunk_once():
     """``TileConfig.backward_chunk_scale``: the chunked backward's edges per chunk times the scale, from each module's
     own value (a second tiled field on the same model does not scale it twice); off CUDA "auto" is 1."""

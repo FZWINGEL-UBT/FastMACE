@@ -980,6 +980,7 @@ class TiledForceField:
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
         self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0  # TILE_GRAPH_CACHE (one call)
+        self._per_receiver = None  # the last measured tile workspace per receiver (bytes; _memory)
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
 
@@ -1037,14 +1038,18 @@ class TiledForceField:
             local = torch.where(local >= r, local + (start - r), local)
         return nodes, ei, shifts, local, r, h
 
-    def _graph_budget(self, wave):
+    def _graph_budget(self, wave, measure=False):
         """The call's graph cache (``TILE_GRAPH_CACHE``): empty with its byte budget, or None (off, under the
-        wavefront, or off a CUDA device)."""
+        wavefront, off a CUDA device, or in a call that measures its workspace, where the kept graphs would count
+        as tile workspace and lower the receiver cap). The budget is the fraction of the memory free at the call's
+        start less the tiles' predicted workspace (the last measured workspace per receiver times the cap, plus
+        10 %, as ``_choose_receivers``), so the graphs never take what the tiles need."""
         self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0
         fraction = self._speed(TILE_GRAPH_CACHE, TILE_GRAPH_CACHE_FRACTION)
-        free = self._free_bytes() if fraction and not wave else None
+        free = self._free_bytes() if fraction and not wave and not measure else None
         if free is not None:
-            self._pieces, self._piece_budget = {}, int(float(fraction) * free)
+            workspace = 1.1 * self._per_receiver * self.receivers if self._per_receiver else 0
+            self._pieces, self._piece_budget = {}, int(float(fraction) * max(0.0, free - workspace))
 
     def _speed(self, value, on=True):
         """A tiled speed switch's value (``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE``, ``TILE_GRAPH_CACHE``): the
@@ -1624,7 +1629,7 @@ class TiledForceField:
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)
         wave = self._wavefront_on(grid, n)
-        self._graph_budget(wave)
+        self._graph_budget(wave, measure)
         started = time.perf_counter()  # the search pass before the sweeps (its syncs make the wall time its cost)
         if wave:
             keys, steps, pool_rows, first, last = self._wavefront(tiles, source, local_of, n, padded)
@@ -1934,10 +1939,13 @@ class TiledForceField:
             # tiles (the energy's float64 sums, the wavefront's search pass) scale with the atoms, not the cap: the
             # first call held them at this atom count, apart from the tiles' workspace (tiled-wavefront.md).
             base = last["loop_base"]
-            return last["tiles_peak"] - base, free + torch.cuda.memory_reserved(self.device) - base
-        allocated = torch.cuda.memory_allocated(self.device)
-        return (torch.cuda.max_memory_allocated(self.device) - allocated,
-                free + torch.cuda.memory_reserved(self.device) - allocated)
+            memory = last["tiles_peak"] - base, free + torch.cuda.memory_reserved(self.device) - base
+        else:
+            allocated = torch.cuda.memory_allocated(self.device)
+            memory = (torch.cuda.max_memory_allocated(self.device) - allocated,
+                      free + torch.cuda.memory_reserved(self.device) - allocated)
+        self._per_receiver = memory[0] / self.receivers  # at this call's cap (TILE_GRAPH_CACHE's budget)
+        return memory
 
     def _choose_mode(self, memory):
         """Mode "auto" after a compiled force field's first (eager) call: compiled tiles when the memory left at
