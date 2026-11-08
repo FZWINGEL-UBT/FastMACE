@@ -160,6 +160,32 @@ def compose_species_skip(first, skip):
     return composed
 
 
+def compose_skip_linear(skip, second):
+    """The SpeciesSkip of ``second(skip(x, node_attrs))`` for a scalar BlockLinear ``second`` whose inputs are the
+    skip's output (the generic readout-tail fold, ``GENERIC_FOLD_READOUT_TAIL``): each species' matrix of a skip path
+    becomes ``W_s @ B`` with ``B`` the layer's ``[mul_mid, mul_out]`` block (products in float64, stored in the skip's
+    dtype). Scalars only, so the layouts of both sides agree."""
+    from fastmace.rewrites.generic.modules import SpeciesSkip
+
+    if [(o, m, d * m) for o, m, d in second.segments_in] != [tuple(s) for s in skip.segments_out]:
+        raise ValueError("compose_skip_linear: the skip's outputs are not the layer's inputs")
+    if any(d != 1 for _, _, d in (*second.segments_in, *second.segments_out)):
+        raise ValueError("compose_skip_linear: scalar layers only")
+    dtype = skip.w0.dtype
+    products = {}
+    for index, (i, mid) in enumerate(skip.pairs):
+        weight = getattr(skip, f"ws{index}").double()  # [species, mul_in, mul_mid]
+        for mid2, k, right in raw_blocks(second):
+            if mid2 == mid:
+                term = torch.matmul(weight, right.double())  # [species, mul_in, mul_out]
+                products[(i, k)] = term if (i, k) not in products else products[(i, k)] + term
+    blocks = [(i, k, weight.to(dtype)) for (i, k), weight in products.items()]
+    composed = SpeciesSkip(skip.columns, skip.segments_in, [(o, m, d * m) for o, m, d in second.segments_out],
+                           blocks, skip.layout)
+    composed._reference = (skip, second)
+    return composed
+
+
 class HeadActivation(torch.nn.Module):
     """The readout's scalar activation on the active head's hidden columns only (TAIL_HEAD prototype)."""
 
