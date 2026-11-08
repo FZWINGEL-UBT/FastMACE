@@ -1,0 +1,2320 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-11-08T14:09:43.402612+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "eced7d7578461210b6d0bf42de051a52e472d478",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "omat0-medium",
+  "structure": "SrTiO3",
+  "precision": "float32",
+  "repeat": "20x20x20",
+  "natoms": 40000,
+  "volume_A3": 476379.5409999999,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "error",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15894315008,
+      "outside_allocator": 1208549376
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17102864384,
+    "windows": {
+      "used_MiB": 1893,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "fastmace.errors.RewriteError",
+    "message": "generic_wprime_backward: no generic interaction with float32 radial tables and the chunked streaming convolution\nNext: Turn that rewrite off (rewrites=...) and report the model; the others stay exact.",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/planner/minimal.py:1222 build: engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(",
+      "fastmace/planner/fixed.py:1763 build: field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,",
+      "fastmace/model/forces.py:555 __init__: compiled = compiling.compile_model(source, self.compile_mode, accelerated=accelerated, oeq=self.oeq,",
+      "fastmace/model/compile.py:295 compile_model: prepare(private)",
+      "fastmace/model/forces.py:527 prepare: self.applied = registry.apply(private, resolution, context, original=source, check=check)",
+      "fastmace/rewrites/registry.py:686 apply: detail = self._records[name].apply(model, context)",
+      "fastmace/rewrites/radial/__init__.py:963 _apply_generic_wprime: return attach_generic_wprime(model)",
+      "fastmace/rewrites/radial/__init__.py:907 attach_generic_wprime: raise RewriteError(\"generic_wprime_backward: no generic interaction with float32 radial tables and the \""
+    ],
+    "memory": {
+      "max_allocated": 292448768,
+      "max_reserved": 331350016,
+      "allocated": 247970304,
+      "reserved": 331350016,
+      "inactive_split_bytes": 0,
+      "active_bytes": 292448768,
+      "reserved_bytes": 331350016,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15516827648,
+      "outside_allocator": 1254686720
+    },
+    "causes": [],
+    "live": {
+      "largest": [
+        {
+          "bytes": 33554432,
+          "site": "fastmace/rewrites/generic/modules.py:749 species_skip",
+          "frames": [
+            "fastmace/rewrites/generic/modules.py:749 species_skip",
+            "fastmace/rewrites/generic/__init__.py:131 apply_species_skip",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare",
+            "fastmace/model/compile.py:295 compile_model",
+            "fastmace/model/forces.py:555 __init__"
+          ]
+        },
+        {
+          "bytes": 33554432,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 23330816,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 23330816,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 20480000,
+          "site": "fastmace/rewrites/mh1/modules.py:381 identity_species_feats",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:381 identity_species_feats",
+            "fastmace/rewrites/mh1/__init__.py:377 species_table",
+            "fastmace/rewrites/generic/__init__.py:177 apply_reassociate",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare",
+            "fastmace/model/compile.py:295 compile_model"
+          ]
+        },
+        {
+          "bytes": 14240256,
+          "site": "fastmace/model/forces.py:480 __init__",
+          "frames": [
+            "fastmace/model/forces.py:480 __init__",
+            "fastmace/planner/fixed.py:1763 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare",
+            "fastmace/simulation.py:631 __init__",
+            "tools/bench/capacity_scan.py:406 run_point"
+          ]
+        },
+        {
+          "bytes": 12773376,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1280 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1338 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 12773376,
+          "site": "fastmace/rewrites/radial/__init__.py:181 power_basis",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:181 power_basis",
+            "fastmace/rewrites/radial/__init__.py:204 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1280 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1338 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply"
+          ]
+        },
+        {
+          "bytes": 10644480,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1280 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1338 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 8896000,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1280 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1338 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 8896000,
+          "site": "fastmace/rewrites/radial/__init__.py:181 power_basis",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:181 power_basis",
+            "fastmace/rewrites/radial/__init__.py:204 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1280 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1338 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply"
+          ]
+        },
+        {
+          "bytes": 7413248,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1280 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1338 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 5832704,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 5832704,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 3918848,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 3918848,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 3918848,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/compile.py:290 compile_model",
+            "fastmace/model/forces.py:555 __init__",
+            "fastmace/planner/fixed.py:1763 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare"
+          ]
+        },
+        {
+          "bytes": 1275904,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 1275904,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 1275904,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/compile.py:290 compile_model",
+            "fastmace/model/forces.py:555 __init__",
+            "fastmace/planner/fixed.py:1763 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare"
+          ]
+        },
+        {
+          "bytes": 655360,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 655360,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 332800,
+          "site": "fastmace/rewrites/generic/modules.py:461 __init__",
+          "frames": [
+            "fastmace/rewrites/generic/modules.py:461 __init__",
+            "fastmace/rewrites/generic/__init__.py:224 apply_chunked_conv_backward",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare",
+            "fastmace/model/compile.py:295 compile_model",
+            "fastmace/model/forces.py:555 __init__"
+          ]
+        },
+        {
+          "bytes": 327680,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/compile.py:290 compile_model",
+            "fastmace/model/forces.py:555 __init__",
+            "fastmace/planner/fixed.py:1763 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare"
+          ]
+        },
+        {
+          "bytes": 327680,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        }
+      ],
+      "by_site": [
+        [
+          "fastmace/model/compile.py:141 private_copy",
+          42028544
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:200 __init__",
+          39772160
+        ],
+        [
+          "fastmace/model/loading.py:709 load",
+          36293632
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:749 species_skip",
+          33554432
+        ],
+        [
+          "outside FastMACE",
+          33554432
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:181 power_basis",
+          21669376
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:381 identity_species_feats",
+          20480000
+        ],
+        [
+          "fastmace/model/forces.py:480 __init__",
+          14240256
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:90 <listcomp>",
+          1365504
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:121 __init__",
+          1364480
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:753 species_skip",
+          983040
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:612 __init__",
+          983040
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:610 __init__",
+          983040
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:461 __init__",
+          332800
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:462 __init__",
+          327680
+        ],
+        [
+          "fastmace/model/compile.py:146 private_copy",
+          29696
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:460 __init__",
+          5120
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:212 __init__",
+          1024
+        ],
+        [
+          "fastmace/rewrites/generic/__init__.py:131 apply_species_skip",
+          1024
+        ],
+        [
+          "fastmace/rewrites/generic/__init__.py:179 apply_reassociate",
+          512
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:653 attach_streaming_kernels",
+          512
+        ]
+      ],
+      "live_bytes": 247970304,
+      "segments_bytes": 331350016
+    }
+  },
+  "trace": {
+    "samples": [
+      [
+        0.05273027598741464,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.1365241339954082,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.1980310479993932,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.24985502799972892,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.3029596369888168,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.3538555359991733,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.4118093170109205,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.4779653059958946,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.5284642250044271,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.5793552289833315,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.6298994630051311,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.6810916399990674,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.7318171240040101,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.7825974529841915,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.833614081988344,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.8844575959956273,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.9355265609920025,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        0.9864786679972894,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.0377007960050832,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.0889730280032381,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.1403663610108197,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.1915597229963169,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.2424592879833654,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.292924157984089,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.3532915399991907,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.4222794009838253,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.473827075009467,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.5435444340109825,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.5968902290042024,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.6481421779899392,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.7002238940040115,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.761989344988251,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.812963533011498,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        1.9338628849945962,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.002059126010863,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.0573894990084227,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.107870103995083,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.158543142984854,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.214854418998584,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.278126051998697,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.3394516489934176,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.400724557985086,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.4621240429987665,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.5234873500012327,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.5847654760000296,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.6466838599881157,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.7079904199927114,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.769442988996161,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.8309300759865437,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.8922252919874154,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        2.9642323759908322,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.0263871650095098,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.087688978994265,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.149484077002853,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.202854953997303,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.2534632929891814,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.304367414006265,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.355541513999924,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.406626428011805,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.457086670008721,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.5077635839988943,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.5589770569931716,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.6102162699971814,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.660743755986914,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.711913820996415,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.76270676398417,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.813399357983144,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.864153609989444,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.914608171005966,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        3.9652100969979074,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.0162129329983145,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.0670357960043475,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.117836313991575,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.168914901005337,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.220047829992836,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.271258855005726,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.32191824101028,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.372944987990195,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.424283886008197,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.475522706983611,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.526009727997007,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.576897447986994,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.627671039983397,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.678124964993913,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.728820924006868,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.7806875509850215,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.831944306002697,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.905958358984208,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        4.958714509994024,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.018394929007627,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.069942280009855,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.1208627249870915,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.171791606000625,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.222453100985149,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.273223986994708,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.3239696210075635,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.374759369005915,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.425526492996141,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.476579089998268,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.527595132007264,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.578584778006189,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.629372306982987,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.679846999992151,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.7305201299896,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.781573557003867,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.832074592995923,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.88281660201028,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.933745771995746,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        5.984251326997764,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.034929152985569,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.085475439002039,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.136408911988838,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.187092323001707,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.237936830002582,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.288869832991622,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.339888854010496,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.390978198993253,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.441680799005553,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.492246365000028,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.542977814009646,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.5937966509955,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.644547386007616,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.695356243988499,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.746234282996738,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.79691930100671,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.847722029982833,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.898868846008554,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        6.949932149000233,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.001226102001965,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.052116951992502,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.103378144005546,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.154583723982796,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.205279685003916,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.256138369004475,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.30735285099945,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.358245285984594,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.408875738008646,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.459846637997543,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.510557250992861,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.561655380006414,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.61269240299589,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.6637193099886645,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.71459153899923,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.7656461499864236,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.8167816560016945,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.867667810001876,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.918457157997182,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        7.96919843100477,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.020219199010171,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.071419454994611,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.122326454002177,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.173407973983558,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.224180788995,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.27462845100672,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.3255354790017,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.462329903995851,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.51287411499652,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.56336322199786,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.613892191991908,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.664567592000822,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.715785567008425,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.766322663985193,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.817454611009452,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.868099262996111,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.918878260999918,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        8.969541094993474,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        9.020053604996065,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        9.070863322005607,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        9.12890627401066,
+        15894315008,
+        0,
+        0
+      ],
+      [
+        9.211572430998785,
+        15892217856,
+        2097152,
+        291328
+      ],
+      [
+        9.269315387995448,
+        15827206144,
+        67108864,
+        65146880
+      ],
+      [
+        9.406339564011432,
+        15806234624,
+        88080384,
+        75485184
+      ],
+      [
+        9.45717604199308,
+        15804137472,
+        90177536,
+        79266816
+      ],
+      [
+        9.508272245991975,
+        15778971648,
+        111149056,
+        101993472
+      ],
+      [
+        9.565466458006995,
+        15755902976,
+        113246208,
+        39619072
+      ],
+      [
+        9.625035522010876,
+        15755902976,
+        113246208,
+        39619072
+      ],
+      [
+        9.681930566002848,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        9.736414726998191,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        9.787498280988075,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        9.83834092298639,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        9.889616840984672,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        9.940634847007459,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        9.991339923988562,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.042193219996989,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.093218547990546,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.143965975003084,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.195024284010287,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.245878046989674,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.29676490998827,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.347689646005165,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.398271813988686,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.448975381004857,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.499853196990443,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.550832570006605,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.60156419800478,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.652785602986114,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.703663833992323,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.754468269995414,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.805628289002925,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.856268792995252,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.90733306700713,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        10.958603112987475,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.009180852008285,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.059843833005289,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.110393479990307,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.161265270988224,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.212015759985661,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.2630552490009,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.313789973995881,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.36478494000039,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.422292757983087,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.48358833999373,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.539114808983868,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.590079746005358,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.641781630984042,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.801600646984298,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.863207963993773,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        11.924382264987798,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        12.09140527798445,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        12.151094683009433,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        12.217475810990436,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        12.286559823987773,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        12.347646301001078,
+        15755902976,
+        113246208,
+        39620096
+      ],
+      [
+        12.406994991993997,
+        15755902976,
+        113246208,
+        39621120
+      ],
+      [
+        12.45784115800052,
+        15755902976,
+        113246208,
+        39621120
+      ],
+      [
+        12.50921036300133,
+        15755902976,
+        113246208,
+        39621120
+      ],
+      [
+        12.565498538984684,
+        15755902976,
+        113246208,
+        39621120
+      ],
+      [
+        12.61635091601056,
+        15755902976,
+        113246208,
+        63504384
+      ],
+      [
+        12.678275234007742,
+        15755902976,
+        113246208,
+        36414464
+      ],
+      [
+        12.740938397007994,
+        15755902976,
+        113246208,
+        36414464
+      ],
+      [
+        12.798739693011157,
+        15755902976,
+        113246208,
+        60174848
+      ],
+      [
+        12.862052490003407,
+        15755902976,
+        113246208,
+        60306432
+      ],
+      [
+        12.918359692004742,
+        15755902976,
+        113246208,
+        60307456
+      ],
+      [
+        12.980074377992423,
+        15755902976,
+        113246208,
+        71088128
+      ],
+      [
+        13.033120606996818,
+        15755902976,
+        113246208,
+        72573952
+      ],
+      [
+        13.101216028007912,
+        15755902976,
+        113246208,
+        72587264
+      ],
+      [
+        13.157706078985939,
+        15755902976,
+        113246208,
+        72587264
+      ],
+      [
+        13.208818590996088,
+        15755902976,
+        113246208,
+        86868480
+      ],
+      [
+        13.388639457989484,
+        15755902976,
+        113246208,
+        86827520
+      ],
+      [
+        13.450072337989695,
+        15755902976,
+        113246208,
+        86827520
+      ],
+      [
+        13.508033919002628,
+        15755902976,
+        113246208,
+        86827520
+      ],
+      [
+        13.57880534499418,
+        15755902976,
+        113246208,
+        86827520
+      ],
+      [
+        13.642973909998545,
+        15755902976,
+        113246208,
+        86827520
+      ],
+      [
+        13.705318613006966,
+        15755902976,
+        113246208,
+        86948352
+      ],
+      [
+        13.762072106997948,
+        15755902976,
+        113246208,
+        86948352
+      ],
+      [
+        13.816422214003978,
+        15734931456,
+        134217728,
+        110708736
+      ],
+      [
+        13.877817428001435,
+        15734931456,
+        134217728,
+        110840320
+      ],
+      [
+        13.93348667700775,
+        15734931456,
+        134217728,
+        110841344
+      ],
+      [
+        13.9861007790023,
+        15734931456,
+        134217728,
+        117692416
+      ],
+      [
+        14.047444111987716,
+        15734931456,
+        134217728,
+        123096576
+      ],
+      [
+        14.15726204100065,
+        15682502656,
+        176160768,
+        157836288
+      ],
+      [
+        14.207978293008637,
+        15655239680,
+        203423744,
+        161516032
+      ],
+      [
+        14.26627124598599,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.317363896989264,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.368186298001092,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.418859727011295,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.469496565987356,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.520349425991299,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.571003277000273,
+        15653142528,
+        203423744,
+        161521664
+      ],
+      [
+        14.62144936999539,
+        15653142528,
+        203423744,
+        161694208
+      ],
+      [
+        14.672093255998334,
+        15653142528,
+        203423744,
+        130762240
+      ],
+      [
+        14.722557397995843,
+        15653142528,
+        203423744,
+        130762752
+      ],
+      [
+        14.775888076983392,
+        15623782400,
+        224395264,
+        166417920
+      ],
+      [
+        14.826298608008074,
+        15623782400,
+        224395264,
+        166707200
+      ],
+      [
+        14.876974918995984,
+        15623782400,
+        224395264,
+        165021184
+      ],
+      [
+        14.92761919600889,
+        15623782400,
+        224395264,
+        165021184
+      ],
+      [
+        14.98724872400635,
+        15623782400,
+        224395264,
+        164017152
+      ],
+      [
+        15.038242504000664,
+        15560867840,
+        287309824,
+        184882176
+      ],
+      [
+        15.089081046986394,
+        15560867840,
+        287309824,
+        184883712
+      ],
+      [
+        15.139696414989885,
+        15560867840,
+        287309824,
+        184883712
+      ],
+      [
+        15.190512539993506,
+        15560867840,
+        287309824,
+        185361408
+      ],
+      [
+        15.240976533008507,
+        15560867840,
+        287309824,
+        185143296
+      ],
+      [
+        15.300245226011612,
+        15560867840,
+        287309824,
+        184497152
+      ],
+      [
+        15.350862766004866,
+        15560867840,
+        287309824,
+        185377280
+      ],
+      [
+        15.401447490992723,
+        15560867840,
+        287309824,
+        185935872
+      ],
+      [
+        15.452015001996187,
+        15560867840,
+        287309824,
+        185676800
+      ],
+      [
+        15.502656875003595,
+        15560867840,
+        287309824,
+        185377792
+      ],
+      [
+        15.553716922004241,
+        15558770688,
+        289406976,
+        190693888
+      ],
+      [
+        15.605033286992693,
+        15558770688,
+        289406976,
+        187330048
+      ],
+      [
+        15.65664476400707,
+        15558770688,
+        289406976,
+        187353088
+      ],
+      [
+        15.70719618399744,
+        15558770688,
+        289406976,
+        186527744
+      ],
+      [
+        15.828406141983578,
+        15516827648,
+        331350016,
+        248289792
+      ],
+      [
+        15.892991509987041,
+        15516827648,
+        331350016,
+        247970304
+      ],
+      [
+        15.943526755989296,
+        15516827648,
+        331350016,
+        247970304
+      ],
+      [
+        15.99836760800099,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.048699022008805,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.099111793009797,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.149512314004824,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.19996834101039,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.25060051298351,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.301025728986133,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.35145421899506,
+        15516827648,
+        331350016,
+        248248320
+      ],
+      [
+        16.40639859699877,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.466288800002076,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.51673938400927,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.567204304999905,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.617593461007345,
+        15516827648,
+        331350016,
+        248196096
+      ],
+      [
+        16.669265901000472,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.71957848200691,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.7699070610106,
+        15516827648,
+        331350016,
+        248110592
+      ],
+      [
+        16.820263775996864,
+        15516827648,
+        331350016,
+        247971840
+      ],
+      [
+        16.872612142993603,
+        15516827648,
+        331350016,
+        247970304
+      ],
+      [
+        17.036337010009447,
+        15516827648,
+        331350016,
+        247961600
+      ],
+      [
+        18.370836063986644,
+        15516827648,
+        331350016,
+        247955456
+      ]
+    ],
+    "events": []
+  },
+  "times": {
+    "load_s": 4.9142388890031725
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

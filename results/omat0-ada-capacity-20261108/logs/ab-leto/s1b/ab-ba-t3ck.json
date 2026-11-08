@@ -1,0 +1,216 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-08T14:26:40.456718+00:00",
+  "host": "leto",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "73e421ea9d475a57eeb3c1795fc84f7481e4288f",
+  "model": "omat0-medium",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "sides": {
+    "a": {},
+    "b": {
+      "tf32x3_gemms": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {
+      "skin": 0.5
+    },
+    "b": {
+      "skin": 0.5
+    }
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP": true,
+      "fastmace.kernels.triton.compose_skip:COMPOSE_FAST": true,
+      "fastmace.kernels.triton.compose_skip:COUNT_PLAN": true,
+      "fastmace.kernels.triton.compose_skip:JOINED_LAYOUT": true,
+      "fastmace.rewrites.cueq_projection:CUEQ_PROJECTED": true,
+      "fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          0
+        ]
+      ]
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": 1.0,
+  "protocol": {
+    "warmup": 200,
+    "block": 256,
+    "blocks": 6
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": null,
+  "stop_beyond": 0.03,
+  "load": [
+    1.12109375,
+    1.689453125,
+    1.91552734375
+  ],
+  "structures": {
+    "SrTiO3": {
+      "natoms": 5000,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 26.113441396319104,
+            "mean_ms": 26.075067701185617,
+            "min_ms": 25.872910499856516,
+            "max_ms": 26.169444683546317,
+            "stdev_ms": 0.10914288527469598,
+            "spread": 0.011355614880067068,
+            "block_ms": [
+              25.872910499856516,
+              26.035389789285546,
+              26.101889952769852,
+              26.124992839868355,
+              26.145778441787115,
+              26.169444683546317
+            ]
+          },
+          "a": {
+            "median_ms": 26.377879345545807,
+            "mean_ms": 26.379938680444564,
+            "min_ms": 26.360842929534556,
+            "max_ms": 26.403484109323472,
+            "stdev_ms": 0.013991699598472452,
+            "spread": 0.0016165507177557218,
+            "block_ms": [
+              26.375450843261206,
+              26.360842929534556,
+              26.38030784783041,
+              26.375330676273734,
+              26.384215676444,
+              26.403484109323472
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.010126507081674,
+        "pair_ratios_b_over_a": [
+          1.0194234175319192,
+          1.0125004135863924,
+          1.010666579912962,
+          1.0095823121537224,
+          1.0091195309096557,
+          1.0089432324073848
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.989975011040023,
+      "pair_ratios": [
+        0.9809466633806153,
+        0.9876539175503992,
+        0.9894459952224002,
+        0.99050863704884,
+        0.9909628833549233,
+        0.9911360400465289
+      ],
+      "setup_s": {
+        "a": 12.419736054958776,
+        "b": 11.842309036059305
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.tf32x3_gemms = off  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, not a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))"
+        ],
+        "b": [
+          "RewriteConfig.tf32x3_gemms = on  (requested 'on': stage 1: on (with block_linear))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 291.4080110872221,
+          "potential_eV_atom": -7.9522369954313294,
+          "kinetic_eV_atom": 0.03766738641675073
+        },
+        "a": {
+          "temperature_K": 296.0912220042338,
+          "potential_eV_atom": -7.951983400317578,
+          "kinetic_eV_atom": 0.03827273804941201
+        }
+      },
+      "load_after": [
+        1.013671875,
+        1.478515625,
+        1.80224609375
+      ],
+      "engine_counters_timed": {
+        "b": {
+          "rebuilds": 108,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 108
+        },
+        "a": {
+          "rebuilds": 125,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 125
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  },
+  "pack": {
+    "name": "t3ck",
+    "entries": [
+      "t3",
+      "t3c",
+      "t3ck",
+      "tail"
+    ],
+    "shared_a": true
+  }
+}
