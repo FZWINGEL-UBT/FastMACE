@@ -17,6 +17,9 @@
 // - the narrow per-entry factors of the strided index (positions and sources, or k-vectors and the per-k glue) are
 //   staged in shared memory, FM_STAGE entries at a time, so each loop step reads them with a broadcast shared load
 //   instead of an L2 round trip (__ldcg, ~300 cycles at 16 warps per SM);
+// - dL/dk (stress) needs a sum over the atoms of each k-vector: the lanes write their terms to shared memory
+//   (rows padded to 33) and the block adds each staged step's rows once, instead of a 5-step shuffle tree per
+//   k-vector and warp;
 // - each pair's phase is one precise sincosf (not the approximate __sincosf: |theta| reaches ~100 rad), then plain
 //   FFMA with the narrow factors as warp-broadcast loads; nothing [k, atoms] leaves the registers;
 // - the phases of one direction are separated by a grid barrier (an arrival counter; the grid is at most the
@@ -33,6 +36,8 @@
 #define FM_WARPS 8
 #define FM_ROWS 32
 #define FM_STAGE 64  // entries of the strided index staged per step (8 per warp)
+#define FM_STAGE_WIDTH 51  // the widest staged entry: k, dyc, dys (2 x 8), a, b (2 x 16)
+#define FM_GK_OFFSET (FM_STAGE * FM_STAGE_WIDTH)  // dL/dk terms of a staged step: [FM_STAGE][3][33] (padded)
 
 extern "C" __device__ int fm_kspace_info[3] = {FM_THREADS, FM_ROWS, FM_WARPS};
 
@@ -203,6 +208,8 @@ __device__ void phase_backward(const float* __restrict__ k, const float* __restr
         float grx = 0.f, gry = 0.f, grz = 0.f;
         const int k0 = s * chunk, k1 = min(K, (s + 1) * chunk);
         constexpr int E = 3 + 2 * CJ + (HAS_G ? 2 * CF : 0);  // staged per k-vector: k, dyc, dys (, a, b)
+        static_assert(E <= FM_STAGE_WIDTH, "the staged entry is wider than FM_STAGE_WIDTH");
+        float* gks = smem + FM_GK_OFFSET;
         for (int base = k0; base < k1; base += FM_STAGE) {
             const int count = min(FM_STAGE, k1 - base);
             for (int idx = threadIdx.x; idx < count * E; idx += FM_THREADS) {
@@ -217,7 +224,6 @@ __device__ void phase_backward(const float* __restrict__ k, const float* __restr
             }
             __syncthreads();
             for (int e = warp; e < count; e += FM_WARPS) {
-                const int kk = base + e;
                 const float* st = smem + e * E;
                 const float kx = st[0], ky = st[1], kz = st[2];
                 float sn, cs;
@@ -242,22 +248,23 @@ __device__ void phase_backward(const float* __restrict__ k, const float* __restr
                 gry = fmaf(dth, ky, gry);
                 grz = fmaf(dth, kz, grz);
                 if (GK) {
-                    float ex = dth * rx, ey = dth * ry, ez = dth * rz;
-#pragma unroll
-                    for (int off = 16; off > 0; off >>= 1) {
-                        ex += __shfl_xor_sync(0xffffffffu, ex, off);
-                        ey += __shfl_xor_sync(0xffffffffu, ey, off);
-                        ez += __shfl_xor_sync(0xffffffffu, ez, off);
-                    }
-                    if (lane == 0) {
-                        float* dst = gk_part + ((size_t)tile * K + kk) * 3;
-                        dst[0] = ex;
-                        dst[1] = ey;
-                        dst[2] = ez;
-                    }
+                    float* row = gks + e * 3 * 33 + lane;
+                    row[0] = dth * rx;
+                    row[33] = dth * ry;
+                    row[66] = dth * rz;
                 }
             }
             __syncthreads();
+            if (GK) {
+                for (int idx = threadIdx.x; idx < count * 3; idx += FM_THREADS) {
+                    const float* row = gks + idx * 33;
+                    float v = 0.f;
+#pragma unroll
+                    for (int l = 0; l < 32; ++l) v += row[l];
+                    gk_part[((size_t)tile * K + base) * 3 + idx] = v;
+                }
+                __syncthreads();
+            }
         }
         float* mine = smem + (warp * FM_ROWS + lane) * WP;
 #pragma unroll
@@ -302,7 +309,9 @@ __device__ void finish_backward(const float* part, const float* gk_part, float* 
     }
 }
 
-__shared__ float fm_smem[FM_WARPS * FM_ROWS * 35];  // the widest item: 2 x 16 columns (ksum), 16 + 3 (backward)
+// the widest per-item reduction (2 x 16 columns in ksum, 16 + 3 in the backward) or a staged step with its dL/dk rows
+#define FM_SMEM_MAX(a, b) ((a) > (b) ? (a) : (b))
+__shared__ float fm_smem[FM_SMEM_MAX(FM_WARPS * FM_ROWS * 35, FM_GK_OFFSET + FM_STAGE * 3 * 33)];
 
 template <int C, int J, int F>
 __device__ void field_forward(const float* k, const float* r, const float* mask, const float* x, const float* dr,
