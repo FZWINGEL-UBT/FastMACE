@@ -228,7 +228,7 @@ base, 3.7 GHz boost, `schedutil` governor). `torch.get_num_threads()` is 16, and
 Setup is single-threaded Python work. In job 4955075's profile, symbolic-shape tracing alone made 3.6 M `SymNode`
 calls. A pure-Python microbenchmark (dict and small-object loops, the same uv-built Python 3.10.12) takes
 **1.52 s on an Alex A100 node and 0.38 s on the PC (Core Ultra 7 270K)**, so tracing runs about 4× slower than on
-the PC. More cores and thread settings do not help much (table).
+the PC. Thread settings change nothing, and more cores per GPU are not available (table).
 
 Setup of one build, POLAR-1-M, A100-SXM4-80GB. One build is one side's engine for one structure, as in
 `setup_s` of `tools/ab_rewrites.py`:
@@ -271,8 +271,8 @@ Rules that follow:
   (54 k files, 6.1 GB) takes about 3.5 min; unpacking one tar of it takes 27–55 s. Make the tar once
   (`tar -cf $WORK/<dir>/env-py310.tar -C $WORK/<dir> uv-python env`) and pass it as `ENV_TAR`.
 - **Keep the compile cache warm.** A cold cache costs 160–260 s per build instead of about 150 s, and Dynamo tracing
-  is paid either way. `CACHE` defaults to `$FM_ROOT/cache` on `$WORK`, which stays warm between jobs. Do not copy a large cache to `$TMPDIR`: `fm-offpolar/cache` is 7.8 GB, and copying it
-  from `$WORK` did not finish within an hour.
+  is paid either way. `CACHE` defaults to `$FM_ROOT/cache` on `$WORK`, which stays warm between jobs. Do not copy a
+  large cache to `$TMPDIR`: `fm-offpolar/cache` is 7.8 GB, and copying it from `$WORK` did not finish within an hour.
 - Profile with `cProfile` only to find where time goes. It inflates setup to about 1.7× (250–270 s per build in
   4955075).
 
