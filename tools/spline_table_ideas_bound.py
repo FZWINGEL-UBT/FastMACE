@@ -193,8 +193,10 @@ def reuse(grid, per_pair_factor, sigma, seed, resident, capacities):
         natural = list(range(len(atoms)))
         mort = list(np.argsort(code, kind="stable"))
         spec_mort = list(np.lexsort((code, si)))
+        species = list(np.argsort(si, kind="stable"))
         orders = {"natural": (natural, False), "morton": (mort, False), "morton, SM-compact": (mort, True),
-                  "species+morton, SM-compact": (spec_mort, True)}
+                  "species+morton, SM-compact": (spec_mort, True), "species": (species, False),
+                  "species+morton": (spec_mort, False)}
         entry = dict(touched_slabs=touched, touched_mb=touched * BYTES_PER_SLAB / 1e6, edges=int(len(slab)), hits={})
         for cap in capacities:
             for name, (order, compact) in orders.items():
@@ -216,16 +218,26 @@ def main(argv=None):
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--resident", type=int, default=6, help="R128 blocks resident per SM")
     p.add_argument("--l1-slabs", type=int, nargs="*", default=[5, 10])
+    p.add_argument("--skip-certify", action="store_true", help="the reuse model only, on the cached production grid")
     args = p.parse_args(argv)
     torch.set_num_threads(8)
     model = torch.load(args.checkpoint, map_location="cpu", weights_only=False).float()
     result = dict(tool="spline_table_ideas_bound", created_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                   sigma=args.sigma, resident=args.resident)
-    result["certify"] = cert = certify(model, args.interaction)
-    factors = {}
-    for k, (name, entry) in enumerate(cert["per_pair"].items()):
-        factors[k] = [b["coarsen"] for b in entry["bands"]]
+    if args.skip_certify:
+        cached = json.loads(args.output.read_text())["certify"]
+        cert = dict(grid=[tuple(g) for g in cached["grid"]], per_pair={})
+        factors = None
+    else:
+        result["certify"] = cert = certify(model, args.interaction)
+        factors = {}
+        for k, (name, entry) in enumerate(cert["per_pair"].items()):
+            factors[k] = [b["coarsen"] for b in entry["bands"]]
     result["reuse"] = reuse(cert["grid"], factors, args.sigma, args.seed, args.resident, args.l1_slabs)
+    if args.skip_certify:  # added beside the earlier run's results
+        previous = json.loads(args.output.read_text())
+        previous["reuse_orders"] = result["reuse"]
+        result = previous
     args.output.write_text(json.dumps(result, indent=2) + "\n")
 
 

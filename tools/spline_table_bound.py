@@ -134,6 +134,34 @@ def slab_sorted(args):
     return args
 
 
+def species_blocks(kernel, args):
+    """BLOCK_ORDER's variant of a captured forward: the same kernel rendered with an order argument, and the receivers
+    grouped by species (the receiver's species from its first edge's pair, sender x S + receiver; H200 tables are
+    not SYMMETRIC_PAIRS). Returns (kernel, order, seconds of the order's construction per call) or None."""
+    import torch
+
+    from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, receiver_order
+    row_ptr, pair, table = args[3], args[5], args[6]
+    species = int(round((table.shape[0] / kernel.intervals) ** 0.5))
+    counts = (row_ptr[1:] - row_ptr[:-1]).long()
+    first = row_ptr[:-1].long().clamp(0, pair.numel() - 1)
+    receiver_species = torch.where(counts > 0, pair[first].long() % species, species)
+    every = torch.repeat_interleave(receiver_species, counts)
+    if not torch.equal(every, pair[:every.numel()].long() % species):
+        print("species-blocks: pair % S differs within a receiver (symmetric tables?); skipped", flush=True)
+        return None
+    ordered = SplineForward(*kernel.init_args, block_order=True)
+    order = receiver_order(receiver_species)
+    torch.cuda.synchronize()
+    start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    start.record()
+    for _ in range(20):
+        receiver_order(torch.where(counts > 0, pair[first].long() % species, species))
+    end.record()
+    end.synchronize()
+    return ordered, order, start.elapsed_time(end) / 20 * 1000.0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", type=Path, required=True)
@@ -165,28 +193,44 @@ def main(argv=None):
     for name, (kernel, real) in captured.items():
         slab, inside = one_slab(name, real, r_max)
         variants = {"real": real, "one-slab": slab}
+        kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "forward":
-            variants["slab-sorted"] = slab_sorted(real)
+            variants["slab-sorted"] = sorted_args = slab_sorted(real)
+            blocks = species_blocks(kernel, real)
+            if blocks is not None:
+                ordered, order, build_us = blocks
+                print(f"species-blocks: the order costs {build_us:.1f} us per call (eager torch)", flush=True)
+                variants["species-blocks"] = real
+                variants["slab-sorted+species-blocks"] = sorted_args
+                kernels["species-blocks"] = kernels["slab-sorted+species-blocks"] = (ordered, dict(order=order))
 
-        def launch(a):
+        def run(label, a):
+            k, extra = kernels.get(label, (kernel, {}))
+            k(*a, **extra)
+
+        def launch(a, label="real"):
             if name == "wprime":
                 a[6].zero_()
-            kernel(*a)
+            run(label, a)
 
         times = {label: {"flush": [], "warm": []} for label in variants}
         for _ in range(3):
-            for a in variants.values():
-                launch(a)
+            for label, a in variants.items():
+                launch(a, label)
         torch.cuda.synchronize()
-        if "slab-sorted" in variants:  # the same message up to summation order
-            outs = []
-            for a in (variants["real"], variants["slab-sorted"]):
+        if name == "forward":  # the same message up to summation order (bitwise for species-blocks alone)
+            def message(label):
+                a = variants[label]
                 o = [t.clone().zero_() for t in a[7]]
-                kernel(*a[:7], o)
-                outs.append(o)
-            torch.cuda.synchronize()
-            worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(*outs))
-            print(f"forward slab-sorted against real: max|d|/max|a| {worst:.2e}", flush=True)
+                k, extra = kernels.get(label, (kernel, {}))
+                k(*a[:7], o, **extra)
+                return o
+            base = message("real")
+            for label in [v for v in variants if v not in ("real", "one-slab")]:
+                got = message(label)
+                torch.cuda.synchronize()
+                worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(got, base))
+                print(f"forward {label} against real: max|d|/max|a| {worst:.2e}", flush=True)
         labels = list(variants)
         for k in range(args.rounds):
             ordered = labels if k % 2 == 0 else labels[::-1]
@@ -196,12 +240,12 @@ def main(argv=None):
                     if mode == "flush":
                         flush.zero_()
                     else:
-                        launch(a)  # the same launch once before: its table lines are in L2
+                        launch(a, label)  # the same launch once before: its table lines are in L2
                     if name == "wprime":
                         a[6].zero_()
                     start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                     start.record()
-                    kernel(*a)
+                    run(label, a)
                     end.record()
                     end.synchronize()
                     times[label][mode].append(start.elapsed_time(end) * 1000.0)
