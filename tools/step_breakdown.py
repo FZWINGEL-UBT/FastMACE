@@ -194,7 +194,8 @@ def build_engine(args, base):
     from fastmace.planner.workload import Workload
 
     from fastmace.config import NeighbourConfig
-    neighbours = NeighbourConfig() if args.skin is None else NeighbourConfig(skin=args.skin)
+    skin = getattr(args, "skin", None)  # tools/module_profile.py builds through here without a --skin option
+    neighbours = NeighbourConfig() if skin is None else NeighbourConfig(skin=skin)
     planner = minimal.MinimalPlanner(engine=EngineConfig(backend=args.backend), neighbours=neighbours)
     hardware = planner.hardware()  # the allocator rule, before the first CUDA allocation
     started = time.perf_counter()
