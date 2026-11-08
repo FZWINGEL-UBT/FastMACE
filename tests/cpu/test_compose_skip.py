@@ -197,6 +197,6 @@ def test_counting_plan_compiles_to_the_same_order():
     assert torch.equal(order, species_plan(index, 3)[0]) and torch.equal(counts, species_plan(index, 3)[1])
 
 
-def test_count_plan_is_off_by_default():
-    assert compose_skip.COUNT_PLAN is None and not compose_skip.COUNT_PLAN_GPUS
-    assert not compose_skip.count_plan_default("NVIDIA H200")
+def test_count_plan_is_on_for_the_h200_only():
+    assert compose_skip.COUNT_PLAN is None and compose_skip.count_plan_default("NVIDIA H200")
+    assert not compose_skip.count_plan_default("NVIDIA A100-SXM4-80GB")

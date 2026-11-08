@@ -41,7 +41,9 @@ COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200",))
 # sums) instead of an int64 radix sort per force call (8 onesweep passes and 10 memsets, ~57 us on the H200). The
 # order is the same stable order. None: on for COUNT_PLAN_GPUS; True / False: an A/B side's choice.
 COUNT_PLAN = None
-COUNT_PLAN_GPUS = GPUModels(())
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108, round 3): MD step b/a 0.9831 / 0.9818 against the
+# H200 defaults of round 2 (ab / ba); bitwise (the same order), faster in both orders (decision 66).
+COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def compose_fast_default(name=None) -> bool:

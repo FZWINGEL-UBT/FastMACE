@@ -34,6 +34,7 @@ THREADS = 256
 MIN_BLOCKS = None
 PARTS = False  # H200 on top of SPLINE_W with MIN_BLOCKS 4: 0.9938 / 0.9904 (under 1 %; off, not tried with R128)
 # R128: THREADS 128 with MIN_BLOCKS 6 (one receiver per block, 80-register cap) as the launch shape; it overrides
+# (with STAGE_EDGES, H200, 8 November 2026: the same shape with MIN_BLOCKS 7 1.0097 / 1.0103, 8 1.0515 / 1.0507; 6 stays)
 # THREADS and MIN_BLOCKS where on. None: on for R128_GPUS (decision 66); True / False: an A/B side's choice.
 R128 = None
 # NVIDIA H200 (7 November 2026, results/spline-w-h200-20261107): MD step b/a 0.9838 / 0.9848 on top of SPLINE_W
