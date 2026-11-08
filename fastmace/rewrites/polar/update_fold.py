@@ -184,6 +184,43 @@ def revert(model):
     return names
 
 
+def _rebuild(module, ref):
+    """A float64 copy of ``ref`` (MACE's block) with the rewrites ``module`` carries: uvu, the dead-degree pruning,
+    this fold and the head composition (the tensor products' own check is uvu's)."""
+    import torch
+
+    from fastmace.rewrites.polar import head_compose, head_liveness, uvu
+
+    holder = torch.nn.Module()
+    holder.block = copy.deepcopy(ref)
+    for _, tp in uvu._targets(holder):
+        tp.forward = types.MethodType(uvu.uvu_forward, tp)
+        setattr(tp, uvu.MARKER, True)
+    if module.__dict__.get(head_liveness.MARKER):
+        head_liveness.apply(holder, fold=True)
+    apply(holder)
+    if module.__dict__.get(head_compose.MARKER):
+        head_compose.apply(holder)
+    return holder.block
+
+
+def _constants_mismatch(module, rebuilt):
+    """None when ``module``'s fold constants are ``rebuilt``'s (float64) rounded to their dtype, else (relative
+    error, reason)."""
+    import torch
+
+    for key in _BUFFERS:
+        installed, exact = getattr(module, key).detach().cpu(), getattr(rebuilt, key)
+        if installed.shape != exact.shape:
+            return math.inf, f"{key} has shape {tuple(installed.shape)}, the rebuild {tuple(exact.shape)}"
+        eps = torch.finfo(installed.dtype).eps
+        scale = float(exact.abs().max()) or 1.0
+        error = float((installed.double() - exact).abs().max()) / scale
+        if error > 8 * eps:  # rounded once; the species table may come from cuEq's own float32 evaluation
+            return error, f"{key}: relative error {error:.3g} against its float64 rebuild ({installed.dtype})"
+    return None
+
+
 def selfcheck(original, rewritten, threshold, atoms=7, seed=0):
     """Each folded block of ``rewritten`` against the matching block of ``original`` (MACE's forward), in float64
     on random one-hot species, node, potential and charge features. Returns (worst relative error, blocks checked,
@@ -201,8 +238,16 @@ def selfcheck(original, rewritten, threshold, atoms=7, seed=0):
             return math.inf, checked, [f"{name}: no unfolded block in the original"]
         # Both blocks run on the CPU in float64: the original may sit on another device than the rewritten copy, and
         # a float64 copy of a cuEquivariance block takes its naive path, whose folded constants stay on the CPU.
-        test = copy.deepcopy(module).cpu().double()
+        # The fold's algebra is checked on a float64 rebuild of the block (the rewrites ``module`` carries, applied
+        # to the original's weights), since a float32 model's constants are rounded to float32 once; the installed
+        # constants must then equal that rebuild's, rounded to their dtype.
         ref = copy.deepcopy(reference).cpu().double()
+        test = _rebuild(module, ref)
+        mismatch = _constants_mismatch(module, test)
+        if mismatch is not None:
+            error, reason = mismatch
+            detail.append(f"{name} (update MLP folded): {reason}")
+            worst = max(worst, error)
         species = module.node_attrs_irreps.dim
         node_attrs = torch.nn.functional.one_hot(
             torch.randint(species, (atoms,), generator=generator), species).double()

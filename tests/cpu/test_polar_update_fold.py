@@ -140,3 +140,20 @@ def test_the_selfcheck_passes_and_catches_a_wrong_fold():
     worst, checked, detail = update_fold.selfcheck(holder, folded, 1e-10)
     assert worst > 1e-4 and "relative error" in detail[0]
     assert update_fold.selfcheck(folded, folded, 1e-10)[0] == float("inf")  # the original must be unfolded
+
+
+def test_the_selfcheck_holds_a_float32_fold_to_float64_algebra():
+    # A float32 model's fold constants are rounded to float32 once; the check rebuilds the fold in float64 from the
+    # original's weights and requires the installed constants to be that rebuild's, rounded (job 4b, 8 Nov 2026:
+    # 5.6e-08 > 1e-10 on POLAR-1-S, a float32 production build).
+    holder = torch.nn.Module()
+    holder.block = _block(2).float()
+    folded = copy.deepcopy(holder)
+    update_fold.apply(folded)
+    assert folded.block._fold_out.dtype == torch.float32
+    worst, checked, detail = update_fold.selfcheck(holder, folded, 1e-10)
+    assert checked == 1 and worst <= 1e-12 and detail == []
+    with torch.no_grad():
+        folded.block._fold_first_bias.add_(1e-3)
+    worst, _, detail = update_fold.selfcheck(holder, folded, 1e-10)
+    assert worst > 1e-5 and "relative error" in detail[0]
