@@ -79,7 +79,8 @@ def test_composed_is_float64_then_cast():
 
 def test_on_for_the_listed_gpus_only():
     assert compose_skip.COMPOSE_SKIP is None and compose_skip.compose_skip_default("NVIDIA H200")
-    assert not compose_skip.compose_skip_default("NVIDIA A100-SXM4-80GB")
+    assert compose_skip.compose_skip_default("NVIDIA A100-SXM4-80GB")  # A100 family, 8 November 2026
+    assert compose_skip.compose_skip_default("NVIDIA A100 80GB PCIe")
     assert not compose_skip.compose_skip_default("NVIDIA GeForce RTX 5060 Ti")
 
 
@@ -94,7 +95,7 @@ def _composing(seed=0):
 
 def test_fast_is_on_for_the_listed_gpus_only():
     assert compose_skip.COMPOSE_FAST is None and compose_skip.compose_fast_default("NVIDIA H200")
-    assert not compose_skip.compose_fast_default("NVIDIA A100-SXM4-80GB")
+    assert compose_skip.compose_fast_default("NVIDIA A100-SXM4-80GB")  # A100 family, 8 November 2026
     assert not compose_skip.compose_fast_default("NVIDIA GeForce RTX 5060 Ti")
 
 
@@ -197,6 +198,6 @@ def test_counting_plan_compiles_to_the_same_order():
     assert torch.equal(order, species_plan(index, 3)[0]) and torch.equal(counts, species_plan(index, 3)[1])
 
 
-def test_count_plan_is_on_for_the_h200_only():
+def test_count_plan_is_on_for_the_h200_and_the_a100():
     assert compose_skip.COUNT_PLAN is None and compose_skip.count_plan_default("NVIDIA H200")
-    assert not compose_skip.count_plan_default("NVIDIA A100-SXM4-80GB")
+    assert compose_skip.count_plan_default("NVIDIA A100-SXM4-80GB")  # A100 family, 8 November 2026

@@ -26,7 +26,10 @@ from fastmace.kernels.gpu_models import GPUModels
 COMPOSE_SKIP = None
 # NVIDIA H200 (7 November 2026, results/h200-compose-quads-20261107): MD step b/a 0.9698 / 0.9738 against the H200
 # defaults (OMAT-0 medium, SrTiO3 10x10x10, Benchmark_loup settings, ab / ba), force/stress gate passes (decision 66).
-COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): MD step b/a 0.8027 / 0.9546 against the A100 defaults; off again from all ten H200
+# switches (with COMPOSE_FAST, COUNT_PLAN) loses; gate passes.
+COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 # The fast path of ``COMPOSE_SKIP`` (h200-fastpath, bitwise): the composed weights once per species table
@@ -36,14 +39,18 @@ COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200",))
 COMPOSE_FAST = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9614 / 0.9656 against the H200 defaults (OMAT-0 medium,
 # SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's run-to-run spread (decision 66).
-COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0240 / 1.0235 (b = off).
+COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # COUNT_PLAN (8 November 2026, round 3; bitwise): COMPOSE_SKIP's species plan by a counting sort (one-hot prefix
 # sums) instead of an int64 radix sort per force call (8 onesweep passes and 10 memsets, ~57 us on the H200). The
 # order is the same stable order. None: on for COUNT_PLAN_GPUS; True / False: an A/B side's choice.
 COUNT_PLAN = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108, round 3): MD step b/a 0.9831 / 0.9818 against the
 # H200 defaults of round 2 (ab / ba); bitwise (the same order), faster in both orders (decision 66).
-COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
+# Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0115 / 1.0130 (b = off).
+COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
 def compose_fast_default(name=None) -> bool:
