@@ -64,8 +64,16 @@ Each switch on its own and both together, against the A100 defaults of 59c1034e.
 `BLOCK_ORDER` is bitwise and faster in both orders, so it is adopted under decision 66:
 `BLOCK_ORDER_GPUS = ("NVIDIA H200", "NVIDIA A100-SXM4-80GB")`.
 
-`SORT_BY_LENGTH` changes rounding, so it still needs the A100 force/stress gate before adoption.
+`SORT_BY_LENGTH` changes rounding, so it needed the A100 force/stress gate before adoption.
 
-## Open
+**A100 gate** (`a100/gate-sorted/`, Alex job 4967026, 9 November). The run used `tools/force_stress_gate.py` with
+production running `SORT_BY_LENGTH` and `BLOCK_ORDER`, the H200 gate's structures and seed 20261015, source
+59c1034e. All three structures pass. Ratios are against the float32 yardstick, limit 3:
 
-A100: a `SORT_BY_LENGTH` gate run on Alex.
+| | SrTiO3 | NaCl | NbCl5 |
+| --- | --- | --- | --- |
+| forces | 0.92 | 0.93 | 0.96 |
+| stress | 0.64 | 1.02 | 1.15 |
+
+Energy is under its 0.01 eV floor. Adopted under decision 66: `SORT_BY_LENGTH_GPUS` now includes the A100 family.
+The A100 step with both switches on is 0.9920 / 0.9904 (7.39 → 7.33 ms).
