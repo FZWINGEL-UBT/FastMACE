@@ -39,6 +39,7 @@ in the model's dtype (SPEC §6.4).
 
 from __future__ import annotations
 
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.model.capabilities import FACTORED_INTERACTIONS
 from fastmace.rewrites.registry import Rewrite, Support, check_tensors
 
@@ -410,6 +411,23 @@ def _product_selfcheck(original, rewritten, context):
 # NbCl5 0.954 / 0.956; Ada SrTiO3 0.954 / 0.955, NbCl5 0.920 / 0.920; force gates pass (the A100's NbCl5 stress
 # exception unchanged). False: the round-5 fold alone.
 FOLD_FIRST_DENSITY_LINEAR = True
+# OPT-T08 C2 for the generic family (h200-fastpath round, Codex H200 report item 4; ledger lin-t08-generic): with the
+# generic fold, also fold the last readout's first (scalar) linear layer into the last product's linear and the last
+# interaction's species skip (``modules.compose`` and ``modules.compose_skip_linear``), the readout's layer left as the
+# identity. Products of 128 output columns become 16 (OMAT-0 medium). Rounding, as the fold. None: on for
+# GENERIC_FOLD_READOUT_TAIL_GPUS (decision 66); True / False: an A/B side's choice.
+GENERIC_FOLD_READOUT_TAIL = None
+# NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108): MD step b/a 0.9855 / 0.9901 (ab / ba); force/stress gate passes (force
+# ratios 0.848 / 0.920 / 0.968, stress 0.437 / 0.824 / 1.043; decision 66).
+GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200",))
+
+
+def generic_fold_readout_tail_default(name=None) -> bool:
+    """``GENERIC_FOLD_READOUT_TAIL`` (None: ``name`` in ``GENERIC_FOLD_READOUT_TAIL_GPUS``)."""
+    on = GENERIC_FOLD_READOUT_TAIL
+    if on is None:
+        on = name in GENERIC_FOLD_READOUT_TAIL_GPUS
+    return bool(on)
 
 
 def _generic_product_support(model):
@@ -472,7 +490,63 @@ def fold_generic_product(model):
             first.skip_tp = m.compose_species_skip(first.linear, first.skip_tp)
             first.linear = torch.nn.Identity()
             names += ["interactions.0.linear", "interactions.0.skip_tp"]
+        names += _fold_generic_tail(model, m)
     return ["products.0.linear", *names]
+
+
+def _generic_tail_applies(model):
+    """The readout-tail fold's conditions on a generic model (after the generic fold): the last readout reads only
+    the last layer, its first layer is a scalar block linear, and the last layer is ``products[-1].linear(..)`` plus
+    the last interaction's species skip (or no skip term)."""
+    from fastmace.model.capabilities import GENERIC_INTERACTIONS
+    from fastmace.rewrites.generic.modules import SpeciesSkip
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    interactions, products, readouts = model.interactions, model.products, model.readouts
+    if len(interactions) < 2 or len(readouts) != len(interactions):
+        return None
+    if type(readouts[-1]).__name__ not in ("NonLinearReadoutBlock", "LinearReadoutBlock"):
+        return None
+    attribute, layer = _readout_first(readouts[-1])
+    product = getattr(products[-1], "linear", None)
+    if not isinstance(layer, BlockLinear) or not isinstance(product, BlockLinear):
+        return None
+    if any(d != 1 for _, _, d in (*layer.segments_in, *layer.segments_out)):
+        return None
+    kind = GENERIC_INTERACTIONS.get(type(interactions[-1]).__name__)
+    skip = getattr(interactions[-1], "skip_tp", None)
+    adds_skip = kind != "density" and getattr(products[-1], "use_sc", True)
+    if kind is None or (adds_skip and not isinstance(skip, SpeciesSkip)):
+        return None
+    return attribute, layer, product, (skip if adds_skip else None)
+
+
+def _fold_generic_tail(model, m):
+    """GENERIC_FOLD_READOUT_TAIL: the last readout's first linear folded into the last product's linear and the last
+    species skip; the replaced names (none where it is off or does not apply)."""
+    import torch
+
+    found = _generic_tail_applies(model)
+    if found is None:
+        return []
+    attribute, layer, product, skip = found
+    device = layer.weight_0.device
+    on = GENERIC_FOLD_READOUT_TAIL
+    if on is None:  # the listed GPUs only; an explicit True folds on any device (tests, A/B)
+        on = device.type == "cuda" and generic_fold_readout_tail_default(torch.cuda.get_device_name(device))
+    if not on:
+        return []
+    index = len(model.interactions) - 1
+    folded = m.compose(product, layer)
+    folded.grouped_launch, folded.sms = product.grouped_launch, product.sms
+    model.products[-1].linear = folded
+    names = [f"products.{index}.linear"]
+    if skip is not None:
+        model.interactions[-1].skip_tp = m.compose_skip_linear(skip, layer)
+        names.append(f"interactions.{index}.skip_tp")
+    setattr(model.readouts[-1], attribute, torch.nn.Identity())
+    names.append(f"readouts.{len(model.readouts) - 1}.{attribute}")
+    return names
 
 
 def _generic_product_selfcheck(original, rewritten, context):
@@ -491,11 +565,20 @@ def _generic_product_selfcheck(original, rewritten, context):
         if not isinstance(module, (BlockLinear, SpeciesSkip)) or not isinstance(pair, tuple) or len(pair) != 2:
             continue
         product, consumer = pair
-        weight = product.weight_0
+        weight = product.w0 if isinstance(product, SpeciesSkip) else product.weight_0
         dtype = dtype or weight.dtype
-        x = torch.randn((_PROBE_ROWS, _width(product.segments_in)), generator=generator, dtype=torch.float64)
+        width = (sum(dim for _, _, dim in product.segments_in) if isinstance(product, SpeciesSkip)
+                 else _width(product.segments_in))
+        x = torch.randn((_PROBE_ROWS, width), generator=generator, dtype=torch.float64)
         x = x.to(device=weight.device, dtype=weight.dtype).requires_grad_()
-        if isinstance(module, SpeciesSkip):
+        if isinstance(product, SpeciesSkip):  # GENERIC_FOLD_READOUT_TAIL: consumer(skip(x, attrs))
+            attrs = _probe_attrs(rewritten, context, generator)
+            attrs = attrs[torch.arange(_PROBE_ROWS, device=attrs.device) % attrs.shape[0]]
+            out_width = sum(dim for _, _, dim in module.segments_out)
+            grad = torch.randn((_PROBE_ROWS, out_width), generator=generator, dtype=torch.float64).to(x)
+            expected = _values_and_gradients(lambda a, c=consumer, p=product: c(p(a, attrs)), (x,), grad)
+            got = _values_and_gradients(lambda a, f=module: f(a, attrs), (x,), grad)
+        elif isinstance(module, SpeciesSkip):
             attrs = _probe_attrs(rewritten, context, generator)
             attrs = attrs[torch.arange(_PROBE_ROWS, device=attrs.device) % attrs.shape[0]]
             out_width = sum(dim for _, _, dim in module.segments_out)
