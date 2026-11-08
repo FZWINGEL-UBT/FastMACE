@@ -3,9 +3,11 @@ True`` (polar-megakernel, 7 November 2026).
 
 Built offline into one cubin per compute capability (``tools/build_kspace_megakernel.sh``; the build record is
 ``kspace_megakernel.build.txt``) and loaded with the CUDA driver API, like ``fastmace.kernels.cutlass.tf32x3``.
-Each entry is a persistent kernel with grid barriers: its grid is the device's resident blocks (the occupancy of
-that entry times the SMs), the same for every launch of the entry, with one arrival counter per entry and device
-(never reset: each barrier waits for the next multiple of the grid). ``field_forward`` / ``field_backward`` give
+Each entry is a persistent kernel with grid barriers: its grid is at most the device's resident blocks (the
+occupancy of that entry times the SMs), fewer when the sums have too little work to give every block
+``ITEMS_PER_BLOCK`` items of at least ``MIN_CHUNK_STEPS`` steps per warp (``_plan``: small structures pay fewer
+barrier arrivals and partial sums), with one arrival counter per entry, grid and device (never reset: each barrier
+waits for the next multiple of the grid). ``field_forward`` / ``field_backward`` give
 the same results as ``kspace_megakernel.kspace_field_forward`` / ``_backward`` (rounding); ``structure_factor``
 gives ``fourier.structure_factor``'s ``(Yc, Ys)`` with its own backward. Shapes the cubin has no entry for, other
 dtypes and devices: ``supports`` is False and the callers take their other path.
@@ -26,7 +28,8 @@ FIELDS = {(1, 4, 8), (2, 4, 8)}  # (C, J, F) with entries
 SF_WIDTHS = {1, 2, 4, 8, 16}
 S0 = 2.0 / (2.0 * math.pi) ** 3
 MAX_BLOCKS_PER_SM = 4
-ITEMS_PER_BLOCK = 2  # work items per resident block (each sum is split until it has this many)
+ITEMS_PER_BLOCK = 2  # work items per block (each sum is split until it has this many)
+MIN_CHUNK_STEPS = 4  # a chunk gives each warp of an item at least this many loop steps
 _KERNELS: dict = {}  # device index -> _Kernels
 
 
@@ -55,7 +58,8 @@ class _Kernels:
             _check(driver.cuMemcpyDtoH(info, pointer, size))
         self.threads, self.rows, self.warps = (int(v) for v in info[:3])
         self.sms = torch.cuda.get_device_properties(index).multi_processor_count
-        self.entries = {}  # name -> (function, grid, counter)
+        self.entries = {}  # name -> (function, resident grid)
+        self.counters = {}  # (name, grid) -> arrival counter
 
     def entry(self, name):
         if name not in self.entries:
@@ -66,16 +70,17 @@ class _Kernels:
             per_sm = _check(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(function, self.threads, 0))
             if per_sm < 1:
                 raise RuntimeError(f"{name}: no block fits on an SM")
-            grid = self.sms * min(int(per_sm), MAX_BLOCKS_PER_SM)
-            counter = torch.zeros(1, dtype=torch.int64, device=f"cuda:{self.index}")
-            self.entries[name] = (function, grid, counter)
+            self.entries[name] = (function, self.sms * min(int(per_sm), MAX_BLOCKS_PER_SM))
         return self.entries[name]
 
     def grid(self, name):
         return self.entry(name)[1]
 
-    def counter(self, name):
-        return self.entry(name)[2]
+    def counter(self, name, grid):
+        """The arrival counter of ``name`` launched with ``grid`` blocks: its count stays a multiple of the grid."""
+        if (name, grid) not in self.counters:
+            self.counters[(name, grid)] = torch.zeros(1, dtype=torch.int64, device=f"cuda:{self.index}")
+        return self.counters[(name, grid)]
 
 
 def _kernels(index):
@@ -114,21 +119,31 @@ def supports_sf(*tensors, width) -> bool:
             and available(tensors[0].device))
 
 
-def _splits(tiles, length, grid, warps):
+def _splits(tiles, length, grid, min_chunk):
     """(splits, chunk) of ``length`` so that ``tiles * splits`` is at least ``ITEMS_PER_BLOCK`` items per block,
-    with at least ``warps`` entries per chunk; a function of the shapes and the grid only (deterministic)."""
+    with at least ``min_chunk`` entries per chunk; a function of the shapes and the grid only (deterministic)."""
     splits = max(1, -(-ITEMS_PER_BLOCK * grid // max(tiles, 1)))
-    splits = min(splits, max(1, -(-length // warps)))
+    splits = min(splits, max(1, length // min_chunk))
     chunk = -(-length // splits)
     return -(-length // chunk), chunk
+
+
+def _plan(kernels, name, *sums):
+    """``(grid, [(splits, chunk), ...])`` for the pair sums ``(tiles, length)`` of one launch: the resident grid,
+    or fewer blocks when the largest sum has fewer than ``ITEMS_PER_BLOCK`` items of ``MIN_CHUNK_STEPS`` steps per
+    warp for each of them."""
+    min_chunk = MIN_CHUNK_STEPS * kernels.warps
+    items = max(tiles * max(1, length // min_chunk) for tiles, length in sums)
+    grid = max(1, min(kernels.grid(name), -(-items // ITEMS_PER_BLOCK)))
+    return grid, [_splits(tiles, length, grid, min_chunk) for tiles, length in sums]
 
 
 _P, _I, _F = ctypes.c_void_p, ctypes.c_int, ctypes.c_float
 
 
-def _launch(kernels, name, pointers, ints, s0, device):
+def _launch(kernels, name, grid, pointers, ints, s0, device):
     values = tuple(t.data_ptr() if isinstance(t, torch.Tensor) else t for t in pointers)
-    values += (kernels.counter(name).data_ptr(),) + tuple(ints)
+    values += (kernels.counter(name, grid).data_ptr(),) + tuple(ints)
     types = (_P,) * (len(pointers) + 1) + (_I,) * len(ints)
     if s0 is not None:
         values += (s0,)
@@ -136,7 +151,7 @@ def _launch(kernels, name, pointers, ints, s0, device):
     from cuda.bindings import driver
 
     from fastmace.kernels.oeq_streaming.runtime import _check
-    function, grid, _ = kernels.entry(name)
+    function = kernels.entry(name)[0]
     current = _check(driver.cuCtxGetCurrent())
     if int(current) != int(kernels.context):
         _check(driver.cuCtxSetCurrent(kernels.context))
@@ -149,16 +164,14 @@ def field_forward(k, r, mask, x, dr, di, w, pr, pi):
     K, N, C, J, F = k.shape[0], r.shape[0], x.shape[1], x.shape[2], pr.shape[1]
     kernels = _kernels(_index(k.device))
     name = f"fm_kspace_field_forward_{C}_{J}_{F}"
-    grid = kernels.grid(name)
-    s1, c1 = _splits(-(-K // kernels.rows), N, grid, kernels.warps)
-    s2, c2 = _splits(-(-N // kernels.rows), K, grid, kernels.warps)
+    grid, ((s1, c1), (s2, c2)) = _plan(kernels, name, (-(-K // kernels.rows), N), (-(-N // kernels.rows), K))
     out = r.new_empty((N, C, F))
     yc, ys = k.new_empty((K, C, J)), k.new_empty((K, C, J))
     a, b = k.new_empty((K, C, F)), k.new_empty((K, C, F))
     part1 = k.new_empty((s1, K, 2 * C * J))
     part2 = k.new_empty((s2, N, C * F))
     args = [t.contiguous() for t in (k, r, mask, x, dr, di, w, pr, pi)]
-    _launch(kernels, name, args + [out, yc, ys, a, b, part1, part2], (K, N, s1, c1, s2, c2), S0, k.device)
+    _launch(kernels, name, grid, args + [out, yc, ys, a, b, part1, part2], (K, N, s1, c1, s2, c2), S0, k.device)
     return out, yc, ys, a, b
 
 
@@ -167,10 +180,8 @@ def field_backward(k, r, mask, x, g, yc, ys, a, b, dr, di, w, pr, pi, factors, g
     K, N, C, J, F = k.shape[0], r.shape[0], x.shape[1], x.shape[2], pr.shape[1]
     kernels = _kernels(_index(k.device))
     name = f"fm_kspace_field_backward_{C}_{J}_{F}_{int(factors)}{int(grad_k)}"
-    grid = kernels.grid(name)
-    s1, c1 = _splits(-(-K // kernels.rows), N, grid, kernels.warps)
     tiles = -(-N // kernels.rows)
-    s2, c2 = _splits(tiles, K, grid, kernels.warps)
+    grid, ((s1, c1), (s2, c2)) = _plan(kernels, name, (-(-K // kernels.rows), N), (tiles, K))
     dyc, dys = k.new_empty((K, C, J)), k.new_empty((K, C, J))
     part1 = k.new_empty((s1, K, 2 * C * F))
     part2 = k.new_empty((s2, N, C * J + 3))
@@ -183,8 +194,8 @@ def field_backward(k, r, mask, x, g, yc, ys, a, b, dr, di, w, pr, pi, factors, g
     else:
         ddr, ddi, dpr, dpi, dw = (k.new_empty((1,)) for _ in range(5))
     args = [t.contiguous() for t in (k, r, mask, x, g, yc, ys, a, b, dr, di, w, pr, pi)]
-    _launch(kernels, name, args + [dyc, dys, part1, part2, gk_part, dk if grad_k else gk_part, gr, dx, ddr, ddi, dw,
-                                   dpr, dpi], (K, N, s1, c1, s2, c2), S0, k.device)
+    outputs = [dyc, dys, part1, part2, gk_part, dk if grad_k else gk_part, gr, dx, ddr, ddi, dw, dpr, dpi]
+    _launch(kernels, name, grid, args + outputs, (K, N, s1, c1, s2, c2), S0, k.device)
     if factors:
         return dk, gr, dx, ddr, ddi, dw, dpr, dpi
     return (dk, gr, dx, *(k.new_empty((0,)) for _ in range(5)))
@@ -215,10 +226,10 @@ def sf_forward(k: torch.Tensor, r: torch.Tensor, mask: torch.Tensor,
         return tuple(t.contiguous() for t in _dense_sf(k, r, mask, x))
     kernels = _kernels(_index(k.device))
     name = f"fm_kspace_sf_forward_{W}"
-    s1, c1 = _splits(-(-K // kernels.rows), N, kernels.grid(name), kernels.warps)
+    grid, ((s1, c1),) = _plan(kernels, name, (-(-K // kernels.rows), N))
     yc, ys = k.new_empty((K, W)), k.new_empty((K, W))
     part1 = k.new_empty((s1, K, 2 * W))
-    _launch(kernels, name, [t.contiguous() for t in (k, r, mask, x)] + [yc, ys, part1], (K, N, s1, c1), None,
+    _launch(kernels, name, grid, [t.contiguous() for t in (k, r, mask, x)] + [yc, ys, part1], (K, N, s1, c1), None,
             k.device)
     return yc, ys
 
@@ -239,12 +250,12 @@ def sf_backward(k: torch.Tensor, r: torch.Tensor, x: torch.Tensor, dyc: torch.Te
     kernels = _kernels(_index(k.device))
     name = f"fm_kspace_sf_backward_{W}_{int(grad_k)}"
     tiles = -(-N // kernels.rows)
-    s2, c2 = _splits(tiles, K, kernels.grid(name), kernels.warps)
+    grid, ((s2, c2),) = _plan(kernels, name, (tiles, K))
     dx, gr = r.new_empty((N, W)), r.new_empty((N, 3))
     dk = k.new_empty((K, 3) if grad_k else (0,))
     part2 = k.new_empty((s2, N, W + 3))
     gk_part = k.new_empty((tiles, K, 3) if grad_k else (1,))
-    _launch(kernels, name, [t.contiguous() for t in (k, r, x, dyc, dys)] + [dx, gr, dk if grad_k else gk_part,
+    _launch(kernels, name, grid, [t.contiguous() for t in (k, r, x, dyc, dys)] + [dx, gr, dk if grad_k else gk_part,
                                                                             part2, gk_part],
             (K, N, s2, c2), None, k.device)
     return dk, gr, dx
