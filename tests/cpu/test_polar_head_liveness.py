@@ -19,6 +19,14 @@ import test_polar_head_compose as compose_test  # noqa: E402
 from fastmace.rewrites.polar import head_compose, head_liveness, update_fold, uvu  # noqa: E402
 
 LAYOUTS = ["mul_ir", "ir_mul"]
+SHIPPED = head_liveness.PRUNE_DEAD_DEGREES  # the default, before the fixture below pins it
+
+
+@pytest.fixture(autouse=True)
+def _plain_uvu(monkeypatch):
+    """uvu.apply alone: no pruning and no fold unless a test asks (both are on by default)."""
+    monkeypatch.setattr(head_liveness, "PRUNE_DEAD_DEGREES", False)
+    monkeypatch.setattr(update_fold, "FOLD_UPDATE", False)
 
 
 def _check_close(block, rewritten, rtol=1e-11):
@@ -29,8 +37,8 @@ def _check_close(block, rewritten, rtol=1e-11):
     return got
 
 
-def test_the_constant_is_off():
-    assert head_liveness.PRUNE_DEAD_DEGREES is False
+def test_the_constant_is_on():
+    assert SHIPPED is True
 
 
 @pytest.mark.parametrize("layout", LAYOUTS)
@@ -108,3 +116,18 @@ def test_a_replaced_readout_linear_proves_nothing():
     block = compose_test._update(2)
     block.readout.linear_1 = torch.nn.Sequential(block.readout.linear_1)  # no instructions to read
     assert head_liveness.dead_output_paths(block) == []
+
+
+def test_uvu_revert_undoes_the_pruning(monkeypatch):
+    holder = torch.nn.Module()
+    holder.update, holder.readout = compose_test._update(2), compose_test._readout(2)
+    monkeypatch.setattr(update_fold, "FOLD_UPDATE", True)
+    monkeypatch.setattr(head_liveness, "PRUNE_DEAD_DEGREES", True)
+    pruned = copy.deepcopy(holder)
+    names = uvu.apply(pruned)
+    assert "readout (dead degrees pruned)" in names
+    assert uvu.revert(pruned) == names
+    for module in (pruned.update, pruned.readout):
+        assert not getattr(module, head_liveness.MARKER, False) and "forward" not in module.__dict__
+        assert not any(hasattr(module, a) for a in ("_live_out_meta", "_live_q_meta", "_live_v_meta"))
+    _check_close(holder.update, pruned.update)

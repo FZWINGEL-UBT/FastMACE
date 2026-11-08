@@ -115,9 +115,11 @@ def revert(model):
         if module.__dict__.pop("forward", None) is not None:
             names.append(name)
         module.__dict__.pop(MARKER, None)
-    from fastmace.rewrites.polar import update_fold
+    from fastmace.rewrites.polar import head_liveness, update_fold
 
-    names += [f"{name} (update MLP folded)" for name in update_fold.revert(model)]
+    folded = update_fold.revert(model)
+    names += [f"{name} (dead degrees pruned)" for name in head_liveness.revert(model)]  # apply's order
+    names += [f"{name} (update MLP folded)" for name in folded]
     return names
 
 

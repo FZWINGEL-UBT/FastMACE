@@ -25,9 +25,11 @@ import hashlib
 import inspect
 import types
 
-# PRUNE_DEAD_DEGREES: True prunes every supported POLAR head when polar_uvu is applied (an A/B side's choice; pure
-# work removal, decision 66).
-PRUNE_DEAD_DEGREES = False
+# PRUNE_DEAD_DEGREES: True prunes every supported POLAR head when polar_uvu is applied. Default on (polar-megakernel,
+# 8 November 2026) under the pure-removal rule (decision 66): MD step b/a, abab / abba, POLAR-1-L, RTX 4000 Ada
+# NaCl 0.974 / 0.973, NbCl5 1.000 / 1.001; RTX 5060 Ti NaCl 0.979; tools/force_stress_gate.py passes on L NaCl (Ada
+# and A4000; L's NbCl5 float64 reference does not fit 20 GB). S and M have nothing dead. False: the whole heads.
+PRUNE_DEAD_DEGREES = True
 UPDATE_CLASS = "AgnosticEmbeddedOneBodyVariableUpdate"
 READOUT_CLASS = "OneBodyMLPFieldReadout"
 UPDATE_READOUT_CLASS = "GeneralNonLinearBiasReadoutBlock"
@@ -141,4 +143,18 @@ def apply(model, context=None, fold=None):
     return names
 
 
-__all__ = ["PRUNE_DEAD_DEGREES", "SOURCE_HASHES", "apply", "dead_input_paths", "dead_output_paths"]
+def revert(model):
+    """Undo ``apply``: the heads run every path again (the readouts their class forward); returns the module names.
+    Revert the fold first (``uvu.revert``): a folded update reads ``_live_out_meta``."""
+    names = []
+    for name, module in model.named_modules():
+        if not module.__dict__.pop(MARKER, None):
+            continue
+        for attribute in ("_live_out_meta", "_live_q_meta", "_live_v_meta"):
+            module.__dict__.pop(attribute, None)
+        module.__dict__.pop("forward", None)
+        names.append(name)
+    return names
+
+
+__all__ = ["PRUNE_DEAD_DEGREES", "SOURCE_HASHES", "apply", "dead_input_paths", "dead_output_paths", "revert"]
