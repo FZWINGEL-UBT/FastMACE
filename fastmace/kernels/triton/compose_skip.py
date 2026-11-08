@@ -29,7 +29,10 @@ COMPOSE_SKIP = None
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): MD step b/a 0.8027 / 0.9546 against the A100 defaults; off again from all ten H200
 # switches (with COMPOSE_FAST, COUNT_PLAN) loses; gate passes.
-COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): routed inside tf32x3_gemms (rewrites.precision),
+# which planner.fixed.DECISION_66_TF32X3_OMAT0_GPUS turns on there with it; off again from the Ada set 1.0572 /
+# 1.0585 (b = off, tf32x3 kept); tf32x3 and the compose group off again 1.0117 / 1.0124; gate passes.
+COMPOSE_SKIP_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 
 
 # The fast path of ``COMPOSE_SKIP`` (h200-fastpath, bitwise): the composed weights once per species table
@@ -41,7 +44,8 @@ COMPOSE_FAST = None
 # SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's run-to-run spread (decision 66).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0240 / 1.0235 (b = off).
-COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set 1.0105 / 1.0104.
+COMPOSE_FAST_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 # COUNT_PLAN (8 November 2026, round 3; bitwise): COMPOSE_SKIP's species plan by a counting sort (one-hot prefix
 # sums) instead of an int64 radix sort per force call (8 onesweep passes and 10 memsets, ~57 us on the H200). The
 # order is the same stable order. None: on for COUNT_PLAN_GPUS; True / False: an A/B side's choice.
@@ -50,6 +54,7 @@ COUNT_PLAN = None
 # H200 defaults of round 2 (ab / ba); bitwise (the same order), faster in both orders (decision 66).
 # A100 family (8 November 2026, results/a100-omat0-best-20261108, NHR Alex A100-SXM4-80GB; OMAT-0 medium,
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0115 / 1.0130 (b = off).
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set 1.0000 / 1.0004, a tie: off.
 COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # JOINED_LAYOUT (Codex H200 round-6 report, 8 November 2026; bitwise): with COMPOSE_FAST the tabled outer sum writes
 # the per-slot sums d-major (its ``inner`` layout with the slots of a receiver as one group), so each path's input is
@@ -59,6 +64,7 @@ COUNT_PLAN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 JOINED_LAYOUT = None
 # NVIDIA H200 (8 November 2026, results/h200-fastpath-20261108 round 6): MD step b/a 0.9805 / 0.9815 against the H200
 # defaults (OMAT-0 medium, SrTiO3 10x10x10, Benchmark_loup settings, ab / ba); forces within the build's spread.
+# NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set 1.0006 / 0.9986, a tie: off.
 JOINED_LAYOUT_GPUS = GPUModels(("NVIDIA H200",))
 
 
