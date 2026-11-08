@@ -100,6 +100,45 @@ The first gate run (`gate-tailoff/`, the tail fold off) also passed, with a wors
 
 Modal `sixth`: $0.76 for the fixed A/B, then $0.62 and $0.38 for the two gate runs.
 
+## Screen: medium's tuned H200 switches on small (`screen/`, `ec3a0c15`)
+
+Owner: "do you think we could improve omat 0 small specifically?" Every H200 kernel switch was chosen on OMAT-0
+medium. This screen runs 16 single-change A/Bs on small, Benchmark_loup, both build orders
+(`tools/modal/omat0_small_screen.sh`).
+- a is small's defaults, about 2.30 ms per step.
+- b is a with one change, so b/a below 1 means the change is faster on small.
+- All 32 entries are valid. Modal `sixth` cost $1.40.
+
+**Faster on small in both orders** (candidates for small's own values):
+
+| Change (b) | ab | ba | On medium |
+| --- | ---: | ---: | --- |
+| `compose_skip.JOINED_LAYOUT` on | 0.9668 | 0.9610 | 0.9805 / 0.9815, being adopted for the H200 (fastmace/joined-layout) |
+| w′ `STAGE_EDGES` on | 0.9857 | 0.9825 | 0.9969 / 1.0010, a tie (off) |
+| spline forward `R128` off, 128 threads, `MIN_BLOCKS` 8 | 0.9947 | 0.9893 | 1.0515 / 1.0507 with R128's shape (off) |
+| spline forward `R128` off, 128 threads, `MIN_BLOCKS` 7 | 0.9951 | 0.9964 | 1.0097 / 1.0103 (off) |
+| w′ `FOLD_ALPHA` off | 0.9940 | 0.9942 | on (0.9963 / 0.9954) |
+| `tf32x3.TILE` 64x32 | 0.9913 | 0.9971 | 1.0014 / 1.0035 (off) |
+
+**Ties:** `tf32x3.TILE` 32x64 (0.9982 / 0.9985) and `POWER_BACKWARD` off (0.9923 / 0.9997).
+
+**Slower on small, so the current defaults stay:**
+
+| Change (b) | ab | ba |
+| --- | ---: | ---: |
+| `R128` off | 1.0200 | 1.0214 |
+| spline forward `STAGE_EDGES` off | 1.0181 | 1.0263 |
+| `PREFETCH_AHEAD` on | 1.0137 | 1.0241 |
+| `SPLINE_VECTOR` 2 | 1.0318 | 1.0376 |
+| w′ `STAGE_SH` off | 1.0041 | 1.0156 |
+| `STAGE_DOUT` off | 1.1743 | 1.1808 |
+| `COUNT_PLAN` off | 1.0234 | 1.0302 |
+| `COMPOSE_FAST` off | 1.0518 | 1.0524 |
+
+So small's kernels are close to tuned already. Beyond JOINED_LAYOUT (3–4 %), four small-specific settings each gain
+0.5–1.7 %, and they have not been combined yet. Each is a per-GPU module constant today. Giving small its own values
+needs a per-model default in the kernels, and a combined A/B and gate first.
+
 ## Not done
 
 - The A100 family: small keeps the pair off there until an Alex A/B (packed) measures it.
