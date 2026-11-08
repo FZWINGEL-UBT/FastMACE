@@ -38,3 +38,15 @@ below ±5 µs.
 **Verdict: not built (bound).** The ceiling is 61 µs, 1.8 % of the 3.42 ms step. That is above the 1 % stop rule but
 below the 68 µs that a lab has to show. A real grouped GEMM would also add per-tile problem lookup and lose some of
 this, so the realistic gain is about 40–50 µs. The report's 75–110 µs exceeds the ceiling.
+
+## The report's other proposals
+
+These were assessed against the code, the ledger and earlier labs on 9 November. Nothing was built, and each has a
+row in the ledger. Proposal 5, distillation, was set aside by the owner.
+
+| Proposal | Claim | Verdict | Evidence |
+| --- | --- | --- | --- |
+| 1: precomputed locator in w′ | 180–240 µs | Rejected: already measured | Under STAGE_EDGES the locator is computed at staging, not in the edge loop. The band chain is warp-uniform (one edge per warp). The precomputed record is `shared-locator`, H200 0.9966 / 0.9974. The cited SASS file does not exist, and w′ is limited by load latency, not instruction issue. |
+| 2: spatial (Hilbert) slab walking | 110–150 µs | Rejected: already modelled | Morton order moved the 8 Nov L1 model by 0.02–0.04. Sorted edges plus species blocks (0.75) are SORT_BY_LENGTH + BLOCK_ORDER, both default. |
+| 4: interaction-1 outer sum fused with its species GEMM | 45–65 µs | Rejected | The 61 MB intermediate is written at about 0.5 TB/s, so the kernel is not traffic bound. Fusing would give up the CUTLASS GEMM's rate. |
+| 6: interaction 2 every 2 fs | 840–950 µs | Owner decision, not pursued | It changes the dynamics, and as described it is not symplectic. Plain 2 fs Langevin is the simpler test of whether 1 fs is required. |
