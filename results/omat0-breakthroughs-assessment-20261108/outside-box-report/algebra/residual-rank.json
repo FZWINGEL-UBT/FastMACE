@@ -1,0 +1,34 @@
+{
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "torch": "2.14.1+cpu",
+  "cuda_visible_devices": "",
+  "matrix": "interaction 2 radial final layer W",
+  "shape": [
+    1280,
+    64
+  ],
+  "coarse": "float32(float16(W)); residual formed in float64",
+  "residual_rank_relative_1e12": 64,
+  "relative_residual_frobenius_norm": 0.00020811676961975437,
+  "residual_relative_smin": 0.21657231868707164,
+  "residual_tail_frobenius_fraction_by_rank": {
+    "8": 0.7935588519239447,
+    "16": 0.6564448805424826,
+    "32": 0.44672638463891723,
+    "48": 0.2761037950197228,
+    "63": 0.05676638583126063
+  },
+  "rank_for_99percent_residual_squarednorm": 62,
+  "channel_gauge": {
+    "signature_shape": [
+      128,
+      640
+    ],
+    "meaning": "Each channel's coefficients over ten independent radial paths and 64 radial hidden basis functions",
+    "distinct_signature_rows": 128,
+    "minimum_distinct_row_distance_l2": 6.5960941558716835,
+    "min_row_norm": 4.990778861039468,
+    "max_row_norm": 12.920338878887746,
+    "boundary": "Distinct coefficient signatures rule out a fixed dense channel gauge commuting with all coefficient-space diagonal filters. They do not prove every sampled radial function is independent. Diagonal scalings and permutations remain possible, but do not eliminate operations."
+  }
+}
