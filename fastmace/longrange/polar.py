@@ -543,7 +543,7 @@ def pbc_forward_dynamic(self, original, source_feats, cache):
     mask = cache.get("fourier_mask")
     if mask is None or cache.get("correction_mode", CORRECTION_MODE_MIXED) != CORRECTION_MODE_PBC:
         return original(self, source_feats, cache)
-    if megakernel_on(cache["node_positions"]):
+    if cache.get("node_positions") is not None and megakernel_on(cache["node_positions"]):
         n_nodes = source_feats.size(0)
         features = _megakernel_features(cache, source_feats.reshape(n_nodes, 1, -1))
         features_flat = self._permute_output_channels(features.reshape(n_nodes, -1))
@@ -581,7 +581,8 @@ def spin_field_features(descriptor, cache, alpha, beta, pbc):
     )
 
     if (cache.get("mode") != "realspace" and cache.get("correction_mode", CORRECTION_MODE_MIXED) == CORRECTION_MODE_PBC
-            and cache.get("fourier_mask") is not None and megakernel_on(cache["node_positions"])):
+            and cache.get("fourier_mask") is not None and cache.get("node_positions") is not None
+            and megakernel_on(cache["node_positions"])):
         n_nodes = alpha.size(0)
         features = _megakernel_features(cache, torch.stack((alpha, beta), dim=1))  # [atoms, 2 spins, sigma * m]
         features_flat = descriptor._permute_output_channels(features)
