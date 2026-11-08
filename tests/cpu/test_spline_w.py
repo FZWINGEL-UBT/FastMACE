@@ -94,6 +94,21 @@ def test_switch_is_off_without_a_listed_gpu(monkeypatch):
     assert sf.spline_w_default("cpu")
 
 
+def test_wprime_stage_edges_is_on_for_omat0_small_on_the_h200_only(monkeypatch):
+    """w' STAGE_EDGES (9 November 2026): off for medium and every other model (STAGE_EDGES_GPUS empty), on for
+    OMAT-0 small on the H200 (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""
+    monkeypatch.setattr(wp, "_device_name", lambda device: device)
+    assert wp.STAGE_EDGES is None
+    assert wp.stage_edges_default("NVIDIA H200", "omat0-small")
+    for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None),
+                          ("NVIDIA A100-SXM4-80GB", "omat0-small"), (None, "omat0-small")):
+        assert not wp.stage_edges_default(device, label), (device, label)
+    monkeypatch.setattr(wp, "STAGE_EDGES", False)
+    assert not wp.stage_edges_default("NVIDIA H200", "omat0-small")
+    monkeypatch.setattr(wp, "STAGE_EDGES", True)
+    assert wp.stage_edges_default("NVIDIA H200", "omat0-medium")
+
+
 def _schedule():
     from test_wprime_backward import _schedule as schedule
 

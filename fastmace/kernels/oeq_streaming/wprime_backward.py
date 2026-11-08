@@ -26,6 +26,7 @@ gradients are added atomically, as in the vendored backward.
 from __future__ import annotations
 
 import ctypes
+from types import MappingProxyType
 
 import torch
 
@@ -223,6 +224,13 @@ STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # for STAGE_EDGES_GPUS; True / False: an A/B side's choice.
 STAGE_EDGES = None
 STAGE_EDGES_GPUS = GPUModels(())
+# A model label's own GPUs for STAGE_EDGES, instead of STAGE_EDGES_GPUS (the label reaches the kernel through the
+# rewrites' context: WPrime's model_label). OMAT-0 small on the H200 (9 November 2026, results/h200-omat0-small-20261108,
+# Benchmark_loup, ab / ba): alone on small's defaults 0.9857 / 0.9825 (b = on); with JOINED_LAYOUT, removing it from the
+# screen's combined set 0.9913 / 0.9900 against 0.9829 / 0.9850 with it. Medium measured a tie (0.9969 / 1.0010).
+STAGE_EDGES_MODEL_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA H200",)),
+})
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
@@ -1097,7 +1105,8 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False):
+                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False,
+                 model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -1130,7 +1139,7 @@ class WPrimeBackward:
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
         self.stage_edges = (self.stage_dout and bool(self.stage_sh) and self.spline is not None
-                            and not self.shared_locator and stage_edges_default(device))
+                            and not self.shared_locator and stage_edges_default(device, model_label))
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
@@ -1564,9 +1573,12 @@ def stage_sh_default(device):
     return bool(STAGE_SH) if STAGE_SH is not None else _device_name(device) in STAGE_SH_GPUS
 
 
-def stage_edges_default(device):
-    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
-    return bool(STAGE_EDGES) if STAGE_EDGES is not None else _device_name(device) in STAGE_EDGES_GPUS
+def stage_edges_default(device, model_label=None):
+    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_MODEL_GPUS[model_label]``
+    for a listed label and for ``STAGE_EDGES_GPUS`` otherwise."""
+    if STAGE_EDGES is not None:
+        return bool(STAGE_EDGES)
+    return _device_name(device) in STAGE_EDGES_MODEL_GPUS.get(model_label, STAGE_EDGES_GPUS)
 
 
 def stage_quads_default(device):
@@ -1607,8 +1619,9 @@ class WPrime(torch.nn.Module):
     """One interaction's ``wprime_backward``: the derivative table ``G'``, the density's derivative series and
     the compiled kernel, built from its radial table, folded weight and streaming kernels."""
 
-    def __init__(self, table, weight, kernels, generic=False):
+    def __init__(self, table, weight, kernels, generic=False, model_label=None):
         super().__init__()
+        self.model_label = model_label  # the model's label-table label: per-model kernel defaults (STAGE_EDGES)
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
         self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
         self.horner = self.table_w and horner_default(table.coef.device)
@@ -1694,7 +1707,7 @@ class WPrime(torch.nn.Module):
                               self.spline["path_scale"], shared_locator=shared),
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
-                               spline=grid, shared_locator=shared))
+                               spline=grid, shared_locator=shared, model_label=self.model_label))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
