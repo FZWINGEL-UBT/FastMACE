@@ -427,6 +427,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-polar-head-compose](#model-polar-head-compose) | POLAR-1's head projections composed into their l x l -> 0 dot products (P1) | `rewrites.polar.head_compose.COMPOSE_HEADS` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | 5060 Ti NaCl 0.872–0.909, NbCl5 0.997–1.005 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-dead-degrees](#model-polar-dead-degrees) | Dead POLAR head degrees pruned at setup (R5) | `rewrites.polar.head_liveness.PRUNE_DEAD_DEGREES` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | Ada NaCl 0.973–0.974, NbCl5 1.000–1.001; 5060 Ti L NaCl 0.975–0.979 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-phase-recurrence](#model-polar-phase-recurrence) | k-space cosines and sines from per-axis phase tables | `longrange.polar.PHASE_RECURRENCE` | FM | REJECTED (5060 Ti: tie) | polar-megakernel 2026-11-08 | 0.988–1.075 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
+| [model-polar-head-rows](#model-polar-head-rows) | Irrep blocks kept as rows across the POLAR head chain (Codex R3) | none | FM | STOPPED (bound: P1 removed its target) | polar-megakernel 2026-11-08 | M NbCl5 target kernels 1070 µs → 0 with P1 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-small-matmuls](#model-small-matmuls) | Small mm/addmm as an Inductor-fused multiply-sum | `rewrites.inductor.SMALL_MATMULS` | FM | REJECTED | off-polar-alex 2026-11-07 | 5060 Ti POLAR-S NaCl 0.951, NbCl5 1.00; OFF23-small 1.045–1.07 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-shared-geometry](#model-polar-shared-geometry) | One unmasked k-space geometry per POLAR call | `longrange.polar.SHARED_GEOMETRY` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.990–1.006 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-e3nn-block-linear](#model-polar-e3nn-block-linear) | e3nn Linears as BlockLinear on POLAR-1 | `rewrites.linear.E3NN_BLOCK_LINEAR` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.991–1.010 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
@@ -4006,6 +4007,27 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
   through cos and sin.
 - Status: REJECTED (tie). RTX 5060 Ti S NaCl 0.997 / 1.008, NbCl5 1.075 / 0.988; M 0.994 / 0.993, 1.008 / 0.997;
   L 0.992 / 0.988, NbCl5 1.017 (ab). Gate passes. The transcendentals were not the cost on this GPU.
+- Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
+
+<a id="model-polar-head-rows"></a>
+#### model-polar-head-rows: irrep blocks kept as rows across the POLAR head chain (Codex R3)
+- Switch: none (not built)
+- Engine: FM
+- Date/round: 8 November 2026, branch `fastmace/polar-megakernel` (Codex `codex-off-polar-profiles-20261107.md` R3)
+- What: pass degree blocks as channel-contiguous rows through the potential/charge embedding, the update's input
+  dot products and the readout's first projections, to drop the join/transpose copies around them. Codex's envelope
+  on POLAR-1-M NbCl5 (RTX 5060 Ti): four fused copy kernels, 334.6 + 314.3 + 213.3 + 204.6 = 1066.8 µs, to be
+  recomputed after P1.
+- Status: STOPPED at the bound (triage stage 2). Module profiles of POLAR-1-M on the RTX 5060 Ti (local job 5c,
+  `tools/module_profile.py`, mace_cueq_oeq_polar, hybrid, float32, 5e855424 defaults with `COMPOSE_HEADS` off and
+  on): the four target kernels (`..._add_cat_clone_permute_slice_transpose_...` ×2 340 µs,
+  `..._add_clone_slice_transpose_view_46` ×2 326 µs, `..._clone_permute_slice_view_20` ×6 210 µs,
+  `..._add_clone_slice_transpose_view_19` 194 µs) are gone with P1. Pure layout kernels in the whole call drop from
+  2.67 ms (6.4 % of 42.05 ms) to 1.36 ms (3.6 % of 37.35 ms); NaCl 91 µs (2.0 %). The largest left
+  (`add_cat_stack_view_48` 199 µs, `..._add_cat_clone_slice_transpose_view_71` ×3 192 µs, `cat_view_24` 158 µs) are
+  not attributed to the head chain, so a further layout rewrite is a different idea and needs its own bound.
+- Note: the module profile's kernel sum falls 11 % on NbCl5 with P1 while the MD A/B ties (M 0.997 / 1.000); the
+  profile is not the captured MD step, so the A/B decides.
 - Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md).
 
 <a id="model-small-matmuls"></a>
