@@ -70,7 +70,9 @@ def run(mode, switches):
         saved[(module, name)] = getattr(module, name)
         setattr(module, name, value)
     try:
-        tiled = TiledForceField(compiled_field if mode == "compiled" else field, TileConfig(256, mode=mode))
+        # compiled: the receiver budget stays at 256 (it would take the 1,080 atoms in one tile)
+        caps = TileConfig(256, mode=mode, **({"budget_receivers": ()} if mode == "compiled" else {}))
+        tiled = TiledForceField(compiled_field if mode == "compiled" else field, caps)
         tiled.evaluate(atoms, stress=True)  # the first call in a process may round differently
         energy, forces, stress = tiled.evaluate(atoms, stress=True)
         tiles = tiled.last["tiles"]
