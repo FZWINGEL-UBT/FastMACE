@@ -74,14 +74,16 @@ FP64_HELPERS = {  # (to double, to float): real conversions, or free reinterpret
 }
 
 
-def fp64_paths(source, helpers="cvt", min_terms=15):
+def fp64_paths(source, helpers="cvt", min_terms=15, max_paths=None, sums="uv"):
     """Round 2 idea 1 (A100): the FACTORED u / v sums of the paths with at least ``min_terms`` u terms (the two 21-term
     paths) in double, so their multiply-adds run on the FP64 pipe beside the FP32 one: scaled = g * c (DMUL),
     u += scaled e and v += scaled x (DFMA), u and v converted back where read. ``helpers`` "cvt": real conversions
     (each output gradient per term, x and e per use, the sums at the end; more accurate than float32); "free": the
-    conversions replaced by register reinterpretations, the upper bound of a design that stages doubles."""
+    conversions replaced by register reinterpretations, the upper bound of a design that stages doubles.
+    ``max_paths``: only the first that many such paths; ``sums`` "u": only the u sums in double (fewer registers; the
+    v sums and scaled stay float32)."""
     lines = source.split("\n")
-    declare = re.compile(r"acc_t ([uv]_\d+) = acc_t\(0\);")
+    declare = re.compile(r"acc_t ([uv]_\d+) = acc_t\(0\);" if sums == "uv" else r"acc_t (u_\d+) = acc_t\(0\);")
     update = re.compile(r"\b(u_\d+) [+-]= scaled")
     starts = [k for k, line in enumerate(lines) if "acc_t u_0 = acc_t(0);" in line] + [len(lines)]
     chosen = []
@@ -90,6 +92,7 @@ def fp64_paths(source, helpers="cvt", min_terms=15):
             chosen.append((a, b))
     if not chosen:
         raise ValueError("fp64_paths: no path with enough terms")
+    chosen = chosen[:max_paths] if max_paths else chosen
     for a, b in chosen:
         names = set()
         for k in range(a, b):
@@ -98,6 +101,13 @@ def fp64_paths(source, helpers="cvt", min_terms=15):
             if m:
                 names.add(m.group(1))
                 lines[k] = line.replace(m.group(0), f"double {m.group(1)} = 0.0;")
+                continue
+            if sums == "u":
+                line = re.sub(r"\b(u_\d+) ([+-])= scaled \* edge_value;",
+                              r"\1 = fma(\2fm_d(scaled), fm_d(edge_value), \1);", line)
+                for name in names:
+                    line = line.replace(f"* {name};", f"* fm_f({name});")
+                lines[k] = line
                 continue
             line = re.sub(r"const scalar_t scaled = output_gradient \* ([^;]+);",
                           r"const double scaled = fm_d(output_gradient) * (double)(\1);", line)
@@ -108,7 +118,7 @@ def fp64_paths(source, helpers="cvt", min_terms=15):
             for name in names:
                 line = line.replace(f"* {name};", f"* fm_f({name});")
             lines[k] = line
-    source = "\n".join(lines).replace("fma(+scaled", "fma(scaled")
+    source = "\n".join(lines).replace("fma(+scaled", "fma(scaled").replace("fma(+fm_d", "fma(fm_d")
     return _after_constants(source, FP64_HELPERS[helpers]), len(chosen)
 
 
@@ -670,6 +680,13 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "fp64-paths-r96": ("rounding", lambda s: fp64_paths(s, "cvt")[0], ("--maxrregcount=96",)),
         "F-fp64-free-r96": ("falsifier", lambda s: fp64_paths(s, "free")[0], ("--maxrregcount=96",)),
         "F-fp64-free-r80": ("falsifier", lambda s: fp64_paths(s, "free")[0], ("--maxrregcount=80",)),
+        # the smallest offloads: one path, or only the u sums (fewer double registers)
+        "fp64-1path": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1)[0], ()),
+        "fp64-u": ("rounding", lambda s: fp64_paths(s, "cvt", sums="u")[0], ()),
+        "fp64-1path-u": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1, sums="u")[0], ()),
+        "F-fp64-free-1path-u": ("falsifier", lambda s: fp64_paths(s, "free", max_paths=1, sums="u")[0], ()),
+        "fp64-1path-u-r80": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1, sums="u")[0],
+                             ("--maxrregcount=80",)),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
         "unordered": ("exact", unordered, ()),
