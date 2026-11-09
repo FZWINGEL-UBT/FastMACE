@@ -27,6 +27,7 @@ for v in ${VARIANTS:-nvrtc spill80 spill64}; do
       bc="$r:NVRTC=\"$lib\"" ;;
     spill80) bc="$w:SMEM_SPILL=True $w:MAX_REGISTERS=80" ;;
     spill64) bc="$w:SMEM_SPILL=True $w:MAX_REGISTERS=64" ;;
+    spill56) bc="$w:SMEM_SPILL=True $w:MAX_REGISTERS=56" ;;
     cap80) bc="$w:MAX_REGISTERS=80" ;;
     *) note "unknown variant $v"; continue ;;
   esac

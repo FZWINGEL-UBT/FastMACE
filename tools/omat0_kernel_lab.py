@@ -691,6 +691,8 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         # blocks per SM? The cap is __launch_bounds__' minimum blocks (smem_spill), not --maxrregcount.
         "base-s64": ("exact", lambda s: smem_spill(s, 64), ()),
         "base-s72": ("exact", lambda s: smem_spill(s, 72), ()),
+        "base-s56": ("exact", lambda s: smem_spill(s, 56), ()),
+        "base-s48": ("exact", lambda s: smem_spill(s, 48), ()),
         "fp64-1path-u-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1, sums="u")[0], 80), ()),
         "fp64-1path-u-s64": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1, sums="u")[0], 64), ()),
         "fp64-1path-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1)[0], 80), ()),
