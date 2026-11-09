@@ -39,7 +39,8 @@ for part in ${PARTS:-bench ncu}; do
         --equilibrate-steps 100 --profile-variants base --output "$out/lab" > "$out/ncu.log" 2>&1 < /dev/null
       note "end ncu exit=$?"
       grep -q ERR_NVGPUCTRPERM "$out/ncu.log" && note "ncu: ERR_NVGPUCTRPERM"
-      [ -f "$out/wprime.ncu-rep" ] && ncu --import "$out/wprime.ncu-rep" --csv --page raw > "$out/ncu-wprime.csv" 2>&1
+      rep=$(ls "$out"/wprime.ncu-rep* 2>/dev/null | head -n 1)  # ncu 2026 writes .ncu-repz
+      [ -n "$rep" ] && ncu --import "$rep" --csv --page raw > "$out/ncu-wprime.csv" 2>&1
       grep -h -E "^wprime " "$out/ncu.log" | cut -c1-240 >> "$log" ;;
   esac
 done
