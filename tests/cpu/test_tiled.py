@@ -1261,6 +1261,60 @@ def test_virial_drops_the_padding_edges_by_their_mask():
     assert torch.allclose(_virial(v[:-7], g[:-7]), expected, rtol=1e-14, atol=1e-14)
 
 
+@pytest.mark.parametrize("cached", [False, True], ids=["no-graph-cache", "graph-cache"])
+def test_lazy_keys_are_bitwise_the_key_pass_and_fall_back_to_it(cached, monkeypatch):
+    """``TILE_LAZY_KEYS``: once the slots exist, sweep 1 takes each tile's slot from the graph the prefetch builds;
+    the call is bitwise the call with the key pass before sweep 1, with the same slots and needs. A tile that fits
+    no slot as it is runs the key pass for every tile then, again bitwise."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    monkeypatch.setattr(tiled_module, "TILE_PREFETCH_DEVICE", True)
+    if cached:
+        monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+        monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: 4 * 10**12)
+    passes = []
+    slot_keys = tiled_module.TiledForceField._slot_keys
+
+    def counting(self, *args, **kwargs):
+        passes.append(1)
+        return slot_keys(self, *args, **kwargs)
+
+    monkeypatch.setattr(tiled_module.TiledForceField, "_slot_keys", counting)
+    results, reports = {}, {}
+    for lazy in (False, True, "fallback"):
+        monkeypatch.setattr(tiled_module, "TILE_LAZY_KEYS", bool(lazy))
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently (makes slots)
+        if lazy == "fallback":  # the third tile fits no slot as it is (asked in its prefetch, then in its sweep)
+            fitting, seen = tiled._fitting_key, []
+
+            def refusing(r, h, edges):
+                seen.append(1)
+                return None if len(seen) in (3, 4) else fitting(r, h, edges)
+
+            tiled._fitting_key = refusing
+        passes.clear()
+        results[lazy], reports[lazy] = [], []
+        for current in (strained(atoms), atoms):
+            seen_before = len(passes)
+            results[lazy].append(tiled.evaluate(current, stress=True))
+            last = tiled.last
+            reports[lazy].append((last["slots"], last["slot_needs"], last["tiles"]))
+            assert last["lazy_keys"] == bool(lazy)
+            assert len(passes) - seen_before == (0 if lazy is True else 1)
+            if lazy == "fallback":
+                seen.clear()
+    assert reports[True] == reports[False] == reports["fallback"]
+    for lazy in (True, "fallback"):
+        for one, two in zip(results[False], results[lazy]):
+            assert one[0] == two[0]
+            assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+            assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
 def test_prefetch_with_the_state_on_the_device_is_bitwise_the_call_without(monkeypatch):
     """``TILE_PREFETCH_DEVICE``: with the state on the device, prefetch builds the next tile's graph ahead (no rows):
     the same graphs, so the call is bitwise the one without; off, the device state builds none ahead."""
