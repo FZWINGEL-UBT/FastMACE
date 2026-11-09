@@ -177,3 +177,14 @@ STAGE_DOUT, STAGE_SH, SPLINE_VECTOR, FOLD_ALPHA and SPLINE_W.
 **Adopted on the H200 and the A100 family** (`BUTTERFLY_GPUS`, decision 66). Results: [h200-butterfly/](h200-butterfly/),
 [a100-butterfly/](a100-butterfly/).
 
+
+## Round 3: re-screen of off switches against today's defaults, and the quadratic-table bound
+
+- MD-step A/Bs (`tools/modal/const_screen.sh`, SrTiO3 10×10×10, both orders, no gate) of switches that are off, or
+  on only elsewhere, last measured before today's defaults:
+  - H200: `TABLE_PAIRS`, `HOIST_SCALE`, `STAGE_QUADS`, w′ `STAGE_EDGES`, forward `PREFETCH_AHEAD` 2, `PACKED_COEF`,
+    `SEGMENT_ROWS` + `SEGMENT_GROUPED`.
+  - A100: forward `PREFETCH_AHEAD` 0 and 4 (the default 2 was tuned before PACKED8 halved the rows),
+    `POWER_BACKWARD`, the tabled forward's `FORWARD_WARPS` 2 and 4 and `FORWARD_CHUNK` 16, `PACKED_COEF`.
+- Kernel lab `F-quad-horner` (H200 and A100): w′ with a quadratic's value and slope (3 FMAs) in place of the cubic's
+  dual Horner, the same loads. It is the timing bound of a quadratic spline table with twice the pieces.
