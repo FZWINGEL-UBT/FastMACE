@@ -59,7 +59,7 @@ def wrap(owner, name, label):
         try:
             return raw(*args, **kwargs)
         finally:
-            _stack.remove(frame)
+            del _stack[next(i for i, f in enumerate(_stack) if f is frame)]  # (equal frames: by identity)
             end = rss()
             entry = table.setdefault(label, dict(calls=0, peak_rise=0, net=0, peak=0))
             entry["calls"] += 1
