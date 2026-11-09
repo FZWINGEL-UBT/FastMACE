@@ -273,6 +273,23 @@ def main(argv=None):
     source, counts["gen-bwd"] = render_bwd(terms, seg_in, seg_w, seg_out)
     (args.output / "gen-bwd.cu").write_text(source)
     kernels["gen-bwd"] = Generated(source, b"sc0_bwd")
+    # The factored invariant circuit (fastmace.kernels.cuda.sc_factored): the same contraction through shared CG
+    # pair tensors, the change of basis folded into the weights.
+    from fastmace.kernels.cuda import sc_factored
+
+    factored = sc_factored.factor(terms, seg_in, seg_w, seg_out)
+    if factored is None:
+        raise SystemExit("sc_factored: the candidates do not span the descriptor's basis")
+    prog, feats, basis_k = factored
+    counts["fac"] = dict(sc_factored.counts(prog, feats), check=sc_factored.check(terms, prog, feats, basis_k, seg_in))
+    w_fac = sc_factored.fold_weights(weight, basis_k, seg_w, THREADS)
+    source = sc_factored.render_forward(prog, feats, seg_in, seg_w, seg_out, THREADS, name="sc0_fwd")
+    (args.output / "fac-fused.cu").write_text(source)
+    kernels["fac-fused"] = Generated(source)
+    source = sc_factored.render_backward(prog, feats, seg_in, seg_w, seg_out, THREADS, name="sc0_bwd")
+    (args.output / "fac-bwd.cu").write_text(source)
+    kernels["fac-bwd"] = Generated(source, b"sc0_bwd")
+    print("factored", json.dumps(counts["fac"]), flush=True)
     gen = torch.Generator(device="cuda").manual_seed(0)
     density = torch.rand(natoms, 1, device="cuda", generator=gen) * 2.0
     m = (x * (density + 1.0)).contiguous()
@@ -288,6 +305,8 @@ def main(argv=None):
     y_fused = torch.empty_like(y_ref)
     kernels["gen"](x, d_flat, weight, idx, y_gen)
     kernels["gen-fused"](m, d_flat, weight, idx, y_fused)
+    y_fac = torch.empty_like(y_ref)
+    kernels["fac-fused"](m, d_flat, w_fac, idx, y_fac)
     torch.cuda.synchronize()
     scale = float(y_ref.abs().max())
 
@@ -303,6 +322,9 @@ def main(argv=None):
     dm_gen = torch.empty_like(m)
     dd_gen = torch.empty(natoms, device="cuda")
     kernels["gen-bwd"](m, d_flat, weight, idx, g, dm_gen, dd_gen)
+    dm_fac = torch.empty_like(m)
+    dd_fac = torch.empty(natoms, device="cuda")
+    kernels["fac-bwd"](m, d_flat, w_fac, idx, g, dm_fac, dd_fac)
     torch.cuda.synchronize()
 
     def err(a, b):
@@ -311,7 +333,9 @@ def main(argv=None):
                     rms_rel=float((a - b).pow(2).mean().sqrt() / b.pow(2).mean().sqrt()))
 
     check = {"gen_vs_cueq": err(y_gen, y_ref), "gen_fused_vs_cueq_div": err(y_fused, y_ref_div),
-             "dm_vs_autograd": err(dm_gen, dm_ref), "dD_vs_autograd": err(dd_gen, dd_ref)}
+             "dm_vs_autograd": err(dm_gen, dm_ref), "dD_vs_autograd": err(dd_gen, dd_ref),
+             "fac_vs_cueq_div": err(y_fac, y_ref_div), "fac_dm_vs_autograd": err(dm_fac, dm_ref),
+             "fac_dD_vs_autograd": err(dd_fac, dd_ref)}
     print("check", json.dumps(check), flush=True)
     if any(v["rms_rel"] > 1e-4 for v in check.values()):
         (args.output / "check.json").write_text(json.dumps(check, indent=1) + "\n")
@@ -335,6 +359,12 @@ def main(argv=None):
         flush_buf.fill_(flush)
         kernels["gen-bwd"](m, d_flat, weight, idx, g, dm_gen, dd_gen)
 
+    def fac_pair(flush):
+        flush_buf.fill_(flush)
+        kernels["fac-fused"](m, d_flat, w_fac, idx, out)
+        flush_buf.fill_(flush)
+        kernels["fac-bwd"](m, d_flat, w_fac, idx, g, dm_fac, dd_fac)
+
     def case(fn):
         def run(flush):
             flush_buf.fill_(flush)
@@ -348,6 +378,8 @@ def main(argv=None):
         "gen-fused": case(lambda: kernels["gen-fused"](m, d_flat, weight, idx, out)),
         "proxy": proxy,
         "gen-pair": gen_pair,
+        "fac-fused": case(lambda: kernels["fac-fused"](m, d_flat, w_fac, idx, out)),
+        "fac-pair": fac_pair,
     }
     with torch.no_grad():
         for fn in cases.values():
@@ -356,11 +388,11 @@ def main(argv=None):
         torch.cuda.synchronize()
         if args.profile_once:
             torch.cuda.profiler.start()
-            for key in ("proxy", "gen-pair"):
+            for key in ("proxy", "gen-pair", "fac-pair"):
                 cases[key](0.0)
             torch.cuda.synchronize()
             torch.cuda.profiler.stop()
-            print("profiled once: proxy, gen-pair", flush=True)
+            print("profiled once: proxy, gen-pair, fac-pair", flush=True)
             return
         not_fill = lambda k: "FillFunctor" not in k  # noqa: E731
         per_round = {k: [] for k in cases}
@@ -375,7 +407,7 @@ def main(argv=None):
     med = {k: statistics.median(v) for k, v in per_round.items()}
     backward = lambda d: sum(t for n, t in d.items() if "bwd" in n or "triton_red" in n)  # noqa: E731
     bwd_med = {k: statistics.median([backward({n: v[r] for n, v in kern[k].items() if r < len(v)})
-                                     for r in range(args.rounds)]) for k in ("proxy", "gen-pair")}
+                                     for r in range(args.rounds)]) for k in ("proxy", "gen-pair", "fac-pair")}
     result = dict(meta, tool="sc0_lab", created_utc=datetime.now(timezone.utc).isoformat(),
                   host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                   fastmace_commit=ab_step_time.fastmace_commit(), rounds=args.rounds, iterations=args.iterations,
@@ -387,14 +419,17 @@ def main(argv=None):
                   saving_us=round(med["cueq+div"] - med["gen-fused"], 2),
                   gen_over_cueq=round(med["gen"] / med["cueq"], 4),
                   backward_us={k: round(v, 2) for k, v in bwd_med.items()},
-                  bucket_saving_us=round(med["proxy"] - med["gen-pair"], 2))
+                  bucket_saving_us=round(med["proxy"] - med["gen-pair"], 2),
+                  fac_over_gen_fused=round(med["fac-fused"] / med["gen-fused"], 4),
+                  fac_pair_over_gen_pair=round(med["fac-pair"] / med["gen-pair"], 4))
     (args.output / "sc0_lab.json").write_text(json.dumps(result, indent=1) + "\n")
     for key in cases:
         print(f"{key}: {med[key]:.1f} us  " + "  ".join(f"{n[:50]} {statistics.median(t):.1f}"
                                                     for n, t in kern[key].items()), flush=True)
     print(f"registers {result['registers']}, local bytes {result['local_bytes']}, counts {counts}; "
           f"gen/cueq {result['gen_over_cueq']}, fused saves {result['saving_us']} us of the forward pair; "
-          f"backward {result['backward_us']}; bucket saving {result['bucket_saving_us']} us", flush=True)
+          f"backward {result['backward_us']}; bucket saving {result['bucket_saving_us']} us; "
+          f"factored forward {result['fac_over_gen_fused']}, pair {result['fac_pair_over_gen_pair']}", flush=True)
 
 
 if __name__ == "__main__":
