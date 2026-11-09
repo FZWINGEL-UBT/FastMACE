@@ -121,6 +121,99 @@ def ghoist(source):
     return source, count[0]
 
 
+def _f32_unit(literal):
+    """+1, -1 or None: the coefficient literal ("0x1.fff...p-1f") as float32 is exactly +-1."""
+    import struct
+
+    v = struct.unpack("f", struct.pack("f", float.fromhex(literal.rstrip("f"))))[0]
+    return 1 if v == 1.0 else -1 if v == -1.0 else None
+
+
+def geom(source):
+    """The shared-geometry forward (9 Nov external proposal 1, "shared geometric expressions across the ten paths"),
+    correct and selective, unlike ``ghoist``: per path the cheapest of three forms, by FP32 operations per (edge,
+    channel), unit coefficients (float32 +-1) free:
+
+    - as today: acc_o = fmaf(w, sum_t x_i e_j c_t, acc_o);
+    - one sender component (the scalar-input paths): wx = w x_i once, acc_o = fmaf(wx, e_j c, acc_o);
+    - G-hoisted: g_oi = sum_j c_oij e_j per edge, computed once per tile edge at staging into shared memory (it does
+      not depend on the channel), and acc_o += (w x_i) g_oi.
+
+    Rounding only (the CG sum is taken before the multiply by w x_i). Returns (source, number of g values per edge)."""
+    if "s_tq[TILE]" not in source:
+        raise ValueError("spline_read_lab: the variants need the STAGE_EDGES kernel")
+    head, sep, loop = source.partition("        for (int k = 0; k < count; ++k) {")
+    if not sep:
+        raise ValueError("spline_read_lab: no edge loop")
+    parts = re.split(r"(\n            \{\n)", loop)
+    fills, ng, chosen = [], 0, []
+    out = [parts[0]]
+    for marker, block in zip(parts[1::2], parts[2::2]):
+        she = dict(re.findall(r"const float (e\d+) = she\[(\d+)\];", block))
+        rows = re.findall(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", block)
+        if not rows or not she:
+            out += [marker, block]
+            continue
+        terms = {o: [(int(xi), ej, c) for xi, ej, c in TERM.findall(expr)] for o, expr in rows}
+        xs = sorted({t[0] for ts in terms.values() for t in ts})
+        nonunit = sum(1 for ts in terms.values() for t in ts if _f32_unit(t[2]) is None)
+        cur = sum(len(ts) + 1 for ts in terms.values()) + nonunit
+        factor = 1 + sum(len(ts) for ts in terms.values()) + nonunit if len(xs) == 1 else cur + 1
+        pairs = sum(len({t[0] for t in ts}) for ts in terms.values())
+        hoist = len(xs) + pairs
+        best = min(cur, factor, hoist)
+        new_rows = {}
+        if best == cur:
+            chosen.append("cur")
+            out += [marker, block]
+            continue
+        if best == factor:
+            chosen.append("factor")
+            i = xs[0]
+            for o, ts in terms.items():
+                expr = f"acc[{o}]"
+                for _, ej, c in ts:
+                    unit = _f32_unit(c)
+                    e = f"-e{ej}" if unit == -1 else f"e{ej}" if unit == 1 else f"e{ej} * {c}"
+                    expr = f"fmaf(wx{i}, {e}, {expr})"
+                new_rows[o] = f"acc[{o}] = {expr};"
+        else:
+            chosen.append("hoist")
+            for o, ts in terms.items():
+                expr = f"acc[{o}]"
+                for i in sorted({t[0] for t in ts}):
+                    g = " + ".join(f"q[{she['e' + ej]}] * {c}" for xi, ej, c in ts if xi == i)
+                    fills.append(f"g[{ng}] = {g};")
+                    expr = f"fmaf(wx{i}, s_g[gk + {ng}], {expr})"
+                    ng += 1
+                new_rows[o] = f"acc[{o}] = {expr};"
+        wx = ", ".join(f"wx{i} = w * x{i}" for i in xs)
+        block = re.sub(r"(const float w = fmaf\(t, .*;\n)",
+                       lambda m: m.group(1) + f"                const float {wx};\n", block, count=1)
+        block = re.sub(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", lambda m: new_rows[m.group(1)], block)
+        block = re.sub(r"\s*const float e\d+ = she\[\d+\];", "", block) if best != factor else block
+        out += [marker, block]
+    source = head + sep + "".join(out)
+    if ng:
+        gd = (ng + 3) // 4 * 4
+        source = _replace(source, "__shared__ __align__(16) float s_sh[TILE * ED];",
+                          f"__shared__ __align__(16) float s_sh[TILE * ED];\n    constexpr int GD = {gd};\n"
+                          "    __shared__ __align__(16) float s_g[TILE * GD];")
+        body = "\n                ".join(fills)
+        source = _replace(source, "        const int count = s_count;\n",
+                          "        for (int kk = ch; kk < count_in; kk += C) {  // geom: the tile's g, once per edge\n"
+                          "            const float* q = s_sh + kk * ED;\n"
+                          "            float* g = s_g + kk * GD;\n"
+                          f"                {body}\n"
+                          "        }\n"
+                          "        __syncthreads();\n"
+                          "        const int count = s_count;\n")
+        she = "const float* she = s_sh + s_k[k] * ED;"
+        source = _replace(source, she, she + "\n            const int gk = s_k[k] * GD;")
+    source = source.replace("// spline_forward", f"// geom lab variant (paths: {' '.join(chosen)}); spline_forward", 1)
+    return source, ng
+
+
 TERM = re.compile(r"x(\d+) \* e(\d+) \* (-?0x[0-9a-fA-F.]+p[+-]?\d+f)")
 
 
@@ -240,7 +333,7 @@ def variant(kernel, read, table=None, grid=None):
         raise SystemExit("spline_read_lab: STAGE_EDGES is off (set spline_forward:STAGE_EDGES=True)")
     q = len(schedule.paths) * schedule.channels
     bias = 0
-    if read == "ghoist" or read in DEFERRED_KEEP:
+    if read in ("ghoist", "geom") or read in DEFERRED_KEEP:
         new_table = table
     elif read == "bspline":
         pairs = table.shape[0] // kernel.intervals
@@ -254,6 +347,8 @@ def variant(kernel, read, table=None, grid=None):
     for i, source in enumerate(k.sources):
         if read == "ghoist":
             new, n = ghoist(source)
+        elif read == "geom":
+            new, n = geom(source)
         elif read in DEFERRED_KEEP:
             new, n = deferred(source, DEFERRED_KEEP[read])
         else:
