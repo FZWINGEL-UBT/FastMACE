@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The bspline-lab lane's second H200 container (9 November 2026, report 5 follow-ups):
-# 1. the kernel lab on SrTiO3 10x10x10: ghoist and one-slab+ghoist (the forward's instruction part), w' zero-byte
+# 1. the kernel lab on SrTiO3 10x10x10 (ghoist stopped on the 5060 Ti: one-slab+ghoist 1.43x one-slab), w' zero-byte
 #    variants (table, dout, sender row, all) and the locality probes;
 # 2. the same on a disordered snapshot (0.3 A Gaussian position noise, 20 MD steps): does the table cost more where
 #    the neighbour shells are not sharp?
@@ -23,7 +23,7 @@ for part in ${PARTS:-lab rattle ab}; do
       [ "$part" = rattle ] && extra="--rattle 0.3 --equilibrate-steps 20"
       mkdir -p "$out/$part"
       # shellcheck disable=SC2086
-      python tools/spline_table_bound.py --checkpoint "$ck" --output "$out/$part" --rounds 31 --table-reads ghoist \
+      python tools/spline_table_bound.py --checkpoint "$ck" --output "$out/$part" --rounds 31 \
         --wprime-zero table dout x all $extra > "$out/$part/bound.log" 2>&1 < /dev/null
       note "end $part exit=$? $(grep -hE '^(forward|wprime)' "$out/$part/bound.log" | tr '\n' ' ' | cut -c1-1600)" ;;
     ab)
