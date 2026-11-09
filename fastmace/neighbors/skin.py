@@ -26,6 +26,13 @@ OVERFLOW_DISPLACEMENT_A = 1.0e6
 # Screened pairs per chunk of build_gpu's float64 test and sort key: bounds the build's temporaries (about 150 B
 # per pair at once otherwise). Elementwise work, so the result does not depend on it.
 BUILD_CHUNK = 1 << 18
+# build_gpu's sort (memory profile, 9 November 2026): True writes each screened pair's order key over its screen code
+# and sorts the keys alone (``torch.unique``: no index tensor, no key-value sort), then decodes the pairs from the
+# sorted keys; False keeps a separate key tensor, sorts it with its indices and gathers the codes, as before (an A/B
+# side only). The same pairs in the same order either way: the key is unique per pair and holds the receiver, sender
+# and image. At SrTiO3 233,280 atoms on the RTX 4000 Ada the old sort's temporaries were 1.0 GiB (4.5 kB/atom), the
+# steady phase's peak beside the captured force graph.
+SORT_KEYS_ONLY = True
 # Candidate pairs per chunk of ``compact``: its float64 shifts, vectors and masks exist for one chunk at a time
 # (about 150 B per candidate at once otherwise: 11 GiB of candidates' temporaries at 2.3M NbCl5 atoms). Lists up
 # to this many candidates (about 150k MH-1 atoms) compact in one chunk, as before; the result is the same for any
@@ -403,7 +410,10 @@ class SkinNeighbourList:
         found = codes.numel()
         # The decision in chunks of BUILD_CHUNK pairs, so only the sort key lives for every screened pair.
         chunk = max(1, BUILD_CHUNK)
-        key = torch.empty(found, dtype=torch.int64, device=device)
+        keys_only = SORT_KEYS_ONLY
+        # SORT_KEYS_ONLY: each chunk's keys overwrite its codes once decoded (the screen's buffer is scratch until
+        # the next screen)
+        key = codes if keys_only else torch.empty(found, dtype=torch.int64, device=device)
         kept = torch.zeros((), dtype=torch.int64, device=device)
         for start in range(0, found, chunk):
             stop = min(found, start + chunk)
@@ -421,7 +431,15 @@ class SkinNeighbourList:
             kept += keep.sum()
             del image, sender, receiver, keep
         n = int(kept)  # host sync (rebuild steps only)
-        order = torch.sort(key).indices[:n]
+        if keys_only:
+            # the sorted keys alone; the rejected pairs' common largest key comes out once, after the kept ones
+            ordered = torch.unique(key, sorted=True)
+            if ordered.numel() < n:
+                raise RuntimeError(f"build_gpu: {n} kept pairs but {ordered.numel()} distinct keys (the screen "
+                                   "returned a pair twice)")
+            ordered = ordered[:n]
+        else:
+            order = torch.sort(key).indices[:n]
         del key
 
         grew = n > self.capacity or self.capacity == 0
@@ -431,7 +449,8 @@ class SkinNeighbourList:
         pad_unit = constants["pad_unit"]
         for start in range(0, n, chunk):
             stop = min(n, start + chunk)
-            image, sender, receiver = decode_codes(codes[order[start:stop]], natoms)
+            image, sender, receiver = (self._decode_key(ordered[start:stop], natoms, constants) if keys_only
+                                       else decode_codes(codes[order[start:stop]], natoms))
             unit_shifts = images[image] - offsets[receiver] + offsets[sender]
             self.candidate_index[0, start:stop].copy_(sender)
             self.candidate_index[1, start:stop].copy_(receiver)
@@ -463,6 +482,21 @@ class SkinNeighbourList:
                 primary = primary * LENGTH_BINS + length_bins(length2, self.cutoff + self.skin)
             return (primary * natoms + sender) * nimages + image
         return (image * natoms + sender) * natoms + receiver
+
+    def _decode_key(self, key, natoms, constants):
+        """(image, sender, receiver) of ``build_gpu``'s order keys (``_sort_key`` with the lengths), int64."""
+        if not self.sort_receivers:
+            return decode_codes(key, natoms)  # the key is the screen code
+        nimages = len(constants["images"])
+        image = key % nimages
+        rest = key // nimages
+        sender = rest % natoms
+        primary = rest // natoms
+        if self._length_sorted(natoms, constants):
+            primary = primary // LENGTH_BINS
+        if constants["groups"] is not None:
+            primary = primary // constants["group_count"]
+        return image, sender, primary
 
     def _async_ready(self) -> bool:
         """Whether ``build_gpu_async`` can run: switched on, fixed cell, a synchronous build done before."""

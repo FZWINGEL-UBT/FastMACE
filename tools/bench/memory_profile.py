@@ -31,6 +31,7 @@ import json
 import os
 import pickle
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -71,6 +72,8 @@ def parse_args(argv=None):
     p.add_argument("--steps", type=int, default=5)
     p.add_argument("--temperature-K", type=float, default=300.0)
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
+                   help="module constants set before the build, as tools/ab_rewrites.py --a-constant takes them")
     p.add_argument("--max-entries", type=int, default=4_000_000, help="allocator trace ring size")
     p.add_argument("--top", type=int, default=40, help="largest live blocks listed")
     p.add_argument("--output", type=Path)
@@ -274,11 +277,19 @@ def run(args):
     atoms.set_pbc(True)
     frontends.thermalize(atoms, args.temperature_K, args.seed)
     natoms = len(atoms)
+    if str(TOOLS) not in sys.path:
+        sys.path.insert(0, str(TOOLS))
+    from ab_rewrites import constant_overrides
+
+    for (module, name_), value in constant_overrides(args.constant).items():
+        importlib.import_module(module)
+        setattr(sys.modules[module], name_, value)
     record = dict(tool="memory_profile", case=args.case, created_utc=datetime.now(timezone.utc).isoformat(),
                   host=os.uname().nodename, fastmace_commit=_commit(), torch=torch.__version__,
                   gpu=torch.cuda.get_device_name(), model=args.model, structure=name, repeat=args.repeat,
                   natoms=natoms, precision=args.precision, warmup=args.warmup, steps=args.steps,
-                  allocator=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"), status="running")
+                  allocator=os.environ.get("PYTORCH_CUDA_ALLOC_CONF"), constants=list(args.constant),
+                  status="running")
     torch.cuda.memory._record_memory_history(enabled="all", context="all", stacks="python",
                                              max_entries=args.max_entries)
     times, sim, edges, extra = {}, None, None, {}
