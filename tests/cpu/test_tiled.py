@@ -1409,43 +1409,6 @@ def test_fill_skip_leaves_the_graph_caches_tiles_out_of_the_list_cache(budget, m
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
-def test_piece_start_keeps_the_slots_halo_start_and_is_bitwise_the_call_without(monkeypatch):
-    """``TILE_PIECE_START``: the graph cache keeps a tile's local index at its slot's halo start; the call is bitwise
-    the call that moves the halo rows from r on every use, and the cache holds the slot's start after the call."""
-    from fastmace.model import tiled as tiled_module
-
-    calc, atoms = calculator(), big_structure()
-    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
-                           rewrites=only(*MH1_PACKAGE))
-    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
-    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: 4 * 10**12)
-    results = {}
-    for start in (False, True):
-        monkeypatch.setattr(tiled_module, "TILE_PIECE_START", start)
-        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", list_reuse=False))
-        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
-        results[start] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
-        assert tiled.last["graph_cache"]["tiles"] > 0
-        if start:  # every kept tile at its slot's start (the slot's receiver rows), not at r
-            pieces = {}
-            original = tiled._piece
-
-            def recording(index, receivers, source, local_of, halo_start=None):
-                piece = original(index, receivers, source, local_of, halo_start)
-                if tiled._pieces is not None and index in tiled._pieces:
-                    pieces[index] = (tiled._pieces[index][5], halo_start, piece[4])
-                return piece
-
-            tiled._piece = recording
-            tiled.evaluate(atoms, stress=True)
-            assert pieces and all(kept == int(slot) for kept, slot, _ in pieces.values() if slot is not None)
-            assert any(kept != r for kept, _, r in pieces.values())
-    for one, two in zip(results[False], results[True]):
-        assert one[0] == two[0]
-        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
-        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
-
-
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
     """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
     tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less

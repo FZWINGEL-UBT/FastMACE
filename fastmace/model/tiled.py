@@ -106,10 +106,6 @@ TILE_FILL_SKIP = True
 # the cap, pageable as before. None: on for TILED_SPEED_GPUS, off under the wavefront (1.012 / 1.028 there).
 TILE_PINNED_SUPERSET = None
 TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
-# TILE_PIECE_START (exact): the graph cache keeps a tile's local index at the halo start it was last used with (its
-# slot's), so the sweeps take it as it is instead of moving the halo rows from the start r on every use (a compare, an
-# add and a where over 2 x E per tile and sweep). The same indices. It only removes work: on everywhere.
-TILE_PIECE_START = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1100,29 +1096,16 @@ class TiledForceField:
                     start = r if halo_start is None else int(halo_start)
                     # local relative to a halo start of r: halo row r + k (int32: every index is below R + H)
                     relative = (local if start == r else torch.where(local >= start, local - (start - r), local))
-                    if self._speed(TILE_PIECE_START):  # kept at its own halo start
-                        cache[index] = (nodes, local.to(torch.int32), shifts, r, h, start)
-                    else:
-                        cache[index] = (nodes, relative.to(torch.int32), shifts, r, h, r)
+                    cache[index] = (nodes, relative.to(torch.int32), shifts, r, h)
                     self._piece_bytes += size
             return piece
-        nodes, kept, shifts, r, h, kept_start = entry
+        nodes, relative, shifts, r, h = entry
+        local = relative.long()
+        ei = nodes[local]  # the global (sender, receiver) pairs, as the list gave them
         start = r if halo_start is None else int(halo_start)
-        local = kept.long()
-        if kept_start == r:  # (as kept without TILE_PIECE_START, or at a start of r)
-            ei = nodes[local]  # the global (sender, receiver) pairs, as the list gave them
-            if start != r:
-                local = torch.where(local >= r, local + (start - r), local)
-            return nodes, ei, shifts, local, r, h
-        if start != kept_start:  # halo row kept_start + k moves to start + k
-            local = torch.where(local >= r, local + (start - kept_start), local)
-            cache[index] = (nodes, local.to(torch.int32), shifts, r, h, start)
-        if start == r:
-            return nodes, nodes[local], shifts, local, r, h
-        rows = nodes.new_zeros(start + h)  # the global pairs through the slot's row layout (node-sized)
-        rows[:r] = nodes[:r]
-        rows[start:] = nodes[r:]
-        return nodes, rows[local], shifts, local, r, h
+        if start != r:
+            local = torch.where(local >= r, local + (start - r), local)
+        return nodes, ei, shifts, local, r, h
 
     def _kept_on_host(self, kept, tensors):
         """A tile's kept lists on the host: pinned (``TILE_PINNED_SUPERSET``) while the pinned ones total at most
