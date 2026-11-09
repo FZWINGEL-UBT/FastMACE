@@ -1221,6 +1221,31 @@ def test_virial_from_edge_gradients_is_the_strain_leafs_gradient(mode, monkeypat
         assert relative(edges[2], field.evaluate(current, stress=True)[2]) <= 1e-11
 
 
+@pytest.mark.parametrize("virial", [False, True], ids=["strain-leaf", "virial"])
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_epilogue_is_bitwise_the_eager_epilogue_outside_compiled_mode(mode, virial, monkeypatch):
+    """``TILE_EPILOGUE``: sweep 1's masks and sweep 3's objective inside the forwards, and the sweeps' edge masks and
+    virial as one epilogue, run as the same products outside mode "compiled": energy, forces and stress bitwise the
+    call without (with the strain leaf and with ``TILE_VIRIAL``)."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    monkeypatch.setattr(tiled_module, "TILE_VIRIAL", virial)
+    results = {}
+    for fused in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_EPILOGUE", fused)
+        tiled = TiledForceField(field, TileConfig(9, mode=mode))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[fused] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        assert tiled.last["tiles"] > 1
+    for plain, fused in zip(results[False], results[True]):
+        assert fused[0] == plain[0]
+        assert np.array_equal(np.asarray(fused[1]), np.asarray(plain[1]))
+        assert np.array_equal(np.asarray(fused[2]), np.asarray(plain[2]))
+
+
 def test_virial_drops_the_padding_edges_by_their_mask():
     """``_virial``: sym(V^T G) over the edges whose mask is 1; a padding edge's vector and gradient add nothing."""
     from fastmace.model.tiled import _virial
@@ -1323,6 +1348,7 @@ def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch)
     from fastmace.model import tiled as tiled_module
 
     assert tiled_module.TILE_VIRIAL is None and tiled_module.TILE_PREFETCH_DEVICE is None
+    assert tiled_module.TILE_EPILOGUE is None and tiled_module.TILE_FILTER32 is None
     assert tiled_module.TILE_GRAPH_CACHE is None and "NVIDIA GeForce RTX 5060 Ti" in tiled_module.TILED_SPEED_GPUS
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,

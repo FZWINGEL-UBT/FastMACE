@@ -86,6 +86,13 @@ TILE_GRAPH_CACHE_FRACTION = 0.25
 # from a 27-row table (``times_3x3`` per row: bitwise the per-edge product). The same edges, shifts and order as the
 # float64 test. The RTX 5060 Ti runs float64 at 1/64 of float32: the test took about 0.2 us per atom per call.
 TILE_FILTER32 = None
+# TILE_EPILOGUE (rounding): the sweeps' eager work around the compiled forwards moves into compiled code (mode
+# "compiled"; the same functions run eagerly in the other modes): sweep 1's padding masks and sweep 3's objective
+# (scale and shift, the masks, <dE/dx, x> + <dE/dsc, sc>) join the sweeps' forwards, and the edge-gradient masks and
+# the virial (TILE_VIRIAL) of sweeps 2 and 3 are one compiled epilogue each. Before, these were about 15 eager
+# elementwise kernels and reductions per tile and sweep (about 0.2 us per atom per call at 975,560 SrTiO3 atoms). The
+# gradients are the same products; the virial's and the objective's sums change their order.
+TILE_EPILOGUE = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1334,7 +1341,7 @@ class TiledForceField:
         """Interaction 0 on a tile. Sweep 1 (``adjoint`` False, no autograd): ``(es, x, sc)``, the receivers' node
         energies before scale and shift and interaction 1's inputs. Sweep 3 (``adjoint`` True): ``(es, edge-vector
         gradient, strain gradient or None)`` of interaction 0's energy plus <dE/dx, x> + <dE/dsc, sc>. Padding
-        receivers (``recv_mask`` 0) give exact zeros."""
+        receivers (``recv_mask`` 0) give exact zeros; with ``TILE_EPILOGUE`` the edge-vector gradient is masked too."""
         import torch
 
         model = self.model
@@ -1342,22 +1349,33 @@ class TiledForceField:
         attrs = self._attrs(nodes)
         receivers = nodes[:r]
         virial = adjoint and strain is not None and self._speed(TILE_VIRIAL)
+        fused = self._speed(TILE_EPILOGUE)
         with torch.enable_grad() if adjoint else torch.no_grad():
             leaf = vectors.detach().requires_grad_(adjoint)
             eps = (torch.zeros((3, 3), dtype=self.dtype, device=self.device, requires_grad=True)
                    if adjoint and strain is not None and not virial else None)
-            es, x, sc = self._forward(3 if adjoint else 1)(leaf, eps, attrs, local, r)
-            heads = self.heads[:r]
-            if not adjoint:
-                return self._masked(es, recv_mask), self._masked(x, recv_mask), self._masked(sc, recv_mask)
-            objective = (self._masked(model.scale_shift(es, heads), recv_mask).sum()
-                         + (self._masked(state.rows("gx", receivers), recv_mask) * x).sum()
-                         + (self._masked(state.rows("gsc", receivers), recv_mask) * sc).sum())
+            if fused and not adjoint:
+                return self._forward("1m")(leaf, eps, attrs, local, r, recv_mask)
+            if fused:
+                es, objective = self._forward("3o")(leaf, eps, attrs, local, r, recv_mask,
+                                                   state.rows("gx", receivers), state.rows("gsc", receivers))
+            else:
+                es, x, sc = self._forward(3 if adjoint else 1)(leaf, eps, attrs, local, r)
+                heads = self.heads[:r]
+                if not adjoint:
+                    return self._masked(es, recv_mask), self._masked(x, recv_mask), self._masked(sc, recv_mask)
+                objective = (self._masked(model.scale_shift(es, heads), recv_mask).sum()
+                             + (self._masked(state.rows("gx", receivers), recv_mask) * x).sum()
+                             + (self._masked(state.rows("gsc", receivers), recv_mask) * sc).sum())
             wanted = [leaf] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
+        es = self._masked(es.detach(), recv_mask)
+        if fused:
+            g_vec, g_eps = self._epilogue("e")(vectors, grads[0], edge_mask, virial)
+            return es, g_vec, g_eps if virial else grads[1] if eps is not None else None
         if virial:
-            return self._masked(es.detach(), recv_mask), grads[0], _virial(vectors, grads[0], edge_mask)
-        return self._masked(es.detach(), recv_mask), grads[0], grads[1] if eps is not None else None
+            return es, grads[0], _virial(vectors, grads[0], edge_mask)
+        return es, grads[0], grads[1] if eps is not None else None
 
     def _second(self, tile, state, strain):
         """Interaction 1 forward and backward on the stored ``linear_up(h1)`` and ``skip_tp(h1)`` (sweep 2):
@@ -1387,6 +1405,10 @@ class TiledForceField:
                 holder_x.value = holder_sc.value = None
             wanted = [leaf, x, sc] + ([eps] if eps is not None else [])
             grads = torch.autograd.grad(objective, wanted)
+        if self._speed(TILE_EPILOGUE):
+            es, g_vec, g_x, g_sc, g_eps = self._epilogue("2")(vectors, es.detach(), grads[0], grads[1], grads[2],
+                                                              node_mask, recv_mask, edge_mask, virial)
+            return es, g_vec, g_x, g_sc, g_eps if virial else grads[3] if eps is not None else None
         g_eps = _virial(vectors, grads[0], edge_mask) if virial else grads[3] if eps is not None else None
         return (self._masked(es.detach(), recv_mask), grads[0], self._masked(grads[1], node_mask),
                 self._masked(grads[2], recv_mask), g_eps)
@@ -1414,13 +1436,53 @@ class TiledForceField:
         es = model.readouts[1](out, heads)[self.arange[:r], heads]
         return self._masked(model.scale_shift(es, heads), recv_mask).sum(), es
 
+    def _first_forward_masked(self, leaf, eps, attrs, local, r, recv_mask):
+        """``TILE_EPILOGUE``: sweep 1's forward with the padding receivers' masks: ``(es, x, sc)``."""
+        es, x, sc = self._first_forward(leaf, eps, attrs, local, r)
+        return self._masked(es, recv_mask), self._masked(x, recv_mask), self._masked(sc, recv_mask)
+
+    def _first_objective(self, leaf, eps, attrs, local, r, recv_mask, gx, gsc):
+        """``TILE_EPILOGUE``: sweep 3's forward up to its objective, interaction 0's energy (after scale and shift)
+        plus <dE/dx, x> + <dE/dsc, sc> over the real receivers: ``(es, objective)``."""
+        es, x, sc = self._first_forward(leaf, eps, attrs, local, r)
+        objective = ((self.model.scale_shift(es, self.heads[:r]) * recv_mask).sum()
+                     + (self._masked(gx, recv_mask) * x).sum() + (self._masked(gsc, recv_mask) * sc).sum())
+        return es, objective
+
+    @staticmethod
+    def _edge_epilogue(vectors, g_vec, edge_mask, virial):
+        """``TILE_EPILOGUE``: sweep 3's edge-vector gradient without its padding edges and (``virial``) the strain
+        gradient of ``_virial``: ``(g_vec, g_eps or None)``."""
+        g_vec = g_vec * edge_mask.unsqueeze(1)
+        return g_vec, _virial(vectors, g_vec) if virial else None
+
+    @staticmethod
+    def _second_epilogue(vectors, es, g_vec, g_x, g_sc, node_mask, recv_mask, edge_mask, virial):
+        """``TILE_EPILOGUE``: sweep 2's outputs without their padding rows and edges and (``virial``) the strain
+        gradient: ``(es, g_vec, g_x, g_sc, g_eps or None)``."""
+        g_vec = g_vec * edge_mask.unsqueeze(1)
+        masked = TiledForceField._masked
+        return (es * recv_mask, g_vec, masked(g_x, node_mask), masked(g_sc, recv_mask),
+                _virial(vectors, g_vec) if virial else None)
+
+    def _epilogue(self, key):
+        """``TILE_EPILOGUE``'s epilogue ``key`` ("e": sweep 3, "2": sweep 2): plain, or compiled in mode "compiled"."""
+        plain = {"e": self._edge_epilogue, "2": self._second_epilogue}[key]
+        return self._compiled_once(f"epilogue{key}", plain)
+
     def _forward(self, sweep):
         """The sweep's forward: plain, or (mode "compiled") compiled on first use, once per sweep (sweeps 1 and 3
-        apart: without and with autograd); each slot's shapes are one specialisation."""
-        plain = {1: self._first_forward, 2: self._second_forward, 3: self._first_forward}[sweep]
+        apart: without and with autograd; "1m" and "3o" are ``TILE_EPILOGUE``'s); each slot's shapes are one
+        specialisation."""
+        plain = {1: self._first_forward, 2: self._second_forward, 3: self._first_forward,
+                 "1m": self._first_forward_masked, "3o": self._first_objective}[sweep]
+        return self._compiled_once(sweep, plain)
+
+    def _compiled_once(self, key, plain):
+        """``plain``, or (mode "compiled") ``plain`` compiled on its first use under ``key``."""
         if self.mode != "compiled":
             return plain
-        compiled = self._compiled.get(sweep)
+        compiled = self._compiled.get(key)
         if compiled is None:
             import torch
 
@@ -1430,7 +1492,7 @@ class TiledForceField:
             torch._dynamo.config.cache_size_limit = max(torch._dynamo.config.cache_size_limit, 64)
             options = inductor_records.inductor_options(self.model)
             compiled = torch.compile(plain, dynamic=False, fullgraph=False, **({"options": options} if options else {}))
-            self._compiled[sweep] = compiled
+            self._compiled[key] = compiled
         return compiled
 
     # ------------------------------------------------------------------ padded slot
@@ -1493,11 +1555,15 @@ class TiledForceField:
             names = ("es", "x", "sc")
         elif sweep == 2:
             es, g_vec, g_x, g_sc, g_eps = self._second(tile, g["state"], strain)
-            values = (es, self._masked(g_vec, slot["edge_mask"]), g_x, g_sc) + ((g_eps,) if strain else ())
+            if not self._speed(TILE_EPILOGUE):  # else its epilogue masked the edge gradient
+                g_vec = self._masked(g_vec, slot["edge_mask"])
+            values = (es, g_vec, g_x, g_sc) + ((g_eps,) if strain else ())
             names = ("es", "g_vec", "g_x", "g_sc", "g_eps")[:len(values)]
         else:
             _, g_vec, g_eps = self._first(tile, g["state"], adjoint=True, strain=strain)
-            values = (self._masked(g_vec, slot["edge_mask"]),) + ((g_eps,) if strain else ())
+            if not self._speed(TILE_EPILOGUE):
+                g_vec = self._masked(g_vec, slot["edge_mask"])
+            values = (g_vec,) + ((g_eps,) if strain else ())
             names = ("g_vec", "g_eps")[:len(values)]
         if not self._captured():  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
             slot["out"] = {sweep: dict(zip(names, values))}  # no copy, and no other sweep's kept beside them

@@ -2,9 +2,10 @@
 
 ``rewrites.generic.modules.TILE_BLOCK_ROWS`` (the w' convolution's block-layout message kept for a tile's receivers),
 ``model.tiled.TILE_VIRIAL`` (the strain gradient from the edge vectors' gradient) and ``model.tiled.
-TILE_PREFETCH_DEVICE`` (the next tile's graph built ahead with the state on the device): each switch on against off
-on the same tiled force field, and the tiled call against the whole-system call of the same plan, on SrTiO3 6x6x6
-(1,080 atoms, rattled and strained) in tiles of 256 receivers, eager and padded. The forces are summed with atomics
+TILE_PREFETCH_DEVICE`` (the next tile's graph built ahead with the state on the device) and ``model.tiled.
+TILE_EPILOGUE`` (the sweeps' masks, objective and virial in compiled code): each switch on against off on the same
+tiled force field, and the tiled call against the whole-system call of the same plan, on SrTiO3 6x6x6 (1,080 atoms,
+rattled and strained) in tiles of 256 receivers, eager and padded (the epilogue compiled too). The forces are summed with atomics
 on the GPU, and so are the forward's sums: the sides agree to float32 rounding, not bitwise, energy included. Needs
 ``FASTMACE_MODELS`` (the checkpoint) and the hybrid backend's kernels; the w' path is on only where decision 66 lists
 the GPU for OMAT-0 medium (otherwise the test skips). Runs in a fresh interpreter (the OEq runtime is prepared before
@@ -83,12 +84,15 @@ cases = {
     "block_rows": (generic, "TILE_BLOCK_ROWS"),
     "virial": (tiled_module, "TILE_VIRIAL"),
     "prefetch": (tiled_module, "TILE_PREFETCH_DEVICE"),
+    "epilogue": (tiled_module, "TILE_EPILOGUE"),
 }
 w_energy, w_forces, w_stress = float(whole[0]), np.asarray(whole[1], np.float64), np.asarray(whole[2], np.float64)
-for mode in ("eager", "padded"):
+for mode in ("eager", "padded", "compiled"):
     for name, (module, constant) in cases.items():
         if name == "prefetch" and mode == "eager":
             continue  # prefetch builds padded tiles' graphs only
+        if mode == "compiled" and name != "epilogue":
+            continue  # the epilogue is the one switch whose compiled code differs
         off = run(mode, {(module, constant): False})
         on = run(mode, {(module, constant): True})
         report[f"{mode}-{name}"] = dict(
@@ -111,8 +115,8 @@ def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
     if "skip" in report:
         pytest.skip(report["skip"])
     cases = {key: value for key, value in report.items() if key != "applied"}
-    assert set(cases) == {"eager-block_rows", "eager-virial", "padded-block_rows", "padded-virial",
-                          "padded-prefetch"}
+    assert set(cases) == {"eager-block_rows", "eager-virial", "eager-epilogue", "padded-block_rows",
+                          "padded-virial", "padded-prefetch", "padded-epilogue", "compiled-epilogue"}
     for name, case in cases.items():
         assert case["tiles"] > 1, name  # halos on every tile
         # The forward's sums are float32 atomics too, so even an exact switch moves the energy by rounding (1.9e-9
