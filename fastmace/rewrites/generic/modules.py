@@ -412,14 +412,17 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     # on every row (no tiles, or first_table_region, which always does); only the division is left
     if (kind == "density" and getattr(reassociation, "compose_skip", None) is not None
             and (n_real is None or recompute_table)):
-        message = message / (density + 1)
+        # rewrites.sc_generated: product 0's generated contraction divides; the density goes in the sc slot
+        divisor = (density,) if getattr(reassociation, "sc_generated", False) else None
+        if divisor is None:
+            message = message / (density + 1)
         if getattr(reassociation, "compose_joined", False):  # COMPOSE_FAST: the joined [n, width] output viewed, not copied
             from fastmace.rewrites.linear.modules import reshape_view
 
             view = reshape_view(self.reshape, message)
             if view is not None:
-                return view, None
-        return self.reshape(message), None
+                return view, divisor
+        return self.reshape(message), divisor
     divided = None
     if early_density is not None and isinstance(message, tuple):
         pass  # first_div: the blocks are divided already (the linear is the identity)

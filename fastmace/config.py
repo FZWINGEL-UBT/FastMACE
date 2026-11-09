@@ -232,6 +232,10 @@ class RewriteConfig:
     # cueq_projection.CUEQ_PROJECTED_GPUS lists the GPU, except for the models the planner's
     # DECISION_66_CUEQ_PROJECTED_EXCLUDED lists there (decision 66: not faster for them).
     cueq_projected: Toggle = "auto"
+    # With tf32x3_gemms: interaction 0's density division and product 0's cuEq symmetric contraction as one
+    # generated straight-line kernel pair (fastmace.rewrites.sc_generated, SC_GENERATED; Codex v3 proposal 5);
+    # rounding; auto = on where sc_generated.SC_GENERATED_GPUS lists the GPU (none yet).
+    sc_generated: Toggle = "auto"
     # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
     # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,
     # fastmace.rewrites.codegen); auto = on for the qualified POLAR-1 checkpoints (S, M, L) in hybrid float32 plans

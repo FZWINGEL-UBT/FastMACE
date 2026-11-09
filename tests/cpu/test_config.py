@@ -94,6 +94,7 @@ AUTO_RULES = {
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.cueq_projected": "on_with_tf32x3_gemms_on_listed_gpus_unless_model_excluded_decision_66",
+    "RewriteConfig.sc_generated": "on_with_tf32x3_gemms_on_listed_gpus_decision_66",
     "RewriteConfig.gate_epilogue": "on_with_segment_gemm_for_mh1_on_decision_66_gpus",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",

@@ -122,6 +122,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.cueq_projected": "on_with_tf32x3_gemms_on_listed_gpus_unless_model_excluded_decision_66",
+    "RewriteConfig.sc_generated": "on_with_tf32x3_gemms_on_listed_gpus_decision_66",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
@@ -906,6 +907,8 @@ class FixedPlanner:
         book.decide("RewriteConfig.inplace_block_linear", _toggle(rewrites.inplace_block_linear), NOT_CARRIED_OVER_1A)
         rewrite_values["cueq_projected"] = self._cueq_projected(book, rewrites.cueq_projected,
                                                                 rewrite_values["tf32x3_gemms"], model_label, hardware)
+        rewrite_values["sc_generated"] = self._sc_generated(book, rewrites.sc_generated, rewrite_values["tf32x3_gemms"],
+                                                            hardware)
         book.decide("RewriteConfig.polar_uvu", _toggle(rewrites.polar_uvu),
                     "PolarMACE only (MACE PR 1711)" if traits.polar else "no effect: not a PolarMACE model")
 
@@ -1713,6 +1716,25 @@ class FixedPlanner:
             choice, reason = "off", f"not a listed GPU, decision 66 ({name})"
         elif name in DECISION_66_CUEQ_PROJECTED_EXCLUDED.get(model_label, ()):
             choice, reason = "off", f"{model_label} measured not faster on {name}, decision 66"
+        else:
+            choice, reason = "on", f"with tf32x3_gemms on a listed GPU, decision 66 ({name})"
+        book.decide(item, choice, _why(asked, AUTO_RULES[item], reason))
+        return choice
+
+    @staticmethod
+    def _sc_generated(book, asked, tf32x3, hardware):
+        """``RewriteConfig.sc_generated``: as asked when "on" or "off"; auto on with tf32x3_gemms on the GPUs
+        ``sc_generated.SC_GENERATED_GPUS`` lists (none yet)."""
+        from fastmace.rewrites.sc_generated import SC_GENERATED_GPUS
+
+        item = "RewriteConfig.sc_generated"
+        name = getattr(hardware, "name", None)
+        if asked != "auto":
+            choice, reason = asked, "asked for"
+        elif tf32x3 != "on":
+            choice, reason = "off", "no effect: tf32x3_gemms is off"
+        elif name not in SC_GENERATED_GPUS:
+            choice, reason = "off", f"not a listed GPU, decision 66 ({name})"
         else:
             choice, reason = "on", f"with tf32x3_gemms on a listed GPU, decision 66 ({name})"
         book.decide(item, choice, _why(asked, AUTO_RULES[item], reason))
