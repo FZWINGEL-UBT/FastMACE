@@ -6,6 +6,6 @@
 set -uo pipefail
 out=${OUT:?the job sets OUT}
 nvidia-smi --query-gpu=name,driver_version,clocks.max.sm --format=csv,noheader > "$out/gpu.txt"
-python tools/fma_dual_pipe_bench.py --output "$out/bench" --dmma --seconds "${SECONDS_PER_MIX:-6}" > "$out/bench.log" 2>&1
+python tools/fma_dual_pipe_bench.py --output "$out/bench" --dmma --dmma-shapes ${SHAPES:-m8n8k4} --seconds "${SECONDS_PER_MIX:-6}" > "$out/bench.log" 2>&1
 echo "exit=$?" >> "$out/bench.log"
 cat "$out/gpu.txt" "$out/bench.log" > "$out/run.log"
