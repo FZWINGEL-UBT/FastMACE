@@ -10,8 +10,8 @@ Each side first runs ``--warmup`` calls (the first, eager call and the compile h
 that order; the result is the ratio of the sides' median call times, b/a (below 1: b is faster), with each block
 pair's ratio. The last call of each side keeps its energy, forces and stress, and the record compares them (b
 against a). A side's ``config:FIELD=VALUE`` items (``config:state_dtype='float16'``, a Python literal) set
-``TileConfig`` fields instead: each side then keeps its own call buffers and state (``TiledForceField._g``), so the
-sides never share a state of another layout. Writes ``<output>/tiled-ab-<tag>.json``. Run on an idle GPU (``tools/ci/local_gpu.py run --quiet``).
+``TileConfig`` fields instead: each side then keeps its own call buffers, state and kept lists
+(``TiledForceField._g``, ``_kept``), so the sides never share a state of another layout or each other's lists. Writes ``<output>/tiled-ab-<tag>.json``. Run on an idle GPU (``tools/ci/local_gpu.py run --quiet``).
 """
 
 from __future__ import annotations
@@ -123,7 +123,8 @@ def main(argv=None):
 
     def call(side, keep=False):
         if own:
-            tiled.config, tiled._g = configs[side], globals_of.get(side)
+            tiled.config = configs[side]
+            tiled._g, tiled._kept = globals_of.get(side, (None, None))
         with constants(sides[side]):
             torch.cuda.synchronize()
             started = time.perf_counter()
@@ -131,7 +132,7 @@ def main(argv=None):
             torch.cuda.synchronize()
             seconds = time.perf_counter() - started
         if own:
-            globals_of[side] = tiled._g
+            globals_of[side] = (tiled._g, getattr(tiled, "_kept", None))
         if keep:
             kept[side] = dict(energy=float(out.energy.reshape(-1)[0]), forces=out.forces.detach().clone(),
                               stress=None if out.stress is None else out.stress.detach().double().cpu())
