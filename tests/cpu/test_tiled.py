@@ -1359,16 +1359,12 @@ def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch)
     assert tiled._speed(True) is True and tiled._speed(0.5, 0.25) == 0.5
     tiled._speed_gpu = True
     assert tiled._speed(None) is True and tiled._speed(None, 0.25) == 0.25 and tiled._speed(False) is False
-    # TILE_EPILOGUE and TILE_PINNED_SUPERSET (plain): off under the wavefront unless set
-    assert tiled._speed(None, plain=True) is True
-    tiled._wave_now = True
-    assert tiled._speed(None, plain=True) is False and tiled._speed(None) is True
-    assert tiled._speed(True, plain=True) is True
 
 
 def test_tile_block_rows_follows_the_module_unless_the_constant_is_set(monkeypatch):
-    """``TILE_BLOCK_ROWS`` at None (the default) is the module's ``tile_block_rows``, which the tiled call sets per
-    call (off under the wavefront) and which is on where no call set it; True / False win everywhere."""
+    """``TILE_BLOCK_ROWS`` at None (the default) is the module's ``tile_block_rows``, on where nothing set it (the
+    tiled call no longer sets it: on under the wavefront too since the host-state worker); True / False win
+    everywhere."""
     import types
 
     from fastmace.rewrites.generic import modules as generic

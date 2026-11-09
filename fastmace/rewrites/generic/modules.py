@@ -73,9 +73,9 @@ FIRST_TABLE_COLUMNS = False
 # the w' convolution's BLOCK_MESSAGE groups keep their block layout for the receivers' rows (a view of the leading
 # rows) and linear_1 multiplies them as on the whole system. Without it the tile turned the groups into the dense
 # [R + H, width] message, sliced the receivers' rows and padded their gradient back to R + H. None: the module's
-# ``tile_block_rows`` (the tiled call sets it per call: off under the wavefront, where the A/Bs measured it slower,
-# 1.030 / 1.060 at 975,560 SrTiO3 atoms, against 0.919 / 0.921 with the state on the device); True / False are the
-# A/B sides.
+# ``tile_block_rows``, on where nothing set it (0.919 / 0.921 at 975,560 SrTiO3 atoms with the state on the device;
+# under the wavefront 1.030 / 1.060 while it was host-bound, 0.931 / 0.937 once the graph cache and the host-state
+# worker made it GPU-bound, 9 November 2026); True / False are the A/B sides.
 TILE_BLOCK_ROWS = None
 # The tabled first interaction's table and outer sums with one fused backward (round 2, 5 November 2026;
 # kernels.triton.tabled_outer_sum): per edge dr and the edge attributes' gradient from the slots' gradient in one walk,
