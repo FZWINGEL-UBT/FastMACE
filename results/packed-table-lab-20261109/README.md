@@ -233,3 +233,30 @@ CG[m1, m2, m3] sh[m2], built once per edge and shared by all channels; rows are 
 the tensor-core fragments across the receiver's edges. Its cost is the float-to-double conversions of x and w
 (slow on both GPUs) unless x is kept in double per layer and w's spline is evaluated in double.
 
+### Bound: w′ and the SPLINE_W forward as DMMA products (rejected before a lab)
+
+Counted from the generated OMAT-0 medium w′ source (A100 build): x carries 4 components per channel (0e + 1o), the
+10 paths write 40 output components, and the paths hold 86 CG terms against 88 entries of their dense (o x i)
+blocks, so the factored FFMA form is already as small as a dense product. Every product form pays tile padding:
+
+| Form (rows = channels) | K x N per channel | Dense useful | Executed (tile) | Inflation |
+| --- | --- | ---: | ---: | ---: |
+| forward / w′ X' = x · M_e (M_e[i, (p, o)] from sh and CG per edge) | 4 x 40 | 88 | 160 | 1.8x |
+| w′ dx = (w ∘ dout) · M_e | 40 x 4 (N padded to 8) | 88 | 320 | 3.6x |
+| forward per path, edges stacked in K, w ∘ x in A, sums kept in the fragments | (edges · i) x (2 l3 + 1) (N padded to 8) | 88 | 176 | 2.0x |
+
+- DMMA alone runs at the FFMA rate (A100 57–64, H200 128 FMA/clk/SM), and together they reach 1.58x on the A100
+  and nothing extra on the H200. So the product forms can win only with less than about 1.6x inflation on the
+  A100 and none on the H200; every form inflates 1.8–3.6x.
+- The forms without per-edge padding (X') leave the path weight w outside the product, so its 40 double results
+  per channel and edge need converting back to float: conversions run at 16 per clock per SM on both GPUs, about
+  320 clocks per edge against about 140 for the whole FFMA contraction on the H200.
+- The form that keeps the sums in double across edges (no per-edge conversion) needs w and w ∘ x in double: about
+  52 DFMA per channel and edge, on the A100 at half the FP32 rate, plus 2x padded DMMA work.
+
+**Rejected (bound).** The contraction is too small per channel (4 input components, paths of 1–7 outputs) for
+8-wide tensor-core tiles, and MACE's per-path, per-channel weight keeps the paths from being merged into one
+dense product. A second pipe through the FP64 tensor cores would need a contraction with dense dimensions of at
+least 8 on both sides of the product; the GEMM-shaped parts of the model already run on TF32 tensor cores
+(3xTF32: A100 about 52, H200 about 165 TFLOPS against DMMA's 19.5 and 67).
+
