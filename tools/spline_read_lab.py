@@ -227,6 +227,42 @@ def wprime_zero(source, what):
     return source, count
 
 
+def wprime_split(source, min_terms=4):
+    """w′'s source with each FACTORED u_i / v_j sum of at least ``min_terms`` terms split into two partial sums
+    (alternate terms), added where the sum is read (round 2 follow-up: are the serial multiply-add chains what w′
+    waits on?). Rounding only. Returns (source, number of split sums)."""
+    lines = source.split("\n")
+    declare = re.compile(r"acc_t ([uv]_\d+) = acc_t\(0\);")
+    update = re.compile(r"\b([uv]_\d+) ([+-]=) scaled")
+    starts = [(k, m.group(1)) for k, line in enumerate(lines) for m in [declare.search(line)] if m]
+    split = set()  # declaration lines of the sums with enough terms
+    for n, (k, name) in enumerate(starts):
+        end = next((k2 for k2, name2 in starts[n + 1:] if name2 == name), len(lines))
+        if sum(1 for line in lines[k:end] if (m := update.search(line)) and m.group(1) == name) >= min_terms:
+            split.add(k)
+    live, count = set(), {}
+    for k, line in enumerate(lines):
+        m = declare.search(line)
+        if m:
+            name = m.group(1)
+            live.discard(name)
+            if k in split:
+                live.add(name)
+                count[name] = 0
+                lines[k] = line.replace(m.group(0), f"acc_t {name} = acc_t(0), {name}_b = acc_t(0);")
+            continue
+        m = update.search(line)
+        if m and m.group(1) in live:
+            name = m.group(1)
+            if count[name] % 2:
+                lines[k] = line.replace(m.group(0), f"{name}_b {m.group(2)} scaled", 1)
+            count[name] += 1
+            continue
+        for name in [n for n in live if f"* {n};" in line]:
+            lines[k] = lines[k].replace(f"* {name};", f"* ({name} + {name}_b);")
+    return "\n".join(lines), len(split)
+
+
 def wprime_variant(kernel, what):
     """A copy of the captured ``WPrimeBackward`` compiled from ``wprime_zero``'s source."""
     import copy
@@ -236,7 +272,7 @@ def wprime_variant(kernel, what):
 
     from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
 
-    source, n = wprime_zero(kernel.source, what)
+    source, n = wprime_split(kernel.source) if what == "split" else wprime_zero(kernel.source, what)
     options = (f"--maxrregcount={kernel.max_registers}",) if kernel.max_registers else ()
     k = copy.copy(kernel)
     k.source = source
@@ -244,5 +280,5 @@ def wprime_variant(kernel, what):
     k._function = _check(driver.cuModuleGetFunction(k._module, b"oeq_projected_backward_wprime"))
     registers = int(_check(driver.cuFuncGetAttribute(
         driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, k._function)))
-    print(f"wprime zero-{what}: {n} loads replaced, registers {registers}", flush=True)
+    print(f"wprime {what}: {n} loads replaced or sums split, registers {registers}", flush=True)
     return k, source

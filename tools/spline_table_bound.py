@@ -190,7 +190,7 @@ def main(argv=None):
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8", "ghoist"],
                    help="lab: the forward with another table read path (tools/spline_read_lab.py)")
-    p.add_argument("--wprime-zero", nargs="*", default=[], choices=["table", "dout", "x", "all"],
+    p.add_argument("--wprime-zero", nargs="*", default=[], choices=["table", "dout", "x", "all", "split"],
                    help="lab: w' with an operand's loads replaced by register values (tools/spline_read_lab.py)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
@@ -226,8 +226,9 @@ def main(argv=None):
                 import spline_read_lab
                 k_zero, src = spline_read_lab.wprime_variant(kernel, what)
                 (args.output / "sources" / f"wprime-zero-{what}.cu").write_text(src)
-                variants[f"zero-{what}"] = real
-                kernels[f"zero-{what}"] = (k_zero, {})
+                label = what if what == "split" else f"zero-{what}"  # split: u / v sums in two halves
+                variants[label] = real
+                kernels[label] = (k_zero, {})
         if name == "forward":
             variants["slab-sorted"] = sorted_args = slab_sorted(real)
             blocks = species_blocks(kernel, numbers)
