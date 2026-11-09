@@ -203,3 +203,33 @@ float table twice to the autograd function, and the aliased inputs made torch.co
 SymInt; ed312e14 passes None instead. The A/Bs ran on 54b4da74 (the packed side is unchanged by the fix). The gain
 grows off-lattice, as the kernel lab predicted (crystal 1.004, 0.3 Å snapshot 0.858). On for the H200 family
 (decision 66); the A100 and Ada are not measured.
+
+## The FP64 tensor cores (DMMA) as the second pipe
+
+The FP64 FMA units cannot help the H200 (an issue-bound kernel gains nothing from a pipe that does one multiply-add
+per lane per issue) and cost the A100 registers. The FP64 tensor cores do 8–64 multiply-adds per lane per issue on
+the tensor pipe, with a few doubles per lane. `tools/fma_dual_pipe_bench.py --dmma` (`tools/modal/dmma_pipe_bench.sh`,
+sources cee11ca9 and b2b3a8da, Modal `sixth`, about $0.40; [dmma-pipe/](dmma-pipe/)): independent FFMA and
+`mma.sync` f64 chains, FMA results per clock per SM, sustained at the full clock:
+
+| Mix (FFMA : DMMA instructions per lane) | A100-SXM4 m8n8k4 | H200 m8n8k4 | H200 m16n8k4 | H200 m16n8k8 | H200 m16n8k16 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| FFMA alone | 63.8 | 126.4 | 126.5 | 126.5 | 126.5 |
+| DMMA alone (8 chains) | 56.9 | 63.8 | 126.8 | 127.8 | 127.9 |
+| 8 : 1 (1 chain) | **101.0** | 99.8 | 138.5 | 133.2 | 134.9 |
+| 16 : 1 | 88.4 | 111.2 | 135.3 | 137.7 | 130.8 |
+| 64 : 1 | – | – | 129.0 | 133.8 | **160.8** |
+
+- **A100: the gate passes.** FFMA + DMMA reach 101.0 against 63.8 (1.58x). The tensor cores slow FFMA down a
+  little (63.8 → 50.5 in the 8 : 1 mix), but together they give 58 % more multiply-adds, in FP64 for the DMMA share.
+- **H200: no second pipe.** The legacy m8n8k4 runs at half rate; the sm_90 shapes reach the full 128 alone, but FFMA
+  and DMMA share the throughput: mixes stay at 129–139, and only 64 FFMA per m16n8k16 reaches 160.8 (1.27x), under
+  the gate. What the H200 can still gain is issue slots: one m16n8k16 does the work of 64 FFMA issues at the same
+  multiply-add rate, and its w′ and forward are near the issue limit.
+
+Next: a kernel-lab form of the per-edge contraction as a DMMA product. Per edge and output degree,
+t[c, m3] = sum over (path, m1) of (w[c, path] x[c, m1]) B_path[m1, m3], with B_path[m1, m3] = sum over m2 of
+CG[m1, m2, m3] sh[m2], built once per edge and shared by all channels; rows are channels, the accumulators stay in
+the tensor-core fragments across the receiver's edges. Its cost is the float-to-double conversions of x and w
+(slow on both GPUs) unless x is kept in double per layer and w's spline is evaluated in double.
+
