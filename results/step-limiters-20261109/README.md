@@ -277,3 +277,23 @@ The FP64 pipes were the other way to more multiply-adds per clock; both were rej
 (`fp64-second-pipe`: registers 80 → 128, 1.039–1.186; `fp64-tensor-pipe`: the same padding, 1.27× on the H200).
 Not built.
 
+## Mirror-pair w′ on the A100, against today's defaults (Alex job 4970636): closed
+
+The 5 November mirror-pair screen ran on the H200 and RTX 5060 Ti; on the A100 only the order was timed, and the w′
+has changed since (STAGE_DOUT, SPLINE_W, BUTTERFLY). The A100's w′ is now FMA-bound with the table about a quarter of
+it, so sharing the table work within a mirror pair was the one untested case. Kernel lab, A100-SXM4-80GB, source
+232f6f7a ([tplab-alex/](tplab-alex/)), base 2,179 µs:
+
+| Variant | Ratio | What it bounds |
+| --- | ---: | --- |
+| `F-no-table-horner` | 0.750 | no table lookup or Horner on any edge |
+| `F-half-table` | 1.308 | the table skipped on every second edge, receiver order (90 registers instead of 79) |
+| `B-mirror-order` | 2.873 | edges physically in mirror order |
+| `B-mirror-share` | 3.825 | mirror order, table shared within each pair |
+| `M-mirror-hybrid` | 3.029 | scalars in mirror order, sh/dsh rows through the permutation |
+
+`M-mirror-perm`'s pattern no longer matches today's kernel. Mirror order now costs 2.9×: STAGE_DOUT stages one
+receiver's dout row for a run of edges, and mirror order breaks those runs. Even in receiver order, skipping half the
+table loses (1.308): the branch takes 11 more registers. A pair's partner edge belongs to another receiver, so sharing
+its w would mean storing w per edge (5 KB per edge), which the table exists to avoid. Closed on every GPU.
+
