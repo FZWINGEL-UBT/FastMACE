@@ -26,6 +26,7 @@ gradients are added atomically, as in the vendored backward.
 from __future__ import annotations
 
 import ctypes
+from types import MappingProxyType
 
 import torch
 
@@ -147,6 +148,11 @@ FOLD_ALPHA = None
 # 0.9884 / 0.9907;
 # gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
 FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# GPUs where a model label keeps FOLD_ALPHA off (WPrime's model_label); none today. OMAT-0 small on the H200
+# (9 November 2026, results/h200-omat0-small-20261108, Benchmark_loup, ab / ba): off 0.9939 / 0.9948 (rescreen), on
+# top of MIN_BLOCKS 8 0.9884 / 0.9908 against 0.9923 / 0.9952 (combo2); but with off as its default, on again was
+# faster, 0.9936 / 0.9927 (defaults2): within the run-to-run spread, so small keeps FOLD_ALPHA on.
+FOLD_ALPHA_MODEL_OFF_GPUS = MappingProxyType({})
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
@@ -235,6 +241,14 @@ STAGE_EDGES = None
 # OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9643 / 0.9853;
 # all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
 STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# A model label's own extra GPUs for STAGE_EDGES, on top of STAGE_EDGES_GPUS (the label reaches the kernel through the
+# rewrites' context: WPrime's model_label). OMAT-0 small on the H200 (9 November 2026, results/h200-omat0-small-20261108,
+# Benchmark_loup, ab / ba): alone on small's defaults 0.9857 / 0.9825 (b = on); with JOINED_LAYOUT, removing it from the
+# screen's combined set 0.9913 / 0.9900 against 0.9829 / 0.9850 with it; as the default, off 1.0072 / 1.0114. Medium
+# measured a tie on the H200 (above).
+STAGE_EDGES_MODEL_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA H200",)),
+})
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
@@ -1112,7 +1126,8 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False):
+                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False,
+                 model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -1145,7 +1160,7 @@ class WPrimeBackward:
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
         self.stage_edges = (self.stage_dout and bool(self.stage_sh) and self.spline is not None
-                            and not self.shared_locator and stage_edges_default(device))
+                            and not self.shared_locator and stage_edges_default(device, model_label))
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
@@ -1547,9 +1562,13 @@ def hoist_scale_default(device):
     return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
 
 
-def fold_alpha_default(device):
-    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS``."""
-    return bool(FOLD_ALPHA) if FOLD_ALPHA is not None else _device_name(device) in FOLD_ALPHA_GPUS
+def fold_alpha_default(device, model_label=None):
+    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS`` except the label's
+    ``FOLD_ALPHA_MODEL_OFF_GPUS``."""
+    if FOLD_ALPHA is not None:
+        return bool(FOLD_ALPHA)
+    name = _device_name(device)
+    return name in FOLD_ALPHA_GPUS and name not in FOLD_ALPHA_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def alpha_rows(schedule, weights):
@@ -1579,9 +1598,13 @@ def stage_sh_default(device):
     return bool(STAGE_SH) if STAGE_SH is not None else _device_name(device) in STAGE_SH_GPUS
 
 
-def stage_edges_default(device):
-    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
-    return bool(STAGE_EDGES) if STAGE_EDGES is not None else _device_name(device) in STAGE_EDGES_GPUS
+def stage_edges_default(device, model_label=None):
+    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS`` (every model) and
+    for ``STAGE_EDGES_MODEL_GPUS[model_label]`` (that label's extra GPUs)."""
+    if STAGE_EDGES is not None:
+        return bool(STAGE_EDGES)
+    name = _device_name(device)
+    return name in STAGE_EDGES_GPUS or name in STAGE_EDGES_MODEL_GPUS.get(model_label, ())
 
 
 def stage_quads_default(device):
@@ -1622,13 +1645,14 @@ class WPrime(torch.nn.Module):
     """One interaction's ``wprime_backward``: the derivative table ``G'``, the density's derivative series and
     the compiled kernel, built from its radial table, folded weight and streaming kernels."""
 
-    def __init__(self, table, weight, kernels, generic=False):
+    def __init__(self, table, weight, kernels, generic=False, model_label=None):
         super().__init__()
+        self.model_label = model_label  # the model's label-table label: per-model kernel defaults (STAGE_EDGES)
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
         self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
         self.horner = self.table_w and horner_default(table.coef.device)
         device = table.coef.device
-        self.fold_alpha = (self.table_w and fold_alpha_default(device) and factored_default(device)
+        self.fold_alpha = (self.table_w and fold_alpha_default(device, self.model_label) and factored_default(device)
                            and not FACTORED_SCALE)
         if self.table_w:
             self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
@@ -1706,10 +1730,10 @@ class WPrime(torch.nn.Module):
             self.spline_block = (
                 fused.id,
                 SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                              self.spline["path_scale"], shared_locator=shared),
+                              self.spline["path_scale"], shared_locator=shared, model_label=self.model_label),
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
-                               spline=grid, shared_locator=shared))
+                               spline=grid, shared_locator=shared, model_label=self.model_label))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1781,7 +1805,7 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
            "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
            "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",

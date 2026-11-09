@@ -98,3 +98,15 @@ def test_pack_entries_must_differ_from_side_a():
     with pytest.raises(SystemExit):  # entry "same" equals side a
         tool.parse_args(["--output", "o", "--checkpoint", "c", "--a", "segment_gemm=on",
                          "--pack", "s|gated_rows=on;same|segment_gemm=on"])
+
+
+def test_a_dict_literal_sets_a_per_model_gpu_table():
+    """A per-model table (MappingProxyType, e.g. DECISION_66_TF32X3_MODEL_GPUS) takes a dict literal, read-only as the
+    default; a space in a GPU name is written as the escape backslash-x20, since --pack splits items at whitespace."""
+    from types import MappingProxyType
+
+    out = tool.constant_overrides(
+        [r"fastmace.planner.fixed:DECISION_66_TF32X3_MODEL_GPUS={'omat0-small':('NVIDIA\x20A100-SXM4-80GB',)}"])
+    value = out[("fastmace.planner.fixed", "DECISION_66_TF32X3_MODEL_GPUS")]
+    assert isinstance(value, MappingProxyType)
+    assert "NVIDIA A100-SXM4-80GB" in value["omat0-small"]

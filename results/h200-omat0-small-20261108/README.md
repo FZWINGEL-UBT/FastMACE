@@ -100,6 +100,221 @@ The first gate run (`gate-tailoff/`, the tail fold off) also passed, with a wors
 
 Modal `sixth`: $0.76 for the fixed A/B, then $0.62 and $0.38 for the two gate runs.
 
+## Screen: medium's tuned H200 switches on small (`screen/`, `ec3a0c15`)
+
+Owner: "do you think we could improve omat 0 small specifically?" Every H200 kernel switch was chosen on OMAT-0
+medium. This screen runs 16 single-change A/Bs on small, Benchmark_loup, both build orders
+(`tools/modal/omat0_small_screen.sh`).
+- a is small's defaults, about 2.30 ms per step.
+- b is a with one change, so b/a below 1 means the change is faster on small.
+- All 32 entries are valid. Modal `sixth` cost $1.40.
+
+**Faster on small in both orders** (candidates for small's own values):
+
+| Change (b) | ab | ba | On medium |
+| --- | ---: | ---: | --- |
+| `compose_skip.JOINED_LAYOUT` on | 0.9668 | 0.9610 | 0.9805 / 0.9815, being adopted for the H200 (fastmace/joined-layout) |
+| w′ `STAGE_EDGES` on | 0.9857 | 0.9825 | 0.9969 / 1.0010, a tie (off) |
+| spline forward `R128` off, 128 threads, `MIN_BLOCKS` 8 | 0.9947 | 0.9893 | 1.0515 / 1.0507 with R128's shape (off) |
+| spline forward `R128` off, 128 threads, `MIN_BLOCKS` 7 | 0.9951 | 0.9964 | 1.0097 / 1.0103 (off) |
+| w′ `FOLD_ALPHA` off | 0.9940 | 0.9942 | on (0.9963 / 0.9954) |
+| `tf32x3.TILE` 64x32 | 0.9913 | 0.9971 | 1.0014 / 1.0035 (off) |
+
+**Ties:** `tf32x3.TILE` 32x64 (0.9982 / 0.9985) and `POWER_BACKWARD` off (0.9923 / 0.9997).
+
+**Slower on small, so the current defaults stay:**
+
+| Change (b) | ab | ba |
+| --- | ---: | ---: |
+| `R128` off | 1.0200 | 1.0214 |
+| spline forward `STAGE_EDGES` off | 1.0181 | 1.0263 |
+| `PREFETCH_AHEAD` on | 1.0137 | 1.0241 |
+| `SPLINE_VECTOR` 2 | 1.0318 | 1.0376 |
+| w′ `STAGE_SH` off | 1.0041 | 1.0156 |
+| `STAGE_DOUT` off | 1.1743 | 1.1808 |
+| `COUNT_PLAN` off | 1.0234 | 1.0302 |
+| `COMPOSE_FAST` off | 1.0518 | 1.0524 |
+
+So small's kernels are close to tuned already. Beyond JOINED_LAYOUT (3–4 %), four small-specific settings each gain
+0.5–1.7 %, and they have not been combined yet. Each is a per-GPU module constant today. Giving small its own values
+needs a per-model default in the kernels, and a combined A/B and gate first.
+
+## Combined: the screen's four wins together (`combined/`, `3bc94302`)
+
+Owner, 9 November 2026: "Yes, combine them" (`tools/modal/omat0_small_combined.sh`, Benchmark_loup, both orders).
+- a is small's defaults with JOINED_LAYOUT on, about 2.23 ms per step.
+- "all" is a with four changes: w′ `STAGE_EDGES` on, the spline forward at 128 threads with `MIN_BLOCKS` 8 instead
+  of R128, w′ `FOLD_ALPHA` off, and tf32x3 `TILE` 64x32.
+- Each "no…" row is all four minus one.
+- Modal `sixth` cost $0.89.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| all four | 0.9829 | 0.9850 |
+| without w′ STAGE_EDGES | 0.9913 | 0.9900 |
+| without MIN_BLOCKS 8 | 0.9893 | 0.9842 |
+| without FOLD_ALPHA off | 0.9802 | 0.9841 |
+| without TILE 64x32 | 0.9833 | 0.9829 |
+
+- **Together the four gain about 1.6 %** (2.23 → 2.19 ms), less than their separate gains added up.
+- **Most of it is w′ `STAGE_EDGES`:** dropping it costs about 0.7 % in both orders.
+- **`MIN_BLOCKS` 8 adds about 0.5 % in order ab** and nothing in order ba.
+- **`FOLD_ALPHA` off and `TILE` 64x32 add nothing on top.** The "without" rows are as fast as "all" or faster.
+- So the setting worth having is w′ STAGE_EDGES on (with MIN_BLOCKS 8 as a marginal extra), worth about 1–1.5 % on
+  top of JOINED_LAYOUT.
+- Gate with all four and JOINED_LAYOUT on: passes. Ratios against the 3× limit:
+
+  | | SrTiO3 | NaCl | NbCl5 |
+  | --- | ---: | ---: | ---: |
+  | Force | 0.87 | 0.95 | 1.00 |
+  | Stress | 0.49 | 1.32 | 1.23 |
+
+- Step breakdown with all of them: 2.18 ms per step, force graph 2.10 ms.
+
+From small's defaults today (2.29 ms), JOINED_LAYOUT plus w′ STAGE_EDGES make about 4.5 % (to about 2.19 ms).
+
+**Open:**
+- JOINED_LAYOUT reaches small through the H200 adoption on fastmace/joined-layout.
+- w′ STAGE_EDGES stays off for medium (a tie there). Small now has it by default on the H200 (next section).
+
+## w′ STAGE_EDGES as small's own H200 default (`stage-edges/`, `387ec7bb`, job `c90d9292`)
+
+Owner, 9 November 2026: "Yes, add it".
+- `wprime_backward.STAGE_EDGES_MODEL_GPUS` is a new per-model GPU list, `{"omat0-small": NVIDIA H200}`.
+  `stage_edges_default(device, model_label)` turns STAGE_EDGES on for `STAGE_EDGES_GPUS` (every model; the A100
+  family since main's round-6 adoption) plus the label's own GPUs. The `STAGE_EDGES` constant still overrides both.
+- The rewrites get the label from `Context.inputs["model_label"]` (`forces._table_label`). A path load finds the
+  label by SHA-256 and head, as the planner's `label_of` does. The generic w′ (`attach_generic_wprime`) passes it to
+  `WPrimeBackward`.
+- On the job's H200, `stage_edges_default` returned True for small and False for medium.
+
+Confirmation (`tools/modal/omat0_small_stage_edges.sh`, Benchmark_loup, JOINED_LAYOUT not on): a = small's new
+defaults, b = `STAGE_EDGES=False`. Modal `sixth` cost $0.37.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| w′ STAGE_EDGES off | 1.0072 (2.277 → 2.294 ms) | 1.0114 (2.272 → 2.298 ms) |
+
+- The default is 0.7–1.1 % faster, matching the combined screen.
+- Step breakdown with the defaults: 2.27 ms per step (2.29 before), force graph 2.19 ms.
+- STAGE_EDGES only changes how the kernel stages edge data (results are bitwise unchanged), so no new force/stress
+  gate was run. The combined gate above had it on and passed.
+
+## Rescreen after main c8d08b5b (`rescreen/`, job `ff0bd317`)
+
+Main c8d08b5b (merged as `a6eddf4a`) turned JOINED_LAYOUT, `BLOCK_ORDER` and `SORT_BY_LENGTH` on for the H200. With
+w′ STAGE_EDGES, small's defaults run Benchmark_loup at **2.14 ms per step** (breakdown 2.13 ms). a = those defaults,
+b = a plus one change. Modal `sixth` cost $0.83.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| BLOCK_ORDER off | 1.0148 | 1.0157 |
+| SORT_BY_LENGTH off | 1.0092 | 1.0102 |
+| JOINED_LAYOUT off | 1.0307 | 1.0315 |
+| PREFETCH_AHEAD on | 1.0218 | 1.0254 |
+| R128 shape with MIN_BLOCKS 8 | **0.9873** | **0.9883** |
+| w′ STAGE_SH off | 1.0193 | 1.0213 |
+| w′ FOLD_ALPHA off | 0.9939 | 0.9948 |
+| tf32x3 TILE 64x32 | 0.9948 | 0.9980 |
+
+- Every H200 default that small now runs helps it.
+- Three changes were faster in both orders: MIN_BLOCKS 8, FOLD_ALPHA off and TILE 64x32.
+
+## Combo2 and defaults2 (`combo2/`, `b4c238ac`; `defaults2/`, `e2206bb6`)
+
+Combo2: a = small's defaults (as in the rescreen). Modal cost $0.68.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| MIN_BLOCKS 8 | 0.9923 | 0.9952 |
+| MIN_BLOCKS 8, FOLD_ALPHA off | 0.9884 | 0.9908 |
+| MIN_BLOCKS 8, TILE 64x32 | 0.9904 | 0.9935 |
+| all three | 0.9895 | 0.9916 |
+| FOLD_ALPHA off, TILE 64x32 | 0.9985 | 0.9959 |
+
+The gate with all three passes, and the breakdown gives 2.11 ms.
+
+Defaults2: a = small with MIN_BLOCKS 8 and FOLD_ALPHA off as its own defaults (`e2206bb6`); b sets one back to the
+shared value. Modal cost $0.92.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| MIN_BLOCKS 6 again | 1.0046 | 1.0057 |
+| FOLD_ALPHA on again | 0.9936 | 0.9927 |
+| both again | 0.9949 | 1.0047 |
+| w′ ESTRIN on | 0.9940 | 0.9933 |
+
+The gate passes; force ratios are 0.94 / 0.91 / 1.01 and stress ratios 0.58 / 1.10 / 1.32 (SrTiO3 / NaCl / NbCl5).
+The breakdown gives 2.12 ms.
+
+- **MIN_BLOCKS 8 is small's H200 default** (`4b80f1ff`: `spline_forward.R128_MIN_BLOCKS_MODEL_GPUS`, bitwise).
+  It is 0.5–1.2 % faster in all three jobs. Medium keeps 6, since 8 is 5 % slower there.
+- **FOLD_ALPHA stays on.** Off was 0.4–0.6 % faster in two jobs, but on again was 0.7 % faster in the third. That is
+  within the run-to-run spread, so it is not adopted. `wprime_backward.FOLD_ALPHA_MODEL_OFF_GPUS` stays as an empty
+  table.
+- ESTRIN was measured only with FOLD_ALPHA off. On medium it adds nothing on top of FOLD_ALPHA, so it was not tried
+  further.
+- The spread between jobs is about ±0.5 %. Changes under that size need a repeat before adoption.
+
+## The A100 family: small's decision 66 pair (`a100/`, Alex)
+
+Small's A100 defaults left the pair off, because its per-model lists held the H200 only. NHR@FAU Alex,
+A100-SXM4-80GB, venv of `fm-a100omat` (Python 3.10.12), float32, Benchmark_loup.
+
+**Pack job 4967329** (source `7790b57c`, `tools/jobs/alex_ab_pack.sh`): a = small's A100 defaults; b = the per-model
+lists with the A100 added. `tools/ab_rewrites.py` now takes a dict literal for a `MappingProxyType` constant.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| the pair | **0.3911** (10.72 → 4.19 ms) | **0.3916** (10.72 → 4.20 ms) |
+| 3×TF32 GEMMs alone | 0.8240 | 0.8243 |
+| generic w′ alone | 0.5586 | 0.5585 |
+
+**Adopted** in `5797d298`: both lists name the H200 and the A100 family.
+
+**Gate job 4967421** (source `5797d298`, the plan's defaults, no constants): the 3× gate passes.
+
+| | SrTiO3 | NaCl | NbCl5 |
+| --- | ---: | ---: | ---: |
+| Force | 1.00 | 0.92 | 1.03 |
+| Stress | 0.79 | 1.31 | 1.33 |
+
+- Energy errors are under the 0.01 eV floor.
+- Step breakdown: **4.19 ms per step**, force graph 4.05 ms.
+- Small's other H200-only defaults (w′ STAGE_EDGES, MIN_BLOCKS 8) need A100 A/Bs of their own. w′ STAGE_EDGES is
+  already on for every model on the A100.
+
+### A100 screen and PREFETCH_AHEAD (`a100/screen-a100-4967540`, `a100/confirm-a100-4967601`)
+
+**Screen job 4967540** (source `14fbf87a`): a = small's A100 defaults with the pair on, about 4.21 ms per step.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| R128 shape with MIN_BLOCKS 8 | 0.9993 | 1.0009 |
+| MIN_BLOCKS 7 | 0.9951 | 0.9986 |
+| w′ FOLD_ALPHA off | 0.9933 | 0.9970 |
+| tf32x3 TILE 64x32 | 1.0016 | 0.9976 |
+| w′ STAGE_SH off | 1.0448 | 1.0444 |
+| forward PREFETCH_AHEAD off | **0.9902** | **0.9908** |
+| w′ STAGE_EDGES off | 1.0330 | 1.0390 |
+| JOINED_LAYOUT off | 1.0312 | 1.0273 |
+
+**Adopted:** PREFETCH_AHEAD off for small on the A100 family (`50480105`,
+`spline_forward.PREFETCH_AHEAD_MODEL_OFF_GPUS`; bitwise, so no gate). Medium keeps it on.
+
+**Confirmation job 4967601** (source `50480105`, a = small's new A100 defaults, about 4.17 ms per step):
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| PREFETCH_AHEAD on again | 1.0068 | 1.0073 |
+| w′ FOLD_ALPHA off | 0.9962 | 0.9971 |
+| both | 1.0065 | 1.0029 |
+
+- FOLD_ALPHA off gains 0.3–0.7 % on the A100 in both jobs. It is a rounding change, and on the H200 the same change
+  reversed between jobs (spread about ±0.5 %), so it is not adopted.
+- MIN_BLOCKS 7 / 8 and TILE 64x32 change nothing on the A100.
+
 ## Not done
 
-- The A100 family: small keeps the pair off there until an Alex A/B (packed) measures it.
+- Small on the Ada and the 5060 Ti is not measured. Those GPUs keep the pair off.
+- The pack env files are in `a100/`. The gate script is `tools/jobs/alex_gate_small.sh`.

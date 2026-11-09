@@ -454,8 +454,10 @@ DECISION_66_TF32X3_MODEL_GPUS = MappingProxyType({
     "polar1-l": GPUModels(("NVIDIA A100-SXM4-80GB",)),  # 0.9064 / 0.9070, 0.7922 / 0.7927
     # OMAT-0 small with medium's H200 settings (8 November 2026, results/h200-omat0-small-20261108, Benchmark_loup,
     # ab / ba): the pair with DECISION_66_GENERIC_WPRIME_LABEL_GPUS 2.294 / 2.282 ms against 5.414 / 5.408 ms
-    # without (b/a 2.360 / 2.370). The A100 needs its own A/B first.
-    "omat0-small": GPUModels(("NVIDIA H200",)),
+    # without (b/a 2.360 / 2.370). The A100 family (9 November 2026, NHR Alex A100-SXM4-80GB job 4967329, against
+    # small's A100 defaults of 7790b57c, ab / ba): the pair 0.3911 / 0.3916 (10.72 -> 4.19 ms per step); 3xTF32 alone
+    # 0.8240 / 0.8243, the generic w' alone 0.5586 / 0.5585; gate on Alex (README).
+    "omat0-small": GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB")),
 })
 # CUEQ_PROJECTED (rewrites.cueq_projection, under tf32x3_gemms) is on for its GPU list; these models are measured not
 # faster with it there and keep the per-call projection (branch fastmace/off-polar-a100, 8 November 2026,
@@ -500,9 +502,9 @@ DECISION_66_GENERIC_WPRIME_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVID
                                              "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 DECISION_66_GENERIC_WPRIME_LABELS = ("omat0-medium",)
 # The same pair for a label on its own GPUs only (instead of DECISION_66_GENERIC_WPRIME_GPUS). OMAT-0 small on the
-# H200: see DECISION_66_TF32X3_MODEL_GPUS, measured together.
+# H200 and the A100 family: see DECISION_66_TF32X3_MODEL_GPUS, measured together.
 DECISION_66_GENERIC_WPRIME_LABEL_GPUS = MappingProxyType({
-    "omat0-small": GPUModels(("NVIDIA H200",)),
+    "omat0-small": GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB")),
 })
 
 
