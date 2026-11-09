@@ -1,0 +1,271 @@
+{
+ "atoms": 975560,
+ "times": [
+  14.204282603983302,
+  31.974374748999253,
+  6.536688819003757,
+  6.588811281020753
+ ],
+ "wall": 6.568907475011656,
+ "regions": [
+  {
+   "region": "(none)",
+   "ns_per_atom": 2382.36447168803,
+   "kernels": 4581,
+   "ops": {
+    "fastmace::streaming_conv_wprime_backward_blocks": 1193.4,
+    "aten::mm": 293.5,
+    "fastmace::tabled_outer_sum_backward": 156.8,
+    "cuequivariance::uniform_1d": 103.5,
+    "fastmace::species_mm": 71.5,
+    "triton_red_fused_add_div_mul_neg_slice_slice_backw": 70.7,
+    "triton_red_fused_add_div_mul_neg_slice_backward_su": 69.4,
+    "triton_poi_fused_add_gather_slice_backward_tabled_": 52.5,
+    "triton_poi_fused_add_slice_backward_view_18": 47.7,
+    "triton_poi_fused_add_slice_slice_backward_species_": 46.3
+   }
+  },
+  {
+   "region": "fwd2 < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 1640.9299315265034,
+   "kernels": 2032,
+   "ops": {
+    "fastmace::fused_folded_message_blocks": 1278.9,
+    "aten::mm": 120.1,
+    "fastmace::radial_table_forward": 72.0,
+    "triton_poi_fused_add_cat_div_slice_view_12": 49.0,
+    "cuequivariance::uniform_1d": 24.7,
+    "triton_poi_fused_cat_view_11": 21.8,
+    "triton_poi_fused_cat_view_10": 15.9,
+    "triton_poi_fused_scatter_add_select_unsqueeze_8": 14.2,
+    "## Call CompiledFxGraph fn2rke3irm2zfkbtpnw2jg4rox": 12.1,
+    "triton_poi_fused_cat_view_9": 7.3
+   }
+  },
+  {
+   "region": "fwd3 < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 795.3837672721456,
+   "kernels": 7214,
+   "ops": {
+    "aten::mm": 167.5,
+    "fastmace::tabled_outer_sum_forward": 98.6,
+    "fastmace::species_mm": 72.2,
+    "triton_poi_fused_cat_slice_view_25": 49.5,
+    "triton_poi_fused_cat_view_10": 42.1,
+    "aten::fill_": 35.1,
+    "triton_poi_fused_cat_view_9": 30.3,
+    "triton_poi_fused_clone_slice_transpose_view_7": 29.8,
+    "cuequivariance::uniform_1d": 28.1,
+    "triton_poi_fused_add_div_exp_index_lt_mul_pow_rsub": 24.5
+   }
+  },
+  {
+   "region": "fwd1 < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 765.4215691500252,
+   "kernels": 6686,
+   "ops": {
+    "aten::mm": 168.4,
+    "fastmace::tabled_outer_sum_forward": 98.2,
+    "fastmace::species_mm": 76.7,
+    "triton_poi_fused_cat_slice_view_25": 48.4,
+    "triton_poi_fused_add_cat_div_view_24": 47.9,
+    "aten::fill_": 36.1,
+    "triton_poi_fused_clone_slice_transpose_view_15": 31.2,
+    "cuequivariance::uniform_1d": 28.9,
+    "triton_poi_fused_cat_view_18": 21.7,
+    "triton_poi_fused_clone_slice_transpose_view_14": 21.4
+   }
+  },
+  {
+   "region": "TiledForceField._tile_graph < TiledForceField._piece < TiledForceField._slot_keys",
+   "ns_per_atom": 221.68959059411932,
+   "kernels": 11194,
+   "ops": {
+    "aten::copy_": 69.8,
+    "aten::index": 48.2,
+    "aten::_unique2": 41.0,
+    "aten::add": 9.0,
+    "aten::nonzero": 8.3,
+    "aten::searchsorted": 7.0,
+    "aten::sub": 7.0,
+    "aten::sum": 6.3,
+    "aten::cat": 5.2,
+    "aten::abs": 4.7
+   }
+  },
+  {
+   "region": "TiledForceField._scatter < TiledForceField._call",
+   "ns_per_atom": 115.1619705604961,
+   "kernels": 952,
+   "ops": {
+    "aten::scatter_add_": 82.2,
+    "aten::index_add_": 32.6,
+    "aten::copy_": 0.2,
+    "aten::add_": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._call",
+   "ns_per_atom": 98.56062364181541,
+   "kernels": 1020,
+   "ops": {
+    "aten::where": 28.7,
+    "aten::index": 20.8,
+    "aten::add": 19.4,
+    "aten::copy_": 17.1,
+    "aten::ge": 12.6
+   }
+  },
+  {
+   "region": "TiledForceField._body < TiledForceField._run_slot < TiledForceField._call",
+   "ns_per_atom": 83.07788142194772,
+   "kernels": 1360,
+   "ops": {
+    "aten::index": 30.1,
+    "aten::add": 16.3,
+    "aten::sub": 14.8,
+    "aten::mul": 10.1,
+    "aten::where": 8.5,
+    "aten::gt": 3.4
+   }
+  },
+  {
+   "region": "TiledForceField._first < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 65.45895383165781,
+   "kernels": 1492,
+   "ops": {
+    "aten::mul": 47.5,
+    "aten::index": 13.7,
+    "aten::sum": 4.0,
+    "aten::add": 0.3
+   }
+  },
+  {
+   "region": "TiledForceField._fill < TiledForceField._call",
+   "ns_per_atom": 48.61815162572981,
+   "kernels": 3468,
+   "ops": {
+    "aten::copy_": 44.8,
+    "aten::fill_": 3.8
+   }
+  },
+  {
+   "region": "TiledForceField._second < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 42.81820902865553,
+   "kernels": 340,
+   "ops": {
+    "aten::index": 21.5,
+    "aten::mul": 21.4
+   }
+  },
+  {
+   "region": "virial < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 28.632262495378423,
+   "kernels": 408,
+   "ops": {
+    "aten::mul": 18.6,
+    "aten::sum": 9.9,
+    "aten::add": 0.2
+   }
+  },
+  {
+   "region": "virial < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 24.555806921164137,
+   "kernels": 408,
+   "ops": {
+    "aten::mul": 16.8,
+    "aten::sum": 7.6,
+    "aten::add": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._globals < TiledForceField._call",
+   "ns_per_atom": 14.450193734880797,
+   "kernels": 8,
+   "ops": {
+    "aten::fill_": 14.4,
+    "aten::copy_": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 8.956848374263,
+   "kernels": 680,
+   "ops": {
+    "aten::fill_": 4.0,
+    "aten::copy_": 3.3,
+    "aten::index": 0.9,
+    "aten::scatter_": 0.8
+   }
+  },
+  {
+   "region": "TiledForceField._source < TiledForceField._call",
+   "ns_per_atom": 5.404103284267552,
+   "kernels": 135,
+   "ops": {
+    "aten::copy_": 5.1,
+    "aten::abs": 0.1,
+    "aten::max": 0.0,
+    "aten::div": 0.0,
+    "aten::linalg_lu_solve": 0.0,
+    "aten::mul": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::floor": 0.0,
+    "aten::_local_scalar_dense": 0.0,
+    "aten::arange": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 4.736466234778147,
+   "kernels": 340,
+   "ops": {
+    "aten::fill_": 2.1,
+    "aten::copy_": 1.8,
+    "aten::index": 0.5,
+    "aten::scatter_": 0.5
+   }
+  },
+  {
+   "region": "TiledForceField._call",
+   "ns_per_atom": 3.711216122021836,
+   "kernels": 305,
+   "ops": {
+    "aten::copy_": 3.6,
+    "aten::index": 0.0,
+    "aten::gather": 0.0,
+    "aten::add": 0.0,
+    "aten::sum": 0.0,
+    "aten::mul": 0.0,
+    "cudaMemGetInfo": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::fill_": 0.0,
+    "aten::prod": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._slot_keys < TiledForceField._call",
+   "ns_per_atom": 0.9191069744556677,
+   "kernels": 68,
+   "ops": {
+    "aten::copy_": 0.9
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 0.051499651478804115,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 0.05120238632206136,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  }
+ ]
+}

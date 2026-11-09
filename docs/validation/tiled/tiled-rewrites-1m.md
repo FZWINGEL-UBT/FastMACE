@@ -1,8 +1,9 @@
-# Tiled call at one million atoms: whole-system rewrites in the tile bodies (8 November 2026)
+# Tiled call at one million atoms: whole-system rewrites in the tile bodies (8-9 November 2026)
 
-Verdict: four switches bring the tiled call with the state on the device from 8.83 to 6.84 µs/atom at 975,560 SrTiO3
-atoms on the RTX 5060 Ti (same-process A/B 0.795 / 0.787). That is 1.43× the whole-system call per atom, down from
-1.83×. The wavefront keeps three of them; block rows measured slower there and stay off.
+Verdict: eight switches bring the tiled call with the state on the device from 8.83 to 6.42 µs/atom at 975,560
+SrTiO3 atoms on the RTX 5060 Ti (same-process A/B, all off against the defaults, 0.729 / 0.731). That is 1.34× the
+whole-system call per atom, down from 1.83×. The wavefront (11.98 µs/atom, was 12.60) keeps five of them; block rows,
+the compiled epilogues and the pinned kept lists measured slower there and stay off.
 
 Numbers, method, records and job scripts: [`results/tiled-speed-20261108`](../../../results/tiled-speed-20261108/README.md).
 
@@ -31,13 +32,21 @@ Outside the bodies, two more costs:
 | `generic.TILE_BLOCK_ROWS` | rounding | 0.918 / 0.921 | 1.030 / 1.060 | on, off under the wavefront |
 | `tiled.TILE_VIRIAL` | rounding | 0.970 / 0.955 | 0.994 / 0.959 | `TILED_SPEED_GPUS` |
 | `tiled.TILE_GRAPH_CACHE` | exact | 0.948 / 0.960 | off | `TILED_SPEED_GPUS` |
+| `tiled.TILE_FILTER32` | exact | 0.987 / 0.993 | 0.981 / 1.012 | `TILED_SPEED_GPUS` |
+| `tiled.TILE_EPILOGUE` | rounding | 0.980 / 0.981 | 1.012 / 1.009 | `TILED_SPEED_GPUS`, off under the wavefront |
+| `tiled.TILE_FILL_SKIP` | exact | 0.961 / 0.966 | – | on |
+| `tiled.TILE_PINNED_SUPERSET` | exact | 0.986 / 0.990 | 1.012 / 1.028 | `TILED_SPEED_GPUS`, off under the wavefront |
 
 `TILED_SPEED_GPUS` is the RTX 5060 Ti family (decision 66: these keep memory alive or replace a kernel). The
-force/stress gate with every switch on (tiled, compiled, R = 48) passes 12 of 12 checks.
+force/stress gate with every switch on (tiled, compiled, R = 48) passes 12 of 12 checks (f36adabd, and b5a59f7d with
+the epilogues). The last four came from a region profile of one steady call: the model's kernels without sweep 3's
+recompute matched the whole-system call, and the gap was the recompute plus about 870 ns/atom of eager glue (graph
+builds, a float64 list filter, masks, copies). The glue is now about 520 ns/atom. Rejected: keeping a tile's index at
+its slot's halo start (0.9999 / 1.0001) and keeping interaction 0's activations for sweep 3 (8 kB per atom).
 
 ## Left open
 
 - Why block rows are slower under the wavefront (same tiles and slots, no recompiles).
-- Sweep 3's recompute of interaction 0 (about 0.75 µs/atom): the three-sweep design.
-- Halo rows (H ≈ 9,000 per 16,384 receivers), the float64 list filter (about 0.35 s per call), and the host list
-  cache's fill for tiles the graph cache holds.
+- Sweep 3's recompute of interaction 0 (about 0.8 µs/atom): the three-sweep design.
+- Halo rows (H ≈ 9,000 per 16,384 receivers in interaction 0) and the forces' scatter (115 ns/atom).
+- On the wavefront, the host state's CPU work; its A/Bs spread by ±8 % between pairs.

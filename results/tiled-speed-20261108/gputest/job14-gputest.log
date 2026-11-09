@@ -1,0 +1,82 @@
+Cannot read termcap database;
+using dumb terminal settings.
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+F..
+=================================== FAILURES ===================================
+___ test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system ___
+
+    def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), os.environ.get("PYTHONPATH", "")]),
+                   PYTHONDONTWRITEBYTECODE="1")
+        result = subprocess.run([sys.executable, "-c", textwrap.dedent(CHILD)], cwd=REPOSITORY_ROOT, env=env,
+                                capture_output=True, text=True, timeout=1800, check=False)
+>       assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-8000:]
+E       AssertionError: GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+E           import pynvml  # type: ignore[import]
+E         /home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+E           warnings.warn(
+E         Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+E         Precompiled extension shared object not found.
+E         For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+E         
+E           from openequivariance._torch.TensorProduct import TensorProduct
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+E           loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+E         /home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+E           "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+E         /home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+E           warnings.warn(
+E         Traceback (most recent call last):
+E           File "<string>", line 64, in <module>
+E           File "<string>", line 38, in run
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 2380, in evaluate
+E             out = self(self.field._prepare_one_off(atoms))
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 1683, in __call__
+E             out = self._call(positions)
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 1946, in _call
+E             tile(sweep, index, lane=lane, position=position if ahead else None)
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 1922, in tile
+E             self._eager_tile(sweep, piece, g)
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 2363, in _eager_tile
+E             es, g_vec, g_x, g_sc, g_eps = self._second(tile, state, strain)
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 1419, in _second
+E             es, g_vec, g_x, g_sc, g_eps = self._epilogue("2")(vectors, es.detach(), grads[0], grads[1], grads[2],
+E           File "/home/fzwin/fm-runs/tiled-speed-20261108/src-b5a59f7d/fastmace/model/tiled.py", line 1473, in _second_epilogue
+E             g_vec = g_vec * edge_mask.unsqueeze(1)
+E         AttributeError: 'NoneType' object has no attribute 'unsqueeze'
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/home/fzwin/environments/mace_cueq_oeq/bin/python', '-c', '\nimport fastmace  # before torch: ...gue\n    g_vec = g_vec * edge_mask.unsqueeze(1)\nAttributeError: \'NoneType\' object has no attribute \'unsqueeze\'\n').returncode
+
+tests/gpu/test_tiled_speed_cuda.py:112: AssertionError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_tiled_speed_cuda.py::test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system
+1 failed, 2 passed in 17.55s

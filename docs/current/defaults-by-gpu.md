@@ -224,6 +224,10 @@ On the A100 family and the other GPUs, small keeps the pair off until it has its
 | `generic.TILE_BLOCK_ROWS` (every GPU, rounding): w′ block message for the receivers only | on, off under the wavefront | on, off under the wavefront | on, off under the wavefront | 5060 Ti device state 0.918 / 0.921; wavefront 1.030 / 1.060 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 | `tiled.TILE_VIRIAL` (`TILED_SPEED_GPUS`, rounding): strain gradient from the edge gradients | on | – | – | 0.970 / 0.955; wavefront 0.994 / 0.959; gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 | `tiled.TILE_GRAPH_CACHE` (`TILED_SPEED_GPUS`, exact): tile graphs kept for the call (25 % of free memory less the workspace; not under the wavefront) | on | – | – | 0.948 / 0.960; all four 0.795 / 0.787 (8.38 → 6.66 s) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_FILTER32` (`TILED_SPEED_GPUS`, exact): kept lists' cutoff test in float32, float64 near the cutoff | on | – | – | 0.987 / 0.993; wavefront 0.981 / 1.012 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_EPILOGUE` (`TILED_SPEED_GPUS`, rounding): sweep masks, objective, virial and edge vectors compiled | on, off under the wavefront | – | – | 0.980 / 0.981; wavefront 1.012 / 1.009; gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_FILL_SKIP` (every GPU, exact): no list-cache fill for graph-cached tiles | on | on | on | 0.961 / 0.966 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_PINNED_SUPERSET` (`TILED_SPEED_GPUS`, exact): kept lists pinned on the host, up to 4 GiB | on, off under the wavefront | – | – | 0.986 / 0.990; wavefront 1.012 / 1.028 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 
 ## 2. Default MH-1 float32 plan (GPU-independent)
 

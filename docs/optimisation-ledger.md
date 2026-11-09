@@ -660,6 +660,12 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-block-rows](#tiled-block-rows) | w′ block message narrowed to a tile's receivers, `linear_1` on the block layout | `generic.TILE_BLOCK_ROWS` | FM | DEFAULT (scoped: off under the wavefront) | decision 66, 2026-11-08 | device 0.918 / 0.921; wave 1.030 / 1.060 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-virial](#tiled-virial) | Strain gradient as sym(Vᵀ ∂E/∂V) instead of a strain leaf | `tiled.TILE_VIRIAL` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.970 / 0.955; wave 0.994 / 0.959 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-graph-cache](#tiled-graph-cache) | Tile graphs kept on the device for the call | `tiled.TILE_GRAPH_CACHE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, not under the wavefront) | decision 66, 2026-11-08 | device 0.948 / 0.960 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-filter32](#tiled-filter32) | Kept lists' cutoff test in float32, float64 only near the cutoff | `tiled.TILE_FILTER32` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.987 / 0.993; wave 0.981 / 1.012 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-epilogue](#tiled-epilogue) | Sweep masks, objective, virial and edge vectors in compiled code | `tiled.TILE_EPILOGUE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, off under the wavefront) | decision 66, 2026-11-09 | device 0.980 / 0.981; wave 1.012 / 1.009; gate 12/12 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-fill-skip](#tiled-fill-skip) | No host list-cache fill for tiles the graph cache keeps | `tiled.TILE_FILL_SKIP` | FM | DEFAULT | decision 66, 2026-11-09 | device 0.961 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, off under the wavefront) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 
 <a id="tiled-prefetch-device"></a>
 #### tiled-prefetch-device: TileConfig.prefetch with the state on the device
@@ -699,6 +705,65 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - What: the slot-key pass keeps each tile's local edge index (int32) and shifts on the device until the call ends (20 bytes per edge), so the sweeps gather it instead of building it again (four builds per tile and call before). The budget is the fraction of the free memory less the tiles' predicted workspace, and a measuring call keeps nothing (the first version lowered the receiver cap from 16,384 to 8,192). Off under the wavefront.
 - Status: DEFAULT (scoped). Exact.
 - Measured: 0.948 / 0.960 (887b6b1d).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-filter32"></a>
+#### tiled-filter32: the kept lists' cutoff test in float32
+- Switch: `fastmace.model.tiled.TILE_FILTER32` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: a call that reuses its kept lists (cutoff + skin) tests each edge against the cutoff in float32 and repeats the float64 test only for edges whose float32 squared length is within a bound of the cutoff's (`_filter32_band`: four times the float32 error for the call's largest coordinates). The 27 unit shifts' float64 vectors come from a table. The RTX 5060 Ti runs float64 at 1/64 rate; `_tile_graph` went from 327 to 222 ns/atom.
+- Status: DEFAULT (scoped). Exact: the same edges, shifts and order (CPU and CUDA tests at 200k atoms, small cell and large coordinates). It removes work, so the mixed wavefront A/B (inside that A/B's noise, pairs 0.88-1.04) does not scope it off.
+- Measured: device 0.987 / 0.993; wavefront 0.981 / 1.012 (838930c0).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-epilogue"></a>
+#### tiled-epilogue: the sweeps' eager glue in compiled code
+- Switch: `fastmace.model.tiled.TILE_EPILOGUE` (None: on for `TILED_SPEED_GPUS`, off under the wavefront)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: sweep 1's padding masks and sweep 3's objective (scale and shift, masks, <dE/dx, x> + <dE/dsc, sc>) inside the compiled forwards; the edge-gradient masks and the virial of sweeps 2 and 3 as one compiled epilogue each; a padded slot's edge vectors as one kernel. About 20 eager kernels per tile and sweep before.
+- Status: DEFAULT (scoped). Rounding (the virial's and the objective's sums change order); bitwise outside mode "compiled" (CPU test); force/stress gate 12/12 (b5a59f7d).
+- Measured: device 0.980 / 0.981 (0134304d); wavefront 1.012 / 1.009 (a first ab run gave 0.939), so off there.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-fill-skip"></a>
+#### tiled-fill-skip: no list-cache fill for graph-cached tiles
+- Switch: `fastmace.model.tiled.TILE_FILL_SKIP` (True)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: the slot-key pass packed every tile's lists into the host list cache (a copy back to the host and a sync), also for the tiles the graph cache then kept on the device, whose lists no sweep reads again. A tile built while the cache had room but too large for what was left is built again from the kept lists (the same edges).
+- Status: DEFAULT. Exact (CPU test, all and some tiles kept); removes work, so on everywhere.
+- Measured: device 0.961 / 0.966 (d5e91441). No effect under the wavefront (no graph cache there).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-pinned-superset"></a>
+#### tiled-pinned-superset: kept lists in pinned host memory
+- Switch: `fastmace.model.tiled.TILE_PINNED_SUPERSET` (None: on for `TILED_SPEED_GPUS`, off under the wavefront), cap `TILE_PINNED_SUPERSET_BYTES` (4 GiB)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: list_reuse's kept lists are stored pinned while they total at most the cap, so each call's copy to the device runs asynchronously at the pinned rate (pageable: about 70 ns/atom per call). A same-process A/B's other side gets a mirror in its own form, made once.
+- Status: DEFAULT (scoped). Exact.
+- Measured: device 0.986 / 0.990; wavefront 1.012 / 1.028 (d5e91441). The pinning cost of a call that searches again is not in the A/B (its positions never move past the skin).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-piece-start"></a>
+#### tiled-piece-start: graph-cached index at the slot's halo start
+- Switch: `fastmace.model.tiled.TILE_PIECE_START` (removed in 455facf2)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: keep a cached tile's local index at its slot's halo start, so the sweeps skip a compare, an add and a where over 2 x E (about 60 ns/atom of eager work in `_piece`).
+- Status: REJECTED. That work runs in the prefetch on the side stream, hidden behind the bodies.
+- Measured: device 0.9999 / 1.0001 (0595c76c).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-keep-a0"></a>
+#### tiled-keep-a0: keep interaction 0's activations instead of sweep 3's recompute
+- Switch: none (bound only)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: sweep 3 recomputes interaction 0's forward (about 0.8 us/atom) to back-propagate through it. Keeping the node-level A it needs takes 2,048 floats = 8 kB per atom, about 8 GB at 1M atoms: it does not fit beside the tiles on 16 GB, and a host round trip of 8 GB (about 1.2 s) costs more than the 0.73 s saved.
+- Status: REJECTED at the bound.
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
 
 ### Alternative backends and external comparisons
@@ -751,6 +816,7 @@ are not A/B comparisons.
 | 2026-11-04 | OMAT-0 kernel round; TP backward | Tensor-core fused forward, `TABLE_W`, `BLOCK_MESSAGE` (+ `BLOCK_LDG`), degree-5 tables, zero-column skip, species GEMM, `FACTORED`, `FACTORED_SCALE`, `SYMMETRIC_PAIRS`, stress bisection | All per GPU under d66 (see defaults-by-gpu); every A100 model counts as one (owner); NbCl5 stress excess accepted | A100 OMAT-0 2.73–2.97 µs/atom/step (NVE, `4b70e3f2`) |
 | 2026-11-05 | A100 rounds 1–5 (OMAT-0; not to be confused with opt round 5 of 26 October) | Round 1: five outside ideas assessed; round 2: fused first interaction, tabled forward, Horner, scalar paths, run-walking outer-sum backward, `generic_fold_product_linear`; round 3: w′ backward attribution, M-precontraction (dropped); round 4: `PREFETCH` (rejected), `VEC_SH`, `VEC_A`, `TC_WFRAG`, `TC_TP` (rejected), 3×FP16 (rejected on accuracy); round 5: `EDGE_SH` | Round 2 and 4 switches and `EDGE_SH` per GPU (d66); `BLOCK_LDG` dropped; `FACTORED` on the 5060 Ti | – |
 | 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| 2026-11-09 | Tiled call gap (OMAT-0, RTX 5060 Ti) | `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_FILL_SKIP`, `TILE_PINNED_SUPERSET`; `TILE_PIECE_START` and keeping interaction 0's A rejected | Decision 66 | Device state 0.923 / 0.928 (all eight switches 0.729 / 0.731) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 
 ## Closed directions
 
