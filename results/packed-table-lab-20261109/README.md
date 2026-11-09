@@ -143,3 +143,19 @@ sources 67d01628 and 312fdb4d, $0.15; [round2-gates/a100/](round2-gates/a100/)):
 
 **Rejected.** The pipes would balance, but the doubles take register pairs: 128 registers cut w′'s occupancy, and any
 cap spills. Even with free conversions it is 18 % slower, so staging doubles cannot rescue it.
+
+Smallest offloads (source 4cad5f10, Modal A100 80GB PCIe, $0.10): one of the two paths, and/or only its u sums in
+double (the v sums stay FP32), so fewer doubles are live at once:
+
+| Variant | Registers (spill) | Kernel against base |
+| --- | --- | ---: |
+| fp64-1path (one path, u and v) | 128 | 1.078 |
+| fp64-u (both paths, u only; dsh bitwise) | 100 | 1.163 |
+| fp64-1path-u (one path, u only) | 96 | **1.039** |
+| F-fp64-free-1path-u (its conversions free) | 100 | 1.094 |
+| fp64-1path-u, capped at 80 | 80 (56 B) | 1.242 |
+
+The smallest offload still needs 96 registers: 80 → 96 drops w′ from 6 to 5 blocks per SM (the kernel is
+latency-bound, the occupancy loss outweighs the pipe), and at 80 it spills. Every form of the FP64 pipe on w′ is
+slower; it would only pay in a kernel that already runs below its register cap and is FP32-pipe bound, and w′ is
+the only FP32-pipe-bound kernel on the A100.
