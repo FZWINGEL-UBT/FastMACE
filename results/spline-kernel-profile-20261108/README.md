@@ -44,6 +44,49 @@ What w′ is *not* limited by:
 
 **The forward is the opposite case.** Its L1 hit rate is 24.6 %, and long-scoreboard stalls of 14.0 drop to 5.8 with one slab. Its latency is the table, which SORT_BY_LENGTH and BLOCK_ORDER already target.
 
+## Correction: the same profile with the H200's switch set
+
+The profile above ran w′ with the 5060 Ti's own defaults. Those leave `STAGE_DOUT` and `STAGE_SH` off and apply the
+80-register cap, `BUTTERFLY` and `REDUX`; on the H200 the first two are on and the rest off. The run was repeated
+with every differing switch set as on the H200 (`STAGE_DOUT`, `STAGE_SH`, `SCALAR_PATHS`, `FOLD_ALPHA` on;
+`BUTTERFLY`, `REDUX` off; no register cap; the forward's `STAGE_EDGES` on).
+
+Files: [5060ti-h200set/](5060ti-h200set/metrics.csv).
+
+| Metric | w′ real | w′ one-slab | forward real | forward one-slab |
+| --- | ---: | ---: | ---: | ---: |
+| Duration (ms) | 4.73 | 3.87 (0.818) | 3.69 | 1.38 (0.374) |
+| Registers / warps active | 96 / 33 % | 96 / 33 % | 80 / 50 % | 80 / 49 % |
+| Issue active / LSU pipe / FMA pipe | 47 / 64 / 37 % | 57 / 77 / 45 % | 25 / 20 / 21 % | 73 / 58 / 61 % |
+| L1 hit / L2 read hit | 10.7 / 96.7 % | 66.1 / 91.8 % | 11.2 / 98.7 % | 87.9 / 91.4 % |
+| L1 global load sectors per edge | 733 | 733 | 700 | 700 |
+| Long-scoreboard stall per issue | **4.07** | 2.16 | **19.2** | 1.29 |
+
+With staging on, w′ is closer to LSU-issue bound: its LSU pipe is 64 % busy, and its load waits halve. The table
+slab is 640 of its 733 sectors per edge, so the table accounts for about half of what is left. The other half is
+mostly the sender rows, the one large global load left unstaged.
+
+## Sender-row bound: stopped
+
+`tools/spline_table_bound.py` has a new w′ variant, `local-sender`, which sets every edge's sender to its own
+receiver. A receiver's edges then read one x row, which stays hot in L1. This is the most that staging or reordering
+the sender rows could save. The output is wrong, and dx's atomics then land on one row per receiver, so the variant
+flatters slightly.
+
+Run: 21 alternating rounds, same switch set. Files: [stb-sender-1755/](stb-sender-1755/spline_table_bound.json) and
+[stb-sender.log](stb-sender.log).
+
+| w′ variant | Flushed / warm (µs) | × real |
+| --- | ---: | ---: |
+| real | 4,595 / 4,559 | 1.000 |
+| local-sender | 4,409 / 4,377 | 0.960 |
+| one-slab | 3,740 / 3,721 | 0.816 |
+| one-slab + local-sender | 3,697 / 3,682 | 0.808 |
+
+**The stop rule applies.** Perfect sender locality saves 4 % of w′. On the H200 that is at most about 44 µs of
+1,099, or 1.3 % of a 3.42 ms step. The triage rule needs a lab gain of twice the 1 % bound, about 68 µs, and real
+staging would also pay for a cooperative load pass. Stopped before any build or Modal run.
+
 ## What this leaves for w′
 
 The two classic levers are already closed:
@@ -51,8 +94,48 @@ The two classic levers are already closed:
 - **More warps (register caps):** `omat0-wprime-maxreg-a100`, ideas-r14 #36, and the 5060 Ti lab of `omat0-horner`. Caps of 64–72 spill and lose 1.11–1.48×.
 - **Prefetching the next edge:** STAGE_EDGES on w′ was 0.9969 / 1.0010 on the H200, and PREFETCH_AHEAD on the forward was 1.0046 / 1.0067.
 
-What remains is to issue fewer dependent loads per edge. Each edge requests 1,406 L1 sectors (525.5 M in total), the same with real and one-slab inputs, against a table slab of 640 sectors.
+The H200 already stages the adjoint rows (`STAGE_DOUT`) and the edge features (`STAGE_SH`). The sender rows were
+bounded above at 4 % of w′ and stopped. With the H200's staging, w′ sits at 64 % LSU issue and 37 % FMA, with the
+table read half of its remaining load waiting. Its table share on the H200 itself is 3 % (one-slab 0.973).
 
-The candidate is a w′ that reads the sender rows and staged adjoints once per cohort into shared memory, as STAGE_SH already does for the edge features, so the per-edge loop reads only the table. That is a lab question for the 5060 Ti first. This profile alone does not bound it, because the other loads' L1 hits (81 % with one slab) are already high.
+No load-side lever for w′ is left above 1 % of the step. A further w′ gain needs fewer instructions per edge, not
+fewer bytes.
 
 Caveat: this is the 5060 Ti. The H200 has a larger L2 and higher L2 bandwidth, and its w′ runs 72 registers in the H200 build. The stall mix should be confirmed there before anyone builds a lever on it. An H200 ncu run is a few minutes on Modal `sixth`.
+
+## BULK_SLAB: the forward's slabs bulk-copied into shared memory (rejected in the lab)
+
+**The idea.** With STAGE_EDGES, each live edge's table slab (1,280 float4 = 20 KB, contiguous) is copied into a ring
+of 1 or 2 shared-memory buffers by one `cp.async.bulk` (TMA, sm_90+). The copy is issued 1–2 edges ahead and
+completes on an mbarrier. The channel loop then reads the slab with LDS.128 instead of waiting on L2.
+
+Target: the forward's table latency. That is 169 µs on the H200 (601 µs real against 433 µs one-slab), and on the
+5060 Ti the one-slab variant runs at 0.37×. Stop rule: recover at least 40 % of the one-slab gap.
+
+Run details:
+
+- **Lab:** `tools/spline_table_bound.py`, 21 alternating rounds, RTX 5060 Ti with the H200 switch set (the same set as above).
+- **Code:** `spline_forward.bulk_source`; the kernel uses 80 registers and no local memory.
+- **Files:** [bulk-slab/](bulk-slab/stb-bulk.log).
+- **Control:** the real kernel launched with the same shared memory, unused (`real-smem-N`), so it runs the same blocks per SM. The 5060 Ti has 100 KB of shared memory per SM, so the ring costs occupancy there.
+
+| Forward variant | Warm (µs) | × real | × its control |
+| --- | ---: | ---: | ---: |
+| real | 3,421 | 1.000 | |
+| one-slab (bound) | 1,262 | 0.369 | |
+| real + 20 KB unused (control 1) | 3,759 | 1.099 | |
+| **bulk, 1 buffer** | 5,047 | 1.475 | **1.343** |
+| real + 40 KB unused (control 2) | 4,285 | 1.253 | |
+| **bulk, 2 buffers** | 4,828 | 1.411 | **1.127** |
+
+**Rejected.** At equal occupancy the copy pipeline is 13–34 % *slower* than the plain loads, so the H200's larger
+shared memory would not rescue it. Two likely reasons:
+
+- Each block copies its own whole slab. The L1 sharing between co-resident blocks that SORT_BY_LENGTH and BLOCK_ORDER created is lost.
+- One `__syncthreads` per edge serialises the block's four warps.
+
+The output also differs from the real kernel at 3.75e-8 relative. That is not bitwise, because the compiler fuses
+differently once the loads come from shared memory.
+
+No H200 run was made. The lab code is in this branch's history (commit "BULK_SLAB lab") and is reverted from the
+production source.

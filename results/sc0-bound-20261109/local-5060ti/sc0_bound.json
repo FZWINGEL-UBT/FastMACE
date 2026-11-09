@@ -1,0 +1,92 @@
+{
+ "structure": "SrTiO3",
+ "natoms": 5000,
+ "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+ "module": "products.0.symmetric_contractions",
+ "method": "uniform_1d",
+ "x_shape": [
+  5000,
+  2048
+ ],
+ "weight_shape": [
+  89,
+  3712
+ ],
+ "indices_dtype": "torch.int32",
+ "x_rms": 0.11205516010522842,
+ "irreps_in": "128x0e+128x1o+128x2e+128x3o",
+ "irreps_out": "128x0e+128x1o",
+ "degree": 3,
+ "tool": "sc0_bound",
+ "created_utc": "2026-11-09T00:11:59.058301+00:00",
+ "host": "Fabi-PC",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "sms": 36,
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "bd6c683ef5ec5a23d6dd0d8b633b8f5d074d80ee",
+ "rounds": 3,
+ "iterations": 10,
+ "us": {
+  "proxy": 898.32,
+  "floor": 413.79,
+  "floor+w": 416.97,
+  "copy": 223.33
+ },
+ "us_spread": {
+  "proxy": [
+   896.6,
+   911.3
+  ],
+  "floor": [
+   390.91,
+   431.44
+  ],
+  "floor+w": [
+   413.06,
+   436.08
+  ],
+  "copy": [
+   223.17,
+   240.03
+  ]
+ },
+ "kernels_us": {
+  "proxy": {
+   "triton_poi_fused_add_div_0": 224.43,
+   "segmented_polynomial_algo1_1": 121.17,
+   "segmented_polynomial_bwd_algo1_1": 240.13,
+   "triton_red_fused_add_div_mul_neg_sum_0": 311.95
+  },
+  "floor": {
+   "fwd": 136.42,
+   "bwd": 277.59
+  },
+  "floor+w": {
+   "fwd": 158.01,
+   "bwd": 257.57
+  },
+  "copy": {
+   "Memcpy DtoD (Device -> Device)": 223.33
+  }
+ },
+ "floor_bytes": {
+  "forward": 51220000,
+  "backward": 92200000
+ },
+ "floor_tb_per_s": 0.347,
+ "copy_tb_per_s": 0.367,
+ "saving_us": {
+  "floor": 484.54,
+  "floor_w": 481.35
+ },
+ "flops": {
+  "forward": 5159680000,
+  "backward": 5159680000,
+  "descriptor": "\u256d a=3712x0e b=128x0e+128x1o+128x2e+128x3o -> C=128x0e+128x1o\n\u2502  []\u00b7a[u]\u00b7b[u]\u279cC[u] \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 num_paths=4 u=128\n\u2502  []\u00b7a[u]\u00b7b[u]\u00b7b[u]\u279cC[u] \u2500\u2500\u2500\u2500\u2500\u2500 num_paths=86 u=128\n\u2570\u2500 []\u00b7a[u]\u00b7b[u]\u00b7b[u]\u00b7b[u]\u279cC[u] \u2500 num_paths=1949 u=128"
+ },
+ "fp32_tflops": 23.7,
+ "flop_floor_us": {
+  "forward": 217.71,
+  "backward": 217.71
+ }
+}

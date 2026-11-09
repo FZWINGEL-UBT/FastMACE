@@ -121,7 +121,10 @@ STAGE_TILE = 32
 # an int: an A/B side's distance (0 off).
 PREFETCH_AHEAD = None
 # NVIDIA H200 (8 November 2026, round 6): MD step b/a 1.0046 / 1.0067 (b = 2): off.
-PREFETCH_AHEAD_GPUS = GPUModels(())
+# A100 family (8 November 2026, results/h200-fastpath-20261108/round6-a100, NHR Alex A100-SXM4-80GB job 4963944;
+# OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9810 / 0.9943 (b = 2);
+# all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
+PREFETCH_AHEAD_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 PREFETCH_AHEAD_DISTANCE = 2
 PREFETCH_PATHS = 4
 
@@ -250,8 +253,9 @@ def render(schedule, blocks, grid, r_max, path_scale=None, part=None, threads=No
 BLOCK_ORDER = None
 # NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`, on
 # top of SORT_BY_LENGTH): MD step b/a 0.9753 / 0.9724 (3.514 -> 3.42 ms); forces 2.6e-6 against the same build's
-# 3.3e-6 eV/A (bitwise forward; w' atomics).
-BLOCK_ORDER_GPUS = GPUModels(("NVIDIA H200",))
+# 3.3e-6 eV/A (bitwise forward; w' atomics). NVIDIA A100-SXM4-80GB (Alex pack 7, job 4965032, against the A100
+# defaults of 59c1034e, SORT_BY_LENGTH off): MD step b/a 0.9953 / 0.9945 (7.37 -> 7.34 ms).
+BLOCK_ORDER_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))  # A100 family
 
 
 def block_order_default(device):

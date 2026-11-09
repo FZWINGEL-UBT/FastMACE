@@ -1,0 +1,151 @@
+{
+  "tool": "spline_table_bound",
+  "created_utc": "2026-11-08T19:07:23Z",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": null,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "rounds": 21,
+  "constants": {
+    "fastmace.kernels.oeq_streaming.spline_forward:SPLINE_W": true,
+    "fastmace.kernels.oeq_streaming.spline_forward:R128": true,
+    "fastmace.kernels.oeq_streaming.spline_forward:STAGE_EDGES": true,
+    "fastmace.kernels.oeq_streaming.spline_forward:BLOCK_ORDER": true,
+    "fastmace.neighbors.skin:SORT_BY_LENGTH": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:SPLINE_VECTOR": 4,
+    "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_DOUT": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_SH": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:SCALAR_PATHS": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:FOLD_ALPHA": true,
+    "fastmace.kernels.oeq_streaming.wprime_backward:BUTTERFLY": false,
+    "fastmace.kernels.oeq_streaming.wprime_backward:REDUX": false,
+    "fastmace.kernels.oeq_streaming.wprime_backward:MAX_REGISTERS": 0
+  },
+  "kernels": {
+    "forward": {
+      "edges": 373760,
+      "edges_inside": 370288,
+      "median_us": {
+        "real": {
+          "flush": 3428.7359714508057,
+          "warm": 3420.8641052246094
+        },
+        "one-slab": {
+          "flush": 1279.9359560012817,
+          "warm": 1261.504054069519
+        },
+        "slab-sorted": {
+          "flush": 3350.816011428833,
+          "warm": 3334.4318866729736
+        },
+        "species-blocks": {
+          "flush": 3417.9840087890625,
+          "warm": 3416.0640239715576
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 3346.208095550537,
+          "warm": 3328.927993774414
+        },
+        "bulk-slab-1": {
+          "flush": 5045.087814331055,
+          "warm": 5046.656131744385
+        },
+        "real-smem-1": {
+          "flush": 3768.8639163970947,
+          "warm": 3759.040117263794
+        },
+        "bulk-slab-2": {
+          "flush": 4829.984188079834,
+          "warm": 4828.03201675415
+        },
+        "real-smem-2": {
+          "flush": 4293.600082397461,
+          "warm": 4285.215854644775
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.37329673869863494,
+          "warm": 0.36876766082080026
+        },
+        "slab-sorted": {
+          "flush": 0.9772744356314487,
+          "warm": 0.9747338052921688
+        },
+        "species-blocks": {
+          "flush": 0.9968641613844668,
+          "warm": 0.9985968220001138
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 0.9759305246634816,
+          "warm": 0.9731248863964566
+        },
+        "bulk-slab-1": {
+          "flush": 1.471413330258941,
+          "warm": 1.4752577058050156
+        },
+        "real-smem-1": {
+          "flush": 1.0991992232059706,
+          "warm": 1.0988568974495936
+        },
+        "bulk-slab-2": {
+          "flush": 1.4086777833861954,
+          "warm": 1.4113486733893945
+        },
+        "real-smem-2": {
+          "flush": 1.2522399269433115,
+          "warm": 1.2526705893110635
+        }
+      },
+      "registers": [
+        80
+      ]
+    },
+    "wprime": {
+      "edges": 373760,
+      "edges_inside": 370288,
+      "median_us": {
+        "real": {
+          "flush": 4597.7277755737305,
+          "warm": 4550.655841827393
+        },
+        "one-slab": {
+          "flush": 3745.7919120788574,
+          "warm": 3720.576047897339
+        },
+        "local-sender": {
+          "flush": 4407.328128814697,
+          "warm": 4374.527931213379
+        },
+        "one-slab+local-sender": {
+          "flush": 3698.6560821533203,
+          "warm": 3678.208112716675
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.8147050227677815,
+          "warm": 0.8175911730567783
+        },
+        "local-sender": {
+          "flush": 0.9585883166527244,
+          "warm": 0.9612961479101249
+        },
+        "one-slab+local-sender": {
+          "flush": 0.8044530391301344,
+          "warm": 0.8082808809465205
+        }
+      },
+      "registers": null
+    }
+  }
+}

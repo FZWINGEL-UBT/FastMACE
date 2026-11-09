@@ -208,3 +208,49 @@ This confirms the report's doubt with a number: at 75 neighbours, a spatial oper
 | §4 rejects (temporal deltas, Taylor reuse, BF16/FP8, FP16×3, polynomial compile, Cartesian, persistence/TMA, neighbour-list reuse) | **Agree.** Each is either closed in the ledger already or bounded below 20 % with correct arithmetic. |
 | Next step: physical-byte/pipe profile of forward and w′ | **Agree.** The table share is now known (above). The pipe and stall profile of w′ is the open measurement. |
 | Retrain with a cheaper interaction | **Owner decision.** Outside same-model scope. |
+
+## Third report (Codex, "beyond kernel tuning"): certified adaptive evaluation
+
+The report is copied to [outside-box-report/](outside-box-report/report.md). It proposes two directions. Only the
+second is assessed here: the owner does not want to train anything, so the learned 32-channel replacement for
+interaction 2 is out of scope.
+
+**The idea.** Keep the checkpoint. Skip interaction-2 edge, path and channel blocks whenever a cheap error certificate
+shows their effect on forces and stress is within budget. Refine, or fall back to the full path, otherwise.
+
+**Its arithmetic holds.** A 20 % step saving is 684.4 µs, which is 40.6 % of the 1,685.2 µs interaction-2 lab sum. With
+100 µs or 200 µs of checking overhead the required omission rises to 46.5 % or 52.5 %
+([budgets.json](outside-box-report/budgets.json)).
+
+### Oracle falsifier: rejected
+
+[skip_oracle.py](outside-box-report/skip_oracle.py) (→ [json](outside-box-report/skip_oracle.json)) assumes a
+*perfect* certificate. It masks interaction 2's per-edge messages for every edge longer than r_s, leaves everything
+else unchanged, and compares forces in float64 with the full model.
+
+Run details:
+
+- OMAT-0 medium on CPU, float64.
+- SrTiO3 4×4×4 (320 atoms, 23,628 edges), thermally displaced with σ = 0.05 Å.
+- The budget is the production rounding error, float32 against float64 on the same structure: 3.57e-5 eV/Å. The gate allows 3× that, so omission may add about 2×, or 7e-5 eV/Å.
+
+| r_s (Å) | Edges omitted | Max force error (eV/Å) | × float32 rounding |
+| ---: | ---: | ---: | ---: |
+| 5.00 | 32.3 % | 3.1e-2 | 877 |
+| 5.50 | 26.4 % | 4.4e-2 | 1,226 |
+| 5.80 | 12.8 % | 6.4e-3 | 179 |
+| 5.90 | 4.3 % | 1.9e-3 | 53 |
+| 5.95 | 1.3 % | 2.8e-4 | 7.9 |
+| 5.98 | 0.43 % | 1.7e-5 | 0.47 |
+| 5.99 | 0.24 % | 5.7e-6 | 0.16 |
+
+Even the oracle stays within budget only for the last 0.02–0.05 Å of the cutoff, about **0.4 % of the edge work**,
+against the 40–53 % the idea needs. Skipping the longest third of the edges costs 900× the budget.
+
+**Distance is the right axis to test.**
+
+- The polynomial cutoff envelope is the only factor that shrinks a whole edge's contribution.
+- Channels give no smaller units: all ten radial path blocks are full rank, with relative smallest singular values 0.033–0.099 (`model_probe.py`, second report).
+- The masking flatters the idea, because the density stays unchanged.
+
+**Verdict: rejected.** A certificate cannot beat its oracle. No implementation, lab or GPU time is warranted.

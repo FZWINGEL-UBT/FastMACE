@@ -40,8 +40,10 @@ COMPACT_CHUNK = 1 << 22
 SORT_BY_LENGTH = None
 # NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`): MD
 # step b/a 0.9807 / 0.9791 (ab / ba, 3.585 -> 3.514 ms); gate passes (forces 0.83 / 0.92 / 0.97, stress 0.48 / 0.94 /
-# 1.07 against 3).
-SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200",))
+# 1.07 against 3). A100 family (9 November 2026, NHR Alex A100-SXM4-80GB, Alex pack 7 job 4965032 against the A100
+# defaults): alone 0.9924 / 0.9936, with BLOCK_ORDER 0.9920 / 0.9904 (7.39 -> 7.33 ms); gate (job 4967026, with
+# BLOCK_ORDER) passes: forces 0.92 / 0.93 / 0.96, stress 0.64 / 1.02 / 1.15 against 3.
+SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))  # H200, A100
 LENGTH_BINS = 4096
 
 
