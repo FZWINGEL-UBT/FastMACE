@@ -212,6 +212,7 @@ nothing is compiled (`EngineConfig.compile_mode="none"`).
 | Option | Values | Default (`auto` means) | What it does | Exactness / limits |
 | --- | --- | --- | --- | --- |
 | `tf32x3_gemms` | `auto`, `on`, `off` | Off. Only `"on"` enables it. | Runs every atom-level matrix product (block linears, `segment_gemm`, species skip, reassociated first interaction) and its input gradient as three TF32 tensor-core products (Triton's `tf32x3`), which together reach about float32 accuracy. | rounding, deterministic; not equivalent to IEEE float32 when terms cancel. Needs `block_linear`, float32 and compute capability 8.0 or higher. Conflicts with `grouped_launch`: set `grouped_launch="off"` with it on the generic MACE family. |
+| `cueq_projected` | `auto`, `on`, `off` | On with `tf32x3_gemms` on the GPUs `cueq_projection.CUEQ_PROJECTED_GPUS` lists (the H200 and the A100 family), except for the models `planner.fixed.DECISION_66_CUEQ_PROJECTED_EXCLUDED` lists there (OFF23-large, POLAR-1-S and POLAR-1-M on the A100 family: not faster). Off elsewhere. | Keeps cuEq's SymmetricContraction weight times its projection as a buffer computed once, instead of an einsum in every call. | rounding, deterministic. Acts only where `tf32x3_gemms` is on. The A/B constant `CUEQ_PROJECTED` overrides it. |
 
 The float64 emulation on integer tensor cores, and its mantissa bits, are
 engine options (`EngineConfig.fp64_emulation`,
