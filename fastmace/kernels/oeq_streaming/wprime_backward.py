@@ -1335,14 +1335,16 @@ class _SplineBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, forward_table):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, forward_table=None):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         _, density = radial_table_forward(r, pair, density_coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
                                           0)
-        # forward_table: the table the forward reads (PACKED8's packed copy, else ``table``)
-        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, forward_table, spline_id)
+        # forward_table: PACKED8's packed copy the forward reads, else None (``table``). Never ``table`` twice: the
+        # aliased inputs made torch.compile recompile with spline_id a SymInt (H200 gate of 54b4da74)
+        read = table if forward_table is None else forward_table
+        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, read, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
                               bins)
         ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
@@ -1768,7 +1770,7 @@ class WPrime(torch.nn.Module):
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
                 x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
-                self.spline_packed if self.spline_block[1].packed8 else self.spline_table)  # PACKED8
+                self.spline_packed if self.spline_block[1].packed8 else None)  # PACKED8
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
