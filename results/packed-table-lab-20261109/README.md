@@ -159,3 +159,27 @@ The smallest offload still needs 96 registers: 80 → 96 drops w′ from 6 to 5 
 latency-bound, the occupancy loss outweighs the pipe), and at 80 it spills. Every form of the FP64 pipe on w′ is
 slower; it would only pay in a kernel that already runs below its register cap and is FP32-pipe bound, and w′ is
 the only FP32-pipe-bound kernel on the A100.
+
+Could a register saving elsewhere pay for the FP64 pipe? The only earlier register-freeing switch that was not slower
+on its own is SMEM_SPILL (w′ capped, spills to shared memory; H200 MD step 0.9999 / 1.0033 at cap 64). Lab on the
+A100 (sources 68eac1ef and 183e7d3d, $0.20; [round2-gates/a100/](round2-gates/a100/)):
+
+| Variant (cap; spill to) | Registers (local bytes) | Kernel against base |
+| --- | --- | ---: |
+| base, cap 72 | 72 (24) | 1.095 |
+| base, cap 64 | 64 (72) | 1.300 |
+| fp64-1path-u, uncapped | 96 (0) | 1.036 |
+| fp64-1path-u, cap 80 | 80 (72) | 1.255 |
+| fp64-1path-u, cap 64 | 64 (144) | 1.911 |
+| fp64-u, cap 80 | 80 (88) | 1.357 |
+| fp64-1path, cap 80 | 80 (120) | 1.551 |
+| fp64-paths, cap 80 | 80 (160) | 1.925 |
+| fp64 free conversions, cap 80 | 80 (160) | 1.986 |
+
+**Closed.** On sm_80 the `enable_smem_spilling` pragma has no effect: the spills go to local memory, and any cap
+below what the FP64 forms need costs more than the pipe gives. Every route to the second pipe on w′ is slower.
+
+Found on the way: with `__launch_bounds__` present ptxas ignores `--maxrregcount`. The first run (68eac1ef) kept
+96 / 128 registers under "caps" of 80 / 64, and `wprime_backward.SMEM_SPILL` had the same bug, so the H200 / 5060 Ti
+SMEM_SPILL MD A/Bs above (source 158399f2) most likely measured uncapped kernels. Fixed in 183e7d3d (the cap is now
+`__launch_bounds__`' minimum blocks per SM); SMEM_SPILL on the H200 (sm_90, where the pragma may work) is untested.

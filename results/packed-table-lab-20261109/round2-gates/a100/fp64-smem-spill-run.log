@@ -1,0 +1,23 @@
+2026-11-09T02:56:15Z Modal NVIDIA A100-SXM4-80GB, 610.57.04; source 183e7d3dd0816fb1061686e5e07e4f3d1fff412e
+2026-11-09T02:58:17Z end lab exit=0
+wprime ptxas base                         {'8.0': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas base-s64                     {'8.0': {'registers': 64, 'spill_store_bytes': 116}}
+wprime ptxas base-s72                     {'8.0': {'registers': 72, 'spill_store_bytes': 32}}
+wprime ptxas fp64-1path-u                 {'8.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas fp64-1path-u-s80             {'8.0': {'registers': 80, 'spill_store_bytes': 92}}
+wprime ptxas fp64-1path-u-s64             {'8.0': {'registers': 64, 'spill_store_bytes': 204}}
+wprime ptxas fp64-1path-s80               {'8.0': {'registers': 80, 'spill_store_bytes': 160}}
+wprime ptxas fp64-u-s80                   {'8.0': {'registers': 80, 'spill_store_bytes': 132}}
+wprime ptxas fp64-paths-s80               {'8.0': {'registers': 80, 'spill_store_bytes': 216}}
+wprime ptxas F-fp64-free-s80              {'8.0': {'registers': 80, 'spill_store_bytes': 220}}
+wprime   base                2238.5 us  ratio 1.000  regs 80 local 0  
+wprime   base-s64            2909.2 us  ratio 1.300  regs 64 local 72  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   base-s72            2451.5 us  ratio 1.095  regs 72 local 24  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 1.87e-07'}
+wprime   fp64-1path-u        2319.4 us  ratio 1.036  regs 96 local 0  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   fp64-1path-u-s80    2809.9 us  ratio 1.255  regs 80 local 72  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   fp64-1path-u-s64    4278.3 us  ratio 1.911  regs 64 local 144  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   fp64-1path-s80      3472.4 us  ratio 1.551  regs 80 local 120  {'dsh': 'max|d|/max|a| = 2.18e-09', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   fp64-u-s80          3037.2 us  ratio 1.357  regs 80 local 88  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.18e-07'}
+wprime   fp64-paths-s80      4308.0 us  ratio 1.925  regs 80 local 160  {'dsh': 'max|d|/max|a| = 2.18e-09', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   F-fp64-free-s80     4445.2 us  ratio 1.986  regs 80 local 160  
+2026-11-09T02:58:17Z done
