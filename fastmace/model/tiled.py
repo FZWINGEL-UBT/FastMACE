@@ -106,12 +106,6 @@ TILE_FILL_SKIP = True
 # the cap, pageable as before. None: on for TILED_SPEED_GPUS, off under the wavefront (1.012 / 1.028 there).
 TILE_PINNED_SUPERSET = None
 TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
-# TILE_LAZY_KEYS (exact): a plain-schedule call whose slots exist (every call after the first compiled one) takes
-# each tile's slot in sweep 1, from the graph built ahead on the prefetch stream while the previous tile runs, instead
-# of building every tile's graph in a pass before sweep 1 (a sync per tile with the GPU idle: about 0.3 s per call at
-# 975,560 SrTiO3 atoms on the RTX 5060 Ti). A tile that fits no slot as it is runs the pass then, as before (its slot
-# grows). The same slots for the tiles that fit, the same graphs. None: on for TILED_SPEED_GPUS (with the prefetch).
-TILE_LAZY_KEYS = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1828,27 +1822,21 @@ class TiledForceField:
         wave = self._wavefront_on(grid, n)
         self._wave_now = wave  # the plain-schedule switches (``_speed(..., plain=True)``) are off under it
         self._graph_budget(wave, measure)
-        lanes = self._lanes_on(padded, n)
-        # TILE_LAZY_KEYS: the slots of this call's tiles in sweep 1, as the prefetch builds their graphs
-        lazy = (padded and not wave and not measure and not lanes and bool(self._slots)
-                and self._edge_step is not None and self.config.prefetch
-                and (self.config.state == "host" or self._speed(TILE_PREFETCH_DEVICE))
-                and bool(self._speed(TILE_LAZY_KEYS)))
         started = time.perf_counter()  # the search pass before the sweeps (its syncs make the wall time its cost)
         if wave:
             keys, steps, pool_rows, first, last = self._wavefront(tiles, source, local_of, n, padded)
         else:
-            keys = ([None] * len(tiles) if lazy else self._slot_keys(tiles, source, local_of, n)) if padded else None
+            keys = self._slot_keys(tiles, source, local_of, n) if padded else None
             steps, pool_rows = [(sweep, index) for sweep in (1, 2, 3) for index in range(len(tiles))], 0
         stats["search_s"] = time.perf_counter() - started if padded or wave else 0.0
-        lazy_sizes = {}  # TILE_LAZY_KEYS: each tile's (r, h, edges) as sweep 1 builds it
+        lanes = self._lanes_on(padded, n)
         if lanes:  # sweep 2 in pairs: its sweep-3 steps between a pair's tiles wait for the pair (a larger pool)
             steps, lane_peak = lane_steps(steps, [int(t.shape[0]) for t in tiles])
             pool_rows = max(pool_rows, lane_peak) if wave else pool_rows
         stats["lanes"] = self.lanes_state
         stats["wavefront"] = dict(on=wave, pool_rows=pool_rows, pool_fraction=pool_rows / max(n, 1),
                                   boundary_skin=self._plan_skin)  # the split's reach (Angstrom), 0: none
-        if padded and not lazy:
+        if padded:
             stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
             stats["slot_needs"] = {key: self.slot_needs[key] for key in sorted(self.slot_needs)}
             stats["slot_changes"] = self.slot_changes
@@ -1900,37 +1888,14 @@ class TiledForceField:
                      for item in steps for k, index in enumerate(item[1:])]
             prepared = {}
 
-            def lazy_piece(index):
-                """TILE_LAZY_KEYS: tile ``index``'s graph and its slot's key, the halo moved to the slot's start;
-                the key None when no slot takes the tile as it is."""
-                piece = self._piece(index, tiles[index], source, local_of)  # halo after the receivers
-                nodes, ei, shifts, local, r, h = piece
-                lazy_sizes[index] = (r, h, int(ei.shape[1]))
-                key = self._fitting_key(r, h, int(ei.shape[1]))
-                if key is None:
-                    return piece, None
-                start = self._slots[key]["sizes"][0]
-                if start != r:
-                    local = torch.where(local >= r, local + (start - r), local)
-                return (nodes, ei, shifts, local, r, h), key
-
             def prepare(position):
                 """Build tile ``order[position]``'s graph ahead; fetch its rows when the sweep before it is its own."""
                 sweep, index, lane = order[position]
-                if keys[index] is None:  # TILE_LAZY_KEYS: its slot from the graph built here
-                    with torch.cuda.stream(prep) if prep is not None else contextlib.nullcontext():
-                        piece, key = lazy_piece(index)
-                    if key is None:
-                        return  # the tile runs the key pass itself
-                    keys[index] = key
-                else:
-                    piece = None
                 slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]]
                 # (device state, TILE_PREFETCH_DEVICE: the graph only; the body reads its rows)
                 rows = state.host and position > 0 and order[position - 1][0] == sweep and sweep in (2, 3)
                 with torch.cuda.stream(prep) if prep is not None else contextlib.nullcontext():
-                    if piece is None:
-                        piece = self._piece(index, tiles[index], source, local_of, slot["sizes"][0])
+                    piece = self._piece(index, tiles[index], source, local_of, slot["sizes"][0])
                     nodes = piece[0].cpu()  # waits for the prefetch stream only
                     fetched = {}
                     if rows:  # the slot's layout (_fill): receivers, then the halo after the receiver slots
@@ -1955,20 +1920,11 @@ class TiledForceField:
                 if sweep == 1 and wave:
                     state.assign(receivers if host_tiles is None else host_tiles[index])
                 state.new_tile()
-                ready = prepared.pop(position, None)
-                piece = None
-                if padded and keys[index] is None and ready is None:  # TILE_LAZY_KEYS, not built ahead
-                    piece, key = lazy_piece(index)
-                    if key is None:  # no slot takes it as it is: the key pass for every tile, as without
-                        keys[:] = self._slot_keys(tiles, source, local_of, n)
-                        piece = None
-                    else:
-                        keys[index] = key
                 slot = self._lane_slot(keys[index]) if lane == 1 else self._slots[keys[index]] if padded else None
+                ready = prepared.pop(position, None)
                 host_nodes, fetched = None, {}
                 if ready is None:
-                    if piece is None:
-                        piece = self._piece(index, receivers, source, local_of, slot["sizes"][0] if padded else None)
+                    piece = self._piece(index, receivers, source, local_of, slot["sizes"][0] if padded else None)
                 else:
                     piece, host_nodes, fetched, event = ready
                     if event is not None:
@@ -2054,17 +2010,6 @@ class TiledForceField:
                 for part in lane_strain:
                     strain_grad.add_(part)
             state.flush()
-            if padded and lazy:  # the slots and needs as the key pass reports them
-                stats["slots"] = {key: self._slots[key]["sizes"] for key in sorted(set(keys))}
-                needs = {}
-                for index, size in lazy_sizes.items():
-                    old = needs.get(keys[index])
-                    needs[keys[index]] = size if old is None else tuple(max(a, b) for a, b in zip(old, size))
-                if len(lazy_sizes) == len(tiles):  # (after a fallback, the key pass set them)
-                    self.slot_needs = needs
-                stats["slot_needs"] = {key: self.slot_needs[key] for key in sorted(self.slot_needs)}
-                stats["slot_changes"] = self.slot_changes
-            stats["lazy_keys"] = bool(lazy)
             stats["tiles_s"] = time.perf_counter() - loop_started  # the host's time in the sweeps (queued work aside)
             stats["graph_cache"] = dict(tiles=len(self._pieces or {}), bytes=self._piece_bytes,
                                         budget=self._piece_budget)
@@ -2388,16 +2333,6 @@ class TiledForceField:
         steps, peak = wavefront_schedule(needs, ready, [int(t.shape[0]) for t in tiles],
                                          self.config.wavefront_group)
         return keys, steps, peak, first, last
-
-    def _fitting_key(self, r, h, edges):
-        """``TILE_LAZY_KEYS``: the existing slot that takes a tile of ``r`` receivers, ``h`` halo rows and ``edges``
-        edges as ``_slot_keys`` would give it without growing a slot (its own bucket's slot, else a neighbouring
-        bucket's), or None."""
-        key = max(1, math.ceil(edges / self._edge_step))
-        raw = (r + 1, h, edges)
-        fits = [k for k in ((key,) if key in self._slots else (key - 1, key + 1))  # its own slot grows if it must
-                if k in self._slots and all(a <= b for a, b in zip(raw, self._slots[k]["sizes"]))]
-        return fits[0] if fits else None
 
     def _slot_keys(self, tiles, source, local_of, n, visit=None):
         """Each tile's slot: the edge bucket ``ceil(edges / step)``, with ``step`` set on the first call from the
