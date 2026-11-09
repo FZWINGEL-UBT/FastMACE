@@ -154,7 +154,7 @@ def analyse(job: Path):
     total = sum(r["duration_us"] for r in rows) or 1.0
     fields = list(rows[0])
     with (job / "limiters.csv").open("w", newline="") as handle:
-        w = csv.DictWriter(handle, fieldnames=fields)
+        w = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         w.writeheader()
         for r in rows:
             w.writerow({k: fmt(v, 3) for k, v in r.items()})
@@ -166,7 +166,7 @@ def analyse(job: Path):
     for r in rows:
         by_lim[r["limiter"].split(":")[0] if r["limiter"].startswith("latency") else r["limiter"]] += r["duration_us"]
     with (job / "limiters_by_category.csv").open("w", newline="") as handle:
-        w = csv.writer(handle)
+        w = csv.writer(handle, lineterminator="\n")
         w.writerow(["category", "us", "share", "limiters (us)"])
         for cat, d in sorted(by_cat.items(), key=lambda kv: -kv[1]["_total"]):
             mix = " ".join(f"{k}={v:.0f}" for k, v in sorted(d.items(), key=lambda kv: -kv[1]) if k != "_total")
@@ -200,7 +200,7 @@ def analyse(job: Path):
     if summary:
         md += ["", "## Main-pass summary keys", "", "```", json.dumps({k: summary[k] for k in list(summary)[:20]},
                                                                     indent=1, default=str)[:4000], "```"]
-    (job / "limiters.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    (job / "limiters.md").write_text("\n".join(md) + "\n", encoding="utf-8", newline="\n")
     print(f"{job}: {len(rows)} kernels, {total:.1f} us; " +
           ", ".join(f"{k} {v / total:.0%}" for k, v in sorted(by_lim.items(), key=lambda kv: -kv[1])))
 
