@@ -260,3 +260,56 @@ dense product. A second pipe through the FP64 tensor cores would need a contract
 least 8 on both sides of the product; the GEMM-shaped parts of the model already run on TF32 tensor cores
 (3xTF32: A100 about 52, H200 about 165 TFLOPS against DMMA's 19.5 and 67).
 
+## Report 7 candidates: SMEM_SPILL on the H200, backward overlap, uniform datapath
+
+### SMEM_SPILL on the H200 with the cap applied (rejected)
+
+Job `h200-smem-spill/` (source d7f75540, H200, CUDA 13 ptxas for sm_90): the lab compiles w′ with
+`.pragma "enable_smem_spilling"` and the cap as the minimum-blocks argument of `__launch_bounds__` (the fix of
+183e7d3d), then MD-step A/Bs on SrTiO3 10x10x10 in both build orders.
+
+| Variant | Registers | Spill stores (ptxas) | Local bytes | w′ time | Ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| base | 72 | 0 | 0 | 1160.6 µs | 1.000 |
+| s72 | 72 | 112 | 64 | 1370.0 µs | 1.180 |
+| s64 | 64 | 184 | 112 | 1613.8 µs | 1.390 |
+| s56 | 56 | 252 | 168 | 2199.9 µs | 1.896 |
+| s48 | 48 | 380 | 264 | 3497.2 µs | 3.013 |
+
+MD step b/a: spill64 1.1647 (ab) / 1.1624 (ba), spill56 1.3112 / 1.3097, all valid. dsh and dr stay bitwise; dx
+moves by about 3e-7 relative.
+
+- The pragma works on sm_90 (local bytes are below the spill stores, so part of the spill goes to shared memory).
+  On sm_80 it had no effect.
+- Every cap is slower. Even s72, at the default register count, loses 18%: the pragma alone changes the
+  allocation. The occupancy gained at 64 or 56 registers does not pay for the extra shared-memory and local
+  traffic on a kernel that is already LSU-heavy (LSU 64% in spline-kernel-profile-20261108).
+- This closes the "slower but frees registers" route for the H200 too: no register budget is cheap enough to buy.
+
+### Bound: overlapping w′ with independent backward work (stop, under 1%)
+
+From the H200 round6 breakdown (`results/h200-fastpath-20261108/round6/breakdown/`):
+
+- w′ takes 1089.2 µs. The only kernels that do not depend on it are the radial-table backward (10.6 µs) and one
+  gather (about 9 µs): about 20 µs, under 1% of the step, even with perfect overlap.
+- The rest of the backward (the layer-1 chain: GEMMs about 231 µs and tabled_outer_sum_backward 213.5 µs) needs
+  w′'s dx.
+- Splitting w′ into a dx/dr kernel and a dsh kernel so that the chain can start early duplicates the per-edge
+  contraction in both kernels. The duplicated work is about as large as the idle time it would fill, so the net is
+  about zero.
+
+### Bound: uniform datapath on the H200 (stop for the forward; one lead in w′)
+
+SASS for sm_90 of the H200's generated sources (`real-0.cu`, the forward; `wprime-real.cu`), loop instruction
+histograms:
+
+- **Forward edge loop:** 216 instructions per edge: FFMA 114, FMUL 62, LDG 14, LDS 8, LEA 5, ULEA 4, IMAD 2.
+  Per-edge integer index work is about 11 instructions (5%), and ptxas already places part of it on the uniform
+  datapath (ULEA, and in the outer loop ULEA/UIADD3 17/16). Moving the rest would save at most about 5% of the
+  forward's issue slots, under 1% of the step.
+- **w′ edge loop:** 859 instructions: FFMA 290, FADD 119, SHFL 85, FMUL 57.
+- **w′ end-of-edge reduction:** MOV 176, WARPSYNC 88, ENDCOLLECTIVE 87, SHFL 85, FADD 85. This is not
+  uniform-datapath work, but it is a sizeable issue overhead on the issue- and LSU-bound H200 kernel. It is the lead
+  this audit leaves: a cheaper cross-lane reduction (fewer shuffles per edge, or one reduction over several edges).
+  Not yet quantified.
+
