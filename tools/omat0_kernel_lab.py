@@ -667,6 +667,9 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         # Round 2 idea 1 (9 Nov 2026): the two 21-term paths on the FP64 pipe (A100 only)
         "fp64-paths": ("rounding", lambda s: fp64_paths(s, "cvt")[0], ()),
         "F-fp64-free": ("falsifier", lambda s: fp64_paths(s, "free")[0], ()),
+        "fp64-paths-r96": ("rounding", lambda s: fp64_paths(s, "cvt")[0], ("--maxrregcount=96",)),
+        "F-fp64-free-r96": ("falsifier", lambda s: fp64_paths(s, "free")[0], ("--maxrregcount=96",)),
+        "F-fp64-free-r80": ("falsifier", lambda s: fp64_paths(s, "free")[0], ("--maxrregcount=80",)),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
         "unordered": ("exact", unordered, ()),

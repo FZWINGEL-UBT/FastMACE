@@ -16,7 +16,7 @@ note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
 nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1 > "$out/gpu.txt"
 grep -q A100 "$out/gpu.txt" || { note "WRONG-GPU $(cat "$out/gpu.txt")"; exit 3; }
 note "Modal $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader); source $(cat .source_commit 2>/dev/null)"
-python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels wprime --variants base fp64-paths F-fp64-free \
+python tools/omat0_kernel_lab.py --checkpoint "$ck" --kernels wprime --variants ${VARIANTS:-base fp64-paths F-fp64-free fp64-paths-r96 F-fp64-free-r96 F-fp64-free-r80} \
   --rounds 21 --ptxas-archs 8.0 --output "$out/lab" > "$out/lab.log" 2>&1 < /dev/null
 note "end lab exit=$?"
 grep -h -E "^wprime |ptxas|registers|spill" "$out/lab.log" | cut -c1-240 >> "$log"
