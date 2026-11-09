@@ -1000,8 +1000,9 @@ def test_wavefront_band_cache_of_kept_lists_after_motion_is_a_fresh_search(monke
     calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                            rewrites=only(*MH1_PACKAGE))
+    # state_dtype None: with no host room "auto" would store the state in float16 (not this test's subject)
     config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, wavefront="on",
-                  wavefront_group=2, boundary_skin=False)
+                  wavefront_group=2, boundary_skin=False, state_dtype=None)
     cached = TiledForceField(field, TileConfig(12, list_reuse=True, **config))
     starved = TiledForceField(field, TileConfig(12, list_reuse=True, **config))
     fresh = TiledForceField(field, TileConfig(12, list_reuse=False, **config))

@@ -2362,7 +2362,8 @@ class TiledForceField:
         room = available - int(self.config.list_reuse_floor)
         if full <= room:
             return self.dtype, "the call's dtype: fits"
-        kept = self._kept
+        # A call that reuses the kept lists did not bin the atoms: it needs them, so they stay (float16 instead).
+        kept = None if getattr(self, "_reusing", False) else self._kept
         lists = 0 if kept is None else int(sum(t.numel() * t.element_size() for entry in kept["superset"].values()
                                                 for t in entry) + kept["reference"].numel() * 8)
         if lists and full <= room + lists:
@@ -2440,7 +2441,8 @@ class TiledForceField:
                 decided, short = n >= 2**20, False
             else:
                 itemsize = 8 if str(self.dtype) == "torch.float64" else 4
-                stored = 2 if self.config.state_dtype else itemsize  # TileConfig.state_dtype: 16-bit rows
+                # TileConfig.state_dtype: 16-bit rows when set to one ("auto" stores the call's dtype while it fits)
+                stored = 2 if self.config.state_dtype not in (None, "auto") else itemsize
                 plain = n * width * (stored + 0.25 * itemsize)
                 decided, short = plain + int(config.list_reuse_floor) > available, plain > available
             self._wave_auto[n], self._wave_short[n] = decided, short

@@ -107,7 +107,8 @@ def _indices(view, ld):
     a = torch.arange(rows, device=view.device, dtype=torch.int64)[:, None]
     j = torch.arange(size, device=view.device, dtype=torch.int64)
     index = ((a * view.stride(0) + j * view.stride(1)) // ld).to(torch.int32).flatten()
-    if not torch.cuda.is_current_stream_capturing():  # a capture's tensors hold values only once it replays
+    if not (view.is_cuda and torch.cuda.is_current_stream_capturing()):  # a capture's tensors hold values only
+        # once it replays
         _INDICES[key] = index
     return index
 
