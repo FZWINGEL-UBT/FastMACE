@@ -188,7 +188,7 @@ def geom(source):
                     ng += 1
                 new_rows[o] = f"acc[{o}] = {expr};"
         wx = ", ".join(f"wx{i} = w * x{i}" for i in xs)
-        block = re.sub(r"(const float w = fmaf\(t, .*;\n)",
+        block = re.sub(r"(const float w = fmaf\(.*;\n)",
                        lambda m: m.group(1) + f"                const float {wx};\n", block, count=1)
         block = re.sub(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", lambda m: new_rows[m.group(1)], block)
         block = re.sub(r"\s*const float e\d+ = she\[\d+\];", "", block) if best != factor else block
@@ -344,7 +344,8 @@ def variant(kernel, read, table=None, grid=None):
     capability = torch.cuda.get_device_capability(device)
     functions, loads, sources = [], 0, []
     k.lab_registers = []
-    for i, source in enumerate(k.sources):
+    # geom transforms the captured sources as they are (PACKED8's table read included, if on)
+    for i, source in enumerate(kernel.sources if read == "geom" else k.sources):
         if read == "ghoist":
             new, n = ghoist(source)
         elif read == "geom":

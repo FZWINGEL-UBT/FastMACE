@@ -118,14 +118,34 @@ class Program:
         return sorted(seen)
 
 
-def _cg(l1, p1, l2, p2, l3, p3):
-    """cuEquivariance's real CG tensor [d1, d2, d3] for O3 (l1 p1) x (l2 p2) -> (l3 p3), or None."""
-    import cuequivariance as cue
+# Relative tolerance of the span tests and the fit: a checkpoint's descriptor carries float32-rounded coefficients
+# (MACE's U matrices), so its basis is exact only to about 1e-7.
+TOLERANCE = 1e-5
+CONVENTIONS = ("cue", "e3nn")  # the real bases ``factor`` tries: cuEquivariance's O3, e3nn's (MACE's O3_e3nn)
+_convention = ["cue"]  # the one ``_cg`` uses during a ``factor`` attempt
 
-    c = cue.O3.clebsch_gordan(cue.O3(l1, p1), cue.O3(l2, p2), cue.O3(l3, p3))
-    if c.shape[0] == 0:
+
+def _cg(l1, p1, l2, p2, l3, p3):
+    """The real CG tensor [d1, d2, d3] for O3 (l1 p1) x (l2 p2) -> (l3 p3) in the current convention, or None:
+    cuEquivariance's ``O3``, or e3nn's ``wigner_3j`` (the basis of MACE's cuEq ``O3_e3nn`` irreps)."""
+    if p1 * p2 != p3 or not abs(l1 - l2) <= l3 <= l1 + l2:
         return None
-    c = np.asarray(c[0], dtype=np.float64)
+    if _convention[0] == "e3nn":
+        try:
+            from e3nn.o3 import wigner_3j
+        except ImportError:
+            from openequivariance.core.e3nn_lite import wigner_3j
+        c = np.asarray(wigner_3j(l1, l2, l3), dtype=np.float64)
+    else:
+        import cuequivariance as cue
+
+        c = cue.O3.clebsch_gordan(cue.O3(l1, p1), cue.O3(l2, p2), cue.O3(l3, p3))
+        if c.shape[0] == 0:
+            return None
+        c = np.asarray(c[0], dtype=np.float64)
+    if not np.any(c):
+        return None
+    c = c.copy()
     c[np.abs(c) < 1e-12] = 0.0
     return c
 
@@ -261,7 +281,21 @@ def _basis_values(terms, x):
 
 def factor(terms, segments_in, segments_w, segments_out, samples=96, seed=0):
     """``(program, features, K)`` or None: ``features [segments_w]`` lists per new weight b its output segments'
-    node ids ``{C: id}``; ``K [segments_w, segments_w]`` float64 with ``w'_b = sum_a w_a K[a, b]``."""
+    node ids ``{C: id}``; ``K [segments_w, segments_w]`` float64 with ``w'_b = sum_a w_a K[a, b]``. Tries each of
+    ``CONVENTIONS`` for the CG tensors (the descriptor's basis is not recorded in it)."""
+    for convention in CONVENTIONS:
+        _convention[0] = convention
+        try:
+            found = _factor(terms, segments_in, segments_w, segments_out, samples, seed)
+        finally:
+            _convention[0] = "cue"
+        if found is not None:
+            factor.convention = convention
+            return found
+    return None
+
+
+def _factor(terms, segments_in, segments_w, segments_out, samples, seed):
     irreps_in, irreps_out = irreps_of(segments_in), irreps_of(segments_out)
     if irreps_in is None or irreps_out is None:
         return None
@@ -310,11 +344,12 @@ def factor(terms, segments_in, segments_w, segments_out, samples=96, seed=0):
                 if values is None or np.linalg.norm(values) == 0.0:
                     continue
                 # inside the target span, and raising the rank
-                inside = np.linalg.norm(values - q_target @ (q_target.T @ values)) <= 1e-9 * np.linalg.norm(values)
+                outside = np.linalg.norm(values - q_target @ (q_target.T @ values))
+                inside = outside <= TOLERANCE * np.linalg.norm(values)
                 if not inside:
                     continue
                 stack = np.stack(chosen_values + [values], axis=1)
-                if np.linalg.matrix_rank(stack, tol=1e-9 * np.abs(stack).max()) <= len(chosen_values):
+                if np.linalg.matrix_rank(stack, tol=TOLERANCE * np.abs(stack).max()) <= len(chosen_values):
                     continue
                 if best is None or cost < best[0]:
                     best = (cost, desc, build)
@@ -330,7 +365,7 @@ def factor(terms, segments_in, segments_w, segments_out, samples=96, seed=0):
             factor.log.append((out_l, desc, best[0]))
         F = np.stack(chosen_values, axis=1)  # [samples * comps, rank]
         coef, *_ = np.linalg.lstsq(F, target, rcond=None)  # target ~ F @ coef: B_a = sum_b coef[b, a] F_b
-        if np.linalg.norm(F @ coef - target) > 1e-9 * np.linalg.norm(target):
+        if np.linalg.norm(F @ coef - target) > TOLERANCE * np.linalg.norm(target):
             return None
         for k, (desc, comps) in enumerate(chosen):
             b = next_b + k
