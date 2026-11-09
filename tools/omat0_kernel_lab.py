@@ -2127,7 +2127,7 @@ def capture(args):
 
     def full():
         return all(name in captured and captured[name][1][edge_arg[name]].shape[0] >= args.min_edges
-                   for name in edge_arg)
+                   for name in edge_arg if name in args.kernels)  # asked for only
 
     originals = {fused_forward.FusedFoldedForward: fused_forward.FusedFoldedForward.__call__,
                  wprime_backward.WPrimeBackward: wprime_backward.WPrimeBackward.__call__}
