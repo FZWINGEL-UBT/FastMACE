@@ -29,6 +29,7 @@ BASIS = ("            const float u1 = 1.f - t, tt = t * t;\n"
          "            const float b2 = fmaf(tt, fmaf(t, -0.5f, 0.5f), fmaf(t, 0.5f, 1.f / 6.f));\n"
          "            const float b3 = tt * t * (1.f / 6.f);\n")
 CENTRE = "            const float s = t - 0.5f, s64 = 64.f * s;\n"
+CENTRE2 = "            const float s = t - 0.5f, s2 = s * s;\n"  # packed8v2
 BITS = (22, 20, 16)  # a0, a1, a2 (packed8)
 
 
@@ -48,10 +49,10 @@ def transform(source, read, bias=0):
     exponent bias)."""
     if "s_tq[TILE]" not in source:
         raise ValueError("spline_read_lab: the variants need the STAGE_EDGES kernel")
-    kind = {"bspline": "float", "packed8": "uint2"}[read]
+    kind = {"bspline": "float", "packed8": "uint2", "packed8v2": "uint2"}[read]
     source = _replace(source, "const float4* __restrict__ table", f"const {kind}* __restrict__ table")
     source = _replace(source, "const float4* tq = table + s_tq[k] + ch;",
-                      f"const {kind}* tq = table + s_tq[k] + ch;\n" + (BASIS if read == "bspline" else CENTRE))
+                      f"const {kind}* tq = table + s_tq[k] + ch;\n" + (BASIS if read == "bspline" else CENTRE2 if read == "packed8v2" else CENTRE))
     source = source.replace("const float4* ahead = table", f"const {kind}* ahead = table")  # PREFETCH_AHEAD
     if read == "bspline":  # (intervals + 3) knot rows per pair
         source = _replace(source, "tq_k = ((int64_t)pairs[e] * intervals + iv) * Q;",
@@ -75,7 +76,18 @@ def transform(source, read, bias=0):
                 f"                const float sc = __uint_as_float(((c.y >> 26) + {106 - bias}u) << 23);\n"
                 f"                const float w = sc * fmaf(s, fmaf(s64, (float)q2, 4.f * (float)q1), (float)q0);")
 
-    return re.sub(pattern, bspline if read == "bspline" else packed8, source), len(loads)
+    def packed8v2(m):  # the same values; each field decoded as (exponent | mantissa field) - 1.5 * 2^e, exact
+        o = m.group(1)
+        return (f"const uint2 c = __ldg(tq + {o});\n"
+                f"                const unsigned eb = ((c.y & 63u) << 23) + {(128 - bias) << 23}u;\n"
+                f"                const float hb = __uint_as_float(eb | 0x400000u);\n"
+                f"                const float f0 = __uint_as_float(((c.x >> 9) & 0x7FFFFEu) | eb) - hb;\n"
+                f"                const float f1 = __uint_as_float(((c.y >> 3) & 0x7FFFF8u) | eb) - hb;\n"
+                f"                const float f2 = __uint_as_float((__funnelshift_l(c.y, c.x, 13) & 0x7FFF80u) | eb) - hb;\n"
+                f"                const float w = fmaf(s2, f2, fmaf(s, f1, f0));")
+
+    reads = {"bspline": bspline, "packed8": packed8, "packed8v2": packed8v2}
+    return re.sub(pattern, reads[read], source), len(loads)
 
 
 def ghoist(source):
@@ -109,7 +121,75 @@ def ghoist(source):
     return source, count[0]
 
 
-def encode_packed8(table):
+TERM = re.compile(r"x(\d+) \* e(\d+) \* (-?0x[0-9a-fA-F.]+p[+-]?\d+f)")
+
+
+def deferred(source, keep=None):
+    """The deferred-CG forward (round 1 proposal 3, Symmetrix compute_Phi1): per path p and (i, j) pair,
+    phi_p[i, j] += (w_p x_i) e_j over the receiver's edges, and the CG coefficients applied once per receiver after the
+    edge loop, acc_o = sum c_oij phi_p[i, j]. Rounding only (the coefficient is applied after the edge sum).
+    ``keep``: the path indices to compute (round 1's two-thread split, timed as two kernels: the paths left out are
+    dropped and their outputs written as zero). Returns (source, number of phi accumulators)."""
+    if "s_tq[TILE]" not in source:
+        raise ValueError("spline_read_lab: the variants need the STAGE_EDGES kernel")
+    lines = source.split("\n")
+    path, phi, finals, out = -1, {}, {}, []
+    pending = []  # the current path's acc lines: (indent, o, terms)
+
+    def flush():
+        if not pending:
+            return
+        indent = pending[0][0]
+        if keep is None or path in keep:
+            used = []
+            for _, o, terms in pending:
+                for i, j, c in terms:
+                    key = (path, i, j)
+                    if key not in phi:
+                        phi[key] = len(phi)
+                        used.append(key)
+                    finals.setdefault(o, []).append((c, phi[key]))
+            for i in sorted({i for _, i, _ in used}):
+                out.append(f"{indent}const float u{i} = w * x{i};")
+            for key in used:
+                out.append(f"{indent}phi[{phi[key]}] = fmaf(u{key[1]}, e{key[2]}, phi[{phi[key]}]);")
+        pending.clear()
+
+    acc_line = re.compile(r"^(\s*)acc\[(\d+)\] = fmaf\(w, (.*), acc\[\2\]\);$")
+    stored = False
+    for line in lines:
+        if "const float w = " in line:
+            flush()
+            path += 1
+        m = acc_line.match(line)
+        if m:
+            terms = [(int(a), int(b), c) for a, b, c in TERM.findall(m.group(3))]
+            if not terms or len(terms) != m.group(3).count("*") // 2:
+                raise ValueError(f"spline_read_lab: cannot parse {line.strip()!r}")
+            pending.append((m.group(1), int(m.group(2)), terms))
+            continue
+        if line.strip() == "}" and pending:
+            flush()
+        if not stored and re.match(r"\s*out0\[", line):
+            stored = True
+            for o in sorted(finals):
+                expr = " + ".join(f"{c} * phi[{n}]" for c, n in finals[o])
+                out.append(f"    acc[{o}] = {expr};")
+        out.append(line)
+    if not stored:
+        raise ValueError("spline_read_lab: no output stores found")
+    source = "\n".join(out)
+    source = _replace(source, "    float acc[40];",
+                      f"    float acc[40];\n    float phi[{max(1, len(phi))}];\n    #pragma unroll\n"
+                      f"    for (int i = 0; i < {max(1, len(phi))}; ++i) phi[i] = 0.f;")
+    return source, len(phi)
+
+
+# round 1's two-thread split of each channel's paths (41 and 35 phi accumulators), timed as two kernels
+DEFERRED_KEEP = {"deferred": None, "deferred-a": {7, 8, 9}, "deferred-b": {0, 1, 2, 3, 4, 5, 6}}
+
+
+def encode_packed8(table, layout="v1"):
     """The packed8 table ``int32 [rows, Q, 2]`` of a production table ``float32 [rows, Q, 4]`` (t basis) and its
     exponent bias."""
     import torch
@@ -129,8 +209,13 @@ def encode_packed8(table):
         lim = 2 ** (n - 1) - 1
         q.append(torch.round(a / torch.exp2(e - n + 1)).clamp(-lim, lim).to(torch.int64))
     q0, q1, q2 = q
-    x = (q0 & 0x3FFFFF) | ((q2 >> 6) & 0x3FF) << 22
-    y = (q1 & 0xFFFFF) | (q2 & 63) << 20 | (e.to(torch.int64) + bias) << 26
+    if layout == "v2":  # biased fields: x = Q0 << 10 | Q2 >> 6, y = (Q2 & 63) << 26 | Q1 << 6 | E6
+        u0, u1, u2 = q0 + 2 ** 21, q1 + 2 ** 19, q2 + 2 ** 15
+        x = u0 << 10 | u2 >> 6
+        y = (u2 & 63) << 26 | u1 << 6 | (e.to(torch.int64) + bias)
+    else:
+        x = (q0 & 0x3FFFFF) | ((q2 >> 6) & 0x3FF) << 22
+        y = (q1 & 0xFFFFF) | (q2 & 63) << 20 | (e.to(torch.int64) + bias) << 26
     packed = torch.stack([x, y], dim=-1)
     packed = torch.where(packed >= 2 ** 31, packed - 2 ** 32, packed).to(torch.int32)
     return packed.contiguous(), bias
@@ -155,19 +240,24 @@ def variant(kernel, read, table=None, grid=None):
         raise SystemExit("spline_read_lab: STAGE_EDGES is off (set spline_forward:STAGE_EDGES=True)")
     q = len(schedule.paths) * schedule.channels
     bias = 0
-    if read == "ghoist":
+    if read == "ghoist" or read in DEFERRED_KEEP:
         new_table = table
     elif read == "bspline":
         pairs = table.shape[0] // kernel.intervals
         g = torch.Generator(device=device).manual_seed(0)
         new_table = torch.randn(pairs * (k.intervals + 3), q, device=device, generator=g) * 0.05
     else:
-        new_table, bias = encode_packed8(table)
+        new_table, bias = encode_packed8(table, "v2" if read == "packed8v2" else "v1")
     capability = torch.cuda.get_device_capability(device)
     functions, loads, sources = [], 0, []
     k.lab_registers = []
     for i, source in enumerate(k.sources):
-        new, n = ghoist(source) if read == "ghoist" else transform(source, read, bias)
+        if read == "ghoist":
+            new, n = ghoist(source)
+        elif read in DEFERRED_KEEP:
+            new, n = deferred(source, DEFERRED_KEEP[read])
+        else:
+            new, n = transform(source, read, bias)
         sources.append(new)
         loads += n
         module = _check(driver.cuModuleLoadData(compile_cubin(new, capability, ())))
@@ -177,7 +267,7 @@ def variant(kernel, read, table=None, grid=None):
         k.lab_registers.append(int(_check(driver.cuFuncGetAttribute(
             driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))))
     k._functions = functions
-    print(f"{read}: {k.intervals} intervals, {loads} table reads (ghoist: g values) per edge, "
+    print(f"{read}: {k.intervals} intervals, {loads} table reads (ghoist: g values; deferred: phi accumulators) per edge, "
           f"registers {k.lab_registers} "
           f"(production {kernel.registers}), table {new_table.numel() * 4 / 2 ** 20:.1f} MiB, bias {bias}",
           flush=True)
