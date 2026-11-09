@@ -83,6 +83,8 @@ def parse_args(argv=None):
                         "tiles times this (none: by device name)")
     p.add_argument("--grid-fit", choices=("on", "off"), default="off",
                    help="TileConfig.grid_fit: the plan's grid with the fewest receiver-cap pieces (off: the rule's)")
+    p.add_argument("--list-reuse", choices=("on", "off"), default="on",
+                   help="TileConfig.list_reuse: the tiles' lists within cutoff + skin kept on the host across calls")
     p.add_argument("--list-cache", choices=("on", "off"), default="on",
                    help="TileConfig.list_cache: a tile's lists kept on the host within the call (with kept lists: "
                         "its filtered ones in the wavefront's band)")
@@ -386,6 +388,7 @@ def main(argv=None):
                                                   backward_chunk_scale=args.backward_chunk_scale,
                                                   grid_fit=args.grid_fit == "on",
                                                   list_cache=args.list_cache == "on",
+                                                  list_reuse=args.list_reuse == "on",
                                                   **({} if args.wavefront_group is None else
                                                      dict(wavefront_group=args.wavefront_group)),
                                                   species="index" if args.species_index else "one_hot"))
