@@ -45,7 +45,10 @@ SEGMENT_ROWS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 SEGMENT_GROUPED = None
 SEGMENT_GROUPED_GPUS = GPUModels(())
 
-_INDICES = {}  # (device index, rows, size, row stride, dim stride, ld) -> int32 row indices (built outside captures)
+# (device index, size, row stride, dim stride, ld) -> int32 row indices for the most rows seen (built outside
+# captures). Fewer rows read a prefix of it: row a's indices do not depend on the row count. Keyed by the row count
+# instead, a tiled call (rows differ per tile) kept one tensor per count it met: 64 GB of a 149M-atom call on an A100.
+_INDICES = {}
 
 
 def segment_rows_default(device) -> bool:
@@ -97,10 +100,10 @@ def _ld(view):
 
 def _indices(view, ld):
     rows, size, _ = view.shape
-    key = (view.device.index, rows, size, view.stride(0), view.stride(1), ld)
+    key = (view.device.index, size, view.stride(0), view.stride(1), ld)
     cached = _INDICES.get(key)
-    if cached is not None:
-        return cached
+    if cached is not None and cached.numel() >= rows * size:
+        return cached[:rows * size]
     a = torch.arange(rows, device=view.device, dtype=torch.int64)[:, None]
     j = torch.arange(size, device=view.device, dtype=torch.int64)
     index = ((a * view.stride(0) + j * view.stride(1)) // ld).to(torch.int32).flatten()
