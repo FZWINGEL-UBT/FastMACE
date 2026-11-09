@@ -78,6 +78,37 @@ def transform(source, read, bias=0):
     return re.sub(pattern, bspline if read == "bspline" else packed8, source), len(loads)
 
 
+def ghoist(source):
+    """The ``ghoist`` falsifier (third 9 Nov report, "G-hoisting"): every output's CG sum regrouped by sender feature,
+    acc_o += (w x_i) g_oi, with the channel-independent g_oi = sum_j c_oij e_j read from a per-edge shared array. The
+    instruction shape of the real rewrite (which would compute g at staging from the tile's harmonics); here g is
+    filled with harmonics, so the output is wrong. Returns (source, number of g values per edge)."""
+    if "s_tq[TILE]" not in source:
+        raise ValueError("spline_read_lab: the variants need the STAGE_EDGES kernel")
+    count = [0]
+
+    def output(m):
+        o, expr = m.group(1), m.group(2)
+        xs = sorted(set(re.findall(r"\bx(\d)\b", expr)))
+        lines = []
+        for i in xs:
+            lines.append(f"acc[{o}] = fmaf(w * x{i}, s_g[gk + {count[0]}], acc[{o}]);")
+            count[0] += 1
+        return "\n                ".join(lines)
+
+    source = re.sub(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", output, source)
+    gd = (count[0] + 3) // 4 * 4
+    source = _replace(source, "__shared__ __align__(16) float s_sh[TILE * ED];",
+                      f"__shared__ __align__(16) float s_sh[TILE * ED];\n    constexpr int GD = {gd};\n"
+                      "    __shared__ __align__(16) float s_g[TILE * GD];")
+    fill = "for (int i = ch; i < count_in * ED; i += C) s_sh[i] = __ldg(sh + base * ED + i);"
+    source = _replace(source, fill, fill + "\n        for (int i = ch; i < count_in * GD; i += C) "
+                      "s_g[i] = __ldg(sh + base * ED + (i & 15));")
+    she = "const float* she = s_sh + s_k[k] * ED;"
+    source = _replace(source, she, she + "\n            const int gk = s_k[k] * GD;")
+    return source, count[0]
+
+
 def encode_packed8(table):
     """The packed8 table ``int32 [rows, Q, 2]`` of a production table ``float32 [rows, Q, 4]`` (t basis) and its
     exponent bias."""
@@ -124,7 +155,9 @@ def variant(kernel, read, table=None, grid=None):
         raise SystemExit("spline_read_lab: STAGE_EDGES is off (set spline_forward:STAGE_EDGES=True)")
     q = len(schedule.paths) * schedule.channels
     bias = 0
-    if read == "bspline":
+    if read == "ghoist":
+        new_table = table
+    elif read == "bspline":
         pairs = table.shape[0] // kernel.intervals
         g = torch.Generator(device=device).manual_seed(0)
         new_table = torch.randn(pairs * (k.intervals + 3), q, device=device, generator=g) * 0.05
@@ -134,7 +167,7 @@ def variant(kernel, read, table=None, grid=None):
     functions, loads, sources = [], 0, []
     k.lab_registers = []
     for i, source in enumerate(k.sources):
-        new, n = transform(source, read, bias)
+        new, n = ghoist(source) if read == "ghoist" else transform(source, read, bias)
         sources.append(new)
         loads += n
         module = _check(driver.cuModuleLoadData(compile_cubin(new, capability, ())))
@@ -144,7 +177,8 @@ def variant(kernel, read, table=None, grid=None):
         k.lab_registers.append(int(_check(driver.cuFuncGetAttribute(
             driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, function))))
     k._functions = functions
-    print(f"{read}: {k.intervals} intervals, {loads} table reads per edge, registers {k.lab_registers} "
+    print(f"{read}: {k.intervals} intervals, {loads} table reads (ghoist: g values) per edge, "
+          f"registers {k.lab_registers} "
           f"(production {kernel.registers}), table {new_table.numel() * 4 / 2 ** 20:.1f} MiB, bias {bias}",
           flush=True)
     return k, new_table, sources

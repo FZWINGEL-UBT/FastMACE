@@ -7,14 +7,14 @@
 # - spill80 / spill64: w' capped at 80 / 64 registers with CUDA 13's shared-memory spilling (wprime_backward:
 #   SMEM_SPILL). The plain cap at 80 spills to local memory and was 1.255x slower (ideas-r14 item 36).
 # Rounding changes only (the compiler's FMA contraction / scheduling); a faster variant still needs the gate.
-# Environment: OUT (the job sets it), VARIANTS (default "nvrtc spill80 spill64").
+# Environment: OUT (the job sets it), VARIANTS (default "nvrtc spill80 spill64"), NVRTC_LIB, PY.
 set -uo pipefail
 out=${OUT:?the job sets OUT}
 log=$out/run.log
 note() { echo "$(date -u +%FT%TZ) $*" >> "$log"; }
 r=fastmace.kernels.oeq_streaming.runtime
 w=fastmace.kernels.oeq_streaming.wprime_backward
-lib=""
+lib=${NVRTC_LIB:-}  # a local libnvrtc.so.13 skips the download
 for v in ${VARIANTS:-nvrtc spill80 spill64}; do
   case $v in
     nvrtc)
@@ -32,7 +32,7 @@ for v in ${VARIANTS:-nvrtc spill80 spill64}; do
   esac
   mkdir -p "$out/$v"
   OUT=$out/$v NAME=$v B_CONSTANTS="$bc" STRUCTURES=${STRUCTURES:-results/loup-a100-20261103/SrTiO3.cif@10x10x10} \
-    bash tools/modal/round6_ab256.sh > "$out/$v.log" 2>&1 < /dev/null
+    bash ${AB_SCRIPT:-tools/modal/round6_ab256.sh} > "$out/$v.log" 2>&1 < /dev/null
   note "end $v exit=$? $(grep -h 'end ab' "$out/$v/run.log" | cut -c1-300 | tr '\n' ' ')"
 done
 note done

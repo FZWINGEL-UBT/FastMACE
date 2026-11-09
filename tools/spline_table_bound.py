@@ -184,7 +184,7 @@ def main(argv=None):
     p.add_argument("--equilibrate-steps", type=int, default=300)
     p.add_argument("--flush-l2-mb", type=int, default=256)
     p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8"],
+    p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8", "ghoist"],
                    help="lab: the forward with another table read path (tools/spline_read_lab.py)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
@@ -260,7 +260,7 @@ def main(argv=None):
             for label in [v for v in variants if v not in ("real", "one-slab")]:
                 got = message(label)
                 torch.cuda.synchronize()
-                if label == "bspline":  # a random table: only a sanity check
+                if label in ("bspline", "ghoist"):  # a random table / fake g: only a sanity check
                     print(f"forward {label}: finite {all(bool(torch.isfinite(o).all()) for o in got)}", flush=True)
                     continue
                 worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(got, base))

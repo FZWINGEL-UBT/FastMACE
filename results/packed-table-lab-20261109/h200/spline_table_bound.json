@@ -1,0 +1,137 @@
+{
+  "tool": "spline_table_bound",
+  "created_utc": "2026-11-09T00:21:25Z",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "21adcc399cd6c909fc2885210b9d5726248d96c2",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "rounds": 31,
+  "constants": {},
+  "kernels": {
+    "forward": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 623.4239935874939,
+          "warm": 622.6239800453186
+        },
+        "one-slab": {
+          "flush": 432.19199776649475,
+          "warm": 431.64798617362976
+        },
+        "slab-sorted": {
+          "flush": 602.4320125579834,
+          "warm": 601.472020149231
+        },
+        "species-blocks": {
+          "flush": 622.5600242614746,
+          "warm": 622.9439973831177
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 602.0479798316956,
+          "warm": 601.5040278434753
+        },
+        "packed8": {
+          "flush": 660.863995552063,
+          "warm": 660.0000262260437
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.6932553161443876,
+          "warm": 0.6932723441557963
+        },
+        "slab-sorted": {
+          "flush": 0.966327922496675,
+          "warm": 0.9660277140393018
+        },
+        "species-blocks": {
+          "flush": 0.9986141545161783,
+          "warm": 1.0005139817097564
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 0.9657119168083506,
+          "warm": 0.9660791217834142
+        },
+        "packed8": {
+          "flush": 1.0600554395558641,
+          "warm": 1.0600298854181696
+        }
+      },
+      "registers": [
+        80
+      ]
+    },
+    "wprime": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 1090.783953666687,
+          "warm": 1088.96005153656
+        },
+        "one-slab": {
+          "flush": 1065.567970275879,
+          "warm": 1062.7520084381104
+        },
+        "local-sender": {
+          "flush": 1086.9439840316772,
+          "warm": 1084.1920375823975
+        },
+        "one-slab+local-sender": {
+          "flush": 1062.9760026931763,
+          "warm": 1060.0320100784302
+        },
+        "local-dout": {
+          "flush": 1058.2400560379028,
+          "warm": 1053.279995918274
+        },
+        "local-sender+local-dout": {
+          "flush": 1059.8399639129639,
+          "warm": 1051.2319803237915
+        },
+        "one-slab+local-sender+local-dout": {
+          "flush": 1049.6000051498413,
+          "warm": 1047.1359491348267
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.976882696792482,
+          "warm": 0.9759329618552405
+        },
+        "local-sender": {
+          "flush": 0.9964796240152767,
+          "warm": 0.9956214978249801
+        },
+        "one-slab+local-sender": {
+          "flush": 0.9745064539315655,
+          "warm": 0.9734351674174719
+        },
+        "local-dout": {
+          "flush": 0.970164671455436,
+          "warm": 0.9672347433058354
+        },
+        "local-sender+local-dout": {
+          "flush": 0.971631421923925,
+          "warm": 0.965354035568584
+        },
+        "one-slab+local-sender+local-dout": {
+          "flush": 0.96224371620209,
+          "warm": 0.9615926200940814
+        }
+      },
+      "registers": null
+    }
+  }
+}
