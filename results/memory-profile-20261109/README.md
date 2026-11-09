@@ -176,5 +176,5 @@ That buffer is the first target of the selective-recompute rung (conductor's ite
   passes on the new source (10 passed); on the old source the new test fails as it should ([t2/](t2/)).
 - **CPU suite** (leto, merge tier, the branch tree without `results/`): 5,501 passed, 1 failed, then fixed and
   re-run: `test_layering.py` wanted `SHAPE_CARRIER` on the module-switch allow list (added; the file now passes,
-  32 passed). Ruff: the changed files pass; the 66 findings on leto are in 51 files this change does not touch
+  32 passed). After merging main (`c153ba87`): **5,531 passed, 0 failed**. Ruff: the changed files pass; the 66 findings on leto are in 51 files this change does not touch
   ([suite-summary.txt](suite-summary.txt)).
