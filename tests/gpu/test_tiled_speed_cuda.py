@@ -58,15 +58,19 @@ if "generic_wprime_backward" not in applied:
     print(json.dumps(dict(report, skip="generic_wprime_backward is off on this GPU")))
     raise SystemExit(0)
 whole = field.evaluate(atoms, stress=True)
+compiled_field = None  # mode "compiled" tiles need a compiled force field: the plan's own, built on first use
 
 
 def run(mode, switches):
+    global compiled_field
+    if mode == "compiled" and compiled_field is None:
+        compiled_field = planner.build_evaluation(plan, user, atoms)
     saved = {}
     for (module, name), value in switches.items():
         saved[(module, name)] = getattr(module, name)
         setattr(module, name, value)
     try:
-        tiled = TiledForceField(field, TileConfig(256, mode=mode))
+        tiled = TiledForceField(compiled_field if mode == "compiled" else field, TileConfig(256, mode=mode))
         tiled.evaluate(atoms, stress=True)  # the first call in a process may round differently
         energy, forces, stress = tiled.evaluate(atoms, stress=True)
         tiles = tiled.last["tiles"]
