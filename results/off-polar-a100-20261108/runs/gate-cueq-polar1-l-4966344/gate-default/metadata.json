@@ -1,0 +1,430 @@
+{
+  "status": "failed",
+  "created_utc": "2026-11-08T22:13:00.193295+00:00",
+  "host": "a0534",
+  "engine": "fastmace",
+  "planner": "minimal",
+  "baseline": null,
+  "structures_root": "/home/atuin/v130cb/v130cb18/fm-offpolar/baseline",
+  "fastmace_commit": "b4ec70530545ad61cfeb67301f5adfde0e75362c",
+  "python": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+  "checkpoint": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-L.model",
+  "checkpoint_sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+  "tf32": false,
+  "model": "polar1-l",
+  "backend": "auto",
+  "dtype": "auto",
+  "rule": {
+    "ratio": 3.0,
+    "floors": {
+      "energy": 0.01,
+      "forces": 1e-05,
+      "stress": 1e-07
+    },
+    "gated": [
+      "energy",
+      "forces",
+      "stress"
+    ],
+    "source": "fastmace.planner.selfcheck"
+  },
+  "energy_gated": true,
+  "references": "fastmace.reference (1b-T13): float64 reference, float32 yardstick with float64 energy",
+  "processes_rule": "every reference in a fresh process that builds no production engine, before the production process (scope 'calculator'); conductor decision after T10",
+  "protocol": "unrelaxed 3x3x3 supercells, symmetric strain +-0.02 (hydrostatic: isotropic; full: anisotropic and shear), Gaussian rattle 0.05 A; float64 reference; gate: max error <= max(3 x that of the float32 yardstick, floor), for energy, forces, stress",
+  "args": {
+    "output": "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default",
+    "engine": "fastmace",
+    "planner": "minimal",
+    "baseline": null,
+    "structures_root": "/home/atuin/v130cb/v130cb18/fm-offpolar/baseline",
+    "checkpoint": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-L.model",
+    "model": "polar1-l",
+    "structures": [
+      "NaCl",
+      "NbCl5"
+    ],
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "configs": 3,
+    "rattle_A": 0.05,
+    "strain": 0.02,
+    "backend": "auto",
+    "dtype": "auto",
+    "main_args": "",
+    "seed": 20261015,
+    "reference_scope": "calculator",
+    "rewrites": {},
+    "engine_config": {},
+    "production_constant": [],
+    "production_tf32": false,
+    "tiled_receivers": 0,
+    "tiled_mode": "eager",
+    "reference_command": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+    "production_command": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python"
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "source": "/home/atuin/v130cb/v130cb18/fm-offpolar/baseline/Structures/Benchmark/R2SCAN/NaCl.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "087450f068b69d8cb848e91ea2b888e8b2e4a451160c0c1de8d2efd1c1b29d9e",
+      "configurations": "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/configs/NaCl.npz",
+      "configs": []
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "source": "/home/atuin/v130cb/v130cb18/fm-offpolar/baseline/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "1d662303cbc693ec1beb1b0af9adccbf0392d0919cddfe4628c5dc5dc1f8ae99",
+      "configurations": "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/configs/NbCl5.npz",
+      "configs": []
+    }
+  },
+  "processes": [
+    {
+      "name": "reference-NaCl-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/src-b4ec7053/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/jobs/reference-NaCl-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 66.29208789899712,
+      "result": {
+        "name": "reference-NaCl-f64",
+        "kind": "reference",
+        "pid": 1055257,
+        "host": "a0534",
+        "python": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "started_utc": "2026-11-08T22:13:00.705751+00:00",
+        "hybrid_launcher": false,
+        "load_s": 28.822444550009095,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-L.model",
+            "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+            "label": "polar1-l",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain",
+            "polar_longrange"
+          ],
+          "corrections_active": [
+            "polar_kspace_stress"
+          ],
+          "optional_physics": [],
+          "gate_floors": {
+            "stress_eV_per_A3": 5e-07
+          },
+          "stock": true,
+          "polar": {
+            "bounds": [
+              6,
+              6,
+              6
+            ],
+            "k_vectors": 346,
+            "k_superset": 786,
+            "headroom": 0.1
+          },
+          "dispersion": null
+        },
+        "fd_stress_check": {
+          "structure": "NaCl",
+          "key": "hydrostatic-0",
+          "max_abs": 9.382731643720055e-09,
+          "tolerance": 1e-06,
+          "strain": 0.0001,
+          "kset": "frozen",
+          "k_vectors_included": 231,
+          "fd_stress": [
+            [
+              -0.008747615019451266,
+              1.762719105598302e-05,
+              -2.7642173484646767e-05
+            ],
+            [
+              1.762719105598302e-05,
+              -0.008909321112776336,
+              1.3848359277815362e-05
+            ],
+            [
+              -2.7642173484646767e-05,
+              1.3848359277815362e-05,
+              -0.008906833350143459
+            ]
+          ],
+          "passed": true
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+        "gpu": "NVIDIA A100-SXM4-80GB",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 2975858688,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 62.07845673899283
+      }
+    },
+    {
+      "name": "reference-NaCl-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/src-b4ec7053/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/jobs/reference-NaCl-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 54.83161721100623,
+      "result": {
+        "name": "reference-NaCl-ase_f32",
+        "kind": "reference",
+        "pid": 1055669,
+        "host": "a0534",
+        "python": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "started_utc": "2026-11-08T22:14:07.120574+00:00",
+        "hybrid_launcher": false,
+        "load_s": 27.918677398003638,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-L.model",
+            "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+            "label": "polar1-l",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain",
+            "polar_longrange"
+          ],
+          "corrections_active": [
+            "polar_kspace_stress"
+          ],
+          "optional_physics": [],
+          "gate_floors": {
+            "stress_eV_per_A3": 5e-07
+          },
+          "stock": true,
+          "polar": {
+            "bounds": [
+              6,
+              6,
+              6
+            ],
+            "k_vectors": 346,
+            "k_superset": 786,
+            "headroom": 0.1
+          },
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+        "gpu": "NVIDIA A100-SXM4-80GB",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 1495269376,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 52.21931591699831
+      }
+    },
+    {
+      "name": "reference-NbCl5-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/src-b4ec7053/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/jobs/reference-NbCl5-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 53.96994882299623,
+      "result": {
+        "name": "reference-NbCl5-f64",
+        "kind": "reference",
+        "pid": 1055987,
+        "host": "a0534",
+        "python": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "started_utc": "2026-11-08T22:15:01.904898+00:00",
+        "hybrid_launcher": false,
+        "load_s": 24.79814178799279,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-L.model",
+            "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+            "label": "polar1-l",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain",
+            "polar_longrange"
+          ],
+          "corrections_active": [
+            "polar_kspace_stress"
+          ],
+          "optional_physics": [],
+          "gate_floors": {
+            "stress_eV_per_A3": 5e-07
+          },
+          "stock": true,
+          "polar": {
+            "bounds": [
+              19,
+              18,
+              6
+            ],
+            "k_vectors": 3959,
+            "k_superset": 7986,
+            "headroom": 0.1
+          },
+          "dispersion": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+        "gpu": "NVIDIA A100-SXM4-80GB",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 26744979456,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 51.26718147499196
+      }
+    },
+    {
+      "name": "reference-NbCl5-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/src-b4ec7053/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/jobs/reference-NbCl5-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 56.01164492900716,
+      "result": {
+        "name": "reference-NbCl5-ase_f32",
+        "kind": "reference",
+        "pid": 1056303,
+        "host": "a0534",
+        "python": "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "started_utc": "2026-11-08T22:15:55.924327+00:00",
+        "hybrid_launcher": false,
+        "load_s": 27.157958746000077,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/atuin/v130cb/v130cb18/fm-offpolar/models/MACE-POLAR-1-L.model",
+            "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b",
+            "label": "polar1-l",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain",
+            "polar_longrange"
+          ],
+          "corrections_active": [
+            "polar_kspace_stress"
+          ],
+          "optional_physics": [],
+          "gate_floors": {
+            "stress_eV_per_A3": 5e-07
+          },
+          "stock": true,
+          "polar": {
+            "bounds": [
+              19,
+              18,
+              6
+            ],
+            "k_vectors": 3959,
+            "k_superset": 7986,
+            "headroom": 0.1
+          },
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+        "gpu": "NVIDIA A100-SXM4-80GB",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 13243514880,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 53.38620116599486
+      }
+    },
+    {
+      "name": "production-fastmace",
+      "kind": "production",
+      "argv": [
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/env/bin/python",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/src-b4ec7053/tools/force_stress_gate.py",
+        "production",
+        "--job",
+        "/home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4966344/gate-default/jobs/production-fastmace.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 1,
+      "wall_s": 308.0228488279972,
+      "result": null
+    }
+  ],
+  "summary": {},
+  "error": "GateJobError: production-fastmace exited with 1; see logs/production-fastmace.log",
+  "finished_utc": "2026-11-08T22:21:59.613010+00:00"
+}

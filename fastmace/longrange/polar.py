@@ -424,10 +424,13 @@ SPIN_BATCHED = True
 # energy then uses FUSED_FOURIER's structure factor. None: on for MEGAKERNEL_GPUS (decision 66) from
 # MEGAKERNEL_MIN_WORK; True / False: an A/B. Rounding. RTX 5060 Ti MD step with the CUDA kernels (b/a, abab / abba):
 # NbCl5 S 0.893 / 0.896, M 0.957 / 0.957, L 0.972 / 0.973; the 3x gate passes on S, M (NaCl, NbCl5) and L NaCl
-# (RTX A4000) and L NbCl5 (A100-80GB). Other GPUs are not measured.
+# (RTX A4000) and L NbCl5 (A100-80GB). A100-SXM4-80GB (NHR Alex, 8 November 2026, results/off-polar-a100-20261108,
+# MEGAKERNEL True against the A100 defaults, ab / ba): NbCl5 S 0.9846 / 0.9854, M 0.9918 / 0.9954, L 0.9855 / 0.9964;
+# NaCl (under MEGAKERNEL_MIN_WORK) S 1.0169 / 1.0149, M 0.9996 / 1.0096; the 3x gate passes on S and M (NaCl,
+# NbCl5) there. On for the A100 family from MEGAKERNEL_MIN_WORK (decision 66). The Ada is not measured.
 # tests/cpu/test_kspace_megakernel.py, tests/gpu/test_kspace_megakernel_cuda.py.
 MEGAKERNEL = None
-MEGAKERNEL_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
+MEGAKERNEL_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA A100-SXM4-80GB")
 # With MEGAKERNEL None, the listed GPUs take the megakernel only for cells with atoms x k-vectors at least this
 # (RTX 5060 Ti, 7-8 November 2026: NbCl5, 1944 x 2989 = 5.8 M, MD step 0.89-0.96 in both orders; NaCl,
 # 216 x 243 = 52 k, 0.998-1.012; nothing measured in between). True / False ignore it (the A/Bs).
