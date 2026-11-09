@@ -48,8 +48,9 @@ ncu --profile-from-start off --target-processes all --cache-control none --clock
   > "$out/ncu.log" 2>&1 < /dev/null
 note "end ncu exit=$? $(grep -c '==PROF== Profiling' "$out/ncu.log") kernels"
 grep -q ERR_NVGPUCTRPERM "$out/ncu.log" && note "ERR_NVGPUCTRPERM, no access to the performance counters"
-if [ -f "$out/ncu.ncu-rep" ]; then
-  ncu --import "$out/ncu.ncu-rep" --csv --page raw --print-units base > "$out/ncu_raw.csv" 2>&1
+rep=$(ls "$out"/ncu.ncu-rep* 2>/dev/null | head -n 1)  # ncu 2026.4 writes .ncu-repz
+if [ -n "$rep" ]; then
+  ncu --import "$rep" --csv --page raw --print-units base > "$out/ncu_raw.csv" 2>&1
   python tools/step_breakdown.py --output "$out/main" --summarize-ncu "$out/ncu_raw.csv" > "$out/join.log" 2>&1
   note "join exit=$? $(tail -n 1 "$out/join.log" | cut -c1-200)"
 fi
