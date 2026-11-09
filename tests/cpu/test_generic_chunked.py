@@ -193,3 +193,49 @@ def test_generic_wprime_stands_aside_on_the_rescue_rung(monkeypatch):
     monkeypatch.setattr(radial, "_generic_interactions", lambda model: [(1, Unchunked())])
     with pytest.raises(RewriteError, match="no generic interaction"):
         radial.attach_generic_wprime(torch.nn.Module())
+
+
+def test_probe_runs_the_composed_skip_without_a_table_gradient():
+    """``generic._run`` (the generic self-checks, ``generic_recompute_first_table``'s after ``tf32x3_gemms``): with
+    ``compose_skip`` on the first interaction (inference only, refuses a species table with a gradient) the probe's
+    table is bound and fed without one and its gradient is zero, the other leaves' gradients unchanged. Before, the
+    rung's self-check failed on the RTX 4000 Ada and the plan fell to the terminal sequence
+    (results/omat0-ada-capacity-20261108, SrTiO3 32^3)."""
+    import torch
+
+    class Reassociation:
+        columns = [0, 1]
+
+        def __init__(self, composed):
+            self.compose_skip = object() if composed else None
+            self.species_feats = None
+
+        def bind(self, feats):
+            if self.compose_skip is not None and feats is not None and feats.requires_grad:
+                raise RuntimeError("compose_skip has no gradient for the weights: inference only (frozen parameters)")
+            self.species_feats = feats
+
+    class Interaction:
+        def __init__(self, composed):
+            self.first_reassociation = Reassociation(composed)
+
+        def linear_up(self, table):
+            return 2.0 * table
+
+        def __call__(self, node_attrs, feats, edge_attrs, edge_feats, edge_index, cutoff=None):
+            x = self.first_reassociation.species_feats
+            if self.first_reassociation.compose_skip is not None and (x.requires_grad or feats.requires_grad):
+                raise RuntimeError("compose_skip has no gradient for the weights: inference only (frozen parameters)")
+            return (feats.sum() * edge_feats.square().sum() + x.sum() * edge_attrs.sum(),)
+
+    generator = torch.Generator().manual_seed(3)
+    probe = dict(node_attrs=torch.eye(2, dtype=torch.float64),
+                 table=torch.randn(2, 3, generator=generator, dtype=torch.float64).requires_grad_(),
+                 edge_attrs=torch.randn(4, 2, generator=generator, dtype=torch.float64).requires_grad_(),
+                 edge_feats=torch.randn(4, 1, generator=generator, dtype=torch.float64).requires_grad_(),
+                 edge_index=torch.zeros(2, 4, dtype=torch.long), node_feats=None, cutoff=None)
+    plain = generic._run(Interaction(False), probe, False, [], generator)
+    composed = generic._run(Interaction(True), probe, False, list([torch.ones(())]), generator)
+    assert torch.equal(composed[1], torch.zeros_like(probe["table"]))  # no table gradient with the composed skip
+    assert plain[1].abs().sum() > 0
+    assert probe["table"].requires_grad  # the caller's probe is left as it was
