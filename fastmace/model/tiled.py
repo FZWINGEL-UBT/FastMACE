@@ -1104,6 +1104,7 @@ class TiledForceField:
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
         self._pieces, self._piece_bytes, self._piece_budget, self._piece_count = None, 0, 0, 0  # TILE_GRAPH_CACHE
+        self._list_cache = None  # TileConfig.list_cache (neighbours "tiles"; set per call by tiles())
         self._per_receiver = None  # the last measured tile workspace per receiver (bytes; _memory)
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}

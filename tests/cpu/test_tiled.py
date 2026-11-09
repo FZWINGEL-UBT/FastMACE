@@ -1504,6 +1504,23 @@ def test_state_dtype_stores_the_host_state_in_16_bits_and_rounds_only_it(store, 
     assert not np.array_equal(f1, f0)  # the stored values were rounded
 
 
+def test_wavefront_runs_on_the_force_fields_own_list():
+    """The wavefront with ``neighbours="global"`` (the force/stress gate's tiled production): its first call has no
+    tile list cache to drop lists from (an AttributeError before); the energy is bitwise the plain sweeps'."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = []
+    for wave in ("off", "on"):
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", state="host", alias_state=True, wavefront=wave,
+                                                  wavefront_group=2, boundary_skin=False))
+        results.append(tiled.evaluate(atoms, stress=True))
+    (e0, f0, s0), (e1, f1, s1) = results
+    assert e1 == e0
+    assert np.allclose(np.asarray(f1), np.asarray(f0), rtol=0, atol=1e-10)
+    assert np.allclose(np.asarray(s1), np.asarray(s0), rtol=0, atol=1e-10)
+
+
 def test_state_dtype_needs_the_aliased_host_state():
     with pytest.raises(ValueError, match="state_dtype"):
         TileConfig(5, state_dtype="float32")
