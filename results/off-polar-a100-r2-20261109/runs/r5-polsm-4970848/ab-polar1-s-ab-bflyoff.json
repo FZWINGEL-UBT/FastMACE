@@ -1,0 +1,381 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-11-09T16:02:22.022823+00:00",
+  "host": "a0632",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "6f03bd02744f8f5fcb3c4f308e8e1e9bd5bde834",
+  "model": "polar1-s",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "sides": {
+    "a": {},
+    "b": {}
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "neighbour_sides": {
+    "a": {},
+    "b": {}
+  },
+  "constant_sides": {
+    "a": {},
+    "b": {
+      "fastmace.kernels.oeq_streaming.wprime_backward:BUTTERFLY": false
+    }
+  },
+  "tf32_sides": {
+    "a": false,
+    "b": false
+  },
+  "recapture_sides": {
+    "a": false,
+    "b": false
+  },
+  "timestep_fs": null,
+  "protocol": {
+    "warmup": 200,
+    "block": 256,
+    "blocks": 6
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float32",
+  "prepare": false,
+  "stop_after": null,
+  "stop_beyond": 0.03,
+  "load": [
+    13.38,
+    14.13,
+    15.25
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 2.3060817147779744,
+            "mean_ms": 33.35360325453015,
+            "min_ms": 2.2895833358234086,
+            "max_ms": 188.5778355469938,
+            "stdev_ms": 76.0440346652434,
+            "spread": 80.78128845885495,
+            "block_ms": [
+              188.5778355469938,
+              2.338472027304306,
+              2.303565187503409,
+              2.3059802852003486,
+              2.2895833358234086,
+              2.3061831443556002
+            ]
+          },
+          "b": {
+            "median_ms": 2.288556413986953,
+            "mean_ms": 2.288772868458485,
+            "min_ms": 2.2871990038311196,
+            "max_ms": 2.2909855040325056,
+            "stdev_ms": 0.001336125734266482,
+            "spread": 0.0016545365358896155,
+            "block_ms": [
+              2.2909855040325056,
+              2.2895081874594325,
+              2.287831687453945,
+              2.288685124995027,
+              2.288427702978879,
+              2.2871990038311196
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9924003990497324,
+        "pair_ratios_b_over_a": [
+          0.012148752780978808,
+          0.979061609772037,
+          0.9931699349621983,
+          0.9924998664054844,
+          0.9994952650002085,
+          0.9917681557204403
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.9924003990497324,
+      "pair_ratios": [
+        0.012148752780978808,
+        0.979061609772037,
+        0.9931699349621983,
+        0.9924998664054844,
+        0.9994952650002085,
+        0.9917681557204403
+      ],
+      "setup_s": {
+        "a": 89.35069394099992,
+        "b": 69.25096387497615
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            4,
+            5
+          ],
+          "aot_autograd.ok": [
+            13,
+            14
+          ],
+          "aot_autograd.total": [
+            13,
+            14
+          ],
+          "frames.ok": [
+            88,
+            89
+          ],
+          "frames.total": [
+            96,
+            97
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/tmp/4970848.alex/fm/env/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x149088f62cb0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            12,
+            13
+          ],
+          "inductor.async_compile_cache_hit": [
+            1532,
+            1909
+          ],
+          "inductor.async_compile_cache_miss": [
+            2304,
+            2871
+          ],
+          "inductor.decompose_mm": [
+            36,
+            45
+          ],
+          "inductor.decompose_mm_pointwise": [
+            4,
+            5
+          ],
+          "inductor.extern_calls": [
+            604,
+            755
+          ],
+          "inductor.fxgraph_cache_hit": [
+            20,
+            22
+          ],
+          "inductor.pattern_matcher_count": [
+            1988,
+            2485
+          ],
+          "inductor.pattern_matcher_nodes": [
+            2160,
+            2700
+          ],
+          "inductor.removed_pointless_view_pair": [
+            24,
+            30
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            764,
+            952
+          ],
+          "stats.calls_captured": [
+            5490,
+            6852
+          ],
+          "stats.unique_graphs": [
+            13,
+            14
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 266.58577953406757,
+          "potential_eV_atom": -8471.38892404065,
+          "kinetic_eV_atom": 0.0344588658817443
+        },
+        "b": {
+          "temperature_K": 241.48826945712312,
+          "potential_eV_atom": -8471.39735745251,
+          "kinetic_eV_atom": 0.031214762857124278
+        }
+      },
+      "load_after": [
+        14.96,
+        14.96,
+        15.32
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 67,
+          "pipelined_redos": 16,
+          "pipelined_early_rebuilds": 67
+        },
+        "b": {
+          "rebuilds": 55,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 55
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 7.742847562440147,
+            "mean_ms": 7.7428774784872685,
+            "min_ms": 7.7410501055510395,
+            "max_ms": 7.74517954687326,
+            "stdev_ms": 0.00160297125000448,
+            "spread": 0.0005333233398849177,
+            "block_ms": [
+              7.74517954687326,
+              7.7410501055510395,
+              7.742555562572306,
+              7.741264628748468,
+              7.743139562307988,
+              7.744075464870548
+            ]
+          },
+          "b": {
+            "median_ms": 7.729923765623425,
+            "mean_ms": 7.945706027991643,
+            "min_ms": 7.717526726537471,
+            "max_ms": 9.005893843777812,
+            "stdev_ms": 0.5198333573538533,
+            "spread": 0.1666726809092189,
+            "block_ms": [
+              7.717526726537471,
+              7.719523113337345,
+              7.717630957131405,
+              9.005893843777812,
+              7.7733371092563175,
+              7.740324417909505
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9983308728846202,
+        "pair_ratios_b_over_a": [
+          0.9964296734286874,
+          0.9972191121462634,
+          0.9967808296318353,
+          1.1633620959465634,
+          1.0038999099403199,
+          0.9995156236560376
+        ],
+        "stopped_after": null
+      },
+      "ratio_b_over_a": 0.9983308728846202,
+      "pair_ratios": [
+        0.9964296734286874,
+        0.9972191121462634,
+        0.9967808296318353,
+        1.1633620959465634,
+        1.0038999099403199,
+        0.9995156236560376
+      ],
+      "setup_s": {
+        "a": 99.09568715101341,
+        "b": 96.69145225198008
+      },
+      "plan_lines": {
+        "a": [],
+        "b": []
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 295.5648344403147,
+          "potential_eV_atom": -10694.8707383964,
+          "kinetic_eV_atom": 0.038204697216556595
+        },
+        "b": {
+          "temperature_K": 255.46042715182392,
+          "potential_eV_atom": -10694.877560393274,
+          "kinetic_eV_atom": 0.0330208033328082
+        }
+      },
+      "load_after": [
+        26.57,
+        23.5,
+        19.19
+      ],
+      "engine_counters_timed": {
+        "a": {
+          "rebuilds": 69,
+          "pipelined_redos": 0,
+          "pipelined_early_rebuilds": 69
+        },
+        "b": {
+          "rebuilds": 56,
+          "pipelined_redos": 3,
+          "pipelined_early_rebuilds": 56
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  },
+  "pack": {
+    "name": "bflyoff",
+    "entries": [
+      "sbloff",
+      "bflyoff",
+      "dpartsoff",
+      "sdoutoff"
+    ],
+    "shared_a": true
+  }
+}
