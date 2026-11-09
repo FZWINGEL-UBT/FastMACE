@@ -1164,7 +1164,11 @@ class WPrimeBackward:
             body = self.source.index(") {", self.source.index(head)) + 3
             pragma = '\n    asm volatile(".pragma \\"enable_smem_spilling\\";");'
             self.source = self.source[:body] + pragma + self.source[body:]
-            bounded = f'extern "C" __global__ void __launch_bounds__({self.num_threads}) oeq_projected_backward_wprime('
+            # the cap as __launch_bounds__' minimum blocks: with __launch_bounds__ present ptxas ignores --maxrregcount
+            # (9 Nov 2026: the H200 / 5060 Ti SMEM_SPILL A/Bs of 158399f2 ran uncapped kernels)
+            low = f", {65536 // (self.num_threads * self.max_registers)}" if self.max_registers else ""
+            bounded = (f'extern "C" __global__ void __launch_bounds__({self.num_threads}{low}) '
+                       'oeq_projected_backward_wprime(')
             self.source = self.source.replace(head, bounded)
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
