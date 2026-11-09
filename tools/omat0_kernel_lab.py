@@ -66,6 +66,52 @@ def _after_constants(source, text):
     return source[:index] + text + source[index:]
 
 
+FP64_HELPERS = {  # (to double, to float): real conversions, or free reinterpretations (an upper bound, wrong values)
+    "cvt": ("__device__ __forceinline__ double fm_d(float f) { return (double)f; }\n"
+            "__device__ __forceinline__ float fm_f(double d) { return (float)d; }\n"),
+    "free": ("__device__ __forceinline__ double fm_d(float f) { return __hiloint2double(__float_as_int(f), 0); }\n"
+             "__device__ __forceinline__ float fm_f(double d) { return __int_as_float(__double2hiint(d)); }\n"),
+}
+
+
+def fp64_paths(source, helpers="cvt", min_terms=15):
+    """Round 2 idea 1 (A100): the FACTORED u / v sums of the paths with at least ``min_terms`` u terms (the two 21-term
+    paths) in double, so their multiply-adds run on the FP64 pipe beside the FP32 one: scaled = g * c (DMUL),
+    u += scaled e and v += scaled x (DFMA), u and v converted back where read. ``helpers`` "cvt": real conversions
+    (each output gradient per term, x and e per use, the sums at the end; more accurate than float32); "free": the
+    conversions replaced by register reinterpretations, the upper bound of a design that stages doubles."""
+    lines = source.split("\n")
+    declare = re.compile(r"acc_t ([uv]_\d+) = acc_t\(0\);")
+    update = re.compile(r"\b(u_\d+) [+-]= scaled")
+    starts = [k for k, line in enumerate(lines) if "acc_t u_0 = acc_t(0);" in line] + [len(lines)]
+    chosen = []
+    for a, b in zip(starts, starts[1:]):
+        if sum(1 for line in lines[a:b] if update.search(line)) >= min_terms:
+            chosen.append((a, b))
+    if not chosen:
+        raise ValueError("fp64_paths: no path with enough terms")
+    for a, b in chosen:
+        names = set()
+        for k in range(a, b):
+            line = lines[k]
+            m = declare.search(line)
+            if m:
+                names.add(m.group(1))
+                lines[k] = line.replace(m.group(0), f"double {m.group(1)} = 0.0;")
+                continue
+            line = re.sub(r"const scalar_t scaled = output_gradient \* ([^;]+);",
+                          r"const double scaled = fm_d(output_gradient) * (double)(\1);", line)
+            line = line.replace("const scalar_t scaled = output_gradient;",
+                                "const double scaled = fm_d(output_gradient);")
+            line = re.sub(r"\b([uv]_\d+) ([+-])= scaled \* (edge_value|input_value);",
+                          r"\1 = fma(\2scaled, fm_d(\3), \1);", line)
+            for name in names:
+                line = line.replace(f"* {name};", f"* fm_f({name});")
+            lines[k] = line
+    source = "\n".join(lines).replace("fma(+scaled", "fma(scaled")
+    return _after_constants(source, FP64_HELPERS[helpers]), len(chosen)
+
+
 # ---------------------------------------------------------------------------------------------------------- wprime
 def wprime_variants(species, kernel=None):
     """name -> (kind, source transform, extra NVRTC options); kind "exact", "rounding" (compared with relative
@@ -618,6 +664,9 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "maxreg-none": ("exact", lambda s: s, ("--maxrregcount=255",)),
         "maxreg72": ("exact", lambda s: s, ("--maxrregcount=72",)),
         "ldcs-w": ("exact", lambda s: hints(s, g=False), ()),
+        # Round 2 idea 1 (9 Nov 2026): the two 21-term paths on the FP64 pipe (A100 only)
+        "fp64-paths": ("rounding", lambda s: fp64_paths(s, "cvt")[0], ()),
+        "F-fp64-free": ("falsifier", lambda s: fp64_paths(s, "free")[0], ()),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
         "unordered": ("exact", unordered, ()),
