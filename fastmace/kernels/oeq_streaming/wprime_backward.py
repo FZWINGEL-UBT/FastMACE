@@ -1296,13 +1296,30 @@ def _(x, sh, senders, receivers, douts, r, pair, gprime, starts, scales, bins, r
     return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
 
 
+def _block_rows(rows, x):
+    """The node rows a block convolution returns: ``rows`` (a tile's receivers;
+    ``rewrites.generic.modules.TILE_BLOCK_ROWS``) where it is in (0, N), else every row of ``x``."""
+    rows = int(rows)
+    return rows if 0 < rows < x.shape[0] else x.shape[0]
+
+
+def _leading_rows(groups, x, rows):
+    """The block-layout groups' first ``rows`` nodes: ``[N * dim, P * C]`` is node-major, so a view of the leading
+    ``rows * dim`` rows. The w' backward reads the message gradient at the edges' receivers only (all below ``rows``
+    on a tile), so it takes the short gradients as they are, with no zero rows for the halo."""
+    n = x.shape[0]
+    if rows == n:
+        return groups
+    return [g.narrow(0, 0, rows * (g.shape[0] // n)) for g in groups]
+
+
 class _WPrimeBlockConvolution(torch.autograd.Function):
     """``_WPrimeConvolution``'s TABLE_W path with the fused message-only forward, the message in the block layout:
     returns the groups, then the edge density."""
 
     @staticmethod
     def forward(ctx, r, pair, coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, weight, gprime, x,
-                sh, senders, receivers, row_ptr, message_id, wprime_id):
+                sh, senders, receivers, row_ptr, message_id, wprime_id, rows=0):
         from fastmace.kernels.oeq_streaming.fused_forward import a_columns, fused_folded_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1310,22 +1327,22 @@ class _WPrimeBlockConvolution(torch.autograd.Function):
                                           a_columns(message_id))  # VEC_A: rows padded for float4 staging
         groups = fused_folded_message_blocks(a, weight, x, sh, senders, receivers, row_ptr, message_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins)
-        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
-        return (*groups, density)
+        ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
+        return (*_leading_rows(groups, x, ctx.rows), density)
 
     @staticmethod
     def backward(ctx, *grads):
         x, sh, senders, receivers, r, pair, gprime, density_dcoef, starts, scales, bins = ctx.saved_tensors
         kernel = _REGISTRY[ctx.wprime_id]
         from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
-        shapes = block_shapes(kernel.blocks, kernel.channels, x.shape[0])
+        shapes = block_shapes(kernel.blocks, kernel.channels, ctx.rows)
         douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
         dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, gprime,
                                                             starts, scales, bins, *ctx.constants, ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
         return (dr.reshape(r.shape), None, None, None, None, None, None, None, None, None, None, None, dx, dsh,
-                None, None, None, None, None)
+                None, None, None, None, None, None)
 
 
 class _SplineBlockConvolution(torch.autograd.Function):
@@ -1335,7 +1352,7 @@ class _SplineBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1344,8 +1361,8 @@ class _SplineBlockConvolution(torch.autograd.Function):
         groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, table, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
                               bins)
-        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
-        return (*groups, density)
+        ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
+        return (*_leading_rows(groups, x, ctx.rows), density)
 
     @staticmethod
     def backward(ctx, *grads):
@@ -1353,7 +1370,7 @@ class _SplineBlockConvolution(torch.autograd.Function):
          bins) = ctx.saved_tensors
         kernel = _REGISTRY[ctx.wprime_id]
         from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
-        shapes = block_shapes(kernel.blocks, kernel.channels, x.shape[0])
+        shapes = block_shapes(kernel.blocks, kernel.channels, ctx.rows)
         douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
         # The spline kernel's piece count is spline_starts' length (its intervals); scales and bins are not read.
         dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
@@ -1361,7 +1378,7 @@ class _SplineBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 5
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
 
 
 class _SplineLocatedBlockConvolution(torch.autograd.Function):
@@ -1370,7 +1387,7 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_locate, spline_message_blocks_located
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1380,8 +1397,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
         groups = spline_message_blocks_located(x, sh, senders, row_ptr, locator, pair, table, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
                               bins, locator)
-        ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
-        return (*groups, density)
+        ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
+        return (*_leading_rows(groups, x, ctx.rows), density)
 
     @staticmethod
     def backward(ctx, *grads):
@@ -1389,14 +1406,14 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
          bins, locator) = ctx.saved_tensors
         kernel = _REGISTRY[ctx.wprime_id]
         from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
-        shapes = block_shapes(kernel.blocks, kernel.channels, x.shape[0])
+        shapes = block_shapes(kernel.blocks, kernel.channels, ctx.rows)
         douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
         dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
                                                             spline_starts, scales, locator, *ctx.constants,
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 5
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
 
 
 def spline_table(coef, row_scale=None):
@@ -1752,7 +1769,7 @@ class WPrime(torch.nn.Module):
                                          batch=REBUILD_BATCH))
 
     def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None,
-                    recompute_rows=0, linear=None):
+                    recompute_rows=0, linear=None, block_rows=None):
         """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh).
         ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward. With the rebuild
         kernels attached (``attach_rebuild``) and ``fused``, the forward stores no ``w`` and the backward builds it on
@@ -1766,14 +1783,15 @@ class WPrime(torch.nn.Module):
             *groups, density = convolution.apply(
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
-                x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id)
+                x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
+                int(block_rows or 0))
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
             *groups, density = _WPrimeBlockConvolution.apply(
                 lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), weight, self.gprime, x, sh,
-                senders, receivers, row_ptr, self.block[2].id, self.block[3].id)
+                senders, receivers, row_ptr, self.block[2].id, self.block[3].id, int(block_rows or 0))
             return tuple(groups), density
         if self.table_w:  # no w is kept anyway; the fused forward's message-only kernel stores none
             if fused is not None and (self.message is None or self.message[0] != fused.id):

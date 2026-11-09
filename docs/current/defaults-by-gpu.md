@@ -223,6 +223,16 @@ w′ `FOLD_ALPHA` off measured within the run-to-run spread (0.4–0.7 % either 
 | --- | --- | --- | --- | --- | --- |
 | `TileConfig.lanes` `auto` (`tiled.LANE_GPUS`, exact): two sweep-2 tiles on disjoint SM halves | – (1.05× per pair) | on (1.09× per pair) | – | under `cudaMallocAsync` | [tiled-concurrent-tiles](../validation/tiled/tiled-concurrent-tiles.md) |
 | `TileConfig.backward_chunk_scale` `auto` (`tiled.TILE_CHUNK_SCALE`, exact) | ×4 | ×4 | ×1 | 1.08M SrTiO3, wavefront, R 8,192: 5060 Ti −10.5 %, Ada −3.2 %; RTX PRO 6000 tiles do not chunk | `results/tiled-ideas-20261102` |
+| `tiled.TILE_PREFETCH_DEVICE` (`TILED_SPEED_GPUS`, exact): prefetch with the state on the device | on | – | – | OMAT-0 SrTiO3 975,560, device state: 0.939 / 0.941 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `generic.TILE_BLOCK_ROWS` (every GPU, rounding): w′ block message for the receivers only | on | on | on | 5060 Ti device state 0.918 / 0.921; wavefront 0.931 / 0.937 (1.030 / 1.060 while host-bound) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_VIRIAL` (`TILED_SPEED_GPUS`, rounding): strain gradient from the edge gradients | on | – | – | 0.970 / 0.955; wavefront 0.994 / 0.959; gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_GRAPH_CACHE` (`TILED_SPEED_GPUS`, exact): tile graphs kept for the call (25 % of free memory less the workspace; wavefront: `TILE_GRAPH_CACHE_WAVE`) | on | – | – | 0.948 / 0.960; all four 0.795 / 0.787 (8.38 → 6.66 s) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_FILTER32` (`TILED_SPEED_GPUS`, exact): kept lists' cutoff test in float32, float64 near the cutoff | on | – | – | 0.987 / 0.993; wavefront 0.981 / 1.012 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_EPILOGUE` (`TILED_SPEED_GPUS`, rounding): sweep masks, objective, virial and edge vectors compiled | on | – | – | 0.980 / 0.981; wavefront 0.985 / 0.983 (1.012 / 1.009 while host-bound); gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_FILL_SKIP` (every GPU, exact): no list-cache fill for graph-cached tiles | on | on | on | 0.961 / 0.966 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_PINNED_SUPERSET` (`TILED_SPEED_GPUS`, exact): kept lists pinned on the host, up to 4 GiB | on | – | – | 0.986 / 0.990; wavefront 0.989 / 0.990 (1.012 / 1.028 while host-bound) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_GRAPH_CACHE_WAVE` (`TILED_SPEED_GPUS`, exact): the graph cache under the wavefront, search pass to sweep 3 | on | – | – | wavefront 0.824 / 0.817 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_HOST_WORKER` (`TILED_SPEED_GPUS`, exact): host-state writes applied on a worker thread | on | – | – | wavefront 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 
 ## 2. Default MH-1 float32 plan (GPU-independent)
 

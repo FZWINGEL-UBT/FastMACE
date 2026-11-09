@@ -1,0 +1,266 @@
+{
+ "atoms": 975560,
+ "times": [
+  14.198380662011914,
+  31.506817748013418,
+  6.313730055990163,
+  6.346840231009992
+ ],
+ "wall": 6.307178975985153,
+ "regions": [
+  {
+   "region": "(none)",
+   "ns_per_atom": 2400.127506252836,
+   "kernels": 4554,
+   "ops": {
+    "fastmace::streaming_conv_wprime_backward_blocks": 1201.1,
+    "aten::mm": 293.0,
+    "fastmace::tabled_outer_sum_backward": 156.7,
+    "cuequivariance::uniform_1d": 104.8,
+    "fastmace::species_mm": 79.3,
+    "triton_red_fused_add_div_mul_neg_slice_slice_backw": 71.8,
+    "triton_red_fused_add_div_mul_neg_slice_backward_su": 69.6,
+    "triton_poi_fused_add_gather_slice_backward_tabled_": 51.5,
+    "triton_poi_fused_add_slice_slice_backward_species_": 48.7,
+    "triton_poi_fused_add_clone_div_slice_slice_backwar": 44.4
+   }
+  },
+  {
+   "region": "fwd2 < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 1650.3850762638974,
+   "kernels": 2032,
+   "ops": {
+    "fastmace::fused_folded_message_blocks": 1282.1,
+    "aten::mm": 125.7,
+    "fastmace::radial_table_forward": 71.6,
+    "triton_poi_fused_add_cat_div_slice_view_12": 48.5,
+    "cuequivariance::uniform_1d": 24.9,
+    "triton_poi_fused_cat_view_11": 21.8,
+    "triton_poi_fused_cat_view_10": 15.7,
+    "triton_poi_fused_scatter_add_select_unsqueeze_8": 14.5,
+    "## Call CompiledFxGraph fn2rke3irm2zfkbtpnw2jg4rox": 11.7,
+    "triton_poi_fused_cat_view_9": 7.5
+   }
+  },
+  {
+   "region": "fwd3o < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 792.9571733157978,
+   "kernels": 7418,
+   "ops": {
+    "aten::mm": 162.7,
+    "fastmace::tabled_outer_sum_forward": 98.0,
+    "fastmace::species_mm": 72.4,
+    "triton_poi_fused_cat_slice_view_25": 48.5,
+    "triton_poi_fused_cat_view_10": 42.2,
+    "aten::fill_": 36.2,
+    "triton_poi_fused_cat_view_9": 30.8,
+    "triton_poi_fused_clone_slice_transpose_view_7": 30.1,
+    "cuequivariance::uniform_1d": 27.5,
+    "triton_poi_fused_add_div_exp_index_lt_mul_pow_rsub": 24.5
+   }
+  },
+  {
+   "region": "fwd1m < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 789.7803989503433,
+   "kernels": 6754,
+   "ops": {
+    "aten::mm": 171.3,
+    "fastmace::tabled_outer_sum_forward": 97.8,
+    "fastmace::species_mm": 88.7,
+    "triton_poi_fused_cat_slice_view_25": 50.1,
+    "triton_poi_fused_add_cat_div_view_24": 49.1,
+    "aten::fill_": 36.4,
+    "triton_poi_fused_clone_slice_transpose_view_15": 31.6,
+    "cuequivariance::uniform_1d": 29.9,
+    "triton_poi_fused_clone_slice_23": 21.7,
+    "triton_poi_fused_cat_view_18": 21.7
+   }
+  },
+  {
+   "region": "TiledForceField._tile_graph < TiledForceField._piece < TiledForceField._call",
+   "ns_per_atom": 181.52080138587215,
+   "kernels": 7530,
+   "ops": {
+    "aten::index": 61.8,
+    "aten::copy_": 47.9,
+    "aten::add": 14.2,
+    "aten::nonzero": 11.6,
+    "aten::sub": 11.2,
+    "aten::cat": 7.2,
+    "aten::mul": 6.1,
+    "aten::sum": 5.4,
+    "aten::_unique2": 3.7,
+    "aten::gather": 3.5
+   }
+  },
+  {
+   "region": "TiledForceField._scatter < TiledForceField._call",
+   "ns_per_atom": 112.65191069744151,
+   "kernels": 952,
+   "ops": {
+    "aten::scatter_add_": 80.8,
+    "aten::index_add_": 31.5,
+    "aten::add_": 0.2,
+    "aten::copy_": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._call",
+   "ns_per_atom": 70.71926688262425,
+   "kernels": 748,
+   "ops": {
+    "aten::where": 19.6,
+    "aten::index": 15.5,
+    "aten::copy_": 13.9,
+    "aten::add": 12.5,
+    "aten::ge": 9.2
+   }
+  },
+  {
+   "region": "TiledForceField._call",
+   "ns_per_atom": 63.89885091638732,
+   "kernels": 578,
+   "ops": {
+    "cudaStreamIsCapturing": 22.9,
+    "cudaEventRecordWithFlags": 20.7,
+    "aten::where": 7.5,
+    "cudaEventRecord": 3.6,
+    "aten::copy_": 3.5,
+    "aten::add": 3.3,
+    "aten::ge": 1.1,
+    "cudaStreamWaitEvent": 0.9,
+    "cudaMemGetInfo": 0.2,
+    "aten::gather": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._fill < TiledForceField._call",
+   "ns_per_atom": 49.260746648074324,
+   "kernels": 3468,
+   "ops": {
+    "aten::copy_": 45.2,
+    "aten::fill_": 4.0
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 28.25344007543762,
+   "kernels": 540,
+   "ops": {
+    "triton_poi_fused_mul_unsqueeze_7": 17.5,
+    "triton_poi_fused_mul_unsqueeze_2": 4.5,
+    "triton_red_fused_mul_sum_unsqueeze_view_3": 4.1,
+    "triton_poi_fused_mul_unsqueeze_1": 1.7,
+    "triton_poi_fused_mul_0": 0.2,
+    "triton_per_fused_mul_sum_unsqueeze_view_4": 0.1,
+    "triton_poi_fused_add_mul_transpose_view_6": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_5": 0.1,
+    "triton_poi_fused_mul_unsqueeze_6": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_4": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._body < TiledForceField._run_slot < TiledForceField._call",
+   "ns_per_atom": 25.52932367051045,
+   "kernels": 204,
+   "ops": {
+    "triton_poi_fused_add_gt_index_select_sub_unsqueeze": 25.5
+   }
+  },
+  {
+   "region": "TiledForceField._second < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 21.536696871536478,
+   "kernels": 136,
+   "ops": {
+    "aten::index": 21.5
+   }
+  },
+  {
+   "region": "TiledForceField._globals < TiledForceField._call",
+   "ns_per_atom": 14.27935647218008,
+   "kernels": 8,
+   "ops": {
+    "aten::fill_": 14.3,
+    "aten::copy_": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._first < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 14.025891795480065,
+   "kernels": 204,
+   "ops": {
+    "aten::index": 13.9,
+    "aten::mul": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 9.593430439939928,
+   "kernels": 680,
+   "ops": {
+    "aten::fill_": 4.4,
+    "aten::copy_": 3.3,
+    "aten::index": 1.0,
+    "aten::scatter_": 0.9
+   }
+  },
+  {
+   "region": "TiledForceField._source < TiledForceField._call",
+   "ns_per_atom": 9.068094222805348,
+   "kernels": 135,
+   "ops": {
+    "aten::copy_": 8.8,
+    "aten::abs": 0.1,
+    "aten::max": 0.0,
+    "aten::div": 0.0,
+    "aten::linalg_lu_solve": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::mul": 0.0,
+    "aten::floor": 0.0,
+    "aten::_local_scalar_dense": 0.0,
+    "aten::arange": 0.0
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 6.8177651810313575,
+   "kernels": 336,
+   "ops": {
+    "triton_red_fused_mul_sum_unsqueeze_view_1": 3.8,
+    "triton_poi_fused_mul_unsqueeze_0": 2.8,
+    "triton_per_fused_mul_sum_unsqueeze_view_2": 0.1,
+    "triton_poi_fused_add_mul_transpose_view_4": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_3": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_2": 0.0,
+    "triton_poi_fused_add_mul_transpose_view_3": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 5.723468571901999,
+   "kernels": 340,
+   "ops": {
+    "aten::fill_": 2.3,
+    "aten::copy_": 2.2,
+    "aten::scatter_": 0.6,
+    "aten::index": 0.6
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 0.06176862519566944,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 0.05169543646609706,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  }
+ ]
+}

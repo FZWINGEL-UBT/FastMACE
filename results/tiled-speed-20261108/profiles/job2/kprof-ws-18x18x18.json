@@ -1,0 +1,940 @@
+{
+ "kind": "ws",
+ "atoms": 29160,
+ "times": [
+  9.557749170984607,
+  0.14000877598300576,
+  0.13887454301584512,
+  0.14169378398219123
+ ],
+ "wall": 0.1439612730173394,
+ "kernel_s": 0.13757738799999975,
+ "busy_s": 0.13757738799999983,
+ "span_s": 0.140863002,
+ "launches": 248,
+ "kernels": [
+  {
+   "name": "fused_folded_forward",
+   "ms": 36.18331299999999,
+   "ns_per_atom": 1240.8543552812068,
+   "calls": 1
+  },
+  {
+   "name": "oeq_projected_backward_wprime",
+   "ms": 32.29248000000001,
+   "ns_per_atom": 1107.4238683127576,
+   "calls": 1
+  },
+  {
+   "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutlass_80_simt_sgemm_128x64_8x5_nn_align1::Params)",
+   "ms": 10.134276999999988,
+   "ns_per_atom": 347.54036351165945,
+   "calls": 19
+  },
+  {
+   "name": "kernel",
+   "ms": 6.783874,
+   "ns_per_atom": 232.64314128943758,
+   "calls": 2
+  },
+  {
+   "name": "void sgemm_largek_lds64<false, true, 6, 3, 4, 5, 2, 64>(float*, float const*, float const*, int, int, int, int, int, int, float const*, float const*, ",
+   "ms": 4.346054999999993,
+   "ns_per_atom": 149.0416666666664,
+   "calls": 3
+  },
+  {
+   "name": "gemm",
+   "ms": 4.276375,
+   "ns_per_atom": 146.65209190672152,
+   "calls": 10
+  },
+  {
+   "name": "segmented_polynomial_bwd_algo1_2",
+   "ms": 2.9087560000000083,
+   "ns_per_atom": 99.75157750342964,
+   "calls": 2
+  },
+  {
+   "name": "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3, 4>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, ",
+   "ms": 2.2692609999999984,
+   "ns_per_atom": 77.82102194787375,
+   "calls": 5
+  },
+  {
+   "name": "triton_poi_fused_add_expand_gather_slice_backward_tabled_outer_sum_backward_transpose_unsqueeze_view_23",
+   "ms": 1.9786259999999893,
+   "ns_per_atom": 67.85411522633709,
+   "calls": 1
+  },
+  {
+   "name": "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_3",
+   "ms": 1.9548440000000118,
+   "ns_per_atom": 67.03854595336118,
+   "calls": 1
+  },
+  {
+   "name": "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_14",
+   "ms": 1.924148000000001,
+   "ns_per_atom": 65.98587105624146,
+   "calls": 1
+  },
+  {
+   "name": "forward",
+   "ms": 1.8913709999999992,
+   "ns_per_atom": 64.86183127572014,
+   "calls": 1
+  },
+  {
+   "name": "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, 3, 3>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int,",
+   "ms": 1.7932660000000125,
+   "ns_per_atom": 61.49746227709233,
+   "calls": 12
+  },
+  {
+   "name": "triton_poi_fused_cat_view_27",
+   "ms": 1.7699310000000041,
+   "ns_per_atom": 60.697222222222365,
+   "calls": 3
+  },
+  {
+   "name": "triton_poi_fused_cat_slice_view_35",
+   "ms": 1.340796000000002,
+   "ns_per_atom": 45.980658436214064,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_cat_div_slice_view_39",
+   "ms": 1.3385560000000114,
+   "ns_per_atom": 45.90384087791534,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_slice_backward_view_22",
+   "ms": 1.3122129999999887,
+   "ns_per_atom": 45.00044581618617,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, ",
+   "ms": 1.2998259999999782,
+   "ns_per_atom": 44.575651577502676,
+   "calls": 7
+  },
+  {
+   "name": "triton_poi_fused_cat_view_26",
+   "ms": 1.233312,
+   "ns_per_atom": 42.294650205761315,
+   "calls": 3
+  },
+  {
+   "name": "triton_poi_fused_add_edge_sh3_backward_25",
+   "ms": 1.0777839999999852,
+   "ns_per_atom": 36.961042524004974,
+   "calls": 1
+  },
+  {
+   "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_simt_sgemm_256x128_8x4_nn_align1::Params)",
+   "ms": 0.9651140000000014,
+   "ns_per_atom": 33.097187928669456,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_25",
+   "ms": 0.8866620000000003,
+   "ns_per_atom": 30.406790123456798,
+   "calls": 1
+  },
+  {
+   "name": "segmented_polynomial_algo4_2",
+   "ms": 0.8002080000000024,
+   "ns_per_atom": 27.441975308642053,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_cat_view_23",
+   "ms": 0.6896509999999908,
+   "ns_per_atom": 23.650582990397485,
+   "calls": 3
+  },
+  {
+   "name": "segmented_polynomial_algo1_1",
+   "ms": 0.6740939999999973,
+   "ns_per_atom": 23.11707818930032,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_16",
+   "ms": 0.637221000000005,
+   "ns_per_atom": 21.852572016461078,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_div_slice_species_mm_view_34",
+   "ms": 0.628451000000001,
+   "ns_per_atom": 21.55181755829907,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_24",
+   "ms": 0.6249619999999996,
+   "ns_per_atom": 21.432167352537707,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_30",
+   "ms": 0.5862639999999992,
+   "ns_per_atom": 20.10507544581616,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_slice_slice_backward_species_mm_view_10",
+   "ms": 0.5834799999999959,
+   "ns_per_atom": 20.00960219478724,
+   "calls": 1
+  },
+  {
+   "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x128_8x5_nn_align1>(cutlass_80_simt_sgemm_64x128_8x5_nn_align1::Params)",
+   "ms": 0.5782309999999997,
+   "ns_per_atom": 19.82959533607681,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused_add_clone_slice_slice_backward_view_19",
+   "ms": 0.5700360000000073,
+   "ns_per_atom": 19.548559670782144,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_26",
+   "ms": 0.5363310000000056,
+   "ns_per_atom": 18.39269547325122,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_add_clone_div_mm_slice_slice_backward_view_4",
+   "ms": 0.5351789999999892,
+   "ns_per_atom": 18.353189300411152,
+   "calls": 1
+  },
+  {
+   "name": "_backward",
+   "ms": 0.5049309999999823,
+   "ns_per_atom": 17.315877914951383,
+   "calls": 1
+  },
+  {
+   "name": "_forward",
+   "ms": 0.4904949999999999,
+   "ns_per_atom": 16.82081618655692,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_cat_view_37",
+   "ms": 0.455862000000001,
+   "ns_per_atom": 15.633127572016495,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_7",
+   "ms": 0.44219499999999246,
+   "ns_per_atom": 15.164437585733623,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_36",
+   "ms": 0.4330080000000016,
+   "ns_per_atom": 14.849382716049439,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused_add_clone_slice_slice_backward_view_20",
+   "ms": 0.4238540000000066,
+   "ns_per_atom": 14.53545953360791,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_slice_slice_backward_species_mm_view_11",
+   "ms": 0.4235019999999931,
+   "ns_per_atom": 14.523388203017596,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_29",
+   "ms": 0.4229900000000016,
+   "ns_per_atom": 14.505829903978109,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_add_clone_div_mm_slice_slice_backward_view_5",
+   "ms": 0.41396300000000336,
+   "ns_per_atom": 14.1962620027436,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_div_slice_species_mm_view_33",
+   "ms": 0.4132910000000011,
+   "ns_per_atom": 14.173216735253808,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_17",
+   "ms": 0.39696699999998963,
+   "ns_per_atom": 13.613408779149164,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_div_exp_index_linalg_vector_norm_lt_mul_pow_rsub_select_sub_unsqueeze_19",
+   "ms": 0.3776019999999999,
+   "ns_per_atom": 12.949314128943755,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_expand_gather_index_mm_mul_select_slice_backward_unsqueeze_view_8",
+   "ms": 0.3608619999999937,
+   "ns_per_atom": 12.375240054869469,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_22",
+   "ms": 0.34540200000000004,
+   "ns_per_atom": 11.845061728395065,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_slice_backward_uniform_1d_view_9",
+   "ms": 0.34076100000001314,
+   "ns_per_atom": 11.68590534979469,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_expand_scatter_add_select_unsqueeze_zeros_20",
+   "ms": 0.30548799999999937,
+   "ns_per_atom": 10.476268861454024,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_18",
+   "ms": 0.2779599999999918,
+   "ns_per_atom": 9.532235939643067,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_clone_slice_slice_backward_view_21",
+   "ms": 0.2630129999999917,
+   "ns_per_atom": 9.019650205761033,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_slice_slice_backward_species_mm_view_12",
+   "ms": 0.25702700000000184,
+   "ns_per_atom": 8.814368998628321,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_add_clone_div_mm_slice_slice_backward_view_6",
+   "ms": 0.2553619999999937,
+   "ns_per_atom": 8.757270233195943,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_div_eq_exp_expand_gather_index_mul_neg_pow_rsub_scalar_tensor_select_sub_unsqueeze_view_where_24",
+   "ms": 0.2496009999999951,
+   "ns_per_atom": 8.559705075445649,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_bmm_index_permute_select_sub_view_16",
+   "ms": 0.23785400000000026,
+   "ns_per_atom": 8.156858710562423,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_div_slice_species_mm_view_32",
+   "ms": 0.2317400000000016,
+   "ns_per_atom": 7.947187928669465,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_div_exp_expand_gather_index_mul_select_slice_backward_tabled_outer_sum_backward_transpose_unsqueeze_view_15",
+   "ms": 0.22981999999999242,
+   "ns_per_atom": 7.881344307269973,
+   "calls": 1
+  },
+  {
+   "name": "backward",
+   "ms": 0.22953099999998813,
+   "ns_per_atom": 7.871433470507137,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_28",
+   "ms": 0.22655500000000028,
+   "ns_per_atom": 7.76937585733883,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_arange_full_like_index_lt_mul_select_where_17",
+   "ms": 0.20232400000000053,
+   "ns_per_atom": 6.938408779149538,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_expand_scatter_add_select_unsqueeze_38",
+   "ms": 0.1852639999999992,
+   "ns_per_atom": 6.353360768175556,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_div_slice_species_mm_view_31",
+   "ms": 0.08037199999999939,
+   "ns_per_atom": 2.756241426611776,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_slice_slice_backward_species_mm_view_13",
+   "ms": 0.07758800000000338,
+   "ns_per_atom": 2.6607681755831063,
+   "calls": 1
+  },
+  {
+   "name": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail::cub::detail::radix::policy_hub<long, at::cuda::cub::detail",
+   "ms": 0.07320600000000103,
+   "ns_per_atom": 2.5104938271605297,
+   "calls": 16
+  },
+  {
+   "name": "triton_poi_fused_add_view_40",
+   "ms": 0.0731710000000021,
+   "ns_per_atom": 2.509293552812143,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_index_mul_scatter_add_select_squeeze_stack_sum_view_zeros_42",
+   "ms": 0.06702599999999802,
+   "ns_per_atom": 2.298559670781825,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_21",
+   "ms": 0.0580619999999999,
+   "ns_per_atom": 1.991152263374482,
+   "calls": 1
+  },
+  {
+   "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x256_8x4_nn_align1>(cutlass_80_simt_sgemm_128x256_8x4_nn_align1::Params)",
+   "ms": 0.05124499999999989,
+   "ns_per_atom": 1.7573731138545916,
+   "calls": 2
+  },
+  {
+   "name": "void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 2, 2, false, false, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<float",
+   "ms": 0.04362700000000041,
+   "ns_per_atom": 1.49612482853225,
+   "calls": 1
+  },
+  {
+   "name": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, float, float, float, false, true, true, false, 6, false, cublasGemvParam",
+   "ms": 0.036169999999994616,
+   "ns_per_atom": 1.2403978052124354,
+   "calls": 2
+  },
+  {
+   "name": "triton_per_fused__to_copy_argmax_7",
+   "ms": 0.03312899999999991,
+   "ns_per_atom": 1.136111111111108,
+   "calls": 1
+  },
+  {
+   "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_align1>(cutlass_80_simt_sgemm_64x64_8x5_nn_align1::Params)",
+   "ms": 0.024198999999999613,
+   "ns_per_atom": 0.8298696844993009,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused__to_copy_arange_full_like_fused_folded_message_blocks_lt_searchsorted_select_where_18",
+   "ms": 0.02007000000000062,
+   "ns_per_atom": 0.6882716049382929,
+   "calls": 1
+  },
+  {
+   "name": "Memset (Device)",
+   "ms": 0.01559099999998125,
+   "ns_per_atom": 0.5346707818923611,
+   "calls": 24
+  },
+  {
+   "name": "triton_poi_fused_argmax_index_index_add_ones_like_zeros_10",
+   "ms": 0.014307999999999993,
+   "ns_per_atom": 0.49067215363511635,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_clone_permute_unsqueeze_14",
+   "ms": 0.011043000000000575,
+   "ns_per_atom": 0.3787037037037234,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_argmax_index_9",
+   "ms": 0.009154000000000452,
+   "ns_per_atom": 0.3139231824417164,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()",
+   "ms": 0.005537000000015268,
+   "ns_per_atom": 0.18988340192096256,
+   "calls": 2
+  },
+  {
+   "name": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortHistogramKernel<at_cuda_detail::cub::detail::radix::policy_hub<long, at::cuda::cub::detai",
+   "ms": 0.005090000000000146,
+   "ns_per_atom": 0.17455418381344806,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_expand_gather_index_mm_mul_select_silu_backward_unsqueeze_view_2",
+   "ms": 0.004896999999997206,
+   "ns_per_atom": 0.1679355281206175,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_clone_permute_unsqueeze_12",
+   "ms": 0.004576999999999316,
+   "ns_per_atom": 0.15696159122082703,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_add_gather_index_mul_view_0",
+   "ms": 0.0037770000000018626,
+   "ns_per_atom": 0.1295267489712573,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_27",
+   "ms": 0.0035209999999788123,
+   "ns_per_atom": 0.12074759945057656,
+   "calls": 1
+  },
+  {
+   "name": "void getrf_pivot<getrf_params_<float, 32, 1, 32, 32, 1> >(int, int, int, void*, int, long*, int, getrf_params_<float, 32, 1, 32, 32, 1>::data_type*, u",
+   "ms": 0.0032330000000074504,
+   "ns_per_atom": 0.11087105624168211,
+   "calls": 1
+  },
+  {
+   "name": "Memcpy DtoD (Device -> Device)",
+   "ms": 0.0028809999999884896,
+   "ns_per_atom": 0.09879972565118277,
+   "calls": 3
+  },
+  {
+   "name": "triton_poi_fused_mul_silu_41",
+   "ms": 0.0026239999999961585,
+   "ns_per_atom": 0.08998628257874343,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_bmm_clone_permute_view_15",
+   "ms": 0.0025609999999996946,
+   "ns_per_atom": 0.0878257887517042,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_expand_scatter_add_select_unsqueeze_zeros_5",
+   "ms": 0.0025599999999994906,
+   "ns_per_atom": 0.08779149519888514,
+   "calls": 4
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<2, at::native::FillFunctor<double>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<double>",
+   "ms": 0.0021119999999937135,
+   "ns_per_atom": 0.07242798353887907,
+   "calls": 3
+  },
+  {
+   "name": "void scal_kernel<float, float, 1, true, 6, 5, 5, 3>(cublasTransposeParams<float>, float const*, float*, float const*)",
+   "ms": 0.0020499999999883584,
+   "ns_per_atom": 0.070301783264347,
+   "calls": 3
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> >, std",
+   "ms": 0.0018879999999771827,
+   "ns_per_atom": 0.06474622770840818,
+   "calls": 2
+  },
+  {
+   "name": "at::native::(anonymous namespace)::fill_reverse_indices_kernel(long*, int, at::cuda::detail::IntDivider<unsigned int>)",
+   "ms": 0.0018570000000008803,
+   "ns_per_atom": 0.06368312757204665,
+   "calls": 2
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::AbsFunctor<float>, std::array<char*, 2ul>, false>(int, at::native::AbsFunctor<float>, st",
+   "ms": 0.0018559999999997671,
+   "ns_per_atom": 0.06364883401919641,
+   "calls": 2
+  },
+  {
+   "name": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortExclusiveSumKernel<at_cuda_detail::cub::detail::radix::policy_hub<long, at::cuda::cub::de",
+   "ms": 0.0017929999999996653,
+   "ns_per_atom": 0.06148834019203242,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_1",
+   "ms": 0.0017289999999920837,
+   "ns_per_atom": 0.059293552811799856,
+   "calls": 2
+  },
+  {
+   "name": "reduction_prod_kernel",
+   "ms": 0.00163200000001234,
+   "ns_per_atom": 0.055967078189723594,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused__to_copy_11",
+   "ms": 0.0016009999999987486,
+   "ns_per_atom": 0.05490397805208328,
+   "calls": 2
+  },
+  {
+   "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<long, at::native::func_wrapper_t<long, at::native::sum_functor<long, long, long>::operator",
+   "ms": 0.0016009999999951105,
+   "ns_per_atom": 0.05490397805195853,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_div_mul_slice_t_unsqueeze_8",
+   "ms": 0.0015039999999999054,
+   "ns_per_atom": 0.05157750342935204,
+   "calls": 1
+  },
+  {
+   "name": "void ipiv_lower_small<float, 32>(int, void*, int, long*, int, int)",
+   "ms": 0.0013770000000076835,
+   "ns_per_atom": 0.04722222222248571,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_index_add_ones_like_zeros_2",
+   "ms": 0.0013760000000002037,
+   "ns_per_atom": 0.04718792866941714,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused_add_zeros_1",
+   "ms": 0.0013759999999992942,
+   "ns_per_atom": 0.047187928669385946,
+   "calls": 2
+  },
+  {
+   "name": "void at::native::unrolled_elementwise_kernel<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> >, std::arr",
+   "ms": 0.0013759999999892899,
+   "ns_per_atom": 0.04718792866904286,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<2, at::native::BUnaryFunctor<long, long, long, at::native::fmod_kernel_cuda(at::TensorIteratorBase&)::{",
+   "ms": 0.0013129999999946448,
+   "ns_per_atom": 0.04502743484206601,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_bmm_clone_permute_view_13",
+   "ms": 0.001311999999999898,
+   "ns_per_atom": 0.044993141289434095,
+   "calls": 1
+  },
+  {
+   "name": "void gemmSN_NN_kernel<float, 256, 4, 2, 8, 3, 4, false, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float const>, cubl",
+   "ms": 0.0011849999999994907,
+   "ns_per_atom": 0.040637860082287064,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_bmm_permute_view_6",
+   "ms": 0.0011210000000000946,
+   "ns_per_atom": 0.038443072702335206,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_bmm_squeeze_view_28",
+   "ms": 0.0011199999999953435,
+   "ns_per_atom": 0.0384087791493602,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<int, int, bool, at::native::(anonymous namespace)::CompareEqFunctor<int> >",
+   "ms": 0.001088000000017928,
+   "ns_per_atom": 0.03731138546014842,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::compare_scalar_kernel<float>(at::TensorIteratorBase&, at::native::(anonymous namespace):",
+   "ms": 0.0010560000000114087,
+   "ns_per_atom": 0.03621399176993857,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::(anonymous namespace)::where_kernel_impl(at::TensorIterator&)::{lambda()#1}::operator()(",
+   "ms": 0.0010560000000114087,
+   "ns_per_atom": 0.03621399176993857,
+   "calls": 1
+  },
+  {
+   "name": "void create_pivot_v2<32>(int, int*, long*, int)",
+   "ms": 0.0010239999999757856,
+   "ns_per_atom": 0.035116598078730646,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<long, long, long, at::native::binary_internal::MulFunctor<long> >, std::ar",
+   "ms": 0.0009610000000102446,
+   "ns_per_atom": 0.03295610425275187,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctorOnSelf_add<long>, std::array<char*, 2ul>, false>(int, at::native::CUDAFunctor",
+   "ms": 0.0009610000000102446,
+   "ns_per_atom": 0.03295610425275187,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_bmm_view_4",
+   "ms": 0.0009600000000000363,
+   "ns_per_atom": 0.03292181069958972,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_mul_transpose_3",
+   "ms": 0.0009599999999991269,
+   "ns_per_atom": 0.03292181069955853,
+   "calls": 1
+  },
+  {
+   "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_inter",
+   "ms": 0.0009280000000144355,
+   "ns_per_atom": 0.031824417010097236,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_add_bmm_mul_select_backward_squeeze_transpose_view_30",
+   "ms": 0.0008319999999948777,
+   "ns_per_atom": 0.028532235939467687,
+   "calls": 1
+  },
+  {
+   "name": "void ipiv_64_to_32_ker<128>(long, long const*, int*)",
+   "ms": 0.0007999999999883584,
+   "ns_per_atom": 0.027434842249257834,
+   "calls": 1
+  }
+ ],
+ "host": [
+  {
+   "name": "cudaDeviceSynchronize",
+   "self_cpu_s": 0.12472663299999999,
+   "calls": 2
+  },
+  {
+   "name": "cuequivariance::uniform_1d",
+   "self_cpu_s": 0.0028555380000000003,
+   "calls": 4
+  },
+  {
+   "name": "Activity Buffer Request",
+   "self_cpu_s": 0.0026915319999999995,
+   "calls": 2
+  },
+  {
+   "name": "## Call CompiledFxGraph fltg3taheup2mbndqt2wav45cncukajp4q6oe64hx7wnteflcj3s ##",
+   "self_cpu_s": 0.0024034330000000073,
+   "calls": 1
+  },
+  {
+   "name": "## Call CompiledFxGraph fvrd5b7gbsmiyfeyzsgx7vz4lgfgagf6nsocvlo7fqobpbvxdfpf ##",
+   "self_cpu_s": 0.0014046150000000162,
+   "calls": 1
+  },
+  {
+   "name": "aten::mm",
+   "self_cpu_s": 0.0011462819999999846,
+   "calls": 48
+  },
+  {
+   "name": "TorchDynamo Cache Lookup",
+   "self_cpu_s": 0.0009380540000000001,
+   "calls": 1
+  },
+  {
+   "name": "fastmace::tabled_outer_sum_forward",
+   "self_cpu_s": 0.0008634309999999996,
+   "calls": 1
+  },
+  {
+   "name": "aten::_linalg_det",
+   "self_cpu_s": 0.0008115640000000131,
+   "calls": 1
+  },
+  {
+   "name": "cuLaunchKernel",
+   "self_cpu_s": 0.0006721039999999902,
+   "calls": 123
+  },
+  {
+   "name": "fastmace::species_mm",
+   "self_cpu_s": 0.0006451549999999988,
+   "calls": 10
+  },
+  {
+   "name": "aten::new_empty",
+   "self_cpu_s": 0.0005702020000000021,
+   "calls": 24
+  },
+  {
+   "name": "cudaLaunchKernel",
+   "self_cpu_s": 0.0005113190000000023,
+   "calls": 82
+  },
+  {
+   "name": "aten::fill_",
+   "self_cpu_s": 0.0002265900000000047,
+   "calls": 11
+  },
+  {
+   "name": "aten::empty",
+   "self_cpu_s": 0.00018447999999999775,
+   "calls": 40
+  },
+  {
+   "name": "CompiledFunction",
+   "self_cpu_s": 0.00017338000000000103,
+   "calls": 1
+  },
+  {
+   "name": "cuLaunchKernelEx",
+   "self_cpu_s": 0.00014447200000000066,
+   "calls": 16
+  },
+  {
+   "name": "CompiledFunctionBackward",
+   "self_cpu_s": 0.0001318269999999975,
+   "calls": 1
+  },
+  {
+   "name": "Torch-Compiled Region: 0/0",
+   "self_cpu_s": 0.00011607999999999993,
+   "calls": 1
+  },
+  {
+   "name": "fastmace::radial_table_forward",
+   "self_cpu_s": 0.00011048600000000078,
+   "calls": 1
+  },
+  {
+   "name": "fastmace::tabled_outer_sum_backward",
+   "self_cpu_s": 9.333100000000196e-05,
+   "calls": 1
+  },
+  {
+   "name": "fastmace::fused_folded_message_blocks",
+   "self_cpu_s": 9.283299999999872e-05,
+   "calls": 1
+  },
+  {
+   "name": "cudaMemsetAsync",
+   "self_cpu_s": 9.11820000000007e-05,
+   "calls": 24
+  },
+  {
+   "name": "aten::copy_",
+   "self_cpu_s": 8.009199999999782e-05,
+   "calls": 5
+  },
+  {
+   "name": "fastmace::streaming_conv_wprime_backward_blocks",
+   "self_cpu_s": 7.269699999999829e-05,
+   "calls": 1
+  },
+  {
+   "name": "fastmace::radial_table_backward",
+   "self_cpu_s": 6.813600000000224e-05,
+   "calls": 1
+  },
+  {
+   "name": "aten::sort",
+   "self_cpu_s": 6.235699999999633e-05,
+   "calls": 2
+  },
+  {
+   "name": "triton_poi_fused_cat_view_23",
+   "self_cpu_s": 5.084399999999914e-05,
+   "calls": 3
+  },
+  {
+   "name": "aten::view",
+   "self_cpu_s": 4.5286999999998443e-05,
+   "calls": 25
+  },
+  {
+   "name": "aten::empty_strided",
+   "self_cpu_s": 4.1860000000007856e-05,
+   "calls": 8
+  },
+  {
+   "name": "cudaMemcpyAsync",
+   "self_cpu_s": 3.9623999999999795e-05,
+   "calls": 3
+  },
+  {
+   "name": "Pregraph bytecode",
+   "self_cpu_s": 3.753699999999981e-05,
+   "calls": 1
+  },
+  {
+   "name": "aten::linalg_lu_factor_ex",
+   "self_cpu_s": 3.3658000000006724e-05,
+   "calls": 1
+  },
+  {
+   "name": "aten::prod",
+   "self_cpu_s": 3.0161999999996626e-05,
+   "calls": 1
+  },
+  {
+   "name": "aten::mul",
+   "self_cpu_s": 2.8800999999999476e-05,
+   "calls": 4
+  },
+  {
+   "name": "triton_poi_fused_scatter_add_zeros_0",
+   "self_cpu_s": 2.160900000000038e-05,
+   "calls": 1
+  },
+  {
+   "name": "triton_poi_fused_cat_view_26",
+   "self_cpu_s": 2.0217999999998938e-05,
+   "calls": 3
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_clone_mm_slice_36",
+   "self_cpu_s": 1.884099999999853e-05,
+   "calls": 2
+  },
+  {
+   "name": "aten::zero_",
+   "self_cpu_s": 1.8757999999996174e-05,
+   "calls": 10
+  },
+  {
+   "name": "triton_poi_fused_add_bmm_permute_view_6",
+   "self_cpu_s": 1.7458999999999834e-05,
+   "calls": 1
+  }
+ ],
+ "last": null
+}
