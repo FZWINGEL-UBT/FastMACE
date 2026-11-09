@@ -284,6 +284,37 @@ lists with the A100 added. `tools/ab_rewrites.py` now takes a dict literal for a
 - Small's other H200-only defaults (w′ STAGE_EDGES, MIN_BLOCKS 8) need A100 A/Bs of their own. w′ STAGE_EDGES is
   already on for every model on the A100.
 
+### A100 screen and PREFETCH_AHEAD (`a100/screen-a100-4967540`, `a100/confirm-a100-4967601`)
+
+**Screen job 4967540** (source `14fbf87a`): a = small's A100 defaults with the pair on, about 4.21 ms per step.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| R128 shape with MIN_BLOCKS 8 | 0.9993 | 1.0009 |
+| MIN_BLOCKS 7 | 0.9951 | 0.9986 |
+| w′ FOLD_ALPHA off | 0.9933 | 0.9970 |
+| tf32x3 TILE 64x32 | 1.0016 | 0.9976 |
+| w′ STAGE_SH off | 1.0448 | 1.0444 |
+| forward PREFETCH_AHEAD off | **0.9902** | **0.9908** |
+| w′ STAGE_EDGES off | 1.0330 | 1.0390 |
+| JOINED_LAYOUT off | 1.0312 | 1.0273 |
+
+**Adopted:** PREFETCH_AHEAD off for small on the A100 family (`50480105`,
+`spline_forward.PREFETCH_AHEAD_MODEL_OFF_GPUS`; bitwise, so no gate). Medium keeps it on.
+
+**Confirmation job 4967601** (source `50480105`, a = small's new A100 defaults, about 4.17 ms per step):
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| PREFETCH_AHEAD on again | 1.0068 | 1.0073 |
+| w′ FOLD_ALPHA off | 0.9962 | 0.9971 |
+| both | 1.0065 | 1.0029 |
+
+- FOLD_ALPHA off gains 0.3–0.7 % on the A100 in both jobs. It is a rounding change, and on the H200 the same change
+  reversed between jobs (spread about ±0.5 %), so it is not adopted.
+- MIN_BLOCKS 7 / 8 and TILE 64x32 change nothing on the A100.
+
 ## Not done
 
-- MIN_BLOCKS 8 on the A100, and small on the Ada and 5060 Ti, are not measured.
+- Small on the Ada and the 5060 Ti is not measured. Those GPUs keep the pair off.
+- The pack env files are in `a100/`. The gate script is `tools/jobs/alex_gate_small.sh`.
