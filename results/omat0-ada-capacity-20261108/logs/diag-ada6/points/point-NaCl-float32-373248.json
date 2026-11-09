@@ -1,0 +1,512 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-11-09T03:13:22.623018+00:00",
+  "host": "leto",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "969bfc4d362cb8cf4eebe9f2842389c4a9353d16",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "model": "omat0-medium",
+  "structure": "NaCl",
+  "precision": "float32",
+  "repeat": "36x36x36",
+  "natoms": 373248,
+  "volume_A3": 8141532.759606013,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "oom",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 20805451776,
+      "outside_allocator": 177274880
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 20805451776,
+    "cuda_total_bytes": 20982726656,
+    "windows": null
+  },
+  "rewrites": {},
+  "constants": [],
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "torch.OutOfMemoryError",
+    "message": "CUDA out of memory. Tried to allocate 7.12 GiB. GPU 0 has a total capacity of 19.54 GiB of which 5.00 GiB is free. Including non-PyTorch memory, this process has 14.54 GiB memory in use. Of the allocated memory 14.20 GiB is allocated by PyTorch, and 118.85 MiB is reserved by PyTorch but unallocated.",
+    "tried_to_allocate": "7.12 GiB",
+    "stage": null,
+    "frames": [
+      "fastmace/planner/minimal.py:1222 build: engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(",
+      "fastmace/planner/fixed.py:1783 build: return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,",
+      "fastmace/engine/graph.py:235 __init__: self._initial_forces()",
+      "fastmace/engine/graph.py:1123 _initial_forces: self._force_stage()",
+      "fastmace/engine/graph.py:1127 _force_stage: out = self.force_field(self.state.positions)",
+      "fastmace/model/forces.py:984 __call__: out = self._outputs(positions)",
+      "fastmace/model/forces.py:1075 _outputs: return self._split_outputs(self._compute_stress)",
+      "fastmace/model/forces.py:1097 _split_outputs: forces, virials, stress_out, _, _ = utils.get_outputs(",
+      "/mnt/homes/zwingel/fm-ada-capacity/cache-leto/inductor/mn/cmnxdfx7yunnkee7snsklidu24pmyahapbyuzrax2xwgp32ssqte.py:2736 call: buf19 = empty_strided_cuda((s85, 5120), (5120, 1), torch.float32)"
+    ],
+    "memory": {
+      "max_allocated": 20165401600,
+      "max_reserved": 20721958912,
+      "allocated": 15245401088,
+      "reserved": 15370027008,
+      "inactive_split_bytes": 0,
+      "active_bytes": 20165401600,
+      "reserved_bytes": 20721958912,
+      "alloc_retries": 4,
+      "segments": 0,
+      "cuda_free": 5364121600,
+      "outside_allocator": 248578048
+    },
+    "causes": [],
+    "live": {
+      "largest": [
+        {
+          "bytes": 3057647616,
+          "site": "fastmace/kernels/triton/tabled_outer_sum.py:390 tabled_outer_sum_forward",
+          "frames": [
+            "fastmace/kernels/triton/tabled_outer_sum.py:390 tabled_outer_sum_forward",
+            "fastmace/kernels/triton/tabled_outer_sum.py:488 forward",
+            "fastmace/kernels/triton/tabled_outer_sum.py:518 tabled_outer_sum",
+            "fastmace/rewrites/generic/modules.py:167 summed_fn",
+            "fastmace/rewrites/mh1/modules.py:255 forward",
+            "fastmace/rewrites/generic/modules.py:182 fused_first_message"
+          ]
+        },
+        {
+          "bytes": 2866544640,
+          "site": "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+          "frames": [
+            "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+            "fastmace/kernels/triton/tf32x3_gemm.py:171 backward",
+            "fastmace/kernels/triton/tf32x3_gemm.py:179 tf32x3_matmul",
+            "fastmace/rewrites/linear/modules.py:62 <listcomp>",
+            "fastmace/rewrites/linear/modules.py:62 block_products",
+            "fastmace/rewrites/linear/modules.py:152 products"
+          ]
+        },
+        {
+          "bytes": 2675441664,
+          "site": "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+          "frames": [
+            "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+            "fastmace/kernels/triton/tf32x3_gemm.py:171 backward",
+            "fastmace/kernels/triton/tf32x3_gemm.py:179 tf32x3_matmul",
+            "fastmace/rewrites/linear/modules.py:62 <listcomp>",
+            "fastmace/rewrites/linear/modules.py:62 block_products",
+            "fastmace/rewrites/linear/modules.py:152 products"
+          ]
+        },
+        {
+          "bytes": 1719926784,
+          "site": "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+          "frames": [
+            "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+            "fastmace/kernels/triton/tf32x3_gemm.py:171 backward",
+            "fastmace/kernels/triton/tf32x3_gemm.py:179 tf32x3_matmul",
+            "fastmace/rewrites/linear/modules.py:62 <listcomp>",
+            "fastmace/rewrites/linear/modules.py:62 block_products",
+            "fastmace/rewrites/linear/modules.py:152 products"
+          ]
+        },
+        {
+          "bytes": 764411904,
+          "site": "fastmace/kernels/triton/edge_sh.py:137 edge_sh3",
+          "frames": [
+            "fastmace/kernels/triton/edge_sh.py:137 edge_sh3",
+            "fastmace/rewrites/generic/modules.py:575 forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 764411904,
+          "site": "fastmace/model/compile.py:331 lean_forward",
+          "frames": [
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs",
+            "fastmace/model/forces.py:984 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage"
+          ]
+        },
+        {
+          "bytes": 384598016,
+          "site": "fastmace/neighbors/skin.py:231 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:231 new",
+            "fastmace/neighbors/skin.py:238 _allocate_now",
+            "fastmace/neighbors/skin.py:224 _allocate",
+            "fastmace/neighbors/skin.py:427 build_gpu",
+            "fastmace/neighbors/skin.py:289 build",
+            "fastmace/model/forces.py:1242 rebuild"
+          ]
+        },
+        {
+          "bytes": 382205952,
+          "site": "fastmace/neighbors/pair_search.py:325 screen_codes",
+          "frames": [
+            "fastmace/neighbors/pair_search.py:325 screen_codes",
+            "fastmace/neighbors/skin.py:400 build_gpu",
+            "fastmace/neighbors/skin.py:289 build",
+            "fastmace/model/forces.py:1242 rebuild",
+            "fastmace/model/forces.py:653 __init__",
+            "fastmace/planner/fixed.py:1769 build"
+          ]
+        },
+        {
+          "bytes": 382205952,
+          "site": "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+          "frames": [
+            "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+            "fastmace/kernels/triton/tf32x3_gemm.py:171 backward",
+            "fastmace/kernels/triton/tf32x3_gemm.py:179 tf32x3_matmul",
+            "fastmace/rewrites/linear/modules.py:62 <listcomp>",
+            "fastmace/rewrites/linear/modules.py:62 block_products",
+            "fastmace/rewrites/linear/modules.py:152 products"
+          ]
+        },
+        {
+          "bytes": 288448512,
+          "site": "fastmace/neighbors/skin.py:231 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:231 new",
+            "fastmace/neighbors/skin.py:236 _allocate_now",
+            "fastmace/neighbors/skin.py:224 _allocate",
+            "fastmace/neighbors/skin.py:427 build_gpu",
+            "fastmace/neighbors/skin.py:289 build",
+            "fastmace/model/forces.py:1242 rebuild"
+          ]
+        },
+        {
+          "bytes": 288448512,
+          "site": "fastmace/neighbors/skin.py:231 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:231 new",
+            "fastmace/neighbors/skin.py:239 _allocate_now",
+            "fastmace/neighbors/skin.py:224 _allocate",
+            "fastmace/neighbors/skin.py:427 build_gpu",
+            "fastmace/neighbors/skin.py:289 build",
+            "fastmace/model/forces.py:1242 rebuild"
+          ]
+        },
+        {
+          "bytes": 288448512,
+          "site": "fastmace/neighbors/skin.py:231 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:231 new",
+            "fastmace/neighbors/skin.py:240 _allocate_now",
+            "fastmace/neighbors/skin.py:224 _allocate",
+            "fastmace/neighbors/skin.py:427 build_gpu",
+            "fastmace/neighbors/skin.py:289 build",
+            "fastmace/model/forces.py:1242 rebuild"
+          ]
+        },
+        {
+          "bytes": 192299008,
+          "site": "fastmace/neighbors/skin.py:231 new",
+          "frames": [
+            "fastmace/neighbors/skin.py:231 new",
+            "fastmace/neighbors/skin.py:235 _allocate_now",
+            "fastmace/neighbors/skin.py:224 _allocate",
+            "fastmace/neighbors/skin.py:427 build_gpu",
+            "fastmace/neighbors/skin.py:289 build",
+            "fastmace/model/forces.py:1242 rebuild"
+          ]
+        },
+        {
+          "bytes": 143327232,
+          "site": "fastmace/model/compile.py:331 lean_forward",
+          "frames": [
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs",
+            "fastmace/model/forces.py:984 __call__",
+            "fastmace/engine/graph.py:1127 _force_stage"
+          ]
+        },
+        {
+          "bytes": 132876288,
+          "site": "fastmace/model/forces.py:480 __init__",
+          "frames": [
+            "fastmace/model/forces.py:480 __init__",
+            "fastmace/planner/fixed.py:1769 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare",
+            "fastmace/simulation.py:648 __init__",
+            "tools/bench/capacity_scan.py:415 run_point"
+          ]
+        },
+        {
+          "bytes": 132876288,
+          "site": "fastmace/rewrites/mh1/modules.py:363 identity_attrs",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:363 identity_attrs",
+            "fastmace/model/forces.py:769 _identity_basis",
+            "fastmace/model/forces.py:798 _setup_tables",
+            "fastmace/model/forces.py:637 __init__",
+            "fastmace/planner/fixed.py:1769 build",
+            "fastmace/planner/minimal.py:1222 build"
+          ]
+        },
+        {
+          "bytes": 53747712,
+          "site": "fastmace/integrators/langevin.py:63 allocate_noise",
+          "frames": [
+            "fastmace/integrators/langevin.py:63 allocate_noise",
+            "fastmace/integrators/langevin.py:174 __init__",
+            "fastmace/integrators/registry.py:462 build_integrator",
+            "fastmace/planner/fixed.py:277 build_stepper",
+            "fastmace/planner/fixed.py:1775 build",
+            "fastmace/planner/minimal.py:1222 build"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward",
+            "fastmace/model/compile.py:330 lean_forward",
+            "fastmace/model/forces.py:1095 _split_outputs",
+            "fastmace/model/forces.py:1075 _outputs"
+          ]
+        },
+        {
+          "bytes": 47775744,
+          "site": "fastmace/kernels/oeq_streaming/runtime.py:560 backward",
+          "frames": [
+            "fastmace/kernels/oeq_streaming/runtime.py:560 backward",
+            "fastmace/kernels/oeq_streaming/runtime.py:578 tabled_recompute_convolution",
+            "fastmace/rewrites/mh1/modules.py:611 streaming_message",
+            "fastmace/rewrites/generic/modules.py:329 generic_interaction_forward",
+            "fastmace/model/compile.py:331 lean_forward"
+          ]
+        }
+      ],
+      "by_site": [
+        [
+          "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+          7668006912
+        ],
+        [
+          "fastmace/kernels/triton/tabled_outer_sum.py:390 tabled_outer_sum_forward",
+          3057647616
+        ],
+        [
+          "fastmace/neighbors/skin.py:231 new",
+          1442242560
+        ],
+        [
+          "fastmace/model/compile.py:331 lean_forward",
+          916527616
+        ],
+        [
+          "fastmace/kernels/triton/edge_sh.py:137 edge_sh3",
+          764411904
+        ],
+        [
+          "fastmace/neighbors/pair_search.py:325 screen_codes",
+          382205952
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:613 streaming_message",
+          346374144
+        ],
+        [
+          "fastmace/model/forces.py:480 __init__",
+          132876288
+        ],
+        [
+          "fastmace/rewrites/mh1/modules.py:363 identity_attrs",
+          132876288
+        ],
+        [
+          "fastmace/model/compile.py:141 private_copy",
+          78307328
+        ],
+        [
+          "fastmace/integrators/langevin.py:63 allocate_noise",
+          53747712
+        ],
+        [
+          "fastmace/kernels/oeq_streaming/runtime.py:560 backward",
+          47775744
+        ],
+        [
+          "fastmace/model/loading.py:709 load",
+          36293632
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:200 __init__",
+          13796352
+        ],
+        [
+          "fastmace/model/forces.py:592 <dictcomp>",
+          10463232
+        ],
+        [
+          "fastmace/state.py:360 from_atoms",
+          8957952
+        ],
+        [
+          "fastmace/state.py:374 from_atoms",
+          8957952
+        ],
+        [
+          "fastmace/state.py:359 from_atoms",
+          8957952
+        ],
+        [
+          "fastmace/neighbors/skin.py:534 _set_reference",
+          8957952
+        ],
+        [
+          "fastmace/integrators/langevin.py:168 __init__",
+          8957952
+        ],
+        [
+          "fastmace/integrators/langevin.py:169 __init__",
+          8957952
+        ],
+        [
+          "fastmace/integrators/langevin.py:170 __init__",
+          8957952
+        ],
+        [
+          "fastmace/integrators/langevin.py:171 __init__",
+          8957952
+        ],
+        [
+          "fastmace/integrators/langevin.py:172 __init__",
+          8957952
+        ],
+        [
+          "outside FastMACE",
+          8519680
+        ]
+      ],
+      "live_bytes": 15245401088,
+      "segments_bytes": 15370027008
+    }
+  },
+  "times": {
+    "load_s": 4.302663003094494
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}
