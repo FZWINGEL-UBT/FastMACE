@@ -87,3 +87,45 @@ H200 container: Modal `sixth`, source 158399f2, 569 s, $0.96 ([h200-night2/](h20
 
 Off-midpoint economized bases (B1: a0 float32, a1/a2 bfloat16; B2: a1 11-bit, a2 3-bit mantissa): value parts 1.745 and
 0.650, both above the 0.5 target, so S12 stays the packed format.
+
+## Round 2 follow-ups: packed8v2, deferred CG, split sums and the FP64 pipe
+
+H200 lab (Modal `sixth`, source 7fcc99d6, 92 s, $0.12; [h200-round2/](h200-round2/)), forward and w′ against real
+(flush / warm):
+
+| Variant | crystal | 0.3 Å disordered | Registers |
+| --- | ---: | ---: | ---: |
+| packed8 (S12) | 1.061 / 1.057 | 0.905 / 0.904 | 80 |
+| **packed8v2** (same values, cheaper decode) | **1.004 / 1.001** (625 µs) | **0.858 / 0.856** (636 µs, −107 µs) | 80 |
+| deferred CG (76 phi) | 2.752 / 2.746 | 2.350 / 2.348 | 80 (spills) |
+| deferred-a + deferred-b (41 / 35 phi, two kernels) | 0.412 + 0.610 = 1.02 | 0.401 + 0.702 = 1.10 | 77, 80 |
+| w′ split (u / v sums of 4+ terms in two halves) | 1.032 / 1.033 | 1.031 / 1.029 | 80 |
+
+- **packed8v2** stores the S12 fields biased and placed so that each decodes as
+  `as_float(exponent | field) − as_float(exponent | 2^22)`, exact by Sterbenz: x = Q0 << 10 | Q2 >> 6,
+  y = (Q2 & 63) << 26 | Q1 << 6 | E6, the third field taken with one funnel shift. About 14 instructions per weight
+  against about 19, no integer-to-float conversions; the decoded values equal packed8's bit for bit (CPU check), so
+  the certificate (value part 0.161) carries over. It removes packed8's crystal penalty and saves 107 µs where the
+  neighbour shells are not sharp.
+- **Deferred CG** needs 76 live accumulators on top of the kernel's state; under the forward's 80-register cap it
+  spills. Round 1's two-thread split does not spill, but its halves together are slower than the real kernel.
+- **w′ split sums**: the FACTORED chains are at most 8 dependent FFMAs (21 terms spread over 3 u and 5–7 v sums).
+  Splitting them costs registers and instructions and gains nothing.
+
+Round 2 idea 1 gates ([round2-gates/](round2-gates/), `tools/fma_dual_pipe_bench.py`, 10 s per mix, no throttling):
+
+| FMA results per clock per SM | FP32 only | FP64 only | 1:1 | 2:1 | 3:1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A100-SXM4-80GB (1,410 MHz) | 63.7 | 31.9 | 62.2 | **93.2** | 82.4 |
+| H200 (1,980 MHz) | 126.5 | 63.9 | 124.3 | 122.8 | 122.0 |
+
+Nsight Compute on today's w′ (one launch, running clocks):
+
+| | A100 | H200 |
+| --- | ---: | ---: |
+| FMA pipe active | **85.8 %** | 52.3 % |
+| issue active | 61.2 % | 77.0 % |
+| warps active | 36.8 % | 42.6 % |
+| stalls per issue: long scoreboard / math throttle / wait / not selected | 2.18 / **1.93** / 1.07 / 2.08 | 2.20 / 0.14 / 0.89 / 2.85 |
+
+The A100's w′ is FP32-pipe bound and its FP64 pipe is idle; the H200's is close to issue-bound.
