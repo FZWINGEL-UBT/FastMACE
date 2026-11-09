@@ -85,6 +85,13 @@ TILE_GRAPH_CACHE_FRACTION = 0.25
 # (the search pass and three sweeps), with a sync per build: 4.3 s of host time in a 13 s call at 975,560 SrTiO3 atoms
 # on the RTX 5060 Ti, the GPU idle for 4.9 s. None: on for TILED_SPEED_GPUS.
 TILE_GRAPH_CACHE_WAVE = None
+# TILE_HOST_WORKER (exact): host state with overlap applies a tile's deferred writes (the event wait for the tile's
+# device work, the put, index_add and close on the host) on one worker thread, in order, instead of on the calling
+# thread at the next tile's first write; a read of the state (rows, fetch, flush) waits for every batch handed over
+# before it, the same writes the calling thread had applied by then. In the wavefront's 13 s call at 975,560 SrTiO3
+# atoms on the RTX 5060 Ti the calling thread spent about 3 s in these writes and their event waits, the GPU idle.
+# None: on for TILED_SPEED_GPUS.
+TILE_HOST_WORKER = None
 # TILE_FILTER32 (exact): the kept lists' per-call cutoff test (list_reuse) in float32, with the float64 test again
 # only for the edges whose float32 squared length lies within a bound of the cutoff's (``_filter32_band``: four times
 # the float32 error for coordinates up to the call's largest), and the float64 shifts of the one-byte unit shifts
@@ -280,6 +287,8 @@ class _State:
         self.device, self.dtype, self.host, self.alias = device, dtype, host, alias
         self.overlap = host and overlap
         self._pending, self._fresh = [], False  # overlap: the host writes not applied yet
+        # TILE_HOST_WORKER: the batches of writes handed to the worker thread (set per call by the tiled call)
+        self.worker, self._executor, self._handed = False, None, []
         self.tensors = {}
         # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
@@ -293,6 +302,7 @@ class _State:
         never shrinks, between calls; ``rows`` 0 switches back to [N, width]."""
         import torch
 
+        self.settle()
         pooled = rows > 0
         size = next(iter(self.tensors.values())).shape[0] if self.tensors else None
         if size is not None and (pooled != self.pooled or (pooled and size < rows) or (not pooled and size != n)):
@@ -369,6 +379,7 @@ class _State:
                 self._slot_of = torch.full((n,), -1, dtype=torch.int32)  # int32: 4 bytes per atom on the host
 
     def zero(self):
+        self.settle()
         for tensor in self.tensors.values():
             tensor.zero_()
         if self.alias and getattr(self, "_slot_of", None) is not None:
@@ -401,6 +412,7 @@ class _State:
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
             return tensor[index]
+        self.settle()
         index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
             return tensor.index_select(0, index).to(self.device)
@@ -413,6 +425,7 @@ class _State:
         stream's: its event orders the read)."""
         import torch
 
+        self.settle()
         tensor = self.tensors[self._storage.get(name, name)]
         index = self._rows_of(name, index, read=True)
         if self.device.type != "cuda":
@@ -442,7 +455,12 @@ class _State:
 
     def flush(self):
         """Apply the pending host writes, in order (the end of every sweep)."""
-        for kind, name, index, values, event in self._pending:
+        self.settle()
+        self._apply(self._pending)
+        self._pending.clear()
+
+    def _apply(self, pending):
+        for kind, name, index, values, event in pending:
             if event is not None:
                 event.synchronize()
             if kind == "close":
@@ -451,7 +469,21 @@ class _State:
                 self.tensors[self._storage.get(name, name)][index] = values
             else:
                 self._add_now(name, index, values)
-        self._pending.clear()
+
+    def _hand_over(self):
+        """``TILE_HOST_WORKER``: the pending writes to the worker thread, applied there in order."""
+        import concurrent.futures
+
+        if self._executor is None:
+            self._executor = concurrent.futures.ThreadPoolExecutor(1, thread_name_prefix="fastmace-tile-state")
+        self._handed.append(self._executor.submit(self._apply, self._pending))
+        self._pending = []
+
+    def settle(self):
+        """Wait for the writes handed to the worker thread (``TILE_HOST_WORKER``); its errors raise here."""
+        handed, self._handed = self._handed, []
+        for future in handed:
+            future.result()
 
     def _defer(self, kind, name, index, values):
         import torch
@@ -464,7 +496,10 @@ class _State:
                 self._add_now(name, index, values)
             return
         if self._fresh:
-            self.flush()
+            if self.worker:  # the earlier tiles' writes on the worker thread; the next read waits for them
+                self._hand_over()
+            else:
+                self.flush()
             self._fresh = False
         event = None
         if self.device.type == "cuda":
@@ -509,6 +544,8 @@ class _State:
     def plan(self, tiles):
         """After sweep 1: the atoms each tile closes, and a window of the most atoms open at once."""
         import torch
+
+        self.settle()
 
         last = self._last.long()
         order = torch.sort(last, stable=True).indices.to(torch.int32)  # kept until the call ends: int32
@@ -1868,6 +1905,8 @@ class TiledForceField:
                     self._graph_key = key
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
             aliased = self.config.alias_state
+            state.worker = state.overlap and bool(self._speed(TILE_HOST_WORKER))
+            stats["host_worker"] = state.worker
             if aliased:
                 state.pool(pool_rows, n)
                 if wave:

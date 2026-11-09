@@ -1450,6 +1450,34 @@ def test_graph_cache_under_the_wavefront_is_bitwise_the_call_that_builds_every_g
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
+@pytest.mark.parametrize("wave", [False, True], ids=["host-state", "wavefront"])
+def test_host_worker_is_bitwise_the_call_that_writes_on_the_calling_thread(wave, monkeypatch):
+    """``TILE_HOST_WORKER``: host state with overlap applies each tile's deferred writes on a worker thread, every
+    read waiting for the batches handed over before it; bitwise the call that applies them itself."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=wave, boundary_skin=False)
+    if wave:
+        config.update(wavefront="on", wavefront_group=2)
+    results = {}
+    for worker in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_HOST_WORKER", worker)
+        tiled = TiledForceField(field, TileConfig(12, **config))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[worker] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        assert tiled.last["host_worker"] is worker and tiled.last["tiles"] > 2
+        state = tiled._g["state"]
+        assert state._handed == [] and state._pending == []
+        assert (state._executor is not None) == worker
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
     """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
     tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less
