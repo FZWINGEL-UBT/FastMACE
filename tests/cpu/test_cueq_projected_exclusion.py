@@ -86,6 +86,6 @@ def test_precision_passes_the_config_to_the_route(monkeypatch):
     from fastmace.rewrites.registry import Context
 
     seen = []
-    monkeypatch.setattr(precision, "route", lambda model, cueq_projected="auto": seen.append(cueq_projected))
+    monkeypatch.setattr(precision, "route", lambda model, cueq_projected="auto", *rest: seen.append(cueq_projected))
     precision._apply(object(), Context(config=RewriteConfig(cueq_projected="off")))
     assert seen == ["off"]

@@ -30,7 +30,7 @@ def _targets(model):
     return [(name, module) for name, module in model.named_modules() if type(module).__name__ in _TYPES]
 
 
-def route(model, cueq_projected="auto"):
+def route(model, cueq_projected="auto", sc_generated_config="auto"):
     """Set ``tf32x3`` on every module that has atom GEMMs, and ``tf32x3_backend``, the backend ``tf32x3_mm`` uses on
     the module's device ("cutlass" on compute capability 8.0, else "triton"; ``GatedRows`` then takes the block
     products instead of its joined Triton GEMM); returns their names."""
@@ -71,6 +71,9 @@ def route(model, cueq_projected="auto"):
     from fastmace.rewrites import cueq_projection
 
     cueq_projection.route(model, cueq_projected)  # CUEQ_PROJECTED, RewriteConfig.cueq_projected
+    from fastmace.rewrites import sc_generated
+
+    sc_generated.route(model, sc_generated_config)  # SC_GENERATED, RewriteConfig.sc_generated
     return names
 
 
@@ -184,7 +187,7 @@ def _selfcheck(original, rewritten, context):
 
 
 def _apply(model, context):
-    return route(model, context.config.cueq_projected)
+    return route(model, context.config.cueq_projected, context.config.sc_generated)
 
 
 RECORDS = {
