@@ -57,3 +57,68 @@ These numbers are an upper bound from names and shapes. The Inductor sources wer
 carry per-step work that has to stay. The bound is just above the 1 % rule on both GPUs and costs nothing in accuracy.
 The work would be an engine change: the plan builds a per-structure species state, and the modules that call
 `argmax` / `species_plan` today read it. Not built yet.
+
+## 3. Factored symmetric contraction: faster on the A100 (follow-up 2)
+
+**Idea.** Each output irrep of the correlation-3 contraction is a weighted sum of basis polynomials. Their span is 13
+invariants plus 16 vector covariants.
+
+[`sc_factored.py`](../../fastmace/kernels/cuda/sc_factored.py):
+
+- picks a cheaper basis of memoised CG pair products, greedily, with a rank check at 1e-5 (the checkpoint's descriptor
+  is exact only to float32);
+- folds the change of basis into the weights at plan time (w′ = w K);
+- generates the backward by reverse mode.
+
+For OMAT-0 medium the factored form costs 413 operations plus 61 output FMAs. The generated kernels it replaces cost
+about 1,040 FP32 operations per channel in the forward and about 1,500 in the backward.
+
+**Lab** ([`tools/sc0_lab.py`](../../tools/sc0_lab.py), cases `fac-*`). All checks pass at float32 rounding: the
+forward agrees with cuEq to 2.6e-7 rms; dm and dD agree with autograd to 2.5e-7 and 3.1e-7.
+
+| Case (µs; × today) | Alex A100-SXM4-80GB, job 4972956 | Local RTX 5060 Ti (A100 defaults) |
+| --- | ---: | ---: |
+| gen-fused (today's forward) | 93.0 | 141.3 |
+| fac-fused | 55.1 (0.593) | 140.5 (0.994) |
+| gen-pair (today's forward + backward) | 226.0 | 397.9 |
+| fac-pair | 162.4 (0.719) | 396.7 (0.997) |
+| fac-pair4 (backward capped at 128 registers) | 147.0 (0.650) | 399.0 (1.003) |
+
+Registers:
+
+| Kernel | Registers |
+| --- | ---: |
+| gen-fused | 79 |
+| fac-fused | 64 |
+| fac-bwd | 161 |
+| fac-bwd4 | 128, plus 24 bytes of local memory |
+
+The 5060 Ti is memory-bound here, so the two forms tie. The A100 is FMA-bound, so the lower operation count shows.
+On the A100 the saving is about 79 µs per force call, about 1.2 % of 6.51 ms.
+
+**Next:** an engine switch, off by default, then the gate and the MD A/B.
+
+## 4. Selective shared geometry in the interaction-2 forward: faster on the A100 (follow-up 3)
+
+**Idea.** For each CG path, [`geom()`](../../tools/spline_read_lab.py) picks the cheapest of three forms:
+
+- today's code;
+- factoring w x out of a single-input path;
+- hoisting g = Σ_j c Y_j into shared memory once per edge tile, for all 128 channels.
+
+FMULs per edge and channel fall from 69 to 48 and shared loads rise from 9 to 28, at 80 registers.
+
+**Lab** ([`tools/spline_table_bound.py`](../../tools/spline_table_bound.py) `--table-reads geom`). The geom forward
+matches the real forward to 6.0e-7.
+
+| Variant (µs; × real) | Alex A100, job 4972955 | Local RTX 5060 Ti (A100 defaults) |
+| --- | ---: | ---: |
+| real | 1,255.4 | 2,162.1 |
+| geom | 1,088.5 (0.867) | 2,334.5 (1.080) |
+| one-slab | 1,314.8 (1.047) | 1,699.6 (0.786) |
+| one-slab + geom | 1,227.8 (0.978) | 1,740.7 (0.805) |
+
+On the A100 geom saves about 167 µs per force call, about 2.6 % of the step. That meets the condition for building the
+receiver-adjoint w′ variant (section 5).
+
+**Next:** an engine switch, then the MD A/B.

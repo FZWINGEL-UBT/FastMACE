@@ -449,6 +449,89 @@ def wprime_split(source, min_terms=4):
     return "\n".join(lines), len(split)
 
 
+_RADJ_GROUP = re.compile(r"const scalar_t output_gradient = stage_row\[(\d+)\s*\+ (\d+) \+ channel\];")
+_RADJ_TERM = re.compile(r" \{\n(\s*const scalar_t input_value =\s*x\[input_base\s*\+ (\d+) \+ channel\];\s*"
+                        r"const scalar_t edge_value =\s*sh_edge\[(\d+)\];\s*)"
+                        r"const scalar_t scaled = output_gradient(?: \* static_cast<scalar_t>\(([^)]*)\))?;\n"
+                        r"(.*?)\n(\s*)\}", re.S)
+
+
+def wprime_radj(source, every=False):
+    """w′'s source with the receiver adjoint R_ij = sum_o c_ijo g_o per path, channel and receiver run (the second
+    external pass, idea 1): R is formed once per run of equal receiver in shared memory, next to the staged dout row,
+    and the edge loop does u_i += R_ij y_j, v_j += R_ij x_i once per distinct (i, j) instead of once per CG term, with
+    no per-term coefficient multiply. ``every``: every path with a saving; else only paths whose saved FP32 ops
+    (dropped terms x 2 plus coefficient products) are at least the added shared-memory loads (pairs - outputs).
+    Rounding only (the R sums regroup). Returns (source, number of R slots)."""
+    head = source.index("for (int channel = lane")
+    body = source[head:]
+    pieces = re.split(r"(const int weight_index =\s*\d+ \+ channel;)", body)
+    slots = []  # [(o, coefficient, sign)] per R slot
+    out = [pieces[0]]
+    for marker, block in zip(pieces[1::2], pieces[2::2]):
+        start = block.find("const scalar_t output_gradient")
+        stop = block.find("const scalar_t scaled_weight")
+        if start < 0 or stop < 0:
+            out += [marker, block]
+            continue
+        start = block.rindex("{", 0, start)
+        region = block[start:stop]
+        groups = list(_RADJ_GROUP.finditer(region))
+        terms = []  # (i, j, o, coefficient, sign, kept text, updates)
+        for n, g in enumerate(groups):
+            end = groups[n + 1].start() if n + 1 < len(groups) else len(region)
+            o = int(g.group(1)) + int(g.group(2))
+            for t in _RADJ_TERM.finditer(region, g.end(), end):
+                updates = t.group(5)
+                sign = -1 if re.search(r"\b[uv]_\d+ -=|edge_gradient\[\d+\]\s*-=", updates) else 1
+                terms.append((int(t.group(2)), int(t.group(3)), o, t.group(4), sign, t.group(1), updates, t.group(6)))
+        if not terms:
+            out += [marker, block]
+            continue
+        pairs = {}
+        for term in terms:
+            pairs.setdefault(term[:2], []).append(term)
+        products = len({(o, c) for _, _, o, c, *_ in terms if c})
+        saved = 2 * (len(terms) - len(pairs)) + products
+        added = len(pairs) - len({term[2] for term in terms})
+        if not saved or not (every or saved >= added):
+            out += [marker, block]
+            continue
+        new = []
+        for (i, j), members in pairs.items():
+            s = len(slots)
+            slots.append([(o, c, sign) for _, _, o, c, sign, *_ in members])
+            _, _, _, _, sign, text, updates, indent = members[0]
+            # the representative term's updates, with the sign folded into R (u -= / v -= become +=)
+            updates = re.sub(r"(\b[uv]_\d+\s*|edge_gradient\[\d+\]\s*)-=", r"\1+=", updates)
+            if "-=" in updates:
+                raise ValueError(f"spline_read_lab: a w′ term's sign was not folded: {updates.strip()}")
+            new.append(f"{{ // RADJ: R[{s}] = (i {i}, j {j}), {len(members)} terms\n{text}"
+                       f"const scalar_t scaled = stage_radj[{s} * CHANNEL_DIM + channel];\n{updates}\n{indent}}}")
+        indent = " " * 16
+        out += [marker, block[:start] + ("\n" + indent).join(new) + "\n" + indent + block[stop:]]
+    if not slots:
+        raise ValueError("spline_read_lab: no w′ path gains from the receiver adjoint")
+    body = "".join(out)
+    fill = []
+    for s, members in enumerate(slots):
+        expr = " + ".join(f"{'-' if sign < 0 else ''}{'static_cast<scalar_t>(' + c + ') * ' if c else ''}"
+                          f"stage_row[{o} + ch]" for o, c, sign in members)
+        fill.append(f"            stage_radj[{s} * CHANNEL_DIM + ch] = {expr};")
+    anchor = "    __syncthreads();\n    for (int64_t e = stage_s + logical_group"
+    source = source[:head] + body
+    if source.count(anchor) != 1:
+        raise ValueError(f"spline_read_lab: w′'s run loop found {source.count(anchor)} times, not once (STAGE_DOUT?)")
+    source = source.replace(anchor, "    __syncthreads();\n    // RADJ: the run's receiver adjoint, one thread per "
+                            "channel\n    for (int ch = threadIdx.x; ch < CHANNEL_DIM; ch += blockDim.x) {\n"
+                            + "\n".join(fill) + "\n    }\n" + anchor)
+    decl = "__shared__ __align__(16) scalar_t stage_row[5120];"
+    if decl not in source:
+        raise ValueError("spline_read_lab: w′'s staged dout row not found")
+    source = source.replace(decl, decl + f"\n    __shared__ __align__(16) scalar_t stage_radj[{len(slots)} * CHANNEL_DIM];")
+    return source, len(slots)
+
+
 def wprime_variant(kernel, what):
     """A copy of the captured ``WPrimeBackward`` compiled from ``wprime_zero``'s source."""
     import copy
@@ -458,7 +541,12 @@ def wprime_variant(kernel, what):
 
     from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
 
-    source, n = wprime_split(kernel.source) if what == "split" else wprime_zero(kernel.source, what)
+    if what == "split":
+        source, n = wprime_split(kernel.source)
+    elif what in ("radj", "radj-all"):
+        source, n = wprime_radj(kernel.source, every=what == "radj-all")
+    else:
+        source, n = wprime_zero(kernel.source, what)
     options = (f"--maxrregcount={kernel.max_registers}",) if kernel.max_registers else ()
     k = copy.copy(kernel)
     k.source = source

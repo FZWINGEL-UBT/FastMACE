@@ -192,8 +192,10 @@ def main(argv=None):
                    choices=["bspline", "packed8", "packed8v2", "ghoist", "geom", "deferred", "deferred-a",
                             "deferred-b"],
                    help="lab: the forward with another table read path (tools/spline_read_lab.py)")
-    p.add_argument("--wprime-zero", nargs="*", default=[], choices=["table", "dout", "x", "all", "split"],
-                   help="lab: w' with an operand's loads replaced by register values (tools/spline_read_lab.py)")
+    p.add_argument("--wprime-zero", nargs="*", default=[],
+                   choices=["table", "dout", "x", "all", "split", "radj", "radj-all"],
+                   help="lab: w' with an operand's loads replaced by register values, or another arithmetic form "
+                        "(split, radj: tools/spline_read_lab.py)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -228,7 +230,7 @@ def main(argv=None):
                 import spline_read_lab
                 k_zero, src = spline_read_lab.wprime_variant(kernel, what)
                 (args.output / "sources" / f"wprime-zero-{what}.cu").write_text(src)
-                label = what if what == "split" else f"zero-{what}"  # split: u / v sums in two halves
+                label = what if what in ("split", "radj", "radj-all") else f"zero-{what}"  # real forms
                 variants[label] = real
                 kernels[label] = (k_zero, {})
         if name == "forward":
@@ -269,6 +271,19 @@ def main(argv=None):
             for label, a in variants.items():
                 launch(a, label)
         torch.cuda.synchronize()
+        if name == "wprime":  # split and radj regroup sums: dx, dsh and dr up to rounding
+            def gradients(label):
+                a = variants[label]
+                a[6].zero_()
+                run(label, a)
+                return [a[6].clone(), a[7].clone(), a[17].clone()]
+            base = gradients("real")
+            for label in ["real"] + [v for v in variants if v in ("split", "radj", "radj-all")]:
+                got = gradients(label)  # real again: the atomics' own run-to-run difference
+                torch.cuda.synchronize()
+                errors = [float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(got, base)]
+                print(f"wprime {label} against real: max|d|/max|a| dx {errors[0]:.2e}, dsh {errors[1]:.2e}, "
+                      f"dr {errors[2]:.2e}", flush=True)
         if name == "forward":  # the same message up to summation order (bitwise for species-blocks alone)
             def message(label):
                 a = variants[label]
