@@ -129,3 +129,17 @@ Nsight Compute on today's w′ (one launch, running clocks):
 | stalls per issue: long scoreboard / math throttle / wait / not selected | 2.18 / **1.93** / 1.07 / 2.08 | 2.20 / 0.14 / 0.89 / 2.85 |
 
 The A100's w′ is FP32-pipe bound and its FP64 pipe is idle; the H200's is close to issue-bound.
+
+Third gate, A100 w′ with the two 21-term paths in double (`tools/modal/a100_fp64_wprime.sh`, Modal A100-SXM4-80GB,
+sources 67d01628 and 312fdb4d, $0.15; [round2-gates/a100/](round2-gates/a100/)):
+
+| Variant | Registers (spill) | Kernel against base |
+| --- | --- | ---: |
+| fp64-paths (real conversions; dx 2.5e-7, dr 1.4e-7 of max against base) | 128 | 1.186 |
+| F-fp64-free (conversions free: the staged-doubles bound) | 128 | 1.178 |
+| fp64-paths, capped at 96 | 96 (88 B) | 1.314 |
+| F-fp64-free, capped at 96 | 96 (92 B) | 1.317 |
+| F-fp64-free, capped at 80 | 80 (220 B) | 2.059 |
+
+**Rejected.** The pipes would balance, but the doubles take register pairs: 128 registers cut w′'s occupancy, and any
+cap spills. Even with free conversions it is 18 % slower, so staging doubles cannot rescue it.
