@@ -10,7 +10,13 @@ note "memcmp start fastmace=$(cat .source_commit)"
 for job in "$@"; do
   structure=${job%%:*} repeat=${job#*:}
   for side in new old; do
-    if why=$(others); then note "STOP before $side $job: $why"; exit 3; fi
+    # Workstation rule: before every point, wait (do not stop) until no other user's process or GPU job is left,
+    # then two quiet minutes.
+    quiet=0; last=""
+    while [ $quiet -lt 2 ]; do
+      if why=$(others); then quiet=0; [ "${why//[0-9]/}" != "$last" ] && note "waiting before $side $job: $why"; last=${why//[0-9]/}; else quiet=$((quiet + 1)); fi
+      sleep 60
+    done
     if [ $side = old ]; then extra=(--tag old --rewrites tf32x3_gemms=off --constant $OLD); else extra=(--tag new); fi
     python tools/bench/capacity_scan.py point --structure "$structure" --model omat0-medium --precision float32 \
       --output "$ROOT/points" --repeat "$repeat" "${extra[@]}" > "$ROOT/point-$side-$structure-$repeat.log" 2>&1 < /dev/null

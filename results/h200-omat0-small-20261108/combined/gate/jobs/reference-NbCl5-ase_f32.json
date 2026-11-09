@@ -1,0 +1,41 @@
+{
+  "kind": "reference",
+  "name": "reference-NbCl5-ase_f32",
+  "structure": "NbCl5",
+  "reference": "ase_f32",
+  "dtype": "float32",
+  "keys": [
+    "hydrostatic-0",
+    "hydrostatic-1",
+    "hydrostatic-2",
+    "full-0",
+    "full-1",
+    "full-2"
+  ],
+  "implementation": "fastmace.reference",
+  "model": "omat0-small",
+  "label": "omat0-small",
+  "checkpoint": "/__modal/volumes/vo-4AvnRSqwjTBUKJJdNFtTo4/models/mace-omat-0-small.model",
+  "checkpoint_sha256": "0abfde07862cf1e93b8b4d03cb702f29ce9c344ff2fc4de2ec0d7166d6c113a5",
+  "baseline": null,
+  "backend": "auto",
+  "md_dtype": "auto",
+  "main_args": "",
+  "rewrites": {},
+  "production_constants": [
+    "fastmace.kernels.triton.compose_skip:JOINED_LAYOUT=True",
+    "fastmace.kernels.oeq_streaming.wprime_backward:STAGE_EDGES=True",
+    "fastmace.kernels.oeq_streaming.spline_forward:R128=False",
+    "fastmace.kernels.oeq_streaming.spline_forward:THREADS=128",
+    "fastmace.kernels.oeq_streaming.spline_forward:MIN_BLOCKS=8",
+    "fastmace.kernels.oeq_streaming.wprime_backward:FOLD_ALPHA=False",
+    "fastmace.kernels.cutlass.tf32x3:TILE='64x32'"
+  ],
+  "engine_config": {},
+  "production_tf32": false,
+  "tiled_receivers": 0,
+  "tiled_mode": "eager",
+  "values": "/tmp/fastmace-out/gate/values/reference-NbCl5-ase_f32.npz",
+  "result": "/tmp/fastmace-out/gate/values/reference-NbCl5-ase_f32.json",
+  "configurations": "/tmp/fastmace-out/gate/configs/NbCl5.npz"
+}

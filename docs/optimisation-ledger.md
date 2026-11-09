@@ -427,7 +427,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [model-polar-head-compose](#model-polar-head-compose) | POLAR-1's head projections composed into their l x l -> 0 dot products (P1) | `rewrites.polar.head_compose.COMPOSE_HEADS` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | 5060 Ti NaCl 0.872–0.909, NbCl5 0.997–1.005 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-dead-degrees](#model-polar-dead-degrees) | Dead POLAR head degrees pruned at setup (R5) | `rewrites.polar.head_liveness.PRUNE_DEAD_DEGREES` | FM | DEFAULT (pure removal, every GPU) | polar-megakernel 2026-11-08 | Ada NaCl 0.973–0.974, NbCl5 1.000–1.001; 5060 Ti L NaCl 0.975–0.979 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-phase-recurrence](#model-polar-phase-recurrence) | k-space cosines and sines from per-axis phase tables | `longrange.polar.PHASE_RECURRENCE` | FM | REJECTED (5060 Ti: tie) | polar-megakernel 2026-11-08 | 0.988–1.075 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
-| [model-polar-kspace-megakernel](#model-polar-kspace-megakernel) | POLAR k-space field call as one CUDA C++ megakernel per direction | `longrange.polar.MEGAKERNEL` (+ `MEGAKERNEL_GPUS`, `MEGAKERNEL_MIN_WORK`), `kernels.triton.kspace_megakernel.CUDA` | FM | DEFAULT (RTX 5060 Ti, atoms x k >= 1e6) | polar-megakernel 2026-11-08 | 5060 Ti NbCl5 0.893–0.973; NaCl 0.998–1.012 (below the threshold: off) | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
+| [model-polar-kspace-megakernel](#model-polar-kspace-megakernel) | POLAR k-space field call as one CUDA C++ megakernel per direction | `longrange.polar.MEGAKERNEL` (+ `MEGAKERNEL_GPUS`, `MEGAKERNEL_MIN_WORK`), `kernels.triton.kspace_megakernel.CUDA` | FM | DEFAULT (RTX 5060 Ti and A100 family, atoms x k >= 1e6) | polar-megakernel 2026-11-08; A100 off-polar-a100 2026-11-08 | 5060 Ti NbCl5 0.893–0.973; A100 NbCl5 0.985–0.996; NaCl 0.998–1.017 (below the threshold: off) | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-polar-head-rows](#model-polar-head-rows) | Irrep blocks kept as rows across the POLAR head chain (Codex R3) | none | FM | STOPPED (bound: P1 removed its target) | polar-megakernel 2026-11-08 | M NbCl5 target kernels 1070 µs → 0 with P1 | [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md) |
 | [model-small-matmuls](#model-small-matmuls) | Small mm/addmm as an Inductor-fused multiply-sum | `rewrites.inductor.SMALL_MATMULS` | FM | REJECTED | off-polar-alex 2026-11-07 | 5060 Ti POLAR-S NaCl 0.951, NbCl5 1.00; OFF23-small 1.045–1.07 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
 | [model-polar-shared-geometry](#model-polar-shared-geometry) | One unmasked k-space geometry per POLAR call | `longrange.polar.SHARED_GEOMETRY` | FM | REJECTED (A100: tie) | off-polar-alex 2026-11-07 | 0.990–1.006 | [off-polar-alex](../results/off-polar-alex-20261106/README.md) |
@@ -536,6 +536,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [codex1109-spatial-slab-walk](../results/omat0-breakthroughs-assessment-20261108/README.md#receiver-order-and-slab-reuse) | Spline forward receivers in a Hilbert/SM-aligned spatial order so co-resident warps walk the radial shells in lockstep, L1 hits to > 0.92 (Codex 9 Nov proposal 2, claimed 110–150 µs) | none | FM | REJECTED (already modelled) | 2026-11-09 | The 8 Nov L1 model already tried Morton order: hit rate 0.061 → 0.079 (0.544 → 0.583 with sorted edges); what helps, sorted edges and species-grouped blocks (0.75), is SORT_BY_LENGTH + BLOCK_ORDER, both DEFAULT; the 0.92 has no model run behind it and the one-slab bound (no table traffic) is not reachable | [assessment](../results/omat0-breakthroughs-assessment-20261108/README.md) |
 | [codex1109-fused-outer-sum](../results/h200-fastpath-20261108/round6/breakdown/) | Interaction 1's outer sums accumulated per receiver in shared memory with the species GEMM applied in the same kernel, no [15000, 1024] intermediate (Codex 9 Nov proposal 4, claimed 45–65 µs) | none | FM | REJECTED (assessment) | 2026-11-09 | The forward outer sum writes its 61 MB in 115 µs (about 0.5 TB/s, far below the H200's bandwidth), so it is not traffic bound; fusing puts a tensor-core GEMM over receiver tiles inside an edge-gather kernel and gives up the CUTLASS species GEMM's rate; full first interaction not adopted on the H200 (h200-defaults), (l, m)-major layout rejected (OPT3-T05) | [round-6 breakdown](../results/h200-fastpath-20261108/round6/breakdown/) |
 | [codex1109-respa](../results/grouped-gemm-bound-20261109/README.md#the-reports-other-proposals) | Interaction 2 evaluated every 2 fs with interaction 1 every 1 fs (multi-timescale MD; Codex 9 Nov proposal 6, claimed 840–950 µs) | none | FM | OWNER DECISION (changes the dynamics), not pursued | 2026-11-09 | Not an exact rewrite; as described (forces extrapolated along velocities) not symplectic; interaction 2 enters through the shared readout and is short-range and stiff, not a smooth separable slow force (resonance risk); if a 2 fs outer step were acceptable, plain 2 fs Langevin halves the cost per simulated time with no splitting (SrTiO3 has no H): the owner question is whether 1 fs is required | none |
+| [codex1109-fused-layer0-sc](../results/sc0-bound-20261109/README.md) | Interaction 0's cuEq `uniform_1d` symmetric contraction (forward and backward) as one generated channel-diagonal NVRTC kernel with the 1 / (density + 1) division and its backward fused (Codex 9 Nov v3 proposal 5, `FUSED_LAYER0_SC`) | `rewrites.sc_generated.SC_GENERATED` (`RewriteConfig.sc_generated`) | FM | ADOPTED (H200, A100 family): MD step H200 0.9760 / 0.9731, A100 PCIe 0.9685 / 0.9652; gate passes on both | 2026-11-09 | H200: the four kernels 179.4 µs (production 175.1: 18.1 + 40.1 + 87.4 + 29.5; the i0 division backward is `…species_mm_rows_grad_sum_view_11`, not `…neg_sum_2`, which is interaction 1's); traffic-only floor 41.8 µs (3.43 TB/s), but cuEq's kernels are FP32-issue bound (ncu: 70 % FMA pipe, 18–23 % DRAM, 1,381 / 2,926 FP32 inst. per atom-channel); the polynomial has 480 distinct terms and 410 monomials, so straight-line code needs about 1,035 / 1,880; ceiling 119–123 µs at full FP32 rate, 95–99 µs (2.8 %) at cuEq's pipe use; lab (`tools/sc0_lab.py`, generated straight-line forward and fused backward, rms ≤ 3e-7 against cuEq): 179.5 → 82.4 µs (forward 32.2, backward 50.2; ncu 1,030 / 1,490 FP32 inst., 80 / 96 registers, no spills), saving 97.1 µs (2.8 %), above the 68 µs bar; engine (branch fastmace/sc0-op, `5c5ade67`): H200 MD step b/a 0.9760 / 0.9731 (3.48 → 3.40 ms), gate passes (forces 0.850 / 0.920 / 0.959, stress 0.415 / 0.778 / 1.209); Modal A100 80GB PCIe 0.9685 / 0.9652 (7.50 → 7.27 ms), gate passes (forces 0.972 / 0.854 / 0.977, stress 0.701 / 0.898 / 1.237) | [bound](../results/sc0-bound-20261109/README.md), [engine](../results/sc0-op-20261109/README.md) |
 | [bspline-table](../results/bspline-reuse-bound-20261109/README.md) | Interaction 2's spline table as per-knot rows shared by neighbouring intervals: a cubic B-spline (one 5.12 KB control point per knot, a refit) or today's Hermite per knot (value, slope; exact up to rounding) (Codex 9 Nov v2 proposal 2) | none (`tools/spline_bspline_reuse_bound.py`) | FM | REJECTED (kernel lab) | 2026-11-09 | CPU L1 model, production order: L1 fill bytes per edge 6.06 KB → knot-hermite 3.74 (× 0.617), bspline 2.26 (× 0.373); ceilings on the H200 forward's 170 µs table share about 65 µs (knot-hermite, under the 68 µs lab bar) and 107 µs (bspline); not counted: 2× or 4× table load instructions. C2 certificate (CPU): 0.635 on production's 736 intervals (passes ≤ 1, misses the 0.5 target), 0.471 at 851; reuse at 851: 2.37 KB/edge (× 0.391), ceiling about 104 µs. Kernel lab (`tools/spline_read_lab.py` bspline, 5060 Ti, H200 switch set, random table on the 851-interval grid): forward 0.930 / 0.925 of real, 11 % of the real − one-slab gap against the model's 61 %: four scalar loads per weight cost what the shared rows save; under half the predicted share, so stopped before the H200 (conductor's stop rule) | [model](../results/bspline-reuse-bound-20261109/README.md) |
 | [packed8-table](../results/packed-table-lab-20261109/README.md) | Interaction 2's forward spline table at 8 bytes per weight: midpoint basis economized to a quadratic, 6-bit shared exponent, 22/20/16-bit fixed point (S12), a second values-only table beside w′'s float32 one (Codex 9 Nov v3 proposal 2) | none (`tools/spline_read_lab.py` packed8, `tools/spline_packed_certificate.py`) | FM | OPEN (structure-dependent: crystal 1.060, disordered 0.882) | 2026-11-09 | Certificate (CPU): value part 0.161 (target 0.5); 5060 Ti stand-in decode recovered 64 % of the real − one-slab gap; H200 exact decode: forward 1.060 / 1.060 of real (660 against 623 µs), message 2.7e-5 of max: the decode's integer work (kernel 848 against 696 instructions) costs more than half the table bytes save on the crystal; on a 0.3 A disordered snapshot (table share 304 against 191 us) packed8 is 0.882 / 0.881 (672 against 763 us, message 2.9e-6), so it pays off-lattice. Next: a decode with fewer integer instructions (packed8 edge loop 378 against 227) | [lab](../results/packed-table-lab-20261109/README.md) |
 | [wprime-locality-bound](../results/packed-table-lab-20261109/README.md#what-this-closes) | w′ operand locality of any kind: sender bins / reordering, L2 residency windows, TMA or cp.async operand pipelines, receiver clusters, dout staging (Codex 9 Nov v4 proposals 1, 2, 6; third report's TMA pipeline, Morton/L2, clusters; second report's L2 pinning, dout in shared memory, cp.async) | none (`tools/spline_table_bound.py` variants local-sender, local-dout and combined) | FM | STOPPED (bound) | 2026-11-09 | H200, H200 switch set: local-sender 0.997 / 0.996, local-dout 0.970 / 0.967, one-slab+local-sender+local-dout 0.962 / 0.962 of w′ (1,089 → 1,047 µs): ideal locality of every operand is worth about 42 µs (1.2 % of the step), under the 68 µs lab bar | [lab](../results/packed-table-lab-20261109/README.md) |
@@ -557,11 +558,16 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [a100-round6](../results/h200-fastpath-20261108/round6-a100/run.log) | The H200 round-6 switches on the A100: `JOINED_LAYOUT`, w′ `STAGE_EDGES`, forward `PREFETCH_AHEAD` | `JOINED_LAYOUT_GPUS`, `wprime_backward.STAGE_EDGES_GPUS`, `PREFETCH_AHEAD_GPUS` | FM | DEFAULT on the A100 family (decision 66, all bitwise) | 2026-11-08 | Alex job 4963944, against the A100 defaults of 11297d45: 0.9782 / 0.9784, 0.9643 / 0.9853, 0.9810 / 0.9943; all three 0.9590 / 0.9641 (about 7.37 → 7.09 ms); the two A100-only ones are off on the H200 | [round6-a100](../results/h200-fastpath-20261108/round6-a100/run.log) |
 | [table-slab-sorted](../results/slab-sorted-h200-20261108/README.md) | Each receiver's edges sorted by length at the skin-list build (within the sender group), so co-resident receivers share spline-table slabs in L1 | `neighbors.skin.SORT_BY_LENGTH` (`SORT_BY_LENGTH_GPUS`) | FM | DEFAULT on the H200 and A100 families (decision 66; A100 with BLOCK_ORDER 0.9920 / 0.9904, gate passes: forces 0.92 / 0.93 / 0.96, stress 0.64 / 1.02 / 1.15) | 2026-11-08 | MD step H200 0.9807 / 0.9791 (3.585 → 3.514 ms); gate passes (forces 0.83 / 0.92 / 0.97, stress 0.48 / 0.94 / 1.07); lab forward 792 → 680 µs | [slab-sorted](../results/slab-sorted-h200-20261108/README.md) |
 | [table-block-order](../results/slab-sorted-h200-20261108/README.md) | SPLINE_W forward's blocks walk the receivers grouped by species (an order the force field binds), so resident blocks share table slabs | `spline_forward.BLOCK_ORDER` (`BLOCK_ORDER_GPUS`) | FM | DEFAULT on the H200 and A100 families (decision 66; A100 alone 0.9953 / 0.9945, Alex pack 7) | 2026-11-08 | MD step H200 0.9753 / 0.9724 on top of SORT_BY_LENGTH (3.514 → 3.42 ms); lab forward 717 → 624 µs, bitwise; modelled L1 hits 0.54 → 0.70 | [slab-sorted](../results/slab-sorted-h200-20261108/README.md) |
+| [omat0-small-pair](../results/h200-omat0-small-20261108/README.md) | OMAT-0 small (label `omat0-small`) with medium's decision 66 pair: 3×TF32 GEMMs and the generic w′ backward | `DECISION_66_TF32X3_MODEL_GPUS`, `DECISION_66_GENERIC_WPRIME_LABEL_GPUS` | FM | DEFAULT for small on the H200 and A100 families (decision 66) | 2026-11-08 / 09 | H200 b = without 2.360 / 2.370 (5.41 → 2.29 ms); A100-SXM4 (Alex 4967329) b = with 0.3911 / 0.3916 (10.72 → 4.19 ms); gates pass (H200 force 1.01, stress 1.22; A100 force 1.03, stress 1.33) | [h200-omat0-small](../results/h200-omat0-small-20261108/README.md) |
+| [omat0-small-stage-edges](../results/h200-omat0-small-20261108/README.md) | w′ STAGE_EDGES for OMAT-0 small (medium: a tie) | `wprime_backward.STAGE_EDGES_MODEL_GPUS` | FM | DEFAULT for small on the H200 (bitwise) | 2026-11-09 | b = off 1.0072 / 1.0114 | [h200-omat0-small](../results/h200-omat0-small-20261108/README.md) |
+| [omat0-small-min-blocks-8](../results/h200-omat0-small-20261108/README.md) | Spline forward R128 shape with MIN_BLOCKS 8 for OMAT-0 small (medium: 8 is 5 % slower) | `spline_forward.R128_MIN_BLOCKS_MODEL_GPUS` | FM | DEFAULT for small on the H200 (bitwise) | 2026-11-09 | b = 8: 0.9873 / 0.9883, 0.9923 / 0.9952; as default b = 6: 1.0046 / 1.0057; step 2.12 ms | [h200-omat0-small](../results/h200-omat0-small-20261108/README.md) |
+| [omat0-small-prefetch-off](../results/h200-omat0-small-20261108/README.md) | Spline forward PREFETCH_AHEAD off for OMAT-0 small on the A100 (medium: on, 0.9810 / 0.9943) | `spline_forward.PREFETCH_AHEAD_MODEL_OFF_GPUS` | FM | DEFAULT for small on the A100 family (bitwise) | 2026-11-09 | Alex 4967540 b = off 0.9902 / 0.9908; 4967601 b = on again 1.0068 / 1.0073; MIN_BLOCKS 7 / 8, TILE 64x32 no gain; FOLD_ALPHA off 0.9933 / 0.9970, 0.9962 / 0.9971 (not adopted) | [h200-omat0-small](../results/h200-omat0-small-20261108/README.md) |
+| [omat0-small-fold-alpha](../results/h200-omat0-small-20261108/README.md) | w′ FOLD_ALPHA off for OMAT-0 small; also TILE 64x32 and ESTRIN | `wprime_backward.FOLD_ALPHA_MODEL_OFF_GPUS` (empty) | FM | MEASURED, closed: within the spread | 2026-11-09 | FOLD_ALPHA off 0.9939 / 0.9948 and 0.9884 / 0.9908 (on MIN_BLOCKS 8), but on again 0.9936 / 0.9927; TILE adds nothing on MIN_BLOCKS 8; ESTRIN (with FOLD_ALPHA off) 0.9940 / 0.9933, not repeated | [h200-omat0-small](../results/h200-omat0-small-20261108/README.md) |
 | [cursor32](#items-3-5) | Spline forward: int loop state | `spline_forward.CURSOR32` | FM | MEASURED, closed: slower (H200 1.0016 / 1.0033) | 2026-11-07 | Same registers; bitwise | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
 | [shared-locator](#items-3-5) | One spline locator record per edge for the forward and w′ | `spline_forward.SHARED_LOCATOR` | FM | MEASURED, closed (H200 0.9966 / 0.9974: under 1 %) | 2026-11-07 | Producer 24 registers, 16 B per edge; bitwise | [h200-compose-quads](../results/h200-compose-quads-20261107/README.md) |
 | [compose-fast](#h200-fastpath) | COMPOSE_SKIP: composed weights bound once per table, the four degree products as one joined species_mm, the division as a view | `compose_skip.COMPOSE_FAST` | FM | DEFAULT on the H200 family (`COMPOSE_FAST_GPUS`; decision 66: 0.9614 / 0.9656) | 2026-11-08 | MD 4.015 → 3.860 ms; bitwise (joined op = per-path species_mm) | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
 | [linear-div-split](#h200-fastpath) | linear_div backward: divided path blocks written contiguously by one kernel | `linear_div.LINEAR_DIV_SPLIT` | FM | MEASURED, closed (H200 0.9972 / 1.0025) | 2026-11-08 | bitwise | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
-| [cueq-projected](#h200-fastpath) | cuEq SymmetricContraction: weight x projection kept as a buffer, not recomputed per call | `cueq_projection.CUEQ_PROJECTED` | FM | DEFAULT on the H200 family (`CUEQ_PROJECTED_GPUS`; decision 66: 0.9902 / 0.9954, gate passed) | 2026-11-08 | force ratios 0.922 / 0.900 / 0.979 | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
+| [cueq-projected](#h200-fastpath) | cuEq SymmetricContraction: weight x projection kept as a buffer, not recomputed per call | `cueq_projection.CUEQ_PROJECTED` | FM | DEFAULT on the H200 family (`CUEQ_PROJECTED_GPUS`; decision 66: 0.9902 / 0.9954, gate passed); A100 family except OFF23-large and POLAR-1-S/-M (`DECISION_66_CUEQ_PROJECTED_EXCLUDED`, off-polar-a100) | 2026-11-08 | force ratios 0.922 / 0.900 / 0.979; A100 OFF 0.989–0.998, POLAR-1-L 0.994–0.999 | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
 | [lin-t08-generic](#h200-fastpath) | Generic product: species skip composed with the following readout linear | `species.GENERIC_FOLD_READOUT_TAIL` | FM | DEFAULT on the H200 family (`GENERIC_FOLD_READOUT_TAIL_GPUS`; decision 66: 0.9855 / 0.9901, gate passed) | 2026-11-08 | force ratios 0.848 / 0.920 / 0.968 | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
 | [stage-edges](#h200-fastpath) | Spline forward: edges staged per 32-edge tile (cutoff, sender, lookup once by warp 0; features coalesced) | `spline_forward.STAGE_EDGES` | FM | DEFAULT on the H200 family (`STAGE_EDGES_GPUS`; decision 66: 0.9864 / 0.9856) | 2026-11-08 | 80 registers, spill 8 → 0 B; bitwise | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
 | [stage-sh](#h200-fastpath) | w′: each cohort's edge features in shared memory once per edge | `wprime_backward.STAGE_SH` | FM | DEFAULT on the H200 family (`STAGE_SH_GPUS`; decision 66: 0.9955 / 0.9950; with STAGE_EDGES 0.9819 / 0.9811) | 2026-11-08 | 72 registers unchanged; bitwise | [h200-fastpath](../results/h200-fastpath-20261108/README.md) |
@@ -574,6 +580,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [cx-n2-fp64-adjoint](#cx-n2-fp64-adjoint) | w′: receiver-tiled FP64 tensor-core matrix adjoints | none (`tools/lab_cartesian.py` skeleton bound) | FM | REJECTED (bound) | 2026-11-06 | H200 optimistic floor 2.38x the default kernel | [cartesian backward](../results/cartesian-backward-20261106/README.md) |
 | [ada-omat0-best](#ada-omat0-best) | The H200/A100 switches of 7–8 November on the RTX 4000 Ada, with their prerequisites (HORNER; tf32x3 for OMAT-0 medium) | `HORNER_GPUS`, `SPLINE_W_GPUS`, `R128_GPUS`, `STAGE_EDGES_GPUS`, `COMPOSE_SKIP_GPUS`, `COMPOSE_FAST_GPUS`, `GENERIC_FOLD_READOUT_TAIL_GPUS`, `DECISION_66_TF32X3_OMAT0_GPUS` | FM | DEFAULT on the RTX 4000 Ada (decision 66: 0.8219 / 0.8208, gate passes); SPLINE_VECTOR 4, STAGE_SH, COUNT_PLAN, JOINED_LAYOUT, CUEQ_PROJECTED off | 2026-11-08 | MD 26.2 → 21.5 ms (Benchmark_loup) | [omat0-ada-capacity](../results/omat0-ada-capacity-20261108/README.md) |
 | [ada-omat0-best](#ada-omat0-best) | Capacity fixes: `attach_generic_wprime` stands aside on rescue rung (B); rule 12 term for `generic_wprime_backward` | `rewrites.radial.attach_generic_wprime`, `rewrites.memory.generic_wprime_backward` | FM | FIXED (every GPU) | 2026-11-08 | 5060 Ti OMAT-0 limit SrTiO3 34,295 → 163,840, NaCl 64,000 → 195,112 | [omat0-ada-capacity](../results/omat0-ada-capacity-20261108/README.md) |
+| [ada-omat0-best](#ada-omat0-best) | Capacity fix: the generic self-check probe takes no species-table gradient through `COMPOSE_SKIP` (`generic_recompute_first_table` failed, the plan fell to the terminal sequence) | `rewrites.generic._run` | FM | FIXED (every GPU with `COMPOSE_SKIP`) | 2026-11-09 | Ada SrTiO3 limit 148,955 → 233,280 | [omat0-ada-capacity](../results/omat0-ada-capacity-20261108/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -675,6 +682,155 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 - Measured: MD step A100-SXM4-80GB 1.0018 / 0.9993 (Modal, 31799fb6), RTX 5060 Ti 1.002; bitwise (`test_leading_columns_bit_for_bit`).
 - Sources: [kernel lab](../results/omat0-kernel-lab-20261103/README.md) §15.
 
+### Tiled call: whole-system rewrites in the tile bodies (8 November 2026)
+
+OMAT-0 medium, SrTiO3 975,560 atoms, RTX 5060 Ti, same-process A/B of the tiled call (`tools/bench/tiled_ab.py`), b/a
+ab / ba. "Device" is the plain schedule with the state on the device; "wave" the wavefront with the state on the host.
+
+| ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [tiled-prefetch-device](#tiled-prefetch-device) | Prefetch the next tile's graph with the state on the device | `tiled.TILE_PREFETCH_DEVICE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.939 / 0.941 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-block-rows](#tiled-block-rows) | w′ block message narrowed to a tile's receivers, `linear_1` on the block layout | `generic.TILE_BLOCK_ROWS` | FM | DEFAULT | decision 66, 2026-11-08; wavefront 2026-11-09 | device 0.918 / 0.921; wave 1.030 / 1.060 host-bound, 0.931 / 0.937 GPU-bound | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-virial](#tiled-virial) | Strain gradient as sym(Vᵀ ∂E/∂V) instead of a strain leaf | `tiled.TILE_VIRIAL` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.970 / 0.955; wave 0.994 / 0.959 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-graph-cache](#tiled-graph-cache) | Tile graphs kept on the device for the call | `tiled.TILE_GRAPH_CACHE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`; wavefront: `TILE_GRAPH_CACHE_WAVE`) | decision 66, 2026-11-08 | device 0.948 / 0.960 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-filter32](#tiled-filter32) | Kept lists' cutoff test in float32, float64 only near the cutoff | `tiled.TILE_FILTER32` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.987 / 0.993; wave 0.981 / 1.012 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-epilogue](#tiled-epilogue) | Sweep masks, objective, virial and edge vectors in compiled code | `tiled.TILE_EPILOGUE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.980 / 0.981; wave 1.012 / 1.009 host-bound, 0.985 / 0.983 GPU-bound; gate 12/12 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-fill-skip](#tiled-fill-skip) | No host list-cache fill for tiles the graph cache keeps | `tiled.TILE_FILL_SKIP` | FM | DEFAULT | decision 66, 2026-11-09 | device 0.961 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 host-bound, 0.989 / 0.990 GPU-bound | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-graph-cache-wave](#tiled-graph-cache-wave) | The graph cache under the wavefront (search pass to sweep 3) | `tiled.TILE_GRAPH_CACHE_WAVE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.824 / 0.817 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-host-worker](#tiled-host-worker) | Host-state writes applied on a worker thread | `tiled.TILE_HOST_WORKER` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-lazy-keys](#tiled-lazy-keys) | Slot keys taken in sweep 1 from the prefetched graphs instead of a search pass | `TILE_LAZY_KEYS` (removed) | FM | REJECTED | 2026-11-09 | device 1.023 / 1.002 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+
+<a id="tiled-prefetch-device"></a>
+#### tiled-prefetch-device: TileConfig.prefetch with the state on the device
+- Switch: `fastmace.model.tiled.TILE_PREFETCH_DEVICE` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: with the state on the device, the next tile's graph is built on the side stream while the current body runs. Before, it was built after the body had drained the GPU, because `torch.unique` and the edge counts sync with it (1.2 s of 8.6 s idle).
+- Status: DEFAULT (scoped). Exact.
+- Measured: 0.939 / 0.941 (cfec5551, the other switches on).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-block-rows"></a>
+#### tiled-block-rows: the w′ block message for a tile's receivers
+- Switch: `fastmace.rewrites.generic.modules.TILE_BLOCK_ROWS` (None: the module's `tile_block_rows`, on where nothing set it; the tiled call set it to `not wave` until 9 November 2026)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: the w′ convolution's BLOCK_MESSAGE groups are narrowed to the tile's receivers (a view; the w′ backward reads the message gradient at receivers only) and `linear_1` multiplies them as on the whole system. Before, a tile densified the message to `[R + H, width]`, sliced the receivers and padded the gradient back.
+- Status: DEFAULT. Rounding (energy 4e-10 relative); the force/stress gate passed with it on.
+- Measured: device 0.918 / 0.921; wavefront 1.030 / 1.060 while the wavefront was host-bound (off there then), 0.931 / 0.937 once the wavefront graph cache and the host worker made it GPU-bound (job 22, 1d30a163), so on there too.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-virial"></a>
+#### tiled-virial: the tile's strain gradient from its edges
+- Switch: `fastmace.model.tiled.TILE_VIRIAL` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: sweeps 2 and 3 compute dE/dε as sym(Vᵀ ∂E/∂V) over the tile's edges (padding edges masked), instead of a strain leaf whose backward was a split-K `sgemm_largek` (about 0.3 µs/atom per call).
+- Status: DEFAULT (scoped). Rounding (stress within 8.6e-8 eV/Å³ of 0.029); force/stress gate passed.
+- Measured: device 0.970 / 0.955; wavefront 0.994 / 0.959.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-graph-cache"></a>
+#### tiled-graph-cache: tile graphs kept for the call
+- Switch: `fastmace.model.tiled.TILE_GRAPH_CACHE` (None: `TILE_GRAPH_CACHE_FRACTION` 0.25 on `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 8 November 2026 (tiled speed)
+- What: the slot-key pass keeps each tile's local edge index (int32) and shifts on the device until the call ends (20 bytes per edge), so the sweeps gather it instead of building it again (four builds per tile and call before). The budget is the fraction of the free memory less the tiles' predicted workspace, and a measuring call keeps nothing (the first version lowered the receiver cap from 16,384 to 8,192). Under the wavefront: `TILE_GRAPH_CACHE_WAVE`.
+- Status: DEFAULT (scoped). Exact.
+- Measured: 0.948 / 0.960 (887b6b1d).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-filter32"></a>
+#### tiled-filter32: the kept lists' cutoff test in float32
+- Switch: `fastmace.model.tiled.TILE_FILTER32` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: a call that reuses its kept lists (cutoff + skin) tests each edge against the cutoff in float32 and repeats the float64 test only for edges whose float32 squared length is within a bound of the cutoff's (`_filter32_band`: four times the float32 error for the call's largest coordinates). The 27 unit shifts' float64 vectors come from a table. The RTX 5060 Ti runs float64 at 1/64 rate; `_tile_graph` went from 327 to 222 ns/atom.
+- Status: DEFAULT (scoped). Exact: the same edges, shifts and order (CPU and CUDA tests at 200k atoms, small cell and large coordinates). It removes work, so the mixed wavefront A/B (inside that A/B's noise, pairs 0.88-1.04) does not scope it off.
+- Measured: device 0.987 / 0.993; wavefront 0.981 / 1.012 (838930c0).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-epilogue"></a>
+#### tiled-epilogue: the sweeps' eager glue in compiled code
+- Switch: `fastmace.model.tiled.TILE_EPILOGUE` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: sweep 1's padding masks and sweep 3's objective (scale and shift, masks, <dE/dx, x> + <dE/dsc, sc>) inside the compiled forwards; the edge-gradient masks and the virial of sweeps 2 and 3 as one compiled epilogue each; a padded slot's edge vectors as one kernel. About 20 eager kernels per tile and sweep before.
+- Status: DEFAULT (scoped). Rounding (the virial's and the objective's sums change order); bitwise outside mode "compiled" (CPU test); force/stress gate 12/12 (b5a59f7d).
+- Measured: device 0.980 / 0.981 (0134304d); wavefront 1.012 / 1.009 while host-bound (a first ab run gave 0.939; off there then), 0.985 / 0.983 GPU-bound (job 22, 1d30a163), so on there too.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-fill-skip"></a>
+#### tiled-fill-skip: no list-cache fill for graph-cached tiles
+- Switch: `fastmace.model.tiled.TILE_FILL_SKIP` (True)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: the slot-key pass packed every tile's lists into the host list cache (a copy back to the host and a sync), also for the tiles the graph cache then kept on the device, whose lists no sweep reads again. A tile built while the cache had room but too large for what was left is built again from the kept lists (the same edges).
+- Status: DEFAULT. Exact (CPU test, all and some tiles kept); removes work, so on everywhere.
+- Measured: device 0.961 / 0.966 (d5e91441). No effect under the wavefront (no graph cache there).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-pinned-superset"></a>
+#### tiled-pinned-superset: kept lists in pinned host memory
+- Switch: `fastmace.model.tiled.TILE_PINNED_SUPERSET` (None: on for `TILED_SPEED_GPUS`), cap `TILE_PINNED_SUPERSET_BYTES` (4 GiB)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: list_reuse's kept lists are stored pinned while they total at most the cap, so each call's copy to the device runs asynchronously at the pinned rate (pageable: about 70 ns/atom per call). A same-process A/B's other side gets a mirror in its own form, made once.
+- Status: DEFAULT (scoped). Exact.
+- Measured: device 0.986 / 0.990; wavefront 1.012 / 1.028 while host-bound (d5e91441; off there then), 0.989 / 0.990 GPU-bound (job 22, 1d30a163). The pinning cost of a call that searches again is not in the A/B (its positions never move past the skin).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-graph-cache-wave"></a>
+#### tiled-graph-cache-wave: the graph cache under the wavefront
+- Switch: `fastmace.model.tiled.TILE_GRAPH_CACHE_WAVE` (None: on for `TILED_SPEED_GPUS`; needs `TILE_GRAPH_CACHE`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: the wavefront's search pass builds every tile's graph; the cache keeps it (within `TILE_GRAPH_CACHE`'s budget) until the tile's sweep 3, which drops it. Before, each tile's graph was built four times per call with a sync per build: 4.3 s of host time in a 13.3 s call at 975,560 SrTiO3 atoms, the GPU idle for 4.9 s (job 19 profile).
+- Status: DEFAULT (scoped). Exact (CPU test, all and some tiles kept: bitwise, one build per tile against four).
+- Measured: wavefront 0.824 / 0.817 (7f193e78): 12.02 to 9.90 µs/atom.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-host-worker"></a>
+#### tiled-host-worker: host-state writes on a worker thread
+- Switch: `fastmace.model.tiled.TILE_HOST_WORKER` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: with host state and overlap, a tile's deferred writes (the wait for its device work, then the put, index_add and alias close on the host) go to one worker thread at the point where the calling thread applied them before, in the same order; every read of the state (rows, fetch, flush) first waits for the batches handed over before it, so it sees the same writes as before. The calling thread spent about 3 s of the 9.9 s wavefront call in these writes and their event waits.
+- Status: DEFAULT (scoped). Exact (CPU tests, host state and wavefront).
+- Measured: wavefront 0.975 / 0.982; host state 0.969 / 0.966 (1d30a163). The wavefront call is then GPU-bound (wall 8.33 s, GPU busy 7.89 s).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-lazy-keys"></a>
+#### tiled-lazy-keys: slot keys from the prefetched graphs
+- Switch: `TILE_LAZY_KEYS` (removed: 5657befc, reverted in a8a17897)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: after the first call, take each tile's slot in sweep 1 from the graph the prefetch builds instead of in a search pass before sweep 1 (a sync per tile, about 0.3 s per call).
+- Status: REJECTED. Device 1.023 / 1.002: the search pass's builds feed the graph cache, so its time was not idle time.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-piece-start"></a>
+#### tiled-piece-start: graph-cached index at the slot's halo start
+- Switch: `fastmace.model.tiled.TILE_PIECE_START` (removed in 455facf2)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: keep a cached tile's local index at its slot's halo start, so the sweeps skip a compare, an add and a where over 2 x E (about 60 ns/atom of eager work in `_piece`).
+- Status: REJECTED. That work runs in the prefetch on the side stream, hidden behind the bodies.
+- Measured: device 0.9999 / 1.0001 (0595c76c).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-keep-a0"></a>
+#### tiled-keep-a0: keep interaction 0's activations instead of sweep 3's recompute
+- Switch: none (bound only)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: sweep 3 recomputes interaction 0's forward (about 0.8 us/atom) to back-propagate through it. Keeping the node-level A it needs takes 2,048 floats = 8 kB per atom, about 8 GB at 1M atoms: it does not fit beside the tiles on 16 GB, and a host round trip of 8 GB (about 1.2 s) costs more than the 0.73 s saved.
+- Status: REJECTED at the bound.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
 ### Alternative backends and external comparisons
 
 | ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
@@ -724,6 +880,9 @@ are not A/B comparisons.
 | 2026-11-03 | Benchmark_loup on the A100; CUTLASS; BF16×3 | Generic radial tables on the A100, generic fused forward + wprime backward, CUTLASS 3×TF32, BF16×3 (FACTO), cuBLASDx INT8, OMAT-0 kernel lab | Generic radial tables on the A100s; generic fused forward + wprime on 5060 Ti, Ada, A100; `tf32x3_gemms` (CUTLASS) on the A100-SXM4-80GB | A100 OMAT-0 3.64 µs/atom/step (NVE) |
 | 2026-11-04 | OMAT-0 kernel round; TP backward | Tensor-core fused forward, `TABLE_W`, `BLOCK_MESSAGE` (+ `BLOCK_LDG`), degree-5 tables, zero-column skip, species GEMM, `FACTORED`, `FACTORED_SCALE`, `SYMMETRIC_PAIRS`, stress bisection | All per GPU under d66 (see defaults-by-gpu); every A100 model counts as one (owner); NbCl5 stress excess accepted | A100 OMAT-0 2.73–2.97 µs/atom/step (NVE, `4b70e3f2`) |
 | 2026-11-05 | A100 rounds 1–5 (OMAT-0; not to be confused with opt round 5 of 26 October) | Round 1: five outside ideas assessed; round 2: fused first interaction, tabled forward, Horner, scalar paths, run-walking outer-sum backward, `generic_fold_product_linear`; round 3: w′ backward attribution, M-precontraction (dropped); round 4: `PREFETCH` (rejected), `VEC_SH`, `VEC_A`, `TC_WFRAG`, `TC_TP` (rejected), 3×FP16 (rejected on accuracy); round 5: `EDGE_SH` | Round 2 and 4 switches and `EDGE_SH` per GPU (d66); `BLOCK_LDG` dropped; `FACTORED` on the 5060 Ti | – |
+| 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| 2026-11-09 | Tiled call gap (OMAT-0, RTX 5060 Ti) | `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_FILL_SKIP`, `TILE_PINNED_SUPERSET`; `TILE_PIECE_START` and keeping interaction 0's A rejected | Decision 66 | Device state 0.923 / 0.928 (all eight switches 0.729 / 0.731) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| 2026-11-09 | Tiled wavefront (OMAT-0, RTX 5060 Ti) | `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`; `TILE_BLOCK_ROWS`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET` on under the wavefront; `TILE_LAZY_KEYS` rejected | Decision 66 | Wavefront 0.766 / 0.774 (10.10 → 7.74 µs/atom) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 
 ## Closed directions
 
@@ -2303,6 +2462,7 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Status: NOT BUILT (screened; build rule needs a ≥ 3 % ceiling).
 - Measured: share of the step NaCl 2.5 %, NbCl5 5.4 %, NaNbO3 3.1 %; kernels at 72–96 % of memory speed-of-light (NbCl5 forward 68–71 MB at up to 422 GB/s); ceilings: other cuEq methods ≤ 1 %, OEq ≤ 1 % (likely negative), fused input ≈ 2.7 % NbCl5 at best (not buildable as an epilogue across four per-l products), output side < 0.5 %, zero paths 0, reassociation n/a, lower precision excluded.
 - Why: memory-bound at its traffic floor.
+- Later (9 November 2026): on the H200 the OMAT-0 medium interaction-0 kernels are FP32-issue bound, not memory bound (70 % FMA pipe, 18–23 % DRAM), so this screen's floor does not carry over there; see [codex1109-fused-layer0-sc](../results/sc0-bound-20261109/README.md).
 - Sources: [opt3-T02](design/speed/opt3-T02-symmetric-contraction.md); [opt-3 plan](../plans/opt-3.md); [rewrites](#screen-table).
 
 <a id="sc-tf32-bwd"></a>
@@ -4074,8 +4234,12 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
   `RewriteConfig.polar_uvu = on`): pass on S and M (NaCl, NbCl5) and L NaCl (RTX A4000, murphy job 8);
   L NbCl5 on Modal A100-80GB (7cf2928a, $0.89, cubin loaded, no rule-13 revision): energy 0.68, forces 0.54,
   stress 0.52.
-- Status: DEFAULT on the RTX 5060 Ti for cells from 1e6 atoms x k (decision 66: both orders win, gate passes).
-  Other GPUs not measured.
+- A100-SXM4-80GB (NHR Alex, branch `fastmace/off-polar-a100`, 8 November 2026, `MEGAKERNEL=True` against the
+  1bd4f3be A100 defaults, ab / ba): NbCl5 S 0.9846 / 0.9854, M 0.9918 / 0.9954, L 0.9855 / 0.9964; NaCl S
+  1.0169 / 1.0149, M 0.9996 / 1.0096 (below the threshold: off). Gates there pass on S and M (NaCl, NbCl5).
+  [off-polar-a100](../results/off-polar-a100-20261108/README.md).
+- Status: DEFAULT on the RTX 5060 Ti and the A100 family for cells from 1e6 atoms x k (decision 66: both orders
+  win, gate passes). The Ada and the H200 are not measured.
 - Sources: [POLAR-1 megakernel](design/research/2026-11-07-polar-megakernel.md);
   tests/cpu/test_kspace_megakernel.py, tests/gpu/test_kspace_cuda.py, tests/gpu/test_kspace_megakernel_cuda.py.
 
@@ -4978,7 +5142,7 @@ Rounds 4 and 5 (main `65923679`, same night) measured the existing switches neve
   - off again from all (b = off, above 1 means the switch helps): tf32x3 with the compose group 1.0117 / 1.0124, `COMPOSE_SKIP` 1.0572 / 1.0585, `COMPOSE_FAST` 1.0105 / 1.0104, `COUNT_PLAN` 1.0000 / 1.0004, `JOINED_LAYOUT` 1.0006 / 0.9986, `CUEQ_PROJECTED` 0.9992 / 0.9987, `SPLINE_W` + `HORNER` 1.2003 / 1.2015, readout tail 1.0020 / 1.0026, `R128` 1.0017 / 1.0004, `STAGE_EDGES` 1.0018 / 1.0028, `STAGE_SH` 0.9903 / 0.9905, `SPLINE_VECTOR` (2) 0.9918 / 0.9906;
   - force/stress gate (3×) with the adopted set: passes, rule 13 revised nothing (forces 0.80 / 1.00 / 0.93, stress 0.51 / 1.13 / 1.16 for SrTiO3 / NaCl / NbCl5; Ada defaults 0.84 / 0.83 / 0.98, 0.60 / 0.61 / 0.73); forces against the plain build 1.0e-5 eV/Å, same build 2.2e-6.
 - Capacity fixes (found by the 5060 Ti scan): since `generic_wprime_backward` (3 November) `attach_generic_wprime` raised when rule 12 took rung (B), so the planner fell to the rewrites-off terminal plan (5060 Ti SrTiO3 limit 53,240 → 34,295, NaCl 85,184 → 64,000); and rule 12 had no memory term for it, so it took (B) beyond about 35,000 atoms. Fixed: the rewrite stands aside on the rescue rung; `rewrites.memory.generic_wprime_backward` and a `CONTEXT_TERMS` entry. 5060 Ti with both fixes: SrTiO3 163,840 atoms, NaCl 195,112.
-- Capacity on the Ada with the new defaults: pending (queued on leto; both Adas busy on 8 November).
+- Capacity on the Ada with the new defaults (leto, each point alone): SrTiO3 233,280 atoms (36³, 1,385 ms, 5.94 µs/atom/step, peak 19.15 GiB; was 69,120), NaCl 343,000 (35³, 1,533 ms, 4.47 µs/atom/step, 18.7 GiB; was 125,000). Old against new plan at the same sizes: peak 6.78 → 5.82 GiB (SrTiO3 69,120), 8.91 → 7.08 GiB (NaCl 125,000); Benchmark_loup 0.94 → 1.18 GiB. SrTiO3 beyond 148,955 needs the third fix: `generic_recompute_first_table`'s self-check asked the composed skip for a species-table gradient, so the rung failed and the planner fell to the terminal sequence on every GPU with `COMPOSE_SKIP` (and the memory probe's replica measured that failure). Fixed in `generic._run` (`969bfc4d`).
 - Why: on the Ada the spline w′ and forward carry over at a gain as large as the A100's; tf32x3 is slower alone but pays through `COMPOSE_SKIP`.
 - Sources: [omat0-ada-capacity](../results/omat0-ada-capacity-20261108/README.md).
 

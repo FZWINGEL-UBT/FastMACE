@@ -178,6 +178,16 @@ WHOLE_SYSTEM_KEEP = frozenset({"positions", "node_attrs", "edge_index", "shifts"
                                "displacement"})
 
 
+def _table_label(loaded):
+    """The label-table label of an ``fm.load`` result (by label, or by SHA-256 and head), None otherwise: the rewrites
+    read it for per-model kernel defaults (``Context.inputs["model_label"]``)."""
+    if loaded is None:
+        return None
+    from fastmace.planner.warnings import label_of
+
+    return label_of(getattr(loaded, "label", None), getattr(loaded, "head", None), getattr(loaded, "sha256", None))
+
+
 def _whole_system_only(key, value, n):
     """Whether batch entry ``key`` is a per-atom buffer that only the whole-system call reads."""
     return key not in WHOLE_SYSTEM_KEEP and value.dim() > 0 and value.shape[0] == n
@@ -503,7 +513,8 @@ class MACEForceField:
             raise ValueError("release_whole_system needs release_node_attrs and a model other than PolarMACE")
         context = reg.Context(config=rewrites if isinstance(rewrites, RewriteConfig) else RewriteConfig(),
                               inputs={"node_attrs": node_attrs, "species_columns": self.species_columns,
-                                      "joint_features": joint_features, "call_rows": self.call_rows})
+                                      "joint_features": joint_features, "call_rows": self.call_rows,
+                                      "model_label": _table_label(loaded)})
         model_records = [name for name in enabled if name not in engine_rewrites.RECORDS]
         # The strain path, bound per model (2-T08b, docs/design/strain-per-model.md): the one-graph
         # function with the record on, else MACE's own, so that neither another instance nor the

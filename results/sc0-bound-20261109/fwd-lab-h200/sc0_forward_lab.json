@@ -1,0 +1,105 @@
+{
+ "structure": "SrTiO3",
+ "natoms": 5000,
+ "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+ "module": "products.0.symmetric_contractions",
+ "method": "uniform_1d",
+ "x_shape": [
+  5000,
+  2048
+ ],
+ "weight_shape": [
+  89,
+  3712
+ ],
+ "indices_dtype": "torch.int32",
+ "x_rms": 0.11205516010522842,
+ "irreps_in": "128x0e+128x1o+128x2e+128x3o",
+ "irreps_out": "128x0e+128x1o",
+ "degree": 3,
+ "tool": "sc0_forward_lab",
+ "created_utc": "2026-11-09T02:12:14.517992+00:00",
+ "host": "modal",
+ "gpu": "NVIDIA H200",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "b45b65a0b3027cd62068b157cf847679ac74142d",
+ "rounds": 15,
+ "iterations": 20,
+ "counts": {
+  "gen": {
+   "terms": 480,
+   "monomials": 410,
+   "groups": 61,
+   "fmul_monomials": 478,
+   "fp32_per_channel": 1019
+  },
+  "gen-fused": {
+   "terms": 480,
+   "monomials": 410,
+   "groups": 61,
+   "fmul_monomials": 478,
+   "fp32_per_channel": 1035
+  }
+ },
+ "registers": {
+  "gen": 80,
+  "gen-fused": 80
+ },
+ "local_bytes": {
+  "gen": 0,
+  "gen-fused": 0
+ },
+ "check": {
+  "gen_vs_cueq": {
+   "max_abs": 1.3113021850585938e-06,
+   "max_rel_to_max": 8.767025463825459e-07,
+   "rms_rel": 2.589171970157622e-07
+  },
+  "gen_fused_vs_cueq_div": {
+   "max_abs": 1.430511474609375e-06,
+   "max_rel_to_max": 9.564027778718682e-07,
+   "rms_rel": 2.6569873057269433e-07
+  }
+ },
+ "us": {
+  "cueq": 39.92,
+  "cueq+div": 61.62,
+  "gen": 31.56,
+  "gen-fused": 31.92
+ },
+ "us_spread": {
+  "cueq": [
+   38.96,
+   40.14
+  ],
+  "cueq+div": [
+   61.39,
+   61.82
+  ],
+  "gen": [
+   31.29,
+   31.82
+  ],
+  "gen-fused": [
+   31.15,
+   32.09
+  ]
+ },
+ "kernels_us": {
+  "cueq": {
+   "segmented_polynomial_algo1_4": 39.92
+  },
+  "cueq+div": {
+   "triton_poi_fused_add_div_0": 21.5,
+   "segmented_polynomial_algo1_4": 40.09
+  },
+  "gen": {
+   "sc0_fwd": 31.56
+  },
+  "gen-fused": {
+   "sc0_fwd": 31.92
+  }
+ },
+ "saving_us": 29.7,
+ "gen_over_cueq": 0.7907
+}

@@ -163,7 +163,7 @@ def species_blocks(kernel, numbers):
     import torch
 
     from fastmace.kernels.oeq_streaming.spline_forward import SplineForward, receiver_order
-    ordered = SplineForward(*kernel.init_args, block_order=True)
+    ordered = SplineForward(*kernel.init_args, block_order=True, model_label=kernel.model_label)
     z = torch.as_tensor(numbers, device="cuda")
     order = receiver_order(z)
     torch.cuda.synchronize()

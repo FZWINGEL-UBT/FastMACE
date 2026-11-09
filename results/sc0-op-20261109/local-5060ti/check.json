@@ -1,0 +1,37 @@
+{
+ "constants": [
+  "fastmace.rewrites.sc_generated:SC_GENERATED=True",
+  "fastmace.kernels.triton.compose_skip:COMPOSE_SKIP=True",
+  "fastmace.kernels.triton.compose_skip:COMPOSE_FAST=True"
+ ],
+ "rewrites": [
+  "tf32x3_gemms=on"
+ ],
+ "structure": "results/loup-a100-20261103/SrTiO3.cif@6x6x6",
+ "products_routed": 1,
+ "interactions_marked": 1,
+ "kernels": 1,
+ "in_use": true,
+ "forward_registers": 80,
+ "forward_local_bytes": 0,
+ "backward_registers": 96,
+ "backward_local_bytes": 0,
+ "compare": {
+  "constants": [
+   "fastmace.rewrites.sc_generated:SC_GENERATED=False"
+  ],
+  "rattle": 0.05,
+  "energy": {
+   "max_abs": 4.6491621105815284e-05,
+   "same_build_max_abs": 1.430515112588182e-06,
+   "max_value": 8581.287026612534,
+   "bitwise": false
+  },
+  "forces": {
+   "max_abs": 3.2186508178710938e-06,
+   "same_build_max_abs": 2.9802322387695312e-06,
+   "max_value": 5.617836952209473,
+   "bitwise": false
+  }
+ }
+}

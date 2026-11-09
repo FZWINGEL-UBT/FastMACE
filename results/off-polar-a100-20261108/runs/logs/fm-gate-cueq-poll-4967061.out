@@ -1,0 +1,58 @@
+### Starting TaskPrologue of job 4967061 on a0533 at Mon Nov  9 12:12:41 AM CET 2026
+Running on cores 16-31 with governor schedutil
+Mon Nov  9 00:12:41 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:49:00.0 Off |                    0 |
+| N/A   32C    P0             63W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB
+node a0533 commit b4ec70530545ad61cfeb67301f5adfde0e75362c
+== /home/atuin/v130cb/v130cb18/fm-offpolar/runs/gate-cueq-polar1-l-4967061/gate-default.log
+   NaCl energy 2.93 forces 0.88 stress 1.16 PASS
+   NbCl5 energy 0.40 forces 0.38 stress 0.28 PASS
+=== JOB_STATISTICS ===
+=== current date     : Mon Nov  9 00:52:41 CET 2026
+= Job-ID             : 4967061 on alex
+= Job-Name           : fm-gate-cueq-poll
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-offpolar/jobs/gate-cueq-poll.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-offpolar
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 03:00:00
+= Elapsed runtime    : 00:40:23
+= Total RAM usage    : 10.3 GiB of assigned  GiB (%)
+= Node list          : a0533
+= Subm/Elig/Start/End: 2026-11-09T00:11:26 / 2026-11-09T00:11:26 / 2026-11-09T00:12:17 / 2026-11-09T00:52:40
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             591.9M   104.9G   209.7G        N/A   1,012      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            33.7G     0.0K     0.0K        N/A     308K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2977049, 4 %, 2 %, 3362 MiB, 47597 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2977385, 1 %, 0 %, 1972 MiB, 42505 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2977858, 10 %, 9 %, 26050 MiB, 43232 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2978161, 6 %, 4 %, 13154 MiB, 44215 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 2978473, 0 %, 0 %, 5582 MiB, 2162700 ms

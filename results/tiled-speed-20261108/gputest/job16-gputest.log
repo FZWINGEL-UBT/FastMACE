@@ -1,0 +1,129 @@
+Cannot read termcap database;
+using dumb terminal settings.
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+{
+ "applied": [
+  "generic_species_skip",
+  "generic_reassociate",
+  "generic_segmented_first_sum",
+  "generic_fused_radial_backward",
+  "generic_streaming",
+  "generic_chunked_conv_backward",
+  "generic_fused_folded_forward",
+  "block_linear",
+  "grouped_linear",
+  "grouped_launch",
+  "generic_radial_tables",
+  "generic_wprime_backward",
+  "single_graph_strain"
+ ],
+ "eager-block_rows": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 2.5462756320268892e-09,
+  "forces": 7.490395440446487e-07,
+  "stress": 1.512757233021796e-07,
+  "whole_energy_rel": 2.7953627306956036e-09,
+  "whole_forces": 2.1534882858663944e-06,
+  "whole_stress": 9.832927964574834e-07
+ },
+ "eager-virial": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 3.3765828967048156e-09,
+  "forces": 1.0299291801969712e-06,
+  "stress": 1.512757347443527e-07,
+  "whole_energy_rel": 6.753160702813665e-09,
+  "whole_forces": 2.20030324860262e-06,
+  "whole_stress": 8.320169816178706e-07
+ },
+ "eager-epilogue": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 2.2141527238693284e-09,
+  "forces": 9.36299430055811e-07,
+  "stress": 1.512757347443527e-07,
+  "whole_energy_rel": 3.2935470908223525e-09,
+  "whole_forces": 2.387563099547524e-06,
+  "whole_stress": 8.320169816178706e-07
+ },
+ "padded-block_rows": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 2.380214173614017e-09,
+  "forces": 8.946045947758064e-07,
+  "stress": 7.563787309326376e-08,
+  "whole_energy_rel": 1.217778923627565e-09,
+  "whole_forces": 2.293933174075072e-06,
+  "whole_stress": 9.832927964574834e-07
+ },
+ "padded-virial": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 9.410149062380678e-10,
+  "forces": 1.0299294694936296e-06,
+  "stress": 1.512757233021796e-07,
+  "whole_energy_rel": 4.9541616245781824e-09,
+  "whole_forces": 2.387563099547524e-06,
+  "whole_stress": 9.07654889037677e-07
+ },
+ "padded-prefetch": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 9.13337994728507e-10,
+  "forces": 9.948180512895416e-07,
+  "stress": 7.563787309326376e-08,
+  "whole_energy_rel": 2.1864707349851325e-09,
+  "whole_forces": 2.106673323130168e-06,
+  "whole_stress": 8.320169816178706e-07
+ },
+ "padded-epilogue": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 1.300814719476823e-09,
+  "forces": 9.597066462353704e-07,
+  "stress": 7.56378616510898e-08,
+  "whole_energy_rel": 2.3525321883607154e-09,
+  "whole_forces": 2.106673323130168e-06,
+  "whole_stress": 8.320169816178706e-07
+ },
+ "compiled-epilogue": {
+  "tiles": 1,
+  "energy_bitwise": false,
+  "energy_rel": 2.7676908666892987e-10,
+  "forces": 9.128927135712504e-07,
+  "stress": 2.2691355062675792e-07,
+  "whole_energy_rel": 8.552169916635901e-09,
+  "whole_forces": 2.106673323130168e-06,
+  "whole_stress": 1.0589307038772898e-06
+ }
+}
+F..
+=================================== FAILURES ===================================
+___ test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system ___
+
+    def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), os.environ.get("PYTHONPATH", "")]),
+                   PYTHONDONTWRITEBYTECODE="1")
+        result = subprocess.run([sys.executable, "-c", textwrap.dedent(CHILD)], cwd=REPOSITORY_ROOT, env=env,
+                                capture_output=True, text=True, timeout=1800, check=False)
+        assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-8000:]
+        report = json.loads(result.stdout.strip().splitlines()[-1])
+        print(json.dumps(report, indent=1))
+        if "skip" in report:
+            pytest.skip(report["skip"])
+        cases = {key: value for key, value in report.items() if key != "applied"}
+        assert set(cases) == {"eager-block_rows", "eager-virial", "eager-epilogue", "padded-block_rows",
+                              "padded-virial", "padded-prefetch", "padded-epilogue", "compiled-epilogue"}
+        for name, case in cases.items():
+>           assert case["tiles"] > 1, name  # halos on every tile
+E           AssertionError: compiled-epilogue
+E           assert 1 > 1
+
+tests/gpu/test_tiled_speed_cuda.py:125: AssertionError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_tiled_speed_cuda.py::test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system
+1 failed, 2 passed in 116.73s (0:01:56)

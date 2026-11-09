@@ -1,0 +1,148 @@
+{
+ "structure": "SrTiO3",
+ "natoms": 5000,
+ "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+ "module": "products.0.symmetric_contractions",
+ "method": "uniform_1d",
+ "x_shape": [
+  5000,
+  2048
+ ],
+ "weight_shape": [
+  89,
+  3712
+ ],
+ "indices_dtype": "torch.int32",
+ "x_rms": 0.11205516010522842,
+ "irreps_in": "128x0e+128x1o+128x2e+128x3o",
+ "irreps_out": "128x0e+128x1o",
+ "degree": 3,
+ "tool": "sc0_lab",
+ "created_utc": "2026-11-09T02:57:04.942616+00:00",
+ "host": "modal",
+ "gpu": "NVIDIA H200",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "636ed4631009d388248e06cac7a3d4a05a82b348",
+ "rounds": 15,
+ "iterations": 20,
+ "counts": {
+  "gen": {
+   "terms": 480,
+   "monomials": 410,
+   "groups": 61,
+   "fmul_monomials": 478,
+   "fp32_per_channel": 1019
+  },
+  "gen-fused": {
+   "terms": 480,
+   "monomials": 410,
+   "groups": 61,
+   "fmul_monomials": 478,
+   "fp32_per_channel": 1035
+  },
+  "gen-bwd": {
+   "terms": 480,
+   "monomials": 410,
+   "groups": 61,
+   "fp32_per_channel": 1668
+  }
+ },
+ "registers": {
+  "gen": 80,
+  "gen-fused": 80,
+  "gen-bwd": 96
+ },
+ "local_bytes": {
+  "gen": 0,
+  "gen-fused": 0,
+  "gen-bwd": 0
+ },
+ "check": {
+  "gen_vs_cueq": {
+   "max_abs": 1.3113021850585938e-06,
+   "max_rel_to_max": 8.767025292399921e-07,
+   "rms_rel": 2.588267875580641e-07
+  },
+  "gen_fused_vs_cueq_div": {
+   "max_abs": 1.3113021850585938e-06,
+   "max_rel_to_max": 8.767025292399921e-07,
+   "rms_rel": 2.657039601672295e-07
+  },
+  "dm_vs_autograd": {
+   "max_abs": 6.556510925292969e-07,
+   "max_rel_to_max": 4.3911816760555666e-07,
+   "rms_rel": 2.4252099706245644e-07
+  },
+  "dD_vs_autograd": {
+   "max_abs": 9.5367431640625e-07,
+   "max_rel_to_max": 3.8612230923718016e-07,
+   "rms_rel": 3.0135225870253635e-07
+  }
+ },
+ "us": {
+  "cueq": 39.97,
+  "cueq+div": 61.45,
+  "gen": 31.47,
+  "gen-fused": 32.04,
+  "proxy": 179.49,
+  "gen-pair": 82.41
+ },
+ "us_spread": {
+  "cueq": [
+   39.8,
+   40.1
+  ],
+  "cueq+div": [
+   61.23,
+   61.7
+  ],
+  "gen": [
+   31.34,
+   31.69
+  ],
+  "gen-fused": [
+   28.78,
+   33.34
+  ],
+  "proxy": [
+   176.41,
+   180.53
+  ],
+  "gen-pair": [
+   79.05,
+   82.84
+  ]
+ },
+ "kernels_us": {
+  "cueq": {
+   "segmented_polynomial_algo1_2": 39.97
+  },
+  "cueq+div": {
+   "triton_poi_fused_add_div_0": 21.53,
+   "segmented_polynomial_algo1_2": 39.89
+  },
+  "gen": {
+   "sc0_fwd": 31.47
+  },
+  "gen-fused": {
+   "sc0_fwd": 32.04
+  },
+  "proxy": {
+   "triton_poi_fused_add_div_0": 21.54,
+   "segmented_polynomial_algo1_2": 40.08,
+   "segmented_polynomial_bwd_algo1_4": 87.78,
+   "triton_red_fused_add_div_mul_neg_sum_0": 29.98
+  },
+  "gen-pair": {
+   "sc0_fwd": 32.17,
+   "sc0_bwd": 50.24
+  }
+ },
+ "saving_us": 29.41,
+ "gen_over_cueq": 0.7873,
+ "backward_us": {
+  "proxy": 117.82,
+  "gen-pair": 50.24
+ },
+ "bucket_saving_us": 97.08
+}

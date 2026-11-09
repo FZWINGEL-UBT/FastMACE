@@ -1,0 +1,92 @@
+{
+ "structure": "SrTiO3",
+ "natoms": 5000,
+ "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+ "module": "products.0.symmetric_contractions",
+ "method": "uniform_1d",
+ "x_shape": [
+  5000,
+  2048
+ ],
+ "weight_shape": [
+  89,
+  3712
+ ],
+ "indices_dtype": "torch.int32",
+ "x_rms": 0.11205516010522842,
+ "irreps_in": "128x0e+128x1o+128x2e+128x3o",
+ "irreps_out": "128x0e+128x1o",
+ "degree": 3,
+ "tool": "sc0_bound",
+ "created_utc": "2026-11-09T00:15:50.672024+00:00",
+ "host": "modal",
+ "gpu": "NVIDIA H200",
+ "sms": 132,
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "bf6703175d9c255ed740a263437ac346afc9a159",
+ "rounds": 15,
+ "iterations": 10,
+ "us": {
+  "proxy": 179.35,
+  "floor": 41.84,
+  "floor+w": 44.82,
+  "copy": 21.58
+ },
+ "us_spread": {
+  "proxy": [
+   178.8,
+   180.3
+  ],
+  "floor": [
+   41.67,
+   42.01
+  ],
+  "floor+w": [
+   44.4,
+   45.33
+  ],
+  "copy": [
+   21.39,
+   21.81
+  ]
+ },
+ "kernels_us": {
+  "proxy": {
+   "triton_poi_fused_add_div_0": 21.87,
+   "segmented_polynomial_algo1_4": 40.23,
+   "segmented_polynomial_bwd_algo1_4": 87.18,
+   "triton_red_fused_add_div_mul_neg_sum_0": 30.16
+  },
+  "floor": {
+   "fwd": 15.89,
+   "bwd": 25.92
+  },
+  "floor+w": {
+   "fwd": 17.05,
+   "bwd": 27.91
+  },
+  "copy": {
+   "Memcpy DtoD (Device -> Device)": 21.58
+  }
+ },
+ "floor_bytes": {
+  "forward": 51220000,
+  "backward": 92200000
+ },
+ "floor_tb_per_s": 3.428,
+ "copy_tb_per_s": 3.796,
+ "saving_us": {
+  "floor": 137.51,
+  "floor_w": 134.53
+ },
+ "descriptor_flops": {
+  "forward": 5159680000,
+  "backward": 5159680000,
+  "descriptor": "\u256d a=3712x0e b=128x0e+128x1o+128x2e+128x3o -> C=128x0e+128x1o\n\u2502  []\u00b7a[u]\u00b7b[u]\u279cC[u] \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 num_paths=4 u=128\n\u2502  []\u00b7a[u]\u00b7b[u]\u00b7b[u]\u279cC[u] \u2500\u2500\u2500\u2500\u2500\u2500 num_paths=86 u=128\n\u2570\u2500 []\u00b7a[u]\u00b7b[u]\u00b7b[u]\u00b7b[u]\u279cC[u] \u2500 num_paths=1949 u=128"
+ },
+ "fp32_tflops": 66.9,
+ "descriptor_flops_at_peak_us": {
+  "forward": 77.13,
+  "backward": 77.13
+ }
+}

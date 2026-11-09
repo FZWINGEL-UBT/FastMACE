@@ -1,0 +1,814 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  58,
+  58,
+  58
+ ],
+ "atoms": 975560,
+ "receivers": 8192,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "d5de5bf7",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2039472128,
+   "host_peak": 2039472128
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2040258560,
+   "host_peak": 2040258560
+  },
+  "build": {
+   "seconds": 10.004673413001,
+   "allocated": 416141824,
+   "reserved": 1296039936,
+   "peak_above_before": 1252585984,
+   "host_rss": 3478761472,
+   "host_peak": 3565527040
+  },
+  "neighbours": {
+   "allocated": 439555584,
+   "reserved": 1296039936,
+   "peak_above_before": 23413760,
+   "host_rss": 3479547904,
+   "host_peak": 3565527040
+  }
+ },
+ "phase": "done",
+ "call_rows": 8192,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=5.496454742719308e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.386883808816971e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.386884304872026e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=5.350295911491125e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.110640918170247e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (893 pieces, 9 pairs, certificate 0.34, cached)', 'interactions.1 (619 pieces, 9 pairs, certificate 0.36, cached)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.262527314552999e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "backward_chunk_edges": [
+  6144
+ ],
+ "ledgers": {},
+ "edges_within_cutoff": 72191440,
+ "calls": [
+  {
+   "seconds": 20.18533219100209,
+   "allocated": 5450167296,
+   "reserved": 6524239872,
+   "peak_above_before": 6017513472,
+   "host_rss": 4692393984,
+   "host_peak": 4692602880,
+   "tiles": 138,
+   "grid": [
+    5,
+    5,
+    5
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 8192,
+   "max_halo": 5820,
+   "max_edges": 607936,
+   "list_reused": false,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 8192,
+   "edges": 72191440,
+   "mode": "eager",
+   "mode_reason": "compiled force field: the first call measures its memory",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.0,
+   "lanes": "off: eager tiles",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "loop_base": 485482496,
+   "peak_before_tiles": 485482496,
+   "tiles_s": 20.000479979993543,
+   "tiles_peak": 6457069056,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 224269136,
+   "list_kept_bytes": 304629060,
+   "list_cache_hits": 276,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 439555584,
+   "total_peak": 6457069056
+  },
+  {
+   "seconds": 34.68356461598887,
+   "allocated": 5604051968,
+   "reserved": 7553941504,
+   "peak_above_before": 1654649344,
+   "host_rss": 5248086016,
+   "host_peak": 5267759104,
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": false,
+   "list_rebuilds": 2,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "8.70 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 2.09938856199733,
+   "lanes": "off: not measured faster on NVIDIA GeForce RTX 5060 Ti",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "loop_base": 5603627520,
+   "peak_before_tiles": 6368545280,
+   "tiles_s": 32.52980570800719,
+   "tiles_peak": 7093108736,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 223631572,
+   "list_kept_bytes": 303814192,
+   "list_cache_hits": 204,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 5438459392,
+   "total_peak": 7093108736
+  },
+  {
+   "seconds": 8.726546369987773,
+   "allocated": 5604051968,
+   "reserved": 7562330112,
+   "peak_above_before": 1482307072,
+   "host_rss": 5293699072,
+   "host_peak": 5318668288,
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": true,
+   "list_rebuilds": 2,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "8.70 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.623493289022008,
+   "lanes": "off: not measured faster on NVIDIA GeForce RTX 5060 Ti",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "tiles_s": 7.948605053010397,
+   "global_bytes": 4994867200,
+   "list_cache_bytes": 223631572,
+   "list_kept_bytes": 303814192,
+   "list_cache_hits": 204,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "allocated_before": 5592344064,
+   "total_peak": 7074651136
+  }
+ ],
+ "sweep_profile": {
+  "sweep1": {
+   "tiles": 3,
+   "kernel_s": 0.03699470199999999,
+   "classes": {
+    "gemm": 0.3255,
+    "copy": 0.2304,
+    "pointwise": 0.1983,
+    "cueq_kernel": 0.1242,
+    "index": 0.058,
+    "conv": 0.0374,
+    "other": 0.0262
+   },
+   "top": [
+    {
+     "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutlass_80_simt_sgemm_128x64_8x5_nn_align1::Params)",
+     "ms": 6.207641000000003,
+     "share": 0.1678,
+     "cls": "gemm"
+    },
+    {
+     "name": "kernel",
+     "ms": 4.593241,
+     "share": 0.1242,
+     "cls": "cueq_kernel"
+    },
+    {
+     "name": "gemm",
+     "ms": 3.440375999999991,
+     "share": 0.093,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_cat_slice_view_25",
+     "ms": 2.2767900000000028,
+     "share": 0.0615,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_cat_div_view_24",
+     "ms": 2.2483539999999995,
+     "share": 0.0608,
+     "cls": "copy"
+    },
+    {
+     "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, std::array",
+     "ms": 1.7353189999999996,
+     "share": 0.0469,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_transpose_view_15",
+     "ms": 1.3905149999999995,
+     "share": 0.0376,
+     "cls": "pointwise"
+    },
+    {
+     "name": "segmented_polynomial_algo1_4",
+     "ms": 1.3335899999999983,
+     "share": 0.036,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_scatter_add_select_unsqueeze_zeros_10",
+     "ms": 1.137008999999999,
+     "share": 0.0307,
+     "cls": "index"
+    },
+    {
+     "name": "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, 3, 3>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, BatchedTe",
+     "ms": 1.1281729999999988,
+     "share": 0.0305,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_cat_mm_view_28",
+     "ms": 1.055757999999998,
+     "share": 0.0285,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_18",
+     "ms": 1.0288589999999995,
+     "share": 0.0278,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_transpose_view_14",
+     "ms": 0.9790630000000019,
+     "share": 0.0265,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_23",
+     "ms": 0.9656779999999999,
+     "share": 0.0261,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_27",
+     "ms": 0.7879359999999997,
+     "share": 0.0213,
+     "cls": "pointwise"
+    },
+    {
+     "name": "_forward",
+     "ms": 0.7285609999999995,
+     "share": 0.0197,
+     "cls": "other"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_17",
+     "ms": 0.6981100000000006,
+     "share": 0.0189,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_22",
+     "ms": 0.6971009999999987,
+     "share": 0.0188,
+     "cls": "pointwise"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFu",
+     "ms": 0.6960389999999971,
+     "share": 0.0188,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_transpose_view_13",
+     "ms": 0.5727380000000012,
+     "share": 0.0155,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused__to_copy_add_div_exp_index_linalg_vector_norm_lt_mul_pow_rsub_select_sub_tabled_outer_sum_forward_unsqueeze_8",
+     "ms": 0.48857000000000017,
+     "share": 0.0132,
+     "cls": "index"
+    },
+    {
+     "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, false>(int, at::native::CUDAFunctor_add<float>, st",
+     "ms": 0.46819500000000075,
+     "share": 0.0127,
+     "cls": "pointwise"
+    },
+    {
+     "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&",
+     "ms": 0.4513430000000014,
+     "share": 0.0122,
+     "cls": "index"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_21",
+     "ms": 0.3497129999999997,
+     "share": 0.0095,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_16",
+     "ms": 0.32258600000000026,
+     "share": 0.0087,
+     "cls": "copy"
+    }
+   ]
+  },
+  "sweep2": {
+   "tiles": 3,
+   "kernel_s": 0.184677826,
+   "classes": {
+    "conv": 0.3416,
+    "other": 0.3393,
+    "gemm": 0.1093,
+    "copy": 0.109,
+    "pointwise": 0.0863,
+    "index": 0.0146
+   },
+   "top": [
+    {
+     "name": "fused_folded_forward",
+     "ms": 57.514095999999995,
+     "share": 0.3114,
+     "cls": "other"
+    },
+    {
+     "name": "oeq_projected_backward_wprime",
+     "ms": 55.13163600000001,
+     "share": 0.2985,
+     "cls": "conv"
+    },
+    {
+     "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutlass_80_simt_sgemm_128x64_8x5_nn_align1::Params)",
+     "ms": 8.205293999999988,
+     "share": 0.0444,
+     "cls": "gemm"
+    },
+    {
+     "name": "void sgemm_largek_lds64<false, true, 6, 3, 4, 5, 2, 64>(float*, float const*, float const*, int, int, int, int, int, int, float const*, float const*, float, flo",
+     "ms": 7.615653000000005,
+     "share": 0.0412,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward_8",
+     "ms": 5.405737000000001,
+     "share": 0.0293,
+     "cls": "pointwise"
+    },
+    {
+     "name": "forward",
+     "ms": 3.328690999999999,
+     "share": 0.018,
+     "cls": "other"
+    },
+    {
+     "name": "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_3",
+     "ms": 3.267969999999994,
+     "share": 0.0177,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_add_select_backward_slice_slice_backward_streaming_conv_wprime_backward_blocks_view_10",
+     "ms": 2.9614329999999973,
+     "share": 0.016,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_add_select_backward_slice_slice_backward_view_9",
+     "ms": 2.7175210000000005,
+     "share": 0.0147,
+     "cls": "pointwise"
+    },
+    {
+     "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x128_8x4_nn_align1>(cutlass_80_simt_sgemm_128x128_8x4_nn_align1::Params)",
+     "ms": 2.2597400000000025,
+     "share": 0.0122,
+     "cls": "gemm"
+    },
+    {
+     "name": "segmented_polynomial_bwd_algo4_2",
+     "ms": 2.2426340000000056,
+     "share": 0.0121,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_add_cat_div_slice_view_24",
+     "ms": 2.2129029999999985,
+     "share": 0.012,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_slice_19",
+     "ms": 2.028716,
+     "share": 0.011,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_slice_20",
+     "ms": 1.8786499999999977,
+     "share": 0.0102,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_select_backward_slice_slice_backward_streaming_conv_wprime_backward_blocks_view_11",
+     "ms": 1.7131560000000028,
+     "share": 0.0093,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_select_view_16",
+     "ms": 1.6318940000000002,
+     "share": 0.0088,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_select_view_15",
+     "ms": 1.6258849999999985,
+     "share": 0.0088,
+     "cls": "copy"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFu",
+     "ms": 1.2495090000000126,
+     "share": 0.0068,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_slice_18",
+     "ms": 1.1950399999999972,
+     "share": 0.0065,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_select_view_14",
+     "ms": 1.1608919999999998,
+     "share": 0.0063,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_select_view_13",
+     "ms": 1.1472210000000014,
+     "share": 0.0062,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused__unsafe_view_cat_clone_select_view_12",
+     "ms": 1.1238600000000005,
+     "share": 0.0061,
+     "cls": "copy"
+    },
+    {
+     "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x128_8x5_nn_align1>(cutlass_80_simt_sgemm_64x128_8x5_nn_align1::Params)",
+     "ms": 1.0906550000000002,
+     "share": 0.0059,
+     "cls": "gemm"
+    },
+    {
+     "name": "segmented_polynomial_algo1_1",
+     "ms": 1.0398300000000018,
+     "share": 0.0056,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_23",
+     "ms": 0.9958179999999957,
+     "share": 0.0054,
+     "cls": "copy"
+    }
+   ]
+  },
+  "sweep3": {
+   "tiles": 3,
+   "kernel_s": 0.08961536999999997,
+   "classes": {
+    "gemm": 0.415,
+    "pointwise": 0.2131,
+    "cueq_kernel": 0.1346,
+    "copy": 0.099,
+    "index": 0.0723,
+    "conv": 0.0475,
+    "other": 0.0186
+   },
+   "top": [
+    {
+     "name": "kernel",
+     "ms": 12.059352000000002,
+     "share": 0.1346,
+     "cls": "cueq_kernel"
+    },
+    {
+     "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(cutlass_80_simt_sgemm_128x64_8x5_nn_align1::Params)",
+     "ms": 9.286357000000002,
+     "share": 0.1036,
+     "cls": "gemm"
+    },
+    {
+     "name": "void sgemm_largek_lds64<false, true, 6, 3, 4, 5, 2, 64>(float*, float const*, float const*, int, int, int, int, int, int, float const*, float const*, float, flo",
+     "ms": 7.657197000000004,
+     "share": 0.0854,
+     "cls": "gemm"
+    },
+    {
+     "name": "gemm",
+     "ms": 6.749336000000007,
+     "share": 0.0753,
+     "cls": "gemm"
+    },
+    {
+     "name": "void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6, 3, 4>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, BatchedTen",
+     "ms": 3.9088369999999997,
+     "share": 0.0436,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_backward_transpose_view_19",
+     "ms": 3.3343199999999995,
+     "share": 0.0372,
+     "cls": "index"
+    },
+    {
+     "name": "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_10",
+     "ms": 3.229450000000001,
+     "share": 0.036,
+     "cls": "pointwise"
+    },
+    {
+     "name": "segmented_polynomial_bwd_algo2_2",
+     "ms": 2.5229519999999974,
+     "share": 0.0282,
+     "cls": "conv"
+    },
+    {
+     "name": "triton_poi_fused_cat_slice_view_26",
+     "ms": 2.2565600000000012,
+     "share": 0.0252,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_add_slice_backward_view_18",
+     "ms": 2.2302910000000047,
+     "share": 0.0249,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_11",
+     "ms": 1.9736280000000006,
+     "share": 0.022,
+     "cls": "copy"
+    },
+    {
+     "name": "void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, 5, 3, 3>(int, int, int, BatchedTensor, int, BatchedTensor, int, BatchedTensor, int, BatchedTe",
+     "ms": 1.6790059999999967,
+     "share": 0.0187,
+     "cls": "gemm"
+    },
+    {
+     "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at::native::FillFunctor<float>, std::array",
+     "ms": 1.656844,
+     "share": 0.0185,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_cat_view_10",
+     "ms": 1.4359729999999982,
+     "share": 0.016,
+     "cls": "copy"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_transpose_view_8",
+     "ms": 1.4359589999999998,
+     "share": 0.016,
+     "cls": "pointwise"
+    },
+    {
+     "name": "segmented_polynomial_algo1_4",
+     "ms": 1.2641319999999978,
+     "share": 0.0141,
+     "cls": "conv"
+    },
+    {
+     "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFu",
+     "ms": 1.2222960000000094,
+     "share": 0.0136,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_add_div_exp_index_lt_mul_pow_rsub_scatter_add_select_sub_unsqueeze_zeros_15",
+     "ms": 1.180378999999998,
+     "share": 0.0132,
+     "cls": "index"
+    },
+    {
+     "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x128_8x5_nn_align1>(cutlass_80_simt_sgemm_64x128_8x5_nn_align1::Params)",
+     "ms": 1.0925099999999994,
+     "share": 0.0122,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_cat_mm_view_32",
+     "ms": 1.084458999999999,
+     "share": 0.0121,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_add_div_slice_species_mm_view_25",
+     "ms": 1.0218950000000022,
+     "share": 0.0114,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_add_slice_slice_backward_species_mm_view_6",
+     "ms": 0.9804489999999969,
+     "share": 0.0109,
+     "cls": "gemm"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_transpose_view_7",
+     "ms": 0.9689869999999992,
+     "share": 0.0108,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_18",
+     "ms": 0.9549249999999992,
+     "share": 0.0107,
+     "cls": "pointwise"
+    },
+    {
+     "name": "triton_poi_fused_clone_slice_12",
+     "ms": 0.9509279999999999,
+     "share": 0.0106,
+     "cls": "pointwise"
+    }
+   ]
+  }
+ },
+ "tiled": {
+  "energy_eV": -7794284.756501498,
+  "energy_per_atom_eV": -7.989549342430499,
+  "max_abs_force": 0.0001641858834773302,
+  "stress": [
+   [
+    -0.028883060440421104,
+    -7.481034541845233e-11,
+    -1.1135797145511717e-10
+   ],
+   [
+    -7.481034541845233e-11,
+    -0.028883071616292,
+    -1.1700322655183726e-10
+   ],
+   [
+    -1.1135797145511717e-10,
+    -1.1700322655183726e-10,
+    -0.028882946819067
+   ]
+  ]
+ },
+ "valid": true,
+ "check": {
+  "initial_edges": 72191440,
+  "expected_initial_edges": 72191440,
+  "reference_edges_per_atom": 74.0,
+  "initial_ok": true,
+  "live_edges": null,
+  "fresh_edges": null,
+  "live_ok": true,
+  "max_abs_force": 0.0001641858834773302,
+  "forces_ok": true
+ }
+}

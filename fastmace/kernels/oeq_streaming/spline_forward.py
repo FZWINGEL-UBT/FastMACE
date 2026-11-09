@@ -13,6 +13,7 @@ Lab (H200, OMAT-0 medium, SrTiO3 10x10x10): forward 0.875 of today's, w' 0.894; 
 from __future__ import annotations
 
 import ctypes
+from types import MappingProxyType
 
 import torch
 
@@ -53,6 +54,15 @@ R128 = None
 # / 0.8312 against the
 # Ada defaults (SPLINE_W alone 0.8396 / 0.8304); off again from the Ada set, with STAGE_EDGES, 1.0017 / 1.0004.
 R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# A model label's own MIN_BLOCKS for the R128 shape on its GPUs, instead of 6 (the label reaches the kernel through
+# the rewrites' context: WPrime's model_label). Bitwise (a register cap). OMAT-0 small on the H200 (9 November 2026,
+# results/h200-omat0-small-20261108, Benchmark_loup, ab / ba, b = 128 threads with MIN_BLOCKS 8 against small's
+# defaults): 0.9873 / 0.9883 (rescreen), 0.9923 / 0.9952 (combo2); as small's default, 6 again 1.0046 / 1.0057
+# (defaults2). Medium
+# on the H200: MIN_BLOCKS 8 1.0515 / 1.0507 (above), so 6 stays for every other model.
+R128_MIN_BLOCKS_MODEL_GPUS = MappingProxyType({
+    "omat0-small": (8, GPUModels(("NVIDIA H200",))),
+})
 # Codex H200 follow-up, item 4 (7 November 2026). FACTOR_W: a path whose terms all share one input component x_k
 # (scalar-input paths) or one edge component e_j (scalar-edge paths) multiplies w by it once (wf = w * x_k) and
 # accumulates fmaf(wf, rest, acc): fewer multiplies, rounding-class (the products associate differently; gate).
@@ -125,17 +135,24 @@ PREFETCH_AHEAD = None
 # OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9810 / 0.9943 (b = 2);
 # all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
 PREFETCH_AHEAD_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# GPUs where a model label keeps PREFETCH_AHEAD off (the label reaches the kernel through WPrime's model_label).
+# OMAT-0 small on the A100 family (9 November 2026, results/h200-omat0-small-20261108, NHR Alex A100-SXM4-80GB job
+# 4967540, Benchmark_loup, against small's A100 defaults of 14fbf87a, ab / ba): off 0.9902 / 0.9908.
+PREFETCH_AHEAD_MODEL_OFF_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA A100-SXM4-80GB",)),
+})
 PREFETCH_AHEAD_DISTANCE = 2
 PREFETCH_PATHS = 4
 
 
-def prefetch_ahead_default(device):
+def prefetch_ahead_default(device, model_label=None):
     """``PREFETCH_AHEAD`` on ``device``: the constant when set, else ``PREFETCH_AHEAD_DISTANCE`` on
-    ``PREFETCH_AHEAD_GPUS`` and 0."""
+    ``PREFETCH_AHEAD_GPUS`` (except the label's ``PREFETCH_AHEAD_MODEL_OFF_GPUS``) and 0."""
     if PREFETCH_AHEAD is not None:
         return int(PREFETCH_AHEAD)
     device = torch.device(device)
-    listed = device.type == "cuda" and torch.cuda.get_device_name(device) in PREFETCH_AHEAD_GPUS
+    name = torch.cuda.get_device_name(device) if device.type == "cuda" else None
+    listed = name in PREFETCH_AHEAD_GPUS and name not in PREFETCH_AHEAD_MODEL_OFF_GPUS.get(model_label, ())
     return int(PREFETCH_AHEAD_DISTANCE) if listed else 0
 
 
@@ -242,6 +259,18 @@ def shared_locator_supported(grid, r_lo):
         return struct.unpack("f", struct.pack("f", float(v)))[0]
 
     return f32(r_lo) <= f32(grid[0][0])
+
+
+def launch_shape(device, model_label=None):
+    """(threads, min_blocks) of the spline forward on ``device``: the R128 shape (128 threads, MIN_BLOCKS 6, or the
+    label's own MIN_BLOCKS from ``R128_MIN_BLOCKS_MODEL_GPUS`` on its GPUs) where R128 is on, else THREADS and
+    MIN_BLOCKS."""
+    if not r128_default(device):
+        return int(THREADS), MIN_BLOCKS
+    blocks, gpus = R128_MIN_BLOCKS_MODEL_GPUS.get(model_label, (6, ()))
+    device = torch.device(device)
+    listed = device.type == "cuda" and torch.cuda.get_device_name(device) in gpus
+    return 128, (blocks if listed else 6)
 
 
 def r128_default(device):
@@ -662,26 +691,27 @@ class SplineForward:
     ``shared_locator`` (SHARED_LOCATOR): it reads ``spline_locator``'s records, compiled alongside (``locate``)."""
 
     def __init__(self, schedule, blocks, grid, r_max, device, path_scale=None, shared_locator=False,
-                 block_order=None, packed8_bias=None):
+                 block_order=None, packed8_bias=None, model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
         device = torch.device(device)
         self.blocks, self.channels, self.grid = blocks, schedule.channels, [tuple(g) for g in grid]
         self.intervals = sum(int(g[2]) for g in self.grid)
-        self.threads, self.min_blocks = (128, 6) if r128_default(device) else (int(THREADS), MIN_BLOCKS)
+        self.threads, self.min_blocks = launch_shape(device, model_label)
         self.parts = (spline_parts(schedule) if PARTS else None) or [None]
         self.factor_w, self.cursor32 = factor_w_default(device), cursor32_default(device)
         self.shared_locator = bool(shared_locator)
         # STAGE_EDGES: only where a block is one receiver (thread = channel) and nothing else changes the edge head
         self.stage_edges = (stage_edges_default(device) and self.threads == self.channels and not self.shared_locator
                             and not self.cursor32)
-        self.prefetch = prefetch_ahead_default(device) if self.stage_edges else 0  # PREFETCH_AHEAD
+        self.prefetch = prefetch_ahead_default(device, model_label) if self.stage_edges else 0  # PREFETCH_AHEAD
         self.block_order = block_order_default(device) if block_order is None else bool(block_order)
         # BLOCK_ORDER: the receivers' order the owning force field binds before its calls (``bind_order``; any
         # permutation of [0, N) gives the same message); a call with another row count walks them in index order.
         self.order, self._identity = None, {}
         self.init_args = (schedule, blocks, grid, r_max, device, path_scale, shared_locator)
+        self.model_label = model_label
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
                                self.stage_edges, self.prefetch, self.block_order)
@@ -812,9 +842,9 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
 
 
 __all__ = ["PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
-           "PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_PATHS",
-           "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
+           "PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
+           "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
-           "cursor32_default", "factor_w_default", "located_source", "locator_reference", "lookup_code", "r128_default",
+           "cursor32_default", "factor_w_default", "launch_shape", "located_source", "locator_reference", "lookup_code", "r128_default",
            "render", "render_locator", "shared_locator_default", "shared_locator_supported", "spline_locate",
            "spline_message_blocks", "spline_message_blocks_located", "spline_parts", "spline_w_default"]

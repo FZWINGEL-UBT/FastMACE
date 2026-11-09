@@ -1,0 +1,102 @@
+Cannot read termcap database;
+using dumb terminal settings.
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+{
+ "applied": [
+  "generic_species_skip",
+  "generic_reassociate",
+  "generic_segmented_first_sum",
+  "generic_fused_radial_backward",
+  "generic_streaming",
+  "generic_chunked_conv_backward",
+  "generic_fused_folded_forward",
+  "block_linear",
+  "grouped_linear",
+  "grouped_launch",
+  "generic_radial_tables",
+  "generic_wprime_backward",
+  "single_graph_strain"
+ ],
+ "eager-block_rows": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 5.535381790829443e-11,
+  "forces": 8.426691714539639e-07,
+  "stress": 3.025514237200165e-07,
+  "whole_energy_rel": 1.3284969105889532e-09,
+  "whole_forces": 2.3407487943037037e-06,
+  "whole_stress": 2.2691363644305614e-07
+ },
+ "eager-virial": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 1.854352903623102e-09,
+  "forces": 8.192620012988345e-07,
+  "stress": 1.5127571186000824e-07,
+  "whole_energy_rel": 1.2454661836116095e-09,
+  "whole_forces": 2.2003038666454812e-06,
+  "whole_stress": 2.2691363644305614e-07
+ },
+ "padded-block_rows": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 1.4391992688420948e-09,
+  "forces": 7.958542174842992e-07,
+  "stress": 7.56378616510898e-08,
+  "whole_energy_rel": 5.812203677928592e-10,
+  "whole_forces": 2.3875637701897776e-06,
+  "whole_stress": 2.2691363644305614e-07
+ },
+ "padded-virial": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 1.4115223561536425e-09,
+  "forces": 9.36299167058898e-07,
+  "stress": 7.563785593000412e-08,
+  "whole_energy_rel": 3.3212818686082783e-10,
+  "whole_forces": 2.3875637701897776e-06,
+  "whole_stress": 2.2691363644305614e-07
+ },
+ "padded-prefetch": {
+  "tiles": 8,
+  "energy_bitwise": false,
+  "energy_rel": 2.2141527126549232e-10,
+  "forces": 9.67753057812921e-07,
+  "stress": 7.56378616510898e-08,
+  "whole_energy_rel": 3.265880540060308e-09,
+  "whole_forces": 2.574823673734074e-06,
+  "whole_stress": 2.2691363644305614e-07
+ }
+}
+F
+=================================== FAILURES ===================================
+___ test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system ___
+
+    def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), os.environ.get("PYTHONPATH", "")]),
+                   PYTHONDONTWRITEBYTECODE="1")
+        result = subprocess.run([sys.executable, "-c", textwrap.dedent(CHILD)], cwd=REPOSITORY_ROOT, env=env,
+                                capture_output=True, text=True, timeout=1800, check=False)
+        assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-8000:]
+        report = json.loads(result.stdout.strip().splitlines()[-1])
+        print(json.dumps(report, indent=1))
+        if "skip" in report:
+            pytest.skip(report["skip"])
+        cases = {key: value for key, value in report.items() if key != "applied"}
+        assert set(cases) == {"eager-block_rows", "eager-virial", "padded-block_rows", "padded-virial",
+                              "padded-prefetch"}
+        for name, case in cases.items():
+            assert case["tiles"] > 1, name  # halos on every tile
+            # TILE_BLOCK_ROWS multiplies linear_1 on the block layout, as the whole-system call does (rounding: 4e-10
+            # relative on the 5060 Ti); the other switches leave the forward as it was.
+>           assert case["energy_rel"] <= (1e-8 if name.endswith("block_rows") else 1e-12), (name, case)
+E           AssertionError: ('eager-virial', {'tiles': 8, 'energy_bitwise': False, 'energy_rel': 1.854352903623102e-09, 'forces': 8.192620012988345e-07, ...})
+E           assert 1.854352903623102e-09 <= 1e-12
+
+tests/gpu/test_tiled_speed_cuda.py:120: AssertionError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_tiled_speed_cuda.py::test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system
+1 failed in 24.12s
