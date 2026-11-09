@@ -20,8 +20,10 @@ import torch
 from fastmace.kernels.gpu_models import GPUModels
 
 SC_GENERATED = None
-# Off on every GPU until a packed A/B in both orders and the force/stress gate say otherwise (decision 66).
-SC_GENERATED_GPUS = GPUModels(())
+# NVIDIA H200 (9 November 2026, results/sc0-op-20261109; OMAT-0 medium, Benchmark_loup SrTiO3 10x10x10, a = the H200
+# defaults of a6430eb6): MD step b/a 0.9760 / 0.9731 (ab / ba); force/stress gate passes (forces 0.850 / 0.920 /
+# 0.959, stress 0.415 / 0.778 / 1.209).
+SC_GENERATED_GPUS = GPUModels(("NVIDIA H200",))
 
 _subclasses = {}
 

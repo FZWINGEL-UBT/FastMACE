@@ -1724,7 +1724,7 @@ class FixedPlanner:
     @staticmethod
     def _sc_generated(book, asked, tf32x3, hardware):
         """``RewriteConfig.sc_generated``: as asked when "on" or "off"; auto on with tf32x3_gemms on the GPUs
-        ``sc_generated.SC_GENERATED_GPUS`` lists (none yet)."""
+        ``sc_generated.SC_GENERATED_GPUS`` lists (the H200)."""
         from fastmace.rewrites.sc_generated import SC_GENERATED_GPUS
 
         item = "RewriteConfig.sc_generated"

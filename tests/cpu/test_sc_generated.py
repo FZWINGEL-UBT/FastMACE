@@ -1,4 +1,4 @@
-"""``RewriteConfig.sc_generated`` (``rewrites.sc_generated``, SC_GENERATED): off by default, the planner's decision,
+"""``RewriteConfig.sc_generated`` (``rewrites.sc_generated``, SC_GENERATED): the GPU list, the planner's decision,
 and the generated source's structure (branch fastmace/sc0-op, 9 November 2026)."""
 
 from types import SimpleNamespace
@@ -10,13 +10,14 @@ from fastmace.config import RewriteConfig
 H200 = "NVIDIA H200"
 
 
-def test_off_by_default(monkeypatch):
+def test_defaults(monkeypatch):
     from fastmace.planner import fixed
     from fastmace.rewrites import sc_generated
 
     assert RewriteConfig().sc_generated == "auto"
-    assert sc_generated.SC_GENERATED is None and not sc_generated.SC_GENERATED_GPUS
-    assert not sc_generated.sc_generated_default(H200)
+    assert sc_generated.SC_GENERATED is None
+    assert sc_generated.sc_generated_default(H200)  # auto: the GPU list (9 November 2026)
+    assert not sc_generated.sc_generated_default("NVIDIA GeForce RTX 5060 Ti")
     assert sc_generated.sc_generated_default(H200, "on") and not sc_generated.sc_generated_default(H200, "off")
     monkeypatch.setattr(sc_generated, "SC_GENERATED", True)  # an A/B side
     assert sc_generated.sc_generated_default(H200, "off")
