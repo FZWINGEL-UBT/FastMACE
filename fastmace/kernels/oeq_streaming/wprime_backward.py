@@ -1331,13 +1331,14 @@ class _SplineBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, forward_table):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         _, density = radial_table_forward(r, pair, density_coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
                                           0)
-        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, table, spline_id)
+        # forward_table: the table the forward reads (PACKED8's packed copy, else ``table``)
+        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, forward_table, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
                               bins)
         ctx.constants, ctx.wprime_id = (r_lo, bin_scale, r_max), wprime_id
@@ -1357,7 +1358,7 @@ class _SplineBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 5
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
 
 
 class _SplineLocatedBlockConvolution(torch.autograd.Function):
@@ -1366,7 +1367,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, forward_table=None):
+        # forward_table: unused (PACKED8 needs STAGE_EDGES, which excludes SHARED_LOCATOR)
         from fastmace.kernels.oeq_streaming.spline_forward import spline_locate, spline_message_blocks_located
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1392,7 +1394,7 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 5
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
 
 
 def spline_table(coef, row_scale=None):
@@ -1663,6 +1665,7 @@ class WPrime(torch.nn.Module):
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.spline = None  # SPLINE_W (attach_spline): dict(grid, r_max, certificate, path_scale)
         self.spline_block = None  # SPLINE_W with BLOCK_MESSAGE: (fused id, SplineForward, spline WPrimeBackward)
+        self.spline_packed = None  # PACKED8 (spline_forward): the forward's 8-byte copy of spline_table
         self.kernels = kernels
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
@@ -1712,12 +1715,19 @@ class WPrime(torch.nn.Module):
         from fastmace.kernels.oeq_streaming.spline_forward import (SplineForward, shared_locator_default,
                                                                    shared_locator_supported, spline_w_default)
         if self.spline is not None and spline_w_default(device):
+            from fastmace.kernels.oeq_streaming.spline_forward import encode_packed8, packed8_default
+
             grid = self.spline["grid"]
             shared = shared_locator_default(device) and shared_locator_supported(grid, self.spline["r_lo"])
+            packed = encode_packed8(self.spline_table) if packed8_default(device) and not shared else None
+            forward = SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
+                                    self.spline["path_scale"], shared_locator=shared,
+                                    packed8_bias=None if packed is None else packed[1])
+            # PACKED8: the forward's own 8-byte table (the w' kernel keeps reading spline_table)
+            self.spline_packed = packed[0] if packed is not None and forward.packed8 else None
             self.spline_block = (
                 fused.id,
-                SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                              self.spline["path_scale"], shared_locator=shared),
+                forward,
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid, shared_locator=shared))
@@ -1753,7 +1763,8 @@ class WPrime(torch.nn.Module):
             *groups, density = convolution.apply(
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
-                x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id)
+                x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
+                self.spline_packed if self.spline_block[1].packed8 else self.spline_table)  # PACKED8
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
