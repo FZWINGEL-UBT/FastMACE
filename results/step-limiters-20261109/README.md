@@ -216,3 +216,37 @@ Quadratic-table bound (`F-quad-horner`, kernel lab; [quad-h200/](quad-h200/), [q
 quadratic table of twice the pieces would save at most 3.4 % of w′ before its larger loads; on the A100 the table cost
 is mostly loads, not FMAs. Not built.
 
+## Round 4: the same profile on an Alex A100-SXM4-80GB ([a100-alex/](a100-alex/limiters.md))
+
+`tools/jobs/alex_step_limiters.sh` (NHR@FAU Alex job 4969862, node a0731, source 735158a2 = main with PACKED8,
+BUTTERFLY and the generated layer-0 symmetric contraction) runs `tools/modal/step_limiters.sh` unchanged, with ncu
+2026.1 from the cluster's `cuda/13.2.0` module and the same flags (running clocks, warm caches). The counters are
+open to users on Alex (no ERR_NVGPUCTRPERM), so this profile costs no Modal budget: 9 min of job time.
+
+| | Alex A100-SXM4 (735158a2) | Modal A100 PCIe (0df22417, PACKED8 only) |
+| --- | ---: | ---: |
+| Wall per MD step | 6.51 ms | 7.25 ms |
+| Force graph per replay | 6.37 ms | 7.13 ms |
+| ncu kernel time per force call | 6,209 µs | 6,512 µs |
+
+Per operation the two A100s agree within 3 % (the same 1,410 MHz SM clock; the SXM board's extra bandwidth does not
+show, because nothing large is DRAM-bound). The step is faster on Alex because of later defaults, not the board: w′
+2,256 → 2,177 µs (BUTTERFLY), and cuEq's `uniform_1d` 402 µs → 90 µs plus the generated contraction's forward 78 µs
+and backward 110 µs (codex1109-fused-layer0-sc).
+
+What limits the A100 step now (59 % of the kernel time is FMA-pipe bound):
+
+- **Edge kernels at the FMA roof (3,432 µs, 55 %).** w′ 2,177 µs: FMA pipe 83 %, issue 60 %, L2 55 %. Spline
+  forward 1,255 µs: FMA 84 %, ALU 43 %. Only fewer FMAs help here (the quadratic-table bound was 0.967; round 3).
+- **Tabled outer sum (832 µs).** The backward is L1-bound (L1 64 %, LSU 49 %); the forward is latency-bound on the
+  long scoreboard (9.8 stalls per issue, 23 % warps active, 128 registers). Register caps tied (FORWARD_MAXNREG);
+  FORWARD_WARPS = 2 gave 0.994 / 0.991.
+- **tf32x3 GEMMs (about 980 µs).** At the mma.sync rate (tensor pipe 40–57 %, math-pipe throttle), as on Modal. The
+  smallest launches are under one wave: `species_mm_rows`, `species_mm_rows_grad` and `tf32x3_segment_rows` at
+  0.25–0.76 waves (SM fill 45–70 %), 8 launches, 125 µs together. Even at full fill that saves ≤ 50 µs (≤ 0.8 % of
+  the step), so split-K or a smaller tile for the small shapes is a lead below the 1 % rule.
+- **Generated layer-0 contraction (188 µs).** FMA pipe 93 %: at its roof.
+
+No new lead of 1 % or more. Alex can repeat this profile, or an A/B, without Modal budget:
+`sbatch tools/jobs/alex_step_limiters.sh <job.env>`, with job.env as for `alex_ab_pack.sh`.
+
