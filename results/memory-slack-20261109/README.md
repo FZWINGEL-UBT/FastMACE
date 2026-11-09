@@ -70,7 +70,8 @@ loads, the driver's own), with WSL2 between: host or driver memory pressure, not
   `compact()`; the GPU check at 36³ compares them on the Ada. A neighbour list's buffers equal bit for bit give the
   same forces.
 - **Speed**: the A/Bs above ([ab3/](ab3/); 5060 Ti in [5060ti/](5060ti/)).
-- **CPU tests** (leto): `test_neighbors.py`, `test_neighbors_lean.py`, `test_rule_11.py`, `test_layering.py` pass.
+- **CPU suite** (leto, merge tier, merged head `17c0cd10`): 5,546 passed, 0 failed. Ruff passes on the changed files
+  (the 66 findings on leto are in files this change does not touch).
 
 ## Jobs
 
