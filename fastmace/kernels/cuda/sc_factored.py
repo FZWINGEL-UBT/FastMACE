@@ -394,8 +394,9 @@ def _emit_node(lines, i, op):
     lines.append(f"  const float v{i} = {expr};")
 
 
-def _header(name, segments_in, segments_w, mul, extra_args, extra_rows):
-    return [f'extern "C" __global__ void __launch_bounds__({mul}) {name}(',
+def _header(name, segments_in, segments_w, mul, extra_args, extra_rows, min_blocks=None):
+    bounds = f"{mul}" if not min_blocks else f"{mul}, {int(min_blocks)}"
+    return [f'extern "C" __global__ void __launch_bounds__({bounds}) {name}(',
             "    const float* __restrict__ m, const float* __restrict__ d, const float* __restrict__ w,",
             f"    const int* __restrict__ sp, {extra_args}) {{",
             "  const int a = blockIdx.x, ch = threadIdx.x;",
@@ -423,13 +424,15 @@ def render_forward(prog, features, segments_in, segments_w, segments_out, mul, n
     return "\n".join(lines) + "\n"
 
 
-def render_backward(prog, features, segments_in, segments_w, segments_out, mul, name="sc_factored_backward"):
-    """CUDA source of ``name(m, d, w', sp, g, dm, dd)``: the forward program, then its reverse mode."""
+def render_backward(prog, features, segments_in, segments_w, segments_out, mul, name="sc_factored_backward",
+                    min_blocks=None):
+    """CUDA source of ``name(m, d, w', sp, g, dm, dd)``: the forward program, then its reverse mode; ``min_blocks``:
+    __launch_bounds__' minimum blocks per SM (a register cap)."""
     roots = [u for f in features for u in f.values() if u is not None]
     used = prog.used(roots)
     rows = [f"  const float* gr = g + (long long)a * {segments_out * mul} + ch;"]
     lines = _header(name, segments_in, segments_w, mul,
-                    "const float* __restrict__ g, float* __restrict__ dm, float* __restrict__ dd", rows)
+                    "const float* __restrict__ g, float* __restrict__ dm, float* __restrict__ dd", rows, min_blocks)
     lines += [f"  const float g{c} = __ldg(gr + {c * mul});" for c in range(segments_out)]
     for i in used:
         _emit_node(lines, i, prog.nodes[i])

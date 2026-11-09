@@ -289,6 +289,10 @@ def main(argv=None):
     source = sc_factored.render_backward(prog, feats, seg_in, seg_w, seg_out, THREADS, name="sc0_bwd")
     (args.output / "fac-bwd.cu").write_text(source)
     kernels["fac-bwd"] = Generated(source, b"sc0_bwd")
+    # the same backward capped at 128 registers (4 blocks of 128 threads per SM; uncapped it takes about 150-160)
+    source = sc_factored.render_backward(prog, feats, seg_in, seg_w, seg_out, THREADS, name="sc0_bwd", min_blocks=4)
+    (args.output / "fac-bwd4.cu").write_text(source)
+    kernels["fac-bwd4"] = Generated(source, b"sc0_bwd")
     print("factored", json.dumps(counts["fac"]), flush=True)
     gen = torch.Generator(device="cuda").manual_seed(0)
     density = torch.rand(natoms, 1, device="cuda", generator=gen) * 2.0
@@ -365,6 +369,12 @@ def main(argv=None):
         flush_buf.fill_(flush)
         kernels["fac-bwd"](m, d_flat, w_fac, idx, g, dm_fac, dd_fac)
 
+    def fac_pair4(flush):
+        flush_buf.fill_(flush)
+        kernels["fac-fused"](m, d_flat, w_fac, idx, out)
+        flush_buf.fill_(flush)
+        kernels["fac-bwd4"](m, d_flat, w_fac, idx, g, dm_fac, dd_fac)
+
     def case(fn):
         def run(flush):
             flush_buf.fill_(flush)
@@ -380,6 +390,7 @@ def main(argv=None):
         "gen-pair": gen_pair,
         "fac-fused": case(lambda: kernels["fac-fused"](m, d_flat, w_fac, idx, out)),
         "fac-pair": fac_pair,
+        "fac-pair4": fac_pair4,
     }
     with torch.no_grad():
         for fn in cases.values():
@@ -388,11 +399,11 @@ def main(argv=None):
         torch.cuda.synchronize()
         if args.profile_once:
             torch.cuda.profiler.start()
-            for key in ("proxy", "gen-pair", "fac-pair"):
+            for key in ("proxy", "gen-pair", "fac-pair", "fac-pair4"):
                 cases[key](0.0)
             torch.cuda.synchronize()
             torch.cuda.profiler.stop()
-            print("profiled once: proxy, gen-pair, fac-pair", flush=True)
+            print("profiled once: proxy, gen-pair, fac-pair, fac-pair4", flush=True)
             return
         not_fill = lambda k: "FillFunctor" not in k  # noqa: E731
         per_round = {k: [] for k in cases}
@@ -407,7 +418,8 @@ def main(argv=None):
     med = {k: statistics.median(v) for k, v in per_round.items()}
     backward = lambda d: sum(t for n, t in d.items() if "bwd" in n or "triton_red" in n)  # noqa: E731
     bwd_med = {k: statistics.median([backward({n: v[r] for n, v in kern[k].items() if r < len(v)})
-                                     for r in range(args.rounds)]) for k in ("proxy", "gen-pair", "fac-pair")}
+                                     for r in range(args.rounds)]) for k in ("proxy", "gen-pair", "fac-pair",
+                                                                                     "fac-pair4")}
     result = dict(meta, tool="sc0_lab", created_utc=datetime.now(timezone.utc).isoformat(),
                   host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                   fastmace_commit=ab_step_time.fastmace_commit(), rounds=args.rounds, iterations=args.iterations,
@@ -421,7 +433,8 @@ def main(argv=None):
                   backward_us={k: round(v, 2) for k, v in bwd_med.items()},
                   bucket_saving_us=round(med["proxy"] - med["gen-pair"], 2),
                   fac_over_gen_fused=round(med["fac-fused"] / med["gen-fused"], 4),
-                  fac_pair_over_gen_pair=round(med["fac-pair"] / med["gen-pair"], 4))
+                  fac_pair_over_gen_pair=round(med["fac-pair"] / med["gen-pair"], 4),
+                  fac_pair4_over_gen_pair=round(med["fac-pair4"] / med["gen-pair"], 4))
     (args.output / "sc0_lab.json").write_text(json.dumps(result, indent=1) + "\n")
     for key in cases:
         print(f"{key}: {med[key]:.1f} us  " + "  ".join(f"{n[:50]} {statistics.median(t):.1f}"
@@ -429,7 +442,8 @@ def main(argv=None):
     print(f"registers {result['registers']}, local bytes {result['local_bytes']}, counts {counts}; "
           f"gen/cueq {result['gen_over_cueq']}, fused saves {result['saving_us']} us of the forward pair; "
           f"backward {result['backward_us']}; bucket saving {result['bucket_saving_us']} us; "
-          f"factored forward {result['fac_over_gen_fused']}, pair {result['fac_pair_over_gen_pair']}", flush=True)
+          f"factored forward {result['fac_over_gen_fused']}, pair {result['fac_pair_over_gen_pair']}, "
+          f"pair4 {result['fac_pair4_over_gen_pair']}", flush=True)
 
 
 if __name__ == "__main__":
