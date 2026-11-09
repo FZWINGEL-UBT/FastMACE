@@ -121,3 +121,43 @@ def test_packed_coef_changes_no_bit(monkeypatch, power):
     (s0, e0, r0, y0), (s1, e1, r1, y1) = results
     assert torch.equal(e0, e1) and torch.equal(r0, r1) and torch.equal(y0, y1)
     torch.testing.assert_close(s1, s0, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("power", [False, True])
+def test_recomputing_backward_allocates_no_value_rows(monkeypatch, power):
+    """With TABLED_FORWARD the fused backward evaluates the table's values again inside the kernel; it passed a
+    shape-only ``[E, K]`` tensor, 4.1 GiB at SrTiO3 233,280 on the RTX 4000 Ada (18.9 kB/atom at the force peak,
+    results/memory-profile-20261109). SHAPE_CARRIER: a stride-0 view carries the shape. The backward's peak above its
+    inputs stays below one ``[E, K]`` float block with it and reaches one without it;
+    the gradients are the same bits."""
+    monkeypatch.setattr(tos, "TABLED_FORWARD", True)
+    monkeypatch.setattr(tos, "POWER_BACKWARD", power)
+    from fastmace.rewrites.radial import power_basis
+
+    coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max = _table()
+    edges, d, k, slots = 200_000, 16, 64, 4001
+    g = torch.Generator().manual_seed(17)
+    r0 = (torch.rand((edges, 1), generator=g) * 6.4 + 0.2).cuda()
+    pair = torch.randint(0, coef.shape[0], (edges,), generator=g).to(torch.int32).cuda()
+    y0 = torch.randn((edges, d), generator=g).cuda()
+    key = torch.sort(torch.randint(0, slots, (edges,), generator=g)).values.cuda()
+    coef_c, dcoef_c, starts_c, scales_c, bins_c = (t.float().cuda() if t.is_floating_point() else t.cuda()
+                                                   for t in (coef, dcoef, starts, scales, bins))
+    pcoef_c = power_basis(coef_c)
+    grads = [torch.randn((slots, d * k), generator=g).cuda(), torch.randn((edges, 1), generator=g).cuda()]
+    peaks, results = {}, {}
+    for carrier in (True, False):
+        monkeypatch.setattr(tos, "SHAPE_CARRIER", carrier)
+        r, y = r0.clone().requires_grad_(True), y0.clone().requires_grad_(True)
+        summed, density = tos.tabled_outer_sum(r, pair, coef_c, dcoef_c, starts_c, scales_c, bins_c, r_lo, bin_scale,
+                                               r_max, k, y, key, slots, pcoef=pcoef_c)
+        torch.cuda.synchronize()
+        before = torch.cuda.memory_allocated()
+        torch.cuda.reset_peak_memory_stats()
+        results[carrier] = torch.autograd.grad([summed, density], (r, y), grads)
+        torch.cuda.synchronize()
+        peaks[carrier] = torch.cuda.max_memory_allocated() - before
+        del summed, density
+    block = edges * k * 4
+    assert peaks[True] < block <= peaks[False], peaks
+    assert all(torch.equal(a, b) for a, b in zip(results[True], results[False]))
