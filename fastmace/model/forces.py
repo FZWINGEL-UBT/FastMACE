@@ -644,7 +644,7 @@ class MACEForceField:
         self.neighbours = SkinNeighbourList(
             cell, calc.r_max, self._device, self._dtype, neighbours,
             sender_groups=self._sender_groups if segmented and sort_receivers else None,
-            group_count=len(self.superset), variable_cell=self._compute_stress)
+            group_count=len(self.superset), variable_cell=self._compute_stress, model_label=_table_label(loaded))
         self._setup_tables()
         if self._compute_stress:
             # Fixed-address cell that MACE's stress path reads (set_cell refills it).

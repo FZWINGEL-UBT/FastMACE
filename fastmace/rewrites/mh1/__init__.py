@@ -318,7 +318,7 @@ def chunked_conv_backwards(model):
     return names
 
 
-def fused_folded_forwards(model):
+def fused_folded_forwards(model, model_label=None):
     """The fused folded forward in every chunked streaming interaction; returns their names (opt-8 OPT8-T02).
 
     Attaches ``fused_folded_forward`` (``oeq_streaming.fused_forward.FusedFoldedForward``): one kernel builds the
@@ -341,7 +341,8 @@ def fused_folded_forwards(model):
             raise RewriteError(f"fused_folded_forward is float32 only, interactions.{index} is {weight.dtype}")
         try:
             interaction.fused_folded_forward = FusedFoldedForward(kernels, weight.shape[1], weight.device,
-                                                                  used=used_columns(weight))
+                                                                  used=used_columns(weight),
+                                                                  model_label=model_label)
         except ValueError as error:
             raise RewriteError(f"fused_folded_forward: interactions.{index}: {error}") from error
         names.append(f"interactions.{index}")
@@ -636,6 +637,11 @@ def _apply(function):
     return apply
 
 
+def _apply_fused_forwards(model, context):
+    # The model label for per-model kernel defaults (DEGREE_PARTS_MODEL_OFF_GPUS).
+    return fused_folded_forwards(model, (context.inputs or {}).get("model_label"))
+
+
 def _apply_reassociate(model, context):
     inputs = context.inputs or {}
     return reassociate_first_interaction(model, inputs.get("node_attrs"), inputs.get("species_columns"),
@@ -690,7 +696,7 @@ RECORDS = {
     # opt-8 OPT8-T02: the folded layer fused into the streaming forward, weights stored for the unchanged chunked
     # backward; the same FP32 sums in the same order (bitwise on sm_120). Float32; default on for MH-1 by owner
     # decision 64 (27 October 2026; the planner's rule picks the model).
-    "fused_folded_forward": _record("fused_folded_forward", _chunked_support, _apply(fused_folded_forwards),
+    "fused_folded_forward": _record("fused_folded_forward", _chunked_support, _apply_fused_forwards,
                                     ("chunked_conv_backward",), exactness="exact",
                                     constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                                     deterministic=False),
