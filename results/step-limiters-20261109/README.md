@@ -188,3 +188,31 @@ STAGE_DOUT, STAGE_SH, SPLINE_VECTOR, FOLD_ALPHA and SPLINE_W.
     `POWER_BACKWARD`, the tabled forward's `FORWARD_WARPS` 2 and 4 and `FORWARD_CHUNK` 16, `PACKED_COEF`.
 - Kernel lab `F-quad-horner` (H200 and A100): w′ with a quadratic's value and slope (3 FMAs) in place of the cubic's
   dual Horner, the same loads. It is the timing bound of a quadratic spline table with twice the pieces.
+
+### Round 3 results: no winner
+
+MD step b/a (b = the switch; both build orders; SrTiO3 10×10×10, 300 K). The stop rule is ≥ 1 % in both orders.
+
+| Switch | H200 ([screen-h200/](screen-h200/), fc6b361e) | A100-SXM4-80GB ([screen-a100/](screen-a100/), fc652335) |
+| --- | --- | --- |
+| `TABLE_PAIRS` | 1.2864 / 1.2826 | – |
+| `HOIST_SCALE` | 0.9986 / 0.9947 | – |
+| `STAGE_QUADS` | 1.0004 / 0.9988 | – |
+| w′ `STAGE_EDGES` | 0.9995 / 0.9960 | – |
+| forward `PREFETCH_AHEAD` = 0 | – | 0.9966 / 0.9959 |
+| forward `PREFETCH_AHEAD` = 2 | 1.0036 / 1.0031 | (default) |
+| forward `PREFETCH_AHEAD` = 4 | – | 0.9995 / 1.0003 |
+| `POWER_BACKWARD` | – | 1.0007 / 0.9992 |
+| tabled forward `FORWARD_WARPS` = 2 | – | 0.9941 / 0.9914 |
+| tabled forward `FORWARD_WARPS` = 4 | – | 1.0411 / 1.0393 |
+| tabled forward `FORWARD_CHUNK` = 16 | – | 1.0005 / 1.0001 |
+| `PACKED_COEF` | 1.0069 / 1.0042 | 1.0024 / 1.0022 |
+| `SEGMENT_ROWS` + `SEGMENT_GROUPED` | 1.0026 / 0.9983 | – |
+
+The A100's `FORWARD_WARPS` = 2 (0.994 / 0.991) is the closest; it misses the 1 % rule in one order and stays off.
+
+Quadratic-table bound (`F-quad-horner`, kernel lab; [quad-h200/](quad-h200/), [quad-a100/](quad-a100/)): H200 0.966
+(base 1,039 µs; no table 0.833, no slope 0.896), A100 PCIe 0.967 (base 2,356 µs; no table 0.748, no slope 0.962). A
+quadratic table of twice the pieces would save at most 3.4 % of w′ before its larger loads; on the A100 the table cost
+is mostly loads, not FMAs. Not built.
+
