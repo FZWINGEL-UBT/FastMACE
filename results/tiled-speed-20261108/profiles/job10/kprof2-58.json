@@ -1,0 +1,929 @@
+{
+ "atoms": 975560,
+ "times": [
+  14.241606596013298,
+  32.84796510101296,
+  6.769492994004395,
+  7.028188626980409
+ ],
+ "wall": 6.959218377014622,
+ "ops": [
+  {
+   "op": "fastmace::fused_folded_message_blocks",
+   "site": "?",
+   "ns_per_atom": 1327.4968079872067,
+   "calls": 68
+  },
+  {
+   "op": "fused_folded_forward",
+   "site": "?",
+   "ns_per_atom": 1327.4968079872067,
+   "calls": 68
+  },
+  {
+   "op": "fastmace::streaming_conv_wprime_backward_blocks",
+   "site": "?",
+   "ns_per_atom": 1241.2705143712342,
+   "calls": 68
+  },
+  {
+   "op": "oeq_projected_backward_wprime",
+   "site": "?",
+   "ns_per_atom": 1241.2705143712342,
+   "calls": 68
+  },
+  {
+   "op": "aten::mm",
+   "site": "?",
+   "ns_per_atom": 776.1128193038181,
+   "calls": 3476
+  },
+  {
+   "op": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_al",
+   "site": "?",
+   "ns_per_atom": 540.8276702611921,
+   "calls": 1748
+  },
+  {
+   "op": "kernel",
+   "site": "?",
+   "ns_per_atom": 367.3361833203496,
+   "calls": 204
+  },
+  {
+   "op": "gemm",
+   "site": "?",
+   "ns_per_atom": 226.28798331214045,
+   "calls": 1072
+  },
+  {
+   "op": "fastmace::species_mm",
+   "site": "?",
+   "ns_per_atom": 225.07658268071017,
+   "calls": 1020
+  },
+  {
+   "op": "triton_poi_fused_cat_slice_view_25",
+   "site": "?",
+   "ns_per_atom": 207.48503833694951,
+   "calls": 256
+  },
+  {
+   "op": "fastmace::tabled_outer_sum_forward",
+   "site": "?",
+   "ns_per_atom": 203.76825720612035,
+   "calls": 136
+  },
+  {
+   "op": "cuequivariance::uniform_1d",
+   "site": "?",
+   "ns_per_atom": 189.69149924146836,
+   "calls": 340
+  },
+  {
+   "op": "void at::native::elementwise_kernel<128, 2, at::native::gpu_",
+   "site": "?",
+   "ns_per_atom": 187.4853386772646,
+   "calls": 2453
+  },
+  {
+   "op": "aten::mul",
+   "site": "?",
+   "ns_per_atom": 181.07515683298269,
+   "calls": 2057
+  },
+  {
+   "op": "void at::native::vectorized_elementwise_kernel<4, at::native",
+   "site": "?",
+   "ns_per_atom": 170.64345914140722,
+   "calls": 3846
+  },
+  {
+   "op": "fastmace::tabled_outer_sum_backward",
+   "site": "?",
+   "ns_per_atom": 163.56792611422932,
+   "calls": 68
+  },
+  {
+   "op": "aten::copy_",
+   "site": "?",
+   "ns_per_atom": 148.8066659149619,
+   "calls": 4058
+  },
+  {
+   "op": "void at::native::vectorized_elementwise_kernel<2, at::native",
+   "site": "?",
+   "ns_per_atom": 146.55486387306294,
+   "calls": 2146
+  },
+  {
+   "op": "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_vi",
+   "site": "?",
+   "ns_per_atom": 144.5600865144191,
+   "calls": 136
+  },
+  {
+   "op": "aten::index",
+   "site": "?",
+   "ns_per_atom": 135.6016964615251,
+   "calls": 2042
+  },
+  {
+   "op": "triton_poi_fused_cat_view_10",
+   "site": "?",
+   "ns_per_atom": 118.54185493460051,
+   "calls": 400
+  },
+  {
+   "op": "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_",
+   "site": "?",
+   "ns_per_atom": 105.79203329369012,
+   "calls": 98
+  },
+  {
+   "op": "aten::fill_",
+   "site": "?",
+   "ns_per_atom": 105.15028598959883,
+   "calls": 3210
+  },
+  {
+   "op": "void at::native::index_elementwise_kernel<128, 4, at::native",
+   "site": "?",
+   "ns_per_atom": 101.66835868629465,
+   "calls": 2042
+  },
+  {
+   "op": "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_10",
+   "site": "?",
+   "ns_per_atom": 101.02673541350131,
+   "calls": 90
+  },
+  {
+   "op": "triton_poi_fused_add_cat_div_slice_view_12",
+   "site": "?",
+   "ns_per_atom": 99.65498585428341,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_slice_backward_view_18",
+   "site": "?",
+   "ns_per_atom": 98.42386321701986,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_cat_div_view_24",
+   "site": "?",
+   "ns_per_atom": 96.58871622453006,
+   "calls": 128
+  },
+  {
+   "op": "aten::add",
+   "site": "?",
+   "ns_per_atom": 93.58379289844211,
+   "calls": 1090
+  },
+  {
+   "op": "void magma_sgemmEx_kernel<float, float, float, false, false,",
+   "site": "?",
+   "ns_per_atom": 91.81050166059477,
+   "calls": 1005
+  },
+  {
+   "op": "void magma_sgemmEx_kernel<float, float, float, true, false, ",
+   "site": "?",
+   "ns_per_atom": 87.873982123098,
+   "calls": 268
+  },
+  {
+   "op": "aten::scatter_add_",
+   "site": "?",
+   "ns_per_atom": 86.51382795523925,
+   "calls": 544
+  },
+  {
+   "op": "triton_poi_fused_cat_view_9",
+   "site": "?",
+   "ns_per_atom": 75.40632252245628,
+   "calls": 408
+  },
+  {
+   "op": "fastmace::radial_table_forward",
+   "site": "?",
+   "ns_per_atom": 71.89036655869036,
+   "calls": 68
+  },
+  {
+   "op": "forward",
+   "site": "?",
+   "ns_per_atom": 71.89036655869036,
+   "calls": 68
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_7",
+   "site": "?",
+   "ns_per_atom": 61.74147361516021,
+   "calls": 144
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_15",
+   "site": "?",
+   "ns_per_atom": 60.2781950879481,
+   "calls": 128
+  },
+  {
+   "op": "void at::native::tma_scatter_add_kernel<float, long>(float*,",
+   "site": "?",
+   "ns_per_atom": 59.37651195211467,
+   "calls": 272
+  },
+  {
+   "op": "segmented_polynomial_algo1_2",
+   "site": "?",
+   "ns_per_atom": 57.93858911805165,
+   "calls": 136
+  },
+  {
+   "op": "segmented_polynomial_bwd_algo1_1",
+   "site": "?",
+   "ns_per_atom": 57.46309504284878,
+   "calls": 68
+  },
+  {
+   "op": "segmented_polynomial_bwd_algo2_2",
+   "site": "?",
+   "ns_per_atom": 49.51677395547295,
+   "calls": 68
+  },
+  {
+   "op": "_forward",
+   "site": "?",
+   "ns_per_atom": 47.9333562261692,
+   "calls": 204
+  },
+  {
+   "op": "triton_poi_fused_add_div_exp_index_lt_mul_pow_rsub_scatter_a",
+   "site": "?",
+   "ns_per_atom": 47.59155151913068,
+   "calls": 144
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_23",
+   "site": "?",
+   "ns_per_atom": 44.36452089056671,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_6",
+   "site": "?",
+   "ns_per_atom": 43.933713969420964,
+   "calls": 144
+  },
+  {
+   "op": "triton_poi_fused_cat_view_18",
+   "site": "?",
+   "ns_per_atom": 43.8206630038139,
+   "calls": 136
+  },
+  {
+   "op": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSor",
+   "site": "?",
+   "ns_per_atom": 43.22594817338143,
+   "calls": 3920
+  },
+  {
+   "op": "triton_poi_fused_add_gather_mm_slice_backward_tabled_outer_s",
+   "site": "?",
+   "ns_per_atom": 43.20167698552791,
+   "calls": 38
+  },
+  {
+   "op": "triton_poi_fused_cat_view_11",
+   "site": "?",
+   "ns_per_atom": 42.515783754976134,
+   "calls": 128
+  },
+  {
+   "op": "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x128_8x4_nn_a",
+   "site": "?",
+   "ns_per_atom": 42.319487268851454,
+   "calls": 64
+  },
+  {
+   "op": "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_9",
+   "site": "?",
+   "ns_per_atom": 41.933623764810875,
+   "calls": 46
+  },
+  {
+   "op": "triton_poi_fused_add_clone_div_slice_slice_backward_view_4",
+   "site": "?",
+   "ns_per_atom": 41.83019188978372,
+   "calls": 128
+  },
+  {
+   "op": "void at::native::unrolled_elementwise_kernel<at::native::dir",
+   "site": "?",
+   "ns_per_atom": 41.64074172783773,
+   "calls": 1639
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_14",
+   "site": "?",
+   "ns_per_atom": 41.409350526876736,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_17",
+   "site": "?",
+   "ns_per_atom": 41.06777440649447,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_div_slice_species_mm_view_24",
+   "site": "?",
+   "ns_per_atom": 40.34750502275092,
+   "calls": 136
+  },
+  {
+   "op": "aten::_unique2",
+   "site": "?",
+   "ns_per_atom": 39.17530034032195,
+   "calls": 136
+  },
+  {
+   "op": "aten::where",
+   "site": "?",
+   "ns_per_atom": 38.23125589404089,
+   "calls": 408
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_12",
+   "site": "?",
+   "ns_per_atom": 38.078318094226994,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_slice_slice_backward_species_mm_view_6",
+   "site": "?",
+   "ns_per_atom": 37.85047152404912,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_scatter_add_select_unsqueeze_zeros_10",
+   "site": "?",
+   "ns_per_atom": 37.840979539955526,
+   "calls": 90
+  },
+  {
+   "op": "_backward",
+   "site": "?",
+   "ns_per_atom": 36.33495223256241,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_add_clone_slice_slice_backward_view_15",
+   "site": "?",
+   "ns_per_atom": 35.96923613105419,
+   "calls": 136
+  },
+  {
+   "op": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<",
+   "site": "?",
+   "ns_per_atom": 35.73548320963949,
+   "calls": 684
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_0",
+   "site": "?",
+   "ns_per_atom": 35.588148345571184,
+   "calls": 256
+  },
+  {
+   "op": "void at::native::vectorized_gather_kernel<16, long>(char*, c",
+   "site": "?",
+   "ns_per_atom": 35.05059145516811,
+   "calls": 272
+  },
+  {
+   "op": "aten::sum",
+   "site": "?",
+   "ns_per_atom": 34.37841034892058,
+   "calls": 479
+  },
+  {
+   "op": "aten::index_add_",
+   "site": "?",
+   "ns_per_atom": 34.3576899421805,
+   "calls": 680
+  },
+  {
+   "op": "void at::native::indexFuncLargeIndex<float, long, unsigned i",
+   "site": "?",
+   "ns_per_atom": 34.3576899421805,
+   "calls": 136
+  },
+  {
+   "op": "Memcpy DtoH (Device -> Pageable)",
+   "site": "?",
+   "ns_per_atom": 34.321187830577536,
+   "calls": 545
+  },
+  {
+   "op": "aten::sub",
+   "site": "?",
+   "ns_per_atom": 33.6818145475363,
+   "calls": 409
+  },
+  {
+   "op": "triton_poi_fused_cat_mm_view_28",
+   "site": "?",
+   "ns_per_atom": 32.615994915743194,
+   "calls": 180
+  },
+  {
+   "op": "triton_poi_fused_cat_mm_view_31",
+   "site": "?",
+   "ns_per_atom": 32.3008015908803,
+   "calls": 180
+  },
+  {
+   "op": "triton_poi_fused_cat_view_8",
+   "site": "?",
+   "ns_per_atom": 31.389226700569868,
+   "calls": 272
+  },
+  {
+   "op": "triton_poi_fused_add_clone_div_slice_slice_backward_view_5",
+   "site": "?",
+   "ns_per_atom": 30.91209356676613,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_22",
+   "site": "?",
+   "ns_per_atom": 30.40756898601715,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_cat_view_17",
+   "site": "?",
+   "ns_per_atom": 30.023986223298532,
+   "calls": 128
+  },
+  {
+   "op": "void at::native::_scatter_gather_elementwise_kernel<128, 8, ",
+   "site": "?",
+   "ns_per_atom": 29.481722292845966,
+   "calls": 545
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_16",
+   "site": "?",
+   "ns_per_atom": 29.039318955271728,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_scatter_add_select_unsqueeze_8",
+   "site": "?",
+   "ns_per_atom": 28.410063963256466,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_add_div_slice_species_mm_view_23",
+   "site": "?",
+   "ns_per_atom": 28.358813399486642,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_add_slice_slice_backward_species_mm_view_7",
+   "site": "?",
+   "ns_per_atom": 26.009397679281765,
+   "calls": 136
+  },
+  {
+   "op": "Memcpy HtoD (Pageable -> Device)",
+   "site": "?",
+   "ns_per_atom": 25.91932018532805,
+   "calls": 544
+  },
+  {
+   "op": "segmented_polynomial_algo1_1",
+   "site": "?",
+   "ns_per_atom": 24.77304112509498,
+   "calls": 68
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_13",
+   "site": "?",
+   "ns_per_atom": 24.653686087992778,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_5",
+   "site": "?",
+   "ns_per_atom": 24.6232317848224,
+   "calls": 144
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_13",
+   "site": "?",
+   "ns_per_atom": 23.969722005823016,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_27",
+   "site": "?",
+   "ns_per_atom": 23.21653819344851,
+   "calls": 180
+  },
+  {
+   "op": "triton_poi_fused__to_copy_add_div_exp_index_linalg_vector_no",
+   "site": "?",
+   "ns_per_atom": 21.31670425191725,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_mm_slice_backward_view_4",
+   "site": "?",
+   "ns_per_atom": 20.96572225182751,
+   "calls": 90
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_30",
+   "site": "?",
+   "ns_per_atom": 20.26893271557285,
+   "calls": 180
+  },
+  {
+   "op": "triton_poi_fused_add_clone_slice_slice_backward_view_16",
+   "site": "?",
+   "ns_per_atom": 19.9752531879166,
+   "calls": 98
+  },
+  {
+   "op": "triton_poi_fused_add_clone_div_slice_slice_backward_view_6",
+   "site": "?",
+   "ns_per_atom": 19.094245356508345,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_div_eq_masked_fill_mul_scalar_tensor_vi",
+   "site": "?",
+   "ns_per_atom": 17.52752060354892,
+   "calls": 136
+  },
+  {
+   "op": "Memcpy DtoD (Device -> Device)",
+   "site": "?",
+   "ns_per_atom": 17.1747509122913,
+   "calls": 988
+  },
+  {
+   "op": "triton_poi_fused_add_div_eq_masked_fill_mul_view_8",
+   "site": "?",
+   "ns_per_atom": 16.953798843738976,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_15",
+   "site": "?",
+   "ns_per_atom": 16.354584033780498,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_21",
+   "site": "?",
+   "ns_per_atom": 15.704612735249873,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_add_mm_slice_backward_uniform_1d_view_5",
+   "site": "?",
+   "ns_per_atom": 15.353878797821437,
+   "calls": 90
+  },
+  {
+   "op": "triton_poi_fused_cat_view_16",
+   "site": "?",
+   "ns_per_atom": 15.147705933004298,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused__to_copy_add_arange_full_like_index_lt_mul_",
+   "site": "?",
+   "ns_per_atom": 14.712864406092473,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_add_div_eq_exp_gather_mul_neg_pow_rsub_scal",
+   "site": "?",
+   "ns_per_atom": 14.306533683215202,
+   "calls": 98
+  },
+  {
+   "op": "aten::sort",
+   "site": "?",
+   "ns_per_atom": 13.822285661588948,
+   "calls": 272
+  },
+  {
+   "op": "## Call CompiledFxGraph f2v5asle7h4f7a7a2dwjkz5svaf2yqbgozkx",
+   "site": "?",
+   "ns_per_atom": 13.591498216408963,
+   "calls": 45
+  },
+  {
+   "op": "## Call CompiledFxGraph fhciimk6lson4boguxy5kese4ey54k3krqfq",
+   "site": "?",
+   "ns_per_atom": 13.536410881955224,
+   "calls": 45
+  },
+  {
+   "op": "triton_poi_fused_add_div_slice_species_mm_view_22",
+   "site": "?",
+   "ns_per_atom": 13.388984788231271,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_add_slice_slice_backward_species_mm_view_5",
+   "site": "?",
+   "ns_per_atom": 13.033295748083258,
+   "calls": 46
+  },
+  {
+   "op": "triton_poi_fused_add_slice_slice_backward_species_mm_view_8",
+   "site": "?",
+   "ns_per_atom": 12.976548853976997,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_14",
+   "site": "?",
+   "ns_per_atom": 12.753563081723293,
+   "calls": 90
+  },
+  {
+   "op": "aten::ge",
+   "site": "?",
+   "ns_per_atom": 12.567080446107754,
+   "calls": 204
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_11",
+   "site": "?",
+   "ns_per_atom": 12.47986182295326,
+   "calls": 38
+  },
+  {
+   "op": "triton_poi_fused_add_clone_slice_slice_backward_view_14",
+   "site": "?",
+   "ns_per_atom": 12.111175119934293,
+   "calls": 46
+  },
+  {
+   "op": "## Call CompiledFxGraph fkf5brgnlje7hnuakfjbygu4lvuyyrtd2y3v",
+   "site": "?",
+   "ns_per_atom": 11.960725121982085,
+   "calls": 45
+  },
+  {
+   "op": "## Call CompiledFxGraph fjvwtn3cwrwtstzxwdyfoz6o3pxp235cjxm2",
+   "site": "?",
+   "ns_per_atom": 11.8797213907917,
+   "calls": 45
+  },
+  {
+   "op": "## Call CompiledFxGraph fpedd5734kprpot6k2bffpyqeafff43qlrve",
+   "site": "?",
+   "ns_per_atom": 11.823462421584907,
+   "calls": 45
+  },
+  {
+   "op": "triton_poi_fused_add_clone_slice_slice_backward_view_17",
+   "site": "?",
+   "ns_per_atom": 11.627811718394323,
+   "calls": 90
+  },
+  {
+   "op": "triton_poi_fused__to_copy_add_index_mul_select_2",
+   "site": "?",
+   "ns_per_atom": 11.459129115588683,
+   "calls": 136
+  },
+  {
+   "op": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_a",
+   "site": "?",
+   "ns_per_atom": 11.396911517488151,
+   "calls": 19
+  },
+  {
+   "op": "triton_poi_fused_mul_scatter_add_select_unsqueeze_zeros_10",
+   "site": "?",
+   "ns_per_atom": 9.900807741193065,
+   "calls": 38
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_29",
+   "site": "?",
+   "ns_per_atom": 8.901717987611793,
+   "calls": 76
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_26",
+   "site": "?",
+   "ns_per_atom": 8.466784205993461,
+   "calls": 76
+  },
+  {
+   "op": "triton_poi_fused_cat_view_27",
+   "site": "?",
+   "ns_per_atom": 8.250155807947039,
+   "calls": 76
+  },
+  {
+   "op": "fastmace::radial_table_backward",
+   "site": "?",
+   "ns_per_atom": 7.979661937763087,
+   "calls": 68
+  },
+  {
+   "op": "backward",
+   "site": "?",
+   "ns_per_atom": 7.979661937763087,
+   "calls": 68
+  },
+  {
+   "op": "aten::searchsorted",
+   "site": "?",
+   "ns_per_atom": 7.3773340440370285,
+   "calls": 68
+  },
+  {
+   "op": "void at::native::(anonymous namespace)::searchsorted_cuda_ke",
+   "site": "?",
+   "ns_per_atom": 7.3773340440370285,
+   "calls": 68
+  },
+  {
+   "op": "triton_poi_fused_linalg_vector_norm_0",
+   "site": "?",
+   "ns_per_atom": 7.326913772611037,
+   "calls": 144
+  },
+  {
+   "op": "aten::nonzero",
+   "site": "?",
+   "ns_per_atom": 7.208422854565691,
+   "calls": 340
+  },
+  {
+   "op": "triton_poi_fused_cat_view_30",
+   "site": "?",
+   "ns_per_atom": 7.002115707900324,
+   "calls": 76
+  },
+  {
+   "op": "void at_cuda_detail::cub::detail::select::DeviceSelectSweepK",
+   "site": "?",
+   "ns_per_atom": 6.831488580917159,
+   "calls": 476
+  },
+  {
+   "op": "triton_poi_fused_add_mm_slice_backward_view_3",
+   "site": "?",
+   "ns_per_atom": 6.21289515765414,
+   "calls": 46
+  },
+  {
+   "op": "aten::addmm",
+   "site": "?",
+   "ns_per_atom": 6.210412481037373,
+   "calls": 68
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_4",
+   "site": "?",
+   "ns_per_atom": 6.058466931813569,
+   "calls": 136
+  },
+  {
+   "op": "triton_poi_fused_add_slice_backward_uniform_1d_view_4",
+   "site": "?",
+   "ns_per_atom": 6.03754356471563,
+   "calls": 46
+  },
+  {
+   "op": "aten::cat",
+   "site": "?",
+   "ns_per_atom": 5.0261398581326295,
+   "calls": 274
+  },
+  {
+   "op": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_",
+   "site": "?",
+   "ns_per_atom": 5.023089302554292,
+   "calls": 272
+  },
+  {
+   "op": "triton_poi_fused_mm_slice_1",
+   "site": "?",
+   "ns_per_atom": 4.983691418266761,
+   "calls": 180
+  },
+  {
+   "op": "triton_poi_fused_linalg_vector_norm_5",
+   "site": "?",
+   "ns_per_atom": 4.976667760058329,
+   "calls": 128
+  },
+  {
+   "op": "triton_poi_fused_clone_slice_transpose_view_12",
+   "site": "?",
+   "ns_per_atom": 4.928131534707161,
+   "calls": 128
+  },
+  {
+   "op": "## Call CompiledFxGraph fbjgx2su6t55dcgbpxhcwjjszg4cfx6be4n4",
+   "site": "?",
+   "ns_per_atom": 4.830933002582167,
+   "calls": 19
+  },
+  {
+   "op": "triton_poi_fused__unsafe_view_add_clone_mm_slice_slice_backw",
+   "site": "?",
+   "ns_per_atom": 4.699175857972316,
+   "calls": 76
+  },
+  {
+   "op": "triton_poi_fused_add_div_eq_exp_gather_mm_mul_neg_pow_rsub_s",
+   "site": "?",
+   "ns_per_atom": 4.49462462585265,
+   "calls": 38
+  },
+  {
+   "op": "triton_per_fused_argmax_1",
+   "site": "?",
+   "ns_per_atom": 4.443456066258432,
+   "calls": 128
+  },
+  {
+   "op": "## Call CompiledFxGraph fx2w7yaf3fq2kd6f6l5tefqr6iiecrbkz7nw",
+   "site": "?",
+   "ns_per_atom": 4.238146295459747,
+   "calls": 19
+  },
+  {
+   "op": "## Call CompiledFxGraph fku2nbrzadifve5vjax33rrjpo43e7p42775",
+   "site": "?",
+   "ns_per_atom": 4.129077657961451,
+   "calls": 19
+  },
+  {
+   "op": "## Call CompiledFxGraph fvcsooje2thl5urzctytrkpfzknezqqii5qz",
+   "site": "?",
+   "ns_per_atom": 4.07020173028815,
+   "calls": 19
+  },
+  {
+   "op": "aten::abs",
+   "site": "?",
+   "ns_per_atom": 4.016014391734871,
+   "calls": 138
+  },
+  {
+   "op": "triton_poi_fused_add_div_slice_species_mm_view_21",
+   "site": "?",
+   "ns_per_atom": 3.9769363237527404,
+   "calls": 128
+  },
+  {
+   "op": "## Call CompiledFxGraph fnpayhlqy7v7o3vhgbrqshliv5zvu25sykoy",
+   "site": "?",
+   "ns_per_atom": 3.9250840542860814,
+   "calls": 19
+  },
+  {
+   "op": "triton_per_fused_argmax_12",
+   "site": "?",
+   "ns_per_atom": 3.9175119931165825,
+   "calls": 136
+  }
+ ],
+ "sites": [
+  {
+   "site": "?",
+   "ns_per_atom": 13291.642262905587,
+   "calls": 76544,
+   "ops": {
+    "fastmace::fused_folded_message_blocks": 1327.5,
+    "fused_folded_forward": 1327.5,
+    "fastmace::streaming_conv_wprime_backward_blocks": 1241.3,
+    "oeq_projected_backward_wprime": 1241.3,
+    "aten::mm": 776.1,
+    "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_al": 540.8,
+    "kernel": 367.3,
+    "gemm": 226.3
+   }
+  }
+ ]
+}

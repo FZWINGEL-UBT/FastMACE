@@ -652,6 +652,70 @@ def test_tile_lists_kept_within_half_the_skin_are_bitwise_a_fresh_search(mode, s
     assert kept.last["list_reused"] is False and kept.list_rebuilds == 3
 
 
+@pytest.mark.parametrize("reach", [20.0, 900.0], ids=["small-cell", "large-coordinates"])
+def test_filter32_keeps_exactly_the_float64_tests_edges(reach):
+    """``TILE_FILTER32``: the float32 test with the float64 one in its band keeps the same edges, units and shifts as
+    the float64 test, also for pairs within 1e-7 A of the cutoff and coordinates up to 900 A."""
+    from fastmace.model.tiled import _filter32, _filter32_band
+    from fastmace.neighbors.skin import times_3x3
+
+    torch.manual_seed(3)
+    cutoff, n, e = 5.0, 4000, 60000
+    cell = torch.tensor([[11.3, 0.0, 0.0], [0.4, 12.1, 0.0], [0.2, -0.3, 10.7]], dtype=torch.float64)
+    positions64 = (torch.rand(n, 3, dtype=torch.float64) * 2 - 1) * (reach - 15)
+    sender, receiver = torch.randint(0, n, (e,)), torch.randint(0, n // 2, (e,))
+    codes = torch.randint(0, 27, (e,))
+    table = torch.stack([torch.arange(27) // 9, torch.arange(27) // 3 % 3, torch.arange(27) % 3], 1).double() - 1
+    shifts27 = times_3x3(table, cell)
+    unit = table[codes]
+    # the first n / 2 pairs: each its own sender (atoms n / 2 .. n - 1, never a receiver), placed at the cutoff
+    # +- up to 1e-7 A from its receiver along a random direction
+    near = torch.arange(n // 2)
+    sender[near] = near + n // 2
+    direction = torch.nn.functional.normalize(torch.randn(n // 2, 3, dtype=torch.float64), dim=1)
+    length = cutoff + (torch.rand(n // 2, dtype=torch.float64) * 2 - 1) * 1e-7
+    positions64 = positions64.clone()
+    positions64[sender[near]] = positions64[receiver[near]] + shifts27[codes[near]] - direction * length.unsqueeze(1)
+    reach_now = float(positions64.abs().max()) + float(shifts27.abs().max())
+    band = _filter32_band(cutoff, reach_now)
+    got = _filter32(positions64.float(), positions64, shifts27, band, cutoff, sender, receiver, unit, codes,
+                    torch.float32)
+    vectors = positions64[receiver] - positions64[sender] + times_3x3(unit, cell)
+    keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
+    expected = sender[keep], receiver[keep], unit[keep], times_3x3(unit, cell)[keep].to(torch.float32)
+    lengths = vectors.norm(dim=1)
+    assert int(((lengths - cutoff).abs() < 1e-6).sum()) > 1000  # many pairs at the cutoff
+    for a, b in zip(got, expected):
+        assert torch.equal(a, b)
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_filter32_tiled_call_is_bitwise_the_float64_filter(mode, monkeypatch):
+    """``TILE_FILTER32`` in the tiled call: a call reusing its kept lists gives bitwise the call with the float64
+    filter (the same edges in the same order)."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    x0 = field._prepare_one_off(atoms).clone()
+    rng = np.random.default_rng(7)
+    direction = torch.tensor(rng.normal(size=(len(atoms), 3)), dtype=x0.dtype)
+    direction /= direction.norm(dim=1, keepdim=True)
+    x1 = x0 + 0.4 * field.neighbours.skin * direction
+    results = {}
+    for fast in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_FILTER32", fast)
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse=True))
+        tiled(x0)
+        tiled(x0)  # TorchScript's first call in a process rounds differently
+        results[fast] = tiled(x1)
+        assert tiled.last["list_reused"] is True
+    assert torch.equal(results[True].energy, results[False].energy)
+    assert torch.equal(results[True].forces, results[False].forces)
+    assert torch.equal(results[True].stress, results[False].stress)
+
+
 def test_tile_lists_not_kept_below_the_host_floor():
     """``list_reuse`` is the default for tile lists; a host with less than ``list_reuse_floor`` available keeps
     nothing (neither the kept lists nor the list cache: the later sweeps search again), says why in the call's
@@ -1132,6 +1196,312 @@ def test_prefetch_call_is_bitwise_the_call_without(wave, lanes, monkeypatch):
         assert one[0] == two[0]
         assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_virial_from_edge_gradients_is_the_strain_leafs_gradient(mode, monkeypatch):
+    """``TILE_VIRIAL``: sweeps 2 and 3 take the strain gradient as sym(V^T dE/dV) of their edges instead of a strain
+    leaf in the graph: the energy and the forces bitwise (eps = 0 adds exact zeros), the stress the same to float64
+    rounding, and the whole-system call's."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = {}
+    for virial in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_VIRIAL", virial)
+        tiled = TiledForceField(field, TileConfig(9, mode=mode))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[virial] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+    for current, leaf, edges in zip((strained(atoms), atoms), results[False], results[True]):
+        assert edges[0] == leaf[0]
+        assert np.array_equal(np.asarray(edges[1]), np.asarray(leaf[1]))
+        assert relative(edges[2], leaf[2]) <= 1e-13
+        assert relative(edges[2], field.evaluate(current, stress=True)[2]) <= 1e-11
+
+
+@pytest.mark.parametrize("virial", [False, True], ids=["strain-leaf", "virial"])
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_epilogue_is_bitwise_the_eager_epilogue_outside_compiled_mode(mode, virial, monkeypatch):
+    """``TILE_EPILOGUE``: sweep 1's masks and sweep 3's objective inside the forwards, and the sweeps' edge masks and
+    virial as one epilogue, run as the same products outside mode "compiled": energy, forces and stress bitwise the
+    call without (with the strain leaf and with ``TILE_VIRIAL``)."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    monkeypatch.setattr(tiled_module, "TILE_VIRIAL", virial)
+    results = {}
+    for fused in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_EPILOGUE", fused)
+        tiled = TiledForceField(field, TileConfig(9, mode=mode))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[fused] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        assert tiled.last["tiles"] > 1
+    for plain, fused in zip(results[False], results[True]):
+        assert fused[0] == plain[0]
+        assert np.array_equal(np.asarray(fused[1]), np.asarray(plain[1]))
+        assert np.array_equal(np.asarray(fused[2]), np.asarray(plain[2]))
+
+
+def test_virial_drops_the_padding_edges_by_their_mask():
+    """``_virial``: sym(V^T G) over the edges whose mask is 1; a padding edge's vector and gradient add nothing."""
+    from fastmace.model.tiled import _virial
+
+    rng = np.random.default_rng(1)
+    v = torch.from_numpy(rng.normal(size=(40, 3)))
+    g = torch.from_numpy(rng.normal(size=(40, 3)))
+    mask = torch.ones(40, dtype=torch.float64)
+    mask[-7:] = 0
+    expected = v[:-7].T @ g[:-7]
+    expected = 0.5 * (expected + expected.T)
+    assert torch.allclose(_virial(v, g, mask), expected, rtol=1e-14, atol=1e-14)
+    assert torch.allclose(_virial(v[:-7], g[:-7]), expected, rtol=1e-14, atol=1e-14)
+
+
+def test_prefetch_with_the_state_on_the_device_is_bitwise_the_call_without(monkeypatch):
+    """``TILE_PREFETCH_DEVICE``: with the state on the device, prefetch builds the next tile's graph ahead (no rows):
+    the same graphs, so the call is bitwise the one without; off, the device state builds none ahead."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    events = []
+    for name in ("_tile_graph", "_fill", "_scatter"):
+        method = getattr(tiled_module.TiledForceField, name)
+
+        def recording(self, *args, _method=method, _name=name, **kwargs):
+            events.append(_name)
+            return _method(self, *args, **kwargs)
+
+        monkeypatch.setattr(tiled_module.TiledForceField, name, recording)
+    results, counts = {}, {}
+    for ahead in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_PREFETCH_DEVICE", ahead)
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        events.clear()
+        results[ahead] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        counts[ahead] = events.count("_tile_graph")
+        # Built ahead: the next tile's graph between a tile's fill (and body) and its scatter.
+        assert any(pair == ("_tile_graph", "_scatter") for pair in zip(events, events[1:])) == ahead
+        assert not tiled._g["state"].prefetched
+    assert counts[True] == counts[False]  # each tile's graph built as often, ahead or not
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+@pytest.mark.parametrize("mode, budget", [("eager", 10**12), ("padded", 10**12), ("padded", 30000)],
+                         ids=["eager", "padded", "padded-partly"])
+def test_graph_cache_is_bitwise_the_call_that_builds_every_graph(mode, budget, monkeypatch):
+    """``TILE_GRAPH_CACHE``: each tile's graph from its first build to the end of the call (the slot-key pass, or
+    an eager call's sweep 1), at the slot's halo start, gives bitwise the same call; with a budget below the pieces'
+    size only some tiles are kept, the rest built again; nothing is kept after the call."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    built = []
+    graph = tiled_module.TiledForceField._tile_graph
+
+    def counting(self, *args, **kwargs):
+        built.append(1)
+        return graph(self, *args, **kwargs)
+
+    monkeypatch.setattr(tiled_module.TiledForceField, "_tile_graph", counting)
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)  # None: off the speed GPUs (and off CUDA)
+    results, counts = {}, {}
+    for cached in (False, True):
+        monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes",
+                            lambda self, cached=cached: budget / 0.25 if cached else None)
+        tiled = TiledForceField(field, TileConfig(12, mode=mode, neighbours="tiles", list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[cached], counts[cached] = [], []
+        for current in (strained(atoms), atoms):
+            built.clear()
+            results[cached].append(tiled.evaluate(current, stress=True))
+            counts[cached].append((len(built), tiled.last["tiles"]))
+            kept = tiled.last["graph_cache"]
+            assert (kept["tiles"] > 0) == cached and kept["bytes"] <= kept["budget"]
+            assert tiled._pieces is None
+    for (plain, tiles), (fewer, same) in zip(counts[False], counts[True]):
+        assert same == tiles and plain == tiles * (4 if mode == "padded" else 3)
+        if budget > 10**9:
+            assert fewer == tiles  # one build per tile and call
+        else:
+            assert tiles < fewer < plain
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch):
+    """``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE`` and ``TILE_GRAPH_CACHE`` at None (the defaults) are on only on
+    ``TILED_SPEED_GPUS`` (decision 66), the graph cache at ``TILE_GRAPH_CACHE_FRACTION``; a set value wins anywhere."""
+    from fastmace.model import tiled as tiled_module
+
+    assert tiled_module.TILE_VIRIAL is None and tiled_module.TILE_PREFETCH_DEVICE is None
+    assert tiled_module.TILE_EPILOGUE is None and tiled_module.TILE_FILTER32 is None
+    assert tiled_module.TILE_GRAPH_CACHE is None and "NVIDIA GeForce RTX 5060 Ti" in tiled_module.TILED_SPEED_GPUS
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(5))
+    assert tiled._speed_gpu is False  # a CPU device
+    assert tiled._speed(None) is False and tiled._speed(None, 0.25) == 0.0
+    assert tiled._speed(True) is True and tiled._speed(0.5, 0.25) == 0.5
+    tiled._speed_gpu = True
+    assert tiled._speed(None) is True and tiled._speed(None, 0.25) == 0.25 and tiled._speed(False) is False
+
+
+def test_tile_block_rows_follows_the_module_unless_the_constant_is_set(monkeypatch):
+    """``TILE_BLOCK_ROWS`` at None (the default) is the module's ``tile_block_rows``, on where nothing set it (the
+    tiled call no longer sets it: on under the wavefront too since the host-state worker); True / False win
+    everywhere."""
+    import types
+
+    from fastmace.rewrites.generic import modules as generic
+
+    assert generic.TILE_BLOCK_ROWS is None
+    unset, off = types.SimpleNamespace(), types.SimpleNamespace(tile_block_rows=False)
+    assert generic.tile_block_rows(unset) is True and generic.tile_block_rows(off) is False
+    monkeypatch.setattr(generic, "TILE_BLOCK_ROWS", True)
+    assert generic.tile_block_rows(off) is True
+    monkeypatch.setattr(generic, "TILE_BLOCK_ROWS", False)
+    assert generic.tile_block_rows(unset) is False
+
+
+@pytest.mark.parametrize("budget", [10**12, 3_000], ids=["all-kept", "some-kept"])
+def test_fill_skip_leaves_the_graph_caches_tiles_out_of_the_list_cache(budget, monkeypatch):
+    """``TILE_FILL_SKIP``: a tile the graph cache takes is not packed into the host list cache; the call is bitwise
+    the call that fills it, also when a tile built for the cache did not fit and is built again."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: budget / 0.25)
+    results, filled = {}, {}
+    for skip in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_FILL_SKIP", skip)
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[skip] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        filled[skip] = tiled.last["list_cache_bytes"]
+        assert tiled.last["graph_cache"]["tiles"] > 0
+    assert filled[False] > 0
+    assert (filled[True] == 0) if budget > 10**9 else (0 <= filled[True] < filled[False])
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+@pytest.mark.parametrize("budget", [10**12, 3_000], ids=["all-kept", "some-kept"])
+def test_graph_cache_under_the_wavefront_is_bitwise_the_call_that_builds_every_graph(budget, monkeypatch):
+    """``TILE_GRAPH_CACHE_WAVE``: the wavefront keeps each tile's graph from its search pass to its sweep 3 (then
+    drops it), bitwise the call that builds every graph four times; with a small budget only some tiles are kept."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    built = []
+    graph = tiled_module.TiledForceField._tile_graph
+
+    def counting(self, *args, **kwargs):
+        built.append(1)
+        return graph(self, *args, **kwargs)
+
+    monkeypatch.setattr(tiled_module.TiledForceField, "_tile_graph", counting)
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: budget / 0.25)
+    results, counts = {}, {}
+    for wave_cache in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE_WAVE", wave_cache)
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
+                                                  alias_state=True, wavefront="on", wavefront_group=2,
+                                                  boundary_skin=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[wave_cache], counts[wave_cache] = [], []
+        for current in (strained(atoms), atoms):
+            built.clear()
+            results[wave_cache].append(tiled.evaluate(current, stress=True))
+            counts[wave_cache].append((len(built), tiled.last["tiles"]))
+            assert (tiled.last["graph_cache"]["tiles"] > 0) == wave_cache and tiled._pieces is None
+    for (plain, tiles), (fewer, same) in zip(counts[False], counts[True]):
+        assert same == tiles and plain == 4 * tiles
+        assert fewer == tiles if budget > 10**9 else tiles < fewer < plain
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+@pytest.mark.parametrize("wave", [False, True], ids=["host-state", "wavefront"])
+def test_host_worker_is_bitwise_the_call_that_writes_on_the_calling_thread(wave, monkeypatch):
+    """``TILE_HOST_WORKER``: host state with overlap applies each tile's deferred writes on a worker thread, every
+    read waiting for the batches handed over before it; bitwise the call that applies them itself."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=wave, boundary_skin=False)
+    if wave:
+        config.update(wavefront="on", wavefront_group=2)
+    results = {}
+    for worker in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_HOST_WORKER", worker)
+        tiled = TiledForceField(field, TileConfig(12, **config))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[worker] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        assert tiled.last["host_worker"] is worker and tiled.last["tiles"] > 2
+        state = tiled._g["state"]
+        assert state._handed == [] and state._pending == []
+        assert (state._executor is not None) == worker
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
+    """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
+    tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less
+    the tiles' predicted workspace (the measured workspace per receiver times the cap, plus 10 %), never below 0."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(10))
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: 10_000)
+    tiled._graph_budget(False, measure=True)
+    assert tiled._pieces is None and tiled._piece_budget == 0
+    tiled._graph_budget(True)
+    assert tiled._pieces is None  # TILE_GRAPH_CACHE_WAVE at None: off the speed GPUs
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE_WAVE", True)
+    tiled._graph_budget(True)
+    assert tiled._pieces == {}
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE_WAVE", None)
+    tiled._graph_budget(False)  # no workspace measured yet
+    assert tiled._pieces == {} and tiled._piece_budget == 2_500
+    tiled._per_receiver = 400.0  # 1.1 * 400 * 10 = 4,400 bytes for the tiles
+    tiled._graph_budget(False)
+    assert tiled._piece_budget == int(0.25 * (10_000 - 1.1 * 400.0 * 10))  # 1,399: 4,400.000000000001 in floats
+    tiled._per_receiver = 4_000.0
+    tiled._graph_budget(False)
+    assert tiled._pieces == {} and tiled._piece_budget == 0
 
 
 def test_backward_chunk_scale_multiplies_each_modules_own_chunk_once():

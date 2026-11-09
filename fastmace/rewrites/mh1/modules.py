@@ -560,7 +560,8 @@ setattr(cutoff_folded_forward, READS_SPECIES_RESIDUAL, True)
 
 
 def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,
-                      w_lengths=None, node_attrs=None, wprime_lengths=None, table_lengths=None, rows=None):
+                      w_lengths=None, node_attrs=None, wprime_lengths=None, table_lengths=None, rows=None,
+                      block_rows=None):
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
@@ -573,6 +574,8 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
 
     ``rows`` (a tile's receiver count, every receiver below it): the message of those rows only, without the
     halo rows' zeros, on the paths whose kernels allow it (``StreamingKernels.rows_fit``); else all ``num_nodes``.
+    ``block_rows`` (wprime_lengths with BLOCK_MESSAGE, ``rewrites.generic.modules.TILE_BLOCK_ROWS``): the block
+    groups of that many leading rows (views), their gradients as short.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
@@ -600,7 +603,8 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
             wprime_lengths, self.radial_table.pair(node_attrs, edge_index), self.radial_table, radial.folded_weight(),
             feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,
             getattr(self, "fused_folded_forward", None), getattr(self, "recompute_weight_rows", 0),
-            linear=getattr(self, "linear", None))  # BLOCK_MESSAGE: a tuple of linear_1's input groups
+            linear=getattr(self, "linear", None),  # BLOCK_MESSAGE: a tuple of linear_1's input groups
+            block_rows=block_rows)
     elif w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
         message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,

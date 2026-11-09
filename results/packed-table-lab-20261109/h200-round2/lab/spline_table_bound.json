@@ -1,0 +1,185 @@
+{
+  "tool": "spline_table_bound",
+  "created_utc": "2026-11-09T02:25:10Z",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "7fcc99d6e3aabc07136b168d5f96cb854eab04e3",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "rounds": 31,
+  "constants": {},
+  "kernels": {
+    "forward": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 623.1039762496948,
+          "warm": 624.7040033340454
+        },
+        "one-slab": {
+          "flush": 432.096004486084,
+          "warm": 431.4559996128082
+        },
+        "slab-sorted": {
+          "flush": 602.6880145072937,
+          "warm": 603.1680107116699
+        },
+        "species-blocks": {
+          "flush": 623.6799955368042,
+          "warm": 623.9680051803589
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 602.2400259971619,
+          "warm": 602.4640202522278
+        },
+        "packed8": {
+          "flush": 660.7999801635742,
+          "warm": 660.1920127868652
+        },
+        "packed8v2": {
+          "flush": 625.7280111312866,
+          "warm": 624.9920129776001
+        },
+        "deferred": {
+          "flush": 1714.6879434585571,
+          "warm": 1715.5519723892212
+        },
+        "one-slab+deferred": {
+          "flush": 1555.4879903793335,
+          "warm": 1554.2399883270264
+        },
+        "deferred-a": {
+          "flush": 256.76798820495605,
+          "warm": 255.13601303100586
+        },
+        "deferred-b": {
+          "flush": 379.93600964546204,
+          "warm": 379.61599230766296
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.6934573056117544,
+          "warm": 0.6906566907049217
+        },
+        "slab-sorted": {
+          "flush": 0.9672350642580078,
+          "warm": 0.9655260851420226
+        },
+        "species-blocks": {
+          "flush": 1.0009244352613127,
+          "warm": 0.9988218449861719
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 0.9665161015692633,
+          "warm": 0.9643991667043547
+        },
+        "packed8": {
+          "flush": 1.0604971326627735,
+          "warm": 1.0568077189571705
+        },
+        "packed8v2": {
+          "flush": 1.004211231161427,
+          "warm": 1.000461033772823
+        },
+        "deferred": {
+          "flush": 2.7518488226938143,
+          "warm": 2.7461837337896347
+        },
+        "one-slab+deferred": {
+          "flush": 2.4963538184131355,
+          "warm": 2.487962266980918
+        },
+        "deferred-a": {
+          "flush": 0.41207887927529785,
+          "warm": 0.4084110421405096
+        },
+        "deferred-b": {
+          "flush": 0.6097473682196681,
+          "warm": 0.6076733785627311
+        }
+      },
+      "registers": [
+        80
+      ]
+    },
+    "wprime": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 1090.175986289978,
+          "warm": 1086.6880416870117
+        },
+        "one-slab": {
+          "flush": 1063.7760162353516,
+          "warm": 1062.656044960022
+        },
+        "local-sender": {
+          "flush": 1086.4959955215454,
+          "warm": 1082.0159912109375
+        },
+        "one-slab+local-sender": {
+          "flush": 1060.256004333496,
+          "warm": 1058.2720041275024
+        },
+        "local-dout": {
+          "flush": 1056.8640232086182,
+          "warm": 1052.191972732544
+        },
+        "local-sender+local-dout": {
+          "flush": 1052.8000593185425,
+          "warm": 1049.3760108947754
+        },
+        "one-slab+local-sender+local-dout": {
+          "flush": 1042.2719717025757,
+          "warm": 1039.1039848327637
+        },
+        "split": {
+          "flush": 1125.4719495773315,
+          "warm": 1122.8480339050293
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.9757837538281601,
+          "warm": 0.977885100594572
+        },
+        "local-sender": {
+          "flush": 0.9966244066878082,
+          "warm": 0.9957006516158757
+        },
+        "one-slab+local-sender": {
+          "flush": 0.972554906425426,
+          "warm": 0.9738507865464359
+        },
+        "local-dout": {
+          "flush": 0.9694434994897244,
+          "warm": 0.9682557756861713
+        },
+        "local-sender+local-dout": {
+          "flush": 0.9657156941251008,
+          "warm": 0.9656644507338906
+        },
+        "one-slab+local-sender+local-dout": {
+          "flush": 0.9560584573593237,
+          "warm": 0.9562118519493626
+        },
+        "split": {
+          "flush": 1.0323763903546166,
+          "warm": 1.0332754119221572
+        }
+      },
+      "registers": null
+    }
+  }
+}

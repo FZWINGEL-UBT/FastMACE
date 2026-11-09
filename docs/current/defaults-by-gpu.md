@@ -121,13 +121,14 @@ GEMM (slower, 1.009–1.020), the chunked fused forward (slower on the medium mo
 | w′ `STAGE_EDGES` (`wprime_backward.STAGE_EDGES_GPUS`; with STAGE_DOUT, STAGE_SH and SPLINE_W the w′ chunk's edges staged per block) and forward `PREFETCH_AHEAD` (`spline_forward.PREFETCH_AHEAD_GPUS`; with STAGE_EDGES the table rows of the edge two positions on hinted into L1) | – | – | on (A100 family) | bitwise | MD step A100 (Alex pack6 against the A100 defaults of main 11297d45): w′ `STAGE_EDGES` 0.9643 / 0.9853, `PREFETCH_AHEAD` 0.9810 / 0.9943, with `JOINED_LAYOUT` all three 0.9590 / 0.9641; H200 off (0.9969 / 1.0010, 1.0046 / 1.0067) | d66, 8 Nov | [round6-a100](../../results/h200-fastpath-20261108/round6-a100/run.log) |
 | `SORT_BY_LENGTH` (`neighbors.skin.SORT_BY_LENGTH_GPUS`; with `sort_receivers` each receiver's candidates, within its sender group, ordered by length at the skin-list build, so neighbouring receivers read the same spline-table slabs) | – | – | on (A100 family; alone 0.9924 / 0.9936, with `BLOCK_ORDER` 0.9920 / 0.9904; gate passes: forces 0.92 / 0.93 / 0.96, stress 0.64 / 1.02 / 1.15) | rounding (gate passes) | MD step H200 0.9807 / 0.9791 on top of the H200 defaults with `JOINED_LAYOUT` (3.585 → 3.514 ms); forward kernel 792 → 680 µs; gate forces 0.83 / 0.92 / 0.97, stress 0.48 / 0.94 / 1.07 | d66, 8 Nov | [slab-sorted](../../results/slab-sorted-h200-20261108/README.md) |
 | `BLOCK_ORDER` (`spline_forward.BLOCK_ORDER_GPUS`; the SPLINE_W forward's blocks walk the receivers grouped by species, an int32 order the force field binds once) | – | – | on (A100 family) | bitwise | MD step H200 0.9753 / 0.9724 on top of `SORT_BY_LENGTH` (3.514 → 3.42 ms); lab forward 717 → 624 µs; A100 alone 0.9953 / 0.9945 (Alex pack 7) | d66, 8 Nov | [slab-sorted](../../results/slab-sorted-h200-20261108/README.md) |
+| `PACKED8` (`spline_forward.PACKED8_GPUS`; with STAGE_EDGES the SPLINE_W forward reads an 8-byte copy of the spline table: the cubic in t − ½ economized to a quadratic, fields of 22 / 20 / 16 bits under one 6-bit exponent, decoded exactly as mantissas; the w′ kernel keeps the float32 table) | – | – | on (H200, A100-SXM4-80GB) | rounding (gate as the default) | MD step H200, SrTiO3 10×10×10: 300 K 0.9930 / 0.9945, 1500 K 0.9818 / 0.9768; A100-SXM4: 300 K 0.9557 / 0.9549, 1500 K 0.9587 / 0.9558 (its forward is L2-bound, step-limiters-20261109); kernel lab forward crystal 1.004, 0.3 Å disordered 0.858; Ada not measured | d66, 9 Nov | [packed-table-lab](../../results/packed-table-lab-20261109/README.md) |
 | fused first-interaction backward (`FUSED_FIRST_BACKWARD_GPUS`) + tabled forward (`TABLED_FORWARD_GPUS`) | on | on | on | rounding | backward alone SrTiO3 / NbCl5: 5060 Ti 0.962 / 0.963, 0.972 / 0.969; Ada 0.962 / 0.963, 0.979 / 0.975; A100-SXM4-80GB 0.969 / 0.966, 0.983 / 0.984. Both: 5060 Ti 0.945 / 0.945, 0.948 / 0.955; Ada 0.949 / 0.944, 0.978 / 0.968; A100 0.966 / 0.962, 0.970 / 0.982 | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
 | run-walking `edge_outer_sum` backward (`edge_outer_sum.BACKWARD_WALK_GPUS`) | – (kernel 0.94, near DRAM floor) | – (kernel 1.03–1.11) | on | rounding | A100-SXM4-80GB SrTiO3 0.995 / 0.987, NbCl5 0.995 / 0.996 (kernel 0.802) | A100 round 2, 5 Nov | [round-2 notes](../../plans/ideas-20261105-round2.md) |
 | `EDGE_SH` Triton edge spherical harmonics (`EDGE_SH_GPUS`) | on | on | on | rounding (5.5e-7 / 1.4e-7 of float64 e3nn) | SrTiO3 / NbCl5: 5060 Ti 0.985 / 0.961, 0.990 / 0.993; Ada 0.989 / 0.987, 0.998 / 0.997; A100 PCIe 0.983 / 0.985, 0.995 / 0.988 | A100 round 5, 5 Nov | `results/round5-20261105` |
 | `HEAD_SLICE` one-head readout as a slice (`energy.HEAD_SLICE_GPUS`) | on | on | on (A100-SXM4-80GB) | bitwise | SrTiO3 / NbCl5: 5060 Ti 0.996 / 0.998, 0.989 / 0.993; Ada 0.999 / 0.997, 0.993 / 0.992; A100 0.992 / 0.987, 0.975 / 0.979 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
 | `GRAPH_SUM` one-graph energy sums as reductions (`energy.GRAPH_SUM_GPUS`) | – (tie) | – (1.001 / 0.999) | on (A100-SXM4-80GB) | rounding | A100 0.997 / 0.998, 0.992 / 0.998 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
 | `SEGMENT_ROWS` in-place BlockLinear 1:1 products (`segment_rows.SEGMENT_ROWS_GPUS`) | – | – | on (A100-SXM4-80GB) | rounding (3xTF32) | A100 SrTiO3 0.985 / 0.984, NbCl5 0.981 / 0.988 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
-| w′ end-of-edge reduction: `BUTTERFLY` (`BUTTERFLY_GPUS`), `REDUX` (`REDUX_GPUS`) | both on | – (REDUX 1.008–1.011) | – (BUTTERFLY 1.006, REDUX 1.018–1.029) | BUTTERFLY bitwise; REDUX fixed point | 5060 Ti REDUX 0.998 / 0.999, 0.999 / 0.998 | d66, 5 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
+| w′ end-of-edge reduction: `BUTTERFLY` (`BUTTERFLY_GPUS`), `REDUX` (`REDUX_GPUS`) | both on | – (REDUX 1.008–1.011) | BUTTERFLY on (H200, A100-SXM4-80GB); REDUX – (1.018–1.029) | BUTTERFLY bitwise; REDUX fixed point | 5060 Ti REDUX 0.998 / 0.999, 0.999 / 0.998; BUTTERFLY 9 Nov, SrTiO3 10×10×10 / NbCl5: H200 0.9863 / 0.9861, 0.9936 / 0.9903; A100-SXM4 0.9910 / 0.9892, 0.9942 / 0.9973 (gate passes; earlier off: A100 1.006, H200 0.9659 / 0.9677 against older w′ defaults) | d66, 5 and 9 Nov | [round 5](../../plans/ideas-20261105-round2.md) |
 | `FOLD_FIRST_DENSITY_LINEAR` (True; follows `generic_fold_product_linear`) | – (fold off) | on | on | rounding | A100-SXM4-80GB SrTiO3 0.978 / 0.977, NbCl5 0.954 / 0.956; Ada 0.954 / 0.955, 0.920 / 0.920 | d66, 5 Nov | [round 6](../../plans/ideas-20261105-round2.md#round-6-skipping-work-around-the-big-kernels-5-november-2026) |
 
 The A100 plan's one accepted gate failure: OMAT-0 NbCl5 stress 1.8e-7 eV/Å³ against a limit of 1.2–1.5e-7, from
@@ -199,21 +200,22 @@ Both pass that test, so both stay on:
 `LANE_INDICES` (idea 15a, bitwise) joined the H200 set on 6 November 2026: MD step 0.9897 / 0.9913 (b = on)
 ([ledger: ideas-r3](../optimisation-ledger.md#ideas-r3)).
 
-### OMAT-0 small (`omat0-small`, 8 November 2026)
+### OMAT-0 small (`omat0-small`, 8–9 November 2026)
 
 OMAT-0 small has had a label since 8 November 2026 (`labels.EXTRA_LABELS`: in the table, recognised by SHA-256, but
-not one of the 19 acceptance labels). It runs medium's per-GPU switches as they are.
+not one of the 19 acceptance labels). It runs the per-GPU switches as they are, plus these per-model defaults:
 
-Of medium's two label-keyed decision 66 defaults, small has its own GPU list. 3×TF32 GEMMs are in
-`DECISION_66_TF32X3_MODEL_GPUS`, and the generic w′ backward with its fused forward is in
-`DECISION_66_GENERIC_WPRIME_LABEL_GPUS`. Both lists hold the **NVIDIA H200 only**.
+| Default | Table | GPUs | Evidence (Benchmark_loup, b/a ab / ba) |
+| --- | --- | --- | --- |
+| 3×TF32 GEMMs and the generic w′ backward with its fused forward (decision 66 pair) | `DECISION_66_TF32X3_MODEL_GPUS`, `DECISION_66_GENERIC_WPRIME_LABEL_GPUS` | H200, A100 family | H200 (b = without): 2.360 / 2.370 (5.41 → 2.29 ms); gate force 1.01, stress 1.22 (NbCl5). A100-SXM4 (Alex 4967329, b = with): 0.3911 / 0.3916 (10.72 → 4.19 ms); A100 gate (4967421) force 1.03, stress 1.33 (NbCl5) |
+| w′ `STAGE_EDGES` on (bitwise) | `wprime_backward.STAGE_EDGES_MODEL_GPUS` (on top of `STAGE_EDGES_GPUS`) | H200 | b = off: 1.0072 / 1.0114 |
+| Spline forward R128 shape with `MIN_BLOCKS` 8 instead of 6 (bitwise) | `spline_forward.R128_MIN_BLOCKS_MODEL_GPUS` | H200 | b = 8: 0.9873 / 0.9883, 0.9923 / 0.9952; as the default, b = 6: 1.0046 / 1.0057. Medium keeps 6 (8: 1.0515 / 1.0507) |
+| Spline forward `PREFETCH_AHEAD` off (bitwise) | `spline_forward.PREFETCH_AHEAD_MODEL_OFF_GPUS` | A100 family | Alex 4967540 b = off 0.9902 / 0.9908; as the default, b = on 1.0068 / 1.0073 (4967601) |
 
-| Measurement (H200, Benchmark_loup, b = without the pair) | Result |
-| --- | --- |
-| MD step b/a, ab / ba | 2.360 / 2.370 (5.41 → 2.29 ms per step) |
-| Force/stress gate (3× rule), worst ratio | force 1.01 (NbCl5), stress 1.22 (NbCl5) |
-
-On the A100 family and the other GPUs, small keeps the pair off until it has its own A/B there. Source:
+The kernels read the table label from the rewrites' `Context.inputs["model_label"]`, through WPrime's `model_label`.
+Small's step (step breakdown, 9 November 2026): H200 2.12 ms (5.41 ms without the pair), A100-SXM4 4.19 ms (10.72 ms without), 4.17 ms with PREFETCH_AHEAD off (A/B).
+w′ `FOLD_ALPHA` off measured within the run-to-run spread (0.4–0.7 % either way), so it stays on
+(`FOLD_ALPHA_MODEL_OFF_GPUS` is empty). The other GPUs keep the pair off until they have their own A/B. Source:
 [h200-omat0-small](../../results/h200-omat0-small-20261108/README.md).
 
 ### Tiled (capacity) mode
@@ -222,6 +224,16 @@ On the A100 family and the other GPUs, small keeps the pair off until it has its
 | --- | --- | --- | --- | --- | --- |
 | `TileConfig.lanes` `auto` (`tiled.LANE_GPUS`, exact): two sweep-2 tiles on disjoint SM halves | – (1.05× per pair) | on (1.09× per pair) | – | under `cudaMallocAsync` | [tiled-concurrent-tiles](../validation/tiled/tiled-concurrent-tiles.md) |
 | `TileConfig.backward_chunk_scale` `auto` (`tiled.TILE_CHUNK_SCALE`, exact) | ×4 | ×4 | ×1 | 1.08M SrTiO3, wavefront, R 8,192: 5060 Ti −10.5 %, Ada −3.2 %; RTX PRO 6000 tiles do not chunk | `results/tiled-ideas-20261102` |
+| `tiled.TILE_PREFETCH_DEVICE` (`TILED_SPEED_GPUS`, exact): prefetch with the state on the device | on | – | – | OMAT-0 SrTiO3 975,560, device state: 0.939 / 0.941 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `generic.TILE_BLOCK_ROWS` (every GPU, rounding): w′ block message for the receivers only | on | on | on | 5060 Ti device state 0.918 / 0.921; wavefront 0.931 / 0.937 (1.030 / 1.060 while host-bound) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_VIRIAL` (`TILED_SPEED_GPUS`, rounding): strain gradient from the edge gradients | on | – | – | 0.970 / 0.955; wavefront 0.994 / 0.959; gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_GRAPH_CACHE` (`TILED_SPEED_GPUS`, exact): tile graphs kept for the call (25 % of free memory less the workspace; wavefront: `TILE_GRAPH_CACHE_WAVE`) | on | – | – | 0.948 / 0.960; all four 0.795 / 0.787 (8.38 → 6.66 s) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_FILTER32` (`TILED_SPEED_GPUS`, exact): kept lists' cutoff test in float32, float64 near the cutoff | on | – | – | 0.987 / 0.993; wavefront 0.981 / 1.012 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_EPILOGUE` (`TILED_SPEED_GPUS`, rounding): sweep masks, objective, virial and edge vectors compiled | on | – | – | 0.980 / 0.981; wavefront 0.985 / 0.983 (1.012 / 1.009 while host-bound); gate 12/12 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_FILL_SKIP` (every GPU, exact): no list-cache fill for graph-cached tiles | on | on | on | 0.961 / 0.966 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_PINNED_SUPERSET` (`TILED_SPEED_GPUS`, exact): kept lists pinned on the host, up to 4 GiB | on | – | – | 0.986 / 0.990; wavefront 0.989 / 0.990 (1.012 / 1.028 while host-bound) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_GRAPH_CACHE_WAVE` (`TILED_SPEED_GPUS`, exact): the graph cache under the wavefront, search pass to sweep 3 | on | – | – | wavefront 0.824 / 0.817 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `tiled.TILE_HOST_WORKER` (`TILED_SPEED_GPUS`, exact): host-state writes applied on a worker thread | on | – | – | wavefront 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 
 ## 2. Default MH-1 float32 plan (GPU-independent)
 

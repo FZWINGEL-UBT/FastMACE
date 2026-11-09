@@ -1,0 +1,274 @@
+{
+ "atoms": 975560,
+ "times": [
+  14.236908856022637,
+  39.729812703997595,
+  6.2622900959977414,
+  6.175359227025183
+ ],
+ "wall": 6.219016363989795,
+ "regions": [
+  {
+   "region": "(none)",
+   "ns_per_atom": 2396.069205379448,
+   "kernels": 4554,
+   "ops": {
+    "fastmace::streaming_conv_wprime_backward_blocks": 1198.9,
+    "aten::mm": 292.7,
+    "fastmace::tabled_outer_sum_backward": 156.5,
+    "cuequivariance::uniform_1d": 103.8,
+    "fastmace::species_mm": 78.1,
+    "triton_red_fused_add_div_mul_neg_slice_slice_backw": 71.3,
+    "triton_red_fused_add_div_mul_neg_slice_backward_su": 70.3,
+    "triton_poi_fused_add_gather_slice_backward_tabled_": 51.4,
+    "triton_poi_fused_add_slice_slice_backward_species_": 48.5,
+    "triton_poi_fused_add_clone_div_slice_slice_backwar": 44.5
+   }
+  },
+  {
+   "region": "fwd2 < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 1646.2999354217193,
+   "kernels": 2032,
+   "ops": {
+    "fastmace::fused_folded_message_blocks": 1280.3,
+    "aten::mm": 123.1,
+    "fastmace::radial_table_forward": 71.9,
+    "triton_poi_fused_add_cat_div_slice_view_12": 48.7,
+    "cuequivariance::uniform_1d": 24.5,
+    "triton_poi_fused_cat_view_11": 21.7,
+    "triton_poi_fused_cat_view_10": 15.6,
+    "triton_poi_fused_scatter_add_select_unsqueeze_8": 14.6,
+    "## Call CompiledFxGraph fn2rke3irm2zfkbtpnw2jg4rox": 11.9,
+    "triton_poi_fused__to_copy_add_arange_full_like_ind": 7.5
+   }
+  },
+  {
+   "region": "fwd3o < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 792.2138607569158,
+   "kernels": 7418,
+   "ops": {
+    "aten::mm": 161.3,
+    "fastmace::tabled_outer_sum_forward": 98.4,
+    "fastmace::species_mm": 72.2,
+    "triton_poi_fused_cat_slice_view_25": 48.3,
+    "triton_poi_fused_cat_view_10": 42.3,
+    "aten::fill_": 36.2,
+    "triton_poi_fused_cat_view_9": 30.8,
+    "triton_poi_fused_clone_slice_transpose_view_7": 30.1,
+    "cuequivariance::uniform_1d": 27.9,
+    "triton_poi_fused_add_div_exp_index_lt_mul_pow_rsub": 25.0
+   }
+  },
+  {
+   "region": "fwd1m < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 771.4768676452511,
+   "kernels": 6754,
+   "ops": {
+    "aten::mm": 169.6,
+    "fastmace::tabled_outer_sum_forward": 100.1,
+    "fastmace::species_mm": 76.5,
+    "triton_poi_fused_add_cat_div_view_24": 48.6,
+    "triton_poi_fused_cat_slice_view_25": 48.4,
+    "aten::fill_": 36.5,
+    "triton_poi_fused_clone_slice_transpose_view_15": 29.9,
+    "cuequivariance::uniform_1d": 29.0,
+    "triton_poi_fused_clone_slice_23": 21.4,
+    "triton_poi_fused_cat_view_18": 21.3
+   }
+  },
+  {
+   "region": "TiledForceField._tile_graph < TiledForceField._piece < TiledForceField._slot_keys",
+   "ns_per_atom": 134.16543626225112,
+   "kernels": 7530,
+   "ops": {
+    "aten::index": 48.1,
+    "aten::copy_": 41.1,
+    "aten::nonzero": 8.3,
+    "aten::add": 8.2,
+    "aten::cat": 7.1,
+    "aten::sub": 6.2,
+    "aten::_unique2": 3.7,
+    "aten::sum": 3.5,
+    "aten::mul": 2.8,
+    "aten::gather": 1.3
+   }
+  },
+  {
+   "region": "TiledForceField._scatter < TiledForceField._call",
+   "ns_per_atom": 112.69406802247697,
+   "kernels": 952,
+   "ops": {
+    "aten::scatter_add_": 81.3,
+    "aten::index_add_": 31.1,
+    "aten::copy_": 0.2,
+    "aten::add_": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._call",
+   "ns_per_atom": 102.18235680018728,
+   "kernels": 1020,
+   "ops": {
+    "aten::where": 29.9,
+    "aten::index": 21.5,
+    "aten::add": 19.2,
+    "aten::copy_": 18.3,
+    "aten::ge": 13.3
+   }
+  },
+  {
+   "region": "TiledForceField._fill < TiledForceField._call",
+   "ns_per_atom": 49.56603591784129,
+   "kernels": 3468,
+   "ops": {
+    "aten::copy_": 45.7,
+    "aten::fill_": 3.9
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 28.07124318340835,
+   "kernels": 540,
+   "ops": {
+    "triton_poi_fused_mul_unsqueeze_7": 17.7,
+    "triton_poi_fused_mul_unsqueeze_2": 4.4,
+    "triton_red_fused_mul_sum_unsqueeze_view_3": 3.9,
+    "triton_poi_fused_mul_unsqueeze_1": 1.7,
+    "triton_poi_fused_mul_0": 0.2,
+    "triton_per_fused_mul_sum_unsqueeze_view_4": 0.1,
+    "triton_poi_fused_add_mul_transpose_view_6": 0.1,
+    "triton_poi_fused_mul_unsqueeze_6": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_5": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_4": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._body < TiledForceField._run_slot < TiledForceField._call",
+   "ns_per_atom": 26.136247898646413,
+   "kernels": 204,
+   "ops": {
+    "triton_poi_fused_add_gt_index_select_sub_unsqueeze": 26.1
+   }
+  },
+  {
+   "region": "TiledForceField._second < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 21.630840747876196,
+   "kernels": 136,
+   "ops": {
+    "aten::index": 21.6
+   }
+  },
+  {
+   "region": "TiledForceField._first < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 14.620484644713216,
+   "kernels": 204,
+   "ops": {
+    "aten::index": 14.5,
+    "aten::mul": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._globals < TiledForceField._call",
+   "ns_per_atom": 14.305045307310605,
+   "kernels": 8,
+   "ops": {
+    "aten::fill_": 14.3,
+    "aten::copy_": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._source < TiledForceField._call",
+   "ns_per_atom": 12.706063184222378,
+   "kernels": 135,
+   "ops": {
+    "aten::copy_": 12.4,
+    "aten::abs": 0.1,
+    "aten::max": 0.0,
+    "aten::div": 0.0,
+    "aten::linalg_lu_solve": 0.0,
+    "aten::mul": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::floor": 0.0,
+    "aten::_local_scalar_dense": 0.0,
+    "aten::arange": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 9.975447947847474,
+   "kernels": 680,
+   "ops": {
+    "aten::fill_": 4.7,
+    "aten::copy_": 3.3,
+    "aten::index": 1.0,
+    "aten::scatter_": 0.9
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 6.601883021035799,
+   "kernels": 336,
+   "ops": {
+    "triton_red_fused_mul_sum_unsqueeze_view_1": 3.7,
+    "triton_poi_fused_mul_unsqueeze_0": 2.7,
+    "triton_per_fused_mul_sum_unsqueeze_view_2": 0.1,
+    "triton_poi_fused_add_mul_transpose_view_4": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_3": 0.1,
+    "triton_red_fused_mul_sum_unsqueeze_view_2": 0.0,
+    "triton_poi_fused_add_mul_transpose_view_3": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 5.516234777974457,
+   "kernels": 340,
+   "ops": {
+    "aten::fill_": 2.3,
+    "aten::copy_": 2.1,
+    "aten::index": 0.5,
+    "aten::scatter_": 0.5
+   }
+  },
+  {
+   "region": "TiledForceField._call",
+   "ns_per_atom": 3.713558366477651,
+   "kernels": 303,
+   "ops": {
+    "aten::copy_": 3.6,
+    "aten::index": 0.0,
+    "aten::add": 0.0,
+    "aten::gather": 0.0,
+    "aten::sum": 0.0,
+    "aten::mul": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::fill_": 0.0,
+    "aten::prod": 0.0,
+    "aten::div": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._slot_keys < TiledForceField._call",
+   "ns_per_atom": 0.9134620115626817,
+   "kernels": 68,
+   "ops": {
+    "aten::copy_": 0.9
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 0.06435688220670491,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 0.05159395629235131,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  }
+ ]
+}

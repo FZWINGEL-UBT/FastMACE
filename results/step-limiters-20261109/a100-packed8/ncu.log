@@ -1,0 +1,142 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 297 (/usr/local/bin/python3.10)
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+==PROF== Connected to process 332 (/usr/local/bin/python3.10)
+==PROF== Profiling "unrolled_elementwise_kernel" - 0: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_zeros_0" - 1: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_zeros_1" - 2: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_scatter_add_..." - 3: 0%....50%....100% - 16 passes
+==PROF== Profiling "gemv2T_kernel_val" - 4: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 5: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_per_fused__to_copy_arg..." - 6: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_index_5" - 7: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_arg..." - 8: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_argmax_index_7" - 9: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_red_fused__to_copy_ara..." - 10: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_per_fused_cumsum_9" - 11: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 12: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 13: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 14: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 15: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 16: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_clone_15" - 17: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_clone_16" - 18: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_index_se..." - 19: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 20: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_ara..." - 21: 0%....50%....100% - 16 passes
+==PROF== Profiling "forward" - 22: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 23: 0%....50%....100% - 16 passes
+==PROF== Profiling "kernel" - 24: 0%....50%....100% - 16 passes
+==PROF== Profiling "_forward" - 25: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 26: 0%....50%....100% - 16 passes
+==PROF== Profiling "kernel" - 27: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 28: 0%....50%....100% - 16 passes
+==PROF== Profiling "kernel" - 29: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 30: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 31: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 32: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 33: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_div_view..." - 34: 0%....50%....100% - 16 passes
+==PROF== Profiling "segmented_polynomial_algo1_2" - 35: 0%....50%....100% - 16 passes
+==PROF== Profiling "elementwise_kernel" - 36: 0%....50%....100% - 16 passes
+==PROF== Profiling "gemv2T_kernel_val" - 37: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_remap_select_rr_64x64" - 38: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 39: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 40: 0%....50%....100% - 16 passes
+==PROF== Profiling "spline_forward0" - 41: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_remap_div_rr_64x64" - 42: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_remap_div_rr_64x64" - 43: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_remap_div_rr_64x64" - 44: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_remap_div_rr_64x64" - 45: 0%....50%....100% - 16 passes
+==PROF== Profiling "segmented_polynomial_algo1_4" - 46: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 47: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_mul_silu..." - 48: 0%....50%....100% - 16 passes
+==PROF== Profiling "kernel" - 49: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_red_fused__to_copy_add..." - 50: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 51: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 52: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 53: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 54: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 55: 0%....50%....100% - 16 passes
+==PROF== Profiling "ampere_sgemm_32x128_nn" - 56: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_mul_silu_bac..." - 57: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 58: 0%....50%....100% - 16 passes
+==PROF== Profiling "segmented_polynomial_bwd_algo..." - 59: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_red_fused_add_div_mul_..." - 60: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_ind..." - 61: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_div_slic..." - 62: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_rr_64x64" - 63: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 64: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_rr_64x64" - 65: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 66: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_rr_64x64" - 67: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__unsafe_view..." - 68: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_rr_64x64" - 69: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 70: 0%....50%....100% - 16 passes
+==PROF== Profiling "oeq_projected_backward_wprime" - 71: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_mul_t_tf32x3..." - 72: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_rc_64x64" - 73: 0%....50%....100% - 16 passes
+==PROF== Profiling "ampere_sgemm_32x128_nn" - 74: 0%....50%....100% - 16 passes
+==PROF== Profiling "elementwise_kernel" - 75: 0%....50%....100% - 16 passes
+==PROF== Profiling "elementwise_kernel" - 76: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 77: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 78: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_slice_ba..." - 79: 0%....50%....100% - 16 passes
+==PROF== Profiling "segmented_polynomial_bwd_algo..." - 80: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_red_fused_add_div_mul_..." - 81: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 82: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 83: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 84: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 85: 0%....50%....100% - 16 passes
+==PROF== Profiling "fm_tf32x3_species_rr_64x64" - 86: 0%....50%....100% - 16 passes
+==PROF== Profiling "kernel" - 87: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_div_eq_i..." - 88: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_div_eq_i..." - 89: 0%....50%....100% - 16 passes
+==PROF== Profiling "backward" - 90: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused__to_copy_add..." - 91: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_edge_sh3..." - 92: 0%....50%....100% - 16 passes
+==PROF== Profiling "_backward" - 93: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_div_eq_i..." - 94: 0%....50%....100% - 16 passes
+==PROF== Profiling "triton_poi_fused_add_16" - 95: 0%....50%....100% - 16 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 96: 0%....50%....100% - 16 passes
+==PROF== Disconnected from process 332
+==PROF== Disconnected from process 297
+==PROF== Report: /tmp/fastmace-out/ncu.ncu-repz

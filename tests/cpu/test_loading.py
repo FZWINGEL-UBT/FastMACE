@@ -593,3 +593,17 @@ def test_a_head_label_without_its_own_entry_finds_the_same_head_again():  # 3-T1
     assert labels.find(entry.label, "omol").head == "omol"
     with pytest.raises(ValueError, match="is head 'omol'"):
         labels.find(entry.label, "spice_wB97M")
+
+
+def test_a_path_load_of_omat0_small_gets_its_label_for_the_rewrites():
+    """A path load of OMAT-0 small (no label given) finds its table label by hash for the rewrites' context
+    (Context.inputs["model_label"]: w' STAGE_EDGES_MODEL_GPUS, 9 November 2026)."""
+    from types import SimpleNamespace
+
+    from fastmace.model.forces import _table_label
+
+    sha = table.LABELS["omat0-small"].checkpoint.sha256
+    assert _table_label(SimpleNamespace(label=None, head="omat_pbe", sha256=sha)) == "omat0-small"
+    assert _table_label(SimpleNamespace(label="omat0-small", head=None, sha256=None)) == "omat0-small"
+    assert _table_label(SimpleNamespace(label=None, head=None, sha256="0" * 64)) is None
+    assert _table_label(None) is None

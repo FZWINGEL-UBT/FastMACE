@@ -50,6 +50,11 @@ POWER_BACKWARD = None
 POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200",))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
+# The tabled forward's register cap (Triton's maxnreg; None: Triton's choice). step_limiters (9 November 2026):
+# Triton gives the 1-warp forward 128 registers on sm_80 (64 on sm_90), so the A100 runs 16 blocks per SM (25 %
+# of warps) and the kernel waits on global loads (long scoreboard 10 per issue), 398 us against the H200's 112.
+# A module constant for the A/B (lab, off).
+FORWARD_MAXNREG = None
 # Idea 3 (Codex H200 report, 7 November 2026). PACKED_COEF (with TABLED_FORWARD): the walks read the value series (the
 # forward's and RECOMPUTE's coef, POWER_BACKWARD's pcoef) from a copy packed per adjacent channel pair,
 # ``[P, pieces, pairs, TERMS, 2]`` (``packed_coef``, built with the table), and load two successive terms of a pair as
@@ -401,7 +406,8 @@ def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Te
             float(r_lo), float(bin_scale), float(r_max), K=k, D=d, INNER=inner, TERMS=coef.shape[2],
             J=coef.shape[-1], CHUNK=FORWARD_CHUNK, BLOCK_K=triton.next_power_of_2(k),
             BLOCK_D=triton.next_power_of_2(d), pack_ptr=packed if packs else coef, PACKED=packs,
-            PAIRS=packed.shape[2] if packs else 1, num_warps=FORWARD_WARPS)
+            PAIRS=packed.shape[2] if packs else 1, num_warps=FORWARD_WARPS,
+            **({} if FORWARD_MAXNREG is None else {"maxnreg": FORWARD_MAXNREG}))
     return out, density
 
 
