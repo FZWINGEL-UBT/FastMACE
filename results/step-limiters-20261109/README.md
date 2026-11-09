@@ -250,3 +250,30 @@ What limits the A100 step now (59 % of the kernel time is FMA-pipe bound):
 No new lead of 1 % or more. Alex can repeat this profile, or an A/B, without Modal budget:
 `sbatch tools/jobs/alex_step_limiters.sh <job.env>`, with job.env as for `alex_ab_pack.sh`.
 
+## Tensor cores for the edge kernels (owner question, 9 November 2026): no
+
+The edge kernels are at the FP32 FMA roof on the A100, so the one big lever would be moving their tensor product to
+3×TF32 tensor cores (A100 dense TF32 is 8× FFMA, 2.67× after the three-way split; H200 7.4×, 2.5×).
+
+- **Built before:** `TC_TP` (5 November, the then fused forward; edges as K, w x as A): A100 lab 1.276, against a
+  no-TP bound of 0.617. Each A element feeds one mma triple (N = 8), and preparing it (multiply by x, split) costs
+  about as much as the FP32 terms it replaces.
+- **The better layout:** x split once per sender node and shared by all 10 paths as B (channels as N), each edge's
+  `S_e = CG·sh` stacked as A (40 rows, K = 4), w applied to the accumulators afterwards (40 FMAs per channel). The
+  tile shapes pad 88 dense entries to 192 multiply-adds (1.8× from K, 1.2× from M); with the 3×TF32 split that is
+  about 144 tensor-pipe clocks per edge against 176 FFMA clocks today on the A100: at most 0.8 of the TP part, with
+  perfect overlap and no extra register pressure.
+- **The backward is worse:** dx is the transposed product (M = 4 input components padded to 16, 4×), and dsh sums
+  over channels with a per-(edge, channel) operand w·dout that costs about 120 operations per channel to prepare
+  against 88 direct.
+- **Measured today (Alex A100-SXM4, kernel lab, jobs 4970586/7):** w′ without the table's Horner evaluation 0.754
+  (1,985 of 2,631 µs). The old F-no-tp patterns no longer match today's FACTORED w′, and the lab's `forward` kernel is the
+  layer-1 fused forward, not SPLINE_W's (not called eagerly at ≥ 100,000 edges), so the TP share was not timed. The
+  ceiling follows anyway: if the TP were all of the spline forward that is not the table (about 0.8 of 1,255 µs),
+  0.8 of it saves at most about 200 µs, 3 % of the A100 step, before preparation and register costs, which made the
+  built version 28 % slower.
+
+The FP64 pipes were the other way to more multiply-adds per clock; both were rejected on 9 November
+(`fp64-second-pipe`: registers 80 → 128, 1.039–1.186; `fp64-tensor-pipe`: the same padding, 1.27× on the H200).
+Not built.
+
