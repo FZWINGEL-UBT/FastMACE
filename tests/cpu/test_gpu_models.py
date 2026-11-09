@@ -120,8 +120,8 @@ def test_factored_and_symmetric_pairs_defaults(monkeypatch):
 def test_round2_defaults(monkeypatch):
     """Round 2 (5 November 2026, decision 66): HORNER on the A100s and the RTX 5060 Ti, SCALAR_PATHS and
     BACKWARD_WALK on the A100s, 80 registers on the RTX 5060 Ti, the fused first interaction (FUSED_FIRST_BACKWARD,
-    TABLED_FORWARD) on all three measured models, BUTTERFLY (round 5) on the RTX 5060 Ti; off elsewhere; the constants
-    override."""
+    TABLED_FORWARD) on all three measured models, BUTTERFLY (round 5) on the RTX 5060 Ti (and the A100 and H200 from
+    9 November); off elsewhere; the constants override."""
     from fastmace.kernels.triton import edge_outer_sum, tabled_outer_sum
     from fastmace.rewrites.generic import modules as generic
 
@@ -132,7 +132,7 @@ def test_round2_defaults(monkeypatch):
     checks = (
         (wprime_backward, "HORNER", wprime_backward.horner_default, {"a100", "5060", "ada"}),
         (wprime_backward, "SCALAR_PATHS", wprime_backward.scalar_paths_default, {"a100"}),
-        (wprime_backward, "BUTTERFLY", wprime_backward.butterfly_default, {"5060"}),
+        (wprime_backward, "BUTTERFLY", wprime_backward.butterfly_default, {"a100", "5060"}),
         (wprime_backward, "REDUX", wprime_backward.redux_default, {"5060"}),
         (edge_outer_sum, "BACKWARD_WALK", walk, {"a100"}),
         (generic, "FUSED_FIRST_BACKWARD", generic.fused_first_backward, {"a100", "5060", "ada"}),
@@ -311,7 +311,8 @@ def test_h200_defaults():
     from fastmace.kernels.cutlass import segment_rows
     assert "NVIDIA H200" not in segment_rows.SEGMENT_ROWS_GPUS  # 1.0006 / 1.0000: no gain
     assert "NVIDIA H200" not in fixed.DECISION_66_TF32X3_GPUS  # OMAT-0 only (TF32X3_OMAT0); MH-1 not measured
-    assert "NVIDIA H200" not in wprime_backward.BUTTERFLY_GPUS  # on 5 Nov; 0.9659 / 0.9677 off at d599cc70 (6 Nov)
+    # on 5 Nov; 0.9659 / 0.9677 off at d599cc70 (6 Nov); on again 9 Nov (0.9863 / 0.9861, today's w' defaults)
+    assert "NVIDIA H200" in wprime_backward.BUTTERFLY_GPUS
     assert "NVIDIA H100 80GB HBM3" not in wprime_backward.BUTTERFLY_GPUS  # exact names: the H100 is not measured
     # SPLINE_W (7 November 2026, results/spline-w-h200-20261107): MD H200 0.8789 / 0.8775, gate passes; R128 on top
     # 0.9838 / 0.9848; PARTS off (0.9938 / 0.9904, under 1 %). The A100 family from 8 November 2026 (Alex, results/

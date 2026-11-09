@@ -135,3 +135,45 @@ Both ran on Modal A100-SXM4-80GB, MD-step A/Bs with `tools/modal/round6_ab256.sh
 3. **Both GPUs: tabled outer sum backward (6.5%).** L1/LSU-bound, so it needs fewer loads per edge.
 4. **A100: w′ is FMA-bound at 85%.** Only fewer FMAs help; the FP64 and DMMA second pipes are closed.
 5. **A100: Triton reductions at 80–90% DRAM.** Each could be fused into its producer GEMM's epilogue, worth 1–2% each.
+
+## Follow-ups on Modal, round 2
+
+### PACKED8 on: the A100 re-profiled ([a100-packed8/](a100-packed8/limiters.md), source 0df22417, A100 80GB PCIe)
+
+The SPLINE_W forward is now FMA-pipe bound: 1,539 → 1,255 µs, FMA pipe 84%, L2 42%, issue 71%. The force stage per
+step went 7.36 → 7.13 ms. Both edge kernels are now at the A100's FMA roof (w′ 85%, forward 84%).
+
+### w′ bounds (`tools/modal/kernel_lab.sh`, falsifiers; time without the part / base)
+
+| Part removed | H200 (dad5375b, base 1,098 µs) | A100-SXM4 (0df22417, base 2,319 µs) |
+| --- | ---: | ---: |
+| Cross-lane reduction (dsh and dr) | 0.932 | 0.950 |
+| dsh's reduction (dr kept) | 0.937 | 0.951 |
+| dr's reduction (dsh kept) | 0.994 | 0.991 |
+| 4 of 5 shuffle levels | 0.947 | 0.956 |
+| dx atomics | 0.996 | 0.962 |
+| The slope | 0.903 | 0.923 |
+| The table's Horner evaluation | 0.853 | 0.781 |
+
+### Reduction variants against today's w′ defaults (H200 kernel lab, dad5375b, base 1,089 µs)
+
+| Variant | Ratio | Exactness |
+| --- | ---: | --- |
+| `butterfly` | **0.956** | dsh and dr bitwise |
+| `redux` | 0.975 | fixed point, 2.8e-7 |
+| `F-redux16` | 0.974 | falsifier |
+| `redux-pc` | 1.004 | fixed point |
+
+On 6 November (d599cc70) the butterfly was 1.145 and was turned off on the H200. The w′ defaults have changed since:
+STAGE_DOUT, STAGE_SH, SPLINE_VECTOR, FOLD_ALPHA and SPLINE_W.
+
+### BUTTERFLY MD-step A/Bs (`tools/modal/round6_ab256.sh`, SKIP_GATE=0; b = on)
+
+| GPU (source) | SrTiO3 10×10×10 | NbCl5 | Gate |
+| --- | --- | --- | --- |
+| H200 (e3049399) | **0.9863 / 0.9861** (3.416 → 3.369 ms) | 0.9936 / 0.9903 | passes (forces 0.849, 1.006, 0.903) |
+| A100-SXM4-80GB (dad5375b, with PACKED8) | **0.9910 / 0.9892** (6.745 → 6.684 ms) | 0.9942 / 0.9973 | passes (forces 0.826, 0.982, 0.890) |
+
+**Adopted on the H200 and the A100 family** (`BUTTERFLY_GPUS`, decision 66). Results: [h200-butterfly/](h200-butterfly/),
+[a100-butterfly/](a100-butterfly/).
+

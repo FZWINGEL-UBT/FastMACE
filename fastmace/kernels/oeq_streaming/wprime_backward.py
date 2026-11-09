@@ -167,8 +167,11 @@ MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> regist
 BUTTERFLY = None
 # NVIDIA H200: on from 5 November 2026 (results/h200-defaults-20261105, MD step b/a 0.994 / 0.994, b = on), off again
 # from 6 November: at d599cc70 (with the later w' defaults) the A/B reversed, b/a 0.9659 / 0.9677 with b = off (kernel
-# lab 1,830 us on, 1,612 us off; results/sx012-profile-20261106).
-BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# lab 1,830 us on, 1,612 us off; results/sx012-profile-20261106). On again for the H200 and on for the A100 from 9
+# November 2026 (results/step-limiters-20261109: kernel lab H200 0.956 against today's w' defaults; force/stress
+# gate passes on both): MD step b/a, b = on, SrTiO3 10x10x10 and NbCl5: H200 (e3049399) 0.9863 / 0.9861 and
+# 0.9936 / 0.9903; A100-SXM4-80GB (dad5375b, with PACKED8) 0.9910 / 0.9892 and 0.9942 / 0.9973.
+BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # Round 5 (5 November 2026, external idea "integer warp reductions"). REDUX: the end-of-edge sums of the EDGE_DIM
 # edge-gradient components and dr in fixed point through the hardware integer reduction (redux.sync.add.s32,
 # compute capability 8.0+): per component one redux.sync.max of the lanes' exponents sets a power-of-two scale with
