@@ -177,6 +177,13 @@ class TileConfig:
     budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
+    # state "host" with alias_state: the dtype x, sc and their aliased adjoints are stored in on the host, None the
+    # call's dtype; "bfloat16" or "float16" halve the host state (capacity: the state is the largest host item per
+    # atom under the wavefront). Each value is rounded once where it is written (on the device, before its copy to
+    # the host, which halves that traffic too) and read back exactly into the call's dtype; the tiles compute in the
+    # call's dtype and the alias window (dE/dx summed over an atom's tiles) stays in it. Rounding class: the forces
+    # and stress change by the stored values' rounding (docs/validation/tiled/tiled-host-state-dtype.md).
+    state_dtype: str | None = None
     # state "host": a tile's writes to the host state are applied after the next tile's work is queued, so the
     # device runs it while the host indexes (on CUDA through pinned buffers and events); the same order.
     overlap: bool = True
@@ -245,6 +252,11 @@ class TileConfig:
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
         if self.alias_state and self.state != "host":
             raise ValueError("TileConfig.alias_state needs state='host'")
+        if self.state_dtype not in (None, "bfloat16", "float16"):
+            raise ValueError(f"TileConfig.state_dtype must be None, 'bfloat16' or 'float16', got {self.state_dtype!r}")
+        if self.state_dtype is not None and not self.alias_state:
+            raise ValueError("TileConfig.state_dtype needs alias_state=True (state='host'): every stored value is then "
+                             "written once, never summed in the stored dtype")
         if self.state not in ("device", "host"):
             raise ValueError(f"TileConfig.state must be 'device' or 'host', got {self.state!r}")
         if self.state == "host" and self.mode == "graphs":
@@ -284,8 +296,10 @@ class _State:
     host memory (``TileConfig.state``). Tiles read rows to the device and put or add rows; on the device these
     are the plain indexing and ``index_add_``, in host memory the same on the host after one copy."""
 
-    def __init__(self, device, dtype, host, alias=False, overlap=False):
+    def __init__(self, device, dtype, host, alias=False, overlap=False, store=None):
         self.device, self.dtype, self.host, self.alias = device, dtype, host, alias
+        # TileConfig.state_dtype: the host tensors' dtype (the alias window stays in ``dtype``)
+        self.store = dtype if store is None else store
         self.overlap = host and overlap
         self._pending, self._fresh = [], False  # overlap: the host writes not applied yet
         # TILE_HOST_WORKER: the batches of writes handed to the worker thread (set per call by the tiled call)
@@ -363,7 +377,8 @@ class _State:
         size = self._pool_rows if self.pooled else n
         for name, width in widths.items():
             if name not in self._storage:
-                self.tensors[name] = torch.zeros((size, width), dtype=self.dtype, device=where)
+                self.tensors[name] = torch.zeros((size, width), dtype=self.store if self.host else self.dtype,
+                                                 device=where)
         if self.alias:
             self._width = widths["gx"]
             self._index(n)
@@ -416,10 +431,10 @@ class _State:
         self.settle()
         index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
-            return tensor.index_select(0, index).to(self.device)
+            return tensor.index_select(0, index).to(self.device).to(self.dtype)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
         torch.index_select(tensor, 0, index, out=staging)
-        return staging.to(self.device, non_blocking=True)
+        return staging.to(self.device, non_blocking=True).to(self.dtype)
 
     def fetch(self, name, index):
         """``rows(name, index)`` for a host ``index``, copied on the current stream without waiting (the prefetch
@@ -430,24 +445,26 @@ class _State:
         tensor = self.tensors[self._storage.get(name, name)]
         index = self._rows_of(name, index, read=True)
         if self.device.type != "cuda":
-            return tensor.index_select(0, index).to(self.device)
+            return tensor.index_select(0, index).to(self.device).to(self.dtype)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
         torch.index_select(tensor, 0, index, out=staging)
-        return staging.to(self.device, non_blocking=True)
+        return staging.to(self.device, non_blocking=True).to(self.dtype)
 
     def put(self, name, index, values):
         """``state[name][index] = values``."""
         if not self.host:
             self.tensors[self._storage.get(name, name)][index] = values
         else:
-            self._defer("put", name, self._rows_of(name, index), values)
+            self._defer("put", name, self._rows_of(name, index), values.detach().to(self.store))
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
         if not self.host:
             self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
         else:
-            self._defer("add", name, self._rows_of(name, index) if name != "gx" else index, values)
+            stored = name != "gx" or not self.alias  # aliased dE/dx: summed in the window, in the call's dtype
+            self._defer("add", name, self._rows_of(name, index) if name != "gx" else index,
+                        values.detach().to(self.store) if stored else values)
 
     def new_tile(self):
         """The call starts a tile: its first host write applies the earlier tiles' pending ones, by then behind
@@ -574,7 +591,7 @@ class _State:
         atoms = self._closing[tile]
         if atoms.numel():
             slots = self._slot_of[atoms]
-            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots]
+            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots].to(self.store)
             self._free[self._top:self._top + slots.numel()] = slots
             self._top += slots.numel()
             self._slot_of[atoms] = -1
@@ -2233,7 +2250,8 @@ class TiledForceField:
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
-                                  alias=self.config.alias_state, overlap=self.config.overlap))
+                                  alias=self.config.alias_state, overlap=self.config.overlap,
+                                  store=getattr(torch, self.config.state_dtype) if self.config.state_dtype else None))
             self._g = g
         elif g["head"] is not None and shared:
             g["head"].copy_(heads[:1])
@@ -2314,7 +2332,8 @@ class TiledForceField:
                 decided, short = n >= 2**20, False
             else:
                 itemsize = 8 if str(self.dtype) == "torch.float64" else 4
-                plain = 1.25 * n * width * itemsize
+                stored = 2 if self.config.state_dtype else itemsize  # TileConfig.state_dtype: 16-bit rows
+                plain = n * width * (stored + 0.25 * itemsize)
                 decided, short = plain + int(config.list_reuse_floor) > available, plain > available
             self._wave_auto[n], self._wave_short[n] = decided, short
         return decided

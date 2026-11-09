@@ -1474,6 +1474,44 @@ def test_host_worker_is_bitwise_the_call_that_writes_on_the_calling_thread(wave,
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
+@pytest.mark.parametrize("wave", [False, True], ids=["alias", "wavefront"])
+@pytest.mark.parametrize("store", ["bfloat16", "float16"])
+def test_state_dtype_stores_the_host_state_in_16_bits_and_rounds_only_it(store, wave):
+    """``TileConfig.state_dtype``: x, sc and their aliased adjoints on the host in 16 bits (half the bytes; the alias
+    window stays in the call's dtype), each value rounded once where it is written. The call stays within the
+    stored values' rounding of the call that keeps them in its own dtype."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, boundary_skin=False,
+                  wavefront="on" if wave else "off", wavefront_group=2)
+    results, sizes = {}, {}
+    for dtype in (None, store):
+        tiled = TiledForceField(field, TileConfig(12, state_dtype=dtype, **config))
+        tiled.evaluate(atoms, stress=True)
+        results[dtype] = tiled.evaluate(strained(atoms), stress=True)
+        state = tiled._g["state"]
+        assert {str(t.dtype) for t in state.tensors.values()} == {f"torch.{dtype}" if dtype else str(tiled.dtype)}
+        sizes[dtype] = sum(t.numel() * t.element_size() for t in state.tensors.values())
+        assert state._window is None or state._window.dtype == tiled.dtype
+    assert sizes[store] * (4 if str(tiled.dtype) == "torch.float64" else 2) == sizes[None]
+    (e0, f0, s0), (e1, f1, s1) = results[None], results[store]
+    f0, f1, s0, s1 = (np.asarray(v, dtype=np.float64) for v in (f0, f1, s0, s1))
+    bound = 2.0**-6 if store == "bfloat16" else 2.0**-9  # a few units of the stored format's rounding
+    assert f1.shape == f0.shape and np.abs(f1 - f0).max() <= bound * np.abs(f0).max()
+    assert np.abs(s1 - s0).max() <= bound * max(np.abs(s0).max(), 1e-12)
+    assert abs(e1 - e0) <= bound * abs(e0)
+    assert not np.array_equal(f1, f0)  # the stored values were rounded
+
+
+def test_state_dtype_needs_the_aliased_host_state():
+    with pytest.raises(ValueError, match="state_dtype"):
+        TileConfig(5, state_dtype="float32")
+    with pytest.raises(ValueError, match="alias_state"):
+        TileConfig(5, state="host", state_dtype="bfloat16")
+    TileConfig(5, state="host", alias_state=True, state_dtype="float16")
+
+
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
     """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
     tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less

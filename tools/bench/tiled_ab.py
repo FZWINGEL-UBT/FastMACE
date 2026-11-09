@@ -9,7 +9,9 @@ Each side first runs ``--warmup`` calls (the first, eager call and the compile h
 ``--order ab`` and side b first with ``ba``. Then ``--blocks`` blocks of ``--calls`` timed calls per side alternate in
 that order; the result is the ratio of the sides' median call times, b/a (below 1: b is faster), with each block
 pair's ratio. The last call of each side keeps its energy, forces and stress, and the record compares them (b
-against a). Writes ``<output>/tiled-ab-<tag>.json``. Run on an idle GPU (``tools/ci/local_gpu.py run --quiet``).
+against a). A side's ``config:FIELD=VALUE`` items (``config:state_dtype='float16'``, a Python literal) set
+``TileConfig`` fields instead: each side then keeps its own call buffers and state (``TiledForceField._g``), so the
+sides never share a state of another layout. Writes ``<output>/tiled-ab-<tag>.json``. Run on an idle GPU (``tools/ci/local_gpu.py run --quiet``).
 """
 
 from __future__ import annotations
@@ -77,7 +79,20 @@ def main(argv=None):
     from fastmace.model.tiled import TileConfig, TiledForceField
     from fastmace.planner import minimal
 
-    sides = {"a": constant_overrides(args.a), "b": constant_overrides(args.b)}
+    import ast
+    import dataclasses
+
+    def split(items):
+        """(module constants, TileConfig fields) of one side's items."""
+        fields = {}
+        for item in items:
+            if item.startswith("config:"):
+                name, _, value = item[len("config:"):].partition("=")
+                fields[name] = ast.literal_eval(value)
+        return constant_overrides([i for i in items if not i.startswith("config:")]), fields
+
+    (const_a, config_a), (const_b, config_b) = split(args.a), split(args.b)
+    sides = {"a": const_a, "b": const_b}
     repeat = tuple(int(x) for x in args.repeat.lower().split("x"))
     atoms = tiled_capacity.supercell(args.structure, repeat, 0.0, 0.0)
     n = len(atoms)
@@ -100,16 +115,23 @@ def main(argv=None):
             species="index"))
         positions = field._prepare_one_off(atoms)
     record["rewrites"] = [str(r) for r in getattr(field, "applied", ())]
+    configs = {"a": dataclasses.replace(tiled.config, **config_a), "b": dataclasses.replace(tiled.config, **config_b)}
+    own = bool(config_a or config_b)  # TileConfig sides: each side's own globals and state
+    globals_of = {}
 
     kept = {}
 
     def call(side, keep=False):
+        if own:
+            tiled.config, tiled._g = configs[side], globals_of.get(side)
         with constants(sides[side]):
             torch.cuda.synchronize()
             started = time.perf_counter()
             out = tiled(positions)
             torch.cuda.synchronize()
             seconds = time.perf_counter() - started
+        if own:
+            globals_of[side] = tiled._g
         if keep:
             kept[side] = dict(energy=float(out.energy.reshape(-1)[0]), forces=out.forces.detach().clone(),
                               stress=None if out.stress is None else out.stress.detach().double().cpu())
