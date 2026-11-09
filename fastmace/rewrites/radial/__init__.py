@@ -1365,6 +1365,14 @@ def attach_generic_first_table(model):
         interaction.recompute_table = True
     if not names:
         raise RewriteError("generic_recompute_first_table: no reassociated or chunked interaction with a radial table")
+    from fastmace.rewrites.generic import modules as gm
+
+    products = getattr(model, "products", ())
+    first = model.interactions[0] if len(getattr(model, "interactions", ())) else None
+    if (gm.FIRST_LAYER_REGION and first is not None and products
+            and getattr(first, "recompute_table", False) and getattr(first, "first_reassociation", None) is not None):
+        gm.attach_layer_region(first, products[0])
+        names[0] += "; with product 0 in one region"
     return names
 
 
@@ -1395,17 +1403,56 @@ def _generic_first_table_selfcheck(original, rewritten, context):
         if added:
             interaction.streaming_count = torch.tensor(edges, device=r.device)
         results, cotangents = [], []
+        layer = interaction.__dict__.pop("layer_product", None)  # the interaction alone; the layer below
         try:
             for flag in (False, True):
                 interaction.recompute_table = flag
                 results.append(generic._run(interaction, probe, False, cotangents, generator))
+            if layer is not None:
+                cases += _layer_region_cases(rewritten, interaction, probe, generator)
         finally:
             interaction.recompute_table = True
+            if layer is not None:
+                interaction.layer_product = layer
             if added:
                 del interaction.streaming_count
         cases += [(f"interactions.{index}", a, b) for a, b in zip(*results)]
         dtype = dtype or table.coef.dtype
     return check_tensors(cases, dtype)
+
+
+class _Layer:
+    """The first interaction followed by product 0, called as an interaction (``generic._run``): the output is
+    product 0's. With ``region`` the interaction hands its inputs to product 0 (``FIRST_LAYER_REGION``)."""
+
+    def __init__(self, interaction, product, region):
+        self._interaction, self._product, self._region = interaction, product, region
+
+    def __getattr__(self, name):
+        return getattr(self._interaction, name)
+
+    def __call__(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index, cutoff=None):
+        if self._region:
+            self._interaction.layer_product = True
+        try:
+            feats, sc = self._interaction(node_attrs, node_feats, edge_attrs, edge_feats, edge_index, cutoff=cutoff,
+                                          first_layer=True)
+            return (self._product(node_feats=feats, sc=sc, node_attrs=node_attrs),)
+        finally:
+            self._interaction.__dict__.pop("layer_product", None)
+
+
+def _layer_region_cases(rewritten, interaction, probe, generator):
+    """``FIRST_LAYER_REGION``: the first interaction and product 0 under the one checkpoint against the two run one
+    after the other (the same kernels on the same values; equal up to the sender gradients' atomic order): product
+    0's output and the gradients to the probe's leaves."""
+    from fastmace.rewrites import generic
+
+    product = rewritten.products[0]
+    cotangents, results = [], []
+    for region in (False, True):
+        results.append(generic._run(_Layer(interaction, product, region), probe, False, cotangents, generator))
+    return [("interactions.0..products.0 (one region)", a, b) for a, b in zip(*results)]
 
 
 def _apply_generic_first_table(model, context):

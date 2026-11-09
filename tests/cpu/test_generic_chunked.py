@@ -11,6 +11,7 @@ The CUDA forward and backward against the unchunked path: tests/gpu/test_rewrite
 """
 
 import json
+import types
 from pathlib import Path
 
 import pytest
@@ -79,6 +80,40 @@ def test_the_rescue_rung():
     assert memory.RESCUE_FLOAT32_ONLY == ("generic_recompute_conv_weights", "generic_recompute_first_table")
     assert memory.rescue_stage(["generic_chunked_conv_backward", "generic_recompute_conv_weights"]) == (
         "generic_recompute_conv_weights")
+
+
+def test_the_rung_saves_nothing_beside_generic_wprime():
+    """Beside generic_wprime_backward (which stores no per-edge weights either) the rung saves nothing per edge and
+    its path keeps the message gradient dense, ``messages`` floats per node more (OMAT-0 medium: 5,120; SrTiO3 39^3
+    ran out of memory on it, results/memory-slack-20261109): its context term says so, and RESCUE_NOT_BESIDE keeps
+    rule 12 and the fallback from taking it there."""
+    from fastmace.planner import memory
+
+    dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
+    assert terms.generic_recompute_conv_weights_beside_wprime(dims, 4) == (0, 5120 * 4)
+    assert ("generic_recompute_conv_weights", "generic_wprime_backward",
+            "generic_recompute_conv_weights_beside_wprime") in memory.CONTEXT_TERMS
+    assert memory.RESCUE_NOT_BESIDE == (("generic_recompute_conv_weights", "generic_wprime_backward"),)
+    terms_ = dict(memory.rewrite_memory_terms(
+        {"generic_recompute_conv_weights": types.SimpleNamespace(memory=terms.generic_recompute_conv_weights)},
+        dims, ["generic_wprime_backward", "generic_recompute_conv_weights"], "float32"))
+    assert terms_["generic_recompute_conv_weights"] == memory.MemoryTerm(0, 5120 * 4)
+
+
+def test_the_first_table_rung_keeps_product_0_s_input_out():
+    """generic_recompute_first_table with FIRST_LAYER_REGION: product 0's input (the first interaction's ``target``,
+    2,048 floats per node at OMAT-0 medium) is not kept either; without it the per-node term is zero."""
+    from fastmace.rewrites.generic import modules as gm
+
+    dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
+    assert gm.FIRST_LAYER_REGION is True
+    assert terms.generic_recompute_first_table(dims, 4) == (-65 * 4, -2048 * 4)
+    assert terms.generic_recompute_first_table_with_weights(dims, 4) == (-2 * 65 * 4, -2048 * 4)
+    gm.FIRST_LAYER_REGION = False
+    try:
+        assert terms.generic_recompute_first_table(dims, 4) == (-65 * 4, 0)
+    finally:
+        gm.FIRST_LAYER_REGION = True
 
 
 def test_an_explicit_rung_needs_the_chunked_path_and_float32():

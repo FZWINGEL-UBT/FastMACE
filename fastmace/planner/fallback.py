@@ -408,7 +408,13 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
     ``recompute_node_segments`` only after ``recompute_conv_weights`` is on. If the context is not usable (a sticky
     CUDA error), ``error`` is raised again with a note naming the fix: the records set in a fresh process.
     """
-    from fastmace.planner.memory import CONTEXT_TERMS, MEMORY_RESCUE, annotate_out_of_memory, rescue_value
+    from fastmace.planner.memory import (
+        CONTEXT_TERMS,
+        MEMORY_RESCUE,
+        RESCUE_NOT_BESIDE,
+        annotate_out_of_memory,
+        rescue_value,
+    )
 
     if not _out_of_memory(error):
         return None
@@ -427,6 +433,9 @@ def memory_rescue(plan: Any, error: BaseException, force_field: Any, atoms: Any,
             continue
         if rung in RESCUE_FLOAT32_ONLY and getattr(getattr(plan, "precision", None), "dtype", "float32") != "float32":
             continue
+        if any(owner == rung and not _off(getattr(plan.rewrites, _field(other), "off"))
+               for owner, other in RESCUE_NOT_BESIDE):
+            continue  # it saves nothing beside that record and keeps more (planner.memory.RESCUE_NOT_BESIDE)
         record = _record(rung)
         if record is None:
             continue

@@ -226,6 +226,65 @@ def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
                       use_reentrant=False, preserve_rng_state=False)
 
 
+# generic_recompute_first_table's checkpoint region through product 0 (memory profile item 2, 9 November 2026): the
+# first interaction, its division and product 0 run under one non-reentrant checkpoint, so the backward keeps the
+# layer's inputs instead of product 0's input, the divided message [N, 2048] (8.2 kB per atom at OMAT-0 medium, live
+# at the force backward's peak), and rebuilds the layer when it reaches it, after the second interaction's backward.
+# On the whole system only (a tile runs the layer as before). True / False are the A/B sides.
+FIRST_LAYER_REGION = True
+
+
+class LayerInputs(tuple):
+    """The first interaction's inputs, which it hands to product 0 instead of its output when product 0 runs the
+    layer region (``FIRST_LAYER_REGION``): ``(node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
+    cutoff)``."""
+
+    __slots__ = ()
+
+
+def layer_region_applies(self, lammps_class):
+    """Whether interaction ``self`` hands its inputs to product 0 (``attach_layer_region``): on the whole system."""
+    return getattr(self, "layer_product", None) is not None and lammps_class is None
+
+
+def layer_forward(self, node_feats, sc, node_attrs):
+    """Product 0's forward with the layer region: given the first interaction's ``LayerInputs``, the interaction and
+    product 0 under one non-reentrant checkpoint; any other input (a tile) goes to its class forward."""
+    if not isinstance(node_feats, LayerInputs):
+        return type(self).forward(self, node_feats=node_feats, sc=sc, node_attrs=node_attrs)
+    from torch.utils.checkpoint import checkpoint
+
+    return checkpoint(self.layer_body, *node_feats, use_reentrant=False, preserve_rng_state=False)
+
+
+def layer_body(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index, cutoff):
+    """The first interaction (without its own table checkpoint, which the region covers) and product 0, on the
+    product's class forward (``sc_generated`` swaps the class)."""
+    interaction = self.layer_interaction[0]
+    feats, sc = generic_interaction_forward(interaction, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
+                                            cutoff, first_layer=True, region=True)
+    return type(self).forward(self, node_feats=feats, sc=sc, node_attrs=node_attrs)
+
+
+def attach_layer_region(interaction, product):
+    """``FIRST_LAYER_REGION``: the first interaction hands its inputs to ``product``, which runs both under one
+    checkpoint. The interaction is held in a list (not a second registration of the module)."""
+    import types
+
+    interaction.layer_product = True
+    product.layer_interaction = [interaction]
+    product.layer_body = types.MethodType(layer_body, product)  # bound here: a MethodType made while tracing breaks
+    product.forward = types.MethodType(layer_forward, product)
+    return product
+
+
+def detach_layer_region(interaction, product):
+    """Undo ``attach_layer_region``."""
+    interaction.__dict__.pop("layer_product", None)
+    for name in ("layer_interaction", "layer_body", "forward"):
+        product.__dict__.pop(name, None)
+
+
 def first_div_applies(self, kind, n_real):
     """Whether the first-interaction blocks go through ``kernels.cutlass.first_div`` (``first_div`` set at build by
     ``precision.route``): a density interaction without halo rows whose linear is the identity (the generic fold)
@@ -308,10 +367,13 @@ def _density_sum(edge_density: torch.Tensor, receivers: torch.Tensor, num_nodes:
 
 
 def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
-                                cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False):
+                                cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False, region=False):
     """RealAgnosticResidual / Density / DensityResidual InteractionBlock.forward (mace-torch 0.3.16)
-    with the generic rewrites: streaming convolution, reassociated first interaction, fused radial backward."""
+    with the generic rewrites: streaming convolution, reassociated first interaction, fused radial backward.
+    ``region``: called inside product 0's layer region (``FIRST_LAYER_REGION``)."""
     from mace.tools.scatter import scatter_sum
+    if not region and layer_region_applies(self, lammps_class):  # product 0 runs the layer under one checkpoint
+        return LayerInputs((node_attrs, node_feats, edge_attrs, edge_feats, edge_index, cutoff)), None
     kind = self.generic_kind
     num_nodes = node_feats.shape[0]
     n_real = lammps_natoms[0] if lammps_class is not None else None
@@ -338,8 +400,8 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     message = None
     early_density = None  # first_div: the density summed before the products
     if recompute_table and reassociation is not None:
-        message, table_density = recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
-                                                        edge_index)
+        region_of = first_table_region if region else recomputed_first_table  # the layer region covers the table
+        message, table_density = region_of(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index)
     elif table_lengths is not None:
         from fastmace.rewrites.mh1.modules import streaming_message
         message, table_density = streaming_message(self, node_feats, edge_attrs, None, edge_index, num_nodes,

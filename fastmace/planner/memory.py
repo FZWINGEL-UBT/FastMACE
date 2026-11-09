@@ -74,7 +74,11 @@ RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights", "generic_recompute_firs
 # The rungs the rescue turns off rather than on.
 RESCUE_OFF = ("gate_epilogue",)
 # generic_recompute_conv_weights saves nothing beside generic_wprime_backward, which stores no per-edge weights either
-# (the rung's interactions then run without w'; rewrites.radial.attach_generic_wprime).
+# (the rung's interactions then run without w'; rewrites.radial.attach_generic_wprime), and its path keeps the message
+# gradient dense beside its blocks (rewrites.memory.generic_recompute_conv_weights_beside_wprime: 20.5 kB per atom
+# more at OMAT-0 medium). (rung, record): neither rule 12 nor the fallback (fallback.memory_rescue) takes the rung
+# while the record is on (results/memory-slack-20261109: SrTiO3 39^3 ran out of memory on that gradient).
+RESCUE_NOT_BESIDE = (("generic_recompute_conv_weights", "generic_wprime_backward"),)
 # Records whose term depends on another enabled record, in priority order: (record, other record, the term's name in
 # ``fastmace.rewrites.memory``, "" for none). The first whose other record is enabled replaces the record's own term.
 # Inside recompute_node_region's chunks gate_epilogue's extra buffers are rebuilt per chunk (0.5 kB per atom); with
@@ -83,7 +87,8 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
                  ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"),
                  ("generic_recompute_first_table", "generic_recompute_conv_weights",
                   "generic_recompute_first_table_with_weights"),
-                 ("generic_recompute_conv_weights", "generic_wprime_backward", ""))
+                 ("generic_recompute_conv_weights", "generic_wprime_backward",
+                  "generic_recompute_conv_weights_beside_wprime"))
 
 
 # The caching allocator's reserve above the live peak differs per stage of the memory rescue (the graph pool's packing
@@ -508,7 +513,8 @@ def annotate_out_of_memory(error, plan) -> Any:
 
 __all__ = ["CONTEXT_TERMS", "DTYPE_BYTES", "FIXED_TERMS", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
            "LadderStage", "MemoryEstimate", "MemoryLadder", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD",
-           "PROBE_HEADROOM", "PROBE_TERM", "RESCUE_OFF", "RESCUE_OVERSTATEMENT", "RESCUE_RESERVE", "SAFETY",
+           "PROBE_HEADROOM", "PROBE_TERM", "RESCUE_NOT_BESIDE", "RESCUE_OFF", "RESCUE_OVERSTATEMENT", "RESCUE_RESERVE",
+           "SAFETY",
            "WORKSPACE_BYTES", "annotate_out_of_memory", "counted_edges", "drop_order", "fixed_bytes", "probe_corrected",
            "probed", "rescue_stage", "rescue_value", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
