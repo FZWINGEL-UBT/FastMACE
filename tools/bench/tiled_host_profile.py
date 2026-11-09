@@ -4,7 +4,8 @@ Each wrapped function (the build's steps and the tiled call's host-heavy steps) 
 at entry, its peak while inside (a thread samples ``/proc/self/statm`` every few milliseconds) and at exit, nested
 calls charged to the innermost one as well as their callers. The table (``host-profile.json`` beside the
 ``tiled_capacity.py`` record) lists, per function, the calls, the largest rise of the peak over the entry and the
-largest net growth, in bytes and in bytes per atom. Usage: ``tiled_host_profile.py <tiled_capacity.py arguments>``.
+largest net growth, in bytes and in bytes per atom. ``HOSTPROF_CENSUS=1``: after the build and after each call, the
+host arrays alive (by dtype and shape) and the resident set before and after ``malloc_trim``. Usage: ``tiled_host_profile.py <tiled_capacity.py arguments>``.
 Linux only.
 """
 
@@ -75,6 +76,64 @@ def wrap(owner, name, label):
         setattr(owner, name, wrapped)
 
 
+censuses = {}
+
+
+def census(tag):
+    """The host arrays alive now (torch tensors by storage, numpy arrays by base, each at least 1 MB), grouped by
+    dtype and shape, and the resident set before and after ``malloc_trim(0)`` (heap freed but kept by glibc)."""
+    import ctypes
+    import gc
+
+    import numpy as np
+    import torch
+
+    seen, groups = set(), {}
+
+    def add(kind, dtype, shape, nbytes, key):
+        if key in seen or nbytes < 2**20:
+            return
+        seen.add(key)
+        g = groups.setdefault(f"{kind} {dtype} {list(shape)}", [0, 0])
+        g[0] += 1
+        g[1] += nbytes
+
+    for obj in gc.get_objects():
+        try:
+            if isinstance(obj, torch.Tensor) and obj.device.type == "cpu" and not obj.is_meta:
+                storage = obj.untyped_storage()
+                add("torch", str(obj.dtype).replace("torch.", ""), obj.shape, storage.nbytes(), ("t", storage.data_ptr()))
+            elif isinstance(obj, np.ndarray):
+                base = obj
+                while isinstance(base.base, np.ndarray):
+                    base = base.base
+                add("numpy", base.dtype, base.shape, base.nbytes, ("n", base.__array_interface__["data"][0]))
+        except Exception:
+            pass
+    before = rss()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except OSError:
+        pass
+    after = rss()
+    rows = sorted(groups.items(), key=lambda kv: -kv[1][1])
+    censuses.setdefault(tag, []).append(dict(rss=before, rss_trimmed=after, arrays=sum(v[1] for _, v in rows),
+                                             groups=[[k, v[0], v[1]] for k, v in rows[:25]]))
+
+
+def after(owner, name, tag):
+    fn = owner.__dict__[name]
+
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            census(tag)
+
+    setattr(owner, name, wrapped)
+
+
 def install():
     import fastmace as fm
     from fastmace.model import forces, tiled
@@ -95,6 +154,9 @@ def install():
     wrap(tiled, "plan_tiles", "tiled.plan_tiles")
     for name in ("allocate", "plan", "pool", "touched"):
         wrap(tiled._State, name, f"_State.{name}")
+    if os.environ.get("HOSTPROF_CENSUS"):  # after the build and after each call (outside the RSS frames)
+        after(planner, "build_evaluation", "build")
+        after(tiled.TiledForceField, "_call", "call")
 
 
 def main(argv=None):
@@ -116,7 +178,7 @@ def main(argv=None):
                             net_per_atom=entry["net"] / atoms if atoms else None)
                 for label, entry in sorted(table.items(), key=lambda kv: -kv[1]["peak_rise"])}
         report = dict(atoms=atoms, process_peak=_peak[0], process_peak_per_atom=_peak[0] / atoms if atoms else None,
-                      seconds=time.perf_counter() - started, functions=rows)
+                      seconds=time.perf_counter() - started, functions=rows, censuses=censuses)
         (out / "host-profile.json").write_text(json.dumps(report, indent=1))
         print(json.dumps(dict(atoms=atoms, process_peak=_peak[0],
                               top={k: (v["peak_rise"], round(v["peak_rise_per_atom"] or 0)) for k, v in
