@@ -303,6 +303,16 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
 
     horner_block = (r"scalar_t gv\[PADDED_TERMS\];.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
 
+    def quad_horner(s):
+        """F-quad-horner: value and slope of a quadratic (3 FMAs) in place of the cubic's dual Horner loop."""
+        pattern = (r"scalar_t radial_weight = gv\[TERMS - 1\];\s*scalar_t radial_dt = scalar_t\(0\);\s*#pragma unroll\s*"
+                   r"for \(int k = TERMS - 2; k >= 0; --k\) \{.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
+        out, n = re.subn(pattern, "scalar_t radial_weight = fmaf(fmaf(gv[2], t, gv[1]), t, gv[0]);\n"
+                         "                scalar_t radial_dt = fmaf(gv[2] + gv[2], t, gv[1]);", s, flags=re.S)
+        if not n:  # one per path and edge channel
+            raise ValueError("F-quad-horner: the dual Horner loop was not found")
+        return out
+
     def skip_table(condition):
         """The value-table load and the dual Horner replaced by constants where ``condition`` holds (warp-uniform:
         one warp per edge). Timing only."""
@@ -611,6 +621,10 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "B-mirror-order": ("falsifier", lambda s: s, (), mirror_order),
         "B-mirror-share": ("falsifier", skip_table("e & 1"), (), mirror_order),
         "F-no-table-horner": ("falsifier", skip_table("true"), ()),
+        # 9 November 2026 (step-limiters follow-up): a quadratic spline (twice the pieces) in place of the cubic. Its
+        # value and slope by 3 FMAs instead of the cubic's dual Horner; the same float4 loads (gv[3] unused). The
+        # timing bound of a quadratic table on the FMA-bound A100 w', before any certification. Values wrong.
+        "F-quad-horner": ("falsifier", quad_horner, ()),
         "F-half-table": ("falsifier", skip_table("e & 1"), ()),
         "M-mirror-perm": ("rounding", perm_source, (), mirror_perm),
         "M-mirror-hybrid": ("falsifier", hybrid_source, (), mirror_hybrid),
