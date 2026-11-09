@@ -1455,7 +1455,7 @@ class TiledForceField:
         """``TILE_EPILOGUE``: sweep 3's forward up to its objective, interaction 0's energy (after scale and shift)
         plus <dE/dx, x> + <dE/dsc, sc> over the real receivers: ``(es, objective)``."""
         es, x, sc = self._first_forward(leaf, eps, attrs, local, r)
-        objective = ((self.model.scale_shift(es, self.heads[:r]) * recv_mask).sum()
+        objective = (self._masked(self.model.scale_shift(es, self.heads[:r]), recv_mask).sum()
                      + (self._masked(gx, recv_mask) * x).sum() + (self._masked(gsc, recv_mask) * sc).sum())
         return es, objective
 
@@ -1463,16 +1463,16 @@ class TiledForceField:
     def _edge_epilogue(vectors, g_vec, edge_mask, virial):
         """``TILE_EPILOGUE``: sweep 3's edge-vector gradient without its padding edges and (``virial``) the strain
         gradient of ``_virial``: ``(g_vec, g_eps or None)``."""
-        g_vec = g_vec * edge_mask.unsqueeze(1)
+        g_vec = TiledForceField._masked(g_vec, edge_mask)
         return g_vec, _virial(vectors, g_vec) if virial else None
 
     @staticmethod
     def _second_epilogue(vectors, es, g_vec, g_x, g_sc, node_mask, recv_mask, edge_mask, virial):
         """``TILE_EPILOGUE``: sweep 2's outputs without their padding rows and edges and (``virial``) the strain
         gradient: ``(es, g_vec, g_x, g_sc, g_eps or None)``."""
-        g_vec = g_vec * edge_mask.unsqueeze(1)
+        g_vec = TiledForceField._masked(g_vec, edge_mask)
         masked = TiledForceField._masked
-        return (es * recv_mask, g_vec, masked(g_x, node_mask), masked(g_sc, recv_mask),
+        return (masked(es, recv_mask), g_vec, masked(g_x, node_mask), masked(g_sc, recv_mask),
                 _virial(vectors, g_vec) if virial else None)
 
     def _epilogue(self, key):
