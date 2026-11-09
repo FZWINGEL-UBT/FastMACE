@@ -26,6 +26,14 @@ SC_GENERATED = None
 # A100 family (9 November 2026, same run id; Modal NVIDIA A100 80GB PCIe, a = its A100 defaults): MD step b/a
 # 0.9685 / 0.9652; gate passes (forces 0.972 / 0.854 / 0.977, stress 0.701 / 0.898 / 1.237).
 SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# SC_FACTORED (results/other-ways-20261109 section 3; rounding: another basis and summation order): with SC_GENERATED
+# the kernel pair of kernels.cuda.sc_factored, the contraction through memoised CG pair products in a cheaper basis of
+# the descriptor's span, the change of basis folded into the weights once at routing. OMAT-0 medium: 413 operations
+# plus 61 output FMAs per channel against about 1,040 forward and 1,500 backward. Kernel lab, A100 defaults: Alex
+# A100-SXM4-80GB forward 0.593, forward + backward 0.650 of the monomial pair (226.0 -> 147.0 us); local RTX 5060 Ti
+# 1.003 (memory-bound there). None: on for SC_FACTORED_GPUS (none yet); True / False: an A/B side's choice.
+SC_FACTORED = None
+SC_FACTORED_GPUS = GPUModels(())
 
 _subclasses = {}
 
@@ -37,6 +45,11 @@ def sc_generated_default(name=None, config="auto") -> bool:
     if on is None:
         on = config == "on" if config in ("on", "off") else name in SC_GENERATED_GPUS
     return bool(on)
+
+
+def sc_factored_default(name=None) -> bool:
+    """``SC_FACTORED`` (an A/B side's choice) when set; else ``name`` in ``SC_FACTORED_GPUS``."""
+    return bool(SC_FACTORED) if SC_FACTORED is not None else name in SC_FACTORED_GPUS
 
 
 def _weight(contraction):
@@ -60,7 +73,10 @@ def _forward(self, node_feats, sc, node_attrs):
     if self.cueq_config.layout_str == "mul_ir":
         node_feats = torch.transpose(node_feats, 1, 2)
     x = contraction.transpose_in(node_feats.flatten(1))
-    y = sc_generated_forward(x, density, _weight(contraction), node_attrs.argmax(dim=-1).int(), self.sc_generated_id)
+    weight = getattr(self, "sc_generated_weight", None)  # SC_FACTORED: folded once at routing
+    if weight is None:
+        weight = _weight(contraction)
+    y = sc_generated_forward(x, density, weight, node_attrs.argmax(dim=-1).int(), self.sc_generated_id)
     return self.linear(contraction.transpose_out(y))
 
 
@@ -100,12 +116,19 @@ def generate(model):
 
     product = model.products[0]
     model.interactions[0].first_reassociation.sc_generated = True
-    if hasattr(type(product), "sc_generated_base"):  # routed before: the kernels are compiled
-        return model
-    with torch.cuda.device(product.symmetric_contractions.weight.device):
-        kernels = GeneratedContraction(product.symmetric_contractions)
+    contraction = product.symmetric_contractions
+    device = contraction.weight.device
+    factored = sc_factored_default(torch.cuda.get_device_name(device))
+    if hasattr(type(product), "sc_generated_base") and getattr(product, "sc_generated_factored", None) == factored:
+        return model  # routed before with the same SC_FACTORED: the kernels are compiled
+    with torch.cuda.device(device):
+        kernels = GeneratedContraction(contraction, factored=factored)
+        product.sc_generated_weight = (kernels.fold(_weight(contraction).detach()).contiguous() if kernels.factored
+                                       else None)
     product.sc_generated_id = kernels.id
-    product.__class__ = _subclass(type(product))
+    product.sc_generated_factored = factored
+    if not hasattr(type(product), "sc_generated_base"):
+        product.__class__ = _subclass(type(product))
     return model
 
 
@@ -127,4 +150,5 @@ def route(model, config="auto") -> int:
     return 1
 
 
-__all__ = ["SC_GENERATED", "SC_GENERATED_GPUS", "applies", "generate", "route", "sc_generated_default"]
+__all__ = ["SC_FACTORED", "SC_FACTORED_GPUS", "SC_GENERATED", "SC_GENERATED_GPUS", "applies", "generate", "route",
+           "sc_factored_default", "sc_generated_default"]
