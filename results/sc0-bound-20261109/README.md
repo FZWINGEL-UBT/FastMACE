@@ -5,15 +5,10 @@ symmetric contraction (OMAT-0 medium) with a generated channel-diagonal NVRTC ke
 `ch = threadIdx.x`), and fuse the 1 / (density + 1) division that feeds it. Is the ceiling above the 68 µs lab bar
 (2× the 1 % triage floor of a 3.42 ms H200 step)?
 
-**Verdict: LAB.** The traffic floor is not the limit; cuEq's kernels are FP32-issue bound on the H200. They also
-execute more FP32 instructions than the polynomial needs: 1.33× forward and 1.56× backward against a straight-line
-evaluation with shared monomials. Counting the instructions a generated kernel needs gives these estimates:
-
-- paper ceiling, at full FP32 rate: about **119–123 µs**;
-- at cuEq's own 70 % FMA-pipe use: about **95–99 µs** (2.8 % of the step).
-
-Both clear 68 µs. Without fewer instructions than cuEq, only the two division kernels go (about 48 µs), which is
-below the bar. The lab must therefore first show the instruction cut (see "Next step").
+**Verdict: LAB, and the lab passes.** The traffic floor is not the limit: cuEq's kernels are FP32-issue bound on the
+H200, and they execute more FP32 instructions than the polynomial needs. The bound from instruction counts was 95–99 µs
+at cuEq's pipe use (119–123 µs at full rate), which clears the 68 µs bar. The generated kernels then measured
+**179.5 → 82.4 µs, saving 97.1 µs (2.8 %)** (see "Lab" below). Next: engine integration, a packed A/B and the gate.
 
 ## The bucket (H200 round-6 breakdown, Benchmark_loup SrTiO3 10×10×10, 5,000 atoms)
 
@@ -128,9 +123,57 @@ bound, so that screen's "at its traffic floor" does not carry over.
   (one block per atom: one block reduction). This is small next to the arithmetic.
 - **cuEq's run-time variant choice** (`algo1_2` / `algo1_4`) moves the forward by under 1 µs here.
 
-## Next step (lab)
+## Lab: generated forward and backward ([`tools/sc0_lab.py`](../../tools/sc0_lab.py))
 
-Build only the forward first: NVRTC straight-line code from the descriptor (shared monomials, immediate
-coefficients, x = m·s fused), timed against cuEq's 40 µs on the H200 with an ncu instruction count. It has to come in
-at about 30 µs or less, and confirm about 1,035 FP32 instructions per channel, before the backward is worth writing.
-If the forward does not beat cuEq, stop: the divisions alone (about 48 µs) are below the bar.
+**Result: 179.5 → 82.4 µs on the H200, saving 97.1 µs (2.8 % of the step). This passes triage stage 3 (the bar is
+twice the 34 µs a 1 % bound needs, so 68 µs).** The next stage is a packed MD-step A/B with the kernels in the
+engine, then the 3× float32 force/stress gate.
+
+Both kernels are NVRTC straight-line code generated from the module's own cuEq descriptor (the descriptor's paths
+with equal (weight, sorted monomial, output) merged: 480 terms). One block of 128 threads per atom, cuEq's layouts.
+
+- **`sc0_fwd`** reads m, D, the species weights, and writes y. It forms x = m·s with s = 1 / (D + 1). It builds the
+  monomials once in consumption order: each degree-2 prefix, then its degree-3 monomials. Each term goes into its
+  (weight, output) accumulator with an immediate coefficient, and y_C = Σ_a w_a · t_aC. 80 registers, no spills.
+- **`sc0_bwd`** reads m, D, the weights and dy, and writes dm and dD. It forms q_aC = w_a·dy_C, then the per-monomial
+  adjoint h = Σ coef·q. For each prefix p = x_i x_j, a monomial (i, j, k) adds h·p to dx_k and h·x_k to a pair
+  adjoint H, and then dx_i += H·x_j and dx_j += H·x_i. This also handles repeated indices. Finally dm = dx·s in the
+  species GEMM's [5000, 16, 128] row layout, and dD = −s·Σ dx·x by a block reduction. 96 registers, no spills.
+- **Correctness against cuEq** (through autograd for the backward; not bitwise, another summation order): y rms
+  2.6e-7, dm rms 2.4e-7, dD rms 3.0e-7, max error 4–9e-7 of the largest value.
+
+H200 (Modal `sixth`): forward step at source `b45b65a0` ([fwd-lab-h200/](fwd-lab-h200/)); full lab at `636ed463`
+([lab-h200/](lab-h200/)). 15 alternating rounds, kernel time, L2 flushed before each pass:
+
+| Case | µs | Kernels (µs) |
+| --- | ---: | --- |
+| cuEq forward | 40.0 | |
+| division + cuEq forward | 61.5 | 21.5 + 39.9 |
+| generated forward | 31.5 | |
+| generated forward, division fused | 32.0 | |
+| **proxy** (division, cuEq forward, cuEq backward, division backward) | **179.5** | 21.5 + 40.1 + 87.8 + 30.0 |
+| **generated pair** (fused forward + fused backward) | **82.4** | 32.2 + 50.2 |
+
+Nsight Compute, one launch each:
+
+| Kernel | µs | FFMA / FMUL | FP32 per atom-channel | FMA pipe | DRAM | Registers |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| cuEq forward | 39.9 | 307 M / 577 M | 1,381 | 71 % | 23 % | 56 |
+| `sc0_fwd` (fused) | 30.5 | 308 M / 351 M | 1,030 | 73 % | 31 % | 80 |
+| cuEq backward | 88.1 | 744 M / 1,135 M | 2,935 | 69 % | 18 % | 96 |
+| `sc0_bwd` (fused) | 48.8 | 614 M / 340 M | 1,490 | 64 % | 32 % | 96 |
+
+The instruction cut is as predicted: forward 0.75×, backward 0.51×. The kernels run at cuEq's pipe use. The
+backward's 1,490 is below the 1,668 that the generated source spells out, because ptxas folds some products.
+
+On the 5060 Ti (smoke test, 3 rounds) the generated pair takes 406 µs against the proxy's 895 µs. Everything there is
+memory bound: the pair runs at about that GPU's traffic floor.
+
+**Still open:**
+- The **invariant-basis rewrite** (a sibling lane's suggestion: s, v, Q, T and 13 + 16 invariants or covariants,
+  about 411 FP32 instructions forward) could cut the forward toward its 16 µs traffic floor. The backward is the
+  larger kernel, and it would need the same treatment.
+- **The engine integration** is the next step. In interaction 0, the compiled graph's division and the cuEq
+  contraction become one custom op, with the generated backward as its autograd. The kernels are specific to the
+  descriptor and generated at plan time, not per GPU or per crystal. Then come the packed H200 A/B (both orders)
+  and the force/stress gate.
