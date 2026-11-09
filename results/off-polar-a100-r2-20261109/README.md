@@ -67,7 +67,20 @@ SORT_BY_LENGTH off: the A100 OFF and POLAR gates of 8 November; bitwise for the 
 
 ## Confirmation (A100-SXM4-80GB, branch c619d306, b = main's defaults forced back)
 
-CONFIRMATION_TABLE
+b/a > 1: the branch's defaults are faster. MD step in ms is side a's (the branch's) median.
+
+| Model | Structure | Branch, ms (ab / ba) | b/a = main / branch (ab / ba) | b forces |
+|---|---|---|---|---|
+| OFF23-small | water_216 | 1.493 / 1.504 | 1.0251 / 1.0074 | `SORT_BY_LENGTH=True` |
+| OFF23-large | water_216 | 6.945 / 6.916 | 0.9972 / 1.0047 | `SORT_BY_LENGTH=True` |
+| POLAR-1-M | NaCl | 4.138 / 4.104 | 1.0129 / 1.0306 | `STAGE_DOUT=True DEGREE_PARTS=True` |
+| POLAR-1-M | NbCl5 | 16.098 / 16.126 | 1.0145 / 1.0142 | `STAGE_DOUT=True DEGREE_PARTS=True` |
+
+OFF23-small and POLAR-1-M confirm in both orders: 0.7-2.5 % and 1.3-3.1 %. OFF23-large is a tie here (the
+screen had 0.5-1 % for the removal in both orders); a pure removal needs only a not-slower A/B (decision 66), so
+it stays off for large as well. The confirmation also shows that the model label reaches the neighbour list, the
+w′ backward and the fused forward in the real force field (side b differs from side a only through the forced
+constants).
 
 ## Files
 
