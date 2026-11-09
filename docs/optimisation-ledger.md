@@ -669,6 +669,9 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-lazy-keys](#tiled-lazy-keys) | Slot keys taken in sweep 1 from the prefetched graphs instead of a search pass | `TILE_LAZY_KEYS` (removed) | FM | REJECTED | 2026-11-09 | device 1.023 / 1.002 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-state-dtype](#tiled-state-dtype) | Host state stored in 16 bits when the host is short (`"auto"`: kept lists first, then float16) | `TileConfig.state_dtype` | FM | DEFAULT `"auto"` (capacity fallback; float16 and bfloat16 not a default) | 2026-11-09 | float16 gate 12-51x, bfloat16 50-750x (fail); f16 store 0.983 / 0.977; host state halved | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
+| [tiled-kept-compact](#tiled-kept-compact) | Kept lists delta-encoded below their 3 B per edge | - | FM | REJECTED (bound) | 2026-11-09 | at most a third of the lists; dropping them whole when short saves all | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
+| [tiled-malloc-mmap](#tiled-malloc-mmap) | glibc mmap threshold 1 MiB for capacity runs | `MALLOC_MMAP_THRESHOLD_` (environment) | FM | MEASURED (environment, not code) | 2026-11-09 | process peak -7 % at 10M atoms; calls within 1 % | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 
 <a id="tiled-prefetch-device"></a>
 #### tiled-prefetch-device: TileConfig.prefetch with the state on the device
@@ -759,6 +762,34 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Status: DEFAULT (scoped). Exact (CPU test, all and some tiles kept: bitwise, one build per tile against four).
 - Measured: wavefront 0.824 / 0.817 (7f193e78): 12.02 to 9.90 µs/atom.
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-state-dtype"></a>
+#### tiled-state-dtype: the host state in 16 bits, as a host-budget fallback
+- Switch: `fastmace.model.tiled.TileConfig.state_dtype` (None, "auto" default, "float16", "bfloat16"; aliased host state only)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled capacity)
+- What: x, sc and their aliased adjoints stored on the host in 16 bits, rounded once where written and read back exactly; the tiles and the alias window stay in the call's dtype. "auto" keeps the call's dtype while the state fits above `list_reuse_floor` (host room = MemAvailable and the memory cgroup's room), drops the kept lists first (exact, 14 % slower calls), and stores float16 only if the state still does not fit.
+- Status: DEFAULT "auto", which changes nothing where the host has room. float16 and bfloat16 REJECTED as defaults: the 3x float32 gate fails (float16 forces 12-51x, bfloat16 112-310x). NVE drift with float16 equals float32's (0.0022 against 0.0023 meV/atom/ps, 40,000 atoms, 1,000 steps), so float16 is the capacity format.
+- Measured: f16 store 0.983 / 0.977, bf16 0.979 / 0.981 (975,560 atoms, wavefront); no kept lists 1.137 / 1.150; host 2,144 to 1,147 B/atom at 10M atoms (float16 and no kept lists).
+- Sources: [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md).
+
+<a id="tiled-kept-compact"></a>
+#### tiled-kept-compact: kept lists below 3 bytes per edge
+- Switch: none (bound only)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled capacity)
+- What: the kept lists already store int16 ranks with a dictionary, one-byte unit codes and narrow counts (about 3 B per edge over a superset of about 2.2x the cutoff's edges). Delta-encoding the ranks would save at most a third of them.
+- Status: REJECTED at the bound: under a short host the lists now go whole (`state_dtype="auto"`, `list_reuse_floor`), which saves all of them at a measured 14 % per call.
+- Sources: [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md).
+
+<a id="tiled-malloc-mmap"></a>
+#### tiled-malloc-mmap: glibc's mmap threshold for capacity runs
+- Switch: environment `MALLOC_MMAP_THRESHOLD_=1048576` (also `MALLOC_ARENA_MAX=2`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled capacity)
+- What: a fixed 1 MiB threshold returns freed mid-size blocks to the system instead of keeping them in the heap.
+- Status: MEASURED: process peak 1,147 to 1,068 B/atom at 10M atoms (MALLOC_ARENA_MAX=2: 1,086), call times within 1 %. An environment setting for capacity runs; no code change.
+- Sources: [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md).
 
 <a id="tiled-host-worker"></a>
 #### tiled-host-worker: host-state writes on a worker thread

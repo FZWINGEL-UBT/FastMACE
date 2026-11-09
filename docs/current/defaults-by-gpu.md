@@ -230,6 +230,7 @@ On the A100 family and the other GPUs, small keeps the pair off until it has its
 | `tiled.TILE_PINNED_SUPERSET` (`TILED_SPEED_GPUS`, exact): kept lists pinned on the host, up to 4 GiB | on | – | – | 0.986 / 0.990; wavefront 0.989 / 0.990 (1.012 / 1.028 while host-bound) | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 | `tiled.TILE_GRAPH_CACHE_WAVE` (`TILED_SPEED_GPUS`, exact): the graph cache under the wavefront, search pass to sweep 3 | on | – | – | wavefront 0.824 / 0.817 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
 | `tiled.TILE_HOST_WORKER` (`TILED_SPEED_GPUS`, exact): host-state writes applied on a worker thread | on | – | – | wavefront 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |
+| `TileConfig.state_dtype` (every GPU, aliased host state): `"auto"`, the call's dtype while the host state fits; else the kept lists go, then float16 (fails the 3x gate: a capacity fallback) | auto | auto | auto | f16 store 0.983 / 0.977; host state halved | [tiled-host-state-dtype](../validation/tiled/tiled-host-state-dtype.md) |
 
 ## 2. Default MH-1 float32 plan (GPU-independent)
 
