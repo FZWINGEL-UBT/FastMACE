@@ -8,7 +8,8 @@
 #SBATCH --export=NONE
 #
 # Usage, on a frontend:  sbatch --output=<OUT>/slurm-%j.out tools/jobs/alex_step_limiters.sh <job.env>
-# <job.env> sets FM_ROOT, SRC, OUT, ENV_TAR, CACHE, STAGE as for alex_ab_pack.sh; NCU_MODULE (default cuda/13.2.0).
+# <job.env> sets FM_ROOT, SRC, OUT, ENV_TAR, CACHE, STAGE as for alex_ab_pack.sh; NCU_MODULE (default cuda/13.2.0);
+# JOB_SCRIPT (default tools/modal/step_limiters.sh) runs another tools/modal job script instead, e.g. kernel_lab.sh.
 # Results: $OUT/run.log, $OUT/main/ (step_breakdown), $OUT/ncu.ncu-rep*, $OUT/ncu_raw.csv; classify offline with
 # tools/step_limiters.py.
 unset SLURM_EXPORT_ENV
@@ -63,7 +64,9 @@ ncu_bin=$(module load "${NCU_MODULE:-cuda/13.2.0}" >/dev/null 2>&1; command -v n
 export PATH=$PATH:$(dirname "$ncu_bin")
 cd "$src" || exit 4
 note "alex_step_limiters v1 job ${SLURM_JOB_ID:-?} on $(hostname); ncu $ncu_bin"
-OUT=$out bash tools/modal/step_limiters.sh
+# JOB_SCRIPT: another tools/modal job script, e.g. kernel_lab.sh (with KERNELS, VARIANTS, ROUNDS, CONSTANTS, LAB_ARGS)
+export KERNELS VARIANTS ROUNDS CONSTANTS LAB_ARGS 2>/dev/null
+OUT=$out bash "${JOB_SCRIPT:-tools/modal/step_limiters.sh}"
 code=$?
-note "step_limiters exit=$code"
+note "${JOB_SCRIPT:-step_limiters} exit=$code"
 exit $code
