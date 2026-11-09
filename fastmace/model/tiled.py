@@ -88,10 +88,11 @@ TILE_GRAPH_CACHE_FRACTION = 0.25
 TILE_FILTER32 = None
 # TILE_EPILOGUE (rounding): the sweeps' eager work around the compiled forwards moves into compiled code (mode
 # "compiled"; the same functions run eagerly in the other modes): sweep 1's padding masks and sweep 3's objective
-# (scale and shift, the masks, <dE/dx, x> + <dE/dsc, sc>) join the sweeps' forwards, and the edge-gradient masks and
-# the virial (TILE_VIRIAL) of sweeps 2 and 3 are one compiled epilogue each. Before, these were about 15 eager
-# elementwise kernels and reductions per tile and sweep (about 0.2 us per atom per call at 975,560 SrTiO3 atoms). The
-# gradients are the same products; the virial's and the objective's sums change their order.
+# (scale and shift, the masks, <dE/dx, x> + <dE/dsc, sc>) join the sweeps' forwards; the edge-gradient masks and the
+# virial (TILE_VIRIAL) of sweeps 2 and 3 are one compiled epilogue each, and a padded slot's edge vectors one kernel.
+# Before, these were about 20 eager elementwise kernels and reductions per tile and sweep (about 0.25 us per atom per
+# call at 975,560 SrTiO3 atoms). The gradients are the same products; the virial's and the objective's sums change
+# their order.
 TILE_EPILOGUE = None
 
 
@@ -766,6 +767,15 @@ def _virial(vectors, gradient, mask=None):
         gradient = gradient * mask.unsqueeze(1)
     outer = (vectors.unsqueeze(2) * gradient.unsqueeze(1)).reshape(-1, 9).sum(dim=0).reshape(3, 3)
     return 0.5 * (outer + outer.transpose(0, 1))
+
+
+def _tile_vectors(pos, ei, shifts, edge_mask, far):
+    """A padded slot's edge vectors [E, 3]: ``pos[receiver] - pos[sender] + shift``, and ``far`` (beyond the cutoff)
+    for the padding edges (``TILE_EPILOGUE``: one compiled kernel)."""
+    import torch
+
+    vectors = pos[ei[1]] - pos[ei[0]] + shifts
+    return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
 
 
 def _split_streams(device):
@@ -1546,8 +1556,11 @@ class TiledForceField:
 
         receivers = slot["sizes"][0]
         nodes, ei = slot["nodes"], slot["ei"]
-        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + slot["shifts"]
-        vectors = torch.where(slot["edge_mask"].unsqueeze(1) > 0, vectors, self._far)
+        if self._speed(TILE_EPILOGUE):
+            vectors = self._compiled_once("vectors", _tile_vectors)(g["pos"], ei, slot["shifts"], slot["edge_mask"],
+                                                                   self._far)
+        else:
+            vectors = _tile_vectors(g["pos"], ei, slot["shifts"], slot["edge_mask"], self._far)
         tile = (nodes, slot["local"], receivers, vectors, slot["recv_mask"], slot["node_mask"], slot["edge_mask"])
         strain = True if g["stress"] else None
         if sweep == 1:

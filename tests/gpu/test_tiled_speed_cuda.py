@@ -1,12 +1,12 @@
 """The tiled call's speed switches (results/tiled-speed-20261108) on CUDA with MACE-OMAT-0 medium.
 
 ``rewrites.generic.modules.TILE_BLOCK_ROWS`` (the w' convolution's block-layout message kept for a tile's receivers),
-``model.tiled.TILE_VIRIAL`` (the strain gradient from the edge vectors' gradient) and ``model.tiled.
-TILE_PREFETCH_DEVICE`` (the next tile's graph built ahead with the state on the device) and ``model.tiled.
-TILE_EPILOGUE`` (the sweeps' masks, objective and virial in compiled code): each switch on against off on the same
-tiled force field, and the tiled call against the whole-system call of the same plan, on SrTiO3 6x6x6 (1,080 atoms,
-rattled and strained) in tiles of 256 receivers, eager and padded (the epilogue compiled too). The forces are summed with atomics
-on the GPU, and so are the forward's sums: the sides agree to float32 rounding, not bitwise, energy included. Needs
+``model.tiled.TILE_VIRIAL`` (the strain gradient from the edge vectors' gradient), ``model.tiled.TILE_PREFETCH_DEVICE``
+(the next tile's graph built ahead with the state on the device) and ``model.tiled.TILE_EPILOGUE`` (the sweeps' masks,
+objective, virial and edge vectors in compiled code): each switch on against off on the same tiled force field, and
+the tiled call against the whole-system call of the same plan, on SrTiO3 6x6x6 (1,080 atoms, rattled and strained) in
+tiles of 256 receivers, eager and padded (the epilogue compiled too). The forces are summed with atomics on the GPU,
+and so are the forward's sums: the sides agree to float32 rounding, not bitwise, energy included. Needs
 ``FASTMACE_MODELS`` (the checkpoint) and the hybrid backend's kernels; the w' path is on only where decision 66 lists
 the GPU for OMAT-0 medium (otherwise the test skips). Runs in a fresh interpreter (the OEq runtime is prepared before
 MACE is imported).
