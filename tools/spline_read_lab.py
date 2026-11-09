@@ -182,3 +182,67 @@ def variant(kernel, read, table=None, grid=None):
           f"(production {kernel.registers}), table {new_table.numel() * 4 / 2 ** 20:.1f} MiB, bias {bias}",
           flush=True)
     return k, new_table, sources
+
+
+def _fake(n, var="channel"):
+    """A per-thread float that costs one integer op and differs per n (so nothing is folded or merged)."""
+    return f"__int_as_float(0x3c000000 | (({var} + {n}) & 0xfff))"
+
+
+def wprime_zero(source, what):
+    """w′'s source with the loads of ``what`` ("table", "dout", "x" or "all") replaced by register values of one
+    integer op each, the arithmetic kept (report 5's zero-byte test: what the operand's L1/shared wavefronts cost,
+    not only its misses). The output is wrong."""
+    parts = ("table", "dout", "x") if what == "all" else (what,)
+    count = 0
+    if "table" in parts:
+        old = "const float4 v = __ldg(gq + k);"
+        if old not in source:
+            raise ValueError("spline_read_lab: no float4 table loads in w′")
+        z = _fake(0, "weight_index")
+        source = source.replace(old, f"const float zq = {z}; const float4 v = make_float4(zq, zq + 1.f, zq + 2.f, "
+                                     "zq + 3.f);")
+        count += 1
+    if "dout" in parts:
+        n = [0]
+
+        def dout(m):
+            n[0] += 1
+            return f"const scalar_t output_gradient = {_fake(100 + n[0])};"
+        source, k = re.subn(r"const scalar_t output_gradient =\s*stage_row\[[^\]]*\];", dout, source)
+        if not k:
+            raise ValueError("spline_read_lab: no staged dout reads in w′")
+        count += k
+    if "x" in parts:
+        names = {}
+
+        def xread(m):
+            key = re.sub(r"\s+", "", m.group(1))
+            names.setdefault(key, len(names))
+            return _fake(300 + names[key])
+        source, k = re.subn(r"\bx\[input_base([^\]]*)\]", xread, source)
+        if not k:
+            raise ValueError("spline_read_lab: no sender-row reads in w′")
+        count += k
+    return source, count
+
+
+def wprime_variant(kernel, what):
+    """A copy of the captured ``WPrimeBackward`` compiled from ``wprime_zero``'s source."""
+    import copy
+
+    import torch
+    from cuda.bindings import driver
+
+    from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+
+    source, n = wprime_zero(kernel.source, what)
+    options = (f"--maxrregcount={kernel.max_registers}",) if kernel.max_registers else ()
+    k = copy.copy(kernel)
+    k.source = source
+    k._module = _check(driver.cuModuleLoadData(compile_cubin(source, torch.cuda.get_device_capability(), options)))
+    k._function = _check(driver.cuModuleGetFunction(k._module, b"oeq_projected_backward_wprime"))
+    registers = int(_check(driver.cuFuncGetAttribute(
+        driver.CUfunction_attribute.CU_FUNC_ATTRIBUTE_NUM_REGS, k._function)))
+    print(f"wprime zero-{what}: {n} loads replaced, registers {registers}", flush=True)
+    return k, source

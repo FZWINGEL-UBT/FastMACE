@@ -75,7 +75,18 @@ FORMATS = {
     "C: m19 m11 b10@a0 b6@a0": (("m", 19), ("m", 11), ("b", 10, 0, 6), ("b", 6, 0, 2)),
     "D: m17 m13 b10@a0 b6@a0": (("m", 17), ("m", 13), ("b", 10, 0, 6), ("b", 6, 0, 2)),
     "E econ: m19 m13 b14@a0": (("m", 19), ("m", 13), ("b", 14, 0, 8), None),
+    # t basis (report 5, proposal 5): a, b float32; c, d float16 scaled by a power of two per (pair, weight)
+    "T1: t-basis f32 f32 h16 h16": (("t",), ("t",), ("h",), ("h",)),
+    "T2: t-basis f32 f32 f32 h16": (("t",), ("t",), ("t",), ("h",)),
 }
+
+
+def half_scaled(x):
+    """x [P, I, Q] rounded to float16 after scaling each (pair, weight) column by 2^(14 - E), E the exponent of the
+    column's largest |x| (so nothing overflows; small values go subnormal as in the kernel)."""
+    top = x.abs().amax(dim=1, keepdim=True)
+    scale = torch.exp2(14 - exponent(top))
+    return (x * scale).to(torch.float16).double() / scale
 
 
 def midpoint(c):
@@ -161,10 +172,17 @@ def main(argv=None):
     print(f"shared exponents span {int(e.min())} .. {int(e.max())} (a 7-bit field holds 128)", flush=True)
     result["shared_exponent_span"] = [int(e.min()), int(e.max())]
     for name, codes in FORMATS.items():
-        q, clipped = quantize(a, codes)
-        c = scorer.certificate(scorer.relative(power(q).to(torch.float32), grid))
+        if codes[0] == ("t",):  # t basis as stored today: float32 or scaled float16 per coefficient
+            clipped = 0
+            q = torch.stack([coef64[..., i, :] if code == ("t",) else half_scaled(coef64[..., i, :])
+                             for i, code in enumerate(codes)], dim=-2)
+            c = scorer.certificate(scorer.relative(q.to(torch.float32), grid))
+        else:
+            q, clipped = quantize(a, codes)
+            c = scorer.certificate(scorer.relative(power(q).to(torch.float32), grid))
         value = max(v for k, v in c["parts"].items() if k.startswith("value"))
-        bits = sum(0 if code is None else (9 + code[1] if code[0] == "m" else code[1]) for code in codes)
+        bits = sum(0 if code is None else 32 if code[0] == "t" else 16 if code[0] == "h" else
+                   (9 + code[1] if code[0] == "m" else code[1]) for code in codes)
         bits += (7 if name.startswith("S8") else 6 if " E6 " in name else 8) if any(cd is not None and cd[0] == "x" for cd in codes) else 0
         result["formats"][name] = dict(codes=[list(cd) if cd else None for cd in codes], bits=bits, clipped=clipped,
                                        value_worst=value, worst=c["worst"], parts=c["parts"])
