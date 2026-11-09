@@ -979,7 +979,7 @@ def moved_within(positions, reference, limit, chunk=None):
 
 def _host_available():
     """The host's available memory in bytes: ``MemAvailable``, or less where the process's memory cgroup leaves less
-    (``_cgroup_room``: a batch job's limit, e.g. 120 GB per A100 on a 2 TB Alex node, which /proc/meminfo does not
+    (``_cgroup_room``: a batch job's limit, e.g. 231.5 GB for one A100-80 on an Alex node, which /proc/meminfo does not
     show); None where /proc/meminfo is missing."""
     available = None
     try:
@@ -1035,7 +1035,8 @@ def _cgroup_room(root="/sys/fs/cgroup", own="/proc/self/cgroup"):
         for depth in range(len(parts), -1, -1):
             directory = os.path.join(base, *parts[:depth])
             if v2:
-                limit, usage = read(os.path.join(directory, "memory.max")), read(os.path.join(directory, "memory.current"))
+                limit = read(os.path.join(directory, "memory.max"))
+                usage = read(os.path.join(directory, "memory.current"))
                 key = "inactive_file"
             else:
                 limit = read(os.path.join(directory, "memory.limit_in_bytes"))

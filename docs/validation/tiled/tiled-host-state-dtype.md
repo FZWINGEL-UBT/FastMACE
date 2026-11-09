@@ -34,8 +34,8 @@ should the kept lists (73.1 GB of the 149M record's 179.8 GB host peak) stay whe
     - otherwise float16, and the kept lists go too if even half does not fit.
 - **`_host_available()`.** Now the minimum of `MemAvailable` and the room the process's memory cgroups leave
   (`_cgroup_room`, v1 and v2, over the cgroup and its ancestors: limit less usage less inactive file cache).
-  - Inside a Slurm job, `/proc/meminfo` shows the whole node (2 TB on an Alex A100 node), not the job's 120 GB per
-    GPU.
+  - Inside a Slurm job, `/proc/meminfo` shows the whole node (1.6 TB available on Alex node a0731), not the job's
+    limit (231.5 GB for one A100-80, cgroup v2).
 - **The call's report** has `state_dtype` and `state_dtype_reason`.
 - **A fix on the way:** the wavefront with `neighbours="global"` failed on a missing `_list_cache` (initialised in
   `__init__` now, with a test).
