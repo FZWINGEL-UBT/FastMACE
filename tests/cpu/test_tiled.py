@@ -1409,6 +1409,47 @@ def test_fill_skip_leaves_the_graph_caches_tiles_out_of_the_list_cache(budget, m
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
 
 
+@pytest.mark.parametrize("budget", [10**12, 3_000], ids=["all-kept", "some-kept"])
+def test_graph_cache_under_the_wavefront_is_bitwise_the_call_that_builds_every_graph(budget, monkeypatch):
+    """``TILE_GRAPH_CACHE_WAVE``: the wavefront keeps each tile's graph from its search pass to its sweep 3 (then
+    drops it), bitwise the call that builds every graph four times; with a small budget only some tiles are kept."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    built = []
+    graph = tiled_module.TiledForceField._tile_graph
+
+    def counting(self, *args, **kwargs):
+        built.append(1)
+        return graph(self, *args, **kwargs)
+
+    monkeypatch.setattr(tiled_module.TiledForceField, "_tile_graph", counting)
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: budget / 0.25)
+    results, counts = {}, {}
+    for wave_cache in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE_WAVE", wave_cache)
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", state="host",
+                                                  alias_state=True, wavefront="on", wavefront_group=2,
+                                                  boundary_skin=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[wave_cache], counts[wave_cache] = [], []
+        for current in (strained(atoms), atoms):
+            built.clear()
+            results[wave_cache].append(tiled.evaluate(current, stress=True))
+            counts[wave_cache].append((len(built), tiled.last["tiles"]))
+            assert (tiled.last["graph_cache"]["tiles"] > 0) == wave_cache and tiled._pieces is None
+    for (plain, tiles), (fewer, same) in zip(counts[False], counts[True]):
+        assert same == tiles and plain == 4 * tiles
+        assert fewer == tiles if budget > 10**9 else tiles < fewer < plain
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
     """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
     tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less
@@ -1424,7 +1465,11 @@ def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measur
     tiled._graph_budget(False, measure=True)
     assert tiled._pieces is None and tiled._piece_budget == 0
     tiled._graph_budget(True)
-    assert tiled._pieces is None
+    assert tiled._pieces is None  # TILE_GRAPH_CACHE_WAVE at None: off the speed GPUs
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE_WAVE", True)
+    tiled._graph_budget(True)
+    assert tiled._pieces == {}
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE_WAVE", None)
     tiled._graph_budget(False)  # no workspace measured yet
     assert tiled._pieces == {} and tiled._piece_budget == 2_500
     tiled._per_receiver = 400.0  # 1.1 * 400 * 10 = 4,400 bytes for the tiles

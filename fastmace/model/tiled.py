@@ -80,6 +80,11 @@ TILE_VIRIAL = None
 # call without.
 TILE_GRAPH_CACHE = None
 TILE_GRAPH_CACHE_FRACTION = 0.25
+# TILE_GRAPH_CACHE_WAVE (exact): the graph cache under the wavefront too, filled by its search pass (which builds every
+# tile's graph), each tile's graph dropped after its sweep 3. The wavefront built every graph four times per call
+# (the search pass and three sweeps), with a sync per build: 4.3 s of host time in a 13 s call at 975,560 SrTiO3 atoms
+# on the RTX 5060 Ti, the GPU idle for 4.9 s. None: on for TILED_SPEED_GPUS.
+TILE_GRAPH_CACHE_WAVE = None
 # TILE_FILTER32 (exact): the kept lists' per-call cutoff test (list_reuse) in float32, with the float64 test again
 # only for the edges whose float32 squared length lies within a bound of the cutoff's (``_filter32_band``: four times
 # the float32 error for coordinates up to the call's largest), and the float64 shifts of the one-byte unit shifts
@@ -1043,7 +1048,7 @@ class TiledForceField:
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
-        self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0  # TILE_GRAPH_CACHE (one call)
+        self._pieces, self._piece_bytes, self._piece_budget, self._piece_count = None, 0, 0, 0  # TILE_GRAPH_CACHE
         self._per_receiver = None  # the last measured tile workspace per receiver (bytes; _memory)
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
@@ -1098,6 +1103,7 @@ class TiledForceField:
                     relative = (local if start == r else torch.where(local >= start, local - (start - r), local))
                     cache[index] = (nodes, relative.to(torch.int32), shifts, r, h)
                     self._piece_bytes += size
+                    self._piece_count += 1
             return piece
         nodes, relative, shifts, r, h = entry
         local = relative.long()
@@ -1143,13 +1149,14 @@ class TiledForceField:
 
     def _graph_budget(self, wave, measure=False):
         """The call's graph cache (``TILE_GRAPH_CACHE``): empty with its byte budget, or None (off, under the
-        wavefront, off a CUDA device, or in a call that measures its workspace, where the kept graphs would count
+        wavefront without ``TILE_GRAPH_CACHE_WAVE``, off a CUDA device, or in a call that measures its workspace, where the kept graphs would count
         as tile workspace and lower the receiver cap). The budget is the fraction of the memory free at the call's
         start less the tiles' predicted workspace (the last measured workspace per receiver times the cap, plus
         10 %, as ``_choose_receivers``), so the graphs never take what the tiles need."""
-        self._pieces, self._piece_bytes, self._piece_budget = None, 0, 0
+        self._pieces, self._piece_bytes, self._piece_budget, self._piece_count = None, 0, 0, 0
         fraction = self._speed(TILE_GRAPH_CACHE, TILE_GRAPH_CACHE_FRACTION)
-        free = self._free_bytes() if fraction and not wave and not measure else None
+        wave_ok = not wave or self._speed(TILE_GRAPH_CACHE_WAVE)
+        free = self._free_bytes() if fraction and wave_ok and not measure else None
         if free is not None:
             workspace = 1.1 * self._per_receiver * self.receivers if self._per_receiver else 0
             self._pieces, self._piece_budget = {}, int(float(fraction) * max(0.0, free - workspace))
@@ -1983,6 +1990,8 @@ class TiledForceField:
                 del piece
                 if sweep == 3 and wave:  # its reads are done (rows() copies on the host before it returns)
                     state.release(receivers if host_tiles is None else host_tiles[index])
+                    if self._pieces is not None:  # TILE_GRAPH_CACHE_WAVE: no sweep reads this tile's graph again
+                        self._pieces.pop(index, None)
                     if self._list_cache is not None:
                         self._list_cache.pop(receivers.data_ptr(), None)  # no sweep reads this tile's lists again
 
@@ -2011,7 +2020,7 @@ class TiledForceField:
                     strain_grad.add_(part)
             state.flush()
             stats["tiles_s"] = time.perf_counter() - loop_started  # the host's time in the sweeps (queued work aside)
-            stats["graph_cache"] = dict(tiles=len(self._pieces or {}), bytes=self._piece_bytes,
+            stats["graph_cache"] = dict(tiles=self._piece_count, bytes=self._piece_bytes,
                                         budget=self._piece_budget)
             self._pieces = None
             if measure:
@@ -2324,7 +2333,7 @@ class TiledForceField:
             else:
                 keys = None
                 for index, receivers in enumerate(tiles):
-                    visit(index, self._tile_graph(receivers, source, local_of))
+                    visit(index, self._piece(index, receivers, source, local_of))
         finally:
             self._cache_paused = False
         owner = None  # 4 bytes per atom on the device, before the sweeps
