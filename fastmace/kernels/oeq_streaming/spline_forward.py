@@ -147,9 +147,11 @@ def prefetch_ahead_default(device):
 # that each decodes as as_float(exponent | field) - as_float(exponent | 2^22), exact (no int-to-float conversions):
 # x = Q0 << 10 | Q2 >> 6, y = (Q2 & 63) << 26 | Q1 << 6 | E6. H200 kernel lab (OMAT-0 medium, SrTiO3 10x10x10):
 # forward 1.004 of the float4 table on the 300 K crystal, 0.858 on a 0.3 A disordered snapshot (the table's L1
-# misses grow off-lattice). None: on for PACKED8_GPUS; True / False: an A/B side's choice. Off everywhere today.
+# misses grow off-lattice). NVIDIA H200 (9 November 2026, Benchmark_loup MD step b/a, b = on): 300 K 0.9930 / 0.9945,
+# 1500 K 0.9818 / 0.9768; force/stress gate passes as the default does (source ed312e14). None: on for PACKED8_GPUS;
+# True / False: an A/B side's choice.
 PACKED8 = None
-PACKED8_GPUS = GPUModels(())
+PACKED8_GPUS = GPUModels(("NVIDIA H200",))
 PACKED8_BITS = (22, 20, 16)  # a0, a1, a2
 
 

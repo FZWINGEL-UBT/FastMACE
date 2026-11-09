@@ -328,6 +328,10 @@ def test_h200_defaults():
                and g in spline_forward.PREFETCH_AHEAD_GPUS for g in a100)
     assert spline_forward.PARTS is False
     assert spline_forward.MIN_BLOCKS is None  # R128's cap stays 6; cap 5 0.9925 / 0.9937, not combined with vec4
+    # PACKED8 (9 November 2026): the forward's 8-byte spline table, H200 only (300 K 0.9930 / 0.9945, 1500 K 0.9818 /
+    # 0.9768, gate passes); not measured on the A100
+    assert "NVIDIA H200" in spline_forward.PACKED8_GPUS and spline_forward.PACKED8 is None
+    assert not any(g in spline_forward.PACKED8_GPUS for g in a100)
     # SPLINE_VECTOR (7 November 2026): the spline w' table as one float4 per weight, MD H200 0.9739 / 0.9793
     assert "NVIDIA H200" in wprime_backward.SPLINE_VECTOR_GPUS
     from fastmace.kernels.triton import compose_skip, tabled_outer_sum as tos

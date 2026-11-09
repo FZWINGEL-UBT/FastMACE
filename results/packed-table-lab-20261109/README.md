@@ -183,3 +183,23 @@ Found on the way: with `__launch_bounds__` present ptxas ignores `--maxrregcount
 96 / 128 registers under "caps" of 80 / 64, and `wprime_backward.SMEM_SPILL` had the same bug, so the H200 / 5060 Ti
 SMEM_SPILL MD A/Bs above (source 158399f2) most likely measured uncapped kernels. Fixed in 183e7d3d (the cap is now
 `__launch_bounds__`' minimum blocks per SM); SMEM_SPILL on the H200 (sm_90, where the pragma may work) is untested.
+
+## PACKED8: packed8v2 in production, adopted on the H200
+
+`spline_forward.PACKED8` (commits 42637640, ed312e14): with STAGE_EDGES the SPLINE_W forward reads an 8-byte copy of
+the spline table (`encode_packed8`, built once per model in `WPrime.prepare_blocks`), decoded as in packed8v2; the w′
+kernel keeps the float32 table. Modal H200 (`sixth`), OMAT-0 medium, `tools/modal/packed8_gate_ab.sh`
+([h200-packed8-gate-ab/](h200-packed8-gate-ab/)):
+
+| Check | Default | PACKED8 |
+| --- | --- | --- |
+| MD step SrTiO3 10×10×10, 300 K (abab / abba) | 3.518 / 3.512 ms | b/a **0.9930 / 0.9945** |
+| MD step SrTiO3 10×10×10, 1500 K (abab / abba) | 3.736 / 3.749 ms | b/a **0.9818 / 0.9768** |
+| Gate forces, max error / ase_f32's (SrTiO3, NaCl, NbCl5) | 0.966, 0.897, 0.971 | 0.903, 0.872, 0.960 |
+| Gate stress, same | 0.535, 0.863, 0.954 | 0.415, 0.863, 0.986 |
+
+Both gates pass (source ed312e14). The first gate (source 54b4da74) failed on the default side: the wiring passed the
+float table twice to the autograd function, and the aliased inputs made torch.compile recompile with the spline id a
+SymInt; ed312e14 passes None instead. The A/Bs ran on 54b4da74 (the packed side is unchanged by the fix). The gain
+grows off-lattice, as the kernel lab predicted (crystal 1.004, 0.3 Å snapshot 0.858). On for the H200 family
+(decision 66); the A100 and Ada are not measured.
