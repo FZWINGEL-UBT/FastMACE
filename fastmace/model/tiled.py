@@ -177,13 +177,17 @@ class TileConfig:
     budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
-    # state "host" with alias_state: the dtype x, sc and their aliased adjoints are stored in on the host, None the
-    # call's dtype; "bfloat16" or "float16" halve the host state (capacity: the state is the largest host item per
-    # atom under the wavefront). Each value is rounded once where it is written (on the device, before its copy to
-    # the host, which halves that traffic too) and read back exactly into the call's dtype; the tiles compute in the
-    # call's dtype and the alias window (dE/dx summed over an atom's tiles) stays in it. Rounding class: the forces
-    # and stress change by the stored values' rounding (docs/validation/tiled/tiled-host-state-dtype.md).
-    state_dtype: str | None = None
+    # state "host" with alias_state: the dtype x, sc and their aliased adjoints are stored in on the host. None: the
+    # call's dtype; "float16" or "bfloat16" halve the host state (capacity: with the kept lists, the largest host
+    # item per atom under the wavefront). Each value is rounded once where it is written (on the device, before its
+    # copy to the host, which halves that traffic too) and read back exactly into the call's dtype; the tiles compute
+    # in the call's dtype and the alias window (dE/dx summed over an atom's tiles) stays in it. Neither format passes
+    # the 3x float32 force/stress gate (float16 8-51x, bfloat16 50-750x; NVE drift with float16 as float32's), so
+    # they are a capacity fallback (tiled-host-state-dtype.md). "auto" (the default; aliased host state only): the
+    # call's dtype while the state fits above ``list_reuse_floor`` on the host; else the kept lists go first (exact,
+    # about 14 % slower calls), and float16 only if the state still does not fit. The choice and its reason are in
+    # the call's report (``state_dtype``).
+    state_dtype: str | None = "auto"
     # state "host": a tile's writes to the host state are applied after the next tile's work is queued, so the
     # device runs it while the host indexes (on CUDA through pinned buffers and events); the same order.
     overlap: bool = True
@@ -252,9 +256,10 @@ class TileConfig:
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
         if self.alias_state and self.state != "host":
             raise ValueError("TileConfig.alias_state needs state='host'")
-        if self.state_dtype not in (None, "bfloat16", "float16"):
-            raise ValueError(f"TileConfig.state_dtype must be None, 'bfloat16' or 'float16', got {self.state_dtype!r}")
-        if self.state_dtype is not None and not self.alias_state:
+        if self.state_dtype not in (None, "auto", "bfloat16", "float16"):
+            raise ValueError(f"TileConfig.state_dtype must be None, 'auto', 'bfloat16' or 'float16', got "
+                             f"{self.state_dtype!r}")
+        if self.state_dtype not in (None, "auto") and not self.alias_state:
             raise ValueError("TileConfig.state_dtype needs alias_state=True (state='host'): every stored value is then "
                              "written once, never summed in the stored dtype")
         if self.state not in ("device", "host"):
@@ -1089,6 +1094,7 @@ class TiledForceField:
         self._grid_fit = None  # (key, blocks per axis) of fit_grid's last choice
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
+        self.state_dtype_state = None  # TileConfig.state_dtype "auto": the host state's dtype and why
         self.list_cache_state = "on" if self.config.list_cache else "off"
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
         self._graph_key = None
@@ -2083,6 +2089,8 @@ class TiledForceField:
             stats["list_cache"] = self.list_cache_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
+            stats["state_dtype"] = str(state.store).replace("torch.", "") if state.host else None
+            stats["state_dtype_reason"] = self.state_dtype_state
             with torch.no_grad():
                 node_inter = self.model.scale_shift(node_es, self.heads[:n])
                 from fastmace.model import energy as energy64
@@ -2252,7 +2260,8 @@ class TiledForceField:
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
                                   alias=self.config.alias_state, overlap=self.config.overlap,
-                                  store=getattr(torch, self.config.state_dtype) if self.config.state_dtype else None))
+                                  store=getattr(torch, self.config.state_dtype)
+                                  if self.config.state_dtype not in (None, "auto") else None))
             self._g = g
         elif g["head"] is not None and shared:
             g["head"].copy_(heads[:1])
@@ -2271,8 +2280,46 @@ class TiledForceField:
     def _state(self, g, x, sc):
         """Allocate ``x``, ``sc`` and their adjoints [N, width] on sweep 1's first outputs."""
         state = g["state"]
+        if not state.tensors and state.host and state.alias and self.config.state_dtype == "auto":
+            state.store, self.state_dtype_state = self._auto_store(state, g["n"], x.shape[1] + sc.shape[1])
         state.allocate(g["n"], dict(x=x.shape[1], sc=sc.shape[1], gx=x.shape[1], gsc=sc.shape[1]))
         return state
+
+    def _auto_store(self, state, n, width):
+        """``TileConfig.state_dtype="auto"``: (the host state's dtype, the reason). The call's dtype while its rows
+        (x and sc, the pool's under the wavefront) and the alias window (about a quarter more, in the call's dtype)
+        leave ``list_reuse_floor`` available on the host; else without the kept lists if that makes them fit; else
+        float16 (the kept lists too go if even that does not fit)."""
+        import torch
+
+        available = _host_available()
+        if available is None:
+            return self.dtype, "the call's dtype (host memory unknown)"
+        rows = state._pool_rows if state.pooled else n
+        itemsize = torch.empty((), dtype=self.dtype).element_size()
+        window = 0.25 * rows * width * itemsize
+        full, half = rows * width * itemsize + window, rows * width * 2 + window
+        room = available - int(self.config.list_reuse_floor)
+        if full <= room:
+            return self.dtype, "the call's dtype: fits"
+        kept = self._kept
+        lists = 0 if kept is None else int(sum(t.numel() * t.element_size() for entry in kept["superset"].values()
+                                                for t in entry) + kept["reference"].numel() * 8)
+        if lists and full <= room + lists:
+            self._drop_kept(f"the host state ({full / 2**30:.1f} GiB) fits only without them")
+            return self.dtype, f"the call's dtype after dropping the kept lists ({lists / 2**30:.1f} GiB)"
+        if lists and half > room:
+            self._drop_kept(f"the float16 host state ({half / 2**30:.1f} GiB) fits only without them")
+        return torch.float16, (f"float16: {full / 2**30:.1f} GiB of state in the call's dtype against "
+                               f"{room / 2**30:.1f} GiB above the floor")
+
+    def _drop_kept(self, why):
+        """The kept lists go for this call and the later ones (``list_reuse_state`` says why)."""
+        if self._kept is not None:  # (this call's sweeps hold the dict: emptied, they search again, bitwise)
+            self._kept["superset"].clear()
+            self._kept["complete"] = False
+        self._reuse_ok, self._kept = False, None
+        self.list_reuse_state = f"off: {why}"
 
     @staticmethod
     def _note(stats, piece):

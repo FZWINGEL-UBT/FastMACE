@@ -1521,9 +1521,46 @@ def test_wavefront_runs_on_the_force_fields_own_list():
     assert np.allclose(np.asarray(s1), np.asarray(s0), rtol=0, atol=1e-10)
 
 
+def test_state_dtype_auto_drops_the_kept_lists_before_it_rounds_the_state(monkeypatch):
+    """``TileConfig.state_dtype="auto"`` (the default): the call's dtype while the host state (the pool's rows and
+    a quarter for the alias window) fits above the floor; else, when that makes it fit, the kept lists go (bitwise
+    the same call, searched again); else float16."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    floor = 2**20
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, boundary_skin=False,
+                  wavefront="on", wavefront_group=2, list_reuse_floor=floor)
+
+    def run(room, **extra):
+        monkeypatch.setattr(tiled_module, "_host_available", lambda: floor + int(room))
+        tiled = TiledForceField(field, TileConfig(12, **dict(config, **extra)))
+        return tiled, tiled.evaluate(atoms, stress=True)
+
+    tiled, plain = run(10**15)
+    assert TileConfig(5).state_dtype == "auto" and tiled.last["state_dtype"] == "float64"
+    assert tiled.last["state_dtype_reason"] == "the call's dtype: fits" and tiled._kept is not None
+    state = tiled._g["state"]
+    rows, width = state._pool_rows, sum(int(t.shape[1]) for t in state.tensors.values())
+    full, half = 1.25 * rows * width * 8, rows * width * 2 + 0.25 * rows * width * 8
+    lists = tiled.last["list_kept_bytes"]
+    assert lists > 0
+    tiled, dropped = run(full - lists / 2)
+    assert tiled.last["state_dtype"] == "float64" and tiled._kept is None
+    assert tiled.list_reuse_state.startswith("off: the host state")
+    assert dropped[0] == plain[0] and np.array_equal(np.asarray(dropped[1]), np.asarray(plain[1]))
+    tiled, rounded = run(half + 1, list_reuse=False)
+    assert tiled.last["state_dtype"] == "float16" and tiled.last["state_dtype_reason"].startswith("float16")
+    f0, f1 = np.asarray(plain[1]), np.asarray(rounded[1])
+    assert not np.array_equal(f1, f0) and np.abs(f1 - f0).max() <= 2.0**-9 * np.abs(f0).max()
+
+
 def test_state_dtype_needs_the_aliased_host_state():
     with pytest.raises(ValueError, match="state_dtype"):
         TileConfig(5, state_dtype="float32")
+    TileConfig(5, state_dtype="auto")  # the default: ignored without the aliased host state
     with pytest.raises(ValueError, match="alias_state"):
         TileConfig(5, state="host", state_dtype="bfloat16")
     TileConfig(5, state="host", alias_state=True, state_dtype="float16")

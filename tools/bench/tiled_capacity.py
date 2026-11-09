@@ -53,9 +53,10 @@ def parse_args(argv=None):
                    help="TileConfig.state='host': x, sc and their adjoints in pinned host memory")
     p.add_argument("--alias-state", action="store_true",
                    help="TileConfig.alias_state (with --host-state): dE/dsc in sc's rows, dE/dx in x's rows")
-    p.add_argument("--state-dtype", choices=("bfloat16", "float16"), default=None,
+    p.add_argument("--state-dtype", choices=("auto", "none", "bfloat16", "float16"), default="auto",
                    help="TileConfig.state_dtype (with --alias-state): x, sc and their aliased adjoints stored on the "
-                        "host in 16 bits")
+                        "host in 16 bits; auto (TileConfig's default): float16 only when the state would not fit "
+                        "above the floor even without the kept lists; none: the call's dtype")
     p.add_argument("--species-index", action="store_true",
                    help="TileConfig.species='index': the tiles' one-hot rows from the species index; the field's "
                         "device one-hot is released")
@@ -380,7 +381,8 @@ def main(argv=None):
                                                   budget_receivers=() if args.no_budget else
                                                   tuple(args.budget_receivers) or None,
                                                   state="host" if args.host_state else "device",
-                                                  alias_state=args.alias_state, state_dtype=args.state_dtype,
+                                                  alias_state=args.alias_state,
+                                                  state_dtype=None if args.state_dtype == "none" else args.state_dtype,
                                                   wavefront=args.wavefront, lanes=args.lanes,
                                                   compiled_graphs=args.compiled_graphs,
                                                   prefetch=args.prefetch == "on",
