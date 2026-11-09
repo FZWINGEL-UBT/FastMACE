@@ -57,7 +57,8 @@ R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 
 # A model label's own MIN_BLOCKS for the R128 shape on its GPUs, instead of 6 (the label reaches the kernel through
 # the rewrites' context: WPrime's model_label). Bitwise (a register cap). OMAT-0 small on the H200 (9 November 2026,
 # results/h200-omat0-small-20261108, Benchmark_loup, ab / ba, b = 128 threads with MIN_BLOCKS 8 against small's
-# defaults): 0.9873 / 0.9883 (rescreen), 0.9923 / 0.9952 (combo2), with w' FOLD_ALPHA off 0.9884 / 0.9908. Medium
+# defaults): 0.9873 / 0.9883 (rescreen), 0.9923 / 0.9952 (combo2); as small's default, 6 again 1.0046 / 1.0057
+# (defaults2). Medium
 # on the H200: MIN_BLOCKS 8 1.0515 / 1.0507 (above), so 6 stays for every other model.
 R128_MIN_BLOCKS_MODEL_GPUS = MappingProxyType({
     "omat0-small": (8, GPUModels(("NVIDIA H200",))),

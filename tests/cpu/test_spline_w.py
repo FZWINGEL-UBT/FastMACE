@@ -94,10 +94,11 @@ def test_switch_is_off_without_a_listed_gpu(monkeypatch):
     assert sf.spline_w_default("cpu")
 
 
-def test_omat0_small_takes_min_blocks_8_and_no_fold_alpha_on_the_h200(monkeypatch):
-    """OMAT-0 small's own H200 launch shape and w' rounding (9 November 2026): the R128 shape with MIN_BLOCKS 8
-    (R128_MIN_BLOCKS_MODEL_GPUS; 6 for every other model and GPU) and FOLD_ALPHA off (FOLD_ALPHA_MODEL_OFF_GPUS);
-    the constants still decide an A/B side."""
+def test_omat0_small_takes_min_blocks_8_on_the_h200(monkeypatch):
+    """OMAT-0 small's own H200 launch shape (9 November 2026): the R128 shape with MIN_BLOCKS 8
+    (R128_MIN_BLOCKS_MODEL_GPUS; 6 for every other model and GPU). FOLD_ALPHA_MODEL_OFF_GPUS is empty (small's
+    FOLD_ALPHA A/Bs were within the spread), and a label listed there would keep FOLD_ALPHA off; the constants still
+    decide an A/B side."""
     name = {"gpu": "NVIDIA H200"}
     monkeypatch.setattr(sf.torch.cuda, "get_device_name", lambda device=None: name["gpu"])
     monkeypatch.setattr(wp, "_device_name", lambda device: name["gpu"])
@@ -105,15 +106,17 @@ def test_omat0_small_takes_min_blocks_8_and_no_fold_alpha_on_the_h200(monkeypatc
     assert sf.R128 is None and sf.MIN_BLOCKS is None and wp.FOLD_ALPHA is None
     assert sf.launch_shape(cuda, "omat0-small") == (128, 8)
     assert sf.launch_shape(cuda, "omat0-medium") == (128, 6) and sf.launch_shape(cuda) == (128, 6)
-    assert not wp.fold_alpha_default(cuda, "omat0-small")
-    assert wp.fold_alpha_default(cuda, "omat0-medium") and wp.fold_alpha_default(cuda)
+    assert wp.FOLD_ALPHA_MODEL_OFF_GPUS == {}
+    assert wp.fold_alpha_default(cuda, "omat0-small") and wp.fold_alpha_default(cuda)
+    monkeypatch.setattr(wp, "FOLD_ALPHA_MODEL_OFF_GPUS", {"omat0-small": ("NVIDIA H200",)})
+    assert not wp.fold_alpha_default(cuda, "omat0-small") and wp.fold_alpha_default(cuda, "omat0-medium")
     name["gpu"] = "NVIDIA A100-SXM4-80GB"
     assert sf.launch_shape(cuda, "omat0-small") == (128, 6) and wp.fold_alpha_default(cuda, "omat0-small")
     name["gpu"] = "NVIDIA H200"
     monkeypatch.setattr(sf, "R128", False)
     assert sf.launch_shape(cuda, "omat0-small") == (sf.THREADS, None)
     monkeypatch.setattr(wp, "FOLD_ALPHA", True)
-    assert wp.fold_alpha_default(cuda, "omat0-small")
+    assert wp.fold_alpha_default(cuda, "omat0-small")  # the constant over the label's off list
     assert sf.launch_shape(torch.device("cpu"), "omat0-small") == (sf.THREADS, None)
 
 

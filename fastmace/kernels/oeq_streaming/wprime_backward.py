@@ -148,12 +148,11 @@ FOLD_ALPHA = None
 # 0.9884 / 0.9907;
 # gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
 FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
-# GPUs where a model label keeps FOLD_ALPHA off (WPrime's model_label). OMAT-0 small on the H200 (9 November 2026,
-# results/h200-omat0-small-20261108, Benchmark_loup, ab / ba, b = off against small's defaults): 0.9939 / 0.9948
-# (rescreen); on top of MIN_BLOCKS 8 0.9884 / 0.9908 against 0.9923 / 0.9952 without; gate passes (3x rule).
-FOLD_ALPHA_MODEL_OFF_GPUS = MappingProxyType({
-    "omat0-small": GPUModels(("NVIDIA H200",)),
-})
+# GPUs where a model label keeps FOLD_ALPHA off (WPrime's model_label); none today. OMAT-0 small on the H200
+# (9 November 2026, results/h200-omat0-small-20261108, Benchmark_loup, ab / ba): off 0.9939 / 0.9948 (rescreen), on
+# top of MIN_BLOCKS 8 0.9884 / 0.9908 against 0.9923 / 0.9952 (combo2); but with off as its default, on again was
+# faster, 0.9936 / 0.9927 (defaults2): within the run-to-run spread, so small keeps FOLD_ALPHA on.
+FOLD_ALPHA_MODEL_OFF_GPUS = MappingProxyType({})
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
