@@ -22,6 +22,26 @@ code). Structure: SrTiO3 supercells from `tools/bench/tiled_capacity.py`; 58×58
 | State on the host, plain schedule | 10.64 s, 10.90 µs/atom | 8.16 s, 8.37 µs/atom (de85f93f) | not run (see "Host state") | not run |
 | State on the host, wavefront | 12.29 s, 12.60 µs/atom | 11.77 s, 12.06 µs/atom (29c91cce) | 11.68 s, 11.98 µs/atom | first four 1.008 / 0.963; gap 0.998 / 0.984 |
 
+**Wavefront round (9 November 2026, d2435c8e).** A profile of the wavefront call (job 19, `jobs/wprof.py`) showed it
+host-bound: 13.3 s wall, 8.4 s of GPU work, and the calling thread spent 4.3 s building tile graphs (four builds per
+tile) and about 3 s applying the host state's writes. Two exact switches remove that, and the three switches that
+had been off under the wavefront are faster there once it is GPU-bound:
+
+| Switch | Class | Wavefront b/a (ab / ba) | Job |
+| --- | --- | --- | --- |
+| `TILE_GRAPH_CACHE_WAVE`: the graph cache from the search pass to each tile's sweep 3 | exact | 0.824 / 0.817 | 20 (7f193e78) |
+| `TILE_HOST_WORKER`: host-state writes on one worker thread, reads wait for the earlier batches | exact | 0.975 / 0.982 (host state, plain schedule: 0.969 / 0.966) | 21 (1d30a163) |
+| `TILE_BLOCK_ROWS` under the wavefront | rounding (gated) | 0.931 / 0.937 (was 1.030 / 1.060 host-bound) | 22 (1d30a163) |
+| `TILE_EPILOGUE` under the wavefront | rounding (gated) | 0.985 / 0.983 (was 1.012 / 1.009) | 22 |
+| `TILE_PINNED_SUPERSET` under the wavefront | exact | 0.989 / 0.990 (was 1.012 / 1.028) | 22 |
+| All five, the old wavefront defaults against the new | | **0.766 / 0.774**: 10.10 → 7.74 µs/atom | 23 (d2435c8e) |
+
+The wavefront call is now 7.74 µs/atom (A/B median 7.55 s), 1.61× the whole-system call per atom, down from 2.50×.
+Its profile at d2435c8e (job 23): 7.72 s wall, 7.10 s of GPU work (about 1 s of it host-device copies). The host
+state's plain schedule is 6.94 µs/atom (A/B median, job 23: 0.968 / 0.972 for the worker). The A side of job 23
+(10.10 µs/atom) is faster than the 11.98 µs/atom single call at 455facf2: it already has the filter32 and fill-skip
+switches and the B side's warm caches in the same process; the decision measure is the ratio.
+
 The single-call rows are each tool's third call (`tiled_capacity.py --sweep-times`, one process per row; cross-process
 noise is about 3 %). The A/B column is the decision 66 measure: one process, both sides on one `TiledForceField`,
 3-4 alternating blocks of 2 calls after 3 warm-up calls per side.
@@ -141,7 +161,8 @@ and the pairs spread from 0.59 to 1.31. The slowness was the machine (WSL load u
 
 **What is left:** sweep 3's recompute of interaction 0 (about 0.8 µs/atom, the three-sweep design); halo rows
 (H ≈ 9,000 per 16,384 receivers in interaction 0); `_scatter` (115 ns/atom, the forces' two `index_add`s over the
-edges); and on the wavefront the host state's CPU work.
+edges); and on the wavefront about 0.6 s of host-device copies and launch gaps not hidden behind the GPU work
+(wall 7.72 s against 7.10 s busy).
 
 ## Correctness
 

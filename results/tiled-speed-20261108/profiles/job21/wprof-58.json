@@ -1,0 +1,235 @@
+{
+ "atoms": 975560,
+ "times": [
+  21.049108153005363,
+  42.272334298002534,
+  8.492992560000857,
+  8.343580887973076
+ ],
+ "wall_plain": 8.329035928996745,
+ "host_plain": {
+  "_body": [
+   1.4581,
+   300
+  ],
+  "autograd.grad": [
+   0.5562,
+   200
+  ],
+  "state.fetch": [
+   0.4885,
+   376
+  ],
+  "state.rows": [
+   0.3984,
+   400
+  ],
+  "_tile_graph": [
+   0.3523,
+   100
+  ],
+  "state._add_now": [
+   0.3103,
+   100
+  ],
+  "state._close_now": [
+   0.2908,
+   100
+  ],
+  "_wavefront": [
+   0.2164,
+   1
+  ],
+  "state.flush": [
+   0.1471,
+   13
+  ],
+  "state.put": [
+   0.1071,
+   300
+  ],
+  "_fill": [
+   0.1049,
+   300
+  ],
+  "_scatter": [
+   0.0759,
+   300
+  ],
+  "_globals": [
+   0.0629,
+   1
+  ],
+  "state.release": [
+   0.0571,
+   100
+  ],
+  "state._to_host": [
+   0.0544,
+   800
+  ],
+  "state._defer": [
+   0.0443,
+   400
+  ],
+  "_attrs": [
+   0.035,
+   300
+  ],
+  "state.plan": [
+   0.0329,
+   1
+  ],
+  "state.assign": [
+   0.0293,
+   100
+  ],
+  "_piece": [
+   0.0265,
+   400
+  ],
+  "_source": [
+   0.0136,
+   1
+  ],
+  "state.add": [
+   -0.0003,
+   100
+  ],
+  "_run_slot": [
+   -0.0447,
+   300
+  ]
+ },
+ "wall_profiled": 8.63425866898615,
+ "gpu_busy_s": 7.889079186000059,
+ "last": {
+  "tiles": 100,
+  "grid": [
+   6,
+   4,
+   4
+  ],
+  "edge_cap": 4611686018427387904,
+  "max_receivers": 16384,
+  "max_halo": 8920,
+  "max_edges": 1215116,
+  "list_reused": true,
+  "list_rebuilds": 1,
+  "list_reuse": "on",
+  "receivers": 16384,
+  "edges": 72191440,
+  "mode": "compiled",
+  "mode_reason": "12.62 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+  "neighbours": "tiles",
+  "species": "index",
+  "search_s": 0.6618060290056746,
+  "lanes": "off: not measured faster on NVIDIA GeForce RTX 5060 Ti",
+  "wavefront": {
+   "on": true,
+   "pool_rows": 883793,
+   "pool_fraction": 0.9059340276354094,
+   "boundary_skin": 6.3
+  },
+  "slots": {
+   "1": [
+    2476,
+    4495,
+    182272
+   ],
+   "5": [
+    13369,
+    8061,
+    911360
+   ],
+   "6": [
+    16187,
+    9106,
+    1093632
+   ],
+   "7": [
+    16385,
+    9812,
+    1275904
+   ]
+  },
+  "slot_needs": {
+   "1": [
+    2250,
+    4086,
+    166500
+   ],
+   "5": [
+    12152,
+    7328,
+    896896
+   ],
+   "6": [
+    14714,
+    8278,
+    1088836
+   ],
+   "7": [
+    16384,
+    8920,
+    1215116
+   ]
+  },
+  "slot_changes": 4,
+  "host_worker": true,
+  "tiles_s": 7.861635244014906,
+  "graph_cache": {
+   "tiles": 100,
+   "bytes": 1456793208,
+   "budget": 3349321510
+  },
+  "global_bytes": 2524979588,
+  "list_cache_bytes": 0,
+  "list_kept_bytes": 304325136,
+  "list_cache_hits": 0,
+  "list_cache": "on",
+  "host_bytes": 2524979588
+ },
+ "kernels": {
+  "fused_folded_forward": 1.2469,
+  "oeq_projected_backward_wprime": 1.1825,
+  "Memcpy HtoD (Pinned -> Device)": 0.5403,
+  "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_al": 0.5114,
+  "Memcpy DtoH (Device -> Pinned)": 0.4426,
+  "kernel": 0.3562,
+  "gemm": 0.2355,
+  "void at::native::vectorized_elementwise_kernel<4, at::native": 0.1717,
+  "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 0.1438,
+  "triton_poi_fused__unsafe_view_add_clone_slice_slice_backward": 0.124,
+  "void magma_sgemmEx_kernel<float, float, float, false, false,": 0.1161,
+  "void at::native::index_elementwise_kernel<128, 4, at::native": 0.104,
+  "triton_poi_fused_add_select_backward_slice_slice_backward_st": 0.1034,
+  "triton_poi_fused_cat_slice_view_25": 0.0998,
+  "void magma_sgemmEx_kernel<float, float, float, true, false, ": 0.0896,
+  "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_vi": 0.0732,
+  "forward": 0.0723,
+  "triton_poi_fused_add_select_backward_slice_slice_backward_vi": 0.0717,
+  "segmented_polynomial_algo1_1": 0.0597,
+  "segmented_polynomial_bwd_algo1_2": 0.0583,
+  "void at::native::vectorized_elementwise_kernel<2, at::native": 0.0574,
+  "triton_poi_fused_add_cat_div_slice_view_23": 0.0501,
+  "triton_poi_fused_add_cat_div_view_24": 0.0499,
+  "triton_poi_fused_add_slice_backward_view_18": 0.0463,
+  "triton_poi_fused__unsafe_view_cat_clone_slice_18": 0.0453,
+  "_forward": 0.0451,
+  "triton_poi_fused_cat_view_10": 0.0434,
+  "void at::native::unrolled_elementwise_kernel<at::native::dir": 0.0422,
+  "triton_poi_fused__unsafe_view_cat_clone_slice_19": 0.0421,
+  "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_9": 0.0412,
+  "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x128_8x4_nn_a": 0.0398,
+  "triton_poi_fused_add_gather_mm_slice_backward_tabled_outer_s": 0.0394,
+  "triton_poi_fused__unsafe_view_cat_clone_select_view_15": 0.0387,
+  "triton_poi_fused__unsafe_view_cat_clone_select_view_14": 0.0382,
+  "segmented_polynomial_bwd_split2_of_2_algo1_2": 0.0382,
+  "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_": 0.0373,
+  "segmented_polynomial_bwd_split1_of_2_algo1_2": 0.0361,
+  "void at::native::indexFuncLargeIndex<float, long, unsigned i": 0.0359,
+  "void at::native::_scatter_gather_elementwise_kernel<128, 8, ": 0.0338,
+  "_backward": 0.0323
+ }
+}

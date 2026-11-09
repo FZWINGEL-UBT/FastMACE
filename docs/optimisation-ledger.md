@@ -657,13 +657,16 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [tiled-prefetch-device](#tiled-prefetch-device) | Prefetch the next tile's graph with the state on the device | `tiled.TILE_PREFETCH_DEVICE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.939 / 0.941 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
-| [tiled-block-rows](#tiled-block-rows) | w′ block message narrowed to a tile's receivers, `linear_1` on the block layout | `generic.TILE_BLOCK_ROWS` | FM | DEFAULT (scoped: off under the wavefront) | decision 66, 2026-11-08 | device 0.918 / 0.921; wave 1.030 / 1.060 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-block-rows](#tiled-block-rows) | w′ block message narrowed to a tile's receivers, `linear_1` on the block layout | `generic.TILE_BLOCK_ROWS` | FM | DEFAULT | decision 66, 2026-11-08; wavefront 2026-11-09 | device 0.918 / 0.921; wave 1.030 / 1.060 host-bound, 0.931 / 0.937 GPU-bound | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-virial](#tiled-virial) | Strain gradient as sym(Vᵀ ∂E/∂V) instead of a strain leaf | `tiled.TILE_VIRIAL` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-08 | device 0.970 / 0.955; wave 0.994 / 0.959 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
-| [tiled-graph-cache](#tiled-graph-cache) | Tile graphs kept on the device for the call | `tiled.TILE_GRAPH_CACHE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, not under the wavefront) | decision 66, 2026-11-08 | device 0.948 / 0.960 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-graph-cache](#tiled-graph-cache) | Tile graphs kept on the device for the call | `tiled.TILE_GRAPH_CACHE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`; wavefront: `TILE_GRAPH_CACHE_WAVE`) | decision 66, 2026-11-08 | device 0.948 / 0.960 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-filter32](#tiled-filter32) | Kept lists' cutoff test in float32, float64 only near the cutoff | `tiled.TILE_FILTER32` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.987 / 0.993; wave 0.981 / 1.012 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
-| [tiled-epilogue](#tiled-epilogue) | Sweep masks, objective, virial and edge vectors in compiled code | `tiled.TILE_EPILOGUE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, off under the wavefront) | decision 66, 2026-11-09 | device 0.980 / 0.981; wave 1.012 / 1.009; gate 12/12 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-epilogue](#tiled-epilogue) | Sweep masks, objective, virial and edge vectors in compiled code | `tiled.TILE_EPILOGUE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.980 / 0.981; wave 1.012 / 1.009 host-bound, 0.985 / 0.983 GPU-bound; gate 12/12 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-fill-skip](#tiled-fill-skip) | No host list-cache fill for tiles the graph cache keeps | `tiled.TILE_FILL_SKIP` | FM | DEFAULT | decision 66, 2026-11-09 | device 0.961 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
-| [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`, off under the wavefront) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 host-bound, 0.989 / 0.990 GPU-bound | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-graph-cache-wave](#tiled-graph-cache-wave) | The graph cache under the wavefront (search pass to sweep 3) | `tiled.TILE_GRAPH_CACHE_WAVE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.824 / 0.817 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-host-worker](#tiled-host-worker) | Host-state writes applied on a worker thread | `tiled.TILE_HOST_WORKER` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-lazy-keys](#tiled-lazy-keys) | Slot keys taken in sweep 1 from the prefetched graphs instead of a search pass | `TILE_LAZY_KEYS` (removed) | FM | REJECTED | 2026-11-09 | device 1.023 / 1.002 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 
@@ -679,12 +682,12 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 
 <a id="tiled-block-rows"></a>
 #### tiled-block-rows: the w′ block message for a tile's receivers
-- Switch: `fastmace.rewrites.generic.modules.TILE_BLOCK_ROWS` (None: the module's `tile_block_rows`, set per tiled call to `not wave`)
+- Switch: `fastmace.rewrites.generic.modules.TILE_BLOCK_ROWS` (None: the module's `tile_block_rows`, on where nothing set it; the tiled call set it to `not wave` until 9 November 2026)
 - Engine: FM
 - Date/round: 8 November 2026 (tiled speed)
 - What: the w′ convolution's BLOCK_MESSAGE groups are narrowed to the tile's receivers (a view; the w′ backward reads the message gradient at receivers only) and `linear_1` multiplies them as on the whole system. Before, a tile densified the message to `[R + H, width]`, sliced the receivers and padded the gradient back.
-- Status: DEFAULT (scoped: plain schedule only). Rounding (energy 4e-10 relative); the force/stress gate passed with it on.
-- Measured: device 0.918 / 0.921; wavefront 1.030 / 1.060 (slower; the cause was not found, so it is off there).
+- Status: DEFAULT. Rounding (energy 4e-10 relative); the force/stress gate passed with it on.
+- Measured: device 0.918 / 0.921; wavefront 1.030 / 1.060 while the wavefront was host-bound (off there then), 0.931 / 0.937 once the wavefront graph cache and the host worker made it GPU-bound (job 22, 1d30a163), so on there too.
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
 
 <a id="tiled-virial"></a>
@@ -702,7 +705,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Switch: `fastmace.model.tiled.TILE_GRAPH_CACHE` (None: `TILE_GRAPH_CACHE_FRACTION` 0.25 on `TILED_SPEED_GPUS`)
 - Engine: FM
 - Date/round: 8 November 2026 (tiled speed)
-- What: the slot-key pass keeps each tile's local edge index (int32) and shifts on the device until the call ends (20 bytes per edge), so the sweeps gather it instead of building it again (four builds per tile and call before). The budget is the fraction of the free memory less the tiles' predicted workspace, and a measuring call keeps nothing (the first version lowered the receiver cap from 16,384 to 8,192). Off under the wavefront.
+- What: the slot-key pass keeps each tile's local edge index (int32) and shifts on the device until the call ends (20 bytes per edge), so the sweeps gather it instead of building it again (four builds per tile and call before). The budget is the fraction of the free memory less the tiles' predicted workspace, and a measuring call keeps nothing (the first version lowered the receiver cap from 16,384 to 8,192). Under the wavefront: `TILE_GRAPH_CACHE_WAVE`.
 - Status: DEFAULT (scoped). Exact.
 - Measured: 0.948 / 0.960 (887b6b1d).
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
@@ -719,12 +722,12 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 
 <a id="tiled-epilogue"></a>
 #### tiled-epilogue: the sweeps' eager glue in compiled code
-- Switch: `fastmace.model.tiled.TILE_EPILOGUE` (None: on for `TILED_SPEED_GPUS`, off under the wavefront)
+- Switch: `fastmace.model.tiled.TILE_EPILOGUE` (None: on for `TILED_SPEED_GPUS`)
 - Engine: FM
 - Date/round: 9 November 2026 (tiled gap)
 - What: sweep 1's padding masks and sweep 3's objective (scale and shift, masks, <dE/dx, x> + <dE/dsc, sc>) inside the compiled forwards; the edge-gradient masks and the virial of sweeps 2 and 3 as one compiled epilogue each; a padded slot's edge vectors as one kernel. About 20 eager kernels per tile and sweep before.
 - Status: DEFAULT (scoped). Rounding (the virial's and the objective's sums change order); bitwise outside mode "compiled" (CPU test); force/stress gate 12/12 (b5a59f7d).
-- Measured: device 0.980 / 0.981 (0134304d); wavefront 1.012 / 1.009 (a first ab run gave 0.939), so off there.
+- Measured: device 0.980 / 0.981 (0134304d); wavefront 1.012 / 1.009 while host-bound (a first ab run gave 0.939; off there then), 0.985 / 0.983 GPU-bound (job 22, 1d30a163), so on there too.
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
 
 <a id="tiled-fill-skip"></a>
@@ -739,12 +742,41 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 
 <a id="tiled-pinned-superset"></a>
 #### tiled-pinned-superset: kept lists in pinned host memory
-- Switch: `fastmace.model.tiled.TILE_PINNED_SUPERSET` (None: on for `TILED_SPEED_GPUS`, off under the wavefront), cap `TILE_PINNED_SUPERSET_BYTES` (4 GiB)
+- Switch: `fastmace.model.tiled.TILE_PINNED_SUPERSET` (None: on for `TILED_SPEED_GPUS`), cap `TILE_PINNED_SUPERSET_BYTES` (4 GiB)
 - Engine: FM
 - Date/round: 9 November 2026 (tiled gap)
 - What: list_reuse's kept lists are stored pinned while they total at most the cap, so each call's copy to the device runs asynchronously at the pinned rate (pageable: about 70 ns/atom per call). A same-process A/B's other side gets a mirror in its own form, made once.
 - Status: DEFAULT (scoped). Exact.
-- Measured: device 0.986 / 0.990; wavefront 1.012 / 1.028 (d5e91441). The pinning cost of a call that searches again is not in the A/B (its positions never move past the skin).
+- Measured: device 0.986 / 0.990; wavefront 1.012 / 1.028 while host-bound (d5e91441; off there then), 0.989 / 0.990 GPU-bound (job 22, 1d30a163). The pinning cost of a call that searches again is not in the A/B (its positions never move past the skin).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-graph-cache-wave"></a>
+#### tiled-graph-cache-wave: the graph cache under the wavefront
+- Switch: `fastmace.model.tiled.TILE_GRAPH_CACHE_WAVE` (None: on for `TILED_SPEED_GPUS`; needs `TILE_GRAPH_CACHE`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: the wavefront's search pass builds every tile's graph; the cache keeps it (within `TILE_GRAPH_CACHE`'s budget) until the tile's sweep 3, which drops it. Before, each tile's graph was built four times per call with a sync per build: 4.3 s of host time in a 13.3 s call at 975,560 SrTiO3 atoms, the GPU idle for 4.9 s (job 19 profile).
+- Status: DEFAULT (scoped). Exact (CPU test, all and some tiles kept: bitwise, one build per tile against four).
+- Measured: wavefront 0.824 / 0.817 (7f193e78): 12.02 to 9.90 µs/atom.
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-host-worker"></a>
+#### tiled-host-worker: host-state writes on a worker thread
+- Switch: `fastmace.model.tiled.TILE_HOST_WORKER` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: with host state and overlap, a tile's deferred writes (the wait for its device work, then the put, index_add and alias close on the host) go to one worker thread at the point where the calling thread applied them before, in the same order; every read of the state (rows, fetch, flush) first waits for the batches handed over before it, so it sees the same writes as before. The calling thread spent about 3 s of the 9.9 s wavefront call in these writes and their event waits.
+- Status: DEFAULT (scoped). Exact (CPU tests, host state and wavefront).
+- Measured: wavefront 0.975 / 0.982; host state 0.969 / 0.966 (1d30a163). The wavefront call is then GPU-bound (wall 8.33 s, GPU busy 7.89 s).
+- Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-lazy-keys"></a>
+#### tiled-lazy-keys: slot keys from the prefetched graphs
+- Switch: `TILE_LAZY_KEYS` (removed: 5657befc, reverted in a8a17897)
+- Engine: FM
+- Date/round: 9 November 2026 (tiled gap)
+- What: after the first call, take each tile's slot in sweep 1 from the graph the prefetch builds instead of in a search pass before sweep 1 (a sync per tile, about 0.3 s per call).
+- Status: REJECTED. Device 1.023 / 1.002: the search pass's builds feed the graph cache, so its time was not idle time.
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
 
 <a id="tiled-piece-start"></a>
@@ -817,6 +849,7 @@ are not A/B comparisons.
 | 2026-11-05 | A100 rounds 1–5 (OMAT-0; not to be confused with opt round 5 of 26 October) | Round 1: five outside ideas assessed; round 2: fused first interaction, tabled forward, Horner, scalar paths, run-walking outer-sum backward, `generic_fold_product_linear`; round 3: w′ backward attribution, M-precontraction (dropped); round 4: `PREFETCH` (rejected), `VEC_SH`, `VEC_A`, `TC_WFRAG`, `TC_TP` (rejected), 3×FP16 (rejected on accuracy); round 5: `EDGE_SH` | Round 2 and 4 switches and `EDGE_SH` per GPU (d66); `BLOCK_LDG` dropped; `FACTORED` on the 5060 Ti | – |
 | 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled call gap (OMAT-0, RTX 5060 Ti) | `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_FILL_SKIP`, `TILE_PINNED_SUPERSET`; `TILE_PIECE_START` and keeping interaction 0's A rejected | Decision 66 | Device state 0.923 / 0.928 (all eight switches 0.729 / 0.731) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| 2026-11-09 | Tiled wavefront (OMAT-0, RTX 5060 Ti) | `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`; `TILE_BLOCK_ROWS`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET` on under the wavefront; `TILE_LAZY_KEYS` rejected | Decision 66 | Wavefront 0.766 / 0.774 (10.10 → 7.74 µs/atom) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 
 ## Closed directions
 
