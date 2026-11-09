@@ -148,10 +148,12 @@ def prefetch_ahead_default(device):
 # x = Q0 << 10 | Q2 >> 6, y = (Q2 & 63) << 26 | Q1 << 6 | E6. H200 kernel lab (OMAT-0 medium, SrTiO3 10x10x10):
 # forward 1.004 of the float4 table on the 300 K crystal, 0.858 on a 0.3 A disordered snapshot (the table's L1
 # misses grow off-lattice). NVIDIA H200 (9 November 2026, Benchmark_loup MD step b/a, b = on): 300 K 0.9930 / 0.9945,
-# 1500 K 0.9818 / 0.9768; force/stress gate passes as the default does (source ed312e14). None: on for PACKED8_GPUS;
-# True / False: an A/B side's choice.
+# 1500 K 0.9818 / 0.9768; force/stress gate passes as the default does (source ed312e14). NVIDIA A100-SXM4-80GB (9
+# November 2026, results/step-limiters-20261109: the A100 forward is L2-bound, not issue-bound): 300 K 0.9557 /
+# 0.9549, 1500 K 0.9587 / 0.9558, gate passes (source 10e23d17). None: on for PACKED8_GPUS; True / False: an A/B
+# side's choice.
 PACKED8 = None
-PACKED8_GPUS = GPUModels(("NVIDIA H200",))
+PACKED8_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 PACKED8_BITS = (22, 20, 16)  # a0, a1, a2
 
 

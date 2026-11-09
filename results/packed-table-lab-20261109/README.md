@@ -313,3 +313,19 @@ histograms:
   this audit leaves: a cheaper cross-lane reduction (fewer shuffles per edge, or one reduction over several edges).
   Not yet quantified.
 
+### PACKED8 on the A100: adopted (9 November 2026)
+
+`tools/modal/step_limiters.sh` ([../step-limiters-20261109/](../step-limiters-20261109/README.md)) showed the A100's
+SPLINE_W forward L2-bound (L2 70%, issue 38%), unlike the H200's issue-bound one. Modal A100-SXM4-80GB,
+`GPU_MATCH=A100 tools/modal/packed8_gate_ab.sh`, source 10e23d17 ([a100-packed8-gate-ab/](a100-packed8-gate-ab/)):
+
+| Check | Default | PACKED8 |
+| --- | --- | --- |
+| MD step SrTiO3 10×10×10, 300 K (abab / abba) | 7.038 / 7.055 ms | b/a **0.9557 / 0.9549** |
+| MD step SrTiO3 10×10×10, 1500 K (abab / abba) | 7.405 / 7.408 ms | b/a **0.9587 / 0.9558** |
+| Gate forces, max error / ase_f32's (SrTiO3, NaCl, NbCl5) | 0.965, 0.868, 0.982 | 0.919, 0.843, 0.973 |
+| Gate stress, same | 0.624, 0.936, 1.324 | 0.658, 0.917, 1.158 |
+
+Both gates pass. PACKED8 is now on for the A100 family (`PACKED8_GPUS`, both A100 names by family). Ada is not
+measured.
+
