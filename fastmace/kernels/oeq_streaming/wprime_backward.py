@@ -148,6 +148,12 @@ FOLD_ALPHA = None
 # 0.9884 / 0.9907;
 # gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
 FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# GPUs where a model label keeps FOLD_ALPHA off (WPrime's model_label). OMAT-0 small on the H200 (9 November 2026,
+# results/h200-omat0-small-20261108, Benchmark_loup, ab / ba, b = off against small's defaults): 0.9939 / 0.9948
+# (rescreen); on top of MIN_BLOCKS 8 0.9884 / 0.9908 against 0.9923 / 0.9952 without; gate passes (3x rule).
+FOLD_ALPHA_MODEL_OFF_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA H200",)),
+})
 MAX_REGISTERS = None
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
@@ -1557,9 +1563,13 @@ def hoist_scale_default(device):
     return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
 
 
-def fold_alpha_default(device):
-    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS``."""
-    return bool(FOLD_ALPHA) if FOLD_ALPHA is not None else _device_name(device) in FOLD_ALPHA_GPUS
+def fold_alpha_default(device, model_label=None):
+    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS`` except the label's
+    ``FOLD_ALPHA_MODEL_OFF_GPUS``."""
+    if FOLD_ALPHA is not None:
+        return bool(FOLD_ALPHA)
+    name = _device_name(device)
+    return name in FOLD_ALPHA_GPUS and name not in FOLD_ALPHA_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def alpha_rows(schedule, weights):
@@ -1643,7 +1653,7 @@ class WPrime(torch.nn.Module):
         self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
         self.horner = self.table_w and horner_default(table.coef.device)
         device = table.coef.device
-        self.fold_alpha = (self.table_w and fold_alpha_default(device) and factored_default(device)
+        self.fold_alpha = (self.table_w and fold_alpha_default(device, self.model_label) and factored_default(device)
                            and not FACTORED_SCALE)
         if self.table_w:
             self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
@@ -1721,7 +1731,7 @@ class WPrime(torch.nn.Module):
             self.spline_block = (
                 fused.id,
                 SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                              self.spline["path_scale"], shared_locator=shared),
+                              self.spline["path_scale"], shared_locator=shared, model_label=self.model_label),
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid, shared_locator=shared, model_label=self.model_label))
@@ -1796,7 +1806,7 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
            "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
            "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",

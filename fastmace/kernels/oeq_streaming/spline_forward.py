@@ -13,6 +13,7 @@ Lab (H200, OMAT-0 medium, SrTiO3 10x10x10): forward 0.875 of today's, w' 0.894; 
 from __future__ import annotations
 
 import ctypes
+from types import MappingProxyType
 
 import torch
 
@@ -53,6 +54,14 @@ R128 = None
 # / 0.8312 against the
 # Ada defaults (SPLINE_W alone 0.8396 / 0.8304); off again from the Ada set, with STAGE_EDGES, 1.0017 / 1.0004.
 R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# A model label's own MIN_BLOCKS for the R128 shape on its GPUs, instead of 6 (the label reaches the kernel through
+# the rewrites' context: WPrime's model_label). Bitwise (a register cap). OMAT-0 small on the H200 (9 November 2026,
+# results/h200-omat0-small-20261108, Benchmark_loup, ab / ba, b = 128 threads with MIN_BLOCKS 8 against small's
+# defaults): 0.9873 / 0.9883 (rescreen), 0.9923 / 0.9952 (combo2), with w' FOLD_ALPHA off 0.9884 / 0.9908. Medium
+# on the H200: MIN_BLOCKS 8 1.0515 / 1.0507 (above), so 6 stays for every other model.
+R128_MIN_BLOCKS_MODEL_GPUS = MappingProxyType({
+    "omat0-small": (8, GPUModels(("NVIDIA H200",))),
+})
 # Codex H200 follow-up, item 4 (7 November 2026). FACTOR_W: a path whose terms all share one input component x_k
 # (scalar-input paths) or one edge component e_j (scalar-edge paths) multiplies w by it once (wf = w * x_k) and
 # accumulates fmaf(wf, rest, acc): fewer multiplies, rounding-class (the products associate differently; gate).
@@ -157,6 +166,18 @@ def shared_locator_supported(grid, r_lo):
         return struct.unpack("f", struct.pack("f", float(v)))[0]
 
     return f32(r_lo) <= f32(grid[0][0])
+
+
+def launch_shape(device, model_label=None):
+    """(threads, min_blocks) of the spline forward on ``device``: the R128 shape (128 threads, MIN_BLOCKS 6, or the
+    label's own MIN_BLOCKS from ``R128_MIN_BLOCKS_MODEL_GPUS`` on its GPUs) where R128 is on, else THREADS and
+    MIN_BLOCKS."""
+    if not r128_default(device):
+        return int(THREADS), MIN_BLOCKS
+    blocks, gpus = R128_MIN_BLOCKS_MODEL_GPUS.get(model_label, (6, ()))
+    device = torch.device(device)
+    listed = device.type == "cuda" and torch.cuda.get_device_name(device) in gpus
+    return 128, (blocks if listed else 6)
 
 
 def r128_default(device):
@@ -577,14 +598,14 @@ class SplineForward:
     ``shared_locator`` (SHARED_LOCATOR): it reads ``spline_locator``'s records, compiled alongside (``locate``)."""
 
     def __init__(self, schedule, blocks, grid, r_max, device, path_scale=None, shared_locator=False,
-                 block_order=None):
+                 block_order=None, model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
         device = torch.device(device)
         self.blocks, self.channels, self.grid = blocks, schedule.channels, [tuple(g) for g in grid]
         self.intervals = sum(int(g[2]) for g in self.grid)
-        self.threads, self.min_blocks = (128, 6) if r128_default(device) else (int(THREADS), MIN_BLOCKS)
+        self.threads, self.min_blocks = launch_shape(device, model_label)
         self.parts = (spline_parts(schedule) if PARTS else None) or [None]
         self.factor_w, self.cursor32 = factor_w_default(device), cursor32_default(device)
         self.shared_locator = bool(shared_locator)
@@ -597,6 +618,7 @@ class SplineForward:
         # permutation of [0, N) gives the same message); a call with another row count walks them in index order.
         self.order, self._identity = None, {}
         self.init_args = (schedule, blocks, grid, r_max, device, path_scale, shared_locator)
+        self.model_label = model_label
         self.sources = [render(schedule, blocks, self.grid, r_max, path_scale, part, self.threads, self.min_blocks,
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
                                self.stage_edges, self.prefetch, self.block_order)
@@ -723,8 +745,8 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
 
 
 __all__ = ["PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_PATHS",
-           "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS",
+           "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
-           "cursor32_default", "factor_w_default", "located_source", "locator_reference", "lookup_code", "r128_default",
+           "cursor32_default", "factor_w_default", "launch_shape", "located_source", "locator_reference", "lookup_code", "r128_default",
            "render", "render_locator", "shared_locator_default", "shared_locator_supported", "spline_locate",
            "spline_message_blocks", "spline_message_blocks_located", "spline_parts", "spline_w_default"]
