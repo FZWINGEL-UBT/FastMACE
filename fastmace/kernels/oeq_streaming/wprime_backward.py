@@ -148,6 +148,10 @@ FOLD_ALPHA = None
 # gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
 FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 MAX_REGISTERS = None
+# Lab (9 Nov 2026, Codex report v4): SMEM_SPILL compiles the kernel with __launch_bounds__(threads) and CUDA 13's
+# ".pragma enable_smem_spilling", so spills under a MAX_REGISTERS cap go to shared memory instead of local memory.
+# Off; for timing screens only.
+SMEM_SPILL = False
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
 # butterfly reduce-scatter. At each step a lane swaps half of its remaining components with its xor partner, so after
@@ -1155,6 +1159,13 @@ class WPrimeBackward:
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges)
         options = ()
+        if SMEM_SPILL:
+            head = 'extern "C" __global__ void oeq_projected_backward_wprime('
+            body = self.source.index(") {", self.source.index(head)) + 3
+            pragma = '\n    asm volatile(".pragma \\"enable_smem_spilling\\";");'
+            self.source = self.source[:body] + pragma + self.source[body:]
+            bounded = f'extern "C" __global__ void __launch_bounds__({self.num_threads}) oeq_projected_backward_wprime('
+            self.source = self.source.replace(head, bounded)
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
             self.source += f"\n// compiled with --maxrregcount={self.max_registers}\n"  # in the content id
@@ -1781,7 +1792,7 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",
            "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
            "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",

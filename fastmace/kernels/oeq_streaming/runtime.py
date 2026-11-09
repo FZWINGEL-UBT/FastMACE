@@ -27,6 +27,8 @@ def content_id(*parts) -> int:
     build's graph differ and miss Inductor's FX cache (setup-across-compositions F1); equal kernels now get equal
     ids, across builds and processes. A later object with the same content replaces the earlier one in its
     registry, which is safe because both run the same code on the same device. Below 2**56: a plain int64."""
+    if NVRTC:  # lab: another compiler's cubin is other content (default ids unchanged)
+        parts = parts + (NVRTC,)
     return int.from_bytes(hashlib.sha256(repr(parts).encode()).digest()[:7], "little")
 
 
@@ -63,9 +65,39 @@ def render_kernels(problem, dtype=np.float32, num_threads=None, layout="mul_ir")
     return schedule, kernel
 
 
+NVRTC = ""  # lab switch (9 Nov 2026): a libnvrtc.so path; "" compiles in-process with the environment's NVRTC
+
+
+def _compile_elsewhere(source, capability, extra_options, suffix):
+    """compile_cubin in a child process that preloads ``NVRTC`` (one process cannot hold two libnvrtc.so.13), so
+    an A/B in one process can compare compilers."""
+    import os
+    import subprocess
+    import sys
+    import tempfile
+
+    helper = ("import ctypes, os, sys\n"
+              "ctypes.CDLL(sys.argv[1], mode=ctypes.RTLD_GLOBAL)\n"
+              "from fastmace.kernels.oeq_streaming import runtime\n"
+              "import ast\n"
+              "a = ast.literal_eval(open(sys.argv[2]).read())\n"
+              "open(sys.argv[3], 'wb').write(runtime.compile_cubin(*a))\n")
+    with tempfile.TemporaryDirectory() as d:
+        args, cubin = os.path.join(d, "args.py"), os.path.join(d, "out.cubin")
+        with open(args, "w") as f:
+            f.write(repr((source, tuple(capability), tuple(extra_options), suffix)))
+        env = dict(os.environ, CUDA_VISIBLE_DEVICES="")
+        subprocess.run([sys.executable, "-c", helper, NVRTC, args, cubin], check=True, env=env,
+                       cwd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        with open(cubin, "rb") as f:
+            return f.read()
+
+
 def compile_cubin(source, capability, extra_options=(), suffix=""):
     """Compile CUDA source to a cubin for compute capability (major, minor) with NVRTC; ``suffix``: an architecture
     suffix such as "a" (sm_90a: wgmma)."""
+    if NVRTC:
+        return _compile_elsewhere(source, capability, extra_options, suffix)
     from cuda.bindings import nvrtc
 
     major, minor = capability

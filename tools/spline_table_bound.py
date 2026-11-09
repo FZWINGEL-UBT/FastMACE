@@ -124,6 +124,15 @@ def local_sender(args):
     return args
 
 
+def local_dout(args):
+    """w′'s arguments with every edge's receiver set to receiver 0: the bound on what staging or caching the receivers'
+    output-gradient rows could save (one dout row, hot in L1). Senders, the table and dx's atomics are unchanged; the
+    output is wrong."""
+    args = list(args)
+    args[4] = args[4].clone().zero_()
+    return args
+
+
 def slab_sorted(args):
     """The forward's arguments with every receiver's edges reordered by (pair, length): the same message up to the
     summation order, so co-resident receivers walk the same slabs at about the same time."""
@@ -175,6 +184,8 @@ def main(argv=None):
     p.add_argument("--equilibrate-steps", type=int, default=300)
     p.add_argument("--flush-l2-mb", type=int, default=256)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8"],
+                   help="lab: the forward with another table read path (tools/spline_read_lab.py)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -199,6 +210,9 @@ def main(argv=None):
         if name == "wprime":  # sender rows: every edge's sender is its receiver, so the x row stays in L1
             variants["local-sender"] = local_sender(real)
             variants["one-slab+local-sender"] = local_sender(slab)
+            variants["local-dout"] = local_dout(real)
+            variants["local-sender+local-dout"] = local_dout(local_sender(real))
+            variants["one-slab+local-sender+local-dout"] = local_dout(local_sender(slab))
         kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "forward":
             variants["slab-sorted"] = sorted_args = slab_sorted(real)
@@ -209,6 +223,17 @@ def main(argv=None):
                 variants["species-blocks"] = real
                 variants["slab-sorted+species-blocks"] = sorted_args
                 kernels["species-blocks"] = kernels["slab-sorted+species-blocks"] = (ordered, dict(order=order))
+            if args.table_reads:  # lab: other table layouts, real lengths and pairs (spline_read_lab)
+                import spline_read_lab
+                (args.output / "sources").mkdir(exist_ok=True)
+                for i, src in enumerate(kernel.sources):
+                    (args.output / "sources" / f"real-{i}.cu").write_text(src)
+                for read in args.table_reads:
+                    k_read, table, sources = spline_read_lab.variant(kernel, read, real[6])
+                    for i, src in enumerate(sources):
+                        (args.output / "sources" / f"{read}-{i}.cu").write_text(src)
+                    variants[read] = real[:6] + [table] + real[7:]
+                    kernels[read] = (k_read, {})
 
         def run(label, a):
             k, extra = kernels.get(label, (kernel, {}))
@@ -235,6 +260,9 @@ def main(argv=None):
             for label in [v for v in variants if v not in ("real", "one-slab")]:
                 got = message(label)
                 torch.cuda.synchronize()
+                if label == "bspline":  # a random table: only a sanity check
+                    print(f"forward {label}: finite {all(bool(torch.isfinite(o).all()) for o in got)}", flush=True)
+                    continue
                 worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(got, base))
                 print(f"forward {label} against real: max|d|/max|a| {worst:.2e}", flush=True)
         labels = list(variants)
