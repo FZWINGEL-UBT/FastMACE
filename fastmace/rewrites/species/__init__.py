@@ -167,14 +167,22 @@ def _distinct_rows(attrs):
     149M atoms the sort took about 5 minutes per checked module and several copies of a 13 GB one-hot."""
     import torch
 
-    # One-hot: no negative entry, each row's largest entry 1 and its sum 1 (reductions only, no copy of attrs).
-    total = torch.float64 if attrs.is_floating_point() else torch.int64
-    if (attrs.dim() == 2 and attrs.numel() and bool(attrs.amin() >= 0) and bool((attrs.amax(dim=1) == 1).all())
-            and bool((attrs.sum(dim=1, dtype=total) == 1).all())):
-        present = attrs.amax(dim=0).nonzero().flatten().flip(0)
-        rows = torch.zeros((present.numel(), attrs.shape[1]), dtype=attrs.dtype, device=attrs.device)
-        rows[torch.arange(present.numel(), device=attrs.device), present] = 1
-        return rows
+    # One-hot: no negative entry, each row's largest entry 1 and its sum 1. Checked in chunks of rows, so that no
+    # temporary is the size of attrs (a sum in int64 over all of it cast 13 GB to 106 GB at 149M atoms).
+    if attrs.dim() == 2 and attrs.numel():
+        total = torch.float64 if attrs.is_floating_point() else torch.int64
+        present = None
+        for chunk in attrs.split(1 << 20):
+            if not (bool(chunk.amin() >= 0) and bool((chunk.amax(dim=1) == 1).all())
+                    and bool((chunk.to(total).sum(dim=1) == 1).all())):
+                break
+            top = chunk.amax(dim=0)
+            present = top if present is None else torch.maximum(present, top)
+        else:
+            columns = present.nonzero().flatten().flip(0)
+            rows = torch.zeros((columns.numel(), attrs.shape[1]), dtype=attrs.dtype, device=attrs.device)
+            rows[torch.arange(columns.numel(), device=attrs.device), columns] = 1
+            return rows
     return torch.unique(attrs, dim=0)
 
 
