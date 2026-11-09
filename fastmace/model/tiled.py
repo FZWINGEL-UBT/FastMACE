@@ -94,6 +94,17 @@ TILE_FILTER32 = None
 # call at 975,560 SrTiO3 atoms). The gradients are the same products; the virial's and the objective's sums change
 # their order.
 TILE_EPILOGUE = None
+# TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
+# the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
+# tile built while the cache had room but too large for what was left is built again from the kept lists (the same
+# edges). It only removes work: on everywhere (decision 66).
+TILE_FILL_SKIP = True
+# TILE_PINNED_SUPERSET (exact): the kept lists (list_reuse's superset within cutoff + skin) in pinned host memory while
+# they total at most TILE_PINNED_SUPERSET_BYTES, so each call's copy to the device runs at the link's pinned rate and
+# without a sync (pageable copies: about 70 ns per atom per call at 975,560 SrTiO3 atoms on the RTX 5060 Ti); past
+# the cap, pageable as before. None: on for TILED_SPEED_GPUS.
+TILE_PINNED_SUPERSET = None
+TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1023,6 +1034,7 @@ class TiledForceField:
         self._pool = None
         self._stream = None
         self._cache_paused = False  # the wavefront's search pass: the tile lists are not kept
+        self._graph_takes = False  # TILE_FILL_SKIP: the graph cache takes the build under way
         self._wave_auto = {}  # TileConfig.wavefront "auto": the decision per atom count
         self._wave_short = {}  # ... and whether the plain state would not fit the host at all
         # TileConfig.lanes: the second lane's padded slots (by edge bucket), its green-context streams (with their
@@ -1070,7 +1082,12 @@ class TiledForceField:
         cache = self._pieces
         entry = cache.get(index) if cache is not None else None
         if entry is None:
-            piece = self._tile_graph(receivers, source, local_of, halo_start)
+            self._graph_takes = (cache is not None and self._piece_bytes < self._piece_budget
+                                 and bool(self._speed(TILE_FILL_SKIP)))
+            try:
+                piece = self._tile_graph(receivers, source, local_of, halo_start)
+            finally:
+                self._graph_takes = False
             if cache is not None:
                 nodes, ei, shifts, local, r, h = piece
                 size = nodes.numel() * nodes.element_size() + local.numel() * 4 + shifts.numel() * shifts.element_size()
@@ -1088,6 +1105,22 @@ class TiledForceField:
         if start != r:
             local = torch.where(local >= r, local + (start - r), local)
         return nodes, ei, shifts, local, r, h
+
+    def _kept_on_host(self, kept, tensors):
+        """A tile's kept lists on the host: pinned (``TILE_PINNED_SUPERSET``) while the pinned ones total at most
+        ``TILE_PINNED_SUPERSET_BYTES``, else pageable."""
+        size = sum(t.numel() * t.element_size() for t in tensors)
+        pinned = kept.get("pinned_bytes", 0)
+        if (self.device.type == "cuda" and self._speed(TILE_PINNED_SUPERSET)
+                and pinned + size <= TILE_PINNED_SUPERSET_BYTES):
+            kept["pinned_bytes"] = pinned + size
+            import torch
+
+            out = tuple(torch.empty(t.shape, dtype=t.dtype, pin_memory=True) for t in tensors)
+            for host, t in zip(out, tensors):
+                host.copy_(t)  # blocking: the host keeps it past this call
+            return out
+        return tuple(t.cpu() for t in tensors)
 
     def _graph_budget(self, wave, measure=False):
         """The call's graph cache (``TILE_GRAPH_CACHE``): empty with its byte budget, or None (off, under the
@@ -1187,13 +1220,14 @@ class TiledForceField:
                     elif kept["complete"]:
                         counts = torch.bincount(torch.searchsorted(receivers, receiver),
                                                 minlength=receivers.shape[0])
-                        kept["superset"][index] = tuple(t.cpu() for t in (*_pack_senders(sender),
-                                                                           _narrow_counts(counts), packed))
+                        kept["superset"][index] = self._kept_on_host(kept, (*_pack_senders(sender),
+                                                                            _narrow_counts(counts), packed))
                     if exact:
                         inner = inner[0]
                         return sender[inner], receiver[inner], unit[inner], shifts[inner]
                 else:
-                    dictionary, codes, counts, packed = (t.to(self.device) for t in superset)
+                    dictionary, codes, counts, packed = (t.to(self.device, non_blocking=t.is_pinned())
+                                                         for t in superset)
                     sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
@@ -1220,7 +1254,8 @@ class TiledForceField:
                     return torch.stack([sender, receiver]), bins.shifts(unit)
                 sender, receiver, unit, shifts = within(receivers) if kept is not None else bins.edges(receivers)
                 packed = (_pack_units(unit) if cache is not None and self.list_cache_state == "on"
-                          and not self._cache_paused else None)  # the wavefront's search pass keeps none
+                          and not self._cache_paused and not self._graph_takes else None)
+                # (the wavefront's search pass keeps none, nor a build the graph cache takes: TILE_FILL_SKIP)
                 if packed is not None and not self._host_keeps_cache(cache):
                     packed = None
                 if packed is not None:

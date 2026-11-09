@@ -1377,6 +1377,33 @@ def test_tile_block_rows_follows_the_module_unless_the_constant_is_set(monkeypat
     assert generic.tile_block_rows(unset) is False
 
 
+@pytest.mark.parametrize("budget", [10**12, 3_000], ids=["all-kept", "some-kept"])
+def test_fill_skip_leaves_the_graph_caches_tiles_out_of_the_list_cache(budget, monkeypatch):
+    """``TILE_FILL_SKIP``: a tile the graph cache takes is not packed into the host list cache; the call is bitwise
+    the call that fills it, also when a tile built for the cache did not fit and is built again."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    monkeypatch.setattr(tiled_module, "TILE_GRAPH_CACHE", 0.25)
+    monkeypatch.setattr(tiled_module.TiledForceField, "_free_bytes", lambda self: budget / 0.25)
+    results, filled = {}, {}
+    for skip in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_FILL_SKIP", skip)
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", neighbours="tiles", list_reuse=False))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[skip] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
+        filled[skip] = tiled.last["list_cache_bytes"]
+        assert tiled.last["graph_cache"]["tiles"] > 0
+    assert filled[False] > 0
+    assert (filled[True] == 0) if budget > 10**9 else (0 <= filled[True] < filled[False])
+    for one, two in zip(results[False], results[True]):
+        assert one[0] == two[0]
+        assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
+        assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
     """``TILE_GRAPH_CACHE``'s budget: none in a call that measures its workspace (the kept graphs would count as
     tile workspace and lower the receiver cap) or under the wavefront; else the fraction of the free memory less
