@@ -687,6 +687,18 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "F-fp64-free-1path-u": ("falsifier", lambda s: fp64_paths(s, "free", max_paths=1, sums="u")[0], ()),
         "fp64-1path-u-r80": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1, sums="u")[0],
                              ("--maxrregcount=80",)),
+        # FP64 offloads with the register cap kept by shared-memory spilling (SMEM_SPILL, H200 MD step neutral at
+        # cap 64): does the pipe pay once w' keeps 6 blocks per SM?
+        "base-s64": ("exact", smem_spill, ("--maxrregcount=64",)),
+        "fp64-1path-u-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1, sums="u")[0]),
+                             ("--maxrregcount=80",)),
+        "fp64-1path-u-s64": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1, sums="u")[0]),
+                             ("--maxrregcount=64",)),
+        "fp64-1path-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1)[0]),
+                           ("--maxrregcount=80",)),
+        "fp64-u-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", sums="u")[0]), ("--maxrregcount=80",)),
+        "fp64-paths-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt")[0]), ("--maxrregcount=80",)),
+        "F-fp64-free-s80": ("falsifier", lambda s: smem_spill(fp64_paths(s, "free")[0]), ("--maxrregcount=80",)),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
         "unordered": ("exact", unordered, ()),
@@ -770,6 +782,18 @@ def _stage_dout(source, rows, fill=True):
     s = _sub(s, "    const int64_t input_base = int64_t(sender) * INPUT_DIM;",
              pointers + "    const int64_t input_base = int64_t(sender) * INPUT_DIM;", 1)
     return re.sub(pattern, lambda m: f"fm_p{m.group(1)}[0 {m.group(3)}]", s)
+
+
+def smem_spill(source, threads=None):
+    """``source`` as ``wprime_backward.SMEM_SPILL`` builds it: ``__launch_bounds__(threads)`` and CUDA 13's
+    ``enable_smem_spilling`` pragma, so spills under a register cap go to shared memory (pair with --maxrregcount)."""
+    from fastmace.kernels.oeq_streaming.runtime import NUM_THREADS
+
+    head = 'extern "C" __global__ void oeq_projected_backward_wprime('
+    body = source.index(") {", source.index(head)) + 3
+    source = source[:body] + '\n    asm volatile(".pragma \\"enable_smem_spilling\\";");' + source[body:]
+    return source.replace(head, 'extern "C" __global__ void __launch_bounds__(%d) oeq_projected_backward_wprime('
+                          % (threads or NUM_THREADS))
 
 
 def _smem_reads(source, keys):
