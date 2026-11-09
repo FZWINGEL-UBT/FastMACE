@@ -197,29 +197,21 @@ Both pass that test, so both stay on:
 `LANE_INDICES` (idea 15a, bitwise) joined the H200 set on 6 November 2026: MD step 0.9897 / 0.9913 (b = on)
 ([ledger: ideas-r3](../optimisation-ledger.md#ideas-r3)).
 
-### OMAT-0 small (`omat0-small`, 8 November 2026)
+### OMAT-0 small (`omat0-small`, 8–9 November 2026)
 
 OMAT-0 small has had a label since 8 November 2026 (`labels.EXTRA_LABELS`: in the table, recognised by SHA-256, but
-not one of the 19 acceptance labels). It runs medium's per-GPU switches as they are.
+not one of the 19 acceptance labels). It runs the per-GPU switches as they are, plus these per-model defaults:
 
-Of medium's two label-keyed decision 66 defaults, small has its own GPU list. 3×TF32 GEMMs are in
-`DECISION_66_TF32X3_MODEL_GPUS`, and the generic w′ backward with its fused forward is in
-`DECISION_66_GENERIC_WPRIME_LABEL_GPUS`. Both lists hold the **NVIDIA H200 only**.
+| Default | Table | GPUs | Evidence (Benchmark_loup, b/a ab / ba) |
+| --- | --- | --- | --- |
+| 3×TF32 GEMMs and the generic w′ backward with its fused forward (decision 66 pair) | `DECISION_66_TF32X3_MODEL_GPUS`, `DECISION_66_GENERIC_WPRIME_LABEL_GPUS` | H200, A100 family | H200 (b = without): 2.360 / 2.370 (5.41 → 2.29 ms); gate force 1.01, stress 1.22 (NbCl5). A100-SXM4 (Alex 4967329, b = with): 0.3911 / 0.3916 (10.72 → 4.19 ms); A100 gate (4967421) force 1.03, stress 1.33 (NbCl5) |
+| w′ `STAGE_EDGES` on (bitwise) | `wprime_backward.STAGE_EDGES_MODEL_GPUS` (on top of `STAGE_EDGES_GPUS`) | H200 | b = off: 1.0072 / 1.0114 |
+| Spline forward R128 shape with `MIN_BLOCKS` 8 instead of 6 (bitwise) | `spline_forward.R128_MIN_BLOCKS_MODEL_GPUS` | H200 | b = 8: 0.9873 / 0.9883, 0.9923 / 0.9952; as the default, b = 6: 1.0046 / 1.0057. Medium keeps 6 (8: 1.0515 / 1.0507) |
 
-| Measurement (H200, Benchmark_loup, b = without the pair) | Result |
-| --- | --- |
-| MD step b/a, ab / ba | 2.360 / 2.370 (5.41 → 2.29 ms per step) |
-| Force/stress gate (3× rule), worst ratio | force 1.01 (NbCl5), stress 1.22 (NbCl5) |
-
-Small also has its own w′ default. `wprime_backward.STAGE_EDGES_MODEL_GPUS` adds the **NVIDIA H200** to the GPUs
-where w′ `STAGE_EDGES` is on, for `omat0-small` only (9 November 2026). It reads the table label from the rewrites'
-`Context.inputs["model_label"]`. Every model, small included, keeps `STAGE_EDGES_GPUS` (the A100 family).
-
-| Measurement (H200, Benchmark_loup, b = STAGE_EDGES off) | Result |
-| --- | --- |
-| MD step b/a, ab / ba | 1.0072 / 1.0114 (step breakdown 2.27 ms per step) |
-
-On the A100 family and the other GPUs, small keeps the pair off until it has its own A/B there. Source:
+The kernels read the table label from the rewrites' `Context.inputs["model_label"]`, through WPrime's `model_label`.
+Small's step (step breakdown, 9 November 2026): H200 2.12 ms (5.41 ms without the pair), A100-SXM4 4.19 ms (10.72 ms without).
+w′ `FOLD_ALPHA` off measured within the run-to-run spread (0.4–0.7 % either way), so it stays on
+(`FOLD_ALPHA_MODEL_OFF_GPUS` is empty). The other GPUs keep the pair off until they have their own A/B. Source:
 [h200-omat0-small](../../results/h200-omat0-small-20261108/README.md).
 
 ### Tiled (capacity) mode

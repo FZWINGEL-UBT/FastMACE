@@ -200,6 +200,90 @@ defaults, b = `STAGE_EDGES=False`. Modal `sixth` cost $0.37.
 - STAGE_EDGES only changes how the kernel stages edge data (results are bitwise unchanged), so no new force/stress
   gate was run. The combined gate above had it on and passed.
 
+## Rescreen after main c8d08b5b (`rescreen/`, job `ff0bd317`)
+
+Main c8d08b5b (merged as `a6eddf4a`) turned JOINED_LAYOUT, `BLOCK_ORDER` and `SORT_BY_LENGTH` on for the H200. With
+w′ STAGE_EDGES, small's defaults run Benchmark_loup at **2.14 ms per step** (breakdown 2.13 ms). a = those defaults,
+b = a plus one change. Modal `sixth` cost $0.83.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| BLOCK_ORDER off | 1.0148 | 1.0157 |
+| SORT_BY_LENGTH off | 1.0092 | 1.0102 |
+| JOINED_LAYOUT off | 1.0307 | 1.0315 |
+| PREFETCH_AHEAD on | 1.0218 | 1.0254 |
+| R128 shape with MIN_BLOCKS 8 | **0.9873** | **0.9883** |
+| w′ STAGE_SH off | 1.0193 | 1.0213 |
+| w′ FOLD_ALPHA off | 0.9939 | 0.9948 |
+| tf32x3 TILE 64x32 | 0.9948 | 0.9980 |
+
+- Every H200 default that small now runs helps it.
+- Three changes were faster in both orders: MIN_BLOCKS 8, FOLD_ALPHA off and TILE 64x32.
+
+## Combo2 and defaults2 (`combo2/`, `b4c238ac`; `defaults2/`, `e2206bb6`)
+
+Combo2: a = small's defaults (as in the rescreen). Modal cost $0.68.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| MIN_BLOCKS 8 | 0.9923 | 0.9952 |
+| MIN_BLOCKS 8, FOLD_ALPHA off | 0.9884 | 0.9908 |
+| MIN_BLOCKS 8, TILE 64x32 | 0.9904 | 0.9935 |
+| all three | 0.9895 | 0.9916 |
+| FOLD_ALPHA off, TILE 64x32 | 0.9985 | 0.9959 |
+
+The gate with all three passes, and the breakdown gives 2.11 ms.
+
+Defaults2: a = small with MIN_BLOCKS 8 and FOLD_ALPHA off as its own defaults (`e2206bb6`); b sets one back to the
+shared value. Modal cost $0.92.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| MIN_BLOCKS 6 again | 1.0046 | 1.0057 |
+| FOLD_ALPHA on again | 0.9936 | 0.9927 |
+| both again | 0.9949 | 1.0047 |
+| w′ ESTRIN on | 0.9940 | 0.9933 |
+
+The gate passes; force ratios are 0.94 / 0.91 / 1.01 and stress ratios 0.58 / 1.10 / 1.32 (SrTiO3 / NaCl / NbCl5).
+The breakdown gives 2.12 ms.
+
+- **MIN_BLOCKS 8 is small's H200 default** (`4b80f1ff`: `spline_forward.R128_MIN_BLOCKS_MODEL_GPUS`, bitwise).
+  It is 0.5–1.2 % faster in all three jobs. Medium keeps 6, since 8 is 5 % slower there.
+- **FOLD_ALPHA stays on.** Off was 0.4–0.6 % faster in two jobs, but on again was 0.7 % faster in the third. That is
+  within the run-to-run spread, so it is not adopted. `wprime_backward.FOLD_ALPHA_MODEL_OFF_GPUS` stays as an empty
+  table.
+- ESTRIN was measured only with FOLD_ALPHA off. On medium it adds nothing on top of FOLD_ALPHA, so it was not tried
+  further.
+- The spread between jobs is about ±0.5 %. Changes under that size need a repeat before adoption.
+
+## The A100 family: small's decision 66 pair (`a100/`, Alex)
+
+Small's A100 defaults left the pair off, because its per-model lists held the H200 only. NHR@FAU Alex,
+A100-SXM4-80GB, venv of `fm-a100omat` (Python 3.10.12), float32, Benchmark_loup.
+
+**Pack job 4967329** (source `7790b57c`, `tools/jobs/alex_ab_pack.sh`): a = small's A100 defaults; b = the per-model
+lists with the A100 added. `tools/ab_rewrites.py` now takes a dict literal for a `MappingProxyType` constant.
+
+| b | ab | ba |
+| --- | ---: | ---: |
+| the pair | **0.3911** (10.72 → 4.19 ms) | **0.3916** (10.72 → 4.20 ms) |
+| 3×TF32 GEMMs alone | 0.8240 | 0.8243 |
+| generic w′ alone | 0.5586 | 0.5585 |
+
+**Adopted** in `5797d298`: both lists name the H200 and the A100 family.
+
+**Gate job 4967421** (source `5797d298`, the plan's defaults, no constants): the 3× gate passes.
+
+| | SrTiO3 | NaCl | NbCl5 |
+| --- | ---: | ---: | ---: |
+| Force | 1.00 | 0.92 | 1.03 |
+| Stress | 0.79 | 1.31 | 1.33 |
+
+- Energy errors are under the 0.01 eV floor.
+- Step breakdown: **4.19 ms per step**, force graph 4.05 ms.
+- Small's other H200-only defaults (w′ STAGE_EDGES, MIN_BLOCKS 8) need A100 A/Bs of their own. w′ STAGE_EDGES is
+  already on for every model on the A100.
+
 ## Not done
 
-- The A100 family: small keeps the pair off there until an Alex A/B (packed) measures it.
+- MIN_BLOCKS 8 on the A100, and small on the Ada and 5060 Ti, are not measured.
