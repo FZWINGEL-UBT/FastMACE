@@ -1,0 +1,12 @@
+╭ a=[3712:29⨯(128)] b=[2048:16⨯(128)] -> C=[512:4⨯(128)]
+│  []·a[u]·b[u]➜C[u] ─────────── num_paths=4 u=128
+│  []·a[u]·b[u]·b[u]➜C[u] ────── num_paths=86 u=128
+╰─ []·a[u]·b[u]·b[u]·b[u]➜C[u] ─ num_paths=1949 u=128
+raw [(3, 4), (4, 86), (5, 1949)]
+sym [(3, 4), (4, 86), (5, 1949)]
+segment shapes in [((128,), (128,), (128,))]
+nonzero coefficient terms 2039 groups (a,C) 61 distinct monomials 410 pairs 116
+terms by degree {1: 4, 2: 86, 3: 1949} monomials deg2/deg3 51 355
+distinct (monomial, C) 410 distinct (monomial, C, a) 480 max a per (monomial,C) 12
+instr straight-line (monomial-shared): FMUL 478 + FFMA terms 2039 + FFMA groups 61
+instr weight-first: per atom-channel combine sum_a coef*w_a for each (m,C): 480 FFMA, then 410 FFMA, + monomial FMULs
