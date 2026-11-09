@@ -978,15 +978,74 @@ def moved_within(positions, reference, limit, chunk=None):
 
 
 def _host_available():
-    """The host's available memory in bytes (``MemAvailable``), or None where /proc/meminfo is missing."""
+    """The host's available memory in bytes: ``MemAvailable``, or less where the process's memory cgroup leaves less
+    (``_cgroup_room``: a batch job's limit, e.g. 120 GB per A100 on a 2 TB Alex node, which /proc/meminfo does not
+    show); None where /proc/meminfo is missing."""
+    available = None
     try:
         with open("/proc/meminfo") as handle:
             for line in handle:
                 if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) * 1024
+                    available = int(line.split()[1]) * 1024
+                    break
     except OSError:
-        pass
-    return None
+        return None
+    room = _cgroup_room()
+    if available is None or room is None:
+        return available
+    return min(available, room)
+
+
+def _cgroup_room(root="/sys/fs/cgroup", own="/proc/self/cgroup"):
+    """The bytes the process's memory cgroups leave it: over the cgroup and its ancestors with a limit, the least of
+    the limit less the usage (less the reclaimable inactive file cache). cgroup v2 (``memory.max``,
+    ``memory.current``, ``memory.stat``) or v1 (``memory.limit_in_bytes``, ``memory.usage_in_bytes``); None
+    without a limit or outside Linux."""
+    import os
+
+    try:
+        with open(own) as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+
+    def read(path):
+        try:
+            with open(path) as handle:
+                return handle.read()
+        except OSError:
+            return None
+
+    def inactive_file(directory, key):
+        stat = read(os.path.join(directory, "memory.stat")) or ""
+        for line in stat.splitlines():
+            name, _, value = line.partition(" ")
+            if name == key:
+                return int(value)
+        return 0
+
+    rooms = []
+    for line in lines:
+        hierarchy, controllers, path = (line.split(":", 2) + ["", ""])[:3]
+        v2 = hierarchy == "0" and controllers == ""
+        if not v2 and "memory" not in controllers.split(","):
+            continue
+        base = root if v2 else os.path.join(root, "memory")
+        parts = [part for part in path.split("/") if part]
+        for depth in range(len(parts), -1, -1):
+            directory = os.path.join(base, *parts[:depth])
+            if v2:
+                limit, usage = read(os.path.join(directory, "memory.max")), read(os.path.join(directory, "memory.current"))
+                key = "inactive_file"
+            else:
+                limit = read(os.path.join(directory, "memory.limit_in_bytes"))
+                usage = read(os.path.join(directory, "memory.usage_in_bytes"))
+                key = "total_inactive_file"
+            if limit is None or usage is None or limit.strip() == "max" or int(limit) >= 2**60:
+                continue
+            used = int(usage) - inactive_file(directory, key)
+            rooms.append(int(limit) - max(used, 0))
+    return min(rooms) if rooms else None
 
 
 def _narrow_counts(counts):

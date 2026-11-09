@@ -1557,6 +1557,36 @@ def test_state_dtype_auto_drops_the_kept_lists_before_it_rounds_the_state(monkey
     assert not np.array_equal(f1, f0) and np.abs(f1 - f0).max() <= 2.0**-9 * np.abs(f0).max()
 
 
+def test_host_room_is_the_memory_cgroups_where_they_limit_it(tmp_path):
+    """``_cgroup_room``: a batch job's memory cgroup (v2: the job's limit one level up from the step's, v1: the
+    memory controller's) leaves the limit less the usage less the inactive file cache; no limit, no room."""
+    from fastmace.model.tiled import _cgroup_room
+
+    root = tmp_path / "v2"
+    job, step = root / "slurm" / "job_1", root / "slurm" / "job_1" / "step_0"
+    step.mkdir(parents=True)
+    (root / "slurm" / "memory.max").write_text("max\n")
+    (root / "slurm" / "memory.current").write_text("5\n")
+    (job / "memory.max").write_text(f"{120 * 2**30}\n")
+    (job / "memory.current").write_text(f"{30 * 2**30}\n")
+    (job / "memory.stat").write_text(f"anon 1\ninactive_file {10 * 2**30}\n")
+    (step / "memory.max").write_text("max\n")
+    (step / "memory.current").write_text(f"{29 * 2**30}\n")
+    own = tmp_path / "cgroup-v2"
+    own.write_text("0::/slurm/job_1/step_0\n")
+    assert _cgroup_room(str(root), str(own)) == 100 * 2**30
+    own.write_text("0::/\n")
+    assert _cgroup_room(str(root), str(own)) is None
+    v1 = tmp_path / "v1" / "memory" / "job_2"
+    v1.mkdir(parents=True)
+    (v1 / "memory.limit_in_bytes").write_text("1000\n")
+    (v1 / "memory.usage_in_bytes").write_text("400\n")
+    (v1 / "memory.stat").write_text("total_inactive_file 100\n")
+    own.write_text("12:cpuset:/job_2\n11:memory:/job_2\n")
+    assert _cgroup_room(str(tmp_path / "v1"), str(own)) == 700
+    assert _cgroup_room(str(tmp_path), str(tmp_path / "missing")) is None
+
+
 def test_state_dtype_needs_the_aliased_host_state():
     with pytest.raises(ValueError, match="state_dtype"):
         TileConfig(5, state_dtype="float32")
