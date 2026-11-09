@@ -1122,6 +1122,24 @@ class TiledForceField:
             return out
         return tuple(t.cpu() for t in tensors)
 
+    def _kept_form(self, kept, index, superset):
+        """Tile ``index``'s kept lists as ``TILE_PINNED_SUPERSET`` wants them now. They are stored as the switch was
+        when they were kept; where it changed since (a same-process A/B's other side), a mirror in the other form is
+        made once and kept beside them (never with the switch left as it is)."""
+        if not superset or self.device.type != "cuda":
+            return superset
+        want = bool(self._speed(TILE_PINNED_SUPERSET))
+        if superset[0].is_pinned() == want:
+            return superset
+        mirrors = kept.setdefault("mirrors", {})
+        mirror = mirrors.get(index)
+        if mirror is None:
+            mirror = self._kept_on_host(kept, superset) if want else tuple(t.clone() for t in superset)
+            if mirror[0].is_pinned() != want:  # past the pinned cap: pageable, as stored
+                return superset
+            mirrors[index] = mirror
+        return mirror
+
     def _graph_budget(self, wave, measure=False):
         """The call's graph cache (``TILE_GRAPH_CACHE``): empty with its byte budget, or None (off, under the
         wavefront, off a CUDA device, or in a call that measures its workspace, where the kept graphs would count
@@ -1227,7 +1245,7 @@ class TiledForceField:
                         return sender[inner], receiver[inner], unit[inner], shifts[inner]
                 else:
                     dictionary, codes, counts, packed = (t.to(self.device, non_blocking=t.is_pinned())
-                                                         for t in superset)
+                                                         for t in self._kept_form(kept, index, superset))
                     sender = _unpack_senders(dictionary, codes)
                     receiver = receivers.repeat_interleave(counts.long(), output_size=sender.shape[0])
                     unit = _unpack_units(packed, bins.float_dtype, self.device)
