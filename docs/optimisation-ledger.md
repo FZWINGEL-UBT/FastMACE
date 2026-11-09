@@ -586,6 +586,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ada-omat0-best](#ada-omat0-best) | Capacity fix: the generic self-check probe takes no species-table gradient through `COMPOSE_SKIP` (`generic_recompute_first_table` failed, the plan fell to the terminal sequence) | `rewrites.generic._run` | FM | FIXED (every GPU with `COMPOSE_SKIP`) | 2026-11-09 | Ada SrTiO3 limit 148,955 → 233,280 | [omat0-ada-capacity](../results/omat0-ada-capacity-20261108/README.md) |
 | [memprofile-shape-carrier](#memprofile-shape-carrier) | Capacity fix: the recomputing outer-sum backward (`TABLED_FORWARD`) carries `a`'s shape as a stride-0 view instead of `[E, 64]` floats it never reads | `kernels.triton.tabled_outer_sum.SHAPE_CARRIER` (True) | FM | FIXED (every GPU with `TABLED_FORWARD`) | 2026-11-09 | Ada b/a 1.0009 / 1.0002; SrTiO3 36³ peak 86.6 → 75.9 kB/atom, Ada SrTiO3 limit 233,280 → 253,265 | [memory-profile](../results/memory-profile-20261109/README.md) |
 | [memprofile-shape-carrier](#memprofile-shape-carrier) | Release the allocator cache before the capture's warm-up, so Triton module loads find free device memory | `EngineConfig.empty_cache_before_warmup` (reverted) | FM | REJECTED (no limit gain) | 2026-11-09 | 5060 Ti: the failure moved to the first eager force call | [memory-profile](../results/memory-profile-20261109/README.md) |
+| [memslack-sort-keys](#memslack-sort-keys) | Neighbour-list rebuild sorts the order keys alone (written over the screen codes) and decodes the pairs from them: no key tensor, no index tensor, no key-value sort | `neighbors.skin.SORT_KEYS_ONLY` (True) | FM | FIXED (every GPU; work removal, bitwise) | 2026-11-09 | Ada b/a 1.0004 / 0.9999, 5060 Ti 1.0027 / 0.9986; rebuild peak 1,019 → 351 MiB, SrTiO3 36³ 75.9 → 72.8 kB/atom, Ada SrTiO3 limit 253,265 → 274,360 | [memory-slack](../results/memory-slack-20261109/README.md) |
+| [memslack-sort-keys](#memslack-sort-keys) | Graph-pool packing: in-place joined species products during the capture | `compose_skip.JOINED_LAYOUT` (Ada) | FM | MEASURED, no change (the same peaks to the byte) | 2026-11-09 | SrTiO3 36³ 16.49 GiB either way | [memory-slack](../results/memory-slack-20261109/README.md) |
+| [memslack-sort-keys](#memslack-sort-keys) | Graph-pool packing: classic (non-expandable) allocator segments | `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` | FM | REJECTED | 2026-11-09 | SrTiO3 36³ out of memory in the build (19.17 GiB) | [memory-slack](../results/memory-slack-20261109/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -5161,6 +5164,18 @@ Rounds 4 and 5 (main `65923679`, same night) measured the existing switches neve
 - Measured (leto RTX 4000 Ada, main `4ffe4f6f`): Benchmark_loup b/a 1.0009 / 1.0002 (b = fix); gradients bitwise equal (`test_recomputing_backward_allocates_no_value_rows`); SrTiO3 36³ MD reserve 18.81 → 16.49 GiB (75.9 kB/atom), single call 13.63 → 12.82 GiB allocated; limits: Ada SrTiO3 233,280 → 253,265 (37³, 1,563 ms), Ada NaCl 343,000 unchanged, 5060 Ti 163,840 / 195,112 unchanged.
 - Next limiters: SrTiO3, the neighbour list's rebuild sort beside the graph pool; NaCl, a dense `[N, 5120]` message gradient (`streaming_conv_tabled_recompute_backward`) built beside the four GEMM gradient blocks; 5060 Ti, Triton module loads in the capture warm-up.
 - Sources: [memory-profile](../results/memory-profile-20261109/README.md).
+
+<a id="memslack-sort-keys"></a>
+#### memslack-sort-keys: reserved but unused memory at the Ada limit, the keys-only rebuild sort (RTX 4000 Ada, 5060 Ti)
+- Switch: `fastmace.neighbors.skin.SORT_KEYS_ONLY` (True; False only as an A/B side).
+- Engine: FM
+- Date/round: 9 November 2026 (owner, via the conductor, item 1 after the memory profile: "reserved-but-unused memory, free in speed"; also the graph pool's packing slack).
+- What: `build_gpu` kept an int64 key per screened pair, sorted it with its indices and gathered the codes; the key is unique and holds receiver, sender and image, so the keys now overwrite the screen codes, are sorted alone (`torch.unique`) and decoded. The same pairs in the same order.
+- Status: FIXED (work removal, bitwise). Graph-pool packing: `JOINED_LAYOUT` no change; `expandable_segments:False` REJECTED (out of memory at 36³).
+- Measured (leto RTX 4000 Ada, `d4d7a08a`): rebuild peak above the list's buffers 1,019 → 351 MiB at SrTiO3 233,280 (same time, buffers bitwise); MD 36³ reserved 16.49 → 15.82 GiB; Ada SrTiO3 limit 253,265 → 274,360 (38³, 1,746 ms); Benchmark_loup b/a Ada 1.0004 / 0.9999, 5060 Ti 1.0027 / 0.9986.
+- Packing slack (13.8 kB/atom): placement loss of the caching allocator inside the capture's one expandable segment (holes 1.28 GiB at the live peak, then 1.74 GiB of growth for an 1,822 MiB request with 5.0 GiB free); every hole is written in the replay. Levers: fewer transients, or item 2's recompute rung.
+- Next limiter: rescue rung (B)'s dense `[atoms, 5120]` message gradient sets both Ada limits now (SrTiO3 296,595, NaCl 373,248).
+- Sources: [memory-slack](../results/memory-slack-20261109/README.md).
 
 <a id="sx-layout-spline"></a>
 #### sx-layout-spline: Symmetrix-XL's interaction 2 forward layout with spline w, and the spline w′ (H200, lab)
