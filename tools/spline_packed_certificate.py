@@ -75,6 +75,10 @@ FORMATS = {
     "C: m19 m11 b10@a0 b6@a0": (("m", 19), ("m", 11), ("b", 10, 0, 6), ("b", 6, 0, 2)),
     "D: m17 m13 b10@a0 b6@a0": (("m", 17), ("m", 13), ("b", 10, 0, 6), ("b", 6, 0, 2)),
     "E econ: m19 m13 b14@a0": (("m", 19), ("m", 13), ("b", 14, 0, 8), None),
+    # cheap decode (9 Nov): a0 float32, a1 / a2 as the top 16 bits of a float32 (bf16), 8 bytes
+    "B1 econ: f32 bf16 bf16": (("m", 23), ("m", 7), ("m", 7), None),
+    "B2 econ: f32 m11 m3 (a1 21 bits, a2 11)": (("m", 23), ("m", 11), ("m", 3), None),
+    "B3: f32 bf16 bf16 + a3 dropped (no econ)": (("m", 23), ("m", 7), ("m", 7), ("m", 0)),
     # t basis (report 5, proposal 5): a, b float32; c, d float16 scaled by a power of two per (pair, weight)
     "T1: t-basis f32 f32 h16 h16": (("t",), ("t",), ("h",), ("h",)),
     "T2: t-basis f32 f32 f32 h16": (("t",), ("t",), ("t",), ("h",)),

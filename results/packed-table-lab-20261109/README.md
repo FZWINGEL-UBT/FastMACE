@@ -62,6 +62,7 @@ operand's L1 / shared wavefronts cost rather than its misses (report 5's critiqu
 | real | 622 µs | 743 µs (+19.5 %) |
 | one-slab | 431 µs | 439 µs |
 | table share (real − one-slab) | 191 µs | **304 µs** |
+| packed8 S12 (against real) | 1.060 / 1.060 | **0.882 / 0.881** (672 µs, message 2.9e-6) |
 | w′ real | 1,085 µs | 1,121 µs (+3.3 %) |
 
 - **On the H200, w′'s operand bytes cost nothing measurable:** replacing a load with one integer op makes w′ slower
@@ -70,7 +71,9 @@ operand's L1 / shared wavefronts cost rather than its misses (report 5's critiqu
   premise). The 5060 Ti is the opposite (zero-table 0.716): it is L1-traffic bound, and its results do not carry
   over.
 - **The forward's table matters more off-lattice:** on the disordered snapshot its share grows from 191 to 304 µs
-  (the sharp shells of the crystal give L1 reuse). Smaller forward tables (packed8, 12-byte) are re-tested there.
+  (the sharp shells of the crystal give L1 reuse). packed8 re-tested there wins 91 µs (about 2.6 % of the step) where it lost 37 µs on the crystal
+  ([h200-packed8-disordered/](h200-packed8-disordered/), source 3a6f3e6b, $0.06). Its edge loop is 378 SASS
+  instructions against 227 (SHF 58, I2FP 30, IMAD 24, LOP3 20): a cheaper decode is the lever.
 
 MD-step A/Bs on the H200 (Benchmark_loup, abab / abba, 8 blocks of 256 steps): w′ capped at 64 registers with
 shared-memory spilling 0.9999 / 1.0033, at 80 1.0005 / 1.0028, NVRTC 13.5.37 against 13.0.88 1.0018 / 1.0040: all
@@ -81,3 +84,6 @@ H200 container: Modal `sixth`, source 158399f2, 569 s, $0.96 ([h200-night2/](h20
 
 12-byte table certificate (CPU, `tools/spline_packed_certificate.py` T1: a, b float32, c, d float16 scaled by 2^k per
 (pair, weight)): value part 0.025 (passes, target 0.5), slope parts 2.87 (fails: w′ would keep the float32 table).
+
+Off-midpoint economized bases (B1: a0 float32, a1/a2 bfloat16; B2: a1 11-bit, a2 3-bit mantissa): value parts 1.745 and
+0.650, both above the 0.5 target, so S12 stays the packed format.
