@@ -17,6 +17,8 @@ def test_defaults(monkeypatch):
     assert RewriteConfig().sc_generated == "auto"
     assert sc_generated.SC_GENERATED is None
     assert sc_generated.sc_generated_default(H200)  # auto: the GPU list (9 November 2026)
+    assert sc_generated.sc_generated_default("NVIDIA A100-SXM4-80GB")
+    assert sc_generated.sc_generated_default("NVIDIA A100 80GB PCIe")
     assert not sc_generated.sc_generated_default("NVIDIA GeForce RTX 5060 Ti")
     assert sc_generated.sc_generated_default(H200, "on") and not sc_generated.sc_generated_default(H200, "off")
     monkeypatch.setattr(sc_generated, "SC_GENERATED", True)  # an A/B side

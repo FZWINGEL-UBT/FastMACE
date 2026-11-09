@@ -23,7 +23,9 @@ SC_GENERATED = None
 # NVIDIA H200 (9 November 2026, results/sc0-op-20261109; OMAT-0 medium, Benchmark_loup SrTiO3 10x10x10, a = the H200
 # defaults of a6430eb6): MD step b/a 0.9760 / 0.9731 (ab / ba); force/stress gate passes (forces 0.850 / 0.920 /
 # 0.959, stress 0.415 / 0.778 / 1.209).
-SC_GENERATED_GPUS = GPUModels(("NVIDIA H200",))
+# A100 family (9 November 2026, same run id; Modal NVIDIA A100 80GB PCIe, a = its A100 defaults): MD step b/a
+# 0.9685 / 0.9652; gate passes (forces 0.972 / 0.854 / 0.977, stress 0.701 / 0.898 / 1.237).
+SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 
 _subclasses = {}
 

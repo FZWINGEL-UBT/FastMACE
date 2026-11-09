@@ -234,7 +234,7 @@ class RewriteConfig:
     cueq_projected: Toggle = "auto"
     # With tf32x3_gemms: interaction 0's density division and product 0's cuEq symmetric contraction as one
     # generated straight-line kernel pair (fastmace.rewrites.sc_generated, SC_GENERATED; Codex v3 proposal 5);
-    # rounding; auto = on where sc_generated.SC_GENERATED_GPUS lists the GPU (the H200).
+    # rounding; auto = on where sc_generated.SC_GENERATED_GPUS lists the GPU (the H200 and the A100 family).
     sc_generated: Toggle = "auto"
     # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
     # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,

@@ -37,7 +37,7 @@ Branch `fastmace/sc0-op` (from main a6430eb6). The integration is in four files:
 | MD step A/B, order ba (ABBA) | b 3.3712 ms, a 3.4645 ms, **b/a 0.9731**, valid |
 
 The step got 84–93 µs faster, against 97 µs saved at kernel level in the lab. It is faster in both orders and the
-gate passes, so the switch is **adopted on the H200** under decision 66 (`SC_GENERATED_GPUS = ("NVIDIA H200",)`).
+gate passes, so the switch is **adopted on the H200** under decision 66.
 
 ## Local RTX 5060 Ti ([local-5060ti/](local-5060ti/check.json))
 
@@ -50,6 +50,21 @@ adoption commit.
 - Product 0 is routed, with 80 / 96 registers and no spills.
 - Forces against off differ by 3.2e-6 eV/Å (same build: 3.0e-6).
 
-## A100
+## A100 ([a100/](a100/run.log))
 
-Pending (Alex A100-SXM4-80GB, packed A/B in both orders and the gate).
+- Machine and environment: Modal `NVIDIA A100 80GB PCIe` (driver 610.57.04, sm_80, CUDA UMD 13.3), profile `sixth`.
+- Same source, image, model, workload and steps as the H200; a = the A100 defaults.
+- Wall time 623 s, about $0.43.
+- Alex was not reachable (csnhr refused connections for about 25 minutes), so the run went to Modal.
+
+| Step | Result |
+| --- | --- |
+| GPU test | 4 passed |
+| Engine check | Routed: forward 79 registers, backward 96, no local memory. Forces against off differ by 4.2e-6 eV/Å (same build: 2.4e-6). |
+| Force/stress gate (limit 3) | **passes**. Forces 0.972 / 0.854 / 0.977, stress 0.701 / 0.898 / 1.237. Energy: SrTiO3 2.4 meV and NbCl5 0.5 meV (both under the 0.01 eV floor), NaCl 1.34. |
+| MD step A/B, order ab | a 7.5005 ms, b 7.2643 ms, **b/a 0.9685**, valid |
+| MD step A/B, order ba | b 7.2667 ms, a 7.5287 ms, **b/a 0.9652**, valid |
+
+It is faster in both orders and the gate passes, so the switch is **adopted for the A100 family** (decision 66).
+`SC_GENERATED_GPUS` lists `NVIDIA A100-SXM4-80GB` and `NVIDIA A100 80GB PCIe`, and `GPUModels` matches every A100
+variant by family.
