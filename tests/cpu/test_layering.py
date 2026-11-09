@@ -88,6 +88,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                 "JOINED_LAYOUT": "first sums d-major, paths read in place; A/B"},
     "fastmace/kernels/cutlass/skip_select.py": {"SKIP_SELECT": "idea 31: species-skip selection in the epilogue; A/B"},
     "fastmace/rewrites/cueq_projection.py": {"CUEQ_PROJECTED": "cuEq projected weight kept; per GPU, A/B"},
+    "fastmace/rewrites/sc_generated.py": {"SC_GENERATED": "interaction 0 division + contraction generated; per GPU, A/B"},
     "fastmace/kernels/triton/divided_blocks.py": {},
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
