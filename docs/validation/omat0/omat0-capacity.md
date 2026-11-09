@@ -274,6 +274,15 @@ its uncorrected estimate is 1.8 times the peak (SrTiO3 69,120), against 1.5 for 
 
 [Results](../../../results/omat0-ada-capacity-20261108/README.md).
 
+**9 November, the memory profile** ([memory-profile-20261109](../../../results/memory-profile-20261109/README.md)):
+the recomputing outer-sum backward allocated `[edges, 64]` floats only to carry a shape (4.1 GiB, 18.9 kB/atom at
+SrTiO3 233,280); a stride-0 view carries it now (`tabled_outer_sum.SHAPE_CARRIER`, work removal, b/a 1.0009 /
+1.0002). Ada SrTiO3 limit 233,280 → **253,265** (37³, 1,563 ms; 274,360 fails in the neighbour list's rebuild beside
+the graph pool); NaCl unchanged at 343,000 (373,248 fails on a dense `[atoms, 5120]` message gradient in the first
+force call); the 5060 Ti unchanged (163,840 and 195,112; Triton module loads fail in the capture warm-up). At 36³
+SrTiO3 the MD peak reserves 75.9 kB/atom (was 86.6): the graph pool 59.7 (live 46.0, packing slack 13.8), the default
+pool 16.1 (neighbour list 11.9 of it with its rebuild temporaries).
+
 ## Records
 
 `results/omat0-capacity-20261102/`:

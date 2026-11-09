@@ -1,0 +1,74 @@
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_recomputing_backward_allocates_no_value_rows[False] ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74508a543ee0>
+power = False
+
+    @pytest.mark.parametrize("power", [False, True])
+    def test_recomputing_backward_allocates_no_value_rows(monkeypatch, power):
+        """With TABLED_FORWARD the fused backward evaluates the table's values again inside the kernel; it passed a
+        shape-only ``[E, K]`` tensor, 4.1 GiB at SrTiO3 233,280 on the RTX 4000 Ada (18.9 kB/atom at the force peak,
+        results/memory-profile-20261109). SHAPE_CARRIER: a stride-0 view carries the shape. The backward's peak above its
+        inputs stays below one ``[E, K]`` float block with it and reaches one without it;
+        the gradients are the same bits."""
+        monkeypatch.setattr(tos, "TABLED_FORWARD", True)
+        monkeypatch.setattr(tos, "POWER_BACKWARD", power)
+        from fastmace.rewrites.radial import power_basis
+    
+        coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max = _table()
+        edges, d, k, slots = 200_000, 16, 64, 4001
+        g = torch.Generator().manual_seed(17)
+        r0 = (torch.rand((edges, 1), generator=g) * 6.4 + 0.2).cuda()
+        pair = torch.randint(0, coef.shape[0], (edges,), generator=g).to(torch.int32).cuda()
+        y0 = torch.randn((edges, d), generator=g).cuda()
+        key = torch.sort(torch.randint(0, slots, (edges,), generator=g)).values.cuda()
+        coef_c, dcoef_c, starts_c, scales_c, bins_c = (t.float().cuda() if t.is_floating_point() else t.cuda()
+                                                       for t in (coef, dcoef, starts, scales, bins))
+        pcoef_c = power_basis(coef_c)
+        grads = [torch.randn((slots, d * k), generator=g).cuda(), torch.randn((edges, 1), generator=g).cuda()]
+        peaks, results = {}, {}
+        for carrier in (True, False):
+>           monkeypatch.setattr(tos, "SHAPE_CARRIER", carrier)
+E           AttributeError: <module 'fastmace.kernels.triton.tabled_outer_sum' from '/mnt/homes/zwingel/fm-memprofile/src/fastmace/kernels/triton/tabled_outer_sum.py'> has no attribute 'SHAPE_CARRIER'
+
+../src-fix2/tests/gpu/test_round2_kernels_cuda.py:150: AttributeError
+___________ test_recomputing_backward_allocates_no_value_rows[True] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74508a6b6410>
+power = True
+
+    @pytest.mark.parametrize("power", [False, True])
+    def test_recomputing_backward_allocates_no_value_rows(monkeypatch, power):
+        """With TABLED_FORWARD the fused backward evaluates the table's values again inside the kernel; it passed a
+        shape-only ``[E, K]`` tensor, 4.1 GiB at SrTiO3 233,280 on the RTX 4000 Ada (18.9 kB/atom at the force peak,
+        results/memory-profile-20261109). SHAPE_CARRIER: a stride-0 view carries the shape. The backward's peak above its
+        inputs stays below one ``[E, K]`` float block with it and reaches one without it;
+        the gradients are the same bits."""
+        monkeypatch.setattr(tos, "TABLED_FORWARD", True)
+        monkeypatch.setattr(tos, "POWER_BACKWARD", power)
+        from fastmace.rewrites.radial import power_basis
+    
+        coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max = _table()
+        edges, d, k, slots = 200_000, 16, 64, 4001
+        g = torch.Generator().manual_seed(17)
+        r0 = (torch.rand((edges, 1), generator=g) * 6.4 + 0.2).cuda()
+        pair = torch.randint(0, coef.shape[0], (edges,), generator=g).to(torch.int32).cuda()
+        y0 = torch.randn((edges, d), generator=g).cuda()
+        key = torch.sort(torch.randint(0, slots, (edges,), generator=g)).values.cuda()
+        coef_c, dcoef_c, starts_c, scales_c, bins_c = (t.float().cuda() if t.is_floating_point() else t.cuda()
+                                                       for t in (coef, dcoef, starts, scales, bins))
+        pcoef_c = power_basis(coef_c)
+        grads = [torch.randn((slots, d * k), generator=g).cuda(), torch.randn((edges, 1), generator=g).cuda()]
+        peaks, results = {}, {}
+        for carrier in (True, False):
+>           monkeypatch.setattr(tos, "SHAPE_CARRIER", carrier)
+E           AttributeError: <module 'fastmace.kernels.triton.tabled_outer_sum' from '/mnt/homes/zwingel/fm-memprofile/src/fastmace/kernels/triton/tabled_outer_sum.py'> has no attribute 'SHAPE_CARRIER'
+
+../src-fix2/tests/gpu/test_round2_kernels_cuda.py:150: AttributeError
+=========================== short test summary info ============================
+FAILED ../src-fix2/tests/gpu/test_round2_kernels_cuda.py::test_recomputing_backward_allocates_no_value_rows[False]
+FAILED ../src-fix2/tests/gpu/test_round2_kernels_cuda.py::test_recomputing_backward_allocates_no_value_rows[True]
+2 failed, 8 deselected in 0.51s
