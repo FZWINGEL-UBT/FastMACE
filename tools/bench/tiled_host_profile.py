@@ -98,7 +98,9 @@ def census(tag):
         g[0] += 1
         g[1] += nbytes
 
-    for obj in gc.get_objects():
+    objects = gc.get_objects()
+    objects += [ref for ref in gc.get_referents(*objects) if isinstance(ref, np.ndarray)]  # (not GC-tracked)
+    for obj in objects:
         try:
             if isinstance(obj, torch.Tensor) and obj.device.type == "cpu" and not obj.is_meta:
                 storage = obj.untyped_storage()
@@ -117,7 +119,19 @@ def census(tag):
         pass
     after = rss()
     rows = sorted(groups.items(), key=lambda kv: -kv[1][1])
+    status = {}
+    with open("/proc/self/status") as handle:
+        for line in handle:
+            if line.startswith(("RssAnon", "RssFile", "RssShmem")):
+                status[line.split(":")[0]] = int(line.split()[1]) * 1024
+    pinned = None
+    try:
+        stats = torch.cuda.host_memory_stats()
+        pinned = {k: v for k, v in stats.items() if k.startswith(("allocated_bytes.current", "reserved_bytes.current"))}
+    except Exception:
+        pass
     censuses.setdefault(tag, []).append(dict(rss=before, rss_trimmed=after, arrays=sum(v[1] for _, v in rows),
+                                             status=status, pinned=pinned,
                                              groups=[[k, v[0], v[1]] for k, v in rows[:25]]))
 
 
