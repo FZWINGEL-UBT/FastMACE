@@ -120,6 +120,25 @@ def test_omat0_small_takes_min_blocks_8_on_the_h200(monkeypatch):
     assert sf.launch_shape(torch.device("cpu"), "omat0-small") == (sf.THREADS, None)
 
 
+def test_omat0_small_keeps_prefetch_ahead_off_on_the_a100(monkeypatch):
+    """PREFETCH_AHEAD (9 November 2026): on for PREFETCH_AHEAD_GPUS (the A100 family) except OMAT-0 small
+    (PREFETCH_AHEAD_MODEL_OFF_GPUS; Alex 4967540 off 0.9902 / 0.9908); the constant still decides an A/B side."""
+    name = {"gpu": "NVIDIA A100-SXM4-80GB"}
+    monkeypatch.setattr(sf.torch.cuda, "get_device_name", lambda device=None: name["gpu"])
+    cuda = torch.device("cuda")
+    assert sf.PREFETCH_AHEAD is None
+    assert sf.prefetch_ahead_default(cuda, "omat0-small") == 0
+    assert sf.prefetch_ahead_default(cuda, "omat0-medium") == sf.PREFETCH_AHEAD_DISTANCE == 2
+    assert sf.prefetch_ahead_default(cuda) == 2
+    name["gpu"] = "NVIDIA A100 80GB PCIe"
+    assert sf.prefetch_ahead_default(cuda, "omat0-small") == 0 and sf.prefetch_ahead_default(cuda) == 2
+    name["gpu"] = "NVIDIA H200"
+    assert sf.prefetch_ahead_default(cuda) == 0
+    monkeypatch.setattr(sf, "PREFETCH_AHEAD", 2)
+    assert sf.prefetch_ahead_default(cuda, "omat0-small") == 2
+    assert sf.prefetch_ahead_default(torch.device("cpu"), "omat0-small") == 2
+
+
 def test_wprime_stage_edges_adds_the_h200_for_omat0_small(monkeypatch):
     """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family) for every model, plus the H200 for OMAT-0
     small (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""

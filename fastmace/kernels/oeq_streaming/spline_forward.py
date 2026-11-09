@@ -135,17 +135,24 @@ PREFETCH_AHEAD = None
 # OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9810 / 0.9943 (b = 2);
 # all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
 PREFETCH_AHEAD_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# GPUs where a model label keeps PREFETCH_AHEAD off (the label reaches the kernel through WPrime's model_label).
+# OMAT-0 small on the A100 family (9 November 2026, results/h200-omat0-small-20261108, NHR Alex A100-SXM4-80GB job
+# 4967540, Benchmark_loup, against small's A100 defaults of 14fbf87a, ab / ba): off 0.9902 / 0.9908.
+PREFETCH_AHEAD_MODEL_OFF_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA A100-SXM4-80GB",)),
+})
 PREFETCH_AHEAD_DISTANCE = 2
 PREFETCH_PATHS = 4
 
 
-def prefetch_ahead_default(device):
+def prefetch_ahead_default(device, model_label=None):
     """``PREFETCH_AHEAD`` on ``device``: the constant when set, else ``PREFETCH_AHEAD_DISTANCE`` on
-    ``PREFETCH_AHEAD_GPUS`` and 0."""
+    ``PREFETCH_AHEAD_GPUS`` (except the label's ``PREFETCH_AHEAD_MODEL_OFF_GPUS``) and 0."""
     if PREFETCH_AHEAD is not None:
         return int(PREFETCH_AHEAD)
     device = torch.device(device)
-    listed = device.type == "cuda" and torch.cuda.get_device_name(device) in PREFETCH_AHEAD_GPUS
+    name = torch.cuda.get_device_name(device) if device.type == "cuda" else None
+    listed = name in PREFETCH_AHEAD_GPUS and name not in PREFETCH_AHEAD_MODEL_OFF_GPUS.get(model_label, ())
     return int(PREFETCH_AHEAD_DISTANCE) if listed else 0
 
 
@@ -613,7 +620,7 @@ class SplineForward:
         # STAGE_EDGES: only where a block is one receiver (thread = channel) and nothing else changes the edge head
         self.stage_edges = (stage_edges_default(device) and self.threads == self.channels and not self.shared_locator
                             and not self.cursor32)
-        self.prefetch = prefetch_ahead_default(device) if self.stage_edges else 0  # PREFETCH_AHEAD
+        self.prefetch = prefetch_ahead_default(device, model_label) if self.stage_edges else 0  # PREFETCH_AHEAD
         self.block_order = block_order_default(device) if block_order is None else bool(block_order)
         # BLOCK_ORDER: the receivers' order the owning force field binds before its calls (``bind_order``; any
         # permutation of [0, N) gives the same message); a call with another row count walks them in index order.
@@ -745,7 +752,7 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_PATHS",
+__all__ = ["PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
            "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
            "cursor32_default", "factor_w_default", "launch_shape", "located_source", "locator_reference", "lookup_code", "r128_default",
