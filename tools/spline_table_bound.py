@@ -64,6 +64,8 @@ def capture(args):
         sha = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
         loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha)
         _, base = ab_step_time.read_structure(args.structure, None)
+        if args.rattle:  # a disordered snapshot: Gaussian position noise (Angstrom), so the shells are not sharp
+            base.rattle(stdev=args.rattle, seed=1)
         captured["numbers"] = base.get_atomic_numbers().tolist()
         field = ForceField(loaded, base, precision="float32", rewrites="auto")
         integrator = IntegratorConfig(temperature_K=300.0, timestep_fs=1.0)
@@ -124,6 +126,15 @@ def local_sender(args):
     return args
 
 
+def local_dout(args):
+    """w′'s arguments with every edge's receiver set to receiver 0: the bound on what staging or caching the receivers'
+    output-gradient rows could save (one dout row, hot in L1). Senders, the table and dx's atomics are unchanged; the
+    output is wrong."""
+    args = list(args)
+    args[4] = args[4].clone().zero_()
+    return args
+
+
 def slab_sorted(args):
     """The forward's arguments with every receiver's edges reordered by (pair, length): the same message up to the
     summation order, so co-resident receivers walk the same slabs at about the same time."""
@@ -172,9 +183,15 @@ def main(argv=None):
     p.add_argument("--structure", default="results/loup-a100-20261103/SrTiO3.cif@10x10x10")
     p.add_argument("--constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE")
     p.add_argument("--rounds", type=int, default=21)
+    p.add_argument("--rattle", type=float, default=0.0,
+                   help="Gaussian position noise (Angstrom) on the structure before equilibration (report 5)")
     p.add_argument("--equilibrate-steps", type=int, default=300)
     p.add_argument("--flush-l2-mb", type=int, default=256)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8", "packed8v2", "ghoist", "deferred", "deferred-a", "deferred-b"],
+                   help="lab: the forward with another table read path (tools/spline_read_lab.py)")
+    p.add_argument("--wprime-zero", nargs="*", default=[], choices=["table", "dout", "x", "all", "split"],
+                   help="lab: w' with an operand's loads replaced by register values (tools/spline_read_lab.py)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -196,10 +213,22 @@ def main(argv=None):
     for name, (kernel, real) in captured.items():
         slab, inside = one_slab(name, real, r_max)
         variants = {"real": real, "one-slab": slab}
+        kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
         if name == "wprime":  # sender rows: every edge's sender is its receiver, so the x row stays in L1
             variants["local-sender"] = local_sender(real)
             variants["one-slab+local-sender"] = local_sender(slab)
-        kernels = {}  # a variant's own kernel and keyword arguments (BLOCK_ORDER)
+            variants["local-dout"] = local_dout(real)
+            variants["local-sender+local-dout"] = local_dout(local_sender(real))
+            variants["one-slab+local-sender+local-dout"] = local_dout(local_sender(slab))
+            (args.output / "sources").mkdir(exist_ok=True)
+            (args.output / "sources" / "wprime-real.cu").write_text(kernel.source)
+            for what in args.wprime_zero:  # lab: an operand's loads replaced by register values (report 5)
+                import spline_read_lab
+                k_zero, src = spline_read_lab.wprime_variant(kernel, what)
+                (args.output / "sources" / f"wprime-zero-{what}.cu").write_text(src)
+                label = what if what == "split" else f"zero-{what}"  # split: u / v sums in two halves
+                variants[label] = real
+                kernels[label] = (k_zero, {})
         if name == "forward":
             variants["slab-sorted"] = sorted_args = slab_sorted(real)
             blocks = species_blocks(kernel, numbers)
@@ -209,6 +238,20 @@ def main(argv=None):
                 variants["species-blocks"] = real
                 variants["slab-sorted+species-blocks"] = sorted_args
                 kernels["species-blocks"] = kernels["slab-sorted+species-blocks"] = (ordered, dict(order=order))
+            if args.table_reads:  # lab: other table layouts, real lengths and pairs (spline_read_lab)
+                import spline_read_lab
+                (args.output / "sources").mkdir(exist_ok=True)
+                for i, src in enumerate(kernel.sources):
+                    (args.output / "sources" / f"real-{i}.cu").write_text(src)
+                for read in args.table_reads:
+                    k_read, table, sources = spline_read_lab.variant(kernel, read, real[6])
+                    for i, src in enumerate(sources):
+                        (args.output / "sources" / f"{read}-{i}.cu").write_text(src)
+                    variants[read] = real[:6] + [table] + real[7:]
+                    kernels[read] = (k_read, {})
+                    if read in ("ghoist", "deferred"):  # the instruction part alone: every edge on one slab
+                        variants[f"one-slab+{read}"] = slab[:6] + [table] + slab[7:]
+                        kernels[f"one-slab+{read}"] = (k_read, {})
 
         def run(label, a):
             k, extra = kernels.get(label, (kernel, {}))
@@ -235,6 +278,10 @@ def main(argv=None):
             for label in [v for v in variants if v not in ("real", "one-slab")]:
                 got = message(label)
                 torch.cuda.synchronize()
+                if label in ("bspline", "ghoist", "one-slab+ghoist", "deferred-a", "deferred-b",
+                             "one-slab+deferred"):  # random table, fake g, half the paths: a sanity check
+                    print(f"forward {label}: finite {all(bool(torch.isfinite(o).all()) for o in got)}", flush=True)
+                    continue
                 worst = max(float((u - v).abs().max() / v.abs().max().clamp_min(1e-30)) for u, v in zip(got, base))
                 print(f"forward {label} against real: max|d|/max|a| {worst:.2e}", flush=True)
         labels = list(variants)

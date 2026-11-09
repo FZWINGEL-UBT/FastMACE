@@ -154,6 +154,10 @@ FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # faster, 0.9936 / 0.9927 (defaults2): within the run-to-run spread, so small keeps FOLD_ALPHA on.
 FOLD_ALPHA_MODEL_OFF_GPUS = MappingProxyType({})
 MAX_REGISTERS = None
+# Lab (9 Nov 2026, Codex report v4): SMEM_SPILL compiles the kernel with __launch_bounds__(threads) and CUDA 13's
+# ".pragma enable_smem_spilling", so spills under a MAX_REGISTERS cap go to shared memory instead of local memory.
+# Off; for timing screens only.
+SMEM_SPILL = False
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
 # butterfly reduce-scatter. At each step a lane swaps half of its remaining components with its xor partner, so after
@@ -169,8 +173,11 @@ MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> regist
 BUTTERFLY = None
 # NVIDIA H200: on from 5 November 2026 (results/h200-defaults-20261105, MD step b/a 0.994 / 0.994, b = on), off again
 # from 6 November: at d599cc70 (with the later w' defaults) the A/B reversed, b/a 0.9659 / 0.9677 with b = off (kernel
-# lab 1,830 us on, 1,612 us off; results/sx012-profile-20261106).
-BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# lab 1,830 us on, 1,612 us off; results/sx012-profile-20261106). On again for the H200 and on for the A100 from 9
+# November 2026 (results/step-limiters-20261109: kernel lab H200 0.956 against today's w' defaults; force/stress
+# gate passes on both): MD step b/a, b = on, SrTiO3 10x10x10 and NbCl5: H200 (e3049399) 0.9863 / 0.9861 and
+# 0.9936 / 0.9903; A100-SXM4-80GB (dad5375b, with PACKED8) 0.9910 / 0.9892 and 0.9942 / 0.9973.
+BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # Round 5 (5 November 2026, external idea "integer warp reductions"). REDUX: the end-of-edge sums of the EDGE_DIM
 # edge-gradient components and dr in fixed point through the hardware integer reduction (redux.sync.add.s32,
 # compute capability 8.0+): per component one redux.sync.max of the lanes' exponents sets a power-of-two scale with
@@ -1170,6 +1177,17 @@ class WPrimeBackward:
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges)
         options = ()
+        if SMEM_SPILL:
+            head = 'extern "C" __global__ void oeq_projected_backward_wprime('
+            body = self.source.index(") {", self.source.index(head)) + 3
+            pragma = '\n    asm volatile(".pragma \\"enable_smem_spilling\\";");'
+            self.source = self.source[:body] + pragma + self.source[body:]
+            # the cap as __launch_bounds__' minimum blocks: with __launch_bounds__ present ptxas ignores --maxrregcount
+            # (9 Nov 2026: the H200 / 5060 Ti SMEM_SPILL A/Bs of 158399f2 ran uncapped kernels)
+            low = f", {65536 // (self.num_threads * self.max_registers)}" if self.max_registers else ""
+            bounded = (f'extern "C" __global__ void __launch_bounds__({self.num_threads}{low}) '
+                       'oeq_projected_backward_wprime(')
+            self.source = self.source.replace(head, bounded)
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
             self.source += f"\n// compiled with --maxrregcount={self.max_registers}\n"  # in the content id
@@ -1352,13 +1370,16 @@ class _SplineBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         _, density = radial_table_forward(r, pair, density_coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
                                           0)
-        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, table, spline_id)
+        # forward_table: PACKED8's packed copy the forward reads, else None (``table``). Never ``table`` twice: the
+        # aliased inputs made torch.compile recompile with spline_id a SymInt (H200 gate of 54b4da74)
+        read = table if forward_table is None else forward_table
+        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, read, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
                               bins)
         ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
@@ -1378,7 +1399,8 @@ class _SplineBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
+        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7
 
 
 class _SplineLocatedBlockConvolution(torch.autograd.Function):
@@ -1387,7 +1409,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None):
+        # forward_table: unused (PACKED8 needs STAGE_EDGES, which excludes SHARED_LOCATOR)
         from fastmace.kernels.oeq_streaming.spline_forward import spline_locate, spline_message_blocks_located
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1413,7 +1436,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
+        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7
 
 
 def spline_table(coef, row_scale=None):
@@ -1693,6 +1717,7 @@ class WPrime(torch.nn.Module):
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.spline = None  # SPLINE_W (attach_spline): dict(grid, r_max, certificate, path_scale)
         self.spline_block = None  # SPLINE_W with BLOCK_MESSAGE: (fused id, SplineForward, spline WPrimeBackward)
+        self.spline_packed = None  # PACKED8 (spline_forward): the forward's 8-byte copy of spline_table
         self.kernels = kernels
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
@@ -1742,12 +1767,19 @@ class WPrime(torch.nn.Module):
         from fastmace.kernels.oeq_streaming.spline_forward import (SplineForward, shared_locator_default,
                                                                    shared_locator_supported, spline_w_default)
         if self.spline is not None and spline_w_default(device):
+            from fastmace.kernels.oeq_streaming.spline_forward import encode_packed8, packed8_default
+
             grid = self.spline["grid"]
             shared = shared_locator_default(device) and shared_locator_supported(grid, self.spline["r_lo"])
+            packed = encode_packed8(self.spline_table) if packed8_default(device) and not shared else None
+            forward = SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
+                                    self.spline["path_scale"], shared_locator=shared,
+                                    packed8_bias=None if packed is None else packed[1], model_label=self.model_label)
+            # PACKED8: the forward's own 8-byte table (the w' kernel keeps reading spline_table)
+            self.spline_packed = packed[0] if packed is not None and forward.packed8 else None
             self.spline_block = (
                 fused.id,
-                SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                              self.spline["path_scale"], shared_locator=shared, model_label=self.model_label),
+                forward,
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid, shared_locator=shared, model_label=self.model_label))
@@ -1784,7 +1816,7 @@ class WPrime(torch.nn.Module):
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
                 x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
-                int(block_rows or 0))
+                int(block_rows or 0), self.spline_packed if self.spline_block[1].packed8 else None)  # PACKED8
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
@@ -1823,7 +1855,7 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",
            "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
            "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",

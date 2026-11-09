@@ -1,0 +1,10 @@
+NVIDIA H200, 610.57.04, 1980 MHz
+NVIDIA H200: 132 SMs, 1056 blocks x 256 threads
+mix fp32: FFMA 126.4 + DFMA 0.0 + DMMA 0.0 = 126.4 FMA results/clk/SM at 1980 MHz (min 1980), max 260 W, 6.0 s, registers 24
+mix m:dmma4: FFMA 0.0 + DFMA 0.0 + DMMA 63.8 = 63.8 FMA results/clk/SM at 1980 MHz (min 1980), max 308 W, 6.0 s, registers 42
+mix m:dmma8: FFMA 0.0 + DFMA 0.0 + DMMA 63.8 = 63.8 FMA results/clk/SM at 1980 MHz (min 1980), max 320 W, 6.0 s, registers 42
+mix m:4:1: FFMA 30.0 + DFMA 0.0 + DMMA 59.9 = 89.9 FMA results/clk/SM at 1980 MHz (min 1980), max 314 W, 5.9 s, registers 42
+mix m:8:1: FFMA 53.4 + DFMA 0.0 + DMMA 53.4 = 106.8 FMA results/clk/SM at 1980 MHz (min 1980), max 322 W, 5.9 s, registers 58
+mix m:8:1b: FFMA 49.9 + DFMA 0.0 + DMMA 49.9 = 99.8 FMA results/clk/SM at 1980 MHz (min 1980), max 269 W, 5.9 s, registers 40
+mix m:16:1: FFMA 74.1 + DFMA 0.0 + DMMA 37.1 = 111.2 FMA results/clk/SM at 1980 MHz (min 1980), max 286 W, 6.0 s, registers 58
+exit=0

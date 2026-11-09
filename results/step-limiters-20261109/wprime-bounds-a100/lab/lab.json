@@ -1,0 +1,124 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA A100-SXM4-80GB))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-09T08:35:25.543099+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "0df2241750fb0d813b6f79f249590ee341b06eac",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 85.993460208,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          6579,
+          1280,
+          4
+        ],
+        "gprime_MB": 128.49609375,
+        "species": 3,
+        "pieces": 731,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 2319.3600177764893,
+          "min_us": 2284.543991088867,
+          "max_us": 2745.3439235687256,
+          "ratio": 1.0
+        },
+        "F-no-reduce": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 2203.648090362549,
+          "min_us": 2164.736032485962,
+          "max_us": 2577.4080753326416,
+          "ratio": 0.9501104069540396
+        },
+        "F-reduce-dr-only": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 2206.7201137542725,
+          "min_us": 2178.0478954315186,
+          "max_us": 2622.4639415740967,
+          "ratio": 0.951434920340568
+        },
+        "F-reduce-sh-only": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 2297.856092453003,
+          "min_us": 2275.3279209136963,
+          "max_us": 2706.432104110718,
+          "ratio": 0.9907285090892868
+        },
+        "F-reduce-1level": {
+          "kind": "falsifier",
+          "registers": 80,
+          "local_bytes": 0,
+          "median_us": 2217.9839611053467,
+          "min_us": 2189.311981201172,
+          "max_us": 2608.128070831299,
+          "ratio": 0.95629136662952
+        },
+        "F-no-atomics": {
+          "kind": "falsifier",
+          "registers": 94,
+          "local_bytes": 0,
+          "median_us": 2230.272054672241,
+          "min_us": 2207.7438831329346,
+          "max_us": 2640.8960819244385,
+          "ratio": 0.9615894201756334
+        },
+        "F-no-slope": {
+          "kind": "falsifier",
+          "registers": 72,
+          "local_bytes": 0,
+          "median_us": 2141.184091567993,
+          "min_us": 2120.703935623169,
+          "max_us": 2512.8960609436035,
+          "ratio": 0.923178840351267
+        },
+        "F-half-terms": {
+          "kind": "falsifier",
+          "error": "variant pattern found 0 times: 'slope += cheb[k] * __ldg(g + k * WEIGHT_DIM + weight_index);'"
+        },
+        "F-no-table-horner": {
+          "kind": "falsifier",
+          "registers": 79,
+          "local_bytes": 0,
+          "median_us": 1811.4559650421143,
+          "min_us": 1795.0719594955444,
+          "max_us": 2148.3519077301025,
+          "ratio": 0.7810154314804092
+        },
+        "F-smem-dout": {
+          "kind": "falsifier",
+          "error": "variant pattern found 0 times: '\\\\bdout(\\\\d)\\\\[([^\\\\[\\\\]]*)\\\\]'"
+        }
+      }
+    }
+  },
+  "constants": {},
+  "profiled": {
+    "wprime": []
+  }
+}

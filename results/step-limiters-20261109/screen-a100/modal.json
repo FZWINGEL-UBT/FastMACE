@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "A100-80GB",
+  "source_commit": "fc652335ef6789ceede93542a81f7da6f56e0245",
+  "command": "SCREEN='prefetch0|fastmace.kernels.oeq_streaming.spline_forward:PREFETCH_AHEAD=0;prefetch4|fastmace.kernels.oeq_streaming.spline_forward:PREFETCH_AHEAD=4;power-backward|fastmace.kernels.triton.tabled_outer_sum:POWER_BACKWARD=True;tos-warps2|fastmace.kernels.triton.tabled_outer_sum:FORWARD_WARPS=2;tos-warps4|fastmace.kernels.triton.tabled_outer_sum:FORWARD_WARPS=4;tos-chunk16|fastmace.kernels.triton.tabled_outer_sum:FORWARD_CHUNK=16;packed-coef|fastmace.kernels.triton.tabled_outer_sum:PACKED_COEF=True' bash tools/modal/const_screen.sh",
+  "nvidia_smi": "NVIDIA A100-SXM4-80GB, 610.57.04, 81920 MiB, 8.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 1695.598871231079,
+  "estimated_gpu_cost_usd": 1.1774992161326938
+}

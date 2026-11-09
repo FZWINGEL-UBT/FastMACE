@@ -156,6 +156,91 @@ def prefetch_ahead_default(device, model_label=None):
     return int(PREFETCH_AHEAD_DISTANCE) if listed else 0
 
 
+# PACKED8 (packed8v2 of results/packed-table-lab-20261109; rounding: a certified approximation of the table): with
+# STAGE_EDGES the forward reads a second, 8-byte-per-weight copy of the spline table instead of the float4 one (the w'
+# kernel keeps the float32 table for its slopes). Per weight the cubic in s = t - 1/2 economized to a quadratic
+# (s^3 -> 3 s / 16) with one shared 6-bit exponent E and signed fixed-point a0, a1, a2 of 22, 20 and 16 bits (format
+# S12, tools/spline_packed_certificate.py: value part 0.161 of the budget). The fields are stored biased and placed so
+# that each decodes as as_float(exponent | field) - as_float(exponent | 2^22), exact (no int-to-float conversions):
+# x = Q0 << 10 | Q2 >> 6, y = (Q2 & 63) << 26 | Q1 << 6 | E6. H200 kernel lab (OMAT-0 medium, SrTiO3 10x10x10):
+# forward 1.004 of the float4 table on the 300 K crystal, 0.858 on a 0.3 A disordered snapshot (the table's L1
+# misses grow off-lattice). NVIDIA H200 (9 November 2026, Benchmark_loup MD step b/a, b = on): 300 K 0.9930 / 0.9945,
+# 1500 K 0.9818 / 0.9768; force/stress gate passes as the default does (source ed312e14). NVIDIA A100-SXM4-80GB (9
+# November 2026, results/step-limiters-20261109: the A100 forward is L2-bound, not issue-bound): 300 K 0.9557 /
+# 0.9549, 1500 K 0.9587 / 0.9558, gate passes (source 10e23d17). None: on for PACKED8_GPUS; True / False: an A/B
+# side's choice.
+PACKED8 = None
+PACKED8_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+PACKED8_BITS = (22, 20, 16)  # a0, a1, a2
+
+
+def packed8_default(device):
+    """``PACKED8`` on ``device``: the constant when set, else on for ``PACKED8_GPUS``."""
+    return _switch(PACKED8, PACKED8_GPUS, device)
+
+
+def encode_packed8(table):
+    """PACKED8's table ``int32 [rows, Q, 2]`` of the q-major spline table ``float32 [rows, Q, 4]`` (power basis of t)
+    and its exponent bias, or None where the exponents do not fit 6 bits."""
+    c = table.double()
+    c0, c1, c2, c3 = c.unbind(-1)
+    # the cubic in s = t - 1/2, with s^3 replaced by its best quadratic-free fit 3 s / 16 on [-1/2, 1/2]
+    a0, a1, a2 = c0 + c1 / 2 + c2 / 4 + c3 / 8, c1 + c2 + 0.75 * c3 + 3.0 / 16.0 * c3, c2 + 1.5 * c3
+    top = torch.stack([a0, a1, a2]).abs().amax(dim=0)
+    e = torch.floor(torch.log2(top.clamp_min(1e-300))) + 1
+    live = top > 0
+    if not bool(live.any()):
+        return None
+    emin, emax = int(e[live].min()), int(e[live].max())
+    e = torch.where(live, e, torch.full_like(e, emin))
+    bias = -emin
+    if emax + bias > 63 or emax + 128 > 254 or emin + 128 < 1:
+        return None
+    q = []
+    for a, n in zip((a0, a1, a2), PACKED8_BITS):
+        lim = 2 ** (n - 1) - 1
+        q.append(torch.round(a / torch.exp2(e - n + 1)).clamp(-lim, lim).to(torch.int64))
+    u0, u1, u2 = q[0] + 2 ** 21, q[1] + 2 ** 19, q[2] + 2 ** 15
+    x = u0 << 10 | u2 >> 6
+    y = (u2 & 63) << 26 | u1 << 6 | (e.to(torch.int64) + bias)
+    packed = torch.stack([x, y], dim=-1)
+    packed = torch.where(packed >= 2 ** 31, packed - 2 ** 32, packed).to(torch.int32)
+    return packed.contiguous(), bias
+
+
+def packed8_source(source, bias):
+    """A STAGE_EDGES ``spline_forward`` source reading PACKED8's table (exponent ``bias``) instead of the float4 one:
+    w = a0 + s a1 + s^2 a2, each a_k decoded exactly from its field."""
+    import re
+
+    if "s_tq[TILE]" not in source:
+        raise ValueError("PACKED8 needs the STAGE_EDGES kernel")
+    for old, new in (("const float4* __restrict__ table", "const uint2* __restrict__ table"),
+                     ("const float4* tq = table + s_tq[k] + ch;",
+                      "const uint2* tq = table + s_tq[k] + ch;\n            const float s = t - 0.5f, s2 = s * s;")):
+        if source.count(old) != 1:
+            raise ValueError(f"PACKED8: expected one {old!r}")
+        source = source.replace(old, new)
+    source = source.replace("const float4* ahead = table", "const uint2* ahead = table")  # PREFETCH_AHEAD
+    pattern = (r"const float4 c = __ldg\(tq \+ (\d+)\);\n(\s*)const float w = fmaf\(t, fmaf\(t, fmaf\(t, c\.w, c\.z\), "
+               r"c\.y\), c\.x\);")
+
+    def decode(m):
+        o, ind = m.group(1), m.group(2)
+        return (f"const uint2 c = __ldg(tq + {o});\n"
+                f"{ind}const unsigned eb = ((c.y & 63u) << 23) + {(128 - bias) << 23}u;  // 2^(E + 1)\n"
+                f"{ind}const float hb = __uint_as_float(eb | 0x400000u);\n"
+                f"{ind}const float a0 = __uint_as_float(((c.x >> 9) & 0x7FFFFEu) | eb) - hb;\n"
+                f"{ind}const float a1 = __uint_as_float(((c.y >> 3) & 0x7FFFF8u) | eb) - hb;\n"
+                f"{ind}const float a2 = __uint_as_float((__funnelshift_l(c.y, c.x, 13) & 0x7FFF80u) | eb) - hb;\n"
+                f"{ind}const float w = fmaf(s2, a2, fmaf(s, a1, a0));")
+
+    source, n = re.subn(pattern, decode, source)
+    if not n:
+        raise ValueError("PACKED8: no table reads found")
+    return source
+
+
 def stage_edges_default(device):
     """``STAGE_EDGES`` on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
     if STAGE_EDGES is not None:
@@ -606,7 +691,7 @@ class SplineForward:
     ``shared_locator`` (SHARED_LOCATOR): it reads ``spline_locator``'s records, compiled alongside (``locate``)."""
 
     def __init__(self, schedule, blocks, grid, r_max, device, path_scale=None, shared_locator=False,
-                 block_order=None, model_label=None):
+                 block_order=None, packed8_bias=None, model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -631,6 +716,10 @@ class SplineForward:
                                f"spline_forward{k}", self.factor_w, self.cursor32, self.shared_locator,
                                self.stage_edges, self.prefetch, self.block_order)
                         for k, part in enumerate(self.parts)]
+        # PACKED8: the forward reads the packed table (``encode_packed8``; the caller passes its bias)
+        self.packed8 = packed8_bias is not None and self.stage_edges
+        if self.packed8:
+            self.sources = [packed8_source(s, int(packed8_bias)) for s in self.sources]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
         self.source = "\n".join(self.sources)
@@ -752,7 +841,8 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
+__all__ = ["PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
+           "PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
            "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
            "cursor32_default", "factor_w_default", "launch_shape", "located_source", "locator_reference", "lookup_code", "r128_default",
