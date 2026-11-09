@@ -1483,7 +1483,7 @@ def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measur
     assert tiled._pieces == {} and tiled._piece_budget == 2_500
     tiled._per_receiver = 400.0  # 1.1 * 400 * 10 = 4,400 bytes for the tiles
     tiled._graph_budget(False)
-    assert tiled._piece_budget == int(0.25 * (10_000 - 4_400))
+    assert tiled._piece_budget == int(0.25 * (10_000 - 1.1 * 400.0 * 10))  # 1,399: 4,400.000000000001 in floats
     tiled._per_receiver = 4_000.0
     tiled._graph_budget(False)
     assert tiled._pieces == {} and tiled._piece_budget == 0
