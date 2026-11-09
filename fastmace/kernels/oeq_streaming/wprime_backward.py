@@ -214,6 +214,12 @@ HOIST_SCALE_GPUS = GPUModels(())
 # A100-SXM4-80GB 0.9896 / 0.9920 (both build orders); bitwise, so no gate.
 STAGE_DOUT = None
 STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# GPUs where a model label keeps STAGE_DOUT off (WPrime's model_label). POLAR-1-M on the A100 family (9 November
+# 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970848, against the A100 defaults of
+# 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911.
+STAGE_DOUT_MODEL_OFF_GPUS = MappingProxyType({
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+})
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # STAGE_DOUT's row as quartets of output-gradient components (Codex H200 follow-up, 7 November 2026, item 2): with
 # the block layout, component o (in the order the paths read them) of channel c at (o // 4) * 4C + 4c + o % 4, so a
@@ -1158,7 +1164,8 @@ class WPrimeBackward:
         self.max_registers = max_registers_default(device)
         self.redux = redux_default(device) and redux_supported(kernels.schedule, scalar)
         self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
-        self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
+        self.stage_dout = (stage_dout_default(device, model_label)
+                           and stage_dout_supported(kernels.schedule, scalar, blocks))
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
         self.stage_quads = self.stage_dout and blocks is not None and stage_quads_default(device)
         self.stage_sh = (self.num_threads // self.cohort if self.cohort == 32 and scalar == "float"
@@ -1629,9 +1636,13 @@ def estrin_default(device):
     return bool(ESTRIN) if ESTRIN is not None else _device_name(device) in ESTRIN_GPUS
 
 
-def stage_dout_default(device):
-    """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS``."""
-    return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
+def stage_dout_default(device, model_label=None):
+    """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS`` except the label's
+    ``STAGE_DOUT_MODEL_OFF_GPUS``."""
+    if STAGE_DOUT is not None:
+        return bool(STAGE_DOUT)
+    name = _device_name(device)
+    return name in STAGE_DOUT_GPUS and name not in STAGE_DOUT_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def stage_sh_default(device):
@@ -1712,7 +1723,8 @@ class WPrime(torch.nn.Module):
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
                                      table_w=self.table_w, horner=self.horner, table_pairs=self.table_pairs,
-                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha)
+                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
+                                     model_label=self.model_label)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.spline = None  # SPLINE_W (attach_spline): dict(grid, r_max, certificate, path_scale)
@@ -1759,10 +1771,12 @@ class WPrime(torch.nn.Module):
             return
         device = self.gprime.device
         self.block = (fused.id, blocks,
-                      FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
+                      FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks,
+                                         model_label=self.model_label),
                       WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
                                      horner=self.horner, table_pairs=self.table_pairs,
-                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha))
+                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
+                                     model_label=self.model_label))
         self.spline_block = None
         from fastmace.kernels.oeq_streaming.spline_forward import (SplineForward, shared_locator_default,
                                                                    shared_locator_supported, spline_w_default)
@@ -1796,7 +1810,7 @@ class WPrime(torch.nn.Module):
             raise ValueError("wprime_backward: the rebuild backward (recompute_conv_weights) reads the term-major "
                              "derivative table; it needs SLOPE_VECTOR = 0 and TABLE_W off")
         device = self.gprime.device
-        self.rebuild = (FusedFoldedForward(kernels, fused.k, device, store_w=False),
+        self.rebuild = (FusedFoldedForward(kernels, fused.k, device, store_w=False, model_label=self.model_label),
                         WRebuildBackward(kernels, fused.k, self.terms, device, parts=REBUILD_PARTS,
                                          batch=REBUILD_BATCH))
 
@@ -1829,7 +1843,7 @@ class WPrime(torch.nn.Module):
             if fused is not None and (self.message is None or self.message[0] != fused.id):
                 from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
                 self.message = (fused.id, FusedFoldedForward(kernels, fused.k, self.gprime.device, store_w=False,
-                                                             used=fused.used))
+                                                             used=fused.used, model_label=self.model_label))
             message_id = self.message[1].id if fused is not None else -1
             return _WPrimeConvolution.apply(lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales,
                                             table.bins, float(table.r_lo), float(table.bin_scale), float(table.r_max),
@@ -1861,7 +1875,7 @@ __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
-           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS", "STAGE_EDGES",
+           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_DOUT_MODEL_OFF_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS", "STAGE_EDGES",
            "STAGE_EDGES_GPUS", "stage_edges_default",
            "stage_quad_layout", "stage_quads_default", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from types import MappingProxyType
 
 import numpy as np
 import torch
@@ -44,15 +45,28 @@ SORT_BY_LENGTH = None
 # defaults): alone 0.9924 / 0.9936, with BLOCK_ORDER 0.9920 / 0.9904 (7.39 -> 7.33 ms); gate (job 4967026, with
 # BLOCK_ORDER) passes: forces 0.92 / 0.93 / 0.96, stress 0.64 / 1.02 / 1.15 against 3.
 SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))  # H200, A100
+# GPUs where a model label keeps SORT_BY_LENGTH off (the label reaches the list as SkinNeighbourList's model_label).
+# MACE-OFF has no spline tables, so the sort's locality buys nothing and its build costs. A100 family (9 November
+# 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970847, water_216, against the A100
+# defaults of 6f03bd02, b = off, ab / ba): OFF23-small 0.9830 / 0.9739, OFF23-large 0.9951 / 0.9900; OFF23-medium,
+# OFF23b-medium, OFF24-medium and POLAR-1 S / M / L ties (0.997-1.010), so they keep it.
+SORT_BY_LENGTH_MODEL_OFF_GPUS = MappingProxyType({
+    "off23-small": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+    "off23-large": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+})
 LENGTH_BINS = 4096
 
 
-def sort_by_length_default(device):
-    """``SORT_BY_LENGTH`` on ``device``: the constant when set, else on for ``SORT_BY_LENGTH_GPUS``."""
+def sort_by_length_default(device, model_label=None):
+    """``SORT_BY_LENGTH`` on ``device``: the constant when set, else on for ``SORT_BY_LENGTH_GPUS`` except the
+    label's ``SORT_BY_LENGTH_MODEL_OFF_GPUS``."""
     if SORT_BY_LENGTH is not None:
         return bool(SORT_BY_LENGTH)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in SORT_BY_LENGTH_GPUS
+    if device.type != "cuda":
+        return False
+    name = torch.cuda.get_device_name(device)
+    return name in SORT_BY_LENGTH_GPUS and name not in SORT_BY_LENGTH_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def length_bins(length2, reach):
@@ -159,7 +173,7 @@ class SkinNeighbourList:
 
     def __init__(self, cell, cutoff, device, float_dtype, config: NeighbourConfig | None = None, *,
                  sort_receivers: bool | None = None, gpu_build: bool | None = None, sender_groups=None,
-                 group_count: int | None = None, variable_cell: bool = False):
+                 group_count: int | None = None, variable_cell: bool = False, model_label: str | None = None):
         config = NeighbourConfig() if config is None else config
         self.config = config
         self.cell = np.asarray(cell, dtype=float)
@@ -171,7 +185,8 @@ class SkinNeighbourList:
         self.edge_multiple = config.edge_multiple
         self.headroom = config.capacity_headroom
         self.sort_receivers = _resolved(sort_receivers, config.sort_receivers, "sort_receivers")
-        self.sort_by_length = bool(self.sort_receivers) and sort_by_length_default(self.device)
+        # model_label: the model's label-table label, for per-model defaults (SORT_BY_LENGTH_MODEL_OFF_GPUS).
+        self.sort_by_length = bool(self.sort_receivers) and sort_by_length_default(self.device, model_label)
         self.gpu_build = _resolved(gpu_build, config.gpu_neighbour_list, "gpu_neighbour_list")
         # Optional per-atom group (sender species, segmented first sum): secondary sort key. A device
         # tensor at a fixed address that its owner refreshes in place (a derived buffer of the species,
