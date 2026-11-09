@@ -99,7 +99,12 @@ def census(tag):
         g[1] += nbytes
 
     objects = gc.get_objects()
-    objects += [ref for ref in gc.get_referents(*objects) if isinstance(ref, np.ndarray)]  # (not GC-tracked)
+    for ref in gc.get_referents(*objects):  # numpy arrays: not GC-tracked themselves
+        try:
+            if type(ref) is np.ndarray:
+                objects.append(ref)
+        except ReferenceError:
+            pass
     for obj in objects:
         try:
             if isinstance(obj, torch.Tensor) and obj.device.type == "cpu" and not obj.is_meta:
