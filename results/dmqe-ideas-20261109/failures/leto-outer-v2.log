@@ -1,0 +1,9 @@
+{"host": "leto", "utc": "2026-11-09T22:40:19Z", "cpu_sample_seconds": 5, "other_active_cpu": [], "gpu_processes": [], "idle": true, "command": ["/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python", "tools/dmqe_outer_lab.py", "--output", "/mnt/homes/zwingel/fm-dmqe-20261109/results/leto-outer-v2-0", "--jitter", "0", "--rounds", "31"]}
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Traceback (most recent call last):
+  File "/mnt/homes/zwingel/fm-dmqe-20261109/src/tools/dmqe_outer_lab.py", line 617, in <module>
+    main()
+  File "/mnt/homes/zwingel/fm-dmqe-20261109/src/tools/dmqe_outer_lab.py", line 554, in main
+    raise RuntimeError(
+RuntimeError: outer candidate correctness failed: max normalized error 1.44589 > 0.001; details={"backward": {"dr": 2.5019898638135645e-07, "grad_y": 1.3742833112531814e-07}, "forward": {"S": 3.4604581065176067e-07, "density_edge": 2.016128722560872e-07}, "inner3": {"S": 3.4604581065176067e-07, "density_edge": 2.016128722560872e-07, "dr": 1.4443865813907593, "grad_y": 1.4458888411290753}, "receiver_density": 1.235738983681184e-06}

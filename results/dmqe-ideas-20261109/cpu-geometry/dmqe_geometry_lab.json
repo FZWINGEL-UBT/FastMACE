@@ -1,0 +1,141 @@
+{
+  "tool": "dmqe_geometry_lab",
+  "created_utc": "2026-11-09T22:39:18.558801+00:00",
+  "host": "Fabi-PC",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "torch": "2.14.1+cpu",
+  "device": "cpu",
+  "gpu": null,
+  "formula": {
+    "source": "mace.modules.radial.ZBLBasis",
+    "p": 6,
+    "coeff": [
+      0.1818,
+      0.5099,
+      0.2802,
+      0.02817
+    ],
+    "decay": [
+      3.2,
+      0.9423,
+      0.4028,
+      0.2016
+    ],
+    "a_prefactor": 0.4543,
+    "bohr": 0.529,
+    "coulomb": 14.3996,
+    "covalent_radii_A": {
+      "8": 0.66,
+      "22": 1.6,
+      "38": 1.95
+    },
+    "directed_edge_half_factor": 0.5
+  },
+  "mace_source_probe": {
+    "status": "ok",
+    "module": "/home/fzwin/environments/fastmace_cpu/lib/python3.10/site-packages/mace/modules/radial.py",
+    "zblbasis_sha256": "c91307f397708c73552c2ca2e7932acfb6e8329547c7598f6c7d1c9b8343752b",
+    "class_source_has_p6_envelope": true,
+    "class_source_has_half_factor": true
+  },
+  "upstream_scale": 0.37,
+  "synthetic_srtio3": {
+    "cells": 2,
+    "atoms": 40,
+    "edges": 2960,
+    "cutoff_A": 6.0,
+    "frozen_species": [
+      38,
+      22,
+      8
+    ]
+  },
+  "compile_current": "disabled",
+  "compile_fused": "disabled",
+  "current_reference": "mace.modules.radial.ZBLBasis",
+  "correctness_float64": {
+    "value_max_abs": 0.0,
+    "value_max_rel": 0.0,
+    "dr_max_abs": 9.094947017729282e-13,
+    "dr_max_rel": 4.4509043129439395e-12,
+    "dtype": "float64",
+    "p6": true,
+    "species": {
+      "sender": [
+        38,
+        38,
+        22,
+        8,
+        8,
+        22,
+        38,
+        8
+      ],
+      "receiver": [
+        8,
+        22,
+        8,
+        8,
+        22,
+        38,
+        38,
+        22
+      ]
+    },
+    "pass": true
+  },
+  "output_contract_float32": {
+    "node_energy_max_abs": 6.536993168992922e-13,
+    "node_energy_max_rel": 1.991192675632192e-06,
+    "radial_dr_max_abs": 7.916241884231567e-09,
+    "radial_dr_max_rel": 6.0450427554314956e-05,
+    "total_energy_max_abs": 0.0,
+    "force_only_total_is_none": true,
+    "pass": true
+  },
+  "timings_float32_us": {
+    "current_autograd_value_plus_dr": {
+      "median_us": 488.88599849306047,
+      "p10_us": 455.8619693852961,
+      "p90_us": 521.9100276008248,
+      "samples_us": [
+        521.9100276008248,
+        455.8619693852961
+      ]
+    },
+    "fused_force_only_value_plus_dr": {
+      "median_us": 565.7705187331885,
+      "p10_us": 397.4970313720405,
+      "p90_us": 734.0440060943365,
+      "samples_us": [
+        734.0440060943365,
+        397.4970313720405
+      ]
+    },
+    "fused_with_total_reduction": {
+      "median_us": 377.83398875035346,
+      "p10_us": 373.6250218935311,
+      "p90_us": 382.0429556071758,
+      "samples_us": [
+        373.6250218935311,
+        382.0429556071758
+      ]
+    }
+  },
+  "cuda_graph_ab": {
+    "status": "skipped",
+    "reason": "CPU"
+  },
+  "gate": {
+    "float64_value_and_autograd": true,
+    "float32_node_and_radial_contract": true,
+    "speed_claim_allowed": true,
+    "verdict": "READY_FOR_GPU_AB"
+  },
+  "interpretation": {
+    "force_only": "fused_force_only_value_plus_dr returns raw per-atom ZBL energy and scaled per-edge dE/dr but intentionally no scalar total; this is not production-safe for energy/MC callers.",
+    "scale_shift": "ScaleShiftMACE applies atomic_inter_scale to pair+interaction node energies before the scalar graph reduction; atomic_inter_shift has zero coordinate derivative. Multiple heads and nonconstant upstreams are outside this falsifier.",
+    "additional_forward_cost": "compare fused_force_only_value_plus_dr against current_autograd_value_plus_dr and fused_with_total_reduction; the latter retains the scalar reduction so work removal is not hidden.",
+    "adoption": "lab/falsifier only; no production adoption or full geometry-tail fusion is claimed."
+  }
+}

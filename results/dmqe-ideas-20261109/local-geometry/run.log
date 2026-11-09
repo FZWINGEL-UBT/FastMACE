@@ -1,0 +1,243 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'dmqe-geometry' (pid 639454)
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/fm-dmqe-ideas/tools/dmqe_geometry_lab.py:124: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than tensor.new_tensor(sourceTensor).
+  sender = sender_cell.new_tensor(sender_cell[:, 0] * (cells * cells) * 5)
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+{
+  "tool": "dmqe_geometry_lab",
+  "created_utc": "2026-11-09T22:40:01.647882+00:00",
+  "host": "Fabi-PC",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "torch": "2.14.1+cu130",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "formula": {
+    "source": "mace.modules.radial.ZBLBasis",
+    "p": 6,
+    "coeff": [
+      0.1818,
+      0.5099,
+      0.2802,
+      0.02817
+    ],
+    "decay": [
+      3.2,
+      0.9423,
+      0.4028,
+      0.2016
+    ],
+    "a_prefactor": 0.4543,
+    "bohr": 0.529,
+    "coulomb": 14.3996,
+    "covalent_radii_A": {
+      "8": 0.66,
+      "22": 1.6,
+      "38": 1.95
+    },
+    "directed_edge_half_factor": 0.5
+  },
+  "mace_source_probe": {
+    "status": "ok",
+    "module": "/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/modules/radial.py",
+    "zblbasis_sha256": "c91307f397708c73552c2ca2e7932acfb6e8329547c7598f6c7d1c9b8343752b",
+    "class_source_has_p6_envelope": true,
+    "class_source_has_half_factor": true
+  },
+  "upstream_scale": 0.37,
+  "synthetic_srtio3": {
+    "cells": 10,
+    "atoms": 5000,
+    "edges": 370000,
+    "cutoff_A": 6.0,
+    "frozen_species": [
+      38,
+      22,
+      8
+    ]
+  },
+  "compile_current": "ok",
+  "compile_fused": "ok",
+  "current_reference": "mace.modules.radial.ZBLBasis",
+  "correctness_float64": {
+    "value_max_abs": 0.0,
+    "value_max_rel": 0.0,
+    "dr_max_abs": 9.094947017729282e-13,
+    "dr_max_rel": 4.451302818120137e-12,
+    "dtype": "float64",
+    "p6": true,
+    "species": {
+      "sender": [
+        38,
+        38,
+        22,
+        8,
+        8,
+        22,
+        38,
+        8
+      ],
+      "receiver": [
+        8,
+        22,
+        8,
+        8,
+        22,
+        38,
+        38,
+        22
+      ]
+    },
+    "pass": true
+  },
+  "output_contract_float32": {
+    "node_energy_max_abs": 7.543712854385376e-08,
+    "node_energy_max_rel": 1.0965792171191424e-05,
+    "radial_dr_max_abs": 6.05359673500061e-09,
+    "radial_dr_max_rel": 2.56429921137169e-05,
+    "total_energy_max_abs": 5.5789947509765625e-05,
+    "force_only_total_is_none": true,
+    "pass": true
+  },
+  "timings_float32_us": {
+    "current_autograd_value_plus_dr": {
+      "median_us": 701.5039920806885,
+      "p10_us": 493.8879907131195,
+      "p90_us": 1047.9040145874023,
+      "samples_us": [
+        592.8639769554138,
+        701.5039920806885,
+        530.5280089378357,
+        620.8639740943909,
+        506.97600841522217,
+        488.0320131778717,
+        599.3919968605042,
+        1047.9040145874023,
+        523.0720043182373,
+        769.6319818496704,
+        788.1600260734558,
+        648.9920020103455,
+        713.1519913673401,
+        756.5119862556458,
+        4839.4880294799805,
+        680.7039976119995,
+        575.3920078277588,
+        719.0719842910767,
+        531.6159725189209,
+        493.8879907131195,
+        339.52000737190247,
+        784.2559814453125,
+        671.9679832458496,
+        440.99199771881104,
+        816.9599771499634,
+        766.7199969291687,
+        1080.7360410690308,
+        987.16801404953,
+        981.6640019416809,
+        1210.528016090393,
+        792.352020740509
+      ]
+    },
+    "fused_force_only_value_plus_dr": {
+      "median_us": 84.19200032949448,
+      "p10_us": 71.35999947786331,
+      "p90_us": 200.00000298023224,
+      "samples_us": [
+        193.37600469589233,
+        90.55999666452408,
+        72.60800153017044,
+        73.2479989528656,
+        73.11999797821045,
+        74.20799881219864,
+        200.00000298023224,
+        170.1119989156723,
+        188.35200369358063,
+        147.2959965467453,
+        72.89600372314453,
+        84.19200032949448,
+        71.35999947786331,
+        69.2799985408783,
+        72.89600372314453,
+        78.65600287914276,
+        74.30399954319,
+        212.64000236988068,
+        73.53600114583969,
+        70.01599669456482,
+        191.45600497722626,
+        74.68800246715546,
+        62.20800057053566,
+        201.08799636363983,
+        161.72799468040466,
+        85.82399785518646,
+        207.2640061378479,
+        84.22400057315826,
+        82.71999657154083,
+        85.31200140714645,
+        155.32800555229187
+      ]
+    },
+    "fused_with_total_reduction": {
+      "median_us": 109.31199789047241,
+      "p10_us": 78.72000336647034,
+      "p90_us": 292.4480140209198,
+      "samples_us": [
+        168.32000017166138,
+        90.2400016784668,
+        91.93599969148636,
+        89.79199826717377,
+        160.3199988603592,
+        90.20800143480301,
+        80.54400235414505,
+        90.55999666452408,
+        153.1520038843155,
+        79.64800298213959,
+        96.28800302743912,
+        242.36799776554108,
+        80.83199709653854,
+        90.91199934482574,
+        144.73600685596466,
+        91.23200178146362,
+        109.31199789047241,
+        379.0079951286316,
+        318.39999556541443,
+        709.3440294265747,
+        71.87200337648392,
+        232.35200345516205,
+        73.02399724721909,
+        72.06399738788605,
+        292.4480140209198,
+        246.91200256347656,
+        149.02399480342865,
+        209.9200040102005,
+        78.72000336647034,
+        138.8159990310669,
+        136.57599687576294
+      ]
+    }
+  },
+  "cuda_graph_ab": {
+    "status": "failed",
+    "reason": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+  },
+  "gate": {
+    "float64_value_and_autograd": true,
+    "float32_node_and_radial_contract": true,
+    "speed_claim_allowed": false,
+    "verdict": "READY_FOR_GPU_AB"
+  },
+  "interpretation": {
+    "force_only": "fused_force_only_value_plus_dr returns raw per-atom ZBL energy and scaled per-edge dE/dr but intentionally no scalar total; this is not production-safe for energy/MC callers.",
+    "scale_shift": "ScaleShiftMACE applies atomic_inter_scale to pair+interaction node energies before the scalar graph reduction; atomic_inter_shift has zero coordinate derivative. Multiple heads and nonconstant upstreams are outside this falsifier.",
+    "additional_forward_cost": "compare fused_force_only_value_plus_dr against current_autograd_value_plus_dr and fused_with_total_reduction; the latter retains the scalar reduction so work removal is not hidden.",
+    "adoption": "lab/falsifier only; no production adoption or full geometry-tail fusion is claimed."
+  }
+}

@@ -1,0 +1,286 @@
+{
+  "timestamp_utc": "2026-11-09T22:33:51.741120+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+  "fastmace_commit": "unknown",
+  "baseline_commit": "unknown",
+  "source_tool_sha256": "528dbaf73b4f7106bb03d487b711c977ffc3cf2dc49e093f4ca84d0a966418ea",
+  "model": "synthetic OMAT-0-like row-product inputs; no checkpoint",
+  "backend": "species_mm_rows forward and input-gradient, CUDA graph replay",
+  "precision": "tf32x3",
+  "counts": [
+    1000,
+    1000,
+    3000
+  ],
+  "sizes": [
+    1,
+    3,
+    5,
+    7
+  ],
+  "input_width": 192,
+  "channels": 128,
+  "compile_plan": true,
+  "scope": "isolated plan removal with unchanged consumers; not a force-call or MD-step speedup",
+  "excluded": [
+    "E0 and graph sums",
+    "contraction-weight clones",
+    "other skip-select plans"
+  ],
+  "lifecycle": "validate outside capture; refresh and recapture on species, model, shape, dtype or device change",
+  "cases": {
+    "sort": {
+      "counting": false,
+      "plan_bitwise_equal": true,
+      "initial_checks": {
+        "output_bitwise_equal": true,
+        "input_gradient_bitwise_equal": true,
+        "output_max_abs": 0.0,
+        "input_gradient_max_abs": 0.0
+      },
+      "invalidation_checks": {
+        "same_count_swap": {
+          "stale_rejected": true,
+          "output_bitwise_equal": true,
+          "input_gradient_bitwise_equal": true,
+          "output_max_abs": 0.0,
+          "input_gradient_max_abs": 0.0
+        },
+        "composition_change": {
+          "stale_rejected": true,
+          "output_bitwise_equal": true,
+          "input_gradient_bitwise_equal": true,
+          "output_max_abs": 0.0,
+          "input_gradient_max_abs": 0.0
+        }
+      },
+      "build_orders": {
+        "ab": {
+          "median_us": {
+            "dynamic": 2343.7640380859375,
+            "frozen": 2194.777297973633
+          },
+          "removed_us": 148.9867401123047,
+          "frozen_over_dynamic": 0.9364327049603609,
+          "samples_us": {
+            "dynamic": [
+              2315.101776123047,
+              2315.787811279297,
+              2343.8461303710938,
+              2316.675262451172,
+              2343.6819458007812,
+              2367.4298095703125,
+              2319.5811462402344,
+              2407.4319458007812,
+              2349.7792053222656,
+              2430.978546142578
+            ],
+            "frozen": [
+              2194.680938720703,
+              2188.8697814941406,
+              2203.434295654297,
+              2194.588165283203,
+              2194.5785522460938,
+              2201.3536071777344,
+              2195.518035888672,
+              2194.705352783203,
+              2210.823974609375,
+              2194.8492431640625
+            ]
+          },
+          "captured_checks": {
+            "output_bitwise_equal": true,
+            "input_gradient_bitwise_equal": true,
+            "output_max_abs": 0.0,
+            "input_gradient_max_abs": 0.0
+          }
+        },
+        "ba": {
+          "median_us": {
+            "frozen": 2207.653579711914,
+            "dynamic": 2323.6265563964844
+          },
+          "removed_us": 115.97297668457031,
+          "frozen_over_dynamic": 0.9500896663599753,
+          "samples_us": {
+            "frozen": [
+              2207.738494873047,
+              2198.7405395507812,
+              2207.5686645507812,
+              2208.6256408691406,
+              2200.667266845703,
+              2198.4707641601562,
+              2217.631072998047,
+              2198.1884765625,
+              2209.0914916992188,
+              2225.082550048828
+            ],
+            "dynamic": [
+              2318.236541748047,
+              2341.007080078125,
+              2352.776641845703,
+              2328.760986328125,
+              2369.7584533691406,
+              2361.7759704589844,
+              2307.7638244628906,
+              2318.4921264648438,
+              2316.7535400390625,
+              2316.5798950195312
+            ]
+          },
+          "captured_checks": {
+            "output_bitwise_equal": true,
+            "input_gradient_bitwise_equal": true,
+            "output_max_abs": 0.0,
+            "input_gradient_max_abs": 0.0
+          }
+        }
+      },
+      "dynamic_plan_only_us": {
+        "median": 118.7996768951416,
+        "samples": [
+          137.0531177520752,
+          115.01184463500977,
+          146.32896423339844,
+          120.32735824584961,
+          113.95327568054199,
+          147.68832206726074,
+          117.2719955444336,
+          110.25631904602051,
+          175.35263061523438,
+          111.0364818572998
+        ]
+      },
+      "cached_plan_bytes": 380012,
+      "validation_snapshot_bytes": 60000
+    },
+    "counting": {
+      "counting": true,
+      "plan_bitwise_equal": true,
+      "initial_checks": {
+        "output_bitwise_equal": true,
+        "input_gradient_bitwise_equal": true,
+        "output_max_abs": 0.0,
+        "input_gradient_max_abs": 0.0
+      },
+      "invalidation_checks": {
+        "same_count_swap": {
+          "stale_rejected": true,
+          "output_bitwise_equal": true,
+          "input_gradient_bitwise_equal": true,
+          "output_max_abs": 0.0,
+          "input_gradient_max_abs": 0.0
+        },
+        "composition_change": {
+          "stale_rejected": true,
+          "output_bitwise_equal": true,
+          "input_gradient_bitwise_equal": true,
+          "output_max_abs": 0.0,
+          "input_gradient_max_abs": 0.0
+        }
+      },
+      "build_orders": {
+        "ab": {
+          "median_us": {
+            "dynamic": 2209.2244720458984,
+            "frozen": 2204.8582458496094
+          },
+          "removed_us": 4.3662261962890625,
+          "frozen_over_dynamic": 0.9980236384977912,
+          "samples_us": {
+            "dynamic": [
+              2203.9244079589844,
+              2205.5810546875,
+              2214.9388122558594,
+              2205.069122314453,
+              2204.9136352539062,
+              2212.6556396484375,
+              2205.7933044433594,
+              2218.7254333496094,
+              2215.1126098632812,
+              2217.2784423828125
+            ],
+            "frozen": [
+              2208.04443359375,
+              2203.1520080566406,
+              2204.7354125976562,
+              2205.3465270996094,
+              2202.368927001953,
+              2206.724090576172,
+              2194.5449829101562,
+              2212.9542541503906,
+              2195.079345703125,
+              2204.9810791015625
+            ]
+          },
+          "captured_checks": {
+            "output_bitwise_equal": true,
+            "input_gradient_bitwise_equal": true,
+            "output_max_abs": 0.0,
+            "input_gradient_max_abs": 0.0
+          }
+        },
+        "ba": {
+          "median_us": {
+            "frozen": 2203.0726623535156,
+            "dynamic": 2211.0275268554688
+          },
+          "removed_us": 7.954864501953125,
+          "frozen_over_dynamic": 0.9964021865827847,
+          "samples_us": {
+            "frozen": [
+              2199.156494140625,
+              2198.7548828125,
+              2207.3046875,
+              2198.6355590820312,
+              2199.0240478515625,
+              2206.9888305664062,
+              2198.7347412109375,
+              2228.477783203125,
+              2230.8665466308594,
+              2320.7545471191406
+            ],
+            "dynamic": [
+              2219.8565673828125,
+              2223.201904296875,
+              2206.2025451660156,
+              2206.700439453125,
+              2223.7452697753906,
+              2204.7657775878906,
+              2225.103302001953,
+              2215.3546142578125,
+              2203.5948181152344,
+              2204.060821533203
+            ]
+          },
+          "captured_checks": {
+            "output_bitwise_equal": true,
+            "input_gradient_bitwise_equal": true,
+            "output_max_abs": 0.0,
+            "input_gradient_max_abs": 0.0
+          }
+        }
+      },
+      "dynamic_plan_only_us": {
+        "median": 14.631360173225403,
+        "samples": [
+          13.818880319595337,
+          14.461120367050171,
+          14.801599979400635,
+          12.927680015563965,
+          15.18399953842163,
+          12.909120321273804,
+          12.348480224609375,
+          18.553279638290405,
+          15.122560262680054,
+          15.31775951385498
+        ]
+      },
+      "cached_plan_bytes": 380012,
+      "validation_snapshot_bytes": 60000
+    }
+  }
+}

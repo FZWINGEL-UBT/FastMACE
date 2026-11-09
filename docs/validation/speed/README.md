@@ -6,6 +6,7 @@ Columns: file, date added, title, and the report's own verdict line or first sen
 
 | File | Added | Title | Verdict / first sentence |
 | --- | --- | --- | --- |
+| [dmqe-transfer-labs-20261109](dmqe-transfer-labs-20261109.md) | 2026-11-09 | dm_qe transfer ideas on local and workstation GPUs | Handwritten receiver-owned sums slower; static species plan about 0.5% on a rattled Ada force call; ZBL analytical derivative saves 28 us in isolation. No defaults changed. |
 | [ab-constants-audit-20261030](ab-constants-audit-20261030.md) | 2026-10-30 | Audit of the `--a-constant` / `--b-constant` A/Bs (30 October 2026) | The segment_gemm tile-order A/B found a bug in `tools/ab_rewrites.py`. |
 | [c1-contraction-fusion](c1-contraction-fusion.md) | 2026-10-30 | C1: fusing the symmetric contraction with a neighbouring GEMM (falsifier) | Idea C1 of plans/capacity-ideas-20261030.md, approved by the owner as a falsifier only. |
 | [decision66-grouped-launch](decision66-grouped-launch.md) | 2026-10-29 | Decision 66: `grouped_launch` for MH-1 on the RTX 5060 Ti (29 October 2026) | Owner decision 66 (SPEC §18): per-GPU defaults where same-process whole-step A/Bs in both build orders measured a speed-up, by exact device name. |

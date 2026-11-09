@@ -5351,3 +5351,45 @@ here.
 - Status: de-phasing and receiver-staged dout DROPPED at their bounds; TC_WFRAG_SPLIT REJECTED (off); W-stationary wgmma and 16-edge batches dead on register counts.
 - Measured (H200 kernel lab, OMAT-0 medium, SrTiO3 10×10×10): F-skew 1.094–1.114; FF-dout-one-row 1.001; F-wfrag-no-wsplit 0.853; TC_WFRAG_SPLIT 1.070 with the plan's launch rule (12 warps, 224 KB shared). The forward is limited by shared-memory loads, not by the split's ALU work.
 - Sources: [research answers](../results/research-answers-20261105/README.md#ideas-session-revised-h200-plan-6-november-2026).
+
+## dm_qe transfer labs (9 November 2026)
+
+| ID | Idea | Switch/flag | Engine | Status | Decision/date | Effect | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [dmqe-firstsum](#dmqe-firstsum) | Handwritten receiver-owned first-interaction sum forward/backward | lab only | FM | REJECTED (tested layouts, stage3) | 2026-11-09 | Register forward 1.7–2.9x slower, butterfly backward 2.5–3.6x slower on Ada/5060 Ti; parity passes; no spills | [report](validation/speed/dmqe-transfer-labs-20261109.md) |
+| [dmqe-static-species](#dmqe-static-species) | Precompute first-interaction species plan and row maps | lab only | FM | LAB ONLY; no adoption | 2026-11-09 | Leto full force/stress b/a, ideal 0.99925 / 1.00465, rattle 0.05 A 0.99462 / 0.99541; MC refresh not implemented | [report](validation/speed/dmqe-transfer-labs-20261109.md) |
+| [dmqe-zbl-derivative](#dmqe-zbl-derivative) | ZBL analytical derivative in forward; scalar-energy omission bound | lab only | FM | STOPPED below useful local whole-step bound | 2026-11-09 | 5060 Ti isolated 80.33 -> 51.89 us retaining energy, 49.68 us omitting it; retained saving is 0.115% of local step profile, not a measured step gain | [report](validation/speed/dmqe-transfer-labs-20261109.md) |
+
+### dmqe-firstsum
+
+The current Triton tabled sums were compared with two new standalone NVRTC implementations, retaining the
+separate species GEMM. Real SrTiO3 5,000-atom topology, ideal and 0.07 A jitter, synthetic derivative-consistent
+OMAT-0-shaped coefficients. The improved variant uses register accumulators and one 8-lane group per backward
+component. Ada jitter forward 752.6 -> 1453.1 us, backward 912.4 -> 2242.6 us; 5060 Ti forward 708.2 -> 2066.1 us,
+backward 845.4 -> 3040.0 us. Both output layouts, receiver density and graph replays pass parity. No spills.
+Rejected at the free-hardware lab; do not infer H200/A100 performance or close every possible handwritten layout.
+The original claimed dynamic instruction census remains unverified.
+
+### dmqe-static-species
+
+`COUNT_PLAN` remains per call. Isolated plan hoisting is byte-identical, including forward/input-gradient
+consumers. Same-count swaps and changed composition correctly invalidate the lab snapshot. Counting-sort
+removal saves only 4–9 us in these isolated screens; stable-sort removal saves 66–149 us. Current Ada full force
+call (including stress), SrTiO3 1,080 atoms, both build orders, is about 0.5% faster after 0.05 A rattle and a tie
+on the ideal lattice. Full-model outputs are not bitwise because the unchanged path is nondeterministic; observed
+force differences are comparable to repeated-call spread. This is not a formal force/stress gate. Production
+integration needs per-force-field, capturable in-place derived-state refresh for all MC trial/rollback and lifecycle
+paths. No implementation/default changed; H200/A100 and MD-step gains unmeasured. Local 5060 Ti defaults do not
+use the composed path; its isolated screen is not evidence of a current full-force default gain.
+
+### dmqe-zbl-derivative
+
+Local standalone compiled ZBL reference versus analytical value/derivative, 5,000 atoms/370,000 edges and non-unit
+constant upstream 0.37. Float64 autograd and compiled float32 checks pass lab tolerances. Alternating graph blocks
+measure 80.33 -> 51.89 us with scalar energy retained; omitting the scalar adds only 2.21 us. The retained saving
+is 0.115% of the fresh 24.78 ms local hybrid MD profile (a scale comparison, not an MD A/B). No full-model gate/drift
+run. The engine/MC energy contract forbids simply dropping per-step energy. Full five-pass geometry-tail fusion
+was not built because the supplied target bound was borderline and this free-hardware falsifier remains small.
+
+Evidence for all three: [dm_qe transfer labs](validation/speed/dmqe-transfer-labs-20261109.md),
+[raw evidence](../results/dmqe-ideas-20261109/README.md). Production/baseline source a7a8211e.

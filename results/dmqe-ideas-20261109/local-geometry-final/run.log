@@ -1,0 +1,350 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'dmqe-geometry' (pid 640437)
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/fm-dmqe-ideas/tools/dmqe_geometry_lab.py:124: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than tensor.new_tensor(sourceTensor).
+  sender = sender_cell.new_tensor(sender_cell[:, 0] * (cells * cells) * 5)
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+{
+  "tool": "dmqe_geometry_lab",
+  "created_utc": "2026-11-09T22:46:16.293032+00:00",
+  "host": "Fabi-PC",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "torch": "2.14.1+cu130",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "formula": {
+    "source": "mace.modules.radial.ZBLBasis",
+    "p": 6,
+    "coeff": [
+      0.1818,
+      0.5099,
+      0.2802,
+      0.02817
+    ],
+    "decay": [
+      3.2,
+      0.9423,
+      0.4028,
+      0.2016
+    ],
+    "a_prefactor": 0.4543,
+    "bohr": 0.529,
+    "coulomb": 14.3996,
+    "covalent_radii_A": {
+      "8": 0.66,
+      "22": 1.6,
+      "38": 1.95
+    },
+    "directed_edge_half_factor": 0.5
+  },
+  "mace_source_probe": {
+    "status": "ok",
+    "module": "/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/modules/radial.py",
+    "zblbasis_sha256": "c91307f397708c73552c2ca2e7932acfb6e8329547c7598f6c7d1c9b8343752b",
+    "class_source_has_p6_envelope": true,
+    "class_source_has_half_factor": true
+  },
+  "upstream_scale": 0.37,
+  "synthetic_srtio3": {
+    "cells": 10,
+    "atoms": 5000,
+    "edges": 370000,
+    "cutoff_A": 6.0,
+    "frozen_species": [
+      38,
+      22,
+      8
+    ]
+  },
+  "compile_current": "ok",
+  "compile_fused": "ok",
+  "current_reference": "mace.modules.radial.ZBLBasis",
+  "correctness_float64": {
+    "value_max_abs": 0.0,
+    "value_max_rel": 0.0,
+    "dr_max_abs": 9.094947017729282e-13,
+    "dr_max_rel": 4.451302818120137e-12,
+    "dtype": "float64",
+    "p6": true,
+    "species": {
+      "sender": [
+        38,
+        38,
+        22,
+        8,
+        8,
+        22,
+        38,
+        8
+      ],
+      "receiver": [
+        8,
+        22,
+        8,
+        8,
+        22,
+        38,
+        38,
+        22
+      ]
+    },
+    "pass": true
+  },
+  "output_contract_float32": {
+    "node_energy_max_abs": 7.543712854385376e-08,
+    "node_energy_max_rel": 1.0965792171191424e-05,
+    "radial_dr_max_abs": 6.05359673500061e-09,
+    "radial_dr_max_rel": 2.56429921137169e-05,
+    "total_energy_max_abs": 5.5789947509765625e-05,
+    "force_only_total_is_none": true,
+    "pass": true
+  },
+  "timings_float32_us": {
+    "current_autograd_value_plus_dr": {
+      "median_us": 931.2000274658203,
+      "p10_us": 669.0559983253479,
+      "p90_us": 1165.1840209960938,
+      "samples_us": [
+        908.5440039634705,
+        989.0559911727905,
+        737.824022769928,
+        876.5119910240173,
+        1130.2399635314941,
+        669.0559983253479,
+        886.1439824104309,
+        919.6479916572571,
+        906.9759845733643,
+        619.80801820755,
+        1060.4159832000732,
+        793.503999710083,
+        976.095974445343,
+        794.3040132522583,
+        1062.3680353164673,
+        1070.1760053634644,
+        1059.2960119247437,
+        885.8559727668762,
+        1029.0559530258179,
+        1030.3360223770142,
+        656.3519835472107,
+        1269.3760395050049,
+        756.1280131340027,
+        1790.8799648284912,
+        817.1200156211853,
+        1481.152057647705,
+        1165.1840209960938,
+        931.2000274658203,
+        986.1760139465332,
+        949.3119716644287,
+        582.6879739761353
+      ]
+    },
+    "fused_force_only_value_plus_dr": {
+      "median_us": 78.17599922418594,
+      "p10_us": 62.78400123119354,
+      "p90_us": 140.44800400733948,
+      "samples_us": [
+        187.45599687099457,
+        61.43999844789505,
+        140.44800400733948,
+        109.0880036354065,
+        256.1280131340027,
+        62.01599910855293,
+        61.216000467538834,
+        77.504001557827,
+        98.2080027461052,
+        107.35999792814255,
+        115.58400094509125,
+        88.95999938249588,
+        75.23199915885925,
+        82.59200304746628,
+        76.19199901819229,
+        76.89599692821503,
+        77.15199887752533,
+        77.40800082683563,
+        77.79199630022049,
+        77.504001557827,
+        137.88799941539764,
+        131.29599392414093,
+        157.0879966020584,
+        76.73600316047668,
+        78.17599922418594,
+        76.86399668455124,
+        78.68800312280655,
+        80.76799660921097,
+        62.78400123119354,
+        63.231997191905975,
+        83.5840031504631
+      ]
+    },
+    "fused_with_total_reduction": {
+      "median_us": 89.66399729251862,
+      "p10_us": 73.02399724721909,
+      "p90_us": 381.8559944629669,
+      "samples_us": [
+        82.11199939250946,
+        161.82400286197662,
+        70.04799693822861,
+        81.95199817419052,
+        79.29600030183792,
+        73.02399724721909,
+        76.9599974155426,
+        83.45600217580795,
+        81.02399855852127,
+        73.47200065851212,
+        425.79200863838196,
+        178.17600071430206,
+        307.48799443244934,
+        67.52000004053116,
+        251.00800395011902,
+        69.92000341415405,
+        354.40000891685486,
+        166.6560024023056,
+        341.15201234817505,
+        392.15999841690063,
+        300.9600043296814,
+        197.1520036458969,
+        381.8559944629669,
+        506.6559910774231,
+        285.2799892425537,
+        89.66399729251862,
+        83.13599973917007,
+        100.832000374794,
+        83.23200047016144,
+        77.53600180149078,
+        76.35200023651123
+      ]
+    }
+  },
+  "cuda_graph_ab": {
+    "status": "ok",
+    "current_autograd_median_us": 80.33344268798828,
+    "fused_force_only_median_us": 49.683837890625,
+    "fused_energy_preserved_median_us": 51.89375877380371,
+    "energy_preserved_samples_us": [
+      51.85152053833008,
+      51.95136070251465,
+      52.4505615234375,
+      51.678080558776855,
+      51.83551788330078,
+      51.765761375427246,
+      51.90783977508545,
+      52.0524787902832,
+      52.30783939361572,
+      51.75551891326904,
+      52.77632236480713,
+      51.46048069000244,
+      51.850881576538086,
+      51.62879943847656,
+      51.93024158477783,
+      51.70368194580078,
+      51.96800231933594,
+      51.89375877380371,
+      52.11520195007324,
+      52.286081314086914,
+      52.536959648132324,
+      51.69856071472168,
+      55.131521224975586,
+      51.67935848236084,
+      52.13119983673096,
+      51.6102409362793,
+      52.03775882720947,
+      51.51552200317383,
+      51.8943977355957,
+      51.83807849884033,
+      51.850881576538086
+    ],
+    "replays_per_sample": 50,
+    "current_samples_us": [
+      86.33919715881348,
+      80.19392013549805,
+      79.6454381942749,
+      85.05791664123535,
+      80.05311965942383,
+      80.33344268798828,
+      80.14080047607422,
+      80.56896209716797,
+      81.26784324645996,
+      80.65471649169922,
+      80.36416053771973,
+      80.49023628234863,
+      80.08447647094727,
+      80.44032096862793,
+      80.03583908081055,
+      80.32896041870117,
+      80.33344268798828,
+      80.54143905639648,
+      80.26880264282227,
+      84.59967613220215,
+      80.22656440734863,
+      81.10464096069336,
+      79.95903968811035,
+      80.5401611328125,
+      80.27327537536621,
+      80.22144317626953,
+      80.19776344299316,
+      80.41024208068848,
+      80.1375961303711,
+      80.34687995910645,
+      80.4640007019043
+    ],
+    "fused_samples_us": [
+      50.08448123931885,
+      49.72288131713867,
+      49.3228816986084,
+      49.63776111602783,
+      49.39712047576904,
+      49.974398612976074,
+      51.23456001281738,
+      52.00704097747803,
+      49.63520050048828,
+      49.69855785369873,
+      49.56736087799072,
+      49.80480194091797,
+      49.51807975769043,
+      49.64223861694336,
+      49.86368179321289,
+      49.502081871032715,
+      49.482879638671875,
+      49.527039527893066,
+      49.48416233062744,
+      49.683837890625,
+      50.41215896606445,
+      50.118398666381836,
+      52.97920227050781,
+      49.56223964691162,
+      49.77791786193848,
+      49.36192035675049,
+      49.7599983215332,
+      49.91424083709717,
+      49.34080123901367,
+      49.67872142791748,
+      49.966721534729004
+    ],
+    "outputs_max_abs": {
+      "energy": 7.543712854385376e-08,
+      "dr": 6.05359673500061e-09,
+      "total": 5.5789947509765625e-05
+    }
+  },
+  "gate": {
+    "float64_value_and_autograd": true,
+    "float32_node_and_radial_contract": true,
+    "speed_claim_allowed": true,
+    "verdict": "READY_FOR_GPU_AB"
+  },
+  "interpretation": {
+    "force_only": "fused_force_only_value_plus_dr returns raw per-atom ZBL energy and scaled per-edge dE/dr but intentionally no scalar total; this is not production-safe for energy/MC callers.",
+    "scale_shift": "ScaleShiftMACE applies atomic_inter_scale to pair+interaction node energies before the scalar graph reduction; atomic_inter_shift has zero coordinate derivative. Multiple heads and nonconstant upstreams are outside this falsifier.",
+    "additional_forward_cost": "compare fused_force_only_value_plus_dr against current_autograd_value_plus_dr and fused_with_total_reduction; the latter retains the scalar reduction so work removal is not hidden.",
+    "adoption": "lab/falsifier only; no production adoption or full geometry-tail fusion is claimed."
+  }
+}

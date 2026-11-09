@@ -1,0 +1,34 @@
+{
+  "host": "murphy",
+  "utc": "2026-11-09T22:40:50Z",
+  "cpu_sample_seconds": 5,
+  "other_active_cpu": [
+    {
+      "pid": 3642359,
+      "owner": "soroosh",
+      "ticks": 876
+    }
+  ],
+  "gpu_processes": [
+    {
+      "pid": 3642359,
+      "owner": "soroosh"
+    }
+  ],
+  "idle": false,
+  "command": [
+    "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+    "tools/dmqe_species_force_lab.py",
+    "--checkpoint",
+    "/mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model",
+    "--structure",
+    "results/loup-a100-20261103/SrTiO3.cif@6x6x6",
+    "--output",
+    "/mnt/homes/zwingel/fm-dmqe-20261109/results/murphy-force-v2",
+    "--blocks",
+    "10",
+    "--rounds",
+    "50",
+    "--stress"
+  ]
+}
