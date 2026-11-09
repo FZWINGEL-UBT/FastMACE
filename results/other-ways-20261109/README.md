@@ -119,6 +119,48 @@ matches the real forward to 6.0e-7.
 | one-slab + geom | 1,227.8 (0.978) | 1,740.7 (0.805) |
 
 On the A100 geom saves about 167 µs per force call, about 2.6 % of the step. That meets the condition for building the
-receiver-adjoint w′ variant (section 5).
+receiver-adjoint w′ variant (section 5). A second A100 run (job 4973691, source 4ef87c1c) gave geom 0.868 again.
 
 **Next:** an engine switch, then the MD A/B.
+
+## 5. Receiver-adjoint w′ backward: rejected (A100 1.26× slower)
+
+**Idea** (second external pass, idea 1). In the w′ backward, each CG term (o, i, j) of a path adds
+c g_o y_j to u_i and c g_o x_i to v_j, per edge and channel. The output gradient g belongs to the receiver. So
+R_ij = Σ_o c g_o can be formed once per run of edges with the same receiver, and the edge loop then does one update
+pair per distinct (i, j), with no coefficient multiplies.
+
+**Built** as [`wprime_radj()`](../../tools/spline_read_lab.py), a transform of the captured A100 kernel:
+
+- R lives in shared memory next to the staged dout row and is filled once per receiver run;
+- it applies only to the paths where the dropped terms and coefficient products outweigh the added loads: 3 of 10
+  paths, 43 R slots per channel;
+- `radj-all` (every path with any saving) does not fit in 48 KB of static shared memory.
+
+**Counts** (static SASS, sm_80):
+
+| Instruction | Real | radj |
+| --- | ---: | ---: |
+| FFMA | 290 | 280 |
+| FMUL | 57 | 53 |
+| LDS | 52 | 95 |
+| Static shared memory | 23 KB | 45 KB |
+
+About 13 % of the FP32 work leaves the edge loop. No spills.
+
+**Lab** (`spline_table_bound.py --wprime-zero radj`). Results match the real kernel to rounding (dx 2.5e-7, dsh 4.4e-9,
+dr 6.9e-8, against 2.5e-7 between two runs of the real kernel).
+
+| GPU | Real (µs) | radj (µs) | × real |
+| --- | ---: | ---: | ---: |
+| Alex A100, job 4973691 | 2,189.3 | 2,767.9 | 1.264 |
+| Local RTX 5060 Ti (A100 defaults) | 4,239.4 | 5,119.5 | 1.208 |
+
+**Why it loses.** The A100 w′ kernel runs at 80 registers with 6 CTAs per SM. The doubled shared memory allows only 3,
+which halves the warps that hide the sender-row and table loads. The 43 extra shared loads per edge and channel also
+land on a pipe the kernel already uses heavily. A 13 % cut in FP32 work cannot pay for either.
+
+A compact layout, which would drop the replaced paths' 17 dout rows (36 KB, 4 CTAs), would still lose occupancy, so
+it was not built. **Rejected.**
+
+The first submission (job 4973619) ran a stale environment file with source 8c88d10c and is void.
