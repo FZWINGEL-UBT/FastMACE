@@ -68,7 +68,7 @@ class ForceField:
 
             self._fix_superset(species_numbers(species))
         elif atoms is not None:
-            self._fix_superset(tuple(sorted({int(z) for z in atoms.numbers})))
+            self._fix_superset(distinct_numbers(atoms.numbers))
 
     # ------------------------------------------------------------------ facts the planner reads
 
@@ -96,7 +96,7 @@ class ForceField:
     def superset_for(self, atoms) -> tuple[int, ...]:
         """The superset, fixed from ``atoms`` at first use if none was declared (atomic numbers, sorted)."""
         if self.species is None:
-            self._fix_superset(tuple(sorted({int(z) for z in atoms.numbers})))
+            self._fix_superset(distinct_numbers(atoms.numbers))
         return self.species
 
     def effective_precision(self, float64_energy=True):
@@ -280,3 +280,11 @@ def _is_label(name):
         return labels.find(name) is not None
     except ValueError:  # an alias of a multi-head checkpoint without head=: fm.load says which heads
         return True
+
+
+def distinct_numbers(numbers) -> tuple[int, ...]:
+    """The distinct atomic numbers of ``numbers``, sorted (``np.unique``: a Python set over the atoms took minutes and
+    gigabytes at 149M atoms)."""
+    import numpy as np
+
+    return tuple(int(z) for z in np.unique(np.asarray(numbers)))
