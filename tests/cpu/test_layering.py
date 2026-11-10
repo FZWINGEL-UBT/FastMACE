@@ -93,6 +93,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/kernels/triton/divided_blocks.py": {},
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
+    "fastmace/rewrites/engine.py": {"VIRIAL_ELEMENTWISE": "one-graph strain as products and sums; per GPU, A/B"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.
     "fastmace/kernels/oeq_streaming/runtime.py": {"TABLE_GRADIENT_PER_CHUNK": "per-chunk table gradient; GPU gate A/B"},
     # OMAT-0 A100 profile follow-ups (3 November 2026): A/B switches of the launch screen
