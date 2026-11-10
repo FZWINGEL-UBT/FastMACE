@@ -31,9 +31,12 @@ SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A
 # the descriptor's span, the change of basis folded into the weights once at routing. OMAT-0 medium: 413 operations
 # plus 61 output FMAs per channel against about 1,040 forward and 1,500 backward. Kernel lab, A100 defaults: Alex
 # A100-SXM4-80GB forward 0.593, forward + backward 0.650 of the monomial pair (226.0 -> 147.0 us); local RTX 5060 Ti
-# 1.003 (memory-bound there). None: on for SC_FACTORED_GPUS (none yet); True / False: an A/B side's choice.
+# 1.003 (memory-bound there). NVIDIA A100-SXM4-80GB (10 November 2026, Alex job 4973813, source 219602cf;
+# Benchmark_loup MD step b/a, a = the A100 defaults): 0.9889 / 0.9881 (ab / ba); force/stress gate passes with GEOM
+# also on (forces 0.863 / 0.913 / 0.985, stress 0.727 / 0.896 / 1.343). The H200 stopped at its bound (ledger
+# sc0-invariant-basis: under 1 % there). None: on for SC_FACTORED_GPUS; True / False: an A/B side's choice.
 SC_FACTORED = None
-SC_FACTORED_GPUS = GPUModels(())
+SC_FACTORED_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 
 _subclasses = {}
 

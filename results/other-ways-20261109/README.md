@@ -164,3 +164,38 @@ A compact layout, which would drop the replaced paths' 17 dout rows (36 KB, 4 CT
 it was not built. **Rejected.**
 
 The first submission (job 4973619) ran a stale environment file with source 8c88d10c and is void.
+
+## 6. GEOM and SC_FACTORED in the engine: default on the A100 (10 November 2026)
+
+Both follow-ups are now engine switches. `spline_forward.GEOM` applies section 4's source transform to the
+STAGE_EDGES forward, after PACKED8. `rewrites.sc_generated.SC_FACTORED` builds section 3's kernel pair inside
+`SC_GENERATED` and folds the weights once at routing (`product.sc_generated_weight`). Both are on for the A100 family
+(`GEOM_GPUS`, `SC_FACTORED_GPUS`) and off elsewhere.
+
+**Run:** Alex job 4973813, NVIDIA A100-SXM4-80GB, source 219602cf, `tools/modal/other_ways_ab_job.sh`. Files are in
+[ab-alex-4973813](ab-alex-4973813/).
+
+- **Check** (`check.json`): the factored kernels are in use, one GEOM forward. Registers: forward 64, backward 128
+  with 24 bytes of local memory.
+- **Gate** (both switches on, `gate.log`): passes on all three systems.
+
+| Ratio to ASE float32 | SrTiO3 3×3×3 | NaCl | NbCl5 |
+| --- | ---: | ---: | ---: |
+| Forces | 0.863 | 0.913 | 0.985 |
+| Stress | 0.727 | 0.896 | 1.343 |
+| Energy | 8.09 | 1.03 | 6.35 |
+
+The energy errors stay under the 0.01 eV floor (SrTiO3 2.4 meV). The SC_GENERATED gate measured comparable energy
+ratios for the defaults alone (7.50 / 1.34 / 4.67).
+
+- **MD step A/B** (Benchmark_loup SrTiO3 10×10×10, a = the A100 defaults, b = the switch on; ab / ba):
+
+| Switch | b/a (ab) | b/a (ba) |
+| --- | ---: | ---: |
+| `GEOM` | 0.9756 | 0.9806 |
+| `SC_FACTORED` | 0.9889 | 0.9881 |
+
+Both clear 1 % in both build orders. **Adopted on the A100 family.** The H200 keeps SC_FACTORED off (ledger
+sc0-invariant-basis: under 1 % there); GEOM was not measured on the H200 or Ada.
+
+`tests/gpu/test_sc_generated_cuda.py` now checks the factored pair against cuEq as well (local RTX 5060 Ti: 6 passed).

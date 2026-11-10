@@ -247,10 +247,13 @@ def packed8_source(source, bias):
 # as today; w x_i factored out of a one-component path; or g_oi = sum_j c_oij e_j computed once per tile edge into
 # shared memory (it does not depend on the channel) and acc_o += (w x_i) g_oi. OMAT-0 medium: FMULs per edge and
 # channel 69 -> 48, shared loads 9 -> 28, 80 registers. Kernel lab, SrTiO3 10x10x10, A100 defaults (PACKED8):
-# Alex A100-SXM4-80GB 0.867 / 0.868 of the forward (two jobs); local RTX 5060 Ti 1.080 (memory-bound there). None:
-# on for GEOM_GPUS (none yet); True / False: an A/B side's choice.
+# Alex A100-SXM4-80GB 0.867 / 0.868 of the forward (two jobs); local RTX 5060 Ti 1.080 (memory-bound there).
+# NVIDIA A100-SXM4-80GB (10 November 2026, Alex job 4973813, source 219602cf; Benchmark_loup MD step b/a, a = the A100
+# defaults): 0.9756 / 0.9806 (ab / ba); force/stress gate passes with SC_FACTORED also on (forces 0.863 / 0.913 /
+# 0.985, stress 0.727 / 0.896 / 1.343). The H200 is not measured (issue-bound there, not FMA-bound). None: on for
+# GEOM_GPUS; True / False: an A/B side's choice.
 GEOM = None
-GEOM_GPUS = GPUModels(())
+GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 
 
 def geom_default(device):
