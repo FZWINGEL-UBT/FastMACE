@@ -5,8 +5,8 @@ The conductor's item 2 after the memory profile ([memory-profile-20261109](../me
 honest, then give (B)'s path a block-layout gradient, or a recompute step that really saves memory. The default plan
 below the limit must stay the same (checked with the plan text), and then the limits are measured again.
 
-Source: branch `fastmace/rung-b` from `a7a8211e`. The commits: `58ad5c99` (rung B never beside w′; the layer region
-inside the first-table rung), `cd56800c` (the layer region as its own rung; the probe change) and `18fa5e7f` (tests).
+Source: branch `fastmace/rung-b-blocks` from `a7a8211e`. The commits: `58ad5c99` (rung B never beside w′; the layer region
+inside the first-table rung), `cd56800c` (the layer region as its own rung; the probe change), `18fa5e7f` and `34db2467` (tests, golden plan texts). Full CPU suite on leto (`eb3ccb37`): 5,548 passed, 7 golden plan texts failed only on the "+N more" off count, rewritten in `34db2467` (30 passed); ruff findings only in pre-existing files.
 GPUs: leto's NVIDIA RTX 4000 Ada Generation (20 GB, NAS `mace_cueq_oeq`, idle check before every job) and the local
 RTX 5060 Ti (WSL2, inside a `tools/ci/local_gpu.py` reservation). OMAT-0 medium, float32, hybrid backend.
 
