@@ -54,3 +54,10 @@ its slot's halo start (0.9999 / 1.0001) and keeping interaction 0's activations 
 - Sweep 3's recompute of interaction 0 (about 0.8 µs/atom): the three-sweep design.
 - Halo rows (H ≈ 9,000 per 16,384 receivers in interaction 0) and the forces' scatter (115 ns/atom).
 - On the wavefront, the host state's CPU work; its A/Bs spread by ±8 % between pairs.
+
+## The write copies (10 November 2026)
+
+`tiled.TILE_COPY_STREAM` (exact, `TILED_SPEED_GPUS`) moves the host state's device-to-host write copies off the
+compute stream (device clones, a side stream copies them): wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom), host state
+0.960 / 0.959. The wavefront call is GPU-bound (wall 7.24 s, GPU busy 7.15 s): 1.55× the whole-system call per atom.
+Records: [`results/tiled-speed-20261110`](../../../results/tiled-speed-20261110/README.md).

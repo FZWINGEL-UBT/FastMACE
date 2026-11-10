@@ -707,6 +707,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 host-bound, 0.989 / 0.990 GPU-bound | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-graph-cache-wave](#tiled-graph-cache-wave) | The graph cache under the wavefront (search pass to sweep 3) | `tiled.TILE_GRAPH_CACHE_WAVE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.824 / 0.817 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-host-worker](#tiled-host-worker) | Host-state writes applied on a worker thread | `tiled.TILE_HOST_WORKER` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-copy-stream](#tiled-copy-stream) | Host-state write copies on a side stream | `tiled.TILE_COPY_STREAM` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-10 | wave 0.962 / 0.964; host state 0.960 / 0.959 | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 | [tiled-lazy-keys](#tiled-lazy-keys) | Slot keys taken in sweep 1 from the prefetched graphs instead of a search pass | `TILE_LAZY_KEYS` (removed) | FM | REJECTED | 2026-11-09 | device 1.023 / 1.002 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
@@ -842,6 +843,16 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Measured: wavefront 0.975 / 0.982; host state 0.969 / 0.966 (1d30a163). The wavefront call is then GPU-bound (wall 8.33 s, GPU busy 7.89 s).
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
 
+<a id="tiled-copy-stream"></a>
+#### tiled-copy-stream: the host state's write copies on a side stream
+- Switch: `fastmace.model.tiled.TILE_COPY_STREAM` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 10 November 2026 (tiled speed)
+- What: with host state and overlap, a tile's deferred writes were copied to pinned host memory on the compute stream (0.44 s of device-to-host copies in the 7.7 s wavefront call at 975,560 SrTiO3 atoms), so the next tile's kernels waited for the link. Now the compute stream clones the values and indices on the device (0.05 s), a side stream copies the clones, and the host applies the same writes in the same order after the copy's event.
+- Status: DEFAULT (scoped). Exact (GPU test against the switch off on the host-state wavefront).
+- Measured: wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom); host state 0.960 / 0.959 (f34f35e8). Wavefront profile: wall 7.24 s, GPU busy 7.15 s (GPU-bound).
+- Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md).
+
 <a id="tiled-lazy-keys"></a>
 #### tiled-lazy-keys: slot keys from the prefetched graphs
 - Switch: `TILE_LAZY_KEYS` (removed: 5657befc, reverted in a8a17897)
@@ -922,6 +933,7 @@ are not A/B comparisons.
 | 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled call gap (OMAT-0, RTX 5060 Ti) | `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_FILL_SKIP`, `TILE_PINNED_SUPERSET`; `TILE_PIECE_START` and keeping interaction 0's A rejected | Decision 66 | Device state 0.923 / 0.928 (all eight switches 0.729 / 0.731) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled wavefront (OMAT-0, RTX 5060 Ti) | `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`; `TILE_BLOCK_ROWS`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET` on under the wavefront; `TILE_LAZY_KEYS` rejected | Decision 66 | Wavefront 0.766 / 0.774 (10.10 → 7.74 µs/atom) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| 2026-11-10 | Tiled speed (OMAT-0, RTX 5060 Ti) | `TILE_COPY_STREAM` | Decision 66 | Wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom), host state 0.960 / 0.959 at 975,560 SrTiO3 atoms; [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 
 ## Closed directions
 
