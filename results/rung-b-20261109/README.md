@@ -165,6 +165,11 @@ about 11 kB of the 68 kB per atom reserved at the limit, roughly +15–20 % atom
 sequence between a recording capture and the real one, and a pluggable allocator or memory pool that serves offsets
 in one buffer. Not built; proposed to the conductor.
 
+**Cheap candidate: `edge_index` in int32.** The skin list keeps `edge_index` as int64 `[2, capacity]` (0.37 GiB at
+SrTiO3 36³), while its candidates are already int32. Storing it as int32 saves 0.8 kB/atom. Each consumer that
+indexes with it (`index_add`, gathers, the custom kernels' sender and receiver arguments) must accept int32 or cast
+in place. A work-removal switch: it needs its own not-slower A/B in both orders (decision 66). Not started.
+
 ## Checks
 
 - **Force/stress gate** (`tools/force_stress_gate.py`, 3× float32 limit, decision 66). It ran on the Ada on
