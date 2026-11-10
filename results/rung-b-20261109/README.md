@@ -135,7 +135,9 @@ with these rungs. No separate measurement was made for each.
   - SrTiO3 3×3×3: energy 1.3e-3, forces 0.81, stress 0.42. Pass.
   - NaCl: energy 1.2e-4, forces 0.93, stress 0.96. Pass.
 - **Targeted CPU tests** on `1522aef2` (leto): 657 passed, 11 skipped.
-- SUITE_LINE
+- **Full CPU suite** on `9b20ddd4` (main `5249d8d8` merged in; leto, `-n 8`, `not acceptance`, idle check before):
+  5,573 passed, 203 skipped, 0 failed. Ruff's findings are all in lines that predate this branch (no line it adds is
+  over 120 characters).
 
 ## Files
 
