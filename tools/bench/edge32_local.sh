@@ -18,6 +18,8 @@ cd "$OUT"
 {
   "$PY" "$S" run "$OUT" --side off --repeat "$REPEAT"; echo "off exit=$?"
   "$PY" "$S" run "$OUT" --side on --repeat "$REPEAT"; echo "on exit=$?"
+  "$PY" "$S" run "$OUT" --side off --repeat "$REPEAT" --tag 2; echo "off2 exit=$?"
   "$PY" "$S" compare "$OUT/edge32-off.pt" "$OUT/edge32-on.pt"; echo "compare exit=$?"
+  "$PY" "$S" compare "$OUT/edge32-off.pt" "$OUT/edge32-off2.pt"; echo "control exit=$?"
 } > "$OUT/edge32.log" 2>&1
 echo "EDGE32 DONE" >> "$OUT/edge32.log"

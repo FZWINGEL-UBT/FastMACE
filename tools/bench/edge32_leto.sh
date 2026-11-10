@@ -19,7 +19,9 @@ for REPEAT in "$@"; do
   {
     python "$S" run "$O" --side off --repeat "$REPEAT"; echo "off exit=$?"
     python "$S" run "$O" --side on --repeat "$REPEAT"; echo "on exit=$?"
+    python "$S" run "$O" --side off --repeat "$REPEAT" --tag 2; echo "off2 exit=$?"
     python "$S" compare "$O/edge32-off.pt" "$O/edge32-on.pt"; echo "compare exit=$?"
+    python "$S" compare "$O/edge32-off.pt" "$O/edge32-off2.pt"; echo "control exit=$?"
   } > "$O/edge32.log" 2>&1 < /dev/null
   note "end $REPEAT $(grep -E 'exit=|all_bitwise' "$O/edge32.log" | tr '\n' ' ' | cut -c1-400)"
 done

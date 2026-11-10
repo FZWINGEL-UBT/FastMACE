@@ -4,6 +4,8 @@
 - ``run OUT --side off|on``: SrTiO3 at REPEAT, OMAT-0 medium float32, 20 Langevin (NVT) steps and 20 LangevinBAOAB
   (NPT, full cell) steps from the same thermalised start; saves positions, forces, energy, stress and cell after each,
   plus the plan text and the steady peak reserved.
+- ``run ... --tag 2``: the same side again (``edge32-off2.pt``), the run-to-run control: a plan with atomic
+  scatters is not bitwise between processes, so off/on is judged against off/off.
 - ``compare A.pt B.pt``: bitwise equality of every saved tensor, else the largest difference.
 
 One side per process (the switch is read when the skin list allocates). Locally through ``tools/ci/local_gpu.py``.
@@ -19,7 +21,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parent.parent
 
 
-def run(out: Path, side: str, repeat: str, steps: int) -> None:
+def run(out: Path, side: str, repeat: str, steps: int, tag: str = "") -> None:
     from fastmace.model.compile import configure_allocator
 
     configure_allocator(enabled=True)
@@ -51,10 +53,10 @@ def run(out: Path, side: str, repeat: str, steps: int) -> None:
         sim.run(steps=steps)
         torch.cuda.synchronize()
         state = sim._engine.state
-        try:
-            dtype = str(field.buffers()["neighbours.edge_index"].dtype)
-        except Exception as error:  # noqa: BLE001 - a record field only
-            dtype = f"unknown ({type(error).__name__})"
+        import gc
+
+        dtype = sorted({str(o.edge_index.dtype) for o in gc.get_objects()
+                        if isinstance(o, skin.SkinNeighbourList) and getattr(o, "edge_index", None) is not None})
         for key in ("positions", "forces", "energy", "stress", "cell"):
             value = getattr(state, key, None)
             if value is not None:
@@ -63,7 +65,7 @@ def run(out: Path, side: str, repeat: str, steps: int) -> None:
                              plan=sim.plan.describe().splitlines()[2:4])
         del sim, field
         torch.cuda.empty_cache()
-    torch.save(saved, out / f"edge32-{side}.pt")
+    torch.save(saved, out / f"edge32-{side}{tag}.pt")
     print(json.dumps(record))
 
 
@@ -91,13 +93,14 @@ def main(argv=None):
     r.add_argument("--side", choices=("off", "on"), required=True)
     r.add_argument("--repeat", default="10x10x10")
     r.add_argument("--steps", type=int, default=20)
+    r.add_argument("--tag", default="", help="file suffix (a repeat of one side: the run-to-run control)")
     c = sub.add_parser("compare")
     c.add_argument("a", type=Path)
     c.add_argument("b", type=Path)
     args = p.parse_args(argv)
     if args.cmd == "run":
         args.out.mkdir(parents=True, exist_ok=True)
-        run(args.out, args.side, args.repeat, args.steps)
+        run(args.out, args.side, args.repeat, args.steps, args.tag)
     else:
         compare(args.a, args.b)
 
