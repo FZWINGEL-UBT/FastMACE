@@ -2,8 +2,9 @@
 
 ``rewrites.generic.modules.TILE_BLOCK_ROWS`` (the w' convolution's block-layout message kept for a tile's receivers),
 ``model.tiled.TILE_VIRIAL`` (the strain gradient from the edge vectors' gradient), ``model.tiled.TILE_PREFETCH_DEVICE``
-(the next tile's graph built ahead with the state on the device) and ``model.tiled.TILE_EPILOGUE`` (the sweeps' masks,
-objective, virial and edge vectors in compiled code): each switch on against off on the same tiled force field, and
+(the next tile's graph built ahead with the state on the device), ``model.tiled.TILE_EPILOGUE`` (the sweeps' masks,
+objective, virial and edge vectors in compiled code) and ``model.tiled.TILE_COPY_STREAM`` (the host state's writes
+copied on a side stream; host state, wavefront): each switch on against off on the same tiled force field, and
 the tiled call against the whole-system call of the same plan, on SrTiO3 6x6x6 (1,080 atoms, rattled and strained) in
 tiles of 256 receivers, eager and padded (the epilogue compiled too). The forces are summed with atomics on the GPU,
 and so are the forward's sums: the sides agree to float32 rounding, not bitwise, energy included. Needs
@@ -61,7 +62,7 @@ whole = field.evaluate(atoms, stress=True)
 compiled_field = None  # mode "compiled" tiles need a compiled force field: the plan's own, built on first use
 
 
-def run(mode, switches):
+def run(mode, switches, extra=None):
     global compiled_field
     if mode == "compiled" and compiled_field is None:
         compiled_field = planner.build_evaluation(plan, user, atoms)
@@ -71,15 +72,15 @@ def run(mode, switches):
         setattr(module, name, value)
     try:
         # compiled: the receiver budget stays at 256 (it would take the 1,080 atoms in one tile)
-        caps = TileConfig(256, mode=mode, **({"budget_receivers": ()} if mode == "compiled" else {}))
+        caps = TileConfig(256, mode=mode, **({"budget_receivers": ()} if mode == "compiled" else {}), **(extra or {}))
         tiled = TiledForceField(compiled_field if mode == "compiled" else field, caps)
         tiled.evaluate(atoms, stress=True)  # the first call in a process may round differently
         energy, forces, stress = tiled.evaluate(atoms, stress=True)
-        tiles = tiled.last["tiles"]
+        tiles, aside = tiled.last["tiles"], tiled.last.get("copy_stream")
     finally:
         for (module, name), value in saved.items():
             setattr(module, name, value)
-    return float(energy), np.asarray(forces, dtype=np.float64), np.asarray(stress, dtype=np.float64), tiles
+    return float(energy), np.asarray(forces, dtype=np.float64), np.asarray(stress, dtype=np.float64), tiles, aside
 
 
 def relative(got, expected):
@@ -106,6 +107,14 @@ for mode in ("eager", "padded", "compiled"):
             forces=relative(on[1], off[1]), stress=relative(on[2], off[2]),
             whole_energy_rel=abs(on[0] - w_energy) / abs(w_energy), whole_forces=relative(on[1], w_forces),
             whole_stress=relative(on[2], w_stress))
+# TILE_COPY_STREAM: the host state's writes copied on a side stream (host state, aliased, the wavefront); exact
+host = dict(state="host", alias_state=True, wavefront="on", wavefront_group=2)
+off = run("padded", {(tiled_module, "TILE_COPY_STREAM"): False}, host)
+on = run("padded", {(tiled_module, "TILE_COPY_STREAM"): True}, host)
+report["copy_stream"] = dict(tiles=on[3], used=[off[4], on[4]], energy_bitwise=on[0] == off[0],
+                             forces_bitwise=bool(np.array_equal(on[1], off[1])),
+                             stress_bitwise=bool(np.array_equal(on[2], off[2])),
+                             forces=relative(on[1], off[1]), whole_forces=relative(on[1], w_forces))
 print(json.dumps(report))
 """
 
@@ -120,6 +129,10 @@ def test_tiled_speed_switches_agree_with_the_switch_off_and_the_whole_system():
     print(json.dumps(report, indent=1))
     if "skip" in report:
         pytest.skip(report["skip"])
+    copy = report.pop("copy_stream")
+    assert copy["used"] == [False, True] and copy["tiles"] > 2, copy
+    # The same writes in the same order: the GPU's atomics alone move the forces (float32), as between two calls
+    assert copy["forces"] <= 1e-5 and copy["whole_forces"] <= 1e-4, copy
     cases = {key: value for key, value in report.items() if key != "applied"}
     assert set(cases) == {"eager-block_rows", "eager-virial", "eager-epilogue", "padded-block_rows",
                           "padded-virial", "padded-prefetch", "padded-epilogue", "compiled-epilogue"}

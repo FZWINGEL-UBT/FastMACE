@@ -119,6 +119,13 @@ TILE_FILL_SKIP = True
 # since the host worker).
 TILE_PINNED_SUPERSET = None
 TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
+# TILE_COPY_STREAM (exact): host state with overlap copies each tile's deferred writes (values and device indices) to
+# pinned host memory on a side stream instead of the compute stream: the compute stream only clones them on the
+# device (at the device's bandwidth; the slot's outputs and index buffers are overwritten by the next tile), and the
+# next tile's kernels no longer queue behind the link. The host applies the same values in the same order after the
+# copy's event. The wavefront at 975,560 SrTiO3 atoms on the RTX 5060 Ti had 0.44 s of device-to-host copies on the
+# compute stream in a 7.7 s call. None: on for TILED_SPEED_GPUS.
+TILE_COPY_STREAM = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -309,6 +316,8 @@ class _State:
         self._pending, self._fresh = [], False  # overlap: the host writes not applied yet
         # TILE_HOST_WORKER: the batches of writes handed to the worker thread (set per call by the tiled call)
         self.worker, self._executor, self._handed = False, None, []
+        # TILE_COPY_STREAM: the deferred writes' device-to-host copies on this side stream (set per call)
+        self.copy_stream = None
         self.tensors = {}
         # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
@@ -525,13 +534,36 @@ class _State:
                 self.flush()
             self._fresh = False
         event = None
-        if self.device.type == "cuda":
+        if self.device.type == "cuda" and self.copy_stream is not None:
+            index, values, event = self._to_host_aside(index, values.detach())
+        elif self.device.type == "cuda":
             index, values = self._to_host(index), self._to_host(values.detach())
             event = torch.cuda.Event()
             event.record()
         else:  # copies: a padded slot's buffers hold the next tile before these writes are applied
             index, values = index.to("cpu", copy=True), values.detach().to("cpu", copy=True)
         self._pending.append((kind, name, index, values, event))
+
+    def _to_host_aside(self, index, values):
+        """``TILE_COPY_STREAM``: pinned host copies of ``index`` (device or host) and ``values`` made on the copy
+        stream from device clones (the slot's buffers hold the next tile before the copy runs): ``(index, values,
+        event)``, the event recorded after the copies."""
+        import torch
+
+        current = torch.cuda.current_stream(self.device)
+        clones = [t.clone() for t in (index, values)]  # a host index too, as _to_host copies it
+        stream = self.copy_stream
+        stream.wait_stream(current)
+        out = []
+        with torch.cuda.stream(stream):
+            for tensor in clones:
+                if tensor.is_cuda:
+                    tensor.record_stream(stream)
+                    tensor = self._to_host(tensor)
+                out.append(tensor)
+            event = torch.cuda.Event()
+            event.record(stream)
+        return out[0], out[1], event
 
     @staticmethod
     def _to_host(tensor):
@@ -1169,6 +1201,7 @@ class TiledForceField:
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
+        self._copy_stream = None  # TILE_COPY_STREAM's side stream
         self._pieces, self._piece_bytes, self._piece_budget, self._piece_count = None, 0, 0, 0  # TILE_GRAPH_CACHE
         self._list_cache = None  # TileConfig.list_cache (neighbours "tiles"; set per call by tiles())
         self._per_receiver = None  # the last measured tile workspace per receiver (bytes; _memory)
@@ -1977,6 +2010,11 @@ class TiledForceField:
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
             aliased = self.config.alias_state
             state.worker = state.overlap and bool(self._speed(TILE_HOST_WORKER))
+            aside = state.overlap and self.device.type == "cuda" and bool(self._speed(TILE_COPY_STREAM))
+            if aside and self._copy_stream is None:
+                self._copy_stream = torch.cuda.Stream(self.device)
+            state.copy_stream = self._copy_stream if aside else None
+            stats["copy_stream"] = aside
             stats["host_worker"] = state.worker
             if aliased:
                 state.pool(pool_rows, n)

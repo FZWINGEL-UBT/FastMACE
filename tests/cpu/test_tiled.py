@@ -1466,6 +1466,7 @@ def test_host_worker_is_bitwise_the_call_that_writes_on_the_calling_thread(wave,
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
         results[worker] = [tiled.evaluate(current, stress=True) for current in (strained(atoms), atoms)]
         assert tiled.last["host_worker"] is worker and tiled.last["tiles"] > 2
+        assert tiled.last["copy_stream"] is False  # TILE_COPY_STREAM: CUDA only
         state = tiled._g["state"]
         assert state._handed == [] and state._pending == []
         assert (state._executor is not None) == worker
