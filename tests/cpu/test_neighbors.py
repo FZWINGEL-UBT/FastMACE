@@ -358,6 +358,34 @@ def test_keys_only_sort_builds_the_same_list(sort, groups, by_length, monkeypatc
     assert candidate_set(new) == ase_pairs(atoms, CUTOFF + 0.3)
 
 
+@pytest.mark.parametrize("chunked", [False, True])
+def test_edge_index_int32_stores_the_same_edges(chunked, monkeypatch):
+    """EDGE_INDEX_INT32: compact() writes the same pairs, in the same order, into an int32 edge_index; the shifts and
+    count are unchanged. Off by default (int64)."""
+    from fastmace.neighbors import skin
+
+    assert skin.EDGE_INDEX_INT32 is False
+    if chunked:
+        monkeypatch.setattr(skin, "COMPACT_CHUNK", 97)
+    atoms = nbcl5(rattle=0.05, seed=7)
+    positions = torch.tensor(atoms.positions)
+    lists = []
+    for int32 in (False, True):
+        monkeypatch.setattr(skin, "EDGE_INDEX_INT32", int32)
+        nl = make(atoms, sort=True)
+        nl.build_gpu(positions)
+        nl.compact(positions)
+        lists.append(nl)
+    wide, narrow = lists
+    assert wide.edge_index.dtype == torch.int64 and narrow.edge_index.dtype == torch.int32
+    assert torch.equal(wide.edge_index, narrow.edge_index.to(torch.int64))
+    for name in ("unit_shifts", "shifts", "count"):
+        assert torch.equal(getattr(wide, name), getattr(narrow, name)), name
+    count = int(narrow.count)
+    index, _, _ = narrow.edges(count)
+    assert index.dtype == torch.int32 and index.shape == (2, count)
+
+
 def test_sort_by_length_is_off_by_default_and_needs_sort_receivers(monkeypatch):
     from fastmace.neighbors import skin
 

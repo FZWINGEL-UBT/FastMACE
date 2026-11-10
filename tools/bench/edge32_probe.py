@@ -1,0 +1,106 @@
+"""int32 ``edge_index`` falsifier (capacity bounds, 10 November 2026): run the real MD plan with
+``fastmace.neighbors.skin.EDGE_INDEX_INT32`` off or on and save the trajectory's end state, then compare two saves.
+
+- ``run OUT --side off|on``: SrTiO3 at REPEAT, OMAT-0 medium float32, 20 Langevin (NVT) steps and 20 LangevinBAOAB
+  (NPT, full cell) steps from the same thermalised start; saves positions, forces, energy, stress and cell after each,
+  plus the plan text and the steady peak reserved.
+- ``compare A.pt B.pt``: bitwise equality of every saved tensor, else the largest difference.
+
+One side per process (the switch is read when the skin list allocates). Locally through ``tools/ci/local_gpu.py``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+TOOLS = Path(__file__).resolve().parent.parent
+
+
+def run(out: Path, side: str, repeat: str, steps: int) -> None:
+    from fastmace.model.compile import configure_allocator
+
+    configure_allocator(enabled=True)
+    import torch
+
+    import fastmace as fm
+    from fastmace.neighbors import skin
+
+    skin.EDGE_INDEX_INT32 = side == "on"
+    sys.path.insert(0, str(TOOLS))
+    sys.path.insert(0, str(TOOLS / "bench"))
+    import capacity_scan as scan
+    from ab_frontends import thermalize
+
+    name, cell = scan.base_cell("SrTiO3")
+    start = cell.repeat(tuple(int(n) for n in repeat.lower().split("x")))
+    start.set_pbc(True)
+    thermalize(start, 300.0, 20261110)
+    model = fm.load("omat0-medium")
+    saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), gpu=torch.cuda.get_device_name())
+    for label, integrator in (
+            ("nvt", fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.002)),
+            ("npt", fm.integrators.LangevinBAOAB(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.002,
+                                                 cell_mode="full"))):
+        atoms = start.copy()
+        field = fm.ForceField(model, atoms, precision="float32")
+        sim = fm.Simulation(atoms, field, seed=20261110, integrator=integrator)
+        torch.cuda.reset_peak_memory_stats()
+        sim.run(steps=steps)
+        torch.cuda.synchronize()
+        state = sim._engine.state
+        try:
+            dtype = str(field.buffers()["neighbours.edge_index"].dtype)
+        except Exception as error:  # noqa: BLE001 - a record field only
+            dtype = f"unknown ({type(error).__name__})"
+        for key in ("positions", "forces", "energy", "stress", "cell"):
+            value = getattr(state, key, None)
+            if value is not None:
+                saved[f"{label}.{key}"] = value.detach().cpu().clone()
+        record[label] = dict(peak_reserved_gib=torch.cuda.max_memory_reserved() / 2**30, edge_index_dtype=dtype,
+                             plan=sim.plan.describe().splitlines()[2:4])
+        del sim, field
+        torch.cuda.empty_cache()
+    torch.save(saved, out / f"edge32-{side}.pt")
+    print(json.dumps(record))
+
+
+def compare(a: Path, b: Path) -> dict:
+    import torch
+
+    sa, sb = torch.load(a), torch.load(b)
+    out = {}
+    for key in sorted(set(sa) | set(sb)):
+        if key not in sa or key not in sb:
+            out[key] = "missing"
+            continue
+        x, y = sa[key], sb[key]
+        out[key] = "bitwise" if torch.equal(x, y) else f"max |d| {float((x.double() - y.double()).abs().max()):.3e}"
+    out["all_bitwise"] = all(v == "bitwise" for v in out.values())
+    print(json.dumps(out))
+    return out
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = p.add_subparsers(dest="cmd", required=True)
+    r = sub.add_parser("run")
+    r.add_argument("out", type=Path)
+    r.add_argument("--side", choices=("off", "on"), required=True)
+    r.add_argument("--repeat", default="10x10x10")
+    r.add_argument("--steps", type=int, default=20)
+    c = sub.add_parser("compare")
+    c.add_argument("a", type=Path)
+    c.add_argument("b", type=Path)
+    args = p.parse_args(argv)
+    if args.cmd == "run":
+        args.out.mkdir(parents=True, exist_ok=True)
+        run(args.out, args.side, args.repeat, args.steps)
+    else:
+        compare(args.a, args.b)
+
+
+if __name__ == "__main__":
+    main()

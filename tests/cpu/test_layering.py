@@ -69,7 +69,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     # prototype was adopted, so neither is a config field (conductor, batch-2 trial merge).
     "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89",
                                    "SORT_BY_LENGTH": "candidates sorted by length at the build; A/B + gate",
-                                   "SORT_KEYS_ONLY": "build sorts the keys alone; old key-value sort an A/B side"},
+                                   "SORT_KEYS_ONLY": "build sorts the keys alone; old key-value sort an A/B side",
+                                   "EDGE_INDEX_INT32": "compacted edge_index stored as int32; capacity A/B"},
     "fastmace/neighbors/pair_search.py": {"BINNED_SCREEN": "cell-list pair screen; per GPU from BINNED_MIN_ATOMS, A/B"},
     "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted",
                                               "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B",
