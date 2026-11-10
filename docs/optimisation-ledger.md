@@ -589,6 +589,10 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [memslack-sort-keys](#memslack-sort-keys) | Neighbour-list rebuild sorts the order keys alone (written over the screen codes) and decodes the pairs from them: no key tensor, no index tensor, no key-value sort | `neighbors.skin.SORT_KEYS_ONLY` (True) | FM | FIXED (every GPU; work removal, bitwise) | 2026-11-09 | Ada b/a 1.0004 / 0.9999, 5060 Ti 1.0027 / 0.9986; rebuild peak 1,019 → 351 MiB, SrTiO3 36³ 75.9 → 72.8 kB/atom, Ada SrTiO3 limit 253,265 → 274,360 | [memory-slack](../results/memory-slack-20261109/README.md) |
 | [memslack-sort-keys](#memslack-sort-keys) | Graph-pool packing: in-place joined species products during the capture | `compose_skip.JOINED_LAYOUT` (Ada) | FM | MEASURED, no change (the same peaks to the byte) | 2026-11-09 | SrTiO3 36³ 16.49 GiB either way | [memory-slack](../results/memory-slack-20261109/README.md) |
 | [memslack-sort-keys](#memslack-sort-keys) | Graph-pool packing: classic (non-expandable) allocator segments | `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` | FM | REJECTED | 2026-11-09 | SrTiO3 36³ out of memory in the build (19.17 GiB) | [memory-slack](../results/memory-slack-20261109/README.md) |
+| [rungb-first-layer](#rungb-first-layer) | Rescue rung (B) never beside w′ (it saved nothing there and kept the dense `[N, 5120]` message gradient); its rule 12 term beside w′ made honest | `planner.memory.RESCUE_NOT_BESIDE` | FM | FIXED | 2026-11-10 | SrTiO3 39³ no longer falls to (B) after an out-of-memory error | [rung-b](../results/rung-b-20261109/README.md) |
+| [rungb-first-layer](#rungb-first-layer) | New rescue rung after the first table's: the first interaction and product 0 under one checkpoint (product 0's input, 8.2 kB/atom, not kept) | `RewriteConfig.recompute_first_layer` (record `generic_recompute_first_layer`) | FM | ADOPTED (rescue rung only, off below the limit) | 2026-11-10 | Ada b/a 1.0923 / 1.0917; SrTiO3 36³ 72.8 → 68.2 kB/atom; Ada SrTiO3 274,360 → 296,595, NaCl 343,000 → 405,224; 5060 Ti SrTiO3 163,840 → 214,375, NaCl 195,112 → 287,496 | [rung-b](../results/rung-b-20261109/README.md) |
+| [rungb-first-layer](#rungb-first-layer) | The layer region inside the first table's rung (always with it) | `generic.modules.FIRST_LAYER_REGION` (removed) | FM | REJECTED (taken at SrTiO3 32³, far below the limit, 8 % slower) | 2026-11-10 | forced 32³ +8.0 %, 36³ +7.5 % | [rung-b](../results/rung-b-20261109/README.md) |
+| [rungb-first-layer](#rungb-first-layer) | The memory probe also measures the next cheaper stage when the chosen one's scale says it might fit | `planner.memory_probe.cheaper_after` | FM | ADOPTED | 2026-11-10 | SrTiO3 32³ plan text equal to `a7a8211e`; open: at 34³–36³ the replica overstates the scale (0.70 against 0.46), so the default pays about 7 % there | [rung-b](../results/rung-b-20261109/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -5176,6 +5180,17 @@ Rounds 4 and 5 (main `65923679`, same night) measured the existing switches neve
 - Packing slack (13.8 kB/atom): placement loss of the caching allocator inside the capture's one expandable segment (holes 1.28 GiB at the live peak, then 1.74 GiB of growth for an 1,822 MiB request with 5.0 GiB free); every hole is written in the replay. Levers: fewer transients, or item 2's recompute rung.
 - Next limiter: rescue rung (B)'s dense `[atoms, 5120]` message gradient sets both Ada limits now (SrTiO3 296,595, NaCl 373,248).
 - Sources: [memory-slack](../results/memory-slack-20261109/README.md).
+
+<a id="rungb-first-layer"></a>
+#### rungb-first-layer: rung (B) beside w′, and the first-layer recompute rung (Ada, 5060 Ti)
+- Switches: `planner.memory.RESCUE_NOT_BESIDE`; `RewriteConfig.recompute_first_layer` ("auto": rule 12's rung after `recompute_first_table`, generic float32 models); `planner.memory_probe.cheaper_after`.
+- Engine: FM
+- Date/round: 9–10 November 2026 (conductor, memory profile item 2: make rule 12's estimate for rung (B) honest, then a recompute step that really saves memory).
+- What: (B) stands w′ aside and leaves Inductor's dense `[N, 5120]` message gradient (20.5 kB/atom more), so it is skipped while w′ is on. The new rung runs the first interaction, its division and product 0 under one non-reentrant checkpoint: product 0's input `[N, 2048]` is rebuilt, not kept. The probe measures the next cheaper stage as well, so the 2× overestimate of rule 12 does not put the rung on far below the limit.
+- Status: FIXED / ADOPTED as a rescue rung; the always-on region REJECTED (8 % slower at 32³).
+- Measured (leto RTX 4000 Ada, `58ad5c99` / `cd56800c`): MD 36³ reserved 15.82 → 14.81 GiB, graph pool live peak 9.99 → 8.45 GiB; A/B b/a 1.0923 / 1.0917; limits as in the table row. 32³ default plan text equals `a7a8211e`.
+- Left: the GEMM gradient blocks (20.5 kB/atom) are the largest live item at the peak; a recompute cannot drop them. The probe's replica overstates the scale at 34³–36³ (the default takes both rungs, about 7 % slower, where the plain plan fits).
+- Sources: [rung-b](../results/rung-b-20261109/README.md).
 
 <a id="sx-layout-spline"></a>
 #### sx-layout-spline: Symmetrix-XL's interaction 2 forward layout with spline w, and the spline w′ (H200, lab)
