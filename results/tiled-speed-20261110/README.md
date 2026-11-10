@@ -57,10 +57,18 @@ source `24926149`:
 `TILED_SPEED_GPUS` now holds the RTX 5060 Ti, the RTX 4000 Ada and every A100 (decision 66; the switches as one set,
 not one by one on these GPUs).
 
+**Checks on `4a1ade7e`** (murphy):
+
+- Full CPU suite (`tests/cpu`, `-n 8 -m "not acceptance"`): 5,562 passed, 203 skipped (`murphy/suite-4a1ade7e-tail.log`).
+- The Ada capacity record with the switches on: 179,685,000 atoms still fit; compiled call 1,676 s, 9.33 µs/atom
+  (was 1,773 s, 9.87), GPU peak 18.7 GiB, host peak 136.1 GB (was 129.0), valid (`murphy/murphy-cap-4a1ade7e-330/`).
+
 ## Records
 
 - `ab/`: the four A/B records of `TILE_COPY_STREAM` (5060 Ti).
-- `murphy/`: the Ada A/Bs (`murphy-ab-24926149-*`: run logs, idle checks, records) and `ws-ab-murphy.log`.
+- `murphy/`: the Ada A/Bs (`murphy-ab-24926149-*`: run logs, idle checks, records) and `ws-ab-murphy.log`; the
+  capacity recheck (`murphy-cap-4a1ade7e-330/`, `ws-scan-murphy.log`), the suite (`suite-4a1ade7e-tail.log`) and
+  `murphy-chain.log`.
 - `alex/`: the A100 job's `run.log`, A/B logs and records, `whole.log`, the Slurm output.
 - `profiles/`: `job35/gputest.log`, `job36/wprof-58.json` and `wprof.log`, the jobs' logs.
 - `jobs/`: `job35.sh`, `job36.sh` (launched by the `launch.sh` of tiled-speed-20261108 as system units behind the

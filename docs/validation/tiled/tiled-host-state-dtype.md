@@ -199,6 +199,14 @@ passed `run.sh`'s idle check (no compute process on the GPU, no other user's bus
 **Records:** `results/tiled-capacity-20261109/murphy/` (each point's `run.log`, idle check and record, and
 `ws-scan-murphy.log`).
 
+**Recheck with the speed switches on** (`4a1ade7e`, `TILED_SPEED_GPUS` holds the Ada; murphy, same settings): 179,685,000
+atoms still fit. Build 221 s, eager call 2,472 s, compiled call **1,676 s (9.33 µs/atom**, was 9.87, −5.5 %), GPU peak
+18.7 GiB, host peak 136.1 GB (was 129.0 GB; the host worker and the side-stream copies), valid with 74 edges per
+atom and the largest force component 1.3 meV/Å. The capacity call gains less than the 975,560-atom A/B (−13 % with
+the state on the device, −23 % on the wavefront): at this size the host state's link traffic and the neighbour
+search (329 s) are fixed costs the switches do not touch. Records:
+`results/tiled-speed-20261110/murphy/murphy-cap-4a1ade7e-330/`.
+
 ## Tests
 
 `tests/cpu/test_tiled.py`:
