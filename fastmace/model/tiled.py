@@ -119,7 +119,8 @@ TILE_FILL_SKIP = True
 # they total at most TILE_PINNED_SUPERSET_BYTES, so each call's copy to the device runs at the link's pinned rate and
 # without a sync (pageable copies: about 70 ns per atom per call at 975,560 SrTiO3 atoms on the RTX 5060 Ti); past
 # the cap, pageable as before. None: on for TILED_SPEED_GPUS (wavefront: 1.012 / 1.028 host-bound, 0.989 / 0.990
-# since the host worker).
+# since the host worker). The cap counts the pinned allocator's power-of-two blocks, and lists dropped or replaced
+# return them to the system (``_release_kept``; the allocator would keep them resident, uncounted by the host budget).
 TILE_PINNED_SUPERSET = None
 TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
 # TILE_COPY_STREAM (exact): host state with overlap copies each tile's deferred writes (values and device indices) to
@@ -1012,6 +1013,42 @@ def moved_within(positions, reference, limit, chunk=None):
     return True
 
 
+def _pinned_block(nbytes):
+    """The bytes PyTorch's pinned host allocator holds for a pinned tensor of ``nbytes``: its block, ``nbytes``
+    rounded up to a power of two (CachingHostAllocator)."""
+    return 1 << max(int(nbytes) - 1, 0).bit_length() if nbytes > 0 else 0
+
+
+def _kept_bytes(kept):
+    """The host bytes a kept-lists dict holds: its reference positions and its tiles' lists (and their A/B mirrors),
+    a pinned tensor by its allocator block (``_pinned_block``)."""
+    def held(t):
+        nbytes = t.numel() * t.element_size()
+        return _pinned_block(nbytes) if t.is_pinned() else nbytes
+
+    entries = list(kept["superset"].values()) + list(kept.get("mirrors", {}).values())
+    return int(sum(held(t) for entry in entries for t in entry) + kept["reference"].numel() * 8)
+
+
+def _release_kept(kept):
+    """Kept lists dropped or replaced: their tensors go, and pinned ones (``TILE_PINNED_SUPERSET``) back to the
+    operating system. PyTorch's pinned allocator keeps a freed block for reuse, resident, so without this the bytes
+    the host budget counts as freed (``_auto_store``, ``list_reuse_floor``) stayed in the process: at 179.7M SrTiO3
+    atoms on the RTX 4000 Ada the host peak grew by 7 GB (two list builds, each 4 GiB of pinned lists, the blocks
+    rounded up to powers of two)."""
+    if kept is None:
+        return
+    kept["superset"].clear()
+    kept.get("mirrors", {}).clear()
+    kept["complete"] = False
+    if kept.get("pinned_bytes"):
+        kept["pinned_bytes"] = 0
+        import torch
+
+        if hasattr(torch._C, "_host_emptyCache"):
+            torch._C._host_emptyCache()  # the free pinned blocks (also staging buffers no longer in use)
+
+
 def _host_available():
     """The host's available memory in bytes: ``MemAvailable``, or less where the process's memory cgroup leaves less
     (``_cgroup_room``: a batch job's limit, e.g. 231.5 GB for one A100-80 on an Alex node, which /proc/meminfo does not
@@ -1273,8 +1310,9 @@ class TiledForceField:
 
     def _kept_on_host(self, kept, tensors):
         """A tile's kept lists on the host: pinned (``TILE_PINNED_SUPERSET``) while the pinned ones total at most
-        ``TILE_PINNED_SUPERSET_BYTES``, else pageable."""
-        size = sum(t.numel() * t.element_size() for t in tensors)
+        ``TILE_PINNED_SUPERSET_BYTES`` (counted by the pinned allocator's blocks, ``_pinned_block``), else
+        pageable."""
+        size = sum(_pinned_block(t.numel() * t.element_size()) for t in tensors)
         pinned = kept.get("pinned_bytes", 0)
         if (self.device.type == "cuda" and self._speed(TILE_PINNED_SUPERSET)
                 and pinned + size <= TILE_PINNED_SUPERSET_BYTES):
@@ -1480,6 +1518,7 @@ class TiledForceField:
         available = _host_available()
         if available is None or available >= int(self.config.list_reuse_floor):
             return True
+        _release_kept(self._kept)
         self._reuse_ok, self._kept = False, None
         self.list_reuse_state = (f"off: {available / 2**30:.1f} GiB available on the host when {what}, below the "
                                  f"floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
@@ -1508,7 +1547,8 @@ class TiledForceField:
                  and torch.equal(kept["cell"], cell.cpu())
                  and moved_within(positions, kept["reference"], skin / 2))
         if not reuse:
-            self._kept = kept = None  # the old reference and lists go before the new reference is copied
+            _release_kept(kept)  # the old reference and lists go before the new reference is copied
+            self._kept = kept = None
             if not self._host_allows("keeping the reference positions"):
                 return None
             here = positions.detach().to("cpu", torch.float64)
@@ -2185,6 +2225,8 @@ class TiledForceField:
             stats["list_kept_bytes"] = 0 if kept is None else int(
                 sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
                 + kept["reference"].numel() * kept["reference"].element_size())
+            # TILE_PINNED_SUPERSET: the pinned allocator's blocks of the kept lists (powers of two)
+            stats["list_kept_pinned_bytes"] = 0 if kept is None else int(kept.get("pinned_bytes", 0))
             stats["list_cache_hits"] = getattr(self, "_list_hits", 0)  # tile visits served from the call's cache
             stats["list_reuse"] = self.list_reuse_state
             stats["list_cache"] = self.list_cache_state
@@ -2405,8 +2447,7 @@ class TiledForceField:
             return self.dtype, "the call's dtype: fits"
         # A call that reuses the kept lists did not bin the atoms: it needs them, so they stay (float16 instead).
         kept = None if getattr(self, "_reusing", False) else self._kept
-        lists = 0 if kept is None else int(sum(t.numel() * t.element_size() for entry in kept["superset"].values()
-                                                for t in entry) + kept["reference"].numel() * 8)
+        lists = 0 if kept is None else _kept_bytes(kept)  # what _drop_kept returns to the host
         if lists and full <= room + lists:
             self._drop_kept(f"the host state ({full / 2**30:.1f} GiB) fits only without them")
             return self.dtype, f"the call's dtype after dropping the kept lists ({lists / 2**30:.1f} GiB)"
@@ -2417,9 +2458,7 @@ class TiledForceField:
 
     def _drop_kept(self, why):
         """The kept lists go for this call and the later ones (``list_reuse_state`` says why)."""
-        if self._kept is not None:  # (this call's sweeps hold the dict: emptied, they search again, bitwise)
-            self._kept["superset"].clear()
-            self._kept["complete"] = False
+        _release_kept(self._kept)  # (this call's sweeps hold the dict: emptied, they search again, bitwise)
         self._reuse_ok, self._kept = False, None
         self.list_reuse_state = f"off: {why}"
 

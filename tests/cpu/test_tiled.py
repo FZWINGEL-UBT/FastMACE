@@ -1562,6 +1562,41 @@ def test_state_dtype_auto_drops_the_kept_lists_before_it_rounds_the_state(monkey
     assert not np.array_equal(f1, f0) and np.abs(f1 - f0).max() <= 2.0**-9 * np.abs(f0).max()
 
 
+def test_pinned_kept_lists_are_counted_by_their_blocks_and_returned_when_dropped(monkeypatch):
+    """``TILE_PINNED_SUPERSET``: PyTorch's pinned allocator holds a power-of-two block per tensor and keeps freed
+    blocks resident, so the kept lists count by their blocks (``_kept_bytes``, the cap) and dropping or replacing them
+    (``_release_kept``) empties the pinned cache, which the host budget counts as returned."""
+    from fastmace.model import tiled as tiled_module
+
+    assert [tiled_module._pinned_block(n) for n in (0, 1, 2, 3, 4, 5, 1000, 1024, 1025)] == [
+        0, 1, 2, 4, 4, 8, 1024, 1024, 2048]
+
+    class Pinned:  # a pinned tensor's size, as a CPU-only host has none
+        def __init__(self, n):
+            self.n = n
+
+        def numel(self):
+            return self.n
+
+        def element_size(self):
+            return 1
+
+        def is_pinned(self):
+            return True
+
+    kept = dict(reference=torch.zeros(10, 3, dtype=torch.float64), superset={0: (Pinned(1025), torch.zeros(3))},
+                mirrors={1: (Pinned(3),)}, pinned_bytes=2048 + 4, complete=True)
+    assert tiled_module._kept_bytes(kept) == 2048 + 3 * 4 + 4 + 240
+    emptied = []
+    monkeypatch.setattr(torch._C, "_host_emptyCache", lambda: emptied.append(True), raising=False)
+    tiled_module._release_kept(kept)
+    assert emptied == [True] and kept["superset"] == {} and kept["mirrors"] == {}
+    assert kept["pinned_bytes"] == 0 and kept["complete"] is False
+    tiled_module._release_kept(dict(reference=torch.zeros(1), superset={0: (torch.zeros(2),)}, complete=True))
+    tiled_module._release_kept(None)
+    assert emptied == [True]  # nothing pinned: the cache stays
+
+
 def test_host_room_is_the_memory_cgroups_where_they_limit_it(tmp_path):
     """``_cgroup_room``: a batch job's memory cgroup (v2: the job's limit one level up from the step's, v1: the
     memory controller's) leaves the limit less the usage less the inactive file cache; no limit, no room."""
