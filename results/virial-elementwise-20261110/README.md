@@ -29,10 +29,17 @@ against 0.029; forces 2–3e-6.
 29,160, under the 1 % bar. The 10³ wall-time ratios are host-dominated (17.5 ms per call against 5.8 ms of kernels)
 and differ between orders; at 18³ the gain is under 1 %.
 
-**RTX 5060 Ti: passes the A/B** (bound 3.5 %, 1 % in both orders). Its own gate has not run: the queued local gate
-was lost when the PC crashed (17:38), and local runs are on hold. The A100 gate passed with the switch on
-(forces 1.000 / 0.934 / 0.970 of ASE float32's error, energies under the 0.01 eV floor), and the job's strain and
-layering tests passed (48). Stays off everywhere until the 5060 Ti gate passes.
+**RTX 5060 Ti: adopted** (`VIRIAL_ELEMENTWISE_GPUS`). Bound 3.5 %, over 1 % in both orders. Its gate passes with the
+switch on (local, after the PC crash cleared; [local-5060ti/gate-summary.txt](local-5060ti/gate-summary.txt)):
+
+| Ratio to ASE float32 | SrTiO3 3×3×3 | NaCl | NbCl5 |
+| --- | ---: | ---: | ---: |
+| Forces | 0.795 | 0.796 | 0.970 |
+| Stress | 0.647 | 0.685 | 0.619 |
+| Energy | 2.03 | 1.09 | 0.96 |
+
+Energies stay under the 0.01 eV floor. The A100 gate passed too (forces 1.000 / 0.934 / 0.970), and the job's strain
+and layering tests passed (48). H200 and Ada not measured.
 
 Run folder: [ab-alex-4976350](ab-alex-4976350/) (`tools/modal/virial_ab_job.sh`, source 48cad68a).
 

@@ -70,9 +70,12 @@ STRAIN_SOURCE = {"mace.modules.utils:get_symmetric_displacement":
 # 145 of 5,171 ns per atom of kernel time for OMAT-0 medium, SrTiO3 18^3 on the RTX 5060 Ti (evaluate with stress,
 # tiled-speed kprof5). As products and sums the backward is one reduction over the edges. Stress calls only (NVE MD
 # has no strain leaf). Bound when the force field binds its strain path (``one_graph_choice``). None: on for
-# VIRIAL_ELEMENTWISE_GPUS; True / False: an A/B side's choice.
+# VIRIAL_ELEMENTWISE_GPUS; True / False: an A/B side's choice. results/virial-elementwise-20261110: RTX 5060 Ti
+# (SrTiO3 10x10x10 force call with stress, tools/virial_ab.py) b/a 0.9675 / 0.9648 (ab / ba), gate passes (forces
+# 0.795 / 0.796 / 0.970, stress 0.647 / 0.685 / 0.619); A100-SXM4-80GB off: the GEMM is 0.4 % of its kernel time
+# (Alex job 4976350); H200 and Ada not measured.
 VIRIAL_ELEMENTWISE = None
-VIRIAL_ELEMENTWISE_GPUS = ()
+VIRIAL_ELEMENTWISE_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
 
 
 def virial_elementwise_default(device) -> bool:
