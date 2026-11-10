@@ -1,0 +1,53 @@
+set fastmace.model.tiled.TILE_PREFETCH_DEVICE = True
+set fastmace.model.tiled.TILE_VIRIAL = True
+set fastmace.model.tiled.TILE_GRAPH_CACHE = 0.25
+set fastmace.model.tiled.TILE_FILTER32 = True
+set fastmace.model.tiled.TILE_EPILOGUE = True
+set fastmace.model.tiled.TILE_PINNED_SUPERSET = True
+set fastmace.model.tiled.TILE_GRAPH_CACHE_WAVE = True
+set fastmace.model.tiled.TILE_HOST_WORKER = True
+set fastmace.model.tiled.TILE_COPY_STREAM = True
+set fastmace.model.tiled.TILE_COPY_STREAM = False
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/homes/zwingel/fm-tiled-speed/src-4a1ade7e/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-tiled-speed/src-4a1ade7e/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fm-tiled-speed/src-4a1ade7e/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/homes/zwingel/fm-tiled-speed/src-4a1ade7e/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+{"atoms": 16875000, "phase": "done", "error": null, "calls": [{"seconds": 198.41346020810306, "allocated": 1629273088, "reserved": 2801795072, "peak_above_before": 1335289856, "host_rss": 22160748544, "host_peak": 22160748544, "tiles": 2546, "grid": [15, 13, 13], "edge_cap": 4611686018427387904, "max_receivers": 8192, "max_halo": 5775, "max_edges": 607936, "list_reused": false, "list_rebuilds": 1, "list_reuse": "on", "receivers": 8192, "edges": 1248750000, "mode": "eager", "mode_reason": "compiled force field: the first call measures its memory", "neighbours": "tiles", "species": "index", "search_s": 28.654268831945956, "lanes": "off: eager tiles", "wavefront": {"on": true, "pool_rows": 3552518, "pool_fraction": 0.21051958518518518, "boundary_skin": 6.3}, "copy_stream": false, "host_worker": true, "loop_base": 2150068736, "peak_before_tiles": 2378776576, "tiles_s": 169.12398317595944, "graph_cache": {"tiles": 0, "bytes": 0, "budget": 0}, "tiles_peak": 2692083200, "global_bytes": 8863286616, "list_cache_bytes": 0, "list_kept_bytes": 5272662140, "list_cache_hits": 5092, "list_cache": "on", "host_bytes": 8863286616, "state_dtype": "float32", "state_dtype_reason": "the call's dtype: fits", "allocated_before": 1356793344, "total_peak": 2692083200}, {"seconds": 174.9814165229909, "allocated": 1788168704, "reserved": 3841982464, "peak_above_before": 1788810752, "host_rss": 29441470464, "host_peak": 29513891840, "tiles": 1952, "grid": [12, 10, 10], "edge_cap": 4611686018427387904, "max_receivers": 16384, "max_halo": 8973, "max_edges": 1215440, "list_reused": false, "list_rebuilds": 2, "list_reuse": "on", "receivers": 16384, "edges": 1248750000, "mode": "compiled", "mode_reason": "16.80 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)", "neighbours": "tiles", "species": "index", "search_s": 30.885118540842086, "lanes": "off: no memory measurement", "wavefront": {"on": true, "pool_rows": 4500534, "pool_fraction": 0.2666983111111111, "boundary_skin": 6.3}, "slots": {"1": [2611, 4662, 182528], "6": [16089, 9093, 1095168], "7": [16385, 9871, 1277696]}, "slot_needs": {"1": [2372, 4238, 174784], "6": [14625, 8266, 1082250], "7": [16384, 8973, 1215440]}, "slot_changes": 3, "copy_stream": false, "host_worker": true, "loop_base": 2275940352, "peak_before_tiles": 2915156992, "tiles_s": 143.32315499405377, "graph_cache": {"tiles": 0, "bytes": 0, "budget": 0}, "tiles_peak": 3215582720, "global_bytes": 10919120408, "list_cache_bytes": 0, "list_kept_bytes": 5264909560, "list_cache_hits": 3904, "list_cache": "on", "host_bytes": 10919120408, "state_dtype": "float32", "state_dtype_reason": "the call's dtype: fits", "allocated_before": 1426771968, "total_peak": 3215582720}], "tiled": {"energy_eV": -134823637.114411, "energy_per_atom_eV": -7.98954886603917, "max_abs_force": 0.0006880280561745167, "stress": [[-0.028883090242743492, -2.950158867198738e-11, -2.707169037552415e-11], [-2.950158867198738e-11, -0.02888309396803379, -4.2753602741418
+host_memory_stats {"active_bytes.allocated": 522247516637, "active_bytes.current": 5944469696, "active_bytes.freed": 516303046941, "active_bytes.peak": 10663417645, "allocated_bytes.allocated": 10663417645, "allocated_bytes.current": 10663417645, "allocated_bytes.freed": 0, "allocated_bytes.peak": 10663417645, "num_host_alloc": 13476, "num_host_free": 0}
+exit 0

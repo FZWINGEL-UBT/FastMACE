@@ -63,6 +63,50 @@ not one by one on these GPUs).
 - The Ada capacity record with the switches on: 179,685,000 atoms still fit; compiled call 1,676 s, 9.33 µs/atom
   (was 1,773 s, 9.87), GPU peak 18.7 GiB, host peak 136.1 GB (was 129.0), valid (`murphy/murphy-cap-4a1ade7e-330/`).
 
+## Review of 673880c3: gates per family and host memory
+
+**Gates.** `TILE_VIRIAL` and `TILE_EPILOGUE` round, and their gates were the 5060 Ti's. Decision 66 wants the 3×
+float32 force/stress gate on each family that adopts them: `tools/force_stress_gate.py --engine fastmace --model
+omat0-medium --tiled-receivers 48 --tiled-mode compiled`, SrTiO3 3×3×3, NaCl, NbCl5, with the nine switches all off
+and all on (`--production-constant`), source `4a1ade7e`. Every check passes on both GPUs and both sides.
+
+| Ratio to ASE float32 (energy / forces / stress) | Ada off | Ada on | A100-SXM4 off | A100-SXM4 on |
+| --- | --- | --- | --- | --- |
+| SrTiO3 3×3×3 | 4.13 / 0.94 / 0.43 | 4.29 / 0.81 / 0.39 | 7.52 / 1.08 / 0.77 | 8.86 / 0.98 / 0.63 |
+| NaCl | 1.28 / 0.90 / 1.06 | 1.24 / 1.01 / 1.06 | 2.10 / 0.91 / 1.13 | 2.07 / 0.87 / 1.11 |
+| NbCl5 | 1.36 / 0.95 / 1.31 | 1.31 / 0.98 / 1.23 | 8.35 / 1.02 / 1.43 | 8.16 / 1.01 / 1.62 |
+
+The energy ratios above 3 pass by the 0.01 meV/atom floor (largest error 2.9e-3 meV/atom) and are as high with the
+switches off. Ada: murphy, run.sh's idle check (`jobs/ws_gate_probe.sh`); A100: Alex 4977013 (`jobs/alex_gate.sh`).
+
+**Host memory.** With the switches on, the Ada capacity call's host peak rose from 129.0 to 136.1 GB. The probe
+(`jobs/ws_gate_probe.sh`; `jobs/with_constants.py` sets the constants and prints PyTorch's pinned-host statistics at
+exit): the capacity settings at SrTiO3 150³ (16,875,000 atoms, 5.3 GB of kept lists), two calls, each host-side
+switch off alone.
+
+| 16,875,000 atoms (Ada) | Host peak, eager call | Host peak, compiled call | Pinned allocator at exit |
+| --- | ---: | ---: | ---: |
+| All on (`4a1ade7e`) | 22.14 GB | 29.57 GB | 10.66 GB |
+| `TILE_PINNED_SUPERSET` off | 20.12 GB | 24.02 GB | 0.39 GB |
+| `TILE_HOST_WORKER` off | 21.98 GB | 29.28 GB | 10.57 GB |
+| `TILE_COPY_STREAM` off | 22.16 GB | 29.51 GB | 10.66 GB |
+| All off | 19.93 GB | 23.51 GB | 0.26 GB |
+| **All on, the fix (`3899b8b0`)** | 22.05 GB | **25.21 GB** | 4.65 GB |
+
+The cause is `TILE_PINNED_SUPERSET`. PyTorch's pinned allocator rounds every block up to a power of two and keeps
+freed blocks resident (none was freed: 13,452 host allocations, 0 frees). The compiled call rebuilds the kept lists
+for its larger receiver cap, so the first call's 4 GiB of pinned lists stayed beside the new ones. The same applied
+where the lists are dropped at the host floor or by `_auto_store`, which counted the dropped bytes as returned. That
+is the A100 397.5M record's path (the lists dropped in the eager call, the peak at 229.1 of 231.5 GB). The fix:
+- the cap counts the allocator's blocks (`_pinned_block`);
+- dropped or replaced lists empty the pinned cache (`_release_kept`);
+- `_auto_store` counts what dropping returns (`_kept_bytes`);
+- the call reports `list_kept_pinned_bytes`.
+
+With the fix, the compiled call peaks at 25.21 GB, 1.2 GB above the switch off (the eager call: 1.9 GB, the 4 GiB
+of pinned lists rounded up to blocks against their pageable form). CPU suite on `4c9be2bb` (the fix and its test,
+murphy): 5,563 passed, 203 skipped.
+
 ## Records
 
 - `ab/`: the four A/B records of `TILE_COPY_STREAM` (5060 Ti).
@@ -71,5 +115,7 @@ not one by one on these GPUs).
   `murphy-chain.log`.
 - `alex/`: the A100 job's `run.log`, A/B logs and records, `whole.log`, the Slurm output.
 - `profiles/`: `job35/gputest.log`, `job36/wprof-58.json` and `wprof.log`, the jobs' logs.
-- `jobs/`: `job35.sh`, `job36.sh` (launched by the `launch.sh` of tiled-speed-20261108 as system units behind the
+- `gate/`: the four gates' `metadata.json` (murphy off and on with their idle checks, Alex 4977013 with its log).
+- `memprobe/`: the host-memory probe's records (`run.log` with the pinned statistics, idle check, record).
+- `jobs/`: `ws_gate_probe.sh`, `ws_fix_chain.sh`, `with_constants.py`, `alex_gate.sh`, `alex_cap3.sh`; `job35.sh`, `job36.sh` (launched by the `launch.sh` of tiled-speed-20261108 as system units behind the
   local GPU reservation).
