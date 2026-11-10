@@ -2,7 +2,8 @@
 ``fastmace.neighbors.skin.EDGE_INDEX_INT32`` off or on and save the trajectory's end state, then compare two saves.
 
 - ``run OUT --side off|on``: SrTiO3 at REPEAT, OMAT-0 medium float32, 20 Langevin (NVT) steps and 20 LangevinBAOAB
-  (NPT, full cell) steps from the same thermalised start; saves positions, forces, energy, stress and cell after each,
+  (NPT, full cell) steps from the same thermalised start, and two one-off evaluations (energy, forces, stress) at the
+  start; saves positions, forces, energy, stress and cell after each,
   plus the plan text and the steady peak reserved.
 - ``run ... --tag 2``: the same side again (``edge32-off2.pt``), the run-to-run control: a plan with atomic
   scatters is not bitwise between processes, so off/on is judged against off/off.
@@ -42,6 +43,15 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "") -> None:
     thermalize(start, 300.0, 20261110)
     model = fm.load("omat0-medium")
     saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), gpu=torch.cuda.get_device_name())
+    # One-off evaluations at the start positions, twice in this process: no trajectory in between, so off/on and
+    # off/off2 compare the force field's own reproducibility (the MD end states also carry the trajectories' drift).
+    single = fm.ForceField(model, start.copy(), precision="float32")
+    for k in range(2):
+        energy, forces, stress = single.evaluate(start, stress=True)
+        saved[f"single{k}.energy"] = torch.tensor([energy], dtype=torch.float64)
+        saved[f"single{k}.forces"] = torch.from_numpy(forces)
+        saved[f"single{k}.stress"] = torch.from_numpy(stress)
+    del single
     for label, integrator in (
             ("nvt", fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.002)),
             ("npt", fm.integrators.LangevinBAOAB(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.002,
