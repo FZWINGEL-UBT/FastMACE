@@ -127,6 +127,30 @@ On `1522aef2` (the two-size probe), all four limits hold, each with the layer ru
 Most of the 5060 Ti gain comes from the earlier fixes on this line (`SORT_KEYS_ONLY`, the shape carrier) together
 with these rungs. No separate measurement was made for each.
 
+## Next limiter: the backward GEMM gradients (bound only, 10 November 2026)
+
+The conductor's follow-up was to stream or chunk the backward's 3×TF32 GEMM gradients, the four blocks of linear_1's
+input gradient (20.5 kB/atom), after a bound. `tools/bench/pool_bound.py` replays the graph pool's allocation trace
+from the SrTiO3 36³ snapshot (r3 of the memory profile) and reports the live peak with selected allocations scaled
+down:
+
+| Graph pool, SrTiO3 36³ | Live peak | kB/atom |
+|---|---:|---:|
+| As profiled (no layer region) | 9.99 GiB | 46.0 |
+| The layer region's saved `[N, 2048]` dropped (the plan at the limit) | 8.45 GiB | 38.9 |
+| … and the GEMM blocks at 1/8 | 8.45 GiB | 38.9 |
+| … and the outer-sum gradient `[3N, 1024]` at 1/8 | 8.17 GiB | 37.6 |
+| … and the species GEMM outputs of the product backward at 1/8 | 7.43 GiB | 34.2 |
+
+With the layer rung on, the peak is in the product backward: the outer-sum gradient (2.67 GiB) and four species GEMM
+outputs (2.67 GiB together). The GEMM blocks are no longer live there, so chunking them alone gains nothing at the
+limit. Chunking all three backward sites gains 1.0 GiB live (4.4 kB/atom). REJECTED at the bound.
+
+What is left at the limit is spread out. The neighbour list holds 1.6–2.0 GiB, of which `edge_index` in int64 is
+0.37 GiB (0.8 kB/atom to gain with int32). The rest are single tensors of a few kB/atom. The one large item is
+placement loss: the graph pool reserves 12.98 GiB for a 9.99 GiB live peak (13.8 kB/atom, as the memory-slack study
+found). The build's eager pass loses 3.41 GiB more in the default pool, but releases it before the capture.
+
 ## Checks
 
 - **Force/stress gate** (`tools/force_stress_gate.py`, 3× float32 limit, decision 66). It ran on the Ada on
