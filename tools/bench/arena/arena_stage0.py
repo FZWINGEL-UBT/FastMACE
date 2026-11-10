@@ -219,6 +219,14 @@ def md(out: Path, structure: str, repeat: str, tag: str, warmup: int, no_split: 
     shim = Shim(out / "arena_shim.so")
     pool = torch.cuda.MemPool(shim.allocator.allocator(), no_split=no_split)
     torch.cuda.graph_pool_handle = lambda: pool.id  # the engine's graph pool on the shim
+    # The shim's segments are never expandable; the engine's allocator check must skip the arena pool's segments
+    # (an engine built while the pool holds segments failed it on the Ada at 36^3; stage 1 exempts the pool there).
+    from fastmace.engine import constraints
+
+    check = constraints.check_allocator
+    constraints.check_allocator = lambda config, segments, *a, **k: check(
+        config, None if segments is None else [s for s in segments
+                                               if tuple(s.get("segment_pool_id") or ()) != tuple(pool.id)], *a, **k)
     name, cell = scan.base_cell(structure)
     atoms = cell.repeat(tuple(int(n) for n in repeat.lower().split("x")))
     atoms.set_pbc(True)
