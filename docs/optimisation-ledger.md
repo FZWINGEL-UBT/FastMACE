@@ -708,6 +708,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-graph-cache-wave](#tiled-graph-cache-wave) | The graph cache under the wavefront (search pass to sweep 3) | `tiled.TILE_GRAPH_CACHE_WAVE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.824 / 0.817 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-host-worker](#tiled-host-worker) | Host-state writes applied on a worker thread | `tiled.TILE_HOST_WORKER` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-copy-stream](#tiled-copy-stream) | Host-state write copies on a side stream | `tiled.TILE_COPY_STREAM` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-10 | wave 0.962 / 0.964; host state 0.960 / 0.959 | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
+| [tiled-speed-gpus](#tiled-speed-gpus) | The tiled speed switches on the RTX 4000 Ada and every A100 | `tiled.TILED_SPEED_GPUS` | FM | DEFAULT | decision 66, 2026-11-10 | Ada device 0.868 / 0.868, wave 0.772 / 0.769; A100 device 0.792 / 0.789, wave 0.782 / 0.785 | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 | [tiled-lazy-keys](#tiled-lazy-keys) | Slot keys taken in sweep 1 from the prefetched graphs instead of a search pass | `TILE_LAZY_KEYS` (removed) | FM | REJECTED | 2026-11-09 | device 1.023 / 1.002 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
@@ -853,6 +854,16 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Measured: wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom); host state 0.960 / 0.959 (f34f35e8). Wavefront profile: wall 7.24 s, GPU busy 7.15 s (GPU-bound).
 - Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md).
 
+<a id="tiled-speed-gpus"></a>
+#### tiled-speed-gpus: the tiled speed switches on the Ada and the A100
+- Switch: `fastmace.model.tiled.TILED_SPEED_GPUS` (the GPUs where the tiled speed switches left at None are on)
+- Engine: FM
+- Date/round: 10 November 2026 (tiled speed)
+- What: the nine `TILED_SPEED_GPUS` switches (`TILE_PREFETCH_DEVICE`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE`, `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET`, `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`, `TILE_COPY_STREAM`) had been on only on the RTX 5060 Ti, where they were measured. The A100 capacity call cost 9.84 µs/atom at 397.5M atoms against 1.96 µs/atom for the A100's whole-system call.
+- Status: DEFAULT. The set measured as one A/B on each GPU, not switch by switch.
+- Measured: 975,560 SrTiO3 atoms, all nine off against all on, same process, both orders (24926149). RTX 4000 Ada (murphy): device state 0.868 / 0.868 (6.50 → 5.64 µs/atom), wavefront 0.772 / 0.769 (8.05 → 6.20). A100-SXM4-80GB (Alex 4976251): device state 0.792 / 0.789 (4.72 → 3.73), wavefront 0.782 / 0.785 (8.98 → 7.04). Every A100 model (GPUModels family).
+- Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md).
+
 <a id="tiled-lazy-keys"></a>
 #### tiled-lazy-keys: slot keys from the prefetched graphs
 - Switch: `TILE_LAZY_KEYS` (removed: 5657befc, reverted in a8a17897)
@@ -933,7 +944,7 @@ are not A/B comparisons.
 | 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled call gap (OMAT-0, RTX 5060 Ti) | `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_FILL_SKIP`, `TILE_PINNED_SUPERSET`; `TILE_PIECE_START` and keeping interaction 0's A rejected | Decision 66 | Device state 0.923 / 0.928 (all eight switches 0.729 / 0.731) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled wavefront (OMAT-0, RTX 5060 Ti) | `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`; `TILE_BLOCK_ROWS`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET` on under the wavefront; `TILE_LAZY_KEYS` rejected | Decision 66 | Wavefront 0.766 / 0.774 (10.10 → 7.74 µs/atom) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
-| 2026-11-10 | Tiled speed (OMAT-0, RTX 5060 Ti) | `TILE_COPY_STREAM` | Decision 66 | Wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom), host state 0.960 / 0.959 at 975,560 SrTiO3 atoms; [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
+| 2026-11-10 | Tiled speed (OMAT-0, RTX 5060 Ti, RTX 4000 Ada, A100) | `TILE_COPY_STREAM`; the tiled speed switches on the Ada and every A100 | Decision 66 | 5060 Ti wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom), host state 0.960 / 0.959; all switches on the Ada 0.868 / 0.868 (device), 0.772 / 0.769 (wavefront), A100 0.792 / 0.789, 0.782 / 0.785; 975,560 SrTiO3 atoms; [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 
 ## Closed directions
 

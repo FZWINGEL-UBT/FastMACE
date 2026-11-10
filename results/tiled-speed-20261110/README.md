@@ -35,9 +35,33 @@ call. CPU: the switch stays off without CUDA (`test_host_worker_is_bitwise_the_c
 Job 35 ran the GPU test and the wavefront's ab order; its unit was stopped by systemd at 09:48:59 (not by this
 session) during the ba order. Job 36 ran the rest.
 
+## The speed switches on the RTX 4000 Ada and the A100
+
+The nine `TILED_SPEED_GPUS` switches were on only on the RTX 5060 Ti, where they had been measured. The A100 capacity
+call cost 9.84 µs/atom at 397.5M atoms (`results/tiled-capacity-20261109`), against 1.96 µs/atom for the A100's
+whole-system call. All nine switches off (as they were there) against all on, same process, both orders, 975,560 atoms,
+source `24926149`:
+
+| GPU | Device state b/a (ab / ba) | µs/atom | Wavefront b/a (ab / ba) | µs/atom |
+| --- | --- | --- | --- | --- |
+| RTX 4000 Ada (murphy, `jobs/ws_ab.sh`) | **0.868 / 0.868** | 6.50 → 5.64 | **0.772 / 0.769** | 8.05 → 6.20 |
+| A100-SXM4-80GB (Alex 4976251, `jobs/alex_ab.sh`) | **0.792 / 0.789** | 4.72 → 3.73 | **0.782 / 0.785** | 8.98 → 7.04 |
+
+- **Pairs.** Ada 0.863–0.870 and 0.764–0.775; A100 0.778–0.808 and 0.769–0.810.
+- **Agreement.** Forces agree within 3.7e-6 eV/Å, stress within 5.5e-8 eV/Å³, energy within 1.5e-6 meV/atom.
+- **Lanes.** On the Ada the lanes were off: they need the `cudaMallocAsync` backend, which `run.sh` does not set.
+- **Whole system.** On the A100 the whole-system call (`fm.ForceField(...).evaluate`, SrTiO3 18³, 29,160 atoms) takes
+  1.96 µs/atom. With the switches on, the A100's tiled call is 1.90× that with the state on the device and 3.59× on
+  the wavefront.
+
+`TILED_SPEED_GPUS` now holds the RTX 5060 Ti, the RTX 4000 Ada and every A100 (decision 66; the switches as one set,
+not one by one on these GPUs).
+
 ## Records
 
-- `ab/`: the four A/B records.
+- `ab/`: the four A/B records of `TILE_COPY_STREAM` (5060 Ti).
+- `murphy/`: the Ada A/Bs (`murphy-ab-24926149-*`: run logs, idle checks, records) and `ws-ab-murphy.log`.
+- `alex/`: the A100 job's `run.log`, A/B logs and records, `whole.log`, the Slurm output.
 - `profiles/`: `job35/gputest.log`, `job36/wprof-58.json` and `wprof.log`, the jobs' logs.
 - `jobs/`: `job35.sh`, `job36.sh` (launched by the `launch.sh` of tiled-speed-20261108 as system units behind the
   local GPU reservation).

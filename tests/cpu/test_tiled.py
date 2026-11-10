@@ -1351,6 +1351,9 @@ def test_speed_switches_left_at_none_are_on_only_for_the_speed_gpus(monkeypatch)
     assert tiled_module.TILE_VIRIAL is None and tiled_module.TILE_PREFETCH_DEVICE is None
     assert tiled_module.TILE_EPILOGUE is None and tiled_module.TILE_FILTER32 is None
     assert tiled_module.TILE_GRAPH_CACHE is None and "NVIDIA GeForce RTX 5060 Ti" in tiled_module.TILED_SPEED_GPUS
+    for name in ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"):  # 10 Nov A/Bs
+        assert name in tiled_module.TILED_SPEED_GPUS
+    assert "NVIDIA H200" not in tiled_module.TILED_SPEED_GPUS  # not measured
     calc, atoms = calculator(), structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                            rewrites=only(*MH1_PACKAGE))

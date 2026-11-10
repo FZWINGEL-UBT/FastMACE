@@ -61,7 +61,10 @@ TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Genera
 # Tiled speed (results/tiled-speed-20261108). None: on for TILED_SPEED_GPUS (decision 66: each keeps more memory
 # alive or replaces a kernel, so it is on where same-process A/Bs at 975,560 SrTiO3 atoms measured it faster in both
 # orders); True / False (TILE_GRAPH_CACHE: a fraction) are the A/B sides' choice on every device.
-TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# 10 November 2026 (results/tiled-speed-20261110): all of them off against all on at 975,560 SrTiO3 atoms, both orders:
+# RTX 4000 Ada device state 0.868 / 0.868, wavefront 0.772 / 0.769; A100-SXM4-80GB 0.792 / 0.789 and 0.782 / 0.785
+# (every A100 model: GPUModels matches the family).
+TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 # TILE_PREFETCH_DEVICE (exact): TileConfig.prefetch also with the state on the device, where it builds the next tile's
 # graph on the side stream while the current tile runs (its rows are read in the body, as before). Without it a
 # device-state call built each graph after the previous body had drained the GPU (torch.unique and the edge counts
