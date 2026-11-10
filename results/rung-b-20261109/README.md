@@ -163,7 +163,8 @@ orders is shown:
 An arena that serves the capture's requests at planned offsets would recover about 80 % of the placement loss. That is
 about 11 kB of the 68 kB per atom reserved at the limit, roughly +15–20 % atoms. It needs a deterministic request
 sequence between a recording capture and the real one, and a pluggable allocator or memory pool that serves offsets
-in one buffer. Not built; proposed to the conductor.
+in one buffer. Stage 0 (`results/capture-arena-20261110`) found that a `MemPool` shim can place only whole
+segments (42–45 % of the loss); stopped there.
 
 **Cheap candidate: `edge_index` in int32.** The skin list keeps `edge_index` as int64 `[2, capacity]` (0.37 GiB at
 SrTiO3 36³), while its candidates are already int32. Storing it as int32 saves 0.8 kB/atom. Each consumer that
