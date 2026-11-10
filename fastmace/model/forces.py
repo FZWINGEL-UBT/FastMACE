@@ -25,6 +25,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, runtime_checkable
 
 from fastmace.errors import ModelElementError, Reason, SpeciesNotInSuperset
+from fastmace.model.forcefield import distinct_numbers
 
 if TYPE_CHECKING:
     import numpy as np
@@ -473,7 +474,7 @@ class MACEForceField:
         if unknown:
             raise ModelElementError(f"species {_symbols(unknown)} have no embedding in the model (it has "
                                     f"{_symbols(z_table)})", why="the model was not trained on them (SPEC §8.5)")
-        wanted = set(_numbers(species) if species is not None else (int(z) for z in atoms.numbers))
+        wanted = set(_numbers(species) if species is not None else distinct_numbers(atoms.numbers))
         self.species_columns = tuple(sorted(z_table.index(z) for z in wanted if z in z_table))
         self.superset = tuple(z_table[column] for column in self.species_columns)
         self.check_species(atoms.numbers)
@@ -832,7 +833,7 @@ class MACEForceField:
         numbers = np.asarray(numbers)
         if numbers.shape != (len(self.numbers),):
             raise ValueError(f"species of {len(self.numbers)} atoms expected, got shape {numbers.shape}")
-        outside = sorted({int(z) for z in numbers} - set(self.superset))
+        outside = sorted(set(distinct_numbers(numbers)) - set(self.superset))
         if outside:
             raise SpeciesNotInSuperset([Reason(
                 f"species {_symbols(outside)} are not in the ForceField's declared superset ({_symbols(self.superset)})"

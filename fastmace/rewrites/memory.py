@@ -152,6 +152,17 @@ def generic_recompute_conv_weights(dims, width):
     return -weights * width, 0
 
 
+def generic_recompute_conv_weights_beside_wprime(dims, width):
+    """``generic_recompute_conv_weights`` where ``generic_wprime_backward`` is on: the w' path stores no per-edge
+    weights either, so the rung saves nothing per edge, and its path (``tabled_recompute_convolution``, w' standing
+    aside) takes the message gradient dense: Inductor joins the four 3xTF32 gradient blocks into one
+    ``[N, messages]`` tensor beside them, ``messages`` floats per node more at the force backward's peak (OMAT-0
+    medium: 5,120, 20.5 kB per atom; SrTiO3 39^3 ran out of memory on it after the fallback took the rung,
+    results/memory-slack-20261109). Rule 12 and the fallback never take the rung there
+    (``planner.memory.RESCUE_NOT_BESIDE``)."""
+    return 0, max((block.messages for block in dims.interactions[1:]), default=0) * width
+
+
 def generic_wprime_backward(dims, width):
     """generic_wprime_backward with generic_fused_folded_forward: the folded forward builds the per-edge weights on
     chip and the w' backward builds them again from the tables, so no per-edge weights are stored, the same as
@@ -245,6 +256,13 @@ def generic_recompute_first_table_with_weights(dims, width):
     """``generic_recompute_first_table`` with ``generic_recompute_conv_weights``: no interaction keeps its table
     output (the chunked convolution evaluates it again)."""
     return -sum(_table_output(i) for i in dims.interactions) * width, 0
+
+
+def generic_recompute_first_layer(dims, width):
+    """The first interaction and product 0 under one checkpoint: product 0's input, the first interaction's divided
+    message (``target`` floats per node; OMAT-0 medium: 2,048, 8.2 kB per atom), is not kept for the backward
+    (measured at SrTiO3 32^3 on the RTX 4000 Ada: 1.32 GiB less reserved, 8.4 kB per atom; results/rung-b-20261109)."""
+    return 0, -(dims.interactions[0].target if dims.interactions else 0) * width
 
 
 def block_linear_resident(dims, width):

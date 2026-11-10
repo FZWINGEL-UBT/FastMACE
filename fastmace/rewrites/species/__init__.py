@@ -161,6 +161,31 @@ def tabulate(model):
     return names
 
 
+def _distinct_rows(attrs):
+    """``torch.unique(attrs, dim=0)`` (its rows, in its order), without sorting the atoms' rows when they are one-hot:
+    then the distinct rows are the unit rows of the columns present, and ascending order is descending column. At
+    149M atoms the sort took about 5 minutes per checked module and several copies of a 13 GB one-hot."""
+    import torch
+
+    # One-hot: no negative entry, each row's largest entry 1 and its sum 1. Checked in chunks of rows, so that no
+    # temporary is the size of attrs (a sum in int64 over all of it cast 13 GB to 106 GB at 149M atoms).
+    if attrs.dim() == 2 and attrs.numel():
+        total = torch.float64 if attrs.is_floating_point() else torch.int64
+        present = None
+        for chunk in attrs.split(1 << 20):
+            if not (bool(chunk.amin() >= 0) and bool((chunk.amax(dim=1) == 1).all())
+                    and bool((chunk.to(total).sum(dim=1) == 1).all())):
+                break
+            top = chunk.amax(dim=0)
+            present = top if present is None else torch.maximum(present, top)
+        else:
+            columns = present.nonzero().flatten().flip(0)
+            rows = torch.zeros((columns.numel(), attrs.shape[1]), dtype=attrs.dtype, device=attrs.device)
+            rows[torch.arange(columns.numel(), device=attrs.device), columns] = 1
+            return rows
+    return torch.unique(attrs, dim=0)
+
+
 def _probe_attrs(model, context, generator):
     """One-hot rows: the structure's (context) or random ones.
 
@@ -175,7 +200,7 @@ def _probe_attrs(model, context, generator):
         species = torch.randint(0, width, (_PROBE_ROWS,), generator=generator)
         attrs = torch.nn.functional.one_hot(species, width)
     elif attrs.shape[0] > _PROBE_ROWS:
-        attrs = torch.unique(attrs, dim=0)
+        attrs = _distinct_rows(attrs)
     rows = _one_hot_rows(model)
     return attrs.to(dtype=rows.dtype, device=rows.device)
 

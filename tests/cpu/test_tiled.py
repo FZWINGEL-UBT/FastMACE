@@ -1000,8 +1000,9 @@ def test_wavefront_band_cache_of_kept_lists_after_motion_is_a_fresh_search(monke
     calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
                            rewrites=only(*MH1_PACKAGE))
+    # state_dtype None: with no host room "auto" would store the state in float16 (not this test's subject)
     config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, wavefront="on",
-                  wavefront_group=2, boundary_skin=False)
+                  wavefront_group=2, boundary_skin=False, state_dtype=None)
     cached = TiledForceField(field, TileConfig(12, list_reuse=True, **config))
     starved = TiledForceField(field, TileConfig(12, list_reuse=True, **config))
     fresh = TiledForceField(field, TileConfig(12, list_reuse=False, **config))
@@ -1472,6 +1473,128 @@ def test_host_worker_is_bitwise_the_call_that_writes_on_the_calling_thread(wave,
         assert one[0] == two[0]
         assert np.array_equal(np.asarray(two[1]), np.asarray(one[1]))
         assert np.array_equal(np.asarray(two[2]), np.asarray(one[2]))
+
+
+@pytest.mark.parametrize("wave", [False, True], ids=["alias", "wavefront"])
+@pytest.mark.parametrize("store", ["bfloat16", "float16"])
+def test_state_dtype_stores_the_host_state_in_16_bits_and_rounds_only_it(store, wave):
+    """``TileConfig.state_dtype``: x, sc and their aliased adjoints on the host in 16 bits (half the bytes; the alias
+    window stays in the call's dtype), each value rounded once where it is written. The call stays within the
+    stored values' rounding of the call that keeps them in its own dtype."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, boundary_skin=False,
+                  wavefront="on" if wave else "off", wavefront_group=2)
+    results, sizes = {}, {}
+    for dtype in (None, store):
+        tiled = TiledForceField(field, TileConfig(12, state_dtype=dtype, **config))
+        tiled.evaluate(atoms, stress=True)
+        results[dtype] = tiled.evaluate(strained(atoms), stress=True)
+        state = tiled._g["state"]
+        assert {str(t.dtype) for t in state.tensors.values()} == {f"torch.{dtype}" if dtype else str(tiled.dtype)}
+        sizes[dtype] = sum(t.numel() * t.element_size() for t in state.tensors.values())
+        assert state._window is None or state._window.dtype == tiled.dtype
+    assert sizes[store] * (4 if str(tiled.dtype) == "torch.float64" else 2) == sizes[None]
+    (e0, f0, s0), (e1, f1, s1) = results[None], results[store]
+    f0, f1, s0, s1 = (np.asarray(v, dtype=np.float64) for v in (f0, f1, s0, s1))
+    bound = 2.0**-6 if store == "bfloat16" else 2.0**-9  # a few units of the stored format's rounding
+    assert f1.shape == f0.shape and np.abs(f1 - f0).max() <= bound * np.abs(f0).max()
+    assert np.abs(s1 - s0).max() <= bound * max(np.abs(s0).max(), 1e-12)
+    assert abs(e1 - e0) <= bound * abs(e0)
+    assert not np.array_equal(f1, f0)  # the stored values were rounded
+
+
+def test_wavefront_runs_on_the_force_fields_own_list():
+    """The wavefront with ``neighbours="global"`` (the force/stress gate's tiled production): its first call has no
+    tile list cache to drop lists from (an AttributeError before); the energy is bitwise the plain sweeps'."""
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = []
+    for wave in ("off", "on"):
+        tiled = TiledForceField(field, TileConfig(12, mode="padded", state="host", alias_state=True, wavefront=wave,
+                                                  wavefront_group=2, boundary_skin=False))
+        results.append(tiled.evaluate(atoms, stress=True))
+    (e0, f0, s0), (e1, f1, s1) = results
+    assert e1 == e0
+    assert np.allclose(np.asarray(f1), np.asarray(f0), rtol=0, atol=1e-10)
+    assert np.allclose(np.asarray(s1), np.asarray(s0), rtol=0, atol=1e-10)
+
+
+def test_state_dtype_auto_drops_the_kept_lists_before_it_rounds_the_state(monkeypatch):
+    """``TileConfig.state_dtype="auto"`` (the default): the call's dtype while the host state (the pool's rows and
+    a quarter for the alias window) fits above the floor; else, when that makes it fit, the kept lists go (bitwise
+    the same call, searched again); else float16."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    floor = 2**20
+    config = dict(mode="padded", neighbours="tiles", state="host", alias_state=True, boundary_skin=False,
+                  wavefront="on", wavefront_group=2, list_reuse_floor=floor)
+
+    def run(room, **extra):
+        monkeypatch.setattr(tiled_module, "_host_available", lambda: floor + int(room))
+        tiled = TiledForceField(field, TileConfig(12, **dict(config, **extra)))
+        return tiled, tiled.evaluate(atoms, stress=True)
+
+    tiled, plain = run(10**15)
+    assert TileConfig(5).state_dtype == "auto" and tiled.last["state_dtype"] == "float64"
+    assert tiled.last["state_dtype_reason"] == "the call's dtype: fits" and tiled._kept is not None
+    state = tiled._g["state"]
+    rows, width = state._pool_rows, sum(int(t.shape[1]) for t in state.tensors.values())
+    full, half = 1.25 * rows * width * 8, rows * width * 2 + 0.25 * rows * width * 8
+    lists = tiled.last["list_kept_bytes"]
+    assert lists > 0
+    tiled, dropped = run(full - lists / 2)
+    assert tiled.last["state_dtype"] == "float64" and tiled._kept is None
+    assert tiled.list_reuse_state.startswith("off: the host state")
+    assert dropped[0] == plain[0] and np.array_equal(np.asarray(dropped[1]), np.asarray(plain[1]))
+    tiled, rounded = run(half + 1, list_reuse=False)
+    assert tiled.last["state_dtype"] == "float16" and tiled.last["state_dtype_reason"].startswith("float16")
+    f0, f1 = np.asarray(plain[1]), np.asarray(rounded[1])
+    assert not np.array_equal(f1, f0) and np.abs(f1 - f0).max() <= 2.0**-9 * np.abs(f0).max()
+
+
+def test_host_room_is_the_memory_cgroups_where_they_limit_it(tmp_path):
+    """``_cgroup_room``: a batch job's memory cgroup (v2: the job's limit one level up from the step's, v1: the
+    memory controller's) leaves the limit less the usage less the inactive file cache; no limit, no room."""
+    from fastmace.model.tiled import _cgroup_room
+
+    root = tmp_path / "v2"
+    job, step = root / "slurm" / "job_1", root / "slurm" / "job_1" / "step_0"
+    step.mkdir(parents=True)
+    (root / "slurm" / "memory.max").write_text("max\n")
+    (root / "slurm" / "memory.current").write_text("5\n")
+    (job / "memory.max").write_text(f"{120 * 2**30}\n")
+    (job / "memory.current").write_text(f"{30 * 2**30}\n")
+    (job / "memory.stat").write_text(f"anon 1\ninactive_file {10 * 2**30}\n")
+    (step / "memory.max").write_text("max\n")
+    (step / "memory.current").write_text(f"{29 * 2**30}\n")
+    own = tmp_path / "cgroup-v2"
+    own.write_text("0::/slurm/job_1/step_0\n")
+    assert _cgroup_room(str(root), str(own)) == 100 * 2**30
+    own.write_text("0::/\n")
+    assert _cgroup_room(str(root), str(own)) is None
+    v1 = tmp_path / "v1" / "memory" / "job_2"
+    v1.mkdir(parents=True)
+    (v1 / "memory.limit_in_bytes").write_text("1000\n")
+    (v1 / "memory.usage_in_bytes").write_text("400\n")
+    (v1 / "memory.stat").write_text("total_inactive_file 100\n")
+    own.write_text("12:cpuset:/job_2\n11:memory:/job_2\n")
+    assert _cgroup_room(str(tmp_path / "v1"), str(own)) == 700
+    assert _cgroup_room(str(tmp_path), str(tmp_path / "missing")) is None
+
+
+def test_state_dtype_needs_the_aliased_host_state():
+    with pytest.raises(ValueError, match="state_dtype"):
+        TileConfig(5, state_dtype="float32")
+    TileConfig(5, state_dtype="auto")  # the default: ignored without the aliased host state
+    with pytest.raises(ValueError, match="alias_state"):
+        TileConfig(5, state="host", state_dtype="bfloat16")
+    TileConfig(5, state="host", alias_state=True, state_dtype="float16")
 
 
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):

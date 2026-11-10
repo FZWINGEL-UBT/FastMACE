@@ -93,6 +93,37 @@ def test_the_rescue_turns_on_one_record_per_rebuild_in_its_order(monkeypatch, st
                                   usable=lambda device: True) is None
 
 
+def test_the_rescue_skips_the_generic_rung_beside_generic_wprime(monkeypatch, stubbed):
+    """planner.memory.RESCUE_NOT_BESIDE: on a generic model (fold_cutoff off) with generic_wprime_backward on (the
+    shared ``wprime_backward`` field), generic_recompute_conv_weights saves nothing and keeps the message gradient
+    dense, so the rescue goes on to the next rung (SrTiO3 39^3 ran out of memory on that gradient,
+    results/memory-slack-20261109); without w' it takes the rung first, as before."""
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=()))
+    ff = types.SimpleNamespace(rewrites="auto")
+    generic_model = {"fold_cutoff": "off", "recompute_first_table": "off"}
+    fallback.memory_rescue(stub_plan(**generic_model), oom(), ff, None, planner=None, stage="build",
+                           usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_first_table": "on"}
+    fallback.memory_rescue(stub_plan(wprime_backward="off", **generic_model), oom(), ff, None, planner=None,
+                           stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_conv_weights": "on"}
+
+
+
+def test_the_rescue_takes_the_first_layer_after_the_first_table(monkeypatch, stubbed):
+    """results/rung-b-20261109: on a generic model the first table's rung comes first, then
+    generic_recompute_first_layer (about 1.09 times the step), which needs the table's rung."""
+    requires = {"generic_recompute_first_layer": ("generic_recompute_first_table",)}
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires.get(name, ())))
+    ff = types.SimpleNamespace(rewrites="auto")
+    generic_model = {"fold_cutoff": "off", "recompute_first_layer": "off"}
+    fallback.memory_rescue(stub_plan(recompute_first_table="off", **generic_model), oom(), ff, None, planner=None,
+                           stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_first_table": "on"}
+    fallback.memory_rescue(stub_plan(recompute_first_table="on", **generic_model), oom(), ff, None, planner=None,
+                           stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_first_layer": "on"}
+
 def test_the_rescue_turns_gate_epilogue_off_after_the_node_segments(monkeypatch, stubbed):
     """docs/validation/capacity/region-norm.md: gate_epilogue (decision 66's default) is the rung the rescue turns off, after
     recompute_node_segments and before recompute_node_region; the caller's explicit "on" is kept."""

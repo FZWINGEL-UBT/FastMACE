@@ -59,6 +59,7 @@ from typing import Any
 
 from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, PolarConfig, PrecisionConfig, RewriteConfig
 from fastmace.errors import ModelElementError, PlanRefused, Reason, SpeciesNotInSuperset
+from fastmace.model.forcefield import distinct_numbers
 from fastmace.rewrites import versions
 
 from . import fixed, rules
@@ -466,7 +467,7 @@ class MinimalPlanner:
 
         if precision not in ("float32", "float64"):
             raise ValueError(f"force precision must be 'float32' or 'float64', got {precision!r}")
-        structure = tuple(sorted({int(z) for z in atoms.numbers}))
+        structure = distinct_numbers(atoms.numbers)
         superset = structure if species is None else species_numbers(species)
         known = set(traits.atomic_numbers)
         if known:
@@ -1018,6 +1019,8 @@ class MinimalPlanner:
                     return False
                 if name in memory.RESCUE_FLOAT32_ONLY and dtype != "float32":
                     return False
+                if any(rung == name and other in enabled for rung, other in memory.RESCUE_NOT_BESIDE):
+                    return False  # it saves nothing beside that record and keeps more
                 record = registry[name]
                 return _family_applies(record, traits) and all(other in enabled for other in record.requires)
 
@@ -1191,7 +1194,7 @@ class MinimalPlanner:
 
     def _check_atoms(self, plan, atoms):
         # Within the superset, not equal to it: a superset species may be absent (rule 8; 3-T09).
-        structure = tuple(sorted({int(z) for z in atoms.numbers}))
+        structure = distinct_numbers(atoms.numbers)
         if plan.superset and not set(structure) <= set(plan.superset):
             raise SpeciesNotInSuperset.from_reasons([Reason(
                 f"the structure's species ({_symbols(structure)}) are not within the plan's superset "

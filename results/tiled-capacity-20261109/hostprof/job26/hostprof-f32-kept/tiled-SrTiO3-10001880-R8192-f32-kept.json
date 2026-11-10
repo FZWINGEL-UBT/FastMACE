@@ -1,0 +1,783 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  126,
+  126,
+  126
+ ],
+ "atoms": 10001880,
+ "receivers": 8192,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "f35b4a30",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2329624576,
+   "host_peak": 2329624576
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2330214400,
+   "host_peak": 2330214400
+  },
+  "build": {
+   "seconds": 16.732504109008005,
+   "allocated": 668878848,
+   "reserved": 1296039936,
+   "peak_above_before": 1252585984,
+   "host_rss": 4050161664,
+   "host_peak": 5696356352
+  },
+  "neighbours": {
+   "allocated": 908924416,
+   "reserved": 1296039936,
+   "peak_above_before": 240045568,
+   "host_rss": 4060954624,
+   "host_peak": 5696356352
+  }
+ },
+ "phase": "neighbours",
+ "call_rows": 8192,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=5.496454742719308e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.722651254672288e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.722651254672288e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=5.350295911491125e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=3.845525186384246e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.110640918170247e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (893 pieces, 9 pairs, certificate 0.34, cached)', 'interactions.1 (619 pieces, 9 pairs, certificate 0.36, cached)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.262527314552999e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "backward_chunk_edges": [
+  6144
+ ],
+ "ledgers": {
+  "build": [
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     5616,
+     1280,
+     6
+    ],
+    "count": 1,
+    "bytes": 172523520,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.gprime"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     10001880,
+     3
+    ],
+    "count": 1,
+    "bytes": 120022560,
+    "names": [
+     "field.data.positions",
+     "field.positions"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int64",
+    "shape": [
+     10001880
+    ],
+    "count": 1,
+    "bytes": 80015040,
+    "names": [
+     "field.atomic_numbers"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.int32",
+    "shape": [
+     10001880
+    ],
+    "count": 2,
+    "bytes": 80015040,
+    "names": [
+     "field._species_index",
+     "tiled._species",
+     "field._sender_groups"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.int64",
+    "shape": [
+     10001880
+    ],
+    "count": 1,
+    "bytes": 80015040,
+    "names": [
+     "field.neighbours.sender_groups"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     5832704
+    ],
+    "count": 1,
+    "bytes": 46661632,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "OrderedDict[weight]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     1,
+     5832704
+    ],
+    "count": 2,
+    "bytes": 46661632,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[weight]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "meta",
+    "dtype": "torch.float32",
+    "shape": [
+     10001880
+    ],
+    "count": 1,
+    "bytes": 40007520,
+    "names": [
+     "field.data.node_attrs",
+     "field.data.charges",
+     "field.data.density_coefficients"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     6,
+     66
+    ],
+    "count": 2,
+    "bytes": 25546752,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[pcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_buffers]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     6,
+     66
+    ],
+    "count": 2,
+    "bytes": 17791488,
+    "names": [
+     "field._streaming.0._modules.radial_table.pcoef",
+     "field._streaming.0._modules.radial_table.coef"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     6,
+     66
+    ],
+    "count": 1,
+    "bytes": 12773376,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[coef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     89,
+     86,
+     128
+    ],
+    "count": 3,
+    "bytes": 11756544,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[weight]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     1458176
+    ],
+    "count": 1,
+    "bytes": 11665408,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "OrderedDict[weight]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     1,
+     1458176
+    ],
+    "count": 2,
+    "bytes": 11665408,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[weight]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 10644480,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[dcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_buffers]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 10644480,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[dcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     6,
+     66
+    ],
+    "count": 1,
+    "bytes": 8895744,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[coef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 7413120,
+    "names": [
+     "field._streaming.0._modules.radial_table.dcoef"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 7413120,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[dcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     3,
+     16,
+     16,
+     16,
+     51
+    ],
+    "count": 1,
+    "bytes": 5013504,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "OrderedDict[U_matrix_3]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_buffers]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     585949
+    ],
+    "count": 1,
+    "bytes": 4687592,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[_W3j_flat]",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "module e3nn.o3._wigner"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     89,
+     51,
+     128
+    ],
+    "count": 1,
+    "bytes": 4647936,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "OrderedDict[weights_max]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     89,
+     23,
+     128
+    ],
+    "count": 2,
+    "bytes": 4192256,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "OrderedDict[weights_max]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     89,
+     28,
+     128
+    ],
+    "count": 3,
+    "bytes": 3827712,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[weight]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_parameters]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     8192,
+     89
+    ],
+    "count": 1,
+    "bytes": 2916352,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   }
+  ]
+ },
+ "edges_within_cutoff": 0
+}

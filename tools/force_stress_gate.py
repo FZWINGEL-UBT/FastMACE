@@ -130,6 +130,32 @@ def rewrite_overrides(items):
     return out
 
 
+def tiled_overrides(items):
+    """{field: value} of ``FIELD=VALUE`` items, each a TileConfig field other than ``receivers`` and ``mode``:
+    true/false, none, an integer or a string (``state=host alias_state=true state_dtype=float16 wavefront=on``)."""
+    import dataclasses
+
+    from fastmace.model.tiled import TileConfig
+
+    fields = {f.name for f in dataclasses.fields(TileConfig)} - {"receivers", "mode"}
+    out = {}
+    for item in items:
+        name, _, value = item.partition("=")
+        if name not in fields or not value:
+            raise ValueError(f"--tiled-config {item!r}: expected FIELD=VALUE with a TileConfig field")
+        lower = value.lower()
+        if lower in ("true", "false"):
+            out[name] = lower == "true"
+        elif lower == "none":
+            out[name] = None
+        else:
+            try:
+                out[name] = int(value)
+            except ValueError:
+                out[name] = value
+    return out
+
+
 def engine_overrides(items):
     """{field: value} of ``FIELD=VALUE`` items, each a boolean EngineConfig field (true/false), e.g.
     model_template_cache=false (2-T23: the OMOL-0 XL production crash with and without OPT-T06's cache)."""
@@ -451,6 +477,9 @@ def parse_args(argv=None):
                         "receivers per tile) on the eager evaluation plan, instead of the graph engine")
     p.add_argument("--tiled-mode", choices=("eager", "padded", "graphs", "compiled"), default="eager",
                    help="TileConfig.mode of --tiled-receivers; 'compiled' builds the compiled evaluation plan")
+    p.add_argument("--tiled-config", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="further TileConfig fields of --tiled-receivers, e.g. state=host alias_state=true "
+                        "state_dtype=float16 wavefront=on")
     p.add_argument("--reference-command", default=sys.executable,
                    help="Interpreter (with an optional launcher prefix) of the reference processes")
     p.add_argument("--production-command", default=sys.executable,
@@ -466,8 +495,11 @@ def parse_args(argv=None):
         p.error(str(exc))
     try:
         args.engine_config = engine_overrides(args.engine_config)
+        args.tiled_config = tiled_overrides(args.tiled_config)
     except ValueError as exc:
         p.error(str(exc))
+    if args.tiled_config and not args.tiled_receivers:
+        p.error("--tiled-config needs --tiled-receivers")
     if args.engine_config and (args.engine != "fastmace" or args.planner != "minimal"):
         p.error("--engine-config are EngineConfig fields of FastMACE's minimal planner (--engine fastmace)")
     if args.rewrites and (args.engine != "fastmace" or args.planner != "minimal"):
@@ -573,7 +605,8 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                       backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
                       production_constants=list(args.production_constant),
                       engine_config=args.engine_config, production_tf32=args.production_tf32,
-                      tiled_receivers=args.tiled_receivers, tiled_mode=args.tiled_mode)
+                      tiled_receivers=args.tiled_receivers, tiled_mode=args.tiled_mode,
+                      tiled_config=args.tiled_config)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # its structure's first hydrostatic configuration.
@@ -970,10 +1003,11 @@ def tiled_production_child(job, result):
             plan = dataclasses.replace(plan, engine=dataclasses.replace(plan.engine, compile_mode="none",
                                                                           dynamic_edges=False))
         field = planner.build_evaluation(plan, force_field, base.copy())
-        tiled = TiledForceField(field, TileConfig(int(job["tiled_receivers"]), mode=mode))
+        tiled = TiledForceField(field, TileConfig(int(job["tiled_receivers"]), mode=mode,
+                                                  **job.get("tiled_config", {})))
         result["setup_s"][structure] = time.perf_counter() - started
         result["plans"][structure] = dict(describe=plan.describe(full=True), tiled_receivers=job["tiled_receivers"],
-                                          tiled_mode=mode)
+                                          tiled_mode=mode, tiled_config=job.get("tiled_config", {}))
         result["force_fields"][structure] = dict(field.info())
         for key in entry["keys"]:
             energy, forces, stress = tiled.evaluate(configs[key], stress=True)

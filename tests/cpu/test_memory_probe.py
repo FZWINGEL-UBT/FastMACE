@@ -178,6 +178,83 @@ def test_the_probe_measures_each_stage_and_re_plans(rescue):
     assert "replica 17576 atoms measured" in line
 
 
+@pytest.mark.parametrize(("cheaper", "scale", "after"), [
+    (30.0, 0.5, True),  # 30 GiB overstated as the chosen stage was: 15 / 1.25 below the limit (18 GiB)
+    (30.0, 0.9, False),  # 27 / 1.25 is not
+    (None, 0.5, False),
+])
+def test_the_cheaper_stage_is_measured_after_the_chosen_one_where_its_scale_says_it_might_fit(cheaper, scale, after):
+    """memory_probe.cheaper_after: rule 12 overstated SrTiO3 32^3's default plan 2x (24.4 GiB against 12.0
+    measured, results/rung-b-20261109), beyond PROBE_SPREAD, so near-limit probing measured only the rung; the
+    chosen stage's measured scale now decides whether the cheaper stage is measured too."""
+    ladder = memory.MemoryLadder(20 * GIB, stage("recompute_conv_weights" if cheaper else "", 14 * GIB),
+                                 None if cheaper is None else stage("", cheaper * GIB))
+    assert memory_probe.cheaper_after(ladder, scale) is after
+    assert memory_probe.stages_to_probe(ladder, "near-limit") == ()  # neither near the limit nor a cheaper stage
+
+
+def test_the_probe_measures_the_cheaper_stage_after_the_chosen_one(rescue):
+    atoms, base, full, free = rescue
+    planner = tmp.minimal()
+    ladder = planner_plan(planner, free, base, atoms).memory_ladder
+    calls = []
+
+    def launch(stage):  # the replica measures a quarter of each stage's variable estimate
+        calls.append(stage.stage)
+        return {"replica_atoms": 17_576, "estimate": stage.fixed + 4 * GIB, "reserved": stage.fixed + GIB,
+                "allocated": stage.fixed + GIB, "seconds": 30.0}
+
+    outcome = memory_probe.probe(planner, ladder, (ladder.chosen,), launch, clock=tc.Clock(),
+                                 plan_with=lambda p: planner_plan(p, free, base, atoms))
+    assert calls == [ladder.chosen.stage, ""]
+    assert outcome.record.chosen == "" and outcome.record.changed_plan
+
+
+
+def test_two_replica_sizes_fit_the_offset():
+    """results/rung-b-20261109 (SrTiO3, generic_recompute_first_layer, RTX 4000 Ada): 16,875 atoms measured 1.79 GB
+    against 2.45 GB estimated (fixed 0.24 GB) and the cell of 233,280 atoms 16.07 GB against 30.77 GB; one replica's
+    ratio (0.70) overstated the cell by 40 %, the line through the two peaks finds its offset and slope."""
+    fixed = 243_007_904
+    small, cell = (2_451_263_266, 1_786_773_504), (30_769_884_501, 16_074_000_000)
+    offset = memory_probe.fitted_offset(fixed, small, cell)
+    assert 0.42e9 < offset < 0.44e9
+    scale = memory_probe.fitted_scale(fixed, offset, *small, cell[0])
+    assert fixed + (cell[0] - fixed) * scale == pytest.approx(cell[1], rel=1e-6)
+    assert memory_probe.fitted_scale(fixed, 0, *small, cell[0]) == pytest.approx(0.699, abs=1e-3)  # one size
+    # no rising line, or an offset outside (0, the small peak above fixed): the one-size correction stays
+    assert memory_probe.fitted_offset(fixed, small, (small[0] * 3, small[1])) == 0
+    assert memory_probe.fitted_offset(fixed, small, (small[0] * 3, small[1] * 4)) == 0  # steeper than the ratio
+    assert memory_probe.fitted_offset(fixed, small, small) == 0
+
+
+def test_the_larger_replica_measures_the_first_stage_once(rescue):
+    atoms, base, full, free = rescue
+    planner = tmp.minimal()
+    ladder = planner_plan(planner, free, base, atoms).memory_ladder
+    calls = []
+
+    def launch(stage):  # a 1 GiB reserve that does not grow, plus a quarter of the variable estimate
+        calls.append(("small", stage.stage))
+        return {"replica_atoms": 17_576, "estimate": stage.fixed + 4 * GIB, "reserved": stage.fixed + 2 * GIB,
+                "allocated": stage.fixed + GIB, "seconds": 30.0}
+
+    def launch_large(stage):
+        calls.append(("large", stage.stage))
+        return {"replica_atoms": 52_728, "estimate": stage.fixed + 12 * GIB, "reserved": stage.fixed + 4 * GIB,
+                "allocated": stage.fixed + 3 * GIB, "seconds": 60.0}
+
+    outcome = memory_probe.probe(planner, ladder, (ladder.chosen,), launch, clock=tc.Clock(),
+                                 plan_with=lambda p: planner_plan(p, free, base, atoms), launch_large=launch_large)
+    assert calls[:2] == [("small", ladder.chosen.stage), ("large", ladder.chosen.stage)]
+    assert [kind for kind, _ in calls].count("large") == 1
+    first = outcome.record.stages[0]
+    assert first.offset == GIB and (first.large_atoms, first.seconds) == (52_728, 90.0)
+    expected = first.estimate - ladder.chosen.fixed
+    assert first.scale == pytest.approx((GIB + 0.25 * expected) / expected)
+    assert all(stage.large_atoms == 0 for stage in outcome.record.stages[1:])
+    assert "offset 1.00 GiB" in memory_probe.report_line(outcome.record)
+
 def test_a_failed_child_keeps_the_rules_plan(rescue):
     atoms, base, full, free = rescue
     planner = tmp.minimal()
