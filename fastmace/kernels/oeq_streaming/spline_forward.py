@@ -737,7 +737,7 @@ class SplineForward:
                 attr.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, function))))
         self._locator = self._functions.pop() if self.shared_locator else None  # registers / local stay listed last
         self.id = content_id("SplineForward", self.source, _device_key(device))
-        _REGISTRY[self.id] = self
+        _REGISTRY.setdefault(self.id, self)  # never replace: see ``shared``
 
     def __call__(self, x, sh, senders, row_ptr, lengths, pairs, table, outs, order=None):
         from cuda.bindings import driver
@@ -750,16 +750,7 @@ class SplineForward:
         if not blocks:
             return
         p = ctypes.c_void_p
-        ordered = ()
-        if self.block_order:  # BLOCK_ORDER: the receivers' order, a permutation of [0, N)
-            order = self.order if order is None else order
-            if order is None or order.numel() != nodes:
-                order = self._identity.get(nodes)
-                if order is None:
-                    order = self._identity[nodes] = torch.arange(nodes, dtype=torch.int32, device=x.device)
-            if order.dtype != torch.int32 or order.device != x.device:
-                raise ValueError("BLOCK_ORDER: the order must be int32 on the kernel's device")
-            ordered = (order.data_ptr(),)
+        ordered = (self.launch_order(nodes, x.device, order).data_ptr(),) if self.block_order else ()
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), senders.data_ptr(), row_ptr.data_ptr(),
                   lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *ordered,
                   *[o.data_ptr() for o in outs])
@@ -767,6 +758,22 @@ class SplineForward:
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         for function in self._functions:  # PARTS: each part writes its own output slots
             _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.threads, 1, 1, 0, stream, (values, types), 0))
+
+    def launch_order(self, nodes, device, order=None):
+        """BLOCK_ORDER: the receivers' order a call over ``nodes`` rows launches with: ``order`` when given, else the
+        bound ``order`` (the force field that calls binds its own right before every call and capture,
+        ``forces._bind_streaming_count``) when it has ``nodes`` rows, else the identity of ``nodes`` rows. The object
+        is shared by every equal build (``shared``), so a bound order of another row count is never read; an
+        identity is cached per row count, the same values for every force field, and lives as long as the registry
+        (the process). Any permutation of [0, N) gives the same message."""
+        order = self.order if order is None else order
+        if order is None or order.numel() != nodes:
+            order = self._identity.get(nodes)
+            if order is None:
+                order = self._identity[nodes] = torch.arange(nodes, dtype=torch.int32, device=device)
+        if order.dtype != torch.int32 or order.device != torch.device(device):
+            raise ValueError("BLOCK_ORDER: the order must be int32 on the kernel's device")
+        return order
 
     def locate(self, lengths, pairs):
         """SHARED_LOCATOR: ``spline_locator``'s records ``int32 [E, 4]`` of ``lengths`` ``[E]`` and ``pairs``."""
@@ -783,6 +790,18 @@ class SplineForward:
             _check(driver.cuLaunchKernel(self._locator, (edges + 255) // 256, 1, 1, 256, 1, 1, 0, stream,
                                          (values, types), 0))
         return locator
+
+
+def shared(kernel):
+    """The registered ``SplineForward`` with ``kernel``'s content id, which every equal build uses (``kernel`` itself
+    when it is the first). The custom ops launch ``_REGISTRY[id]``, and that object carries per-call state: the
+    BLOCK_ORDER ``order`` its force field binds before each call, and the identity orders it caches. Replacing the
+    entry with a later equal build (another force field in the process) made earlier force fields launch through the
+    newer object, so their captured graphs read its ``order``; once that object was replaced again and freed, a
+    replay read freed memory (CUDA illegal address in a five-engine A/B process, RTX 4000 Ada, 10 November 2026,
+    results/ada-5060-screen-20261110). The first object stays registered, and each force field binds its own order
+    on it, so a graph keeps the address of the order its force field holds."""
+    return _REGISTRY.setdefault(kernel.id, kernel)
 
 
 @torch.library.custom_op("fastmace::spline_message_blocks", mutates_args=())
@@ -841,7 +860,7 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
+__all__ = ["shared", "PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
            "PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
            "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
