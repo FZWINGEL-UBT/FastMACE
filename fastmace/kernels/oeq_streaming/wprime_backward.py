@@ -1782,13 +1782,15 @@ class WPrime(torch.nn.Module):
                                                                    shared_locator_supported, spline_w_default)
         if self.spline is not None and spline_w_default(device):
             from fastmace.kernels.oeq_streaming.spline_forward import encode_packed8, packed8_default
+            from fastmace.kernels.oeq_streaming.spline_forward import shared as registered_forward
 
             grid = self.spline["grid"]
             shared = shared_locator_default(device) and shared_locator_supported(grid, self.spline["r_lo"])
             packed = encode_packed8(self.spline_table) if packed8_default(device) and not shared else None
-            forward = SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                                    self.spline["path_scale"], shared_locator=shared,
-                                    packed8_bias=None if packed is None else packed[1], model_label=self.model_label)
+            forward = registered_forward(SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
+                                           self.spline["path_scale"], shared_locator=shared,
+                                           packed8_bias=None if packed is None else packed[1],
+                                           model_label=self.model_label))  # the registered equal build
             # PACKED8: the forward's own 8-byte table (the w' kernel keeps reading spline_table)
             self.spline_packed = packed[0] if packed is not None and forward.packed8 else None
             self.spline_block = (
