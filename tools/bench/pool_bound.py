@@ -85,5 +85,6 @@ for pool in pools:
             best = (val, i, dict(live))
     print(f"\npool {pool}: tagged at 1/8, layer output dropped: peak {best[0] / GiB:.2f} GiB at event {best[1]}")
     for e in sorted(best[2].values(), key=lambda e: -e["size"])[:12]:
-        keep = [f for f in where(e) if not f.startswith(("<", "__init__", "graphs.py", "module.py", "custom_ops", "eval_frame", "_compile"))]
+        skip = ("<", "__init__", "graphs.py", "module.py", "custom_ops", "eval_frame", "_compile")
+        keep = [f for f in where(e) if not f.startswith(skip)]
         print(f"  {e['size'] / GiB:6.2f} GiB tagged={is_tagged(e)!s:5} dropped={dropped(e)!s:5} {' < '.join(keep[:4])}")
