@@ -234,7 +234,7 @@ def variant(kernel, read, table=None, grid=None):
     schedule, blocks, old_grid, r_max, device, path_scale, shared_locator = kernel.init_args
     grid = (c2_grid() if grid is None else grid) if read == "bspline" else old_grid
     k = SplineForward(schedule, blocks, grid, r_max, device, path_scale, shared_locator,
-                      block_order=kernel.block_order)
+                      block_order=kernel.block_order, model_label=getattr(kernel, "model_label", None))
     k.order = kernel.order
     if not k.stage_edges:
         raise SystemExit("spline_read_lab: STAGE_EDGES is off (set spline_forward:STAGE_EDGES=True)")
@@ -251,7 +251,11 @@ def variant(kernel, read, table=None, grid=None):
     capability = torch.cuda.get_device_capability(device)
     functions, loads, sources = [], 0, []
     k.lab_registers = []
-    for i, source in enumerate(k.sources):
+    # ghoist / deferred keep the table read: transform the captured kernel's own sources, so PACKED8 and
+    # PREFETCH_AHEAD stay as the GPU's default has them (11 Nov 2026, A100 re-screen)
+    keep_read = read == "ghoist" or read in DEFERRED_KEEP
+    base_sources = kernel.sources[:len(k.sources)] if keep_read else k.sources
+    for i, source in enumerate(base_sources):
         if read == "ghoist":
             new, n = ghoist(source)
         elif read in DEFERRED_KEEP:
