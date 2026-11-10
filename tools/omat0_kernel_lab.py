@@ -66,6 +66,62 @@ def _after_constants(source, text):
     return source[:index] + text + source[index:]
 
 
+FP64_HELPERS = {  # (to double, to float): real conversions, or free reinterpretations (an upper bound, wrong values)
+    "cvt": ("__device__ __forceinline__ double fm_d(float f) { return (double)f; }\n"
+            "__device__ __forceinline__ float fm_f(double d) { return (float)d; }\n"),
+    "free": ("__device__ __forceinline__ double fm_d(float f) { return __hiloint2double(__float_as_int(f), 0); }\n"
+             "__device__ __forceinline__ float fm_f(double d) { return __int_as_float(__double2hiint(d)); }\n"),
+}
+
+
+def fp64_paths(source, helpers="cvt", min_terms=15, max_paths=None, sums="uv"):
+    """Round 2 idea 1 (A100): the FACTORED u / v sums of the paths with at least ``min_terms`` u terms (the two 21-term
+    paths) in double, so their multiply-adds run on the FP64 pipe beside the FP32 one: scaled = g * c (DMUL),
+    u += scaled e and v += scaled x (DFMA), u and v converted back where read. ``helpers`` "cvt": real conversions
+    (each output gradient per term, x and e per use, the sums at the end; more accurate than float32); "free": the
+    conversions replaced by register reinterpretations, the upper bound of a design that stages doubles.
+    ``max_paths``: only the first that many such paths; ``sums`` "u": only the u sums in double (fewer registers; the
+    v sums and scaled stay float32)."""
+    lines = source.split("\n")
+    declare = re.compile(r"acc_t ([uv]_\d+) = acc_t\(0\);" if sums == "uv" else r"acc_t (u_\d+) = acc_t\(0\);")
+    update = re.compile(r"\b(u_\d+) [+-]= scaled")
+    starts = [k for k, line in enumerate(lines) if "acc_t u_0 = acc_t(0);" in line] + [len(lines)]
+    chosen = []
+    for a, b in zip(starts, starts[1:]):
+        if sum(1 for line in lines[a:b] if update.search(line)) >= min_terms:
+            chosen.append((a, b))
+    if not chosen:
+        raise ValueError("fp64_paths: no path with enough terms")
+    chosen = chosen[:max_paths] if max_paths else chosen
+    for a, b in chosen:
+        names = set()
+        for k in range(a, b):
+            line = lines[k]
+            m = declare.search(line)
+            if m:
+                names.add(m.group(1))
+                lines[k] = line.replace(m.group(0), f"double {m.group(1)} = 0.0;")
+                continue
+            if sums == "u":
+                line = re.sub(r"\b(u_\d+) ([+-])= scaled \* edge_value;",
+                              r"\1 = fma(\2fm_d(scaled), fm_d(edge_value), \1);", line)
+                for name in names:
+                    line = line.replace(f"* {name};", f"* fm_f({name});")
+                lines[k] = line
+                continue
+            line = re.sub(r"const scalar_t scaled = output_gradient \* ([^;]+);",
+                          r"const double scaled = fm_d(output_gradient) * (double)(\1);", line)
+            line = line.replace("const scalar_t scaled = output_gradient;",
+                                "const double scaled = fm_d(output_gradient);")
+            line = re.sub(r"\b([uv]_\d+) ([+-])= scaled \* (edge_value|input_value);",
+                          r"\1 = fma(\2scaled, fm_d(\3), \1);", line)
+            for name in names:
+                line = line.replace(f"* {name};", f"* fm_f({name});")
+            lines[k] = line
+    source = "\n".join(lines).replace("fma(+scaled", "fma(scaled").replace("fma(+fm_d", "fma(fm_d")
+    return _after_constants(source, FP64_HELPERS[helpers]), len(chosen)
+
+
 # ---------------------------------------------------------------------------------------------------------- wprime
 def wprime_variants(species, kernel=None):
     """name -> (kind, source transform, extra NVRTC options); kind "exact", "rounding" (compared with relative
@@ -246,6 +302,16 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         return s
 
     horner_block = (r"scalar_t gv\[PADDED_TERMS\];.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
+
+    def quad_horner(s):
+        """F-quad-horner: value and slope of a quadratic (3 FMAs) in place of the cubic's dual Horner loop."""
+        pattern = (r"scalar_t radial_weight = gv\[TERMS - 1\];\s*scalar_t radial_dt = scalar_t\(0\);\s*#pragma unroll\s*"
+                   r"for \(int k = TERMS - 2; k >= 0; --k\) \{.*?radial_weight = radial_weight \* t \+ gv\[k\];\s*\}")
+        out, n = re.subn(pattern, "scalar_t radial_weight = fmaf(fmaf(gv[2], t, gv[1]), t, gv[0]);\n"
+                         "                scalar_t radial_dt = fmaf(gv[2] + gv[2], t, gv[1]);", s, flags=re.S)
+        if not n:  # one per path and edge channel
+            raise ValueError("F-quad-horner: the dual Horner loop was not found")
+        return out
 
     def skip_table(condition):
         """The value-table load and the dual Horner replaced by constants where ``condition`` holds (warp-uniform:
@@ -555,6 +621,10 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "B-mirror-order": ("falsifier", lambda s: s, (), mirror_order),
         "B-mirror-share": ("falsifier", skip_table("e & 1"), (), mirror_order),
         "F-no-table-horner": ("falsifier", skip_table("true"), ()),
+        # 9 November 2026 (step-limiters follow-up): a quadratic spline (twice the pieces) in place of the cubic. Its
+        # value and slope by 3 FMAs instead of the cubic's dual Horner; the same float4 loads (gv[3] unused). The
+        # timing bound of a quadratic table on the FMA-bound A100 w', before any certification. Values wrong.
+        "F-quad-horner": ("falsifier", quad_horner, ()),
         "F-half-table": ("falsifier", skip_table("e & 1"), ()),
         "M-mirror-perm": ("rounding", perm_source, (), mirror_perm),
         "M-mirror-hybrid": ("falsifier", hybrid_source, (), mirror_hybrid),
@@ -618,6 +688,31 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         "maxreg-none": ("exact", lambda s: s, ("--maxrregcount=255",)),
         "maxreg72": ("exact", lambda s: s, ("--maxrregcount=72",)),
         "ldcs-w": ("exact", lambda s: hints(s, g=False), ()),
+        # Round 2 idea 1 (9 Nov 2026): the two 21-term paths on the FP64 pipe (A100 only)
+        "fp64-paths": ("rounding", lambda s: fp64_paths(s, "cvt")[0], ()),
+        "F-fp64-free": ("falsifier", lambda s: fp64_paths(s, "free")[0], ()),
+        "fp64-paths-r96": ("rounding", lambda s: fp64_paths(s, "cvt")[0], ("--maxrregcount=96",)),
+        "F-fp64-free-r96": ("falsifier", lambda s: fp64_paths(s, "free")[0], ("--maxrregcount=96",)),
+        "F-fp64-free-r80": ("falsifier", lambda s: fp64_paths(s, "free")[0], ("--maxrregcount=80",)),
+        # the smallest offloads: one path, or only the u sums (fewer double registers)
+        "fp64-1path": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1)[0], ()),
+        "fp64-u": ("rounding", lambda s: fp64_paths(s, "cvt", sums="u")[0], ()),
+        "fp64-1path-u": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1, sums="u")[0], ()),
+        "F-fp64-free-1path-u": ("falsifier", lambda s: fp64_paths(s, "free", max_paths=1, sums="u")[0], ()),
+        "fp64-1path-u-r80": ("rounding", lambda s: fp64_paths(s, "cvt", max_paths=1, sums="u")[0],
+                             ("--maxrregcount=80",)),
+        # FP64 offloads with the register cap kept by shared-memory spilling: does the pipe pay once w' keeps 6
+        # blocks per SM? The cap is __launch_bounds__' minimum blocks (smem_spill), not --maxrregcount.
+        "base-s64": ("exact", lambda s: smem_spill(s, 64), ()),
+        "base-s72": ("exact", lambda s: smem_spill(s, 72), ()),
+        "base-s56": ("exact", lambda s: smem_spill(s, 56), ()),
+        "base-s48": ("exact", lambda s: smem_spill(s, 48), ()),
+        "fp64-1path-u-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1, sums="u")[0], 80), ()),
+        "fp64-1path-u-s64": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1, sums="u")[0], 64), ()),
+        "fp64-1path-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", max_paths=1)[0], 80), ()),
+        "fp64-u-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt", sums="u")[0], 80), ()),
+        "fp64-paths-s80": ("rounding", lambda s: smem_spill(fp64_paths(s, "cvt")[0], 80), ()),
+        "F-fp64-free-s80": ("falsifier", lambda s: smem_spill(fp64_paths(s, "free")[0], 80), ()),
         "evict-last-g": ("exact", lambda s: hints(s, w=False), ()),
         "hints": ("exact", hints, ()),
         "unordered": ("exact", unordered, ()),
@@ -701,6 +796,20 @@ def _stage_dout(source, rows, fill=True):
     s = _sub(s, "    const int64_t input_base = int64_t(sender) * INPUT_DIM;",
              pointers + "    const int64_t input_base = int64_t(sender) * INPUT_DIM;", 1)
     return re.sub(pattern, lambda m: f"fm_p{m.group(1)}[0 {m.group(3)}]", s)
+
+
+def smem_spill(source, cap, threads=None):
+    """``source`` with CUDA 13's ``enable_smem_spilling`` pragma under a ``cap`` of registers, set as
+    ``__launch_bounds__(threads, 65536 // (threads * cap))``: with ``__launch_bounds__`` present ptxas ignores
+    --maxrregcount (the first lab run, 68eac1ef, kept 96 / 128 registers under "caps" of 80 / 64)."""
+    from fastmace.kernels.oeq_streaming.runtime import NUM_THREADS
+
+    head = 'extern "C" __global__ void oeq_projected_backward_wprime('
+    body = source.index(") {", source.index(head)) + 3
+    source = source[:body] + '\n    asm volatile(".pragma \\"enable_smem_spilling\\";");' + source[body:]
+    threads = threads or NUM_THREADS
+    return source.replace(head, 'extern "C" __global__ void __launch_bounds__(%d, %d) oeq_projected_backward_wprime('
+                          % (threads, 65536 // (threads * cap)))
 
 
 def _smem_reads(source, keys):
@@ -2127,7 +2236,7 @@ def capture(args):
 
     def full():
         return all(name in captured and captured[name][1][edge_arg[name]].shape[0] >= args.min_edges
-                   for name in edge_arg)
+                   for name in edge_arg if name in args.kernels)  # asked for only
 
     originals = {fused_forward.FusedFoldedForward: fused_forward.FusedFoldedForward.__call__,
                  wprime_backward.WPrimeBackward: wprime_backward.WPrimeBackward.__call__}

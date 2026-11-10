@@ -331,12 +331,40 @@ def test_sort_by_length_torch_and_matscipy_builds_agree_on_bins(monkeypatch):
     assert torch.equal(ka, kb) and torch.equal(ba, bb)  # the same (key, bin) sequence; only ties may differ
 
 
+@pytest.mark.parametrize("sort", [False, True], ids=["unsorted", "receivers"])
+@pytest.mark.parametrize("groups", [False, True])
+@pytest.mark.parametrize("by_length", [False, True])
+def test_keys_only_sort_builds_the_same_list(sort, groups, by_length, monkeypatch):
+    """SORT_KEYS_ONLY: build_gpu sorts the keys alone and decodes the pairs from them; the candidates, their order
+    and their shifts are those of the key-value sort, element for element, then so is compact()'s edge list."""
+    from fastmace.neighbors import skin
+
+    monkeypatch.setattr(skin, "SORT_BY_LENGTH", by_length)
+    monkeypatch.setattr(skin, "BUILD_CHUNK", 97)  # several chunks, a ragged last one
+    atoms = nbcl5(rattle=0.05, seed=6)
+    group = atoms.numbers % 3 if groups else None
+    positions = torch.tensor(atoms.positions)
+    lists = []
+    for keys_only in (True, False):
+        monkeypatch.setattr(skin, "SORT_KEYS_ONLY", keys_only)
+        nl = make(atoms, sort=sort, groups=group)
+        nl.build_gpu(positions)
+        nl.compact(positions)
+        lists.append(nl)
+    new, old = lists
+    assert new.num_candidates == old.num_candidates > 0
+    for name in ("candidate_index", "candidate_unit_shifts", "edge_index", "unit_shifts", "shifts", "count"):
+        assert torch.equal(getattr(new, name), getattr(old, name)), name
+    assert candidate_set(new) == ase_pairs(atoms, CUTOFF + 0.3)
+
+
 def test_sort_by_length_is_off_by_default_and_needs_sort_receivers(monkeypatch):
     from fastmace.neighbors import skin
 
     atoms = nacl(rattle=0.05, seed=1)
     assert skin.SORT_BY_LENGTH is None and not skin.sort_by_length_default("cpu")
     assert "NVIDIA H200" in skin.SORT_BY_LENGTH_GPUS and "NVIDIA H200 NVL" in skin.SORT_BY_LENGTH_GPUS
+    assert "NVIDIA A100-SXM4-80GB" in skin.SORT_BY_LENGTH_GPUS and "NVIDIA A100 80GB PCIe" in skin.SORT_BY_LENGTH_GPUS
     assert "NVIDIA GeForce RTX 5060 Ti" not in skin.SORT_BY_LENGTH_GPUS
     assert not make(atoms, sort=True).sort_by_length
     monkeypatch.setattr(skin, "SORT_BY_LENGTH", True)

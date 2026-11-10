@@ -1,0 +1,15 @@
+2026-11-09T02:34:48Z Modal NVIDIA A100 80GB PCIe, 610.57.04; source 4cad5f108d73ca7269ff210eb457479d25916950
+2026-11-09T02:36:14Z end lab exit=0
+wprime ptxas base                         {'8.0': {'registers': 80, 'spill_store_bytes': 0}}
+wprime ptxas fp64-1path                   {'8.0': {'registers': 128, 'spill_store_bytes': 0}}
+wprime ptxas fp64-u                       {'8.0': {'registers': 100, 'spill_store_bytes': 0}}
+wprime ptxas fp64-1path-u                 {'8.0': {'registers': 96, 'spill_store_bytes': 0}}
+wprime ptxas F-fp64-free-1path-u          {'8.0': {'registers': 100, 'spill_store_bytes': 0}}
+wprime ptxas fp64-1path-u-r80             {'8.0': {'registers': 80, 'spill_store_bytes': 80}}
+wprime   base                2440.2 us  ratio 1.000  regs 80 local 0  
+wprime   fp64-1path          2629.6 us  ratio 1.078  regs 128 local 0  {'dsh': 'max|d|/max|a| = 2.18e-09', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   fp64-u              2837.5 us  ratio 1.163  regs 100 local 0  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   fp64-1path-u        2535.4 us  ratio 1.039  regs 96 local 0  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   F-fp64-free-1path-u    2668.5 us  ratio 1.094  regs 100 local 0  
+wprime   fp64-1path-u-r80    3031.0 us  ratio 1.242  regs 80 local 56  {'dsh': 'bitwise', 'dr': 'max|d|/max|a| = 1.37e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+2026-11-09T02:36:14Z done

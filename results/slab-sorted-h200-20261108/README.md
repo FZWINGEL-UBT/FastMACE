@@ -50,6 +50,30 @@ against the same build's 3.34e-6 (the w' atomics). Adopted: `BLOCK_ORDER_GPUS = 
 The order costs 89 µs per call if made eagerly; the force field makes it once per species set, so it is free per
 step. w' (1084 µs) is not table-bound (one slab 0.978).
 
-## Open
+## A100 (Alex pack 7, job 4965032, `a100/pack7/`)
 
-A100: both switches go in one Alex pack (singly and together, against the A100 defaults).
+Each switch on its own and both together, against the A100 defaults of 59c1034e. OMAT-0 medium, SrTiO3 10×10×10,
+`alex_ab_pack`, both build orders:
+
+| b | ab: a → b (ms) | b/a | ba: b/a |
+| --- | --- | --- | --- |
+| `SORT_BY_LENGTH` | 7.3593 → 7.3034 | 0.9924 | 0.9936 |
+| `BLOCK_ORDER` | 7.3734 → 7.3388 | 0.9953 | 0.9945 |
+| both | 7.3911 → 7.3323 | 0.9920 | 0.9904 |
+
+`BLOCK_ORDER` is bitwise and faster in both orders, so it is adopted under decision 66:
+`BLOCK_ORDER_GPUS = ("NVIDIA H200", "NVIDIA A100-SXM4-80GB")`.
+
+`SORT_BY_LENGTH` changes rounding, so it needed the A100 force/stress gate before adoption.
+
+**A100 gate** (`a100/gate-sorted/`, Alex job 4967026, 9 November). The run used `tools/force_stress_gate.py` with
+production running `SORT_BY_LENGTH` and `BLOCK_ORDER`, the H200 gate's structures and seed 20261015, source
+59c1034e. All three structures pass. Ratios are against the float32 yardstick, limit 3:
+
+| | SrTiO3 | NaCl | NbCl5 |
+| --- | --- | --- | --- |
+| forces | 0.92 | 0.93 | 0.96 |
+| stress | 0.64 | 1.02 | 1.15 |
+
+Energy is under its 0.01 eV floor. Adopted under decision 66: `SORT_BY_LENGTH_GPUS` now includes the A100 family.
+The A100 step with both switches on is 0.9920 / 0.9904 (7.39 → 7.33 ms).

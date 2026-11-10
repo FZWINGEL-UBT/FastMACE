@@ -388,6 +388,13 @@ def _run(module, probe, with_cutoff, cotangents, generator):
 
     reassociation = getattr(module, "first_reassociation", None)
     own = None if reassociation is None else reassociation.species_feats
+    # kernels.triton.compose_skip is inference only (frozen species table): with it, the probe's table carries no
+    # gradient and is not a leaf, as in production (forces need none); the outputs and the other leaves' gradients
+    # are compared as before. A rung checked after tf32x3_gemms (generic_recompute_first_table) otherwise fails its
+    # self-check and drops the plan to the terminal sequence (results/omat0-ada-capacity-20261108).
+    composed = getattr(reassociation, "compose_skip", None) is not None and probe["table"] is not None
+    if composed:
+        probe = dict(probe, table=probe["table"].detach())
     with torch.enable_grad():
         feats = probe["node_attrs"] @ probe["table"] if probe["table"] is not None else probe["node_feats"]
         cutoff = probe["cutoff"] if with_cutoff else None
@@ -403,7 +410,10 @@ def _run(module, probe, with_cutoff, cotangents, generator):
                                   for out in outputs)
             leaves = [probe["table"] if probe["table"] is not None else probe["node_feats"],
                       probe["edge_attrs"], probe["edge_feats"]] + ([probe["cutoff"]] if with_cutoff else [])
-            grads = torch.autograd.grad(outputs, leaves, cotangents[:len(outputs)], allow_unused=True)
+            wanted = [leaf for leaf in leaves if leaf.requires_grad]
+            found = dict(zip(map(id, wanted), torch.autograd.grad(outputs, wanted, cotangents[:len(outputs)],
+                                                                   allow_unused=True)))
+            grads = [found.get(id(leaf)) for leaf in leaves]
         finally:
             if reassociation is not None:
                 reassociation.bind(own)

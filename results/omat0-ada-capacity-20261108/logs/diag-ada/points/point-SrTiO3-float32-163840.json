@@ -1,0 +1,505 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-11-09T02:20:48.561383+00:00",
+  "host": "leto",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "d3d459efc5f2b4df5b46efae4add6edb6d01ef36",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "model": "omat0-medium",
+  "structure": "SrTiO3",
+  "precision": "float32",
+  "repeat": "32x32x32",
+  "natoms": 163840,
+  "volume_A3": 1951250.5999360022,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "error",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 20805451776,
+      "outside_allocator": 177274880
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 20805451776,
+    "cuda_total_bytes": 20982726656,
+    "windows": null
+  },
+  "rewrites": {},
+  "constants": [],
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "builtins.RuntimeError",
+    "message": "compose_skip has no gradient for the weights: inference only (frozen parameters)",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/rewrites/registry.py:689 apply: result = self.selfcheck(name, original, model, context)",
+      "fastmace/rewrites/registry.py:662 selfcheck: result = CheckResult.coerce(self._records[name].selfcheck(original, rewritten, context))",
+      "fastmace/rewrites/radial/__init__.py:1400 _generic_first_table_selfcheck: results.append(generic._run(interaction, probe, False, cotangents, generator))",
+      "fastmace/rewrites/generic/__init__.py:399 _run: outputs = [out for out in module(probe[\"node_attrs\"], feats, probe[\"edge_attrs\"], probe[\"edge_feats\"],",
+      "fastmace/rewrites/generic/modules.py:342 generic_interaction_forward: message, table_density = fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, edge_index,",
+      "fastmace/rewrites/generic/modules.py:182 fused_first_message: message = reassociation(node_feats, node_attrs, edge_attrs, None, edge_index, weight, rows=rows,",
+      "fastmace/rewrites/mh1/modules.py:265 forward: return self._composed(summed, node_attrs, x, weight, nodes, slots, width)",
+      "fastmace/rewrites/mh1/modules.py:309 _composed: raise RuntimeError(\"compose_skip has no gradient for the weights: inference only (frozen parameters)\")"
+    ],
+    "memory": {
+      "max_allocated": 468019200,
+      "max_reserved": 587202560,
+      "allocated": 313722880,
+      "reserved": 587202560,
+      "inactive_split_bytes": 0,
+      "active_bytes": 468019200,
+      "reserved_bytes": 587202560,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 20172111872,
+      "outside_allocator": 223412224
+    },
+    "causes": [],
+    "live": {
+      "largest": [
+        {
+          "bytes": 83886080,
+          "site": "fastmace/rewrites/mh1/modules.py:381 identity_species_feats",
+          "frames": [
+            "fastmace/rewrites/mh1/modules.py:381 identity_species_feats",
+            "fastmace/rewrites/mh1/__init__.py:377 species_table",
+            "fastmace/rewrites/generic/__init__.py:177 apply_reassociate",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare",
+            "fastmace/model/compile.py:295 compile_model"
+          ]
+        },
+        {
+          "bytes": 58327040,
+          "site": "fastmace/model/forces.py:480 __init__",
+          "frames": [
+            "fastmace/model/forces.py:480 __init__",
+            "fastmace/planner/fixed.py:1769 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare",
+            "fastmace/simulation.py:631 __init__",
+            "tools/bench/capacity_scan.py:415 run_point"
+          ]
+        },
+        {
+          "bytes": 23330816,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 23330816,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 12773376,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1283 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1341 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 12773376,
+          "site": "fastmace/rewrites/radial/__init__.py:181 power_basis",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:181 power_basis",
+            "fastmace/rewrites/radial/__init__.py:204 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1283 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1341 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply"
+          ]
+        },
+        {
+          "bytes": 10644480,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1283 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1341 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 8896000,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1283 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1341 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 8896000,
+          "site": "fastmace/rewrites/radial/__init__.py:181 power_basis",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:181 power_basis",
+            "fastmace/rewrites/radial/__init__.py:204 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1283 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1341 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply"
+          ]
+        },
+        {
+          "bytes": 8519680,
+          "site": "outside FastMACE",
+          "frames": []
+        },
+        {
+          "bytes": 8519680,
+          "site": "fastmace/rewrites/generic/modules.py:749 species_skip",
+          "frames": [
+            "fastmace/rewrites/generic/modules.py:749 species_skip",
+            "fastmace/rewrites/generic/__init__.py:131 apply_species_skip",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare",
+            "fastmace/model/compile.py:295 compile_model",
+            "fastmace/model/forces.py:555 __init__"
+          ]
+        },
+        {
+          "bytes": 7413248,
+          "site": "fastmace/rewrites/radial/__init__.py:200 __init__",
+          "frames": [
+            "fastmace/rewrites/radial/__init__.py:200 __init__",
+            "fastmace/rewrites/radial/__init__.py:244 _table_module",
+            "fastmace/rewrites/radial/__init__.py:1283 tabulate_generic",
+            "fastmace/rewrites/radial/__init__.py:1341 _apply_generic",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare"
+          ]
+        },
+        {
+          "bytes": 5832704,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 5832704,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 3918848,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 3918848,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 3918848,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/compile.py:290 compile_model",
+            "fastmace/model/forces.py:555 __init__",
+            "fastmace/planner/fixed.py:1769 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare"
+          ]
+        },
+        {
+          "bytes": 1275904,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 1275904,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 1275904,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/compile.py:290 compile_model",
+            "fastmace/model/forces.py:555 __init__",
+            "fastmace/planner/fixed.py:1769 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare"
+          ]
+        },
+        {
+          "bytes": 655360,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/templates.py:87 private",
+            "fastmace/model/templates.py:117 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 655360,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        },
+        {
+          "bytes": 332800,
+          "site": "fastmace/rewrites/generic/modules.py:461 __init__",
+          "frames": [
+            "fastmace/rewrites/generic/modules.py:461 __init__",
+            "fastmace/rewrites/generic/__init__.py:224 apply_chunked_conv_backward",
+            "fastmace/rewrites/registry.py:686 apply",
+            "fastmace/model/forces.py:527 prepare",
+            "fastmace/model/compile.py:295 compile_model",
+            "fastmace/model/forces.py:555 __init__"
+          ]
+        },
+        {
+          "bytes": 327680,
+          "site": "fastmace/model/compile.py:141 private_copy",
+          "frames": [
+            "fastmace/model/compile.py:141 private_copy",
+            "fastmace/model/compile.py:290 compile_model",
+            "fastmace/model/forces.py:555 __init__",
+            "fastmace/planner/fixed.py:1769 build",
+            "fastmace/planner/minimal.py:1222 build",
+            "fastmace/simulation.py:724 _build_and_prepare"
+          ]
+        },
+        {
+          "bytes": 327680,
+          "site": "fastmace/model/loading.py:709 load",
+          "frames": [
+            "fastmace/model/loading.py:709 load",
+            "fastmace/model/forcefield.py:170 load",
+            "fastmace/model/templates.py:114 execution_model",
+            "fastmace/model/forcefield.py:176 execution_model",
+            "fastmace/planner/minimal.py:1185 _execution_model",
+            "fastmace/planner/minimal.py:1219 build"
+          ]
+        }
+      ],
+      "by_site": [
+        [
+          "fastmace/rewrites/mh1/modules.py:381 identity_species_feats",
+          83886080
+        ],
+        [
+          "fastmace/model/forces.py:480 __init__",
+          58327040
+        ],
+        [
+          "fastmace/model/compile.py:141 private_copy",
+          42028544
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:200 __init__",
+          39772160
+        ],
+        [
+          "fastmace/model/loading.py:709 load",
+          36293632
+        ],
+        [
+          "fastmace/rewrites/radial/__init__.py:181 power_basis",
+          21669376
+        ],
+        [
+          "outside FastMACE",
+          8519680
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:749 species_skip",
+          8519680
+        ],
+        [
+          "fastmace/kernels/triton/compose_skip.py:112 composed",
+          2359296
+        ],
+        [
+          "fastmace/kernels/triton/compose_skip.py:113 composed",
+          2359296
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:612 __init__",
+          1990656
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:610 __init__",
+          1990656
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:90 <listcomp>",
+          1505280
+        ],
+        [
+          "fastmace/rewrites/linear/modules.py:121 __init__",
+          1503744
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:753 species_skip",
+          983040
+        ],
+        [
+          "fastmace/rewrites/species/modules.py:156 <listcomp>",
+          983040
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:461 __init__",
+          332800
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:462 __init__",
+          327680
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:133 fc_last_weight",
+          131072
+        ],
+        [
+          "fastmace/kernels/triton/tabled_outer_sum.py:390 tabled_outer_sum_forward",
+          110592
+        ],
+        [
+          "fastmace/rewrites/generic/__init__.py:368 draw",
+          48128
+        ],
+        [
+          "fastmace/model/compile.py:146 private_copy",
+          29696
+        ],
+        [
+          "fastmace/rewrites/species/modules.py:182 <listcomp>",
+          24576
+        ],
+        [
+          "fastmace/kernels/triton/tf32x3_gemm.py:126 tf32x3_mm",
+          6144
+        ],
+        [
+          "fastmace/rewrites/generic/modules.py:460 __init__",
+          5120
+        ]
+      ],
+      "live_bytes": 313722880,
+      "segments_bytes": 587202560
+    }
+  },
+  "times": {
+    "load_s": 4.7112093470059335
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

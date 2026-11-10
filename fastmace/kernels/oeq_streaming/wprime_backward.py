@@ -26,6 +26,7 @@ gradients are added atomically, as in the vendored backward.
 from __future__ import annotations
 
 import ctypes
+from types import MappingProxyType
 
 import torch
 
@@ -147,7 +148,16 @@ FOLD_ALPHA = None
 # 0.9884 / 0.9907;
 # gate as the default's (worst max-error ratio 1.049, SrTiO3 forces and stress).
 FOLD_ALPHA_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# GPUs where a model label keeps FOLD_ALPHA off (WPrime's model_label); none today. OMAT-0 small on the H200
+# (9 November 2026, results/h200-omat0-small-20261108, Benchmark_loup, ab / ba): off 0.9939 / 0.9948 (rescreen), on
+# top of MIN_BLOCKS 8 0.9884 / 0.9908 against 0.9923 / 0.9952 (combo2); but with off as its default, on again was
+# faster, 0.9936 / 0.9927 (defaults2): within the run-to-run spread, so small keeps FOLD_ALPHA on.
+FOLD_ALPHA_MODEL_OFF_GPUS = MappingProxyType({})
 MAX_REGISTERS = None
+# Lab (9 Nov 2026, Codex report v4): SMEM_SPILL compiles the kernel with __launch_bounds__(threads) and CUDA 13's
+# ".pragma enable_smem_spilling", so spills under a MAX_REGISTERS cap go to shared memory instead of local memory.
+# Off; for timing screens only.
+SMEM_SPILL = False
 MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> registers
 # Round 5 (5 November 2026). BUTTERFLY: the end-of-edge reduction of the EDGE_DIM edge-gradient components as a
 # butterfly reduce-scatter. At each step a lane swaps half of its remaining components with its xor partner, so after
@@ -163,8 +173,11 @@ MAX_REGISTERS_GPUS = {"NVIDIA GeForce RTX 5060 Ti": 80}  # device name -> regist
 BUTTERFLY = None
 # NVIDIA H200: on from 5 November 2026 (results/h200-defaults-20261105, MD step b/a 0.994 / 0.994, b = on), off again
 # from 6 November: at d599cc70 (with the later w' defaults) the A/B reversed, b/a 0.9659 / 0.9677 with b = off (kernel
-# lab 1,830 us on, 1,612 us off; results/sx012-profile-20261106).
-BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# lab 1,830 us on, 1,612 us off; results/sx012-profile-20261106). On again for the H200 and on for the A100 from 9
+# November 2026 (results/step-limiters-20261109: kernel lab H200 0.956 against today's w' defaults; force/stress
+# gate passes on both): MD step b/a, b = on, SrTiO3 10x10x10 and NbCl5: H200 (e3049399) 0.9863 / 0.9861 and
+# 0.9936 / 0.9903; A100-SXM4-80GB (dad5375b, with PACKED8) 0.9910 / 0.9892 and 0.9942 / 0.9973.
+BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # Round 5 (5 November 2026, external idea "integer warp reductions"). REDUX: the end-of-edge sums of the EDGE_DIM
 # edge-gradient components and dr in fixed point through the hardware integer reduction (redux.sync.add.s32,
 # compute capability 8.0+): per component one redux.sync.max of the lanes' exponents sets a power-of-two scale with
@@ -201,6 +214,12 @@ HOIST_SCALE_GPUS = GPUModels(())
 # A100-SXM4-80GB 0.9896 / 0.9920 (both build orders); bitwise, so no gate.
 STAGE_DOUT = None
 STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# GPUs where a model label keeps STAGE_DOUT off (WPrime's model_label). POLAR-1-M on the A100 family (9 November
+# 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970848, against the A100 defaults of
+# 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911.
+STAGE_DOUT_MODEL_OFF_GPUS = MappingProxyType({
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+})
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # STAGE_DOUT's row as quartets of output-gradient components (Codex H200 follow-up, 7 November 2026, item 2): with
 # the block layout, component o (in the order the paths read them) of channel c at (o // 4) * 4C + 4c + o % 4, so a
@@ -235,6 +254,14 @@ STAGE_EDGES = None
 # OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9643 / 0.9853;
 # all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
 STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# A model label's own extra GPUs for STAGE_EDGES, on top of STAGE_EDGES_GPUS (the label reaches the kernel through the
+# rewrites' context: WPrime's model_label). OMAT-0 small on the H200 (9 November 2026, results/h200-omat0-small-20261108,
+# Benchmark_loup, ab / ba): alone on small's defaults 0.9857 / 0.9825 (b = on); with JOINED_LAYOUT, removing it from the
+# screen's combined set 0.9913 / 0.9900 against 0.9829 / 0.9850 with it; as the default, off 1.0072 / 1.0114. Medium
+# measured a tie on the H200 (above).
+STAGE_EDGES_MODEL_GPUS = MappingProxyType({
+    "omat0-small": GPUModels(("NVIDIA H200",)),
+})
 # SPLINE_W's w' kernel: the spline table's four terms per weight loaded as SPLINE_VECTOR floats at a time (2: two
 # float2 loads, TABLE_W's width; 4: one float4, as spline_forward). The same values: bitwise. The w' kernel is bound by
 # load instructions in L1 (ledger, round 3), and the spline table is [rows, Q, 4]. None: 4 on SPLINE_VECTOR_GPUS
@@ -1112,7 +1139,8 @@ class WPrimeBackward:
     ``SLOPE_VECTOR``)."""
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
-                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False):
+                 horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False,
+                 model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -1136,7 +1164,8 @@ class WPrimeBackward:
         self.max_registers = max_registers_default(device)
         self.redux = redux_default(device) and redux_supported(kernels.schedule, scalar)
         self.butterfly = not self.redux and butterfly_default(device) and butterfly_supported(kernels.schedule)
-        self.stage_dout = stage_dout_default(device) and stage_dout_supported(kernels.schedule, scalar, blocks)
+        self.stage_dout = (stage_dout_default(device, model_label)
+                           and stage_dout_supported(kernels.schedule, scalar, blocks))
         self.stage_chunk = int(STAGE_DOUT_CHUNK)
         self.stage_quads = self.stage_dout and blocks is not None and stage_quads_default(device)
         self.stage_sh = (self.num_threads // self.cohort if self.cohort == 32 and scalar == "float"
@@ -1145,7 +1174,7 @@ class WPrimeBackward:
         self.spline = None if spline is None else [tuple(g) for g in spline]  # SPLINE_W: the spline's grid
         self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
         self.stage_edges = (self.stage_dout and bool(self.stage_sh) and self.spline is not None
-                            and not self.shared_locator and stage_edges_default(device))
+                            and not self.shared_locator and stage_edges_default(device, model_label))
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
@@ -1155,6 +1184,17 @@ class WPrimeBackward:
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges)
         options = ()
+        if SMEM_SPILL:
+            head = 'extern "C" __global__ void oeq_projected_backward_wprime('
+            body = self.source.index(") {", self.source.index(head)) + 3
+            pragma = '\n    asm volatile(".pragma \\"enable_smem_spilling\\";");'
+            self.source = self.source[:body] + pragma + self.source[body:]
+            # the cap as __launch_bounds__' minimum blocks: with __launch_bounds__ present ptxas ignores --maxrregcount
+            # (9 Nov 2026: the H200 / 5060 Ti SMEM_SPILL A/Bs of 158399f2 ran uncapped kernels)
+            low = f", {65536 // (self.num_threads * self.max_registers)}" if self.max_registers else ""
+            bounded = (f'extern "C" __global__ void __launch_bounds__({self.num_threads}{low}) '
+                       'oeq_projected_backward_wprime(')
+            self.source = self.source.replace(head, bounded)
         if self.max_registers:
             options = (f"--maxrregcount={self.max_registers}",)
             self.source += f"\n// compiled with --maxrregcount={self.max_registers}\n"  # in the content id
@@ -1337,13 +1377,16 @@ class _SplineBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
         _, density = radial_table_forward(r, pair, density_coef, starts, scales, bins, r_lo, bin_scale, r_max, True,
                                           0)
-        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, table, spline_id)
+        # forward_table: PACKED8's packed copy the forward reads, else None (``table``). Never ``table`` twice: the
+        # aliased inputs made torch.compile recompile with spline_id a SymInt (H200 gate of 54b4da74)
+        read = table if forward_table is None else forward_table
+        groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, read, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
                               bins)
         ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
@@ -1363,7 +1406,8 @@ class _SplineBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
+        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7
 
 
 class _SplineLocatedBlockConvolution(torch.autograd.Function):
@@ -1372,7 +1416,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None):
+        # forward_table: unused (PACKED8 needs STAGE_EDGES, which excludes SHARED_LOCATOR)
         from fastmace.kernels.oeq_streaming.spline_forward import spline_locate, spline_message_blocks_located
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1398,7 +1443,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
                                                             ctx.wprime_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 6
+        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7
 
 
 def spline_table(coef, row_scale=None):
@@ -1564,9 +1610,13 @@ def hoist_scale_default(device):
     return bool(HOIST_SCALE) if HOIST_SCALE is not None else _device_name(device) in HOIST_SCALE_GPUS
 
 
-def fold_alpha_default(device):
-    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS``."""
-    return bool(FOLD_ALPHA) if FOLD_ALPHA is not None else _device_name(device) in FOLD_ALPHA_GPUS
+def fold_alpha_default(device, model_label=None):
+    """``FOLD_ALPHA`` on ``device``: the constant when set, else on for ``FOLD_ALPHA_GPUS`` except the label's
+    ``FOLD_ALPHA_MODEL_OFF_GPUS``."""
+    if FOLD_ALPHA is not None:
+        return bool(FOLD_ALPHA)
+    name = _device_name(device)
+    return name in FOLD_ALPHA_GPUS and name not in FOLD_ALPHA_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def alpha_rows(schedule, weights):
@@ -1586,9 +1636,13 @@ def estrin_default(device):
     return bool(ESTRIN) if ESTRIN is not None else _device_name(device) in ESTRIN_GPUS
 
 
-def stage_dout_default(device):
-    """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS``."""
-    return bool(STAGE_DOUT) if STAGE_DOUT is not None else _device_name(device) in STAGE_DOUT_GPUS
+def stage_dout_default(device, model_label=None):
+    """``STAGE_DOUT`` on ``device``: the constant when set, else on for ``STAGE_DOUT_GPUS`` except the label's
+    ``STAGE_DOUT_MODEL_OFF_GPUS``."""
+    if STAGE_DOUT is not None:
+        return bool(STAGE_DOUT)
+    name = _device_name(device)
+    return name in STAGE_DOUT_GPUS and name not in STAGE_DOUT_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def stage_sh_default(device):
@@ -1596,9 +1650,13 @@ def stage_sh_default(device):
     return bool(STAGE_SH) if STAGE_SH is not None else _device_name(device) in STAGE_SH_GPUS
 
 
-def stage_edges_default(device):
-    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
-    return bool(STAGE_EDGES) if STAGE_EDGES is not None else _device_name(device) in STAGE_EDGES_GPUS
+def stage_edges_default(device, model_label=None):
+    """``STAGE_EDGES`` (w') on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS`` (every model) and
+    for ``STAGE_EDGES_MODEL_GPUS[model_label]`` (that label's extra GPUs)."""
+    if STAGE_EDGES is not None:
+        return bool(STAGE_EDGES)
+    name = _device_name(device)
+    return name in STAGE_EDGES_GPUS or name in STAGE_EDGES_MODEL_GPUS.get(model_label, ())
 
 
 def stage_quads_default(device):
@@ -1639,13 +1697,14 @@ class WPrime(torch.nn.Module):
     """One interaction's ``wprime_backward``: the derivative table ``G'``, the density's derivative series and
     the compiled kernel, built from its radial table, folded weight and streaming kernels."""
 
-    def __init__(self, table, weight, kernels, generic=False):
+    def __init__(self, table, weight, kernels, generic=False, model_label=None):
         super().__init__()
+        self.model_label = model_label  # the model's label-table label: per-model kernel defaults (STAGE_EDGES)
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
         self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
         self.horner = self.table_w and horner_default(table.coef.device)
         device = table.coef.device
-        self.fold_alpha = (self.table_w and fold_alpha_default(device) and factored_default(device)
+        self.fold_alpha = (self.table_w and fold_alpha_default(device, self.model_label) and factored_default(device)
                            and not FACTORED_SCALE)
         if self.table_w:
             self.terms, self.vector = int(table.coef.shape[2]), TABLE_W_VECTOR
@@ -1664,11 +1723,13 @@ class WPrime(torch.nn.Module):
         self.register_buffer("density_dcoef", density_column(table.dcoef), persistent=False)
         self.kernel = WPrimeBackward(kernels, self.terms, self.gprime.device, vector=self.vector,
                                      table_w=self.table_w, horner=self.horner, table_pairs=self.table_pairs,
-                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha)
+                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
+                                     model_label=self.model_label)
         self.message = None  # TABLE_W with the fused forward: (its id, the message-only FusedFoldedForward)
         self.block = None  # BLOCK_MESSAGE: (fused id, blocks, block FusedFoldedForward, block WPrimeBackward)
         self.spline = None  # SPLINE_W (attach_spline): dict(grid, r_max, certificate, path_scale)
         self.spline_block = None  # SPLINE_W with BLOCK_MESSAGE: (fused id, SplineForward, spline WPrimeBackward)
+        self.spline_packed = None  # PACKED8 (spline_forward): the forward's 8-byte copy of spline_table
         self.kernels = kernels
         # recompute_conv_weights on the fused kernels (attach_rebuild): the message-only forward and the backward that
         # builds w on chip, as (FusedFoldedForward(store_w=False), WRebuildBackward); None: the chunked recompute.
@@ -1710,23 +1771,32 @@ class WPrime(torch.nn.Module):
             return
         device = self.gprime.device
         self.block = (fused.id, blocks,
-                      FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks),
+                      FusedFoldedForward(self.kernels, fused.k, device, store_w=False, used=fused.used, blocks=blocks,
+                                         model_label=self.model_label),
                       WPrimeBackward(self.kernels, self.terms, device, vector=self.vector, table_w=True, blocks=blocks,
                                      horner=self.horner, table_pairs=self.table_pairs,
-                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha))
+                                     factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
+                                     model_label=self.model_label))
         self.spline_block = None
         from fastmace.kernels.oeq_streaming.spline_forward import (SplineForward, shared_locator_default,
                                                                    shared_locator_supported, spline_w_default)
         if self.spline is not None and spline_w_default(device):
+            from fastmace.kernels.oeq_streaming.spline_forward import encode_packed8, packed8_default
+
             grid = self.spline["grid"]
             shared = shared_locator_default(device) and shared_locator_supported(grid, self.spline["r_lo"])
+            packed = encode_packed8(self.spline_table) if packed8_default(device) and not shared else None
+            forward = SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
+                                    self.spline["path_scale"], shared_locator=shared,
+                                    packed8_bias=None if packed is None else packed[1], model_label=self.model_label)
+            # PACKED8: the forward's own 8-byte table (the w' kernel keeps reading spline_table)
+            self.spline_packed = packed[0] if packed is not None and forward.packed8 else None
             self.spline_block = (
                 fused.id,
-                SplineForward(self.kernels.schedule, blocks, grid, self.spline["r_max"], device,
-                              self.spline["path_scale"], shared_locator=shared),
+                forward,
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
-                               spline=grid, shared_locator=shared))
+                               spline=grid, shared_locator=shared, model_label=self.model_label))
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1740,7 +1810,7 @@ class WPrime(torch.nn.Module):
             raise ValueError("wprime_backward: the rebuild backward (recompute_conv_weights) reads the term-major "
                              "derivative table; it needs SLOPE_VECTOR = 0 and TABLE_W off")
         device = self.gprime.device
-        self.rebuild = (FusedFoldedForward(kernels, fused.k, device, store_w=False),
+        self.rebuild = (FusedFoldedForward(kernels, fused.k, device, store_w=False, model_label=self.model_label),
                         WRebuildBackward(kernels, fused.k, self.terms, device, parts=REBUILD_PARTS,
                                          batch=REBUILD_BATCH))
 
@@ -1760,7 +1830,7 @@ class WPrime(torch.nn.Module):
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
                 x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
-                int(block_rows or 0))
+                int(block_rows or 0), self.spline_packed if self.spline_block[1].packed8 else None)  # PACKED8
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
@@ -1773,7 +1843,7 @@ class WPrime(torch.nn.Module):
             if fused is not None and (self.message is None or self.message[0] != fused.id):
                 from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
                 self.message = (fused.id, FusedFoldedForward(kernels, fused.k, self.gprime.device, store_w=False,
-                                                             used=fused.used))
+                                                             used=fused.used, model_label=self.model_label))
             message_id = self.message[1].id if fused is not None else -1
             return _WPrimeConvolution.apply(lengths, pair, table.coef, self.density_dcoef, table.starts, table.scales,
                                             table.bins, float(table.r_lo), float(table.bin_scale), float(table.r_max),
@@ -1799,13 +1869,13 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
-           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS",
+           "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",
            "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
            "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",
            "block_message_default", "block_spec", "dense_message", "density_backward", "density_column",
            "alpha_rows", "derivative_table", "estrin_default", "fold_alpha_default", "factored_default", "factored_paths", "horner_default", "max_registers_default",
            "padded_terms", "pair_table", "power_table", "prepare_block_messages",
-           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS", "STAGE_EDGES",
+           "render", "spline_table", "STAGE_DOUT", "STAGE_DOUT_CHUNK", "STAGE_DOUT_GPUS", "STAGE_DOUT_MODEL_OFF_GPUS", "STAGE_QUADS", "STAGE_QUADS_GPUS", "STAGE_EDGES",
            "STAGE_EDGES_GPUS", "stage_edges_default",
            "stage_quad_layout", "stage_quads_default", "stage_dout_default", "stage_dout_supported",
            "streaming_conv_wprime_backward", "streaming_conv_wprime_backward_blocks",

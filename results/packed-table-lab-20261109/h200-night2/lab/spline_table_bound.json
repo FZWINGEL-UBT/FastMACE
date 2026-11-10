@@ -1,0 +1,161 @@
+{
+  "tool": "spline_table_bound",
+  "created_utc": "2026-11-09T01:12:50Z",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "158399f2384a6359eaa09e80e8b88b35bb9da09f",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "rounds": 31,
+  "constants": {},
+  "kernels": {
+    "forward": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 622.3999857902527,
+          "warm": 621.4079856872559
+        },
+        "one-slab": {
+          "flush": 431.39201402664185,
+          "warm": 430.65598607063293
+        },
+        "slab-sorted": {
+          "flush": 601.1840105056763,
+          "warm": 600.4800200462341
+        },
+        "species-blocks": {
+          "flush": 621.6959953308105,
+          "warm": 622.3040223121643
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 601.1840105056763,
+          "warm": 599.7440218925476
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.6931105782062468,
+          "warm": 0.6930325904877811
+        },
+        "slab-sorted": {
+          "flush": 0.965912635332665,
+          "warm": 0.9663216982674013
+        },
+        "species-blocks": {
+          "flush": 0.9988689099043788,
+          "warm": 1.0014419457836825
+        },
+        "slab-sorted+species-blocks": {
+          "flush": 0.965912635332665,
+          "warm": 0.9651372941872501
+        }
+      },
+      "registers": [
+        80
+      ]
+    },
+    "wprime": {
+      "edges": 373760,
+      "edges_inside": 370966,
+      "median_us": {
+        "real": {
+          "flush": 1089.2800092697144,
+          "warm": 1085.3439569473267
+        },
+        "one-slab": {
+          "flush": 1063.264012336731,
+          "warm": 1060.6720447540283
+        },
+        "local-sender": {
+          "flush": 1084.06400680542,
+          "warm": 1080.575942993164
+        },
+        "one-slab+local-sender": {
+          "flush": 1060.1279735565186,
+          "warm": 1058.2400560379028
+        },
+        "local-dout": {
+          "flush": 1057.1520328521729,
+          "warm": 1052.7679920196533
+        },
+        "local-sender+local-dout": {
+          "flush": 1052.1279573440552,
+          "warm": 1047.551989555359
+        },
+        "one-slab+local-sender+local-dout": {
+          "flush": 1041.9199466705322,
+          "warm": 1039.1680002212524
+        },
+        "zero-table": {
+          "flush": 1136.031985282898,
+          "warm": 1136.064052581787
+        },
+        "zero-dout": {
+          "flush": 1103.6479473114014,
+          "warm": 1103.1039953231812
+        },
+        "zero-x": {
+          "flush": 1148.7360000610352,
+          "warm": 1143.7760591506958
+        },
+        "zero-all": {
+          "flush": 1117.5040006637573,
+          "warm": 1117.8239583969116
+        }
+      },
+      "over_real": {
+        "real": {
+          "flush": 1.0,
+          "warm": 1.0
+        },
+        "one-slab": {
+          "flush": 0.9761163367439146,
+          "warm": 0.9772681166782452
+        },
+        "local-sender": {
+          "flush": 0.9952115136421246,
+          "warm": 0.9956069097509206
+        },
+        "one-slab+local-sender": {
+          "flush": 0.9732373352442774,
+          "warm": 0.9750273627674151
+        },
+        "local-dout": {
+          "flush": 0.9705053097971741,
+          "warm": 0.9699855840914271
+        },
+        "local-sender+local-dout": {
+          "flush": 0.9658930196005644,
+          "warm": 0.9651797320563127
+        },
+        "one-slab+local-sender+local-dout": {
+          "flush": 0.9565216820320298,
+          "warm": 0.9574550017710973
+        },
+        "zero-table": {
+          "flush": 1.0429200716210036,
+          "warm": 1.0467318174204585
+        },
+        "zero-dout": {
+          "flush": 1.0131903072850108,
+          "warm": 1.0163635115505751
+        },
+        "zero-x": {
+          "flush": 1.0545828347948678,
+          "warm": 1.0538374050266215
+        },
+        "zero-all": {
+          "flush": 1.025910685180907,
+          "warm": 1.0299259983359923
+        }
+      },
+      "registers": null
+    }
+  }
+}

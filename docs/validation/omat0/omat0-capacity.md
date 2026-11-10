@@ -251,10 +251,37 @@ A rescan on the 5060 Ti found the limit lower than on 2 November: SrTiO3 34,295 
 At 53,240 SrTiO3 the step is now 291 ms (5.47 µs per atom). First failures: SrTiO3 179,685, NaCl 216,000. The
 estimate is 1.18–1.21 of the peak where the near-limit probe corrected it.
 
-**RTX 4000 Ada with the new defaults** (spline w and the composed skip on for OMAT-0 medium, ledger `ada-omat0-best`):
-pending. The scan and an old/new peak comparison at the same sizes are queued on leto.
+**RTX 4000 Ada with the new defaults** (spline w and the composed skip on for OMAT-0 medium, ledger `ada-omat0-best`;
+leto, each point alone on the GPU):
+
+| Crystal | 2 November: atoms, ms/step | 9 November: atoms, ms/step, µs/atom/step | Peak, estimate (GiB) | Rung |
+|---|---|---|---|---|
+| SrTiO3 | 69,120, 974 | **233,280**, 1,385, 5.94 | 19.15, 24.47 | recompute_first_table |
+| NaCl | 125,000, 965 | **343,000**, 1,533, 4.47 | 18.71, 22.64 | recompute_first_table |
+
+First failures: SrTiO3 253,265 (warm-up), NaCl 373,248 (an [atoms, 5120] buffer in the first force call; the rungs
+save per-edge memory only). At the old limits the step is now 339 ms (SrTiO3) and 409 ms (NaCl).
+
+A third bug held SrTiO3 at 148,955: `generic_recompute_first_table` is checked after `tf32x3_gemms`, which attaches
+`COMPOSE_SKIP`, and its self-check differentiated the probe's species table, which the composed skip refuses. The rung
+failed and the planner fell to the terminal sequence, on every GPU with `COMPOSE_SKIP`. The memory probe's replica of
+the rung measured the same failure (13.2 GiB at 17,576 atoms instead of 1.3), so near the limit it also misjudged the
+rung. Fixed in `generic._run` (`969bfc4d`).
+
+The spline and composed-skip paths lower the peak at large sizes (old against new plan: SrTiO3 69,120 6.78 → 5.82 GiB,
+NaCl 125,000 8.91 → 7.08 GiB; Benchmark_loup 0.94 → 1.18 GiB). Rule 12 has no terms for them, so for the new plan
+its uncorrected estimate is 1.8 times the peak (SrTiO3 69,120), against 1.5 for the old plan.
 
 [Results](../../../results/omat0-ada-capacity-20261108/README.md).
+
+**9 November, the memory profile** ([memory-profile-20261109](../../../results/memory-profile-20261109/README.md)):
+the recomputing outer-sum backward allocated `[edges, 64]` floats only to carry a shape (4.1 GiB, 18.9 kB/atom at
+SrTiO3 233,280); a stride-0 view carries it now (`tabled_outer_sum.SHAPE_CARRIER`, work removal, b/a 1.0009 /
+1.0002). Ada SrTiO3 limit 233,280 → **253,265** (37³, 1,563 ms; 274,360 fails in the neighbour list's rebuild beside
+the graph pool); NaCl unchanged at 343,000 (373,248 fails on a dense `[atoms, 5120]` message gradient in the first
+force call); the 5060 Ti unchanged (163,840 and 195,112; Triton module loads fail in the capture warm-up). At 36³
+SrTiO3 the MD peak reserves 75.9 kB/atom (was 86.6): the graph pool 59.7 (live 46.0, packing slack 13.8), the default
+pool 16.1 (neighbour list 11.9 of it with its rebuild temporaries).
 
 ## Records
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from types import MappingProxyType
 
 import numpy as np
 import torch
@@ -26,6 +27,13 @@ OVERFLOW_DISPLACEMENT_A = 1.0e6
 # Screened pairs per chunk of build_gpu's float64 test and sort key: bounds the build's temporaries (about 150 B
 # per pair at once otherwise). Elementwise work, so the result does not depend on it.
 BUILD_CHUNK = 1 << 18
+# build_gpu's sort (memory profile, 9 November 2026): True writes each screened pair's order key over its screen code
+# and sorts the keys alone (``torch.unique``: no index tensor, no key-value sort), then decodes the pairs from the
+# sorted keys; False keeps a separate key tensor, sorts it with its indices and gathers the codes, as before (an A/B
+# side only). The same pairs in the same order either way: the key is unique per pair and holds the receiver, sender
+# and image. At SrTiO3 233,280 atoms on the RTX 4000 Ada the old sort's temporaries were 1.0 GiB (4.5 kB/atom), the
+# steady phase's peak beside the captured force graph.
+SORT_KEYS_ONLY = True
 # Candidate pairs per chunk of ``compact``: its float64 shifts, vectors and masks exist for one chunk at a time
 # (about 150 B per candidate at once otherwise: 11 GiB of candidates' temporaries at 2.3M NbCl5 atoms). Lists up
 # to this many candidates (about 150k MH-1 atoms) compact in one chunk, as before; the result is the same for any
@@ -40,17 +48,32 @@ COMPACT_CHUNK = 1 << 22
 SORT_BY_LENGTH = None
 # NVIDIA H200 (8 November 2026, results/slab-sorted-h200-20261108; OMAT-0 medium, Benchmark_loup, Modal `sixth`): MD
 # step b/a 0.9807 / 0.9791 (ab / ba, 3.585 -> 3.514 ms); gate passes (forces 0.83 / 0.92 / 0.97, stress 0.48 / 0.94 /
-# 1.07 against 3).
-SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200",))
+# 1.07 against 3). A100 family (9 November 2026, NHR Alex A100-SXM4-80GB, Alex pack 7 job 4965032 against the A100
+# defaults): alone 0.9924 / 0.9936, with BLOCK_ORDER 0.9920 / 0.9904 (7.39 -> 7.33 ms); gate (job 4967026, with
+# BLOCK_ORDER) passes: forces 0.92 / 0.93 / 0.96, stress 0.64 / 1.02 / 1.15 against 3.
+SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))  # H200, A100
+# GPUs where a model label keeps SORT_BY_LENGTH off (the label reaches the list as SkinNeighbourList's model_label).
+# MACE-OFF has no spline tables, so the sort's locality buys nothing and its build costs. A100 family (9 November
+# 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970847, water_216, against the A100
+# defaults of 6f03bd02, b = off, ab / ba): OFF23-small 0.9830 / 0.9739, OFF23-large 0.9951 / 0.9900; OFF23-medium,
+# OFF23b-medium, OFF24-medium and POLAR-1 S / M / L ties (0.997-1.010), so they keep it.
+SORT_BY_LENGTH_MODEL_OFF_GPUS = MappingProxyType({
+    "off23-small": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+    "off23-large": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+})
 LENGTH_BINS = 4096
 
 
-def sort_by_length_default(device):
-    """``SORT_BY_LENGTH`` on ``device``: the constant when set, else on for ``SORT_BY_LENGTH_GPUS``."""
+def sort_by_length_default(device, model_label=None):
+    """``SORT_BY_LENGTH`` on ``device``: the constant when set, else on for ``SORT_BY_LENGTH_GPUS`` except the
+    label's ``SORT_BY_LENGTH_MODEL_OFF_GPUS``."""
     if SORT_BY_LENGTH is not None:
         return bool(SORT_BY_LENGTH)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in SORT_BY_LENGTH_GPUS
+    if device.type != "cuda":
+        return False
+    name = torch.cuda.get_device_name(device)
+    return name in SORT_BY_LENGTH_GPUS and name not in SORT_BY_LENGTH_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def length_bins(length2, reach):
@@ -157,7 +180,7 @@ class SkinNeighbourList:
 
     def __init__(self, cell, cutoff, device, float_dtype, config: NeighbourConfig | None = None, *,
                  sort_receivers: bool | None = None, gpu_build: bool | None = None, sender_groups=None,
-                 group_count: int | None = None, variable_cell: bool = False):
+                 group_count: int | None = None, variable_cell: bool = False, model_label: str | None = None):
         config = NeighbourConfig() if config is None else config
         self.config = config
         self.cell = np.asarray(cell, dtype=float)
@@ -169,7 +192,8 @@ class SkinNeighbourList:
         self.edge_multiple = config.edge_multiple
         self.headroom = config.capacity_headroom
         self.sort_receivers = _resolved(sort_receivers, config.sort_receivers, "sort_receivers")
-        self.sort_by_length = bool(self.sort_receivers) and sort_by_length_default(self.device)
+        # model_label: the model's label-table label, for per-model defaults (SORT_BY_LENGTH_MODEL_OFF_GPUS).
+        self.sort_by_length = bool(self.sort_receivers) and sort_by_length_default(self.device, model_label)
         self.gpu_build = _resolved(gpu_build, config.gpu_neighbour_list, "gpu_neighbour_list")
         # Optional per-atom group (sender species, segmented first sum): secondary sort key. A device
         # tensor at a fixed address that its owner refreshes in place (a derived buffer of the species,
@@ -401,7 +425,10 @@ class SkinNeighbourList:
         found = codes.numel()
         # The decision in chunks of BUILD_CHUNK pairs, so only the sort key lives for every screened pair.
         chunk = max(1, BUILD_CHUNK)
-        key = torch.empty(found, dtype=torch.int64, device=device)
+        keys_only = SORT_KEYS_ONLY
+        # SORT_KEYS_ONLY: each chunk's keys overwrite its codes once decoded (the screen's buffer is scratch until
+        # the next screen)
+        key = codes if keys_only else torch.empty(found, dtype=torch.int64, device=device)
         kept = torch.zeros((), dtype=torch.int64, device=device)
         for start in range(0, found, chunk):
             stop = min(found, start + chunk)
@@ -419,7 +446,15 @@ class SkinNeighbourList:
             kept += keep.sum()
             del image, sender, receiver, keep
         n = int(kept)  # host sync (rebuild steps only)
-        order = torch.sort(key).indices[:n]
+        if keys_only:
+            # the sorted keys alone; the rejected pairs' common largest key comes out once, after the kept ones
+            ordered = torch.unique(key, sorted=True)
+            if ordered.numel() < n:
+                raise RuntimeError(f"build_gpu: {n} kept pairs but {ordered.numel()} distinct keys (the screen "
+                                   "returned a pair twice)")
+            ordered = ordered[:n]
+        else:
+            order = torch.sort(key).indices[:n]
         del key
 
         grew = n > self.capacity or self.capacity == 0
@@ -429,7 +464,8 @@ class SkinNeighbourList:
         pad_unit = constants["pad_unit"]
         for start in range(0, n, chunk):
             stop = min(n, start + chunk)
-            image, sender, receiver = decode_codes(codes[order[start:stop]], natoms)
+            image, sender, receiver = (self._decode_key(ordered[start:stop], natoms, constants) if keys_only
+                                       else decode_codes(codes[order[start:stop]], natoms))
             unit_shifts = images[image] - offsets[receiver] + offsets[sender]
             self.candidate_index[0, start:stop].copy_(sender)
             self.candidate_index[1, start:stop].copy_(receiver)
@@ -461,6 +497,21 @@ class SkinNeighbourList:
                 primary = primary * LENGTH_BINS + length_bins(length2, self.cutoff + self.skin)
             return (primary * natoms + sender) * nimages + image
         return (image * natoms + sender) * natoms + receiver
+
+    def _decode_key(self, key, natoms, constants):
+        """(image, sender, receiver) of ``build_gpu``'s order keys (``_sort_key`` with the lengths), int64."""
+        if not self.sort_receivers:
+            return decode_codes(key, natoms)  # the key is the screen code
+        nimages = len(constants["images"])
+        image = key % nimages
+        rest = key // nimages
+        sender = rest % natoms
+        primary = rest // natoms
+        if self._length_sorted(natoms, constants):
+            primary = primary // LENGTH_BINS
+        if constants["groups"] is not None:
+            primary = primary // constants["group_count"]
+        return image, sender, primary
 
     def _async_ready(self) -> bool:
         """Whether ``build_gpu_async`` can run: switched on, fixed cell, a synchronous build done before."""

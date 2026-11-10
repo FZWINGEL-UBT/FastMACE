@@ -1,0 +1,10 @@
+NVIDIA A100-SXM4-80GB, 610.57.04, 1410 MHz
+NVIDIA A100-SXM4-80GB: 108 SMs, 864 blocks x 256 threads
+mix fp32: FFMA 63.8 + DFMA 0.0 + DMMA 0.0 = 63.8 FMA results/clk/SM at 1410 MHz (min 1410), max 187 W, 5.3 s, registers 22
+mix m:dmma4: FFMA 0.0 + DFMA 0.0 + DMMA 63.8 = 63.8 FMA results/clk/SM at 1410 MHz (min 1410), max 252 W, 5.9 s, registers 26
+mix m:dmma8: FFMA 0.0 + DFMA 0.0 + DMMA 56.9 = 56.9 FMA results/clk/SM at 1410 MHz (min 1410), max 257 W, 5.9 s, registers 42
+mix m:4:1: FFMA 29.2 + DFMA 0.0 + DMMA 58.5 = 87.7 FMA results/clk/SM at 1410 MHz (min 1410), max 261 W, 6.0 s, registers 30
+mix m:8:1: FFMA 49.9 + DFMA 0.0 + DMMA 49.9 = 99.8 FMA results/clk/SM at 1410 MHz (min 1410), max 283 W, 6.0 s, registers 39
+mix m:8:1b: FFMA 50.5 + DFMA 0.0 + DMMA 50.5 = 101.0 FMA results/clk/SM at 1410 MHz (min 1410), max 250 W, 6.0 s, registers 24
+mix m:16:1: FFMA 58.9 + DFMA 0.0 + DMMA 29.5 = 88.4 FMA results/clk/SM at 1410 MHz (min 1410), max 236 W, 5.9 s, registers 31
+exit=0

@@ -37,6 +37,7 @@ import ctypes
 import dataclasses
 import re
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import torch
 
@@ -125,6 +126,12 @@ DEGREE_PARTS = None
 # MD step b/a (b = on; OMAT-0 medium, SrTiO3 10x10x10, ab / ba, results/h200-ideas-20261105 idea 2): NVIDIA H200
 # 0.9818 / 0.9845, A100-SXM4-80GB 0.9920 / 0.9932.
 DEGREE_PARTS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
+# GPUs where a model label keeps DEGREE_PARTS off (FusedFoldedForward's model_label). POLAR-1-M on the A100 family
+# (9 November 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970848, against the A100
+# defaults of 6f03bd02, b = off, ab / ba): NaCl 0.9825 / 0.9911, NbCl5 0.9967 / 0.9962.
+DEGREE_PARTS_MODEL_OFF_GPUS = MappingProxyType({
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+})
 # Round 4: the tensor-core kernel's W slice stored in mma.sync fragment order, [paths][KP / 8][2 m-tiles][32 lanes][4],
 # so each lane loads its four W values of a fragment with one float4 shared load (consecutive 16 B per lane: no bank
 # conflicts) instead of four scalar loads at row stride TC_STRIDE. The same values reach the same mma: bitwise.
@@ -290,9 +297,12 @@ def vec_sh_default(edge_dim, name=None):
     return bool(on) and int(edge_dim) % 4 == 0
 
 
-def degree_parts_default(name=None):
-    """``DEGREE_PARTS`` (None: ``name`` in ``DEGREE_PARTS_GPUS``)."""
-    return bool(DEGREE_PARTS) if DEGREE_PARTS is not None else name in DEGREE_PARTS_GPUS
+def degree_parts_default(name=None, model_label=None):
+    """``DEGREE_PARTS`` (None: ``name`` in ``DEGREE_PARTS_GPUS`` except the label's
+    ``DEGREE_PARTS_MODEL_OFF_GPUS``)."""
+    if DEGREE_PARTS is not None:
+        return bool(DEGREE_PARTS)
+    return name in DEGREE_PARTS_GPUS and name not in DEGREE_PARTS_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def degree_parts(schedule):
@@ -2250,7 +2260,7 @@ class FusedFoldedForward:
     """Compiled ``fused_folded_forward`` for the streaming kernels of one interaction (``StreamingKernels``) and a
     folded input width ``k``; float32 only. ``used``: the inputs the k-loop reads (``used_columns``; default ``k``)."""
 
-    def __init__(self, kernels, k, device=None, store_w=True, used=None, blocks=None):
+    def __init__(self, kernels, k, device=None, store_w=True, used=None, blocks=None, model_label=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -2291,7 +2301,8 @@ class FusedFoldedForward:
                      int(props.shared_memory_per_block_optin), int(props.multi_processor_count))
             options = dict(tc=self.tc, prefetch=self.prefetch, x_slots=schedule.input_dim // schedule.channels,
                            wfrag=self.wfrag_region)
-            self.groups = degree_parts(schedule) if degree_parts_default(torch.cuda.get_device_name(device)) else None
+            self.groups = (degree_parts(schedule)
+                           if degree_parts_default(torch.cuda.get_device_name(device), model_label) else None)
             self.rule = launch_rule(*shape, groups=self.groups, **options) if self.groups else None
             if self.rule is None:
                 self.groups = None

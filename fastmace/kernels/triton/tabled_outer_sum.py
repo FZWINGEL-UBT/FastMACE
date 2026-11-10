@@ -23,6 +23,11 @@ from fastmace.kernels.gpu_models import GPUModels
 
 CHUNK = 16  # edges per program (the walk's A100 optimum, tools/eos_backward_lab.py)
 WARPS = 1
+# The recomputing backward (TABLED_FORWARD) evaluates the table's values inside the kernel and never reads ``a``; the
+# op still needs its shape. True: a stride-0 view carries it; False: ``[E, K]`` floats, as before (an A/B side only).
+# The floats were the force peak's largest block: 4.1 GiB, 18.9 kB/atom at SrTiO3 233,280 on the RTX 4000 Ada
+# (results/memory-profile-20261109). Work removal, no rounding change.
+SHAPE_CARRIER = True
 # Phase 2: the forward evaluates a = g(r) inside the segmented sum's walk (no [E, K] table output written and read
 # back) and the backward evaluates it again next to the derivative row (nothing of a saved). Rounding (its own
 # Clenshaw sums, the same recurrence). None: on for TABLED_FORWARD_GPUS (decision 66, after the MD-step A/Bs); True /
@@ -45,6 +50,11 @@ POWER_BACKWARD = None
 POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200",))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
+# The tabled forward's register cap (Triton's maxnreg; None: Triton's choice). step_limiters (9 November 2026):
+# Triton gives the 1-warp forward 128 registers on sm_80 (64 on sm_90), so the A100 runs 16 blocks per SM (25 %
+# of warps) and the kernel waits on global loads (long scoreboard 10 per issue), 398 us against the H200's 112.
+# A module constant for the A/B (lab, off).
+FORWARD_MAXNREG = None
 # Idea 3 (Codex H200 report, 7 November 2026). PACKED_COEF (with TABLED_FORWARD): the walks read the value series (the
 # forward's and RECOMPUTE's coef, POWER_BACKWARD's pcoef) from a copy packed per adjacent channel pair,
 # ``[P, pieces, pairs, TERMS, 2]`` (``packed_coef``, built with the table), and load two successive terms of a pair as
@@ -396,7 +406,8 @@ def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Te
             float(r_lo), float(bin_scale), float(r_max), K=k, D=d, INNER=inner, TERMS=coef.shape[2],
             J=coef.shape[-1], CHUNK=FORWARD_CHUNK, BLOCK_K=triton.next_power_of_2(k),
             BLOCK_D=triton.next_power_of_2(d), pack_ptr=packed if packs else coef, PACKED=packs,
-            PAIRS=packed.shape[2] if packs else 1, num_warps=FORWARD_WARPS)
+            PAIRS=packed.shape[2] if packs else 1, num_warps=FORWARD_WARPS,
+            **({} if FORWARD_MAXNREG is None else {"maxnreg": FORWARD_MAXNREG}))
     return out, density
 
 
@@ -426,7 +437,9 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
                                         int(columns))
             coef = None
         else:
-            a = r.new_empty((r.numel(), int(columns)))  # shape only: the kernel evaluates a
+            # shape only: the kernel evaluates a (SHAPE_CARRIER: a stride-0 view, not [E, K] floats)
+            a = (r.new_empty((1, int(columns))).expand(r.numel(), int(columns)) if SHAPE_CARRIER
+                 else r.new_empty((r.numel(), int(columns))))
     num_edges, k = a.shape
     d = y.shape[1]
     grad_density = grad_density.reshape(-1)
@@ -444,7 +457,8 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
     import triton
 
     from fastmace.kernels.triton.edge_outer_sum import _rows
-    grad, a, y, key = grad.contiguous(), _rows(a), y.contiguous(), key.contiguous()
+    grad, y, key = grad.contiguous(), y.contiguous(), key.contiguous()
+    a = a if coef is not None else _rows(a)  # with coef, a is the stride-0 shape carrier: never read
     r, pair, grad_density = r.reshape(-1).contiguous(), pair.contiguous(), grad_density.contiguous()
     dr = r.new_empty((num_edges,))
     grad_y = torch.empty_like(y)

@@ -769,7 +769,7 @@ def _apply_w_tables(model, context):
 # --------------------------------------------------------------------------- wprime_backward (opt-9 OPT9-T03)
 
 
-def attach_wprime(model):
+def attach_wprime(model, model_label=None):
     """``wprime_backward`` (``fastmace.kernels.oeq_streaming.wprime_backward``) in every float32 interaction whose
     tables feed the chunked streaming convolution; returns their names. Reassociated interactions keep their own
     path."""
@@ -795,7 +795,7 @@ def attach_wprime(model):
         if size > W_TABLE_MAX_BYTES:
             raise RewriteError(f"wprime_backward: interactions.{index} would hold {size / 2**30:.1f} GiB of tables "
                                f"(more than W_TABLE_MAX_BYTES)")
-        interaction.wprime_backward = WPrime(table, weight, kernels)
+        interaction.wprime_backward = WPrime(table, weight, kernels, model_label=model_label)
         names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB)")
     if not names:
         raise RewriteError("wprime_backward: no interaction with float32 radial tables and the chunked streaming "
@@ -870,10 +870,10 @@ def _wprime_selfcheck(original, rewritten, context):
 
 
 def _apply_wprime(model, context):
-    return attach_wprime(model)
+    return attach_wprime(model, (context.inputs or {}).get("model_label"))
 
 
-def attach_generic_wprime(model):
+def attach_generic_wprime(model, model_label=None):
     """``generic_wprime_backward``: ``wprime_backward`` in every generic interaction whose tables feed the chunked
     folded streaming convolution with stored weights (``generic_chunked_conv_backward``; not on the recompute
     paths, ``generic_recompute_conv_weights`` and ``generic_recompute_first_table``); returns their names. The
@@ -903,7 +903,8 @@ def attach_generic_wprime(model):
         if size > W_TABLE_MAX_BYTES:
             raise RewriteError(f"generic_wprime_backward: interactions.{index} would hold {size / 2**30:.1f} GiB of "
                                f"tables (more than W_TABLE_MAX_BYTES)")
-        interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels, generic=True)
+        interaction.wprime_backward = WPrime(table, weight, interaction.streaming_kernels, generic=True,
+                                             model_label=model_label)
         note = _attach_spline(model, index, interaction, table, weight)
         names.append(f"interactions.{index} ({pairs * pieces} groups, {terms} terms, {size / 2**20:.0f} MiB{note})")
     if not names and not rescued:
@@ -963,7 +964,7 @@ def _generic_wprime_selfcheck(original, rewritten, context):
 
 
 def _apply_generic_wprime(model, context):
-    return attach_generic_wprime(model)
+    return attach_generic_wprime(model, context.inputs.get("model_label"))
 
 
 # --------------------------------------------------------------------------- recompute_conv_weights (CAP-T07)

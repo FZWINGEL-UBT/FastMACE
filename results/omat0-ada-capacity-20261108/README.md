@@ -6,9 +6,8 @@ MACE-OMAT-0 medium. First, a same-process MD-step A/B on the RTX 4000 Ada of the
 [omat0-capacity](../../docs/validation/omat0/omat0-capacity.md) with the new Ada defaults, on the Ada and the local
 RTX 5060 Ti.
 
-Branch `fastmace/omat0-ada-capacity`; source main `73e421ea` (A/B, gate) and `1cd369e4` (scan: the adoptions plus the
-two capacity fixes below). GPU: leto's NVIDIA RTX 4000 Ada Generation (20 GB, driver 595.99.02); murphy's (same model)
-for the first, inert pack. Jobs in [jobs/](jobs/), logs in [logs/](logs/).
+Branch `fastmace/omat0-ada-capacity`; source main `73e421ea` (A/B, gate), main `d3d459ef` (Ada scan) and `969bfc4d`
+(the third fix). GPU: leto's NVIDIA RTX 4000 Ada Generation (20 GB, driver 595.99.02); murphy's (same model) for the first, inert pack. Jobs in [jobs/](jobs/), logs in [logs/](logs/).
 
 ## Summary
 
@@ -35,8 +34,16 @@ for the first, inert pack. Jobs in [jobs/](jobs/), logs in [logs/](logs/).
 - **5060 Ti capacity (main `73e421ea` plus the fixes; the Ada adoptions do not touch the 5060 Ti's plan):** SrTiO3
   163,840 atoms (was 53,240 on 2 November), NaCl 195,112 (was 85,184). At 53,240 SrTiO3 the step is 291 ms
   (5.47 µs per atom) against 840 ms on 2 November.
-- **Ada capacity with the new defaults: pending.** Both Adas (leto, murphy) were busy with other users' jobs; the scan
-  and the old/new peak-memory comparison are queued on leto and follow in a second merge request.
+- **Ada capacity with the new defaults (leto, alone on the GPU): SrTiO3 233,280 atoms (was 69,120), NaCl 343,000
+  (was 125,000).** SrTiO3 needs a third fix (below): without it the Ada stopped at 148,955.
+- **Third capacity bug, every GPU with `COMPOSE_SKIP` (H200, A100, Ada):** the rescue rung
+  `generic_recompute_first_table` failed its self-check (its probe asked the composed skip for a species-table
+  gradient, which it refuses), so the planner fell to the terminal sequence near the limit. The memory probe's replica
+  of the rung measured that fallback (13.2 GiB instead of 1.3 GiB), so it also misjudged the rung. Fixed in
+  `generic._run` (`969bfc4d`).
+- **The spline and composed-skip paths lower peak memory at large sizes** and are faster at every size: at SrTiO3
+  69,120 5.82 GiB against 6.78 (339 against 401 ms), at NaCl 125,000 7.08 against 8.91 GiB (409 against 477 ms). At
+  Benchmark_loup (5,000 atoms) 1.18 against 0.94 GiB.
 
 ## A/B (same process, both build orders)
 
@@ -129,12 +136,76 @@ the fixes, main `eced7d75` ([logs/local-5060ti/scan-local-eced](logs/local-5060t
 - On the 5060 Ti the spline and composed-skip paths are off (not in its GPU lists), so this scan does not answer
   whether they change peak memory; the Ada comparison does.
 
-### RTX 4000 Ada 20 GB (leto): pending
+### RTX 4000 Ada 20 GB (leto)
 
-Queued on leto ([jobs/chain-leto7.sh](jobs/chain-leto7.sh), [jobs/chain-leto8.sh](jobs/chain-leto8.sh)) with source
-`1cd369e4`: the scan from the old maxima (SrTiO3 69,120 at 974 ms, NaCl 125,000 at 965 ms, leeloo, 2 November), then
-the old and new plans' peaks at the same sizes (Benchmark_loup, SrTiO3 24³, NaCl 25³). Both Adas were taken by
-other users' jobs on 8 November; the results follow in a second merge request.
+leto's RTX 4000 Ada (20 GB, driver 595.99.02), `mace_cueq_oeq`, hybrid backend, float32, OMAT-0 medium. Both Adas
+(leto, murphy) were queued with a claim on the shared home ([jobs/chain-ada.sh](jobs/chain-ada.sh)); leto went idle
+first and ran everything. Before every point: wait until no other user has a process above 20 % CPU or a GPU job,
+then two quiet minutes ([jobs/edge2.sh](jobs/edge2.sh)); the later points log the GPU's processes every 30 s.
+
+**Scan, main `d3d459ef`** (the adoptions and the first two fixes; [logs/scan-ada-new](logs/scan-ada-new)):
+
+| Crystal | Repeat | Atoms | Result | ms/step | µs/atom/step | Peak (GiB) | Estimate (GiB) | est/peak | Rung |
+|---|---|---:|---|---:|---:|---:|---:|---:|---|
+| SrTiO3 | 24³ | 69,120 | ok | 339.4 | 4.91 | 5.82 | 10.42 | 1.79 | – |
+| SrTiO3 | 26³ | 87,880 | ok | 446.9 | 5.09 | 7.21 | 13.19 | 1.83 | – |
+| SrTiO3 | 29³ | 121,945 | ok | 646.4 | 5.30 | 9.78 | 12.38 | 1.27 | – |
+| SrTiO3 | 30³ | 135,000 | ok | 731.2 | 5.42 | 10.73 | 13.68 | 1.28 | – |
+| SrTiO3 | 31³ | 148,955 | ok | 816.1 | 5.48 | 11.77 | 15.07 | 1.28 | – |
+| SrTiO3 | 32³ | 163,840 | fails: terminal sequence (third bug) | | | | | | |
+| NaCl | 25³ | 125,000 | ok | 411.9 | 3.29 | 7.08 | 8.38 | 1.18 | – |
+| NaCl | 27³ | 157,464 | ok | 559.0 | 3.55 | 8.81 | 10.50 | 1.19 | – |
+| NaCl | 30³ | 216,000 | ok | 806.1 | 3.73 | 11.93 | 25.42 | 2.13 | – |
+| NaCl | 33³ | 287,496 | ok | 1,204.6 | 4.19 | 15.75 | 33.75 | 2.14 | – |
+| NaCl | 34³ | 314,432 | ok (rerun alone) | 1,322.1 | 4.20 | 17.17 | 36.90 | 2.15 | – |
+| NaCl | **35³** | **343,000** | **ok** | **1,533.6** | **4.47** | 18.72 | 40.23 | 2.15 | – |
+| NaCl | 36³ | 373,248 | out of memory (alone, `--diagnose`) | | | | | | |
+
+- In the scan itself the first failures were 900 s point timeouts: SrTiO3 32³ (20:30–20:45 UTC), and NaCl 34³ and
+  36³, which ran beside another user's GPU job (KernKat, 10 GB, from 21:28 UTC). Those NaCl points are void, not
+  failures; both sizes were rerun alone. The SrTiO3 32³ rerun of 22:28 UTC is void too (the same user's 8.4 GB job
+  joined at 22:41).
+- SrTiO3 32³ alone ([logs/edge-ada2](logs/edge-ada2)) ran out of memory in the build; with `--diagnose`
+  ([logs/diag-ada](logs/diag-ada)) the first failure is `compose_skip has no gradient for the weights` in the
+  self-check of `generic_recompute_first_table`: the third bug.
+- NaCl 36³ fails with a real out-of-memory in the default plan's first force call (an [atoms, 5120] float32 buffer,
+  7.1 GiB), with and without the third fix; the rescue rungs save per-edge memory only.
+- From NaCl 216,000 up, rule 12's estimate is 2.1 times the peak and the default plan ran anyway: the memory probe's
+  replica of the rung measured the terminal sequence (13.2 GiB at 17,576 atoms), scaled it to 156–248 GiB, and kept
+  the default.
+
+**With the third fix, `969bfc4d`** ([logs/edge-ada5](logs/edge-ada5), [logs/edge-ada6](logs/edge-ada6),
+[logs/edge-ada7](logs/edge-ada7)):
+
+| Crystal | Repeat | Atoms | Result | ms/step | µs/atom/step | Peak (GiB) | Estimate (GiB) | est/peak | Rung |
+|---|---|---:|---|---:|---:|---:|---:|---:|---|
+| SrTiO3 | 32³ | 163,840 | ok | 905.1 | 5.52 | 13.65 | 17.25 | 1.26 | recompute_first_table |
+| SrTiO3 | 33³ | 179,685 | ok | 1,024.3 | 5.70 | 14.87 | 18.90 | 1.27 | recompute_first_table |
+| SrTiO3 | 34³ | 196,520 | ok | 1,129.8 | 5.75 | 16.21 | 20.65 | 1.27 | recompute_first_table |
+| SrTiO3 | 35³ | 214,375 | ok | 1,271.3 | 5.93 | 17.62 | 22.50 | 1.28 | recompute_first_table |
+| SrTiO3 | **36³** | **233,280** | **ok** | **1,384.7** | **5.94** | 19.15 | 24.47 | 1.28 | recompute_first_table |
+| SrTiO3 | 37³ | 253,265 | out of memory (warm-up) | | | | | | |
+| NaCl | 30³ | 216,000 | ok | 803.1 | 3.72 | 11.95 | 14.34 | 1.20 | recompute_first_table |
+| NaCl | 35³ | 343,000 | ok | 1,533.3 | 4.47 | 18.71 | 22.64 | 1.21 | recompute_first_table |
+| NaCl | 36³ | 373,248 | out of memory (build) | | | | | | |
+
+- The probe now measures the rung (1.32 GiB at 17,576 atoms against 2.14 estimated) and takes it; NaCl's step time
+  and peak are unchanged (803.1 against 806.1 ms, 1,533.3 against 1,533.6 ms).
+- 2 November (leeloo, the old plan): SrTiO3 69,120 at 974 ms, NaCl 125,000 at 965 ms. Now 3.4 and 2.7 times the
+  atoms, and at the old limits 339 and 409 ms per step.
+
+**Old and new plans at the same sizes** ([jobs/memcmp.sh](jobs/memcmp.sh), [logs/memcmp-ada](logs/memcmp-ada); old =
+`SPLINE_W`, `R128`, `STAGE_EDGES`, `HORNER`, `COMPOSE_SKIP`, `COMPOSE_FAST`, the readout tail and OMAT-0 tf32x3 off;
+peak = the largest `max_reserved` over the phases):
+
+| Size | ms/step new / old | Peak GiB new / old | Estimate GiB new / old |
+|---|---|---|---|
+| SrTiO3 10³, 5,000 (Benchmark_loup) | 20.8 / 25.1 | 1.18 / 0.94 | 0.96 / 0.96 |
+| SrTiO3 24³, 69,120 | 338.8 / 400.7 | 5.82 / 6.78 | 10.42 / 10.42 |
+| NaCl 25³, 125,000 | 409.3 / 476.6 | 7.08 / 8.91 | 8.38 / 9.39 |
+
+The new paths lower the peak by 14 % (SrTiO3) and 21 % (NaCl) at these sizes. Rule 12 has no terms for them, so its
+estimate barely changes, and est/peak rises from 1.54 to 1.79 at SrTiO3 69,120.
 
 ## The capacity bugs
 
@@ -149,7 +220,22 @@ other users' jobs on 8 November; the results follow in a second merge request.
    took rung (B) beyond about 35,000 atoms: twice the step cost, with the w′ backward off. Fix:
    `rewrites.memory.generic_wprime_backward` (B's term) and a `CONTEXT_TERMS` entry (B saves nothing beside it).
 
+3. `generic_recompute_first_table` (registry position 39) is checked after `tf32x3_gemms` (36), which attaches
+   `COMPOSE_SKIP` to the first interaction. Its self-check (`generic._run`) differentiated the probe's species table,
+   which the composed skip (inference only) refuses: `compose_skip has no gradient for the weights`. The rung failed,
+   the fallback ran the terminal sequence, and that ran out of memory. Every GPU with `COMPOSE_SKIP` (H200, A100
+   family, Ada) lost the rung. The memory probe's replica measured the same failure, so near the limit it misjudged
+   the rung. Fix (`969bfc4d`): with the composed skip, the probe's table carries no gradient (as in production) and is
+   not differentiated; the outputs and the other gradients are compared as before
+   (`tests/cpu/test_generic_chunked.py::test_probe_runs_the_composed_skip_without_a_table_gradient`, fails without
+   the fix). Found with `capacity_scan.py point --diagnose`.
+
 ## CPU suite
+
+With the third fix (`969bfc4d`), trillian, the same script with PYTHONPATH: 5,475 passed, 203 skipped,
+none failed ([logs/suite-trillian-969bfc4d/summary.txt](logs/suite-trillian-969bfc4d/summary.txt)).
+
+First merge request:
 
 trillian, merge `706b5ef0` (main `a557ea55` merged; the later commit `b10d9345` only rewraps comments),
 [jobs/suite.sh](jobs/suite.sh): `tests/cpu -n 8 -m "not acceptance"`, `CUDA_VISIBLE_DEVICES=` empty: 5,470 passed,

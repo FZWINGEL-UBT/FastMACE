@@ -1,0 +1,13 @@
+species-blocks: the order costs 141.4 us per call (eager torch)
+ghoist: 731 intervals, 76 table reads (ghoist: g values) per edge, registers [80] (production [80]), table 128.5 MiB, bias 0
+forward slab-sorted against real: max|d|/max|a| 4.88e-07
+forward species-blocks against real: max|d|/max|a| 0.00e+00
+forward slab-sorted+species-blocks against real: max|d|/max|a| 4.88e-07
+forward ghoist: finite True
+forward one-slab+ghoist: finite True
+forward: edges 373760 (inside 370288); real flush 3406.7 / warm 3394.1 us (x 1.0000 / 1.0000); one-slab flush 1281.1 / warm 1260.8 us (x 0.3761 / 0.3715); slab-sorted flush 3322.2 / warm 3312.7 us (x 0.9752 / 0.9760); species-blocks flush 3408.2 / warm 3406.1 us (x 1.0004 / 1.0035); slab-sorted+species-blocks flush 3322.8 / warm 3306.4 us (x 0.9754 / 0.9741); ghoist flush 3650.5 / warm 3637.5 us (x 1.0716 / 1.0717); one-slab+ghoist flush 1826.2 / warm 1809.7 us (x 0.5361 / 0.5332)
+wprime zero-table: 1 loads replaced, registers 80
+wprime zero-dout: 40 loads replaced, registers 80
+wprime zero-x: 112 loads replaced, registers 96
+wprime zero-all: 153 loads replaced, registers 80
+wprime: edges 373760 (inside 370288); real flush 4599.8 / warm 4556.8 us (x 1.0000 / 1.0000); one-slab flush 3735.6 / warm 3717.2 us (x 0.8121 / 0.8157); local-sender flush 4395.0 / warm 4382.7 us (x 0.9555 / 0.9618); one-slab+local-sender flush 3694.6 / warm 3679.5 us (x 0.8032 / 0.8075); local-dout flush 4464.7 / warm 4431.9 us (x 0.9706 / 0.9726); local-sender+local-dout flush 4280.4 / warm 4247.6 us (x 0.9305 / 0.9321); one-slab+local-sender+local-dout flush 3612.6 / warm 3596.3 us (x 0.7854 / 0.7892); zero-table flush 3291.2 / warm 3274.8 us (x 0.7155 / 0.7187); zero-dout flush 4030.5 / warm 3998.3 us (x 0.8762 / 0.8774); zero-x flush 4274.2 / warm 4239.9 us (x 0.9292 / 0.9305); zero-all flush 2675.7 / warm 2663.4 us (x 0.5817 / 0.5845)

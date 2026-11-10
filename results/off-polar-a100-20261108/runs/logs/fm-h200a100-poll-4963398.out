@@ -1,0 +1,71 @@
+### Starting TaskPrologue of job 4963398 on a0931 at Sun Nov  8 12:17:58 PM CET 2026
+Running on cores 64-79 with governor schedutil
+Sun Nov  8 12:17:58 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:49:00.0 Off |                    0 |
+| N/A   32C    P0             61W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-08T12:17:59+0100 alex_ab_pack v1 job 4963398 on a0931 (16 cores, AMD EPYC 7713 64-Core Processor); NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; source 1bd4f3be7391bb785ee834b8a0682079e6bb552b
+2026-11-08T12:17:59+0100 start ab-polar1-l-ab (4 switches)
+2026-11-08T14:08:52+0100 end ab-polar1-l-ab exit=0 wall 6653 s
+  polar1-l ab cueqproj NaCl a 7.7448 ms b 7.7002 ms b/a 0.9942 valid 
+  polar1-l ab mega NaCl a 7.8128 ms b 7.7423 ms b/a 0.9910 INVALID 
+  polar1-l ab headsoff NaCl a 7.8849 ms b 8.6985 ms b/a 1.1032 valid 
+  polar1-l ab pruneoff NaCl a 7.8590 ms b 8.9636 ms b/a 1.1406 valid 
+  polar1-l ab cueqproj NbCl5 a 29.4975 ms b 29.4692 ms b/a 0.9990 valid 
+  polar1-l ab mega NbCl5 a 29.5060 ms b 29.0793 ms b/a 0.9855 valid 
+  polar1-l ab headsoff NbCl5 a 29.4950 ms b 34.3479 ms b/a 1.1645 valid 
+  polar1-l ab pruneoff NbCl5 a 29.4759 ms b 35.8760 ms b/a 1.2171 valid 
+  SETUP ab-polar1-l-ab-cueqproj NaCl a 358 s b 435 s
+  SETUP ab-polar1-l-ab-cueqproj NbCl5 a 421 s b 393 s
+  SETUP ab-polar1-l-ab-headsoff NaCl a 358 s b 462 s
+  SETUP ab-polar1-l-ab-headsoff NbCl5 a 421 s b 438 s
+  SETUP ab-polar1-l-ab-mega NaCl a 358 s b 544 s
+  SETUP ab-polar1-l-ab-mega NbCl5 a 421 s b 671 s
+  SETUP ab-polar1-l-ab-pruneoff NaCl a 358 s b 441 s
+  SETUP ab-polar1-l-ab-pruneoff NbCl5 a 421 s b 468 s
+2026-11-08T14:08:59+0100 start ab-polar1-l-ba (4 switches)
+[2026-11-08T15:17:48.164] error: *** JOB 4963398 ON a0931 CANCELLED AT 2026-11-08T15:17:48 DUE TO TIME LIMIT ***
+=== JOB_STATISTICS ===
+=== current date     : Sun Nov  8 15:17:53 CET 2026
+= Job-ID             : 4963398 on alex
+= Job-Name           : fm-h200a100-poll
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-offpolar/jobs/h200a100-alex_ab_pack.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-offpolar
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 03:00:00
+= Elapsed runtime    : 03:00:02
+= Total RAM usage    : 13.1 GiB of assigned  GiB (%)
+= Node list          : a0931
+= Subm/Elig/Start/End: 2026-11-08T12:17:05 / 2026-11-08T12:17:05 / 2026-11-08T12:17:46 / 2026-11-08T15:17:48
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             587.0M   104.9G   209.7G        N/A     990      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            39.4G     0.0K     0.0K        N/A     420K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 1726995, 8 %, 2 %, 10926 MiB, 6637406 ms
+NVIDIA A100-SXM4-80GB, 00000000:49:00.0, 1758935, 2 %, 0 %, 6874 MiB, 4120128 ms

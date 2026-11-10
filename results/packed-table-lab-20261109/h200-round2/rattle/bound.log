@@ -1,0 +1,58 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/fastmace-src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/fastmace-src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/usr/local/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+species-blocks: the order costs 84.0 us per call (eager torch)
+packed8: 731 intervals, 10 table reads (ghoist: g values; deferred: phi accumulators) per edge, registers [80] (production [80]), table 64.2 MiB, bias 31
+packed8v2: 731 intervals, 10 table reads (ghoist: g values; deferred: phi accumulators) per edge, registers [80] (production [80]), table 64.2 MiB, bias 31
+deferred: 731 intervals, 76 table reads (ghoist: g values; deferred: phi accumulators) per edge, registers [80] (production [80]), table 128.5 MiB, bias 0
+deferred-a: 731 intervals, 41 table reads (ghoist: g values; deferred: phi accumulators) per edge, registers [77] (production [80]), table 128.5 MiB, bias 0
+deferred-b: 731 intervals, 35 table reads (ghoist: g values; deferred: phi accumulators) per edge, registers [80] (production [80]), table 128.5 MiB, bias 0
+forward slab-sorted against real: max|d|/max|a| 1.47e-07
+forward species-blocks against real: max|d|/max|a| 0.00e+00
+forward slab-sorted+species-blocks against real: max|d|/max|a| 1.47e-07
+forward packed8 against real: max|d|/max|a| 2.92e-06
+forward packed8v2 against real: max|d|/max|a| 2.92e-06
+forward deferred against real: max|d|/max|a| 3.67e-07
+forward one-slab+deferred: finite True
+forward deferred-a: finite True
+forward deferred-b: finite True
+forward: edges 378880 (inside 374548); real flush 743.7 / warm 743.5 us (x 1.0000 / 1.0000); one-slab flush 440.1 / warm 439.7 us (x 0.5918 / 0.5913); slab-sorted flush 737.8 / warm 738.5 us (x 0.9920 / 0.9932); species-blocks flush 743.6 / warm 743.9 us (x 0.9999 / 1.0005); slab-sorted+species-blocks flush 737.5 / warm 739.0 us (x 0.9916 / 0.9939); packed8 flush 672.8 / warm 672.1 us (x 0.9046 / 0.9039); packed8v2 flush 638.2 / warm 636.3 us (x 0.8582 / 0.8557); deferred flush 1747.8 / warm 1745.5 us (x 2.3501 / 2.3476); one-slab+deferred flush 1571.7 / warm 1569.3 us (x 2.1133 / 2.1107); deferred-a flush 297.9 / warm 297.1 us (x 0.4005 / 0.3996); deferred-b flush 521.8 / warm 523.1 us (x 0.7016 / 0.7036)
+wprime split: 20 loads replaced or sums split, registers 80
+wprime: edges 378880 (inside 374548); real flush 1164.4 / warm 1163.2 us (x 1.0000 / 1.0000); one-slab flush 1126.3 / warm 1120.6 us (x 0.9674 / 0.9634); local-sender flush 1153.9 / warm 1151.1 us (x 0.9910 / 0.9896); one-slab+local-sender flush 1122.8 / warm 1119.6 us (x 0.9644 / 0.9626); local-dout flush 1120.7 / warm 1115.6 us (x 0.9625 / 0.9591); local-sender+local-dout flush 1115.0 / warm 1110.5 us (x 0.9576 / 0.9547); one-slab+local-sender+local-dout flush 1102.0 / warm 1098.9 us (x 0.9464 / 0.9448); split flush 1200.5 / warm 1197.0 us (x 1.0311 / 1.0291)

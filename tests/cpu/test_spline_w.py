@@ -94,6 +94,68 @@ def test_switch_is_off_without_a_listed_gpu(monkeypatch):
     assert sf.spline_w_default("cpu")
 
 
+def test_omat0_small_takes_min_blocks_8_on_the_h200(monkeypatch):
+    """OMAT-0 small's own H200 launch shape (9 November 2026): the R128 shape with MIN_BLOCKS 8
+    (R128_MIN_BLOCKS_MODEL_GPUS; 6 for every other model and GPU). FOLD_ALPHA_MODEL_OFF_GPUS is empty (small's
+    FOLD_ALPHA A/Bs were within the spread), and a label listed there would keep FOLD_ALPHA off; the constants still
+    decide an A/B side."""
+    name = {"gpu": "NVIDIA H200"}
+    monkeypatch.setattr(sf.torch.cuda, "get_device_name", lambda device=None: name["gpu"])
+    monkeypatch.setattr(wp, "_device_name", lambda device: name["gpu"])
+    cuda = torch.device("cuda")
+    assert sf.R128 is None and sf.MIN_BLOCKS is None and wp.FOLD_ALPHA is None
+    assert sf.launch_shape(cuda, "omat0-small") == (128, 8)
+    assert sf.launch_shape(cuda, "omat0-medium") == (128, 6) and sf.launch_shape(cuda) == (128, 6)
+    assert wp.FOLD_ALPHA_MODEL_OFF_GPUS == {}
+    assert wp.fold_alpha_default(cuda, "omat0-small") and wp.fold_alpha_default(cuda)
+    monkeypatch.setattr(wp, "FOLD_ALPHA_MODEL_OFF_GPUS", {"omat0-small": ("NVIDIA H200",)})
+    assert not wp.fold_alpha_default(cuda, "omat0-small") and wp.fold_alpha_default(cuda, "omat0-medium")
+    name["gpu"] = "NVIDIA A100-SXM4-80GB"
+    assert sf.launch_shape(cuda, "omat0-small") == (128, 6) and wp.fold_alpha_default(cuda, "omat0-small")
+    name["gpu"] = "NVIDIA H200"
+    monkeypatch.setattr(sf, "R128", False)
+    assert sf.launch_shape(cuda, "omat0-small") == (sf.THREADS, None)
+    monkeypatch.setattr(wp, "FOLD_ALPHA", True)
+    assert wp.fold_alpha_default(cuda, "omat0-small")  # the constant over the label's off list
+    assert sf.launch_shape(torch.device("cpu"), "omat0-small") == (sf.THREADS, None)
+
+
+def test_omat0_small_keeps_prefetch_ahead_off_on_the_a100(monkeypatch):
+    """PREFETCH_AHEAD (9 November 2026): on for PREFETCH_AHEAD_GPUS (the A100 family) except OMAT-0 small
+    (PREFETCH_AHEAD_MODEL_OFF_GPUS; Alex 4967540 off 0.9902 / 0.9908); the constant still decides an A/B side."""
+    name = {"gpu": "NVIDIA A100-SXM4-80GB"}
+    monkeypatch.setattr(sf.torch.cuda, "get_device_name", lambda device=None: name["gpu"])
+    cuda = torch.device("cuda")
+    assert sf.PREFETCH_AHEAD is None
+    assert sf.prefetch_ahead_default(cuda, "omat0-small") == 0
+    assert sf.prefetch_ahead_default(cuda, "omat0-medium") == sf.PREFETCH_AHEAD_DISTANCE == 2
+    assert sf.prefetch_ahead_default(cuda) == 2
+    name["gpu"] = "NVIDIA A100 80GB PCIe"
+    assert sf.prefetch_ahead_default(cuda, "omat0-small") == 0 and sf.prefetch_ahead_default(cuda) == 2
+    name["gpu"] = "NVIDIA H200"
+    assert sf.prefetch_ahead_default(cuda) == 0
+    monkeypatch.setattr(sf, "PREFETCH_AHEAD", 2)
+    assert sf.prefetch_ahead_default(cuda, "omat0-small") == 2
+    assert sf.prefetch_ahead_default(torch.device("cpu"), "omat0-small") == 2
+
+
+def test_wprime_stage_edges_adds_the_h200_for_omat0_small(monkeypatch):
+    """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family) for every model, plus the H200 for OMAT-0
+    small (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""
+    monkeypatch.setattr(wp, "_device_name", lambda device: device)
+    assert wp.STAGE_EDGES is None
+    for device, label in (("NVIDIA H200", "omat0-small"), ("NVIDIA A100-SXM4-80GB", "omat0-small"),
+                          ("NVIDIA A100-SXM4-80GB", "omat0-medium"), ("NVIDIA A100-SXM4-80GB", None)):
+        assert wp.stage_edges_default(device, label), (device, label)
+    for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None),
+                          ("NVIDIA RTX 4000 Ada Generation", "omat0-small")):
+        assert not wp.stage_edges_default(device, label), (device, label)
+    monkeypatch.setattr(wp, "STAGE_EDGES", False)
+    assert not wp.stage_edges_default("NVIDIA H200", "omat0-small")
+    monkeypatch.setattr(wp, "STAGE_EDGES", True)
+    assert wp.stage_edges_default("NVIDIA H200", "omat0-medium")
+
+
 def _schedule():
     from test_wprime_backward import _schedule as schedule
 
@@ -455,7 +517,8 @@ def test_receiver_order_groups_species_stably():
     order = sf.receiver_order(torch.tensor([2, 0, 1, 0, 2, 1]))
     assert order.dtype == torch.int32 and order.tolist() == [1, 3, 2, 5, 0, 4]
     assert sf.BLOCK_ORDER is None and not sf.block_order_default("cpu")
-    assert "NVIDIA H200" in sf.BLOCK_ORDER_GPUS and "NVIDIA GeForce RTX 5060 Ti" not in sf.BLOCK_ORDER_GPUS
+    assert "NVIDIA H200" in sf.BLOCK_ORDER_GPUS and "NVIDIA A100-SXM4-80GB" in sf.BLOCK_ORDER_GPUS
+    assert "NVIDIA GeForce RTX 5060 Ti" not in sf.BLOCK_ORDER_GPUS
 
 
 def test_block_order_sources_compile_with_nvrtc():

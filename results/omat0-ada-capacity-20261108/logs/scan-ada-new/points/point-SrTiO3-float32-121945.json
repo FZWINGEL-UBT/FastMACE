@@ -1,0 +1,319 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-11-08T20:25:57.859588+00:00",
+  "host": "leto",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "d3d459efc5f2b4df5b46efae4add6edb6d01ef36",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "model": "omat0-medium",
+  "structure": "SrTiO3",
+  "precision": "float32",
+  "repeat": "29x29x29",
+  "natoms": 121945,
+  "volume_A3": 1452302.5781811245,
+  "steps": 200,
+  "warmup": 20,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "ok",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 20805451776,
+      "outside_allocator": 177274880
+    },
+    "build": {
+      "max_allocated": 7773950464,
+      "max_reserved": 10500440064,
+      "allocated": 1599476736,
+      "reserved": 9464446976,
+      "inactive_split_bytes": 0,
+      "active_bytes": 7773950464,
+      "reserved_bytes": 10500440064,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 11269701632,
+      "outside_allocator": 248578048
+    },
+    "warmup": {
+      "max_allocated": 2161519104,
+      "max_reserved": 10055843840,
+      "allocated": 1599476736,
+      "reserved": 10055843840,
+      "inactive_split_bytes": 0,
+      "active_bytes": 2161519104,
+      "reserved_bytes": 10055843840,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 10678304768,
+      "outside_allocator": 248578048
+    },
+    "steady": {
+      "max_allocated": 8007287296,
+      "max_reserved": 10120855552,
+      "allocated": 1599476736,
+      "reserved": 10120855552,
+      "inactive_split_bytes": 0,
+      "active_bytes": 8007287296,
+      "reserved_bytes": 10120855552,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 10611195904,
+      "outside_allocator": 250675200
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 20805451776,
+    "cuda_total_bytes": 20982726656,
+    "windows": null
+  },
+  "rewrites": {},
+  "constants": [],
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "plan": {
+    "engine": "GraphEngine",
+    "predicted_memory_bytes": 13293250951,
+    "memory": [
+      "memory",
+      "fits",
+      "rule 12: predicted 12.38 GiB (run; run 12.38, build 0.23) at 9475127 edges, 121945 atoms, float32 (activations 135106 MiB, neighbour list 1223 MiB, workspace 160 MiB); needs 12.38 of 19.38 GiB free; memory probe: corrected by a replica's measured peak (docs/validation/capacity/estimate-probe.md)"
+    ],
+    "rule_12": [
+      [
+        "RewriteConfig.recompute_conv_weights",
+        "off",
+        "auto (on_by_rule_12_when_the_plan_does_not_fit_without_it): off: on only when memory would not be enough without it: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (CAP-T07)"
+      ],
+      [
+        "RewriteConfig.recompute_first_table",
+        "off",
+        "auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights): off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (rebuild-a)"
+      ],
+      [
+        "RewriteConfig.recompute_node_segments",
+        "off",
+        "auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights): off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (CAP-T08)"
+      ],
+      [
+        "RewriteConfig.recompute_node_region",
+        "off",
+        "auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments): off: on only when memory would not be enough with recompute_node_segments on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (ninth list item 2)"
+      ],
+      [
+        "EngineConfig.memory_probe",
+        "near-limit",
+        "auto (near_limit_for_md_on_cuda): MD with CUDA graphs: rule 12's ambiguous memory choices are measured on a replica"
+      ],
+      [
+        "memory",
+        "fits",
+        "rule 12: predicted 12.38 GiB (run; run 12.38, build 0.23) at 9475127 edges, 121945 atoms, float32 (activations 135106 MiB, neighbour list 1223 MiB, workspace 160 MiB); needs 12.38 of 19.38 GiB free; memory probe: corrected by a replica's measured peak (docs/validation/capacity/estimate-probe.md)"
+      ]
+    ],
+    "text": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (16): reassociate_first, fused_folded_backward, segmented_first_sum, streaming_conv,\n      chunked_conv_backward, fused_folded_forward, radial_tables, wprime_backward, block_linear, grouped_linear,\n      merged_residual, species_skip, single_graph_strain, fold_product_linear, tf32x3_gemms, polar_uvu\n  rewrites off: factor_species, fold_cutoff, density_first, joint_radial_input, folded_backward_tiles, w_tables,\n      gated_rows, segment_gemm,\n      gate_epilogue (not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDens\u2026\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 12.38 GiB predicted (run; run 12.38, build 0.23), fits (19.38 GiB free); GPU NVIDIA RTX 4000 Ada Ge\u2026\n  workload: Langevin NVT, fixcm=True; 121945 atoms, 3D PBC, no constraints; up to 300 K\n  rules 8-11: superset O Ti Sr (8), max_temperature_K 300 K (11), host_callbacks_every none (9),\n      species_changes off (8), skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  memory probe: kept the default; default 12.38 GiB (was 18.22); 58 s\n  revisions: 0 minimal plan (phase 1b)",
+    "memory_probe": {
+      "stages": [
+        {
+          "stage": "",
+          "rewrites": [
+            [
+              "recompute_conv_weights",
+              "off"
+            ],
+            [
+              "recompute_conv_weights",
+              "off"
+            ],
+            [
+              "recompute_first_table",
+              "off"
+            ],
+            [
+              "recompute_first_table",
+              "off"
+            ],
+            [
+              "recompute_node_segments",
+              "off"
+            ],
+            [
+              "gate_epilogue",
+              "off"
+            ],
+            [
+              "recompute_node_region",
+              "off"
+            ]
+          ],
+          "replica_atoms": 16875,
+          "replica_estimate": 2916037680,
+          "replica_reserved": 1962934272,
+          "replica_allocated": 1564822528,
+          "scale": 0.6434370404110306,
+          "estimate": 19559276817,
+          "corrected": 13293250951,
+          "seconds": 42.28359645581804
+        }
+      ],
+      "before": "",
+      "chosen": "",
+      "changed_plan": false,
+      "headroom": 1.05,
+      "setup_s": 58.33669651905075
+    },
+    "memory_ladder": {
+      "free_bytes": 20805451776,
+      "chosen": {
+        "stage": "",
+        "rewrites": [
+          [
+            "recompute_conv_weights",
+            "off"
+          ],
+          [
+            "recompute_conv_weights",
+            "off"
+          ],
+          [
+            "recompute_first_table",
+            "off"
+          ],
+          [
+            "recompute_first_table",
+            "off"
+          ],
+          [
+            "recompute_node_segments",
+            "off"
+          ],
+          [
+            "gate_epilogue",
+            "off"
+          ],
+          [
+            "recompute_node_region",
+            "off"
+          ]
+        ],
+        "estimate": 13293250951,
+        "fixed": 243007904
+      },
+      "cheaper": null
+    }
+  },
+  "edges": {
+    "at_cutoff_initial": 9023930,
+    "at_cutoff_now": 9062264,
+    "candidates_cutoff_plus_skin": 11068542,
+    "capacity": 13070080,
+    "skin_A": 0.3,
+    "cutoff_A": 6.0,
+    "edge_bucket": 451328,
+    "padded_sizes": [
+      9026560,
+      9477888
+    ],
+    "rebuilds": 28,
+    "captures": [
+      {
+        "key": "ACP",
+        "warmup_in_pool": false,
+        "max_reserved_after_warmup_MiB": 8086.0,
+        "max_reserved_after_capture_MiB": 8086.0
+      },
+      {
+        "key": "('B', 9026560)",
+        "warmup_in_pool": false,
+        "max_reserved_after_warmup_MiB": 10014.0,
+        "max_reserved_after_capture_MiB": 10014.0
+      },
+      {
+        "key": "('B', 9477888)",
+        "warmup_in_pool": true,
+        "max_reserved_after_warmup_MiB": 9592.0,
+        "max_reserved_after_capture_MiB": 9592.0
+      }
+    ],
+    "force_graphs": "fit",
+    "force_graph_releases": 0,
+    "force_graph_floor": 0,
+    "recaptures": 1,
+    "force_bytes_per_edge": 863.5752694271129,
+    "pool_bytes": 7879000064,
+    "neighbour_list": {
+      "buffers_bytes": 787131560,
+      "buffers": {
+        "candidate_index": 104560640,
+        "candidate_unit_shifts": 156840960,
+        "edge_index": 209121280,
+        "unit_shifts": 156840960,
+        "shifts": 156840960,
+        "count": 8,
+        "reference_positions": 2926680,
+        "build_cell": 72
+      },
+      "bytes_per_slot": 60.0,
+      "screen_buffer_bytes": 124871680
+    }
+  },
+  "ms_per_step": 646.4110877853818,
+  "check": {
+    "initial_edges": 9023930,
+    "expected_initial_edges": 9023930,
+    "reference_edges_per_atom": 74.0,
+    "initial_ok": true,
+    "live_edges": 9062264,
+    "fresh_edges": 9062264,
+    "live_ok": true,
+    "max_abs_force": 2.94339656829834,
+    "forces_ok": true
+  },
+  "rebuild_transient": {
+    "peak_above_live_bytes": 550222336,
+    "reserved_added_bytes": 568328192,
+    "grew": false,
+    "candidates": 11066836
+  },
+  "times": {
+    "load_s": 4.513368709944189,
+    "build_s": 118.74559602793306,
+    "warmup_s": 11.729857431026176,
+    "steady_s": 129.28221755707636
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}
