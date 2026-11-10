@@ -107,6 +107,21 @@ With the fix, the compiled call peaks at 25.21 GB, 1.2 GB above the switch off (
 of pinned lists rounded up to blocks against their pageable form). CPU suite on `4c9be2bb` (the fix and its test,
 murphy): 5,563 passed, 203 skipped.
 
+## Receiver caps above 16,384 (rejected)
+
+The compiled budget takes caps up to 16,384 receivers. Job 37 (4c9be2bb, 5060 Ti, default allocator) fixed the
+cap with `--no-budget` at 975,560 SrTiO3 atoms, device state, two calls per side, 16,384 again at the end:
+
+| Cap | Median a / b (s) | µs/atom |
+| --- | --- | --- |
+| 16,384 | 6.197 / 6.263 | 6.35 / 6.42 |
+| 32,768 | 6.188 / 6.135 | 6.34 / 6.29 |
+| 65,536 | 6.400 / 6.393 | 6.56 / 6.55 |
+| 16,384 | 6.136 / 6.117 | 6.29 / 6.27 |
+
+32,768 sits inside the 16,384 runs' drift; 65,536 is 3.5 % slower. The default stays. The A100 and the Ada were
+not screened (ledger: tiled-receiver-cap).
+
 ## Records
 
 - `ab/`: the four A/B records of `TILE_COPY_STREAM` (5060 Ti).
@@ -117,5 +132,6 @@ murphy): 5,563 passed, 203 skipped.
 - `profiles/`: `job35/gputest.log`, `job36/wprof-58.json` and `wprof.log`, the jobs' logs.
 - `gate/`: the four gates' `metadata.json` (murphy off and on with their idle checks, Alex 4977013 with its log).
 - `memprobe/`: the host-memory probe's records (`run.log` with the pinned statistics, idle check, record).
-- `jobs/`: `ws_gate_probe.sh`, `ws_fix_chain.sh`, `with_constants.py`, `alex_gate.sh`, `alex_cap3.sh`; `job35.sh`, `job36.sh` (launched by the `launch.sh` of tiled-speed-20261108 as system units behind the
+- `capscreen/`: job 37's log, the per-cap logs and records.
+- `jobs/`: `job37.sh`, `ws_gate_probe.sh`, `ws_fix_chain.sh`, `with_constants.py`, `alex_gate.sh`, `alex_cap3.sh`; `job35.sh`, `job36.sh` (launched by the `launch.sh` of tiled-speed-20261108 as system units behind the
   local GPU reservation).

@@ -714,6 +714,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-state-dtype](#tiled-state-dtype) | Host state stored in 16 bits when the host is short (`"auto"`: kept lists first, then float16) | `TileConfig.state_dtype` | FM | DEFAULT `"auto"` (capacity fallback; float16 and bfloat16 not a default) | 2026-11-09 | float16 gate 12-51x, bfloat16 50-750x (fail); f16 store 0.983 / 0.977; host state halved | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 | [tiled-kept-compact](#tiled-kept-compact) | Kept lists delta-encoded below their 3 B per edge | - | FM | REJECTED (bound) | 2026-11-09 | at most a third of the lists; dropping them whole when short saves all | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
+| [tiled-receiver-cap](#tiled-receiver-cap) | Receiver caps above 16,384 in the compiled budget (32,768, 65,536) | `TileConfig.budget_receivers` | FM | REJECTED | 2026-11-11 | 5060 Ti device: 32,768 within noise of 16,384 (6.13–6.19 s against 6.12–6.26 s), 65,536 +3.5 % | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 | [tiled-malloc-mmap](#tiled-malloc-mmap) | glibc mmap threshold 1 MiB for capacity runs | `MALLOC_MMAP_THRESHOLD_` (environment) | FM | MEASURED (environment, not code) | 2026-11-09 | process peak -7 % at 10M atoms; calls within 1 % | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 
 <a id="tiled-prefetch-device"></a>
@@ -825,6 +826,15 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - What: the kept lists already store int16 ranks with a dictionary, one-byte unit codes and narrow counts (about 3 B per edge over a superset of about 2.2x the cutoff's edges). Delta-encoding the ranks would save at most a third of them.
 - Status: REJECTED at the bound: under a short host the lists now go whole (`state_dtype="auto"`, `list_reuse_floor`), which saves all of them at a measured 14 % per call.
 - Sources: [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md).
+
+<a id="tiled-receiver-cap"></a>
+#### tiled-receiver-cap: receiver caps above 16,384
+- Switch: `TileConfig.budget_receivers` (default `(8192, 16384)` in compiled mode; unchanged)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed)
+- What: larger tiles to cut the halo and the per-tile overhead (the A100 397.5M call ran 68 tiles of 16,384 receivers with about 8,920 halo atoms each).
+- Status: REJECTED on the RTX 5060 Ti. 975,560 SrTiO3 atoms, device state, the cap fixed (`--no-budget`), medians of two calls per side: R = 16,384 6.20 / 6.26 s, then 6.14 / 6.12 s at the end; R = 32,768 6.19 / 6.13 s (within the drift); R = 65,536 6.40 / 6.39 s (+3.5 %). Not measured on the A100 or the Ada, where the tiles' share of the GPU differs; open for a screen there.
+- Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) (`capscreen/`, job 37, 4c9be2bb).
 
 <a id="tiled-malloc-mmap"></a>
 #### tiled-malloc-mmap: glibc's mmap threshold for capacity runs
