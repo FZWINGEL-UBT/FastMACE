@@ -1801,8 +1801,15 @@ class Simulation:
                 allow_reference=self.options.allow_reference, mode=self.options.mode)
 
         launcher = memory_probe.ChildProbe(self, replica)
+        large = (memory_probe.replica(self._atoms, memory_probe.REPLICA_LARGE_ATOMS)
+                 if len(self._atoms) > memory_probe.REPLICA_LARGE_ATOMS[1] else None)
+
+        def launch_large(stage):  # the first stage again on the larger replica, for the offset
+            return launcher(stage, large)
+
         try:
-            return memory_probe.probe(planner, plan.memory_ladder, stages, launcher, plan_with=plan_with)
+            return memory_probe.probe(planner, plan.memory_ladder, stages, launcher, plan_with=plan_with,
+                                      launch_large=None if large is None else launch_large)
         finally:
             launcher.close()
 

@@ -67,14 +67,23 @@ MARGIN = 0.9
 # its per-edge weights are not kept, on the chunked folded path; then, with radial tables,
 # generic_recompute_first_table (docs/validation/omat0-capacity-2.md), the tables' outputs are evaluated again in the
 # backward. Both float32 only (RESCUE_FLOAT32_ONLY).
+#
+# A generic model's third rung, generic_recompute_first_layer (results/rung-b-20261109), after the table's: the first
+# interaction and product 0 under one checkpoint, about 1.09 times the step with the table's rung on.
 MEMORY_RESCUE = ("recompute_conv_weights", "generic_recompute_conv_weights", "recompute_first_table",
-                 "generic_recompute_first_table", "recompute_node_segments", "gate_epilogue", "recompute_node_region")
+                 "generic_recompute_first_table", "generic_recompute_first_layer", "recompute_node_segments",
+                 "gate_epilogue", "recompute_node_region")
 # Rungs whose kernels are float32 only: never taken in a float64 plan.
-RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights", "generic_recompute_first_table")
+RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights", "generic_recompute_first_table",
+                       "generic_recompute_first_layer")
 # The rungs the rescue turns off rather than on.
 RESCUE_OFF = ("gate_epilogue",)
 # generic_recompute_conv_weights saves nothing beside generic_wprime_backward, which stores no per-edge weights either
-# (the rung's interactions then run without w'; rewrites.radial.attach_generic_wprime).
+# (the rung's interactions then run without w'; rewrites.radial.attach_generic_wprime), and its path keeps the message
+# gradient dense beside its blocks (rewrites.memory.generic_recompute_conv_weights_beside_wprime: 20.5 kB per atom
+# more at OMAT-0 medium). (rung, record): neither rule 12 nor the fallback (fallback.memory_rescue) takes the rung
+# while the record is on (results/memory-slack-20261109: SrTiO3 39^3 ran out of memory on that gradient).
+RESCUE_NOT_BESIDE = (("generic_recompute_conv_weights", "generic_wprime_backward"),)
 # Records whose term depends on another enabled record, in priority order: (record, other record, the term's name in
 # ``fastmace.rewrites.memory``, "" for none). The first whose other record is enabled replaces the record's own term.
 # Inside recompute_node_region's chunks gate_epilogue's extra buffers are rebuilt per chunk (0.5 kB per atom); with
@@ -83,7 +92,8 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
                  ("gate_epilogue", "recompute_node_segments", "gate_epilogue_in_segments"),
                  ("generic_recompute_first_table", "generic_recompute_conv_weights",
                   "generic_recompute_first_table_with_weights"),
-                 ("generic_recompute_conv_weights", "generic_wprime_backward", ""))
+                 ("generic_recompute_conv_weights", "generic_wprime_backward",
+                  "generic_recompute_conv_weights_beside_wprime"))
 
 
 # The caching allocator's reserve above the live peak differs per stage of the memory rescue (the graph pool's packing
@@ -98,7 +108,7 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # Ada; docs/validation/omat0/omat0-capacity.md). The envelope of cells of at least 15,000 atoms is 0.975 (with SrTiO3 and
 # NaCl only, NaNbO3 held out came out at 0.980-1.014); 1 keeps the smaller cells (3,645-7,680 atoms) at their peak too.
 RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("generic_recompute_conv_weights", 1.0),
-                  ("generic_recompute_first_table", 1.0),
+                  ("generic_recompute_first_table", 1.0), ("generic_recompute_first_layer", 1.0),
                   ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84), ("gate_epilogue", 1.0),
                   ("recompute_node_region", 0.9))
 
@@ -107,7 +117,8 @@ def rescue_stage(enabled) -> str:
     """The deepest memory-rescue rung among ``enabled`` (record names; gate_epilogue's rung is taken when it is off
     with the node segments on): ``RESCUE_RESERVE``'s key, or "" for the default plan."""
     enabled = set(enabled)
-    for name in ("generic_recompute_first_table", "generic_recompute_conv_weights"):  # a generic model's rungs
+    for name in ("generic_recompute_first_layer", "generic_recompute_first_table",
+                 "generic_recompute_conv_weights"):  # a generic model's rungs
         if name in enabled:
             return name
     if "recompute_node_region" in enabled:
@@ -508,7 +519,8 @@ def annotate_out_of_memory(error, plan) -> Any:
 
 __all__ = ["CONTEXT_TERMS", "DTYPE_BYTES", "FIXED_TERMS", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN",
            "LadderStage", "MemoryEstimate", "MemoryLadder", "MemoryTerm", "MEMORY_RESCUE", "POLAR_STREAMING_BACKWARD",
-           "PROBE_HEADROOM", "PROBE_TERM", "RESCUE_OFF", "RESCUE_OVERSTATEMENT", "RESCUE_RESERVE", "SAFETY",
+           "PROBE_HEADROOM", "PROBE_TERM", "RESCUE_NOT_BESIDE", "RESCUE_OFF", "RESCUE_OVERSTATEMENT", "RESCUE_RESERVE",
+           "SAFETY",
            "WORKSPACE_BYTES", "annotate_out_of_memory", "counted_edges", "drop_order", "fixed_bytes", "probe_corrected",
            "probed", "rescue_stage", "rescue_value", "short_by_far",
            "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",

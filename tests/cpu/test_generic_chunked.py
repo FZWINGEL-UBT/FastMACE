@@ -11,6 +11,7 @@ The CUDA forward and backward against the unchunked path: tests/gpu/test_rewrite
 """
 
 import json
+import types
 from pathlib import Path
 
 import pytest
@@ -76,9 +77,63 @@ def test_the_rescue_rung():
     assert terms.generic_recompute_conv_weights(dims, 4) == (-1280 * 4, 0)  # the stored [E, 1280] weights
     rescue = memory.MEMORY_RESCUE
     assert rescue.index("generic_recompute_conv_weights") == rescue.index("recompute_conv_weights") + 1
-    assert memory.RESCUE_FLOAT32_ONLY == ("generic_recompute_conv_weights", "generic_recompute_first_table")
+    assert memory.RESCUE_FLOAT32_ONLY == ("generic_recompute_conv_weights", "generic_recompute_first_table",
+                                         "generic_recompute_first_layer")
     assert memory.rescue_stage(["generic_chunked_conv_backward", "generic_recompute_conv_weights"]) == (
         "generic_recompute_conv_weights")
+
+
+def test_the_rung_saves_nothing_beside_generic_wprime():
+    """Beside generic_wprime_backward (which stores no per-edge weights either) the rung saves nothing per edge and
+    its path keeps the message gradient dense, ``messages`` floats per node more (OMAT-0 medium: 5,120; SrTiO3 39^3
+    ran out of memory on it, results/memory-slack-20261109): its context term says so, and RESCUE_NOT_BESIDE keeps
+    rule 12 and the fallback from taking it there."""
+    from fastmace.planner import memory
+
+    dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
+    assert terms.generic_recompute_conv_weights_beside_wprime(dims, 4) == (0, 5120 * 4)
+    assert ("generic_recompute_conv_weights", "generic_wprime_backward",
+            "generic_recompute_conv_weights_beside_wprime") in memory.CONTEXT_TERMS
+    assert memory.RESCUE_NOT_BESIDE == (("generic_recompute_conv_weights", "generic_wprime_backward"),)
+    terms_ = dict(memory.rewrite_memory_terms(
+        {"generic_recompute_conv_weights": types.SimpleNamespace(memory=terms.generic_recompute_conv_weights)},
+        dims, ["generic_wprime_backward", "generic_recompute_conv_weights"], "float32"))
+    assert terms_["generic_recompute_conv_weights"] == memory.MemoryTerm(0, 5120 * 4)
+
+
+def test_the_first_layer_rung():
+    """generic_recompute_first_layer (results/rung-b-20261109): its own field, off by default, after the first
+    table's rung; rounding; float32 only; product 0's input (the first interaction's ``target``, 2,048 floats per node
+    at OMAT-0 medium) is not kept, while the table's rung keeps its per-edge term only."""
+    from fastmace.planner import fixed as fixed_planner
+    from fastmace.planner import memory
+    from fastmace.rewrites import radial
+
+    record = radial.RECORDS["generic_recompute_first_layer"]
+    assert record["config_field"] == "recompute_first_layer" and record["default"] == "off"
+    assert record["requires"] == ("generic_recompute_first_table",) and record["exactness"] == "rounding"
+    assert record["memory"] is terms.generic_recompute_first_layer
+    dims = ModelDims.from_record(FIT["dims"]["omat0-medium"])
+    assert terms.generic_recompute_first_layer(dims, 4) == (0, -2048 * 4)
+    assert terms.generic_recompute_first_table(dims, 4) == (-65 * 4, 0)
+    assert terms.generic_recompute_first_table_with_weights(dims, 4) == (-2 * 65 * 4, 0)
+    rescue = memory.MEMORY_RESCUE
+    assert rescue.index("generic_recompute_first_layer") == rescue.index("generic_recompute_first_table") + 1
+    assert "generic_recompute_first_layer" in memory.RESCUE_FLOAT32_ONLY
+    assert memory.rescue_stage(["generic_recompute_first_table", "generic_recompute_first_layer"]) == (
+        "generic_recompute_first_layer")
+    assert fixed_planner.AUTO_RULES["RewriteConfig.recompute_first_layer"] == (
+        "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_first_table")
+    assert tp.plan_for("omat0-medium").rewrites.recompute_first_layer == "off"  # auto: the rescue's
+
+
+def test_an_explicit_first_layer_needs_the_first_table_on_a_generic_model():
+    from fastmace.errors import PlanRefused
+
+    with pytest.raises(PlanRefused, match="recompute_first_layer='on' requires recompute_first_table"):
+        tp.plan_for("omat0-medium", rewrites=RewriteConfig(recompute_first_layer="on", recompute_first_table="off"))
+    with pytest.raises(PlanRefused, match="recompute_first_layer='on' requires recompute_first_table"):
+        tp.plan_for("mh1-r2scan", rewrites=RewriteConfig(recompute_first_layer="on", recompute_first_table="on"))
 
 
 def test_an_explicit_rung_needs_the_chunked_path_and_float32():

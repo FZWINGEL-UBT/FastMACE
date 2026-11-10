@@ -90,7 +90,7 @@ def test_the_record_is_rounding_deterministic_off_and_rescued_after_recompute_co
     assert (record.exactness, record.default, record.deterministic) == ("rounding", "off", True)
     assert record.requires == ("gated_rows",)
     assert memory.MEMORY_RESCUE == ("recompute_conv_weights", "generic_recompute_conv_weights", "recompute_first_table",
-                                    "generic_recompute_first_table",
+                                    "generic_recompute_first_table", "generic_recompute_first_layer",
                                     "recompute_node_segments",
                                     "gate_epilogue", "recompute_node_region")
     assert "fastmace.rewrites.segments" in reg.RECORD_SOURCES
