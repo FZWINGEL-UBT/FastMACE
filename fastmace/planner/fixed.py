@@ -103,6 +103,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.wprime_backward": "on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus",
     "RewriteConfig.recompute_conv_weights": "on_by_rule_12_when_the_plan_does_not_fit_without_it",
     "RewriteConfig.recompute_first_table": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
+    "RewriteConfig.recompute_first_layer": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_first_table",
     "RewriteConfig.recompute_node_segments": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights",
     "RewriteConfig.recompute_node_region": "on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
@@ -154,7 +155,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
                   "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
                   "fused_folded_forward", "radial_tables", "w_tables", "wprime_backward", "recompute_conv_weights",
-                  "recompute_first_table",
+                  "recompute_first_table", "recompute_first_layer",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_epilogue",
                   "recompute_node_segments", "recompute_node_region", "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -1694,6 +1695,17 @@ class FixedPlanner:
             "off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that "
             "cannot fit, or a rebuild after an out-of-memory error at build or capture (rebuild-a)"
             if self.rewrites.recompute_first_table == "auto" else "off: requested")
+        # Item 2 of the memory profile (results/rung-b-20261109): a generic model's rung after the first table's.
+        first_layer = v["recompute_first_table"] and generic
+        if self.rewrites.recompute_first_layer == "on" and not first_layer:
+            book.refuse("RewriteConfig.recompute_first_layer='on' requires recompute_first_table on a generic model",
+                        "rewrite-requirement-missing")
+        v["recompute_first_layer"] = self.rewrites.recompute_first_layer == "on" and first_layer
+        v["_why"]["recompute_first_layer"] = (
+            "on: requested" if v["recompute_first_layer"] else
+            "off: on only when memory would not be enough with recompute_first_table on: rule 12 for a cell that "
+            "cannot fit, or a rebuild after an out-of-memory error at build or capture (results/rung-b-20261109)"
+            if self.rewrites.recompute_first_layer == "auto" else "off: requested")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))

@@ -226,17 +226,16 @@ def recomputed_first_table(self, edge_feats, node_feats, node_attrs, edge_attrs,
                       use_reentrant=False, preserve_rng_state=False)
 
 
-# generic_recompute_first_table's checkpoint region through product 0 (memory profile item 2, 9 November 2026): the
-# first interaction, its division and product 0 run under one non-reentrant checkpoint, so the backward keeps the
-# layer's inputs instead of product 0's input, the divided message [N, 2048] (8.2 kB per atom at OMAT-0 medium, live
-# at the force backward's peak), and rebuilds the layer when it reaches it, after the second interaction's backward.
-# On the whole system only (a tile runs the layer as before). True / False are the A/B sides.
-FIRST_LAYER_REGION = True
+# generic_recompute_first_layer (memory profile item 2, results/rung-b-20261109): the first interaction, its division
+# and product 0 under one non-reentrant checkpoint, so the backward keeps the layer's inputs instead of product 0's
+# input, the divided message [N, 2048] (8.2 kB per atom at OMAT-0 medium, live at the force backward's peak), and
+# rebuilds the layer when it reaches it, after the second interaction's backward. On the whole system only (a tile
+# runs the layer as before).
 
 
 class LayerInputs(tuple):
     """The first interaction's inputs, which it hands to product 0 instead of its output when product 0 runs the
-    layer region (``FIRST_LAYER_REGION``): ``(node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
+    layer region (``attach_layer_region``): ``(node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
     cutoff)``."""
 
     __slots__ = ()
@@ -267,8 +266,8 @@ def layer_body(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
 
 
 def attach_layer_region(interaction, product):
-    """``FIRST_LAYER_REGION``: the first interaction hands its inputs to ``product``, which runs both under one
-    checkpoint. The interaction is held in a list (not a second registration of the module)."""
+    """``generic_recompute_first_layer``: the first interaction hands its inputs to ``product``, which runs both
+    under one checkpoint. The interaction is held in a list (not a second registration of the module)."""
     import types
 
     interaction.layer_product = True
@@ -370,7 +369,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
                                 cutoff=None, lammps_class=None, lammps_natoms=(0, 0), first_layer=False, region=False):
     """RealAgnosticResidual / Density / DensityResidual InteractionBlock.forward (mace-torch 0.3.16)
     with the generic rewrites: streaming convolution, reassociated first interaction, fused radial backward.
-    ``region``: called inside product 0's layer region (``FIRST_LAYER_REGION``)."""
+    ``region``: called inside product 0's layer region (``attach_layer_region``)."""
     from mace.tools.scatter import scatter_sum
     if not region and layer_region_applies(self, lammps_class):  # product 0 runs the layer under one checkpoint
         return LayerInputs((node_attrs, node_feats, edge_attrs, edge_feats, edge_index, cutoff)), None

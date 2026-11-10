@@ -1365,15 +1365,56 @@ def attach_generic_first_table(model):
         interaction.recompute_table = True
     if not names:
         raise RewriteError("generic_recompute_first_table: no reassociated or chunked interaction with a radial table")
+    return names
+
+
+# --------------------------------------------------------------------------- generic_recompute_first_layer
+
+
+def attach_generic_first_layer(model):
+    """``generic_recompute_first_layer``: the reassociated first interaction (its table recomputed,
+    ``generic_recompute_first_table``) and product 0 under one checkpoint (``generic.modules.attach_layer_region``),
+    so the backward keeps the layer's inputs instead of product 0's input. Returns its name."""
     from fastmace.rewrites.generic import modules as gm
 
     products = getattr(model, "products", ())
     first = model.interactions[0] if len(getattr(model, "interactions", ())) else None
-    if (gm.FIRST_LAYER_REGION and first is not None and products
-            and getattr(first, "recompute_table", False) and getattr(first, "first_reassociation", None) is not None):
-        gm.attach_layer_region(first, products[0])
-        names[0] += "; with product 0 in one region"
-    return names
+    if (first is None or not products or not getattr(first, "recompute_table", False)
+            or getattr(first, "first_reassociation", None) is None):
+        raise RewriteError("generic_recompute_first_layer: the first interaction is not reassociated with its table "
+                           "recomputed (generic_recompute_first_table)")
+    gm.attach_layer_region(first, products[0])
+    return ["interactions.0..products.0 (one region)"]
+
+
+def _generic_first_layer_selfcheck(original, rewritten, context):
+    """The first interaction and product 0 under the one checkpoint against the two run one after the other, on the
+    first-table check's probe leaves: product 0's output and the gradients to the leaves (the same kernels on the
+    same values; equal up to the sender gradients' atomic order)."""
+    import torch
+
+    from fastmace.rewrites import generic
+    from fastmace.rewrites.registry import check_tensors
+
+    interaction = rewritten.interactions[0]
+    table = interaction.radial_table
+    generator = torch.Generator().manual_seed(context.seed + 61)
+    probe = generic._probe_inputs(interaction, table.columns, generator, True)
+    edges = probe["edge_feats"].shape[0]
+    r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand((edges, 1), generator=generator, dtype=torch.float64)
+    r[::12] = table.r_max + 0.5 * torch.rand((r[::12].shape[0], 1), generator=generator, dtype=torch.float64)
+    probe["edge_feats"] = r.to(probe["edge_attrs"]).requires_grad_()
+    layer = interaction.__dict__.pop("layer_product", None)
+    try:
+        cases = _layer_region_cases(rewritten, interaction, probe, generator)
+    finally:
+        if layer is not None:
+            interaction.layer_product = layer
+    return check_tensors(cases, table.coef.dtype)
+
+
+def _apply_generic_first_layer(model, context):
+    return attach_generic_first_layer(model)
 
 
 def _generic_first_table_selfcheck(original, rewritten, context):
@@ -1408,8 +1449,6 @@ def _generic_first_table_selfcheck(original, rewritten, context):
             for flag in (False, True):
                 interaction.recompute_table = flag
                 results.append(generic._run(interaction, probe, False, cotangents, generator))
-            if layer is not None:
-                cases += _layer_region_cases(rewritten, interaction, probe, generator)
         finally:
             interaction.recompute_table = True
             if layer is not None:
@@ -1423,7 +1462,7 @@ def _generic_first_table_selfcheck(original, rewritten, context):
 
 class _Layer:
     """The first interaction followed by product 0, called as an interaction (``generic._run``): the output is
-    product 0's. With ``region`` the interaction hands its inputs to product 0 (``FIRST_LAYER_REGION``)."""
+    product 0's. With ``region`` the interaction hands its inputs to product 0 (``attach_layer_region``)."""
 
     def __init__(self, interaction, product, region):
         self._interaction, self._product, self._region = interaction, product, region
@@ -1443,9 +1482,9 @@ class _Layer:
 
 
 def _layer_region_cases(rewritten, interaction, probe, generator):
-    """``FIRST_LAYER_REGION``: the first interaction and product 0 under the one checkpoint against the two run one
-    after the other (the same kernels on the same values; equal up to the sender gradients' atomic order): product
-    0's output and the gradients to the probe's leaves."""
+    """``generic_recompute_first_layer``: the first interaction and product 0 under the one checkpoint against the
+    two run one after the other (the same kernels on the same values; equal up to the sender gradients' atomic
+    order): product 0's output and the gradients to the probe's leaves."""
     from fastmace.rewrites import generic
 
     product = rewritten.products[0]
@@ -1480,6 +1519,14 @@ RECORDS = {
         source_hashes={}, exactness="exact", default="off", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_generic_first_table,
         selfcheck=_generic_first_table_selfcheck, memory=memory_terms.generic_recompute_first_table),
+    # The first-table region widened through product 0 (memory profile item 2, results/rung-b-20261109): rounding
+    # (Inductor fuses the recomputed layer apart); float32 (after generic_recompute_first_table); a rescue rung.
+    "generic_recompute_first_layer": dict(
+        name="generic_recompute_first_layer", config_field="recompute_first_layer", applies_to=_generic_support,
+        requires=("generic_recompute_first_table",), conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={},
+        exactness="rounding", default="off", deterministic=False, workload_constraints=(FIXED_SPECIES_SUPERSET,),
+        apply=_apply_generic_first_layer, selfcheck=_generic_first_layer_selfcheck,
+        memory=memory_terms.generic_recompute_first_layer),
     # ideas-20261027 D2: rounding (the series and the folded product reassociated); float64; opt-in.
     "w_tables": Rewrite(
         name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),

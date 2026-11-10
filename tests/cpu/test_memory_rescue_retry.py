@@ -109,6 +109,21 @@ def test_the_rescue_skips_the_generic_rung_beside_generic_wprime(monkeypatch, st
     assert stubbed[-1]["rewrites"] == {"recompute_conv_weights": "on"}
 
 
+
+def test_the_rescue_takes_the_first_layer_after_the_first_table(monkeypatch, stubbed):
+    """results/rung-b-20261109: on a generic model the first table's rung comes first, then
+    generic_recompute_first_layer (about 1.09 times the step), which needs the table's rung."""
+    requires = {"generic_recompute_first_layer": ("generic_recompute_first_table",)}
+    monkeypatch.setattr(fallback, "_record", lambda name: types.SimpleNamespace(requires=requires.get(name, ())))
+    ff = types.SimpleNamespace(rewrites="auto")
+    generic_model = {"fold_cutoff": "off", "recompute_first_layer": "off"}
+    fallback.memory_rescue(stub_plan(recompute_first_table="off", **generic_model), oom(), ff, None, planner=None,
+                           stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_first_table": "on"}
+    fallback.memory_rescue(stub_plan(recompute_first_table="on", **generic_model), oom(), ff, None, planner=None,
+                           stage="build", usable=lambda device: True)
+    assert stubbed[-1]["rewrites"] == {"recompute_first_layer": "on"}
+
 def test_the_rescue_turns_gate_epilogue_off_after_the_node_segments(monkeypatch, stubbed):
     """docs/validation/capacity/region-norm.md: gate_epilogue (decision 66's default) is the rung the rescue turns off, after
     recompute_node_segments and before recompute_node_region; the caller's explicit "on" is kept."""

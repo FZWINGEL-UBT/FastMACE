@@ -246,25 +246,23 @@ def _table_output(interaction):
     return interaction.radial[-2] + 1
 
 
-def _first_layer_region(dims):
-    """Floats per node that ``generic.modules.FIRST_LAYER_REGION`` keeps out of the backward: product 0's input, the
-    first interaction's divided message (``target``; OMAT-0 medium: 2,048, 8.2 kB per atom)."""
-    from fastmace.rewrites.generic import modules as gm
-
-    return dims.interactions[0].target if gm.FIRST_LAYER_REGION and dims.interactions else 0
-
-
 def generic_recompute_first_table(dims, width):
     """The reassociated first interaction's table output is not kept for the backward (it keeps the lengths, which
-    the table keeps anyway), nor, with the layer region, product 0's input. With stored weights the other
-    interactions keep the weights, not the table output."""
-    return -_table_output(dims.interactions[0]) * width, -_first_layer_region(dims) * width
+    the table keeps anyway). With stored weights the other interactions keep the weights, not the table output."""
+    return -_table_output(dims.interactions[0]) * width, 0
 
 
 def generic_recompute_first_table_with_weights(dims, width):
     """``generic_recompute_first_table`` with ``generic_recompute_conv_weights``: no interaction keeps its table
     output (the chunked convolution evaluates it again)."""
-    return -sum(_table_output(i) for i in dims.interactions) * width, -_first_layer_region(dims) * width
+    return -sum(_table_output(i) for i in dims.interactions) * width, 0
+
+
+def generic_recompute_first_layer(dims, width):
+    """The first interaction and product 0 under one checkpoint: product 0's input, the first interaction's divided
+    message (``target`` floats per node; OMAT-0 medium: 2,048, 8.2 kB per atom), is not kept for the backward
+    (measured at SrTiO3 32^3 on the RTX 4000 Ada: 1.32 GiB less reserved, 8.4 kB per atom; results/rung-b-20261109)."""
+    return 0, -(dims.interactions[0].target if dims.interactions else 0) * width
 
 
 def block_linear_resident(dims, width):

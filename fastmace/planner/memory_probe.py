@@ -86,6 +86,17 @@ def stages_to_probe(ladder: MemoryLadder | None, setting: str) -> tuple[LadderSt
     return (ladder.chosen,) + ((cheaper,) if cheaper_might_fit else ())
 
 
+def cheaper_after(ladder: MemoryLadder, scale: float) -> bool:
+    """Whether the next-cheaper stage is measured too once the chosen rescue stage measured ``scale``: when its
+    estimate, overstated as much as the chosen one's, might fit (``PROBE_SPREAD`` between the stages). Rule 12
+    overstates the default plan more than ``PROBE_SPREAD`` (SrTiO3 32^3 with MACE-OMAT-0 medium on the RTX 4000 Ada:
+    24.4 GiB estimated, 12.0 GiB measured), so ``stages_to_probe`` alone left the default plan unmeasured and the run
+    took generic_recompute_first_table, 8 % slower, far below the limit (results/rung-b-20261109)."""
+    cheaper = ladder.cheaper
+    return (cheaper is not None and bool(ladder.chosen.stage)
+            and cheaper.fixed + (cheaper.estimate - cheaper.fixed) * scale / PROBE_SPREAD <= ladder.limit)
+
+
 def repeat_unit(atoms: Any, tolerance_A: float = POSITION_TOLERANCE_A) -> tuple[Any, tuple[int, int, int]] | None:
     """``(unit, repeats)``: the smallest cell whose ``repeats`` along the three cell vectors make ``atoms`` (the
     structure's translational period along each vector, from the positions), or ``None`` when ``atoms`` is not
@@ -198,6 +209,7 @@ def probe(planner: Any, ladder: MemoryLadder, stages, launch: Callable[[LadderSt
 
     started = clock()
     measured = []
+    stages = list(stages)
     for stage in stages:
         try:
             result = launch(stage)
@@ -217,6 +229,8 @@ def probe(planner: Any, ladder: MemoryLadder, stages, launch: Callable[[LadderSt
             replica_estimate=int(result["estimate"]), replica_reserved=int(result["reserved"]),
             replica_allocated=int(result["allocated"]), scale=float(scale), estimate=int(stage.estimate),
             corrected=int(math.ceil(corrected)), seconds=float(result["seconds"])))
+        if stage == ladder.chosen and cheaper_after(ladder, scale) and ladder.cheaper not in stages:
+            stages.append(ladder.cheaper)  # measured too: the loop goes on over the list it grows
     scaled = with_scales(planner, [(stage.stage, stage.scale) for stage in measured])
     plan = plan_with(scaled)
     ladder_after = plan.memory_ladder
@@ -277,4 +291,4 @@ class ChildProbe:
 
 
 __all__ = ("ChildProbe", "Outcome", "POSITION_TOLERANCE_A", "PROBE_SPREAD", "PROBE_STEPS", "REPLICA_ATOMS", "apply",
-           "probe", "repeat_unit", "replica", "report_line", "stages_to_probe", "with_scales")
+           "cheaper_after", "probe", "repeat_unit", "replica", "report_line", "stages_to_probe", "with_scales")

@@ -118,8 +118,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                              "FUSED_FIRST_CONSTANT_NAME": "device check as a Dynamo constant; A/B",
                                              "EDGE_SH": "Triton edge spherical harmonics; per GPU, A/B",
                                              "STOCK_FIRST_SKIP": "MACE-OFF first block's species skip; A/B",
-                                             "TILE_BLOCK_ROWS": "tiled w' block rows; None = per call, A/B",
-                                             "FIRST_LAYER_REGION": "first table rung through product 0; A/B"},
+                                             "TILE_BLOCK_ROWS": "tiled w' block rows; None = per call, A/B"},
     # Tiled speed (8-9 November 2026, results/tiled-speed-20261108): same-process A/B switches of
     # tools/bench/tiled_ab.py; None = TILED_SPEED_GPUS (decision 66).
     "fastmace/model/tiled.py": {"TILE_PREFETCH_DEVICE": "prefetch with device state; None = per GPU, A/B",

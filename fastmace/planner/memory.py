@@ -67,10 +67,15 @@ MARGIN = 0.9
 # its per-edge weights are not kept, on the chunked folded path; then, with radial tables,
 # generic_recompute_first_table (docs/validation/omat0-capacity-2.md), the tables' outputs are evaluated again in the
 # backward. Both float32 only (RESCUE_FLOAT32_ONLY).
+#
+# A generic model's third rung, generic_recompute_first_layer (results/rung-b-20261109), after the table's: the first
+# interaction and product 0 under one checkpoint, about 1.09 times the step with the table's rung on.
 MEMORY_RESCUE = ("recompute_conv_weights", "generic_recompute_conv_weights", "recompute_first_table",
-                 "generic_recompute_first_table", "recompute_node_segments", "gate_epilogue", "recompute_node_region")
+                 "generic_recompute_first_table", "generic_recompute_first_layer", "recompute_node_segments",
+                 "gate_epilogue", "recompute_node_region")
 # Rungs whose kernels are float32 only: never taken in a float64 plan.
-RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights", "generic_recompute_first_table")
+RESCUE_FLOAT32_ONLY = ("generic_recompute_conv_weights", "generic_recompute_first_table",
+                       "generic_recompute_first_layer")
 # The rungs the rescue turns off rather than on.
 RESCUE_OFF = ("gate_epilogue",)
 # generic_recompute_conv_weights saves nothing beside generic_wprime_backward, which stores no per-edge weights either
@@ -103,7 +108,7 @@ CONTEXT_TERMS = (("gate_epilogue", "recompute_node_region", ""),
 # Ada; docs/validation/omat0/omat0-capacity.md). The envelope of cells of at least 15,000 atoms is 0.975 (with SrTiO3 and
 # NaCl only, NaNbO3 held out came out at 0.980-1.014); 1 keeps the smaller cells (3,645-7,680 atoms) at their peak too.
 RESCUE_RESERVE = (("recompute_conv_weights", 0.855), ("generic_recompute_conv_weights", 1.0),
-                  ("generic_recompute_first_table", 1.0),
+                  ("generic_recompute_first_table", 1.0), ("generic_recompute_first_layer", 1.0),
                   ("recompute_first_table", 0.85), ("recompute_node_segments", 0.84), ("gate_epilogue", 1.0),
                   ("recompute_node_region", 0.9))
 
@@ -112,7 +117,8 @@ def rescue_stage(enabled) -> str:
     """The deepest memory-rescue rung among ``enabled`` (record names; gate_epilogue's rung is taken when it is off
     with the node segments on): ``RESCUE_RESERVE``'s key, or "" for the default plan."""
     enabled = set(enabled)
-    for name in ("generic_recompute_first_table", "generic_recompute_conv_weights"):  # a generic model's rungs
+    for name in ("generic_recompute_first_layer", "generic_recompute_first_table",
+                 "generic_recompute_conv_weights"):  # a generic model's rungs
         if name in enabled:
             return name
     if "recompute_node_region" in enabled:

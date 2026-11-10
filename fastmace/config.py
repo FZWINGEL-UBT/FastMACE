@@ -156,6 +156,13 @@ class RewriteConfig:
     # (capacity ideas, rebuild-a); exact; needs radial_tables and reassociate_first; auto = off, turned on by rule 12
     # only when the plan would not fit with recompute_conv_weights on.
     recompute_first_table: Toggle = "auto"
+    # A generic model's first interaction and product 0 under one non-reentrant checkpoint (the first-table region
+    # widened, rewrites.generic.modules.attach_layer_region): the force call keeps the layer's inputs instead of
+    # product 0's input, the divided message [N, 2048] at MACE-OMAT-0 medium (8.2 kB per atom), and runs the layer
+    # again in the backward, about 1.09 times the step (results/rung-b-20261109); rounding; needs
+    # recompute_first_table on a generic model; auto = off, turned on by rule 12 only when the plan would not fit
+    # with recompute_first_table on.
+    recompute_first_layer: Toggle = "auto"
     # Each interaction's gated_rows chain and product block under non-reentrant checkpointing: the force call keeps
     # only their inputs and rebuilds their intermediates in the backward (plans/capacity.md CAP-T08,
     # fastmace.rewrites.segments); rounding; needs gated_rows; auto = off, turned on by rule 12 only when the plan

@@ -178,6 +178,38 @@ def test_the_probe_measures_each_stage_and_re_plans(rescue):
     assert "replica 17576 atoms measured" in line
 
 
+@pytest.mark.parametrize(("cheaper", "scale", "after"), [
+    (30.0, 0.5, True),  # 30 GiB overstated as the chosen stage was: 15 / 1.25 below the limit (18 GiB)
+    (30.0, 0.9, False),  # 27 / 1.25 is not
+    (None, 0.5, False),
+])
+def test_the_cheaper_stage_is_measured_after_the_chosen_one_where_its_scale_says_it_might_fit(cheaper, scale, after):
+    """memory_probe.cheaper_after: rule 12 overstated SrTiO3 32^3's default plan 2x (24.4 GiB against 12.0
+    measured, results/rung-b-20261109), beyond PROBE_SPREAD, so near-limit probing measured only the rung; the
+    chosen stage's measured scale now decides whether the cheaper stage is measured too."""
+    ladder = memory.MemoryLadder(20 * GIB, stage("recompute_conv_weights" if cheaper else "", 14 * GIB),
+                                 None if cheaper is None else stage("", cheaper * GIB))
+    assert memory_probe.cheaper_after(ladder, scale) is after
+    assert memory_probe.stages_to_probe(ladder, "near-limit") == ()  # neither near the limit nor a cheaper stage
+
+
+def test_the_probe_measures_the_cheaper_stage_after_the_chosen_one(rescue):
+    atoms, base, full, free = rescue
+    planner = tmp.minimal()
+    ladder = planner_plan(planner, free, base, atoms).memory_ladder
+    calls = []
+
+    def launch(stage):  # the replica measures a quarter of each stage's variable estimate
+        calls.append(stage.stage)
+        return {"replica_atoms": 17_576, "estimate": stage.fixed + 4 * GIB, "reserved": stage.fixed + GIB,
+                "allocated": stage.fixed + GIB, "seconds": 30.0}
+
+    outcome = memory_probe.probe(planner, ladder, (ladder.chosen,), launch, clock=tc.Clock(),
+                                 plan_with=lambda p: planner_plan(p, free, base, atoms))
+    assert calls == [ladder.chosen.stage, ""]
+    assert outcome.record.chosen == "" and outcome.record.changed_plan
+
+
 def test_a_failed_child_keeps_the_rules_plan(rescue):
     atoms, base, full, free = rescue
     planner = tmp.minimal()
