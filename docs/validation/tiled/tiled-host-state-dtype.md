@@ -122,6 +122,57 @@ Bytes per atom:
 - **Build host peak.** 6.5–6.9 kB/atom at 20M before MACE's batch skipped its neighbour list; about 0.55 kB/atom
   now (340 B/atom of it per atom).
 
+## Capacity on one A100-80 (Alex, 9–10 November 2026)
+
+**Result: 397,535,000 atoms** (SrTiO3 430³) in one Slurm job with one A100-SXM4-80GB on node a0934. Alex gives a
+one-GPU job a 231.5 GB memory cgroup. Source `7e4fbf4c`; environment `fm-a100omat/env` (torch 2.14.1+cu130); OMAT-0
+medium, float32 calls. Settings:
+- `tools/bench/tiled_capacity.py --mode auto --tile-list --host-state --alias-state --species-index --wavefront on
+  --calls 2 --state-dtype auto`;
+- the first call eager (it measures its memory), the second compiled.
+
+| Atoms | Build | Eager call | Compiled call | µs/atom (compiled) | GPU peak | Host peak | Host state, kept lists |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 148,955,000 | 371 s | 3,719 s (R 8,192) | 1,810 s (R 16,384) | 12.15 | 15.6 GiB | 117.3 GB | float32, kept |
+| 320,000,000 | 519 s | 6,970 s | 3,585 s | 11.20 | 32.8 GiB | 207.9 GB | float32; lists dropped in call 2 |
+| **397,535,000** | 660 s | 11,468 s | **3,913 s** | **9.84** | 40.6 GiB | 229.1 GB | **float16** in call 2; lists dropped |
+
+- **Validity.** Every point is valid, with edges exactly 74 per atom. 397.5M atoms have 29,417,590,000 edges.
+- **Energy per atom.** −7.989547 eV at 149M and 320M (float32 state). At 397.5M it is −7.989009 eV, 0.54 meV/atom
+  above: the float16 state's rounding, about four times the shift measured at 975,560 atoms.
+- **Largest force component.** 2.2 meV/Å at 397.5M, against 1.3 meV/Å in float32 (perfect crystal, so the exact
+  value is 0).
+- **What limits.** The host: 229.1 GB of the 231.5 GB cgroup at 397.5M.
+  - `"auto"` worked as designed. At 320M the kept lists went in the second call. At 397.5M they went in the first
+    (the list floor), and the second call stored float16.
+  - SrTiO3 470³ (519M atoms) would need about 300 GB at the same bytes per atom.
+  - That point ended with a segmentation fault 10 minutes in, before the build. Its faulthandler stack dump fired at
+    the same moment and printed only one ASE frame. With the host projection above, the point was not retried.
+- **GPU memory** is about 100 B/atom plus the tiles' workspace, so an A100-80 would hold about 700M atoms on the
+  device.
+
+**Two device leaks and two slow build steps, found on the way (fixed in `ddd26d16`, `7e4fbf4c`).** Neither the
+workstations nor the 5060 Ti run these A100-only rewrites, so neither leak showed there.
+- **`segment_rows._indices`** (the A100's `SEGMENT_ROWS`): one int32 index tensor per row count. Tiles meet a new row
+  count almost every tile.
+  - Now there is one tensor per layout, sized to the most rows seen; fewer rows read its prefix.
+- **`refresh_composed`** (compose_skip, also A100 only): the composed weights of every tile's species table, about
+  0.55 MB per tile. That was 3.9 GiB after a 5M-atom call (census of job 4973583), and at 149M the GPU ran out of
+  memory 30 minutes into the first call (17 to 81 GB).
+  - Now entries go once their table is gone; a 5M-atom call stays flat at 0.92 GiB.
+- **The build's whole-structure scans:**
+  - a Python set over `atoms.numbers` in six places (now `np.unique`);
+  - `torch.unique(dim=0)` on the 13 GB one-hot, once per module in the A100's species-product self-checks (now the
+    unit rows of the columns present, checked in chunks).
+  - The 149M build went from 2,018 s and a 79 GB host peak to 371 s and 43 GB. 519M had run out of host memory in
+    this build (226 GB).
+
+**Records:** `results/tiled-capacity-20261109/alex/` holds:
+- `cap-4973640` (the scan), with its `run.log`, per-minute `mem.log` and the call records;
+- `cap-4972536` (the 149M run that ran out of GPU memory);
+- `leak-4973583` and `leak-4973621` (the census before and after the fix);
+- job scripts in `jobs/`.
+
 ## Tests
 
 `tests/cpu/test_tiled.py`:
@@ -134,6 +185,13 @@ Bytes per atom:
   above its step), v1, and no limit.
 - **The neighbours fix.** `test_wavefront_runs_on_the_force_fields_own_list`.
 - **The precondition.** `test_state_dtype_needs_the_aliased_host_state`.
+- **The A100 fixes.**
+  - `tests/cpu/test_segment_rows_indices.py`: one cached index tensor per layout, prefixes exact.
+  - `tests/cpu/test_composed_cache.py`: dead tables' entries go; the live one keeps its addresses.
+  - `tests/cpu/test_capacity_build_scans.py`: `distinct_numbers`, and the one-hot's distinct rows equal to
+    `torch.unique`'s.
+- **Full CPU suite** on `d036568b` (murphy, NAS `mace_cueq_latest`, `-n 8 -m "not acceptance"`): 5,513 passed, 863
+  skipped.
 
 ## Runs
 
