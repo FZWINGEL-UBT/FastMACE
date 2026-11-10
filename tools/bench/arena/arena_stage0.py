@@ -275,7 +275,20 @@ def compare(a: Path, b: Path) -> dict:
     return out
 
 
+def refuse_wsl() -> None:
+    """Never on WSL: the shim pool (cuMemAlloc through dlopen libcuda) with max_split_size_mb and without expandable
+    segments oversubscribed the 16 GiB RTX 5060 Ti (27.9 GiB reserved) and twice took the PC down with bugcheck
+    0x00020001 HYPERVISOR_ERROR (10 November 2026). The conductor banned every configuration of it on the local PC."""
+    try:
+        release = Path("/proc/version").read_text().lower()
+    except OSError:
+        return
+    if "microsoft" in release or "wsl" in release:
+        sys.exit("arena_stage0.py refuses to run on WSL (HYPERVISOR_ERROR crashes, results/capture-arena-20261110)")
+
+
 def main(argv=None):
+    refuse_wsl()
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
     for name in ("build", "toy"):

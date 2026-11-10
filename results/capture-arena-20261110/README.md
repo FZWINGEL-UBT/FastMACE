@@ -86,6 +86,35 @@ The allocator's own options do not help:
 - **(C) Stop.** Chosen by the conductor (10 November 2026): A's gain does not justify a silent-aliasing risk on the
   main MD path, and B is too global.
 
+## Finding: the shim crashed the local PC twice (HYPERVISOR_ERROR)
+
+**Never run the shim, this script, or any `max_split_size_mb` / `expandable_segments` / `CUDAPluggableAllocator`
+configuration on the local PC (WSL2).**
+
+Both crashes on 10 November 2026, at 14:16 and 17:38 CET, were Windows bugcheck 0x00020001 HYPERVISOR_ERROR, which
+took the WSL2 GPU paravirtualisation down. Both happened during the same local job:
+
+- SrTiO3 30³ on the RTX 5060 Ti.
+- The shim pool (`cuMemAlloc` through `dlopen("libcuda.so.1")`).
+- `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:20` without expandable segments.
+- The allocator's memory history on.
+
+The 14:06 run died in its first record. The 17:08 rerun finished that record (`e`) and died in the second (`f`).
+
+The one record that finished reports 27.9 GiB reserved on the 16 GiB card. The shim pool alone held 18.5 GiB in 52
+segments, and the step took 1,260 s against 210 s with the default pool. So device allocations spilled into shared
+system memory under WDDM.
+
+There was a warning just before the first crash: the same probe with `expandable_segments:True` had failed in an
+eager allocation with "CUDA driver error: device not ready".
+
+The shim's default-pool and `no_split` records at 30³ (12.7 and 14.0 GiB reserved, expandable segments on) did not
+crash. Still, the conductor banned every configuration of the shim on the local PC (10 November 2026), and runs on
+workstations or Alex are not needed either.
+
+`arena_stage0.py` now refuses to start on WSL, and the WSL launchers (`local0*.sh`, `launch_local0*.sh`) are removed
+from the branch.
+
 ## What a future attempt needs
 
 - **The allocator-check exemption.** `fastmace/engine/constraints.py:check_allocator` refuses an engine when any
@@ -112,5 +141,5 @@ The allocator's own options do not help:
   - WSL: `~/fm-ada-capacity/arena/stage0-10x10x10-r2`, `stage0-30x30x30`.
   - leto: `/mnt/homes/zwingel/fm-arena/ada-36`, `ada-36b` (the out-of-memory run), `ada-34`.
   - Alex: `/home/atuin/v130cb/v130cb18/fm-arena/runs/stage0-4977416`.
-- Job scripts: `tools/bench/arena/local0.sh`, `launch_local0.sh`, `local0_msplit.sh`, `launch_local0_msplit.sh`,
-  `stage0_leto.sh`, `stage0b_leto.sh`, `alex_arena0.sh`.
+- Job scripts: `tools/bench/arena/stage0_leto.sh`, `stage0b_leto.sh`, `alex_arena0.sh`. The WSL launchers were
+  removed after the crashes; they are in the branch's history at `a4a44eef`.
