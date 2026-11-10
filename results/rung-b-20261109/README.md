@@ -151,6 +151,20 @@ What is left at the limit is spread out. The neighbour list holds 1.6–2.0 GiB,
 placement loss: the graph pool reserves 12.98 GiB for a 9.99 GiB live peak (13.8 kB/atom, as the memory-slack study
 found). The build's eager pass loses 3.41 GiB more in the default pool, but releases it before the capture.
 
+**Bound for a planned capture arena** (`pool_bound.py`, offline, the same trace). The captured pool's 195
+allocations, with their lifetimes known, are packed at the lowest offset free over each lifetime. The best of three
+orders is shown:
+
+| Graph pool, SrTiO3 36³ | Live peak | Caching allocator | Planned arena | Gain |
+|---|---:|---:|---:|---:|
+| As profiled | 9.99 GiB | 12.98 GiB | 10.44 GiB (by lifetime) | 2.54 GiB, 10.9 kB/atom |
+| The layer region's output dropped | 8.45 GiB | (about 11.5, not traced) | 9.15 GiB (by size × lifetime) | about 2.4 GiB |
+
+An arena that serves the capture's requests at planned offsets would recover about 80 % of the placement loss. That is
+about 11 kB of the 68 kB per atom reserved at the limit, roughly +15–20 % atoms. It needs a deterministic request
+sequence between a recording capture and the real one, and a pluggable allocator or memory pool that serves offsets
+in one buffer. Not built; proposed to the conductor.
+
 ## Checks
 
 - **Force/stress gate** (`tools/force_stress_gate.py`, 3× float32 limit, decision 66). It ran on the Ada on

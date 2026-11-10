@@ -88,3 +88,49 @@ for pool in pools:
         skip = ("<", "__init__", "graphs.py", "module.py", "custom_ops", "eval_frame", "_compile")
         keep = [f for f in where(e) if not f.startswith(skip)]
         print(f"  {e['size'] / GiB:6.2f} GiB tagged={is_tagged(e)!s:5} dropped={dropped(e)!s:5} {' < '.join(keep[:4])}")
+
+
+# The capture arena's bound: the pool's allocations packed offline with their lifetimes known (greedy by size, each
+# at the lowest offset free over its lifetime; 512-byte alignment as the caching allocator's), against the live peak
+# and the pool's mapped peak.
+def arena(pool, drop=lambda e: False, order=lambda b: -b[2]):
+    start, blocks = {}, []
+    for i, e in enumerate(t):
+        if e["pool_id"] != pool:
+            continue
+        if e["action"] == "alloc":
+            start[e["addr"]] = (i, e)
+        elif e["action"] == "free_completed" and e["addr"] in start:
+            i0, a = start.pop(e["addr"])
+            blocks.append((i0, i, -(-a["size"] // 512) * 512, a))
+    end = max((i for i, _ in start.values()), default=0) + 1
+    blocks += [(i0, end + 1, -(-a["size"] // 512) * 512, a) for i0, a in start.values()]
+    blocks = [b for b in blocks if not drop(b[3])]
+    placed, top = [], 0
+    for i0, i1, size, _ in sorted(blocks, key=order):
+        busy = sorted((o, o + s) for j0, j1, o, s in placed if j0 < i1 and i0 < j1)
+        offset = 0
+        for lo, hi in busy:
+            if offset + size <= lo:
+                break
+            offset = max(offset, hi)
+        placed.append((i0, i1, offset, size))
+        top = max(top, offset + size)
+    events = sorted([(i0, s) for i0, _, s, _ in blocks] + [(i1, -s) for _, i1, s, _ in blocks])
+    cur = live = 0
+    for _, d in events:
+        cur += d
+        live = max(live, cur)
+    return top, live
+
+
+for pool in pools:
+    if pool == (0, 0):
+        continue
+    orders = {"size": lambda b: -b[2], "lifetime": lambda b: -(b[1] - b[0]),
+              "size*lifetime": lambda b: -b[2] * (b[1] - b[0])}
+    for label, drop in (("as profiled", lambda e: False), ("layer output dropped", dropped)):
+        for name, order in orders.items():
+            top, live = arena(pool, drop, order)
+            print(f"arena {pool} {label}, by {name}: packed {top / GiB:.2f} GiB, live peak {live / GiB:.2f} GiB, "
+                  f"loss {(top - live) / GiB:.2f} GiB")
