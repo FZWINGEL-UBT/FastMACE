@@ -1584,7 +1584,7 @@ def test_pinned_kept_lists_are_counted_by_their_blocks_and_returned_when_dropped
         def is_pinned(self):
             return True
 
-    kept = dict(reference=torch.zeros(10, 3, dtype=torch.float64), superset={0: (Pinned(1025), torch.zeros(3))},
+    kept = dict(reference=torch.zeros(10, 3, dtype=torch.float64), superset={0: (Pinned(1025), torch.zeros(3, dtype=torch.float32))},
                 mirrors={1: (Pinned(3),)}, pinned_bytes=2048 + 4, complete=True)
     assert tiled_module._kept_bytes(kept) == 2048 + 3 * 4 + 4 + 240
     emptied = []
