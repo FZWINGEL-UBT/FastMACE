@@ -55,8 +55,14 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "") -> None:
         state = sim._engine.state
         import gc
 
-        dtype = sorted({str(o.edge_index.dtype) for o in gc.get_objects()
-                        if isinstance(o, skin.SkinNeighbourList) and getattr(o, "edge_index", None) is not None})
+        dtype = set()
+        for o in gc.get_objects():
+            try:  # dead weak proxies raise ReferenceError on any access
+                if type(o) is skin.SkinNeighbourList and getattr(o, "edge_index", None) is not None:
+                    dtype.add(str(o.edge_index.dtype))
+            except ReferenceError:
+                continue
+        dtype = sorted(dtype)
         for key in ("positions", "forces", "energy", "stress", "cell"):
             value = getattr(state, key, None)
             if value is not None:
