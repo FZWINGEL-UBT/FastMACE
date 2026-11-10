@@ -177,6 +177,17 @@ class TileConfig:
     budget_receivers: tuple[int, ...] | None = None
     state: str = "device"
     alias_state: bool = False
+    # state "host" with alias_state: the dtype x, sc and their aliased adjoints are stored in on the host. None: the
+    # call's dtype; "float16" or "bfloat16" halve the host state (capacity: with the kept lists, the largest host
+    # item per atom under the wavefront). Each value is rounded once where it is written (on the device, before its
+    # copy to the host, which halves that traffic too) and read back exactly into the call's dtype; the tiles compute
+    # in the call's dtype and the alias window (dE/dx summed over an atom's tiles) stays in it. Neither format passes
+    # the 3x float32 force/stress gate (float16 8-51x, bfloat16 50-750x; NVE drift with float16 as float32's), so
+    # they are a capacity fallback (tiled-host-state-dtype.md). "auto" (the default; aliased host state only): the
+    # call's dtype while the state fits above ``list_reuse_floor`` on the host; else the kept lists go first (exact,
+    # about 14 % slower calls), and float16 only if the state still does not fit. The choice and its reason are in
+    # the call's report (``state_dtype``).
+    state_dtype: str | None = "auto"
     # state "host": a tile's writes to the host state are applied after the next tile's work is queued, so the
     # device runs it while the host indexes (on CUDA through pinned buffers and events); the same order.
     overlap: bool = True
@@ -245,6 +256,12 @@ class TileConfig:
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
         if self.alias_state and self.state != "host":
             raise ValueError("TileConfig.alias_state needs state='host'")
+        if self.state_dtype not in (None, "auto", "bfloat16", "float16"):
+            raise ValueError(f"TileConfig.state_dtype must be None, 'auto', 'bfloat16' or 'float16', got "
+                             f"{self.state_dtype!r}")
+        if self.state_dtype not in (None, "auto") and not self.alias_state:
+            raise ValueError("TileConfig.state_dtype needs alias_state=True (state='host'): every stored value is then "
+                             "written once, never summed in the stored dtype")
         if self.state not in ("device", "host"):
             raise ValueError(f"TileConfig.state must be 'device' or 'host', got {self.state!r}")
         if self.state == "host" and self.mode == "graphs":
@@ -284,8 +301,10 @@ class _State:
     host memory (``TileConfig.state``). Tiles read rows to the device and put or add rows; on the device these
     are the plain indexing and ``index_add_``, in host memory the same on the host after one copy."""
 
-    def __init__(self, device, dtype, host, alias=False, overlap=False):
+    def __init__(self, device, dtype, host, alias=False, overlap=False, store=None):
         self.device, self.dtype, self.host, self.alias = device, dtype, host, alias
+        # TileConfig.state_dtype: the host tensors' dtype (the alias window stays in ``dtype``)
+        self.store = dtype if store is None else store
         self.overlap = host and overlap
         self._pending, self._fresh = [], False  # overlap: the host writes not applied yet
         # TILE_HOST_WORKER: the batches of writes handed to the worker thread (set per call by the tiled call)
@@ -363,7 +382,8 @@ class _State:
         size = self._pool_rows if self.pooled else n
         for name, width in widths.items():
             if name not in self._storage:
-                self.tensors[name] = torch.zeros((size, width), dtype=self.dtype, device=where)
+                self.tensors[name] = torch.zeros((size, width), dtype=self.store if self.host else self.dtype,
+                                                 device=where)
         if self.alias:
             self._width = widths["gx"]
             self._index(n)
@@ -416,10 +436,10 @@ class _State:
         self.settle()
         index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
-            return tensor.index_select(0, index).to(self.device)
+            return tensor.index_select(0, index).to(self.device).to(self.dtype)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
         torch.index_select(tensor, 0, index, out=staging)
-        return staging.to(self.device, non_blocking=True)
+        return staging.to(self.device, non_blocking=True).to(self.dtype)
 
     def fetch(self, name, index):
         """``rows(name, index)`` for a host ``index``, copied on the current stream without waiting (the prefetch
@@ -430,24 +450,26 @@ class _State:
         tensor = self.tensors[self._storage.get(name, name)]
         index = self._rows_of(name, index, read=True)
         if self.device.type != "cuda":
-            return tensor.index_select(0, index).to(self.device)
+            return tensor.index_select(0, index).to(self.device).to(self.dtype)
         staging = torch.empty((index.shape[0], tensor.shape[1]), dtype=tensor.dtype, pin_memory=True)
         torch.index_select(tensor, 0, index, out=staging)
-        return staging.to(self.device, non_blocking=True)
+        return staging.to(self.device, non_blocking=True).to(self.dtype)
 
     def put(self, name, index, values):
         """``state[name][index] = values``."""
         if not self.host:
             self.tensors[self._storage.get(name, name)][index] = values
         else:
-            self._defer("put", name, self._rows_of(name, index), values)
+            self._defer("put", name, self._rows_of(name, index), values.detach().to(self.store))
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
         if not self.host:
             self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
         else:
-            self._defer("add", name, self._rows_of(name, index) if name != "gx" else index, values)
+            stored = name != "gx" or not self.alias  # aliased dE/dx: summed in the window, in the call's dtype
+            self._defer("add", name, self._rows_of(name, index) if name != "gx" else index,
+                        values.detach().to(self.store) if stored else values)
 
     def new_tile(self):
         """The call starts a tile: its first host write applies the earlier tiles' pending ones, by then behind
@@ -574,7 +596,7 @@ class _State:
         atoms = self._closing[tile]
         if atoms.numel():
             slots = self._slot_of[atoms]
-            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots]
+            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots].to(self.store)
             self._free[self._top:self._top + slots.numel()] = slots
             self._top += slots.numel()
             self._slot_of[atoms] = -1
@@ -956,15 +978,75 @@ def moved_within(positions, reference, limit, chunk=None):
 
 
 def _host_available():
-    """The host's available memory in bytes (``MemAvailable``), or None where /proc/meminfo is missing."""
+    """The host's available memory in bytes: ``MemAvailable``, or less where the process's memory cgroup leaves less
+    (``_cgroup_room``: a batch job's limit, e.g. 231.5 GB for one A100-80 on an Alex node, which /proc/meminfo does not
+    show); None where /proc/meminfo is missing."""
+    available = None
     try:
         with open("/proc/meminfo") as handle:
             for line in handle:
                 if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) * 1024
+                    available = int(line.split()[1]) * 1024
+                    break
     except OSError:
-        pass
-    return None
+        return None
+    room = _cgroup_room()
+    if available is None or room is None:
+        return available
+    return min(available, room)
+
+
+def _cgroup_room(root="/sys/fs/cgroup", own="/proc/self/cgroup"):
+    """The bytes the process's memory cgroups leave it: over the cgroup and its ancestors with a limit, the least of
+    the limit less the usage (less the reclaimable inactive file cache). cgroup v2 (``memory.max``,
+    ``memory.current``, ``memory.stat``) or v1 (``memory.limit_in_bytes``, ``memory.usage_in_bytes``); None
+    without a limit or outside Linux."""
+    import os
+
+    try:
+        with open(own) as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+
+    def read(path):
+        try:
+            with open(path) as handle:
+                return handle.read()
+        except OSError:
+            return None
+
+    def inactive_file(directory, key):
+        stat = read(os.path.join(directory, "memory.stat")) or ""
+        for line in stat.splitlines():
+            name, _, value = line.partition(" ")
+            if name == key:
+                return int(value)
+        return 0
+
+    rooms = []
+    for line in lines:
+        hierarchy, controllers, path = (line.split(":", 2) + ["", ""])[:3]
+        v2 = hierarchy == "0" and controllers == ""
+        if not v2 and "memory" not in controllers.split(","):
+            continue
+        base = root if v2 else os.path.join(root, "memory")
+        parts = [part for part in path.split("/") if part]
+        for depth in range(len(parts), -1, -1):
+            directory = os.path.join(base, *parts[:depth])
+            if v2:
+                limit = read(os.path.join(directory, "memory.max"))
+                usage = read(os.path.join(directory, "memory.current"))
+                key = "inactive_file"
+            else:
+                limit = read(os.path.join(directory, "memory.limit_in_bytes"))
+                usage = read(os.path.join(directory, "memory.usage_in_bytes"))
+                key = "total_inactive_file"
+            if limit is None or usage is None or limit.strip() == "max" or int(limit) >= 2**60:
+                continue
+            used = int(usage) - inactive_file(directory, key)
+            rooms.append(int(limit) - max(used, 0))
+    return min(rooms) if rooms else None
 
 
 def _narrow_counts(counts):
@@ -1072,6 +1154,7 @@ class TiledForceField:
         self._grid_fit = None  # (key, blocks per axis) of fit_grid's last choice
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
+        self.state_dtype_state = None  # TileConfig.state_dtype "auto": the host state's dtype and why
         self.list_cache_state = "on" if self.config.list_cache else "off"
         self.list_rebuilds = 0  # list_reuse: the calls that searched (and planned) again
         self._graph_key = None
@@ -1087,6 +1170,7 @@ class TiledForceField:
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
         self._pieces, self._piece_bytes, self._piece_budget, self._piece_count = None, 0, 0, 0  # TILE_GRAPH_CACHE
+        self._list_cache = None  # TileConfig.list_cache (neighbours "tiles"; set per call by tiles())
         self._per_receiver = None  # the last measured tile workspace per receiver (bytes; _memory)
         self.lanes_state = "off" if self.config.lanes == "off" else None
         self.last = {}
@@ -2065,6 +2149,8 @@ class TiledForceField:
             stats["list_cache"] = self.list_cache_state
             self._list_cache = None
             stats["host_bytes"] = state.bytes() if state.host else 0
+            stats["state_dtype"] = str(state.store).replace("torch.", "") if state.host else None
+            stats["state_dtype_reason"] = self.state_dtype_state
             with torch.no_grad():
                 node_inter = self.model.scale_shift(node_es, self.heads[:n])
                 from fastmace.model import energy as energy64
@@ -2233,7 +2319,9 @@ class TiledForceField:
                      node_es=torch.zeros((n,), dtype=self.dtype, device=self.device),
                      strain_grad=torch.zeros((3, 3), dtype=torch.float64, device=self.device),
                      state=_State(self.device, self.dtype, self.config.state == "host",
-                                  alias=self.config.alias_state, overlap=self.config.overlap))
+                                  alias=self.config.alias_state, overlap=self.config.overlap,
+                                  store=getattr(torch, self.config.state_dtype)
+                                  if self.config.state_dtype not in (None, "auto") else None))
             self._g = g
         elif g["head"] is not None and shared:
             g["head"].copy_(heads[:1])
@@ -2252,8 +2340,47 @@ class TiledForceField:
     def _state(self, g, x, sc):
         """Allocate ``x``, ``sc`` and their adjoints [N, width] on sweep 1's first outputs."""
         state = g["state"]
+        if not state.tensors and state.host and state.alias and self.config.state_dtype == "auto":
+            state.store, self.state_dtype_state = self._auto_store(state, g["n"], x.shape[1] + sc.shape[1])
         state.allocate(g["n"], dict(x=x.shape[1], sc=sc.shape[1], gx=x.shape[1], gsc=sc.shape[1]))
         return state
+
+    def _auto_store(self, state, n, width):
+        """``TileConfig.state_dtype="auto"``: (the host state's dtype, the reason). The call's dtype while its rows
+        (x and sc, the pool's under the wavefront) and the alias window (about a quarter more, in the call's dtype)
+        leave ``list_reuse_floor`` available on the host; else without the kept lists if that makes them fit; else
+        float16 (the kept lists too go if even that does not fit)."""
+        import torch
+
+        available = _host_available()
+        if available is None:
+            return self.dtype, "the call's dtype (host memory unknown)"
+        rows = state._pool_rows if state.pooled else n
+        itemsize = torch.empty((), dtype=self.dtype).element_size()
+        window = 0.25 * rows * width * itemsize
+        full, half = rows * width * itemsize + window, rows * width * 2 + window
+        room = available - int(self.config.list_reuse_floor)
+        if full <= room:
+            return self.dtype, "the call's dtype: fits"
+        # A call that reuses the kept lists did not bin the atoms: it needs them, so they stay (float16 instead).
+        kept = None if getattr(self, "_reusing", False) else self._kept
+        lists = 0 if kept is None else int(sum(t.numel() * t.element_size() for entry in kept["superset"].values()
+                                                for t in entry) + kept["reference"].numel() * 8)
+        if lists and full <= room + lists:
+            self._drop_kept(f"the host state ({full / 2**30:.1f} GiB) fits only without them")
+            return self.dtype, f"the call's dtype after dropping the kept lists ({lists / 2**30:.1f} GiB)"
+        if lists and half > room:
+            self._drop_kept(f"the float16 host state ({half / 2**30:.1f} GiB) fits only without them")
+        return torch.float16, (f"float16: {full / 2**30:.1f} GiB of state in the call's dtype against "
+                               f"{room / 2**30:.1f} GiB above the floor")
+
+    def _drop_kept(self, why):
+        """The kept lists go for this call and the later ones (``list_reuse_state`` says why)."""
+        if self._kept is not None:  # (this call's sweeps hold the dict: emptied, they search again, bitwise)
+            self._kept["superset"].clear()
+            self._kept["complete"] = False
+        self._reuse_ok, self._kept = False, None
+        self.list_reuse_state = f"off: {why}"
 
     @staticmethod
     def _note(stats, piece):
@@ -2314,7 +2441,9 @@ class TiledForceField:
                 decided, short = n >= 2**20, False
             else:
                 itemsize = 8 if str(self.dtype) == "torch.float64" else 4
-                plain = 1.25 * n * width * itemsize
+                # TileConfig.state_dtype: 16-bit rows when set to one ("auto" stores the call's dtype while it fits)
+                stored = 2 if self.config.state_dtype not in (None, "auto") else itemsize
+                plain = n * width * (stored + 0.25 * itemsize)
                 decided, short = plain + int(config.list_reuse_floor) > available, plain > available
             self._wave_auto[n], self._wave_short[n] = decided, short
         return decided

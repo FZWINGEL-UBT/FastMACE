@@ -1,0 +1,87 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  310,
+  310,
+  310
+ ],
+ "atoms": 148955000,
+ "receivers": 8192,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA A100-SXM4-80GB",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "bafc2396",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 6957076480,
+   "host_peak": 12559933440
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 6958497792,
+   "host_peak": 12559933440
+  },
+  "build": {
+   "seconds": 2018.121143013006,
+   "allocated": 4654339584,
+   "reserved": 4825546752,
+   "peak_above_before": 4803296256,
+   "host_rss": 43799863296,
+   "host_peak": 84558209024
+  },
+  "neighbours": {
+   "allocated": 8229259776,
+   "reserved": 8264876032,
+   "peak_above_before": 3574920192,
+   "host_rss": 43800494080,
+   "host_peak": 84558209024
+  }
+ },
+ "phase": "tiled call 0",
+ "call_rows": 8192,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=3.224279599209149e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.585259070478081e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.585259070478081e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.7445807662076195e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=5.008168586552488e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.4307143943444155e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=1.058054945851393e-06, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=4.3058104256444307e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=4.3058104256444307e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_fold_product_linear', result=CheckResult(passed=True, max_relative_error=5.934048979640278e-07, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['products.0.linear', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'readouts.0.linear', 'interactions.0.linear', 'interactions.0.skip_tp', 'products.1.linear', 'interactions.1.skip_tp', 'readouts.1.linear_1'])",
+  "AppliedRewrite(name='tf32x3_gemms', result=CheckResult(passed=True, max_relative_error=5.646331310346931e-07, threshold=0.0001, modules=12, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.skip_tp', 'interactions.0.first_reassociation', 'interactions.1.linear_up', 'interactions.1.linear', 'interactions.1.skip_tp', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.110640918170247e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (895 pieces, 9 pairs, certificate 0.34, fitted)', 'interactions.1 (612 pieces, 9 pairs, certificate 0.36, fitted)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.262527314552999e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB; spline 731 intervals, certificate 0.48)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=0.0, threshold=1e-10, modules=2, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "backward_chunk_edges": [
+  2048
+ ],
+ "ledgers": {},
+ "edges_within_cutoff": 0,
+ "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 64.00 MiB. GPU 0 has a total capacity of 79.28 GiB of which 75.19 MiB is free. Including non-PyTorch memory, this process has 79.20 GiB memory in use. Of the allocated memory 76.24 GiB is allocated by PyTorch, and 2.44 GiB is reserved by PyTorch but unallocated.",
+ "oom_at": "tiled call 0",
+ "traceback": [
+  "tools/bench/tiled_capacity.py:446 main: out = tiled(positions)",
+  "/tmp/4972536.alex/src/fastmace/model/tiled.py:1857 __call__: out = self._call(positions)",
+  "/tmp/4972536.alex/src/fastmace/model/tiled.py:2122 _call: tile(sweep, index, lane=lane, position=position if ahead else None)",
+  "/tmp/4972536.alex/src/fastmace/model/tiled.py:2096 tile: self._eager_tile(sweep, piece, g)",
+  "/tmp/4972536.alex/src/fastmace/model/tiled.py:2587 _eager_tile: _, g_vec, g_eps = self._first(tile, state, adjoint=True, strain=strain)",
+  "/tmp/4972536.alex/src/fastmace/model/tiled.py:1555 _first: grads = torch.autograd.grad(objective, wanted)",
+  "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/__init__.py:594 grad: result = _engine_run_backward(",
+  "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/graph.py:1072 _engine_run_backward: return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass"
+ ]
+}

@@ -197,6 +197,10 @@ class FirstInteractionReassociation(torch.nn.Module):
         with torch.no_grad():
             weights = self._compose_weights(table, self._radial_weight())
         if entry is None or entry[0]() is not table:
+            # Entries of tables that are gone go first: the tiled call binds a new table per tile, and their composed
+            # weights (two [3, 192, 128] float32 per path) held 64 GB of an A100 by the end of a 149M-atom call.
+            for key in [key for key, held in cache.items() if held[0]() is None]:
+                del cache[key]
             entry = [weakref.ref(table), table._version, weights]
             cache[id(table)] = entry
         else:

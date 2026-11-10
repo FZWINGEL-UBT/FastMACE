@@ -53,6 +53,10 @@ def parse_args(argv=None):
                    help="TileConfig.state='host': x, sc and their adjoints in pinned host memory")
     p.add_argument("--alias-state", action="store_true",
                    help="TileConfig.alias_state (with --host-state): dE/dsc in sc's rows, dE/dx in x's rows")
+    p.add_argument("--state-dtype", choices=("auto", "none", "bfloat16", "float16"), default="auto",
+                   help="TileConfig.state_dtype (with --alias-state): x, sc and their aliased adjoints stored on the "
+                        "host in 16 bits; auto (TileConfig's default): float16 only when the state would not fit "
+                        "above the floor even without the kept lists; none: the call's dtype")
     p.add_argument("--species-index", action="store_true",
                    help="TileConfig.species='index': the tiles' one-hot rows from the species index; the field's "
                         "device one-hot is released")
@@ -80,6 +84,8 @@ def parse_args(argv=None):
                         "tiles times this (none: by device name)")
     p.add_argument("--grid-fit", choices=("on", "off"), default="off",
                    help="TileConfig.grid_fit: the plan's grid with the fewest receiver-cap pieces (off: the rule's)")
+    p.add_argument("--list-reuse", choices=("on", "off"), default="on",
+                   help="TileConfig.list_reuse: the tiles' lists within cutoff + skin kept on the host across calls")
     p.add_argument("--list-cache", choices=("on", "off"), default="on",
                    help="TileConfig.list_cache: a tile's lists kept on the host within the call (with kept lists: "
                         "its filtered ones in the wavefront's band)")
@@ -376,6 +382,7 @@ def main(argv=None):
                                                   tuple(args.budget_receivers) or None,
                                                   state="host" if args.host_state else "device",
                                                   alias_state=args.alias_state,
+                                                  state_dtype=None if args.state_dtype == "none" else args.state_dtype,
                                                   wavefront=args.wavefront, lanes=args.lanes,
                                                   compiled_graphs=args.compiled_graphs,
                                                   prefetch=args.prefetch == "on",
@@ -383,6 +390,7 @@ def main(argv=None):
                                                   backward_chunk_scale=args.backward_chunk_scale,
                                                   grid_fit=args.grid_fit == "on",
                                                   list_cache=args.list_cache == "on",
+                                                  list_reuse=args.list_reuse == "on",
                                                   **({} if args.wavefront_group is None else
                                                      dict(wavefront_group=args.wavefront_group)),
                                                   species="index" if args.species_index else "one_hot"))
