@@ -9,6 +9,6 @@ mkdir -p "$OUT/tmp"
 "$E/bin/python" -m pytest -q -p no:cacheprovider --basetemp="$OUT/pt" tests/cpu/test_generic_chunked.py tests/cpu/test_memory_rescue_retry.py \
   tests/cpu/test_layering.py tests/cpu/test_memory_estimate.py tests/cpu/test_memory_fit.py \
   tests/cpu/test_recompute_first_table.py tests/cpu/test_rewrites_generic.py tests/cpu/test_reproducible.py \
-  tests/cpu/test_config.py tests/cpu/test_report.py tests/cpu/test_recompute_node_segments.py tests/cpu/test_memory_probe.py \
+  tests/cpu/test_config.py tests/cpu/test_report.py tests/cpu/test_recompute_node_segments.py tests/cpu/test_memory_probe.py tests/cpu/test_plan_text.py tests/cpu/test_provenance*.py \
   > "$OUT/tests.log" 2>&1 < /dev/null
 echo "exit=$? $(tail -n 1 "$OUT/tests.log")" >> "$OUT/tests.log"
