@@ -11,6 +11,12 @@
 # both structures, or the gate fails.
 #   modal run tools/modal/fastmace_modal.py::job --gpu H200 --timeout-min 50 --tarball <slim tar> \
 #     --command "bash tools/modal/h200_hybrid_geom.sh" --out <dir>
+# Launch notes (11 November 2026, the first launch on profile "sixth"):
+#   - run modal from a folder holding tools/modal/ (fastmace_modal.py, budget.py), e.g. extracted from the slim tar
+#     next to src.tar; the tar alone is not enough for the client;
+#   - set MODAL_IMAGE_BUILDER_VERSION=2025.06: a workspace on image builder 2026.10 rejects python_version="3.10"
+#     (the first launch on such a workspace then rebuilds the image once).
+#   - past the month's cap, --limit-usd above the job's worst case (34 here; worst case $33.38) with --owner-override.
 # Environment: OUT (the job sets it), EXPECT_GPU (default H200), BLOCKS (6), DRY (1: print the commands only).
 set -uo pipefail
 out=${OUT:?the job sets OUT}

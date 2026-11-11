@@ -270,9 +270,11 @@ def packed8_source(source, bias):
 # 0.985, stress 0.727 / 0.896 / 1.343). The H200 is not measured (issue-bound there, not FMA-bound). None: on for
 # GEOM_GPUS; True / False: an A/B side's choice. RTX 4000 Ada (ada-5060-screen, 11 November 2026): off, 1.0226 / 1.0209
 # (SrTiO3 10x10x10), 1.0156 / 1.0159 (NbCl5); with PACKED8 0.9120 / 0.9139 against PACKED8's 0.9013 / 0.9058 (census on
-# sm_89: 614 -> 667 instructions, stack 8 -> 16 bytes, shared 2.7 -> 10.4 kB).
+# sm_89: 614 -> 667 instructions, stack 8 -> 16 bytes, shared 2.7 -> 10.4 kB). NVIDIA H200 (decision 66, 11 November 2026,
+# Modal, source daf1ab5b, results/h200-hybrid-geom-20261111): on, MD step SrTiO3 10x10x10 0.9857 / 0.9890, NbCl5 3x3x3 0.9891 / 0.9860 (ab / ba); gate passes
+# (forces 0.83 / 0.85 / 0.99, stress 0.42 / 0.83 / 1.04); sm_90 census 80 registers, 5 spill ops, loop 348 -> 317.
 GEOM = None
-GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 
 
 def geom_default(device):

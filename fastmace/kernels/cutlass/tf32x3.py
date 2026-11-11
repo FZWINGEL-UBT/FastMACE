@@ -39,9 +39,11 @@ _TILES = ("64x64", "32x64", "64x32")
 # mma; error at or below 3xTF32's, kernel 0.85-0.90 of it on the A100). Operands must stay below 32752 in magnitude
 # (float16 cross parts). None: on for HYBRID_GPUS; True / False: an A/B side's choice, read at call time like TILE.
 # On the A100 family (decision 66, 11 November 2026, Alex A100-SXM4-80GB, OMAT-0 medium on the default plan: MD step
-# 0.9896 / 0.9877 SrTiO3 10x10x10, 0.9832 / 0.9846 NbCl5 3x3x3; gate passes). The H200 (sm_90 cubin) is not measured.
+# 0.9896 / 0.9877 SrTiO3 10x10x10, 0.9832 / 0.9846 NbCl5 3x3x3; gate passes). NVIDIA H200 (decision 66, 11 November
+# 2026, Modal, source daf1ab5b, results/h200-hybrid-geom-20261111; sm_90 cubin): MD step SrTiO3 10x10x10 0.9909 / 0.9940, NbCl5 3x3x3 0.9892 / 0.9885 (ab / ba);
+# gate passes (forces 0.92 / 0.76 / 0.95, stress 0.41 / 0.94 / 1.30).
 HYBRID = None
-HYBRID_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+HYBRID_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 HYBRID_CUBINS = {CAPABILITY: Path(__file__).with_name("tf32x3_hyb_sm80.cubin"),
                  (9, 0): Path(__file__).with_name("tf32x3_hyb_sm90.cubin")}
 _KERNELS = {}  # (device index, hybrid) -> _Kernels
