@@ -1,0 +1,865 @@
+{
+ "tool": "first_interaction_lab --census",
+ "created_utc": "2026-11-11T15:28:11.150800+00:00",
+ "triton": "3.8.0",
+ "rows": [
+  {
+   "sm": 80,
+   "variant": "forward-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 13
+   },
+   "ptx_atomics": 64,
+   "ptx_instructions": 659,
+   "shared_mem": 0,
+   "registers": 128,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 8,
+    "32": 11
+   },
+   "sass_instructions": 508
+  },
+  {
+   "sm": 80,
+   "variant": "forward-noslot",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 419,
+   "shared_mem": 0,
+   "registers": 72,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 8,
+    "32": 19
+   },
+   "sass_instructions": 366
+  },
+  {
+   "sm": 80,
+   "variant": "forward-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 1,
+    "scalar": 8
+   },
+   "ptx_atomics": 64,
+   "ptx_instructions": 624,
+   "shared_mem": 0,
+   "registers": 123,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 3,
+    "32": 6
+   },
+   "sass_instructions": 500
+  },
+  {
+   "sm": 80,
+   "variant": "byslot-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 13
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 354,
+   "shared_mem": 2048,
+   "registers": 64,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 8,
+    "32": 11
+   },
+   "sass_instructions": 325
+  },
+  {
+   "sm": 80,
+   "variant": "byslot-w2",
+   "warps": 2,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 0,
+    "scalar": 19
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 260,
+   "shared_mem": 4096,
+   "registers": 39,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 2,
+    "32": 17
+   },
+   "sass_instructions": 245
+  },
+  {
+   "sm": 80,
+   "variant": "byslot-w4",
+   "warps": 4,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 0,
+    "scalar": 27
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 231,
+   "shared_mem": 4096,
+   "registers": 32,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 2,
+    "32": 25
+   },
+   "sass_instructions": 213
+  },
+  {
+   "sm": 80,
+   "variant": "aligned-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 15
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 370,
+   "shared_mem": 2048,
+   "registers": 64,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 10,
+    "32": 11
+   },
+   "sass_instructions": 340
+  },
+  {
+   "sm": 80,
+   "variant": "aligned-w2",
+   "warps": 2,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 0,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 276,
+   "shared_mem": 4096,
+   "registers": 40,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 4,
+    "32": 17
+   },
+   "sass_instructions": 256
+  },
+  {
+   "sm": 80,
+   "variant": "walk-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 24
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 520,
+   "shared_mem": 0,
+   "registers": 95,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 11,
+    "32": 19
+   },
+   "sass_instructions": 564
+  },
+  {
+   "sm": 80,
+   "variant": "backward-recompute-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 11,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 585,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 13,
+    "32": 19
+   },
+   "sass_instructions": 512
+  },
+  {
+   "sm": 80,
+   "variant": "backward-recompute-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 1,
+    "scalar": 17
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 519,
+   "shared_mem": 64,
+   "registers": 92,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 3,
+    "32": 15
+   },
+   "sass_instructions": 472
+  },
+  {
+   "sm": 80,
+   "variant": "backward-power-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 6,
+    "scalar": 22
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 550,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 8,
+    "32": 20
+   },
+   "sass_instructions": 480
+  },
+  {
+   "sm": 80,
+   "variant": "backward-power-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 1,
+    "scalar": 18
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 518,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 3,
+    "32": 16
+   },
+   "sass_instructions": 472
+  },
+  {
+   "sm": 90,
+   "variant": "forward-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 21
+   },
+   "ptx_atomics": 16,
+   "ptx_instructions": 477,
+   "shared_mem": 0,
+   "registers": 64,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 8,
+    "32": 19
+   },
+   "sass_instructions": 372
+  },
+  {
+   "sm": 90,
+   "variant": "forward-noslot",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 413,
+   "shared_mem": 0,
+   "registers": 64,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 8,
+    "32": 19
+   },
+   "sass_instructions": 374
+  },
+  {
+   "sm": 90,
+   "variant": "forward-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 1,
+    "scalar": 16
+   },
+   "ptx_atomics": 16,
+   "ptx_instructions": 442,
+   "shared_mem": 0,
+   "registers": 64,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 3,
+    "32": 14
+   },
+   "sass_instructions": 364
+  },
+  {
+   "sm": 90,
+   "variant": "byslot-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 13
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 350,
+   "shared_mem": 512,
+   "registers": 64,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 8,
+    "32": 11
+   },
+   "sass_instructions": 309
+  },
+  {
+   "sm": 90,
+   "variant": "byslot-w2",
+   "warps": 2,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 0,
+    "scalar": 19
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 250,
+   "shared_mem": 1024,
+   "registers": 36,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 2,
+    "32": 17
+   },
+   "sass_instructions": 229
+  },
+  {
+   "sm": 90,
+   "variant": "byslot-w4",
+   "warps": 4,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 0,
+    "scalar": 27
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 222,
+   "shared_mem": 2048,
+   "registers": 32,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 2,
+    "32": 25
+   },
+   "sass_instructions": 213
+  },
+  {
+   "sm": 90,
+   "variant": "aligned-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 15
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 364,
+   "shared_mem": 512,
+   "registers": 63,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 10,
+    "32": 11
+   },
+   "sass_instructions": 324
+  },
+  {
+   "sm": 90,
+   "variant": "aligned-w2",
+   "warps": 2,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 0,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 264,
+   "shared_mem": 1024,
+   "registers": 36,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 4,
+    "32": 17
+   },
+   "sass_instructions": 256
+  },
+  {
+   "sm": 90,
+   "variant": "walk-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 24
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 521,
+   "shared_mem": 0,
+   "registers": 96,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 11,
+    "32": 19
+   },
+   "sass_instructions": 612
+  },
+  {
+   "sm": 90,
+   "variant": "backward-recompute-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 11,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 585,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 13,
+    "32": 19
+   },
+   "sass_instructions": 520
+  },
+  {
+   "sm": 90,
+   "variant": "backward-recompute-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 1,
+    "scalar": 17
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 519,
+   "shared_mem": 64,
+   "registers": 72,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 3,
+    "32": 15
+   },
+   "sass_instructions": 488
+  },
+  {
+   "sm": 90,
+   "variant": "backward-power-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 6,
+    "scalar": 22
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 550,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 8,
+    "32": 20
+   },
+   "sass_instructions": 488
+  },
+  {
+   "sm": 90,
+   "variant": "backward-power-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 1,
+    "scalar": 18
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 518,
+   "shared_mem": 64,
+   "registers": 72,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 3,
+    "32": 16
+   },
+   "sass_instructions": 488
+  },
+  {
+   "sm": 120,
+   "variant": "forward-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 21
+   },
+   "ptx_atomics": 16,
+   "ptx_instructions": 480,
+   "shared_mem": 0,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 8,
+    "32": 19
+   },
+   "sass_instructions": 390
+  },
+  {
+   "sm": 120,
+   "variant": "forward-noslot",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 416,
+   "shared_mem": 0,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 8,
+    "32": 19
+   },
+   "sass_instructions": 383
+  },
+  {
+   "sm": 120,
+   "variant": "forward-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 1,
+    "scalar": 16
+   },
+   "ptx_atomics": 16,
+   "ptx_instructions": 445,
+   "shared_mem": 0,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 3,
+    "32": 14
+   },
+   "sass_instructions": 374
+  },
+  {
+   "sm": 120,
+   "variant": "byslot-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 13
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 339,
+   "shared_mem": 512,
+   "registers": 77,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 8,
+    "32": 11
+   },
+   "sass_instructions": 309
+  },
+  {
+   "sm": 120,
+   "variant": "byslot-w2",
+   "warps": 2,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 0,
+    "scalar": 19
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 245,
+   "shared_mem": 1024,
+   "registers": 40,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 2,
+    "32": 17
+   },
+   "sass_instructions": 215
+  },
+  {
+   "sm": 120,
+   "variant": "byslot-w4",
+   "warps": 4,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 0,
+    "scalar": 27
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 221,
+   "shared_mem": 2048,
+   "registers": 40,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 2,
+    "32": 25
+   },
+   "sass_instructions": 197
+  },
+  {
+   "sm": 120,
+   "variant": "aligned-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 6,
+    "scalar": 15
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 353,
+   "shared_mem": 512,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 10,
+    "32": 11
+   },
+   "sass_instructions": 316
+  },
+  {
+   "sm": 120,
+   "variant": "aligned-w2",
+   "warps": 2,
+   "ptx_loads": {
+    "v4": 4,
+    "v2": 0,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 259,
+   "shared_mem": 1024,
+   "registers": 40,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 4,
+    "64": 4,
+    "32": 17
+   },
+   "sass_instructions": 242
+  },
+  {
+   "sm": 120,
+   "variant": "walk-w1",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 0,
+    "v2": 6,
+    "scalar": 24
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 491,
+   "shared_mem": 0,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 0,
+    "64": 11,
+    "32": 19
+   },
+   "sass_instructions": 590
+  },
+  {
+   "sm": 120,
+   "variant": "backward-recompute-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 11,
+    "scalar": 21
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 691,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 13,
+    "32": 19
+   },
+   "sass_instructions": 530
+  },
+  {
+   "sm": 120,
+   "variant": "backward-recompute-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 1,
+    "scalar": 17
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 625,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 3,
+    "32": 15
+   },
+   "sass_instructions": 474
+  },
+  {
+   "sm": 120,
+   "variant": "backward-power-copy",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 6,
+    "scalar": 22
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 656,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 8,
+    "32": 20
+   },
+   "sass_instructions": 498
+  },
+  {
+   "sm": 120,
+   "variant": "backward-power-oneload",
+   "warps": 1,
+   "ptx_loads": {
+    "v4": 16,
+    "v2": 1,
+    "scalar": 18
+   },
+   "ptx_atomics": 0,
+   "ptx_instructions": 624,
+   "shared_mem": 64,
+   "registers": 80,
+   "spill_stores": 0,
+   "spill_loads": 0,
+   "sass_loads": {
+    "128": 16,
+    "64": 3,
+    "32": 16
+   },
+   "sass_instructions": 474
+  }
+ ]
+}

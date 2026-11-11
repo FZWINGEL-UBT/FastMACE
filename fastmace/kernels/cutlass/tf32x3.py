@@ -21,6 +21,8 @@ from pathlib import Path
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
+
 CUBIN = Path(__file__).with_name("tf32x3_sm80.cubin")
 CAPABILITY = (8, 0)
 # One cubin per compute capability, built from the same source (5 November 2026: sm_90 for the H100 and H200; the
@@ -32,14 +34,24 @@ ALIGNMENT = 4  # elements: 128-bit loads
 # 3xTF32 split; the K loop and so each element's sum are the same in every tile. A module constant for the A/B.
 TILE = "64x64"
 _TILES = ("64x64", "32x64", "64x32")
-_KERNELS = {}  # device index -> _Kernels
+# HYBRID (11 November 2026, review retry of the A100 screen's idea 4; results/hybrid-gemm-20261111): every entry from
+# the cubins built with -DFM_HYBRID_F16 (hybrid_f16.h: big * big on TF32 tensor cores, both cross products in one FP16
+# mma; error at or below 3xTF32's, kernel 0.85-0.90 of it on the A100). Operands must stay below 32752 in magnitude
+# (float16 cross parts). None: on for HYBRID_GPUS; True / False: an A/B side's choice, read at call time like TILE.
+# On the A100 family (decision 66, 11 November 2026, Alex A100-SXM4-80GB, OMAT-0 medium on the default plan: MD step
+# 0.9896 / 0.9877 SrTiO3 10x10x10, 0.9832 / 0.9846 NbCl5 3x3x3; gate passes). The H200 (sm_90 cubin) is not measured.
+HYBRID = None
+HYBRID_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+HYBRID_CUBINS = {CAPABILITY: Path(__file__).with_name("tf32x3_hyb_sm80.cubin"),
+                 (9, 0): Path(__file__).with_name("tf32x3_hyb_sm90.cubin")}
+_KERNELS = {}  # (device index, hybrid) -> _Kernels
 
 
 class _Kernels:
     """The cubin's GEMM entries on one device (both B layouts, every tile), with their launch sizes
     (``fm_tf32x3_info``)."""
 
-    def __init__(self, index):
+    def __init__(self, index, hybrid=False):
         import numpy as np
         from cuda.bindings import driver
 
@@ -47,7 +59,7 @@ class _Kernels:
         with torch.cuda.device(index):
             torch.zeros(1, device=f"cuda:{index}")  # a runtime call: the device's primary context is current
             self.context = _check(driver.cuCtxGetCurrent())
-            self.module = _check(driver.cuModuleLoadData(_cubin(index).read_bytes()))
+            self.module = _check(driver.cuModuleLoadData(_cubin(index, hybrid).read_bytes()))
             self.functions = {(layout, tile): _check(driver.cuModuleGetFunction(
                 self.module, f"fm_tf32x3_{layout}_{tile}".encode())) for layout in ("rr", "rc") for tile in _TILES}
             pointer, size = _check(driver.cuModuleGetGlobal(self.module, b"fm_tf32x3_info"))
@@ -96,7 +108,7 @@ def available(device, family=False) -> bool:
     capability = tuple(torch.cuda.get_device_capability(index))
     if capability not in CUBINS and not (family and capability[0] == CAPABILITY[0]):
         return False
-    if not _cubin(index).is_file():
+    if not _cubin(index, hybrid_default(index)).is_file():
         return False
     try:
         _kernels(index)
@@ -105,15 +117,25 @@ def available(device, family=False) -> bool:
     return True
 
 
-def _cubin(index):
-    """The cubin for device ``index``: its capability's own, else the sm_80 one (8.x family, for tests)."""
-    return CUBINS.get(tuple(torch.cuda.get_device_capability(index)), CUBIN)
+def _cubin(index, hybrid=False):
+    """The cubin for device ``index``: its capability's own, else the sm_80 one (8.x family, for tests); with
+    ``hybrid`` the HYBRID build."""
+    cubins = HYBRID_CUBINS if hybrid else CUBINS
+    return cubins.get(tuple(torch.cuda.get_device_capability(index)), cubins[CAPABILITY])
+
+
+def hybrid_default(index):
+    """``HYBRID`` on device ``index``: the constant when set, else on for ``HYBRID_GPUS``."""
+    if HYBRID is not None:
+        return bool(HYBRID)
+    return torch.cuda.get_device_name(index) in HYBRID_GPUS
 
 
 def _kernels(index):
-    if index not in _KERNELS:
-        _KERNELS[index] = _Kernels(index)
-    return _KERNELS[index]
+    key = (index, hybrid_default(index))
+    if key not in _KERNELS:
+        _KERNELS[key] = _Kernels(*key)
+    return _KERNELS[key]
 
 
 def _layout(t):
@@ -276,5 +298,5 @@ def species_into(a, lda, gather, w, out, scatter, counts, size, grid_rows):
                                  kernels.species_shared, stream, (values, types), 0))
 
 
-__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "CUBINS", "LONG_K", "MIN_TILES", "TILE", "available", "eligible", "fit",
+__all__ = ["ALIGNMENT", "CAPABILITY", "CUBIN", "CUBINS", "HYBRID", "HYBRID_CUBINS", "HYBRID_GPUS", "LONG_K", "MIN_TILES", "TILE", "available", "eligible", "fit",
            "mm_into", "remap_div_into", "remap_select_into", "species_into", "takes"]
