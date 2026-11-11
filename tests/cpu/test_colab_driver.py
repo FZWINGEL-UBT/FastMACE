@@ -117,16 +117,24 @@ def test_ledger_header_once_and_rows(tmp_path):
     assert rows[0]["commands"] == "pytest -m compat ; echo, \"hi\""
 
 
+@pytest.fixture(autouse=True)
+def _git_independent_of_the_machine(monkeypatch):
+    """Every git process of these tests (the temporary repos and the driver's own ``rev-parse`` and ``archive``) reads
+    no global or system configuration and gets an identity and ``safe.directory=*`` from the environment (command-line
+    scope, which git trusts): on murphy a temporary repo on the NAS (/mnt/homes) failed git's ownership check (exit
+    128, "dubious ownership"), and there is no global identity there."""
+    for key, value in {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_COUNT": "3",
+                       "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*",
+                       "GIT_CONFIG_KEY_1": "user.email", "GIT_CONFIG_VALUE_1": "t@t",
+                       "GIT_CONFIG_KEY_2": "user.name", "GIT_CONFIG_VALUE_2": "t"}.items():
+        monkeypatch.setenv(key, value)
+
+
 def _git_repo(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
-    # Independent of the machine's git configuration (murphy: no global identity, config exited 128): no global or
-    # system config, the identity on the command line.
-    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
-    run = lambda *a: subprocess.run(  # noqa: E731
-        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "-C", str(repo), *a], check=True, capture_output=True,
-        env=env)
-    run("init", "-q")
+    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    run("init", "-q")  # identity and safe.directory: ``_git_independent_of_the_machine``
     (repo / "a.txt").write_text("one\n")
     run("add", "a.txt")
     run("commit", "-q", "-m", "one")
