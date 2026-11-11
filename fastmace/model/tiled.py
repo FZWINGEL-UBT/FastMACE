@@ -1005,6 +1005,28 @@ def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
     return (rows64 - image - origin).to(dtype), (shift - image[local[0]]).to(dtype)
 
 
+def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+    """``_tile_local`` on a padded slot's fixed-size buffers (rows ``nodes`` with ``node_mask``, edges ``local`` and
+    ``shifts`` with ``edge_mask``; ``receivers`` slot receiver rows): ``(rows, remaining shifts)`` with the padding
+    rows zero, as one fixed-shape graph that mode "compiled" compiles once per slot bucket (local job 53: the
+    per-tile eager form cost 1.06x at 320,000 atoms on the RTX 5060 Ti)."""
+    import torch
+
+    from fastmace.neighbors.skin import times_3x3
+
+    count, e = nodes.shape[0], local.shape[1]
+    rows64 = positions64[nodes]
+    shift = times_3x3(torch.round(times_3x3(shifts.to(torch.float64), inverse)), cell)
+    edge = torch.arange(e, device=local.device)
+    edge = torch.where(edge_mask > 0, edge, torch.full_like(edge, e))
+    first = torch.full((count,), e, dtype=edge.dtype, device=local.device).scatter_reduce(
+        0, local[0], edge, reduce="amin")
+    halo = (first < e) & (torch.arange(count, device=local.device) >= receivers)
+    image = torch.where(halo.unsqueeze(1), shift[first.clamp(max=e - 1)], torch.zeros_like(rows64))
+    rows = (rows64 - image - rows64[:1]) * node_mask.unsqueeze(1).to(torch.float64)
+    return rows.to(dtype), (shift - image[local[0]]).to(dtype)
+
+
 def _frame_parts(positions64, width, dtype):
     """``TILE_LOCAL_FRAME``: float64 positions [n, 3] as int16 bins of ``width`` and offsets in ``dtype``."""
     import torch
@@ -1956,17 +1978,13 @@ class TiledForceField:
         import torch
 
         positions64, cell, inverse = local_frame
-        nodes, _, shifts, local, r, h = piece
-        receivers, halo, edges = slot["sizes"]
-        e = local.shape[1]
-        rows64 = torch.zeros((receivers + halo, 3), dtype=torch.float64, device=self.device)
-        rows64[:r] = positions64[nodes[:r]]
-        rows64[receivers:receivers + h] = positions64[nodes[r:]]
-        rows, remaining = _tile_local(rows64, receivers, local, shifts, cell, inverse, self.dtype)
-        slot["rows"].copy_(rows)
-        slot["rows"][r:receivers].zero_()  # padding receivers and halo rows as the plain positions' atom 0 rows
-        slot["rows"][receivers + h:].zero_()
-        slot["shifts"][:e] = remaining
+        receivers = slot["sizes"][0]
+        # On the slot's padded buffers (after _fill): one fixed-shape graph per slot bucket in mode "compiled".
+        rows, remaining = self._compiled_once("tile_local", _slot_local)(
+            positions64, slot["nodes"], slot["node_mask"], slot["local"], slot["edge_mask"], slot["shifts"], cell,
+            inverse, receivers, self.dtype)
+        slot["rows"].copy_(rows)  # the padding rows zero (masked, as the plain positions' atom 0 rows are)
+        slot["shifts"].copy_(remaining)
 
     def _fill(self, slot, piece):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
