@@ -3555,3 +3555,10 @@ CPU suite on murphy at the merged tip 0d1ce6d6, collecting `tests/`: 5,600 passe
   - The conductor accepted these as an accuracy fix: 2 % bar, 3.5 % for the A100 frame, because the A100 is the capacity GPU. A faster A100 frame is follow-up 11b in `plans/ideas-20261111-tiled-round2.md`.
 
 CPU suite on murphy (tests/cpu) at f8ea447e with main b951e804 merged in: 5,610 passed, 203 skipped. The later commits are docs and records; main's later f31d4f50 touches only plans/, results/ and docs/. See `results/tiled-speed-20261111/README.md`.
+
+**Ledger tidy (11 November 2026; worker docs-refresh, conductor; docs only):**
+- **Six new rows.**
+  - Open, with estimated sizes, first tests and stop rules: ideas 18, 19 and 20, and the outside ideas "joint rescaling" and "one decode for two edges".
+  - Closed by argument: texture interpolation.
+- **Four stale statuses corrected to REJECTED:** omat0-slope-vector, -stream-w, -stream-store-w, -eos-chunks.
+- **The 27 unverified agent notes on the rejected-row catalogue:** 14 confirmed and fixed, 11 not confirmed, 2 unclear (their records are in ResearchModule). See `plans/notes/rejected-ledger-20261111/verified.md`.

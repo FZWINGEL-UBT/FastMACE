@@ -1,6 +1,6 @@
 # OPT-T01: FP32-accurate tensor-core GEMMs (optimisation round 1)
 
-Plan: `plans/opt-1.md`, OPT-T01. **Result: rejected on sm_89; the local sm_120 rerun is still to do.**
+Plan: `plans/opt-1.md`, OPT-T01. **Result: rejected on sm_89; the local sm_120 rerun is still to do.** (Note, 11 November 2026: the sm_120 rerun ran on 20 October, 21:47 UTC, `results/opt-T01-gemm-precision-20261020/local/`: tf32x3 faster on 13 of 92 shapes, NbCl5 GEMMs 24.9 against 12.5 ms per call; rejected on sm_120 too. See `docs/validation/speed/opt-1.md`.)
 On the production GEMM shapes, no FP32-accurate tensor-core mode our stack exposes is faster than
 cuBLAS's SIMT FP32 GEMM. The only one available, 3×TF32 (Triton `tf32x3`), is accurate but slower on 89
 of 92 shapes. The 3 it wins are tiny.
