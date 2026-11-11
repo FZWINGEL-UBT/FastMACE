@@ -3480,3 +3480,12 @@ between plans is unchanged. See `docs/validation/capacity/setup-fixes.md`.
 - **TF32 big·big with FP16 cross GEMM: stopped,** error 6.3e-7 to 1.4e-6 against the 2.7e-7 stop rule.
 
 Tools: `tools/bench/cu_census.py`, `tools/bench/half_system_streams.py`, `tools/fma_dual_pipe_bench.py` HFMA2, `tools/fp16x3_gemm_bench.py`. CPU suite on leto at 51634810: 5,579 passed, 203 skipped, 0 failed. Colab spend 14.9 CU. See `results/a100-colab-ideas-20261111/README.md`.
+
+**int32 neighbour-list edge_index (11 November 2026; worker omat0-ada-capacity, conductor, decision 66):** `NeighbourConfig.edge_index_int32` (default "auto") stores the skin list's `edge_index` in int32. The planner turns it on for `planner.fixed.DECISION_66_EDGE_INDEX_INT32_GPUS` (RTX 4000 Ada, RTX 5060 Ti, every A100 model) and records the decision in the plan; the H200 is not measured and stays off. It is a rounding change: on the reproducible MH-1 plan, forces differ by up to 3.8e-5 eV/Å, while energy and cell stay bitwise. The 3× float32 gate passes:
+
+| GPU | SrTiO3 forces / stress | NaCl forces / stress |
+|---|---|---|
+| RTX 4000 Ada | 0.79 / 0.47 | 0.91 / 1.00 |
+| A100-SXM4-80GB (Alex 4981362) | 0.93 / 0.65 | 0.83 / 0.88 |
+
+MD step b/a, SrTiO3 10×10×10 (b = int32), ab / ba: Ada 1.0001 / 0.9987, RTX 5060 Ti 1.0022 / 0.9959, A100 0.9960 / 0.9951. Memory at Ada SrTiO3 34³: neighbour list 1.37 → 1.21 GiB (0.8 kB/atom), peak reserved 13.40 → 12.95 GiB; the cube-step capacity limits do not move. The tiled kept lists are already about 3 B per edge, so they gain nothing. CPU suite on leto at the merged tip 20352f78: 5,580 passed, 203 skipped, 2 failed. Both failures were the new test, fixed in efc24fe0; the changed test files were rerun (77 + 204 passed). See `results/edge-index-int32-20261111/`.

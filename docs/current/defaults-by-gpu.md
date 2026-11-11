@@ -490,7 +490,7 @@ PrecisionConfig: `dtype` float32 (`float32_for_hybrid_float64_for_cueq`); `tf32`
 NeighbourConfig: `skin` `"auto"` (0.3 Å for MD workloads; rule 11 for MC, species-change and displacement workloads,
 3-T05); `sort_receivers` (`on_for_hybrid_graph_engine`, RE 10 Oct); `gpu_neighbour_list` (`on_with_graph_engine`,
 RE 14 Oct); `edge_multiple` 256, `edge_bucket_fraction` 0.05, `capacity_headroom` 1.15, `headroom` `"auto"`,
-`d3_skin` `"auto"` (rule 11, 3b-T02). `IntegratorConfig.noise_batch` 256, the next batch drawn ahead on a background thread (`langevin.NOISE_DRAW_AHEAD`, every GPU, bitwise; A100 PCIe step 0.97 / 0.96 against off; round 6, 5 Nov); `fixcm_projection` `mass_weighted` under
+`d3_skin` `"auto"` (rule 11, 3b-T02), `edge_index_int32` `"auto"`: on on the RTX 4000 Ada, the RTX 5060 Ti and every A100 (decision 66, 11 Nov; b/a 1.0001 / 0.9987, 1.0022 / 0.9959 and A100 0.9960 / 0.9951, gate passed on the Ada and A100; 8 B per edge, 0.8 kB/atom), off on the H200 until measured. `IntegratorConfig.noise_batch` 256, the next batch drawn ahead on a background thread (`langevin.NOISE_DRAW_AHEAD`, every GPU, bitwise; A100 PCIe step 0.97 / 0.96 against off; round 6, 5 Nov); `fixcm_projection` `mass_weighted` under
 NVT fixcm (decision 37, correctness).
 
 ## 3. Default MH-1 float64 plan: extra switches
