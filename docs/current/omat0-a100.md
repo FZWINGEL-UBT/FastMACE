@@ -43,7 +43,9 @@ and a step breakdown at `7ffcaf7a` (`results/ideas-queue2-20261106/runs/breakdow
 - **Whole-system** (§1–§3): one force call over all atoms, captured in CUDA graphs. This is the fast path for MD up to
   its memory limit (69,120 SrTiO3 atoms on a 20 GB RTX 4000 Ada, `docs/validation/omat0/omat0-capacity.md:21`).
 - **Tiled streaming** (§4): receiver tiles in three sweeps. This is the capacity path; the MD runs at 975,560 atoms use it.
-- **Wavefront tiled streaming** (§5): the same sweeps in a moving band of tiles. It holds the record of 149M atoms.
+- **Wavefront tiled streaming** (§5): the same sweeps in a moving band of tiles. It holds the records: 397.5M atoms
+  on one A100-80 and 179.7M atoms on a 20 GB RTX 4000 Ada
+  ([tiled-host-state-dtype](../validation/tiled/tiled-host-state-dtype.md)).
 
 §3.8 lists the A100 changes after the profiled run. §6 compares FastMACE's architecture with Symmetrix-XL's. §7 lists
 the parts whose origin is not recorded.
@@ -474,6 +476,12 @@ fused forward and the w′ backward for OMAT-0 on the RTX 4000 Ada; this has not
 - **Rerun** at R = 8,192: compiled call 2,947 s, 19.8 µs/atom (`:89-94`).
 
 These are single force calls, not MD steps.
+
+**Later records** (10 November 2026, [tiled-host-state-dtype](../validation/tiled/tiled-host-state-dtype.md)):
+- **murphy:** 179,685,000 atoms, compiled call 1,773 s, 9.87 µs/atom. The limit is the device: 196.5M ran out of GPU
+  memory.
+- **One A100-80 on Alex:** 397,535,000 atoms, compiled call 3,913 s, 9.84 µs/atom. The limit is the job's host
+  memory, and `state_dtype` "auto" stored the state in float16.
 
 **What changes against §4.** Mainly the order of the sweeps and where the node-state rows live, plus host and
 device trims (table below):

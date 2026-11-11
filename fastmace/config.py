@@ -421,6 +421,10 @@ class NeighbourConfig:
     # The D3 pair list's own skin in Angstrom (SPEC §11.2; 3b-T02). "auto": rule 11 from the workload and
     # the barostat when the force field has D3; without D3 it stays "auto" and nothing reads it.
     d3_skin: float | Literal["auto"] = "auto"
+    # The compacted edge_index in int32 instead of int64 (8 B per edge; 0.8 kB/atom at SrTiO3). A rounding change
+    # inside the 3x float32 gate (results/edge-index-int32-20261111). "auto": on on the GPUs where its gate and
+    # same-process A/B passed (planner.fixed.DECISION_66_EDGE_INDEX_INT32_GPUS), off elsewhere and without a plan.
+    edge_index_int32: Toggle = "auto"
 
     def __post_init__(self):
         _check_choices(self)

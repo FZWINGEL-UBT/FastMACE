@@ -1,0 +1,49 @@
+### Starting TaskPrologue of job 4981351 on a0731 at Wed Nov 11 04:31:56 AM CET 2026
+Running on cores 112-127 with governor schedutil
+Wed Nov 11 04:31:56 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:CD:00.0 Off |                    0 |
+| N/A   34C    P0             64W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+=== JOB_STATISTICS ===
+=== current date     : Wed Nov 11 04:38:10 CET 2026
+= Job-ID             : 4981351 on alex
+= Job-Name           : fm-tiledgap
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-tiledgate/alex_gap.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-tiledgate
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 01:00:00
+= Elapsed runtime    : 00:06:53
+= Total RAM usage    : 11.0 GiB of assigned  GiB (%)
+= Node list          : a0731
+= Subm/Elig/Start/End: 2026-11-11T04:30:39 / 2026-11-11T04:30:39 / 2026-11-11T04:31:17 / 2026-11-11T04:38:10
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             594.2M   104.9G   209.7G        N/A   1,169      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            40.6G     0.0K     0.0K        N/A     422K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:CD:00.0, 2183135, 5 %, 2 %, 8326 MiB, 356647 ms

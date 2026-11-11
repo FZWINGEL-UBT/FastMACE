@@ -629,6 +629,9 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [ada-5060-set](../results/ada-5060-screen-20261110/README.md#rtx-5060-ti) | `CUEQ_PROJECTED`, `BLOCK_ORDER`, `GRAPH_SUM`, `DEGREE_PARTS`, `SPLINE_VECTOR` 4, `SYMMETRIC_PAIRS`, SC_GENERATED + SC_FACTORED on the 5060 Ti | the `*_GPUS` sets | FM | MEASURED, closed (no help in the set; SYMMETRIC_PAIRS mixed; the SC pair runs only under tf32x3) | 2026-11-11 | leave-one-outs within ±0.8 %, see the README | [ada-5060-screen](../results/ada-5060-screen-20261110/README.md#rtx-5060-ti) |
 | [ada-5060-set](../results/ada-5060-screen-20261110/README.md#rtx-5060-ti) | POLAR-1 on the 5060 Ti: `gate_epilogue` (S, M, L) and the w′ pair (M) | `POLAR_DECISION_66_GATE_EPILOGUE_GPUS`, `POLAR_DECISION_66_WPRIME_LABEL_GPUS["polar1-m"]` | FM | DEFAULT on the RTX 5060 Ti (gates pass) | 2026-11-11 | POLAR-1-M NaCl 0.9659 / 0.9758, NbCl5 0.9273 / 0.9389; S, L NbCl5 0.985–0.993 | [ada-5060-screen](../results/ada-5060-screen-20261110/README.md#rtx-5060-ti) |
 | [ada-5060-set](../results/ada-5060-screen-20261110/README.md#registry-fix) | compute-sanitizer memcheck of the SplineForward registry fix | none | FM | MEASURED, impractical (compute-sanitizer 2026.2 aborts the stack on the host) | 2026-11-11 | double free in the host process before any kernel check | [ada-5060-screen](../results/ada-5060-screen-20261110/README.md#registry-fix) |
+| [rungb-first-layer](#rungb-first-layer) | Chunked backward GEMM gradients: linear_1's input gradient (the four 3×TF32 blocks, 20.5 kB/atom) streamed per receiver block into the w′ edge backward | none (bound only, `tools/bench/pool_bound.py`) | FM | REJECTED (bound) | 2026-11-10 | SrTiO3 36³ graph-pool trace (r3): with the layer rung's saved output gone, the live peak moves to the product backward and stays 8.45 GiB with the blocks at 1/8; the blocks plus the outer-sum gradient plus the species GEMM outputs at 1/8 give 7.43 GiB (−1.02 GiB, 4.4 kB/atom) | [rung-b](../results/rung-b-20261109/README.md) |
+| [rungb-first-layer](#rungb-first-layer) | Planned capture arena: the CUDA graph's requests served at offsets planned from a recorded capture (lifetimes known) instead of the caching allocator's best fit | none (bound only, `tools/bench/pool_bound.py`) | FM | PROPOSED (design sent to the conductor) | 2026-11-10 | SrTiO3 36³ graph pool: 12.98 GiB reserved, 10.44 GiB planned, 9.99 live (−2.54 GiB, 10.9 kB/atom); with the layer region 9.15 planned against 8.45 live | [rung-b](../results/rung-b-20261109/README.md) |
+| [rungb-first-layer](#rungb-first-layer) | The skin list's `edge_index` in int32 (its candidates already are) | `NeighbourConfig.edge_index_int32` (`skin.EDGE_INDEX_INT32` an A/B side) | FM | DEFAULT on the RTX 4000 Ada, RTX 5060 Ti and A100 (decision 66; the H200 not measured) | 2026-11-11 | rounding change (reproducible MH-1: forces 3.8e-5 eV/Å); A/B b/a Ada 1.0001 / 0.9987, 5060 Ti 1.0022 / 0.9959, A100 0.9960 / 0.9951; Ada SrTiO3 34³ peak reserved 13.40 → 12.95 GiB; cube-step limits unchanged; gate SrTiO3 forces 0.79, NaCl 0.91 (A100 0.93, 0.83) | [edge-index-int32](../results/edge-index-int32-20261111/README.md) |
 
 <a id="omat0-tc-presplit"></a>
 #### omat0-tc-presplit: the W slice split once per block (tensor-core forward, A100)
@@ -744,14 +747,20 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-filter32](#tiled-filter32) | Kept lists' cutoff test in float32, float64 only near the cutoff | `tiled.TILE_FILTER32` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.987 / 0.993; wave 0.981 / 1.012 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-epilogue](#tiled-epilogue) | Sweep masks, objective, virial and edge vectors in compiled code | `tiled.TILE_EPILOGUE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.980 / 0.981; wave 1.012 / 1.009 host-bound, 0.985 / 0.983 GPU-bound; gate 12/12 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-fill-skip](#tiled-fill-skip) | No host list-cache fill for tiles the graph cache keeps | `tiled.TILE_FILL_SKIP` | FM | DEFAULT | decision 66, 2026-11-09 | device 0.961 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
-| [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 host-bound, 0.989 / 0.990 GPU-bound | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-pinned-superset](#tiled-pinned-superset) | Kept lists in pinned host memory (up to 4 GiB) | `tiled.TILE_PINNED_SUPERSET` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | device 0.986 / 0.990; wave 1.012 / 1.028 host-bound, 0.989 / 0.990 GPU-bound; pinned blocks returned when dropped (3899b8b0, host peak −4.4 GB at 16.9M) | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-graph-cache-wave](#tiled-graph-cache-wave) | The graph cache under the wavefront (search pass to sweep 3) | `tiled.TILE_GRAPH_CACHE_WAVE` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.824 / 0.817 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-host-worker](#tiled-host-worker) | Host-state writes applied on a worker thread | `tiled.TILE_HOST_WORKER` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-09 | wave 0.975 / 0.982; host state 0.969 / 0.966 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| [tiled-copy-stream](#tiled-copy-stream) | Host-state write copies on a side stream | `tiled.TILE_COPY_STREAM` | FM | DEFAULT (scoped: `TILED_SPEED_GPUS`) | decision 66, 2026-11-10 | wave 0.962 / 0.964; host state 0.960 / 0.959 | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
+| [tiled-speed-gpus](#tiled-speed-gpus) | The tiled speed switches on the RTX 4000 Ada and every A100 | `tiled.TILED_SPEED_GPUS` | FM | DEFAULT | decision 66, 2026-11-10 | Ada device 0.868 / 0.868, wave 0.772 / 0.769; A100 device 0.792 / 0.789, wave 0.782 / 0.785; gates (off / on) Ada pass / pass, A100 pass / pass | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 | [tiled-lazy-keys](#tiled-lazy-keys) | Slot keys taken in sweep 1 from the prefetched graphs instead of a search pass | `TILE_LAZY_KEYS` (removed) | FM | REJECTED | 2026-11-09 | device 1.023 / 1.002 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-piece-start](#tiled-piece-start) | Graph cache keeps a tile's index at its slot's halo start | `TILE_PIECE_START` (removed) | FM | REJECTED | 2026-11-09 | device 0.9999 / 1.0001 | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-keep-a0](#tiled-keep-a0) | Keep interaction 0's node-level A for sweep 3 instead of recomputing it | – | FM | REJECTED (bound) | 2026-11-09 | 8 kB/atom (8 GB at 1M atoms); host round trip about 1.2 s > 0.73 s saved | [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | [tiled-state-dtype](#tiled-state-dtype) | Host state stored in 16 bits when the host is short (`"auto"`: kept lists first, then float16) | `TileConfig.state_dtype` | FM | DEFAULT `"auto"` (capacity fallback; float16 and bfloat16 not a default) | 2026-11-09 | float16 gate 12-51x, bfloat16 50-750x (fail); f16 store 0.983 / 0.977; host state halved | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 | [tiled-kept-compact](#tiled-kept-compact) | Kept lists delta-encoded below their 3 B per edge | - | FM | REJECTED (bound) | 2026-11-09 | at most a third of the lists; dropping them whole when short saves all | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
+| [tiled-receiver-cap](#tiled-receiver-cap) | Receiver caps above 16,384 in the compiled budget (32,768, 65,536) | `TileConfig.budget_receivers` | FM | REJECTED | 2026-11-11 | 5060 Ti device: 32,768 within noise of 16,384 (6.13–6.19 s against 6.12–6.26 s), 65,536 +3.5 % | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
+| [tiled-device-pool](#tiled-device-pool) | The wavefront's row pool (and the alias window) on the device | `TileConfig(state="device", alias_state=True, wavefront="on")` | FM | REJECTED (speed) | 2026-11-11 | 5060 Ti 975,560 atoms: against the host wavefront 1.012 / 0.994; against the plain device state 1.263 / 1.181 | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
+| [tiled-device-alias](#tiled-device-alias) | The aliased state on the device (x and sc only; dE/dx in a planned window) | `TileConfig(state="device", alias_state=True)` | FM | MEASURED (opt-in; capacity lever, not a default) | 2026-11-11 | device state 4.99 → 2.52 GB at 975,560 atoms; 1.034 / 1.021 slower (5060 Ti) | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
+| [tiled-heap-trim](#tiled-heap-trim) | `malloc_trim(0)` after the kept lists are dropped or the list cache cleared | `tiled.TILE_HEAP_TRIM` | FM | DEFAULT (memory only) | 2026-11-11 | 7.0 GiB forced drop at 20.1M atoms: resident 8.11 → 5.48 GiB (trimmed 5.37); A100 397.5M: A100PENDING | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-malloc-mmap](#tiled-malloc-mmap) | glibc mmap threshold 1 MiB for capacity runs | `MALLOC_MMAP_THRESHOLD_` (environment) | FM | MEASURED (environment, not code) | 2026-11-09 | process peak -7 % at 10M atoms; calls within 1 % | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 
 <a id="tiled-prefetch-device"></a>
@@ -832,6 +841,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - What: list_reuse's kept lists are stored pinned while they total at most the cap, so each call's copy to the device runs asynchronously at the pinned rate (pageable: about 70 ns/atom per call). A same-process A/B's other side gets a mirror in its own form, made once.
 - Status: DEFAULT (scoped). Exact.
 - Measured: device 0.986 / 0.990; wavefront 1.012 / 1.028 while host-bound (d5e91441; off there then), 0.989 / 0.990 GPU-bound (job 22, 1d30a163). The pinning cost of a call that searches again is not in the A/B (its positions never move past the skin).
+- Host memory (10 November 2026, 3899b8b0): PyTorch's pinned allocator rounds each block up to a power of two and keeps freed blocks resident. Kept lists dropped at the host floor or by `_auto_store`, or rebuilt (the compiled call's receiver cap), left their pinned blocks in the process while the host budget counted them as returned. Probe at 16,875,000 SrTiO3 atoms on the Ada (capacity settings, two calls), compiled call's host peak: all on 29.57 GB (pinned allocator 10.66 GB at exit), `TILE_PINNED_SUPERSET` off 24.02 GB (0.39 GB), `TILE_HOST_WORKER` off 29.28 GB, `TILE_COPY_STREAM` off 29.51 GB, all off 23.51 GB. Now the cap counts blocks, dropped or replaced lists empty the pinned cache (`_release_kept`), and `_auto_store` counts the blocks it frees: all on 25.21 GB (pinned 4.65 GB). The call reports `list_kept_pinned_bytes`. Records: `results/tiled-speed-20261110/memprobe/`.
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
 
 <a id="tiled-graph-cache-wave"></a>
@@ -863,6 +873,43 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Status: REJECTED at the bound: under a short host the lists now go whole (`state_dtype="auto"`, `list_reuse_floor`), which saves all of them at a measured 14 % per call.
 - Sources: [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md).
 
+<a id="tiled-receiver-cap"></a>
+#### tiled-receiver-cap: receiver caps above 16,384
+- Switch: `TileConfig.budget_receivers` (default `(8192, 16384)` in compiled mode; unchanged)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed)
+- What: larger tiles to cut the halo and the per-tile overhead (the A100 397.5M call ran 68 tiles of 16,384 receivers with about 8,920 halo atoms each).
+- Status: REJECTED on the RTX 5060 Ti. 975,560 SrTiO3 atoms, device state, the cap fixed (`--no-budget`), medians of two calls per side: R = 16,384 6.20 / 6.26 s, then 6.14 / 6.12 s at the end; R = 32,768 6.19 / 6.13 s (within the drift); R = 65,536 6.40 / 6.39 s (+3.5 %). Not measured on the A100 or the Ada, where the tiles' share of the GPU differs; open for a screen there.
+- Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) (`capscreen/`, job 37, 4c9be2bb).
+
+<a id="tiled-device-pool"></a>
+#### tiled-device-pool: the wavefront's row pool on the device (idea 3)
+- Switch: `TileConfig(state="device", alias_state=True, wavefront="on")` (eacf7cfd: the aliased state now runs on the device; the pool's row map and free rows and the alias window live there, the window's rows planned on the host once after sweep 1)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed, `plans/ideas-20261111-tiled.md` idea 3)
+- What: the idea's premise was that the wavefront's gap to the device state is its host copies (1,085 ns/atom in the 10 November profile). With the pool on the device there are none.
+- Status: REJECTED for speed on the RTX 5060 Ti (975,560 SrTiO3 atoms, compiled tiles, R 16,384 budget, both orders, job 41): against the host wavefront 1.012 / 0.994 (`TILE_COPY_STREAM` and `TILE_HOST_WORKER` already hide the copies); against the plain device state 1.263 / 1.181. The wavefront's cost at this size is its plan (100 tiles with the boundary skins against 68, a pool of 91 % of the atoms, a smaller graph cache), not the copies. Exact: CPU tests (device wavefront against the three-sweep call), leto 188 passed.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`devpool/`).
+
+<a id="tiled-device-alias"></a>
+#### tiled-device-alias: the aliased state on the device
+- Switch: `TileConfig(state="device", alias_state=True)` (opt-in; no default changed)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed)
+- What: x and sc on the device with dE/dsc in sc's rows and dE/dx in x's rows once an atom is closed, its sum until then in a window whose rows are planned after sweep 1 (`_State._plan_slots`): two of the four state tensors.
+- Status: MEASURED. Device state 4.99 → 2.52 GB at 975,560 SrTiO3 atoms (about 2.6 kB/atom less); 1.034 / 1.021 slower on the RTX 5060 Ti (job 43). Bitwise the plain device state on CPU. A capacity lever for device state near its limit (the Ada and the 5060 Ti hold 3–5M atoms in device state); no automatic choice yet.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`devalias/`).
+
+<a id="tiled-heap-trim"></a>
+#### tiled-heap-trim: return dropped kept lists to the system
+- Switch: `fastmace.model.tiled.TILE_HEAP_TRIM` (default True; stats `heap_trims`, `heap_trim_s`)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed, idea 1)
+- What: the kept lists' few-MB host tensors come from glibc's heap once its mmap threshold has risen; freed, they stayed resident (the A100 397.5M record held about 110 GiB no live array accounted for, which forced float16 state and switched the list cache off). The call now runs `malloc_trim(0)` after it drops the kept lists and after it clears the list cache, next to the pinned allocator's `empty_cache` (3899b8b0).
+- Status: DEFAULT. Memory only; no rounding change (same arrays, same order).
+- Measured: SrTiO3 20,098,395 atoms on the 5060 Ti host, the first call forced to drop its 7.00 GiB of kept lists: resident set after the drop 8.11 GiB without the trim, 5.48 GiB with it (5.37 GiB after a manual trim; live arrays 1.17 GiB in both). A100 397.5M (Alex 4981047): A100PENDING. Not addressed: about 1.5 GiB glibc holds at the end of a call.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`census38/`, `census39/`).
+
 <a id="tiled-malloc-mmap"></a>
 #### tiled-malloc-mmap: glibc's mmap threshold for capacity runs
 - Switch: environment `MALLOC_MMAP_THRESHOLD_=1048576` (also `MALLOC_ARENA_MAX=2`)
@@ -881,6 +928,29 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Status: DEFAULT (scoped). Exact (CPU tests, host state and wavefront).
 - Measured: wavefront 0.975 / 0.982; host state 0.969 / 0.966 (1d30a163). The wavefront call is then GPU-bound (wall 8.33 s, GPU busy 7.89 s).
 - Sources: [tiled-speed](../results/tiled-speed-20261108/README.md).
+
+<a id="tiled-copy-stream"></a>
+#### tiled-copy-stream: the host state's write copies on a side stream
+- Switch: `fastmace.model.tiled.TILE_COPY_STREAM` (None: on for `TILED_SPEED_GPUS`)
+- Engine: FM
+- Date/round: 10 November 2026 (tiled speed)
+- What: with host state and overlap, a tile's deferred writes were copied to pinned host memory on the compute stream (0.44 s of device-to-host copies in the 7.7 s wavefront call at 975,560 SrTiO3 atoms), so the next tile's kernels waited for the link. Now the compute stream clones the values and indices on the device (0.05 s), a side stream copies the clones, and the host applies the same writes in the same order after the copy's event.
+- Status: DEFAULT (scoped). Exact (GPU test against the switch off on the host-state wavefront).
+- Measured: wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom); host state 0.960 / 0.959 (f34f35e8). Wavefront profile: wall 7.24 s, GPU busy 7.15 s (GPU-bound).
+- Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md).
+
+<a id="tiled-speed-gpus"></a>
+#### tiled-speed-gpus: the tiled speed switches on the Ada and the A100
+- Switch: `fastmace.model.tiled.TILED_SPEED_GPUS` (the GPUs where the tiled speed switches left at None are on)
+- Engine: FM
+- Date/round: 10 November 2026 (tiled speed)
+- What: the nine `TILED_SPEED_GPUS` switches (`TILE_PREFETCH_DEVICE`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE`, `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET`, `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`, `TILE_COPY_STREAM`) had been on only on the RTX 5060 Ti, where they were measured. The A100 capacity call cost 9.84 µs/atom at 397.5M atoms against 1.96 µs/atom for the A100's whole-system call.
+- Status: DEFAULT. The set measured as one A/B on each GPU, not switch by switch.
+- Measured: 975,560 SrTiO3 atoms, all nine off against all on, same process, both orders (24926149). RTX 4000 Ada (murphy): device state 0.868 / 0.868 (6.50 → 5.64 µs/atom), wavefront 0.772 / 0.769 (8.05 → 6.20). A100-SXM4-80GB (Alex 4976251): device state 0.792 / 0.789 (4.72 → 3.73), wavefront 0.782 / 0.785 (8.98 → 7.04). Every A100 model (GPUModels family).
+- Gates (decision 66: `TILE_VIRIAL` and `TILE_EPILOGUE` round; their 12/12 gates were the 5060 Ti's): `tools/force_stress_gate.py --engine fastmace --model omat0-medium --tiled-receivers 48 --tiled-mode compiled`, SrTiO3 3×3×3, NaCl, NbCl5, the nine switches all off and all on (`--production-constant`), 4a1ade7e. Every check passes on both GPUs, both sides. Ratios to ASE float32 (energy / forces / stress), off → on: Ada (murphy) SrTiO3 4.13 / 0.94 / 0.43 → 4.29 / 0.81 / 0.39, NaCl 1.28 / 0.90 / 1.06 → 1.24 / 1.01 / 1.06, NbCl5 1.36 / 0.95 / 1.31 → 1.31 / 0.98 / 1.23; A100-SXM4-80GB (Alex 4977013) SrTiO3 7.52 / 1.08 / 0.77 → 8.86 / 0.98 / 0.63, NaCl 2.10 / 0.91 / 1.13 → 2.07 / 0.87 / 1.11, NbCl5 8.35 / 1.02 / 1.43 → 8.16 / 1.01 / 1.62. The energy ratios above 3 are under the 0.01 meV/atom floor (largest 2.9e-3 meV/atom) and as high with the switches off.
+- Host memory: `TILE_PINNED_SUPERSET` held its pinned blocks after the kept lists were dropped or rebuilt (see [tiled-pinned-superset](#tiled-pinned-superset)); fixed in 3899b8b0 before the A100's 397.5M record was rerun with the switches on.
+- Gate on the merged tip (69a48049, main 4e9388c8 merged; A100-SXM4-80GB, Alex 4981048): every check passes, off → on: SrTiO3 10.59 / 1.05 / 0.66 → 8.80 / 1.08 / 0.66, NaCl 1.94 / 0.90 / 1.02 → 1.91 / 0.84 / 1.04, NbCl5 8.31 / 1.00 / 1.70 → 8.64 / 1.01 / 1.36 (energy ratios above 3 under the floor, as high with the switches off). Records: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`gate/alex-4981048/`).
+- Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md).
 
 <a id="tiled-lazy-keys"></a>
 #### tiled-lazy-keys: slot keys from the prefetched graphs
@@ -962,6 +1032,7 @@ are not A/B comparisons.
 | 2026-11-08 | Tiled call speed (OMAT-0, RTX 5060 Ti) | `TILE_PREFETCH_DEVICE`, `TILE_BLOCK_ROWS`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE` | Decision 66 | Device state 0.795 / 0.787 at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled call gap (OMAT-0, RTX 5060 Ti) | `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_FILL_SKIP`, `TILE_PINNED_SUPERSET`; `TILE_PIECE_START` and keeping interaction 0's A rejected | Decision 66 | Device state 0.923 / 0.928 (all eight switches 0.729 / 0.731) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
 | 2026-11-09 | Tiled wavefront (OMAT-0, RTX 5060 Ti) | `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER`; `TILE_BLOCK_ROWS`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET` on under the wavefront; `TILE_LAZY_KEYS` rejected | Decision 66 | Wavefront 0.766 / 0.774 (10.10 → 7.74 µs/atom) at 975,560 SrTiO3 atoms; [tiled-speed](../results/tiled-speed-20261108/README.md) |
+| 2026-11-10 | Tiled speed (OMAT-0, RTX 5060 Ti, RTX 4000 Ada, A100) | `TILE_COPY_STREAM`; the tiled speed switches on the Ada and every A100 | Decision 66 | 5060 Ti wavefront 0.962 / 0.964 (7.80 → 7.51 µs/atom), host state 0.960 / 0.959; all switches on the Ada 0.868 / 0.868 (device), 0.772 / 0.769 (wavefront), A100 0.792 / 0.789, 0.782 / 0.785; 975,560 SrTiO3 atoms; force/stress gates all off and all on pass on the Ada and the A100; the pinned kept lists' blocks returned when dropped (3899b8b0); [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
 
 ## Closed directions
 
