@@ -65,11 +65,12 @@ def parse_args(argv=None):
                         "fastmace.kernels.oeq_streaming.fused_forward:BLOCKS_PER_SM=4): what it captures again in "
                         "warm-up (new edge sizes) reads them too")
     p.add_argument("--b-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side b's, as --a-constant")
-    p.add_argument("--b-expect", nargs="*", default=[], metavar="MODULE:NAME",
+    p.add_argument("--b-expect", nargs="*", default=[], metavar="[ENTRY@]MODULE:NAME",
                    help="Proof counters (ints or functions returning one, e.g. "
                         "fastmace.kernels.triton.tabled_outer_sum:split_walks) that must "
                         "advance over side b's build and warm-up, and stay put over side a's; recorded per side as "
-                        "'expect', and the entry is INVALID (exit 3) where they do not")
+                        "'expect', and the entry is INVALID (exit 3) where they do not. ENTRY@: for that --pack "
+                        "entry's b only (the others' advance is recorded, not required)")
     p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"])
     p.add_argument("--temperature-K", type=float, default=300.0)
@@ -355,9 +356,15 @@ def main(argv=None):
                  if any(f"RewriteConfig.{f} " in line for f in every_field)]
         return timed, time.perf_counter() - started, lines
 
+    proofs = sorted({item.rpartition("@")[2] for item in args.b_expect})
+
+    def required(name):  # the counters side b of pack entry ``name`` must advance
+        return [item.rpartition("@")[2] for item in args.b_expect
+                if not item.rpartition("@")[1] or item.rpartition("@")[0] == name]
+
     def expect_values():  # an int attribute, or a function returning one
         values = {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1])
-                  for item in args.b_expect}
+                  for item in proofs}
         return {item: value() if callable(value) else value for item, value in values.items()}
 
     def measure(name, sides, setup, lines, structure, natoms, advanced):
@@ -388,8 +395,8 @@ def main(argv=None):
                                             for side, now in engine_counters().items()},
                      other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()])
         entry["expect"] = advanced
-        entry["expect_failed"] = [f"{side} {item}" for item in args.b_expect for side in sides
-                                  if (advanced[side][item] > 0) != (side == "b")]
+        entry["expect_failed"] = ([f"a {item}" for item in proofs if advanced["a"][item] > 0]
+                                  + [f"b {item}" for item in required(name) if advanced["b"][item] <= 0])
         entry["valid"] = not recompiled and not entry["other_gpu_processes"] and not entry["expect_failed"]
         if entry["expect_failed"]:
             failed_expectations.append(f"{name} {structure}: {entry['expect_failed']}")
@@ -408,7 +415,7 @@ def main(argv=None):
         for _, fields_b, _ in specs:
             everything.update(fields_b)
 
-        advanced = {key: {item: 0 for item in args.b_expect} for key in ["a", *range(len(specs))]}
+        advanced = {key: {item: 0 for item in proofs} for key in ["a", *range(len(specs))]}
 
         def counted(key, make):
             before = expect_values()

@@ -163,12 +163,15 @@ def test_recomputing_backward_allocates_no_value_rows(monkeypatch, power):
     assert all(torch.equal(a, b) for a, b in zip(results[True], results[False]))
 
 
+@pytest.mark.parametrize("power", [True, False])
 @pytest.mark.parametrize("inner", [1, 3])
-def test_nested_split_walks_match_the_full_walks(monkeypatch, inner):
+def test_nested_split_walks_match_the_full_walks(monkeypatch, inner, power):
     """rewrites.radial.nested's split walks (``r_far``): on a table whose channels K/2.. are zero from ``r_far`` (a
-    piece start), the sums, the edge density, dL/dr and grad_y of the full power-basis walks, to rounding."""
+    piece start), the sums, the edge density, dL/dr and grad_y of the full walks, to rounding; the backward in the
+    power basis or by recompute (NESTED_POWER False with POWER_BACKWARD off)."""
     monkeypatch.setattr(tos, "TABLED_FORWARD", True)
-    monkeypatch.setattr(tos, "POWER_BACKWARD", True)
+    monkeypatch.setattr(tos, "POWER_BACKWARD", power)
+    monkeypatch.setattr(tos, "NESTED_POWER", power)
     from fastmace.rewrites.radial import power_basis
 
     coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max = _table()

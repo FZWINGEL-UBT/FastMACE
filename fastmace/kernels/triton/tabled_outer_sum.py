@@ -54,6 +54,9 @@ POWER_BACKWARD = None
 # SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9917 / 0.9946, 0.9944 / 0.9941;
 # left out of the candidate set 1.0126 / 1.0070, 1.0068 / 1.0091.
 POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200", "NVIDIA RTX 4000 Ada Generation", "NVIDIA GeForce RTX 5060 Ti"))
+# rewrites.radial.nested (11 November 2026): NESTED_POWER True runs the nested split's backward in the power basis on
+# every GPU (dual Horner); False: as POWER_BACKWARD says there (the recompute split where it is off, the A100's).
+NESTED_POWER = True
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
 # The tabled forward's register cap (Triton's maxnreg; None: Triton's choice). step_limiters (9 November 2026):
@@ -709,9 +712,11 @@ class _TabledOuterSum(torch.autograd.Function):
         ctx.inner, ctx.columns = inner, int(columns)
         ctx.shape, ctx.slots = r.shape, int(slots)
         ctx.tabled = tabled_forward(r.device) and r.dtype == torch.float32
-        # the nested split (r_far > 0) runs with the tabled CUDA walks only, its backward in the power basis
+        # the nested split (r_far > 0) runs with the tabled CUDA walks only, its backward in the power basis where
+        # NESTED_POWER says so (else as POWER_BACKWARD)
         ctx.r_far = r_far if ctx.tabled and r.is_cuda and pcoef is not None else 0.0
-        ctx.power = ctx.tabled and pcoef is not None and r.is_cuda and (power_backward(r.device) or ctx.r_far > 0)
+        ctx.power = ctx.tabled and pcoef is not None and r.is_cuda and (
+            power_backward(r.device) or (ctx.r_far > 0 and bool(NESTED_POWER)))
         if ctx.tabled:  # nothing of a kept: the backward evaluates it again
             # PACKED_COEF: the packed copies exist where it was on at the table's build (saved last, if any)
             pack = ppacked if ctx.power else packed
@@ -754,7 +759,7 @@ def tabled_outer_sum(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale
                                  float(r_far))
 
 
-__all__ = ["CHUNK", "FORWARD_CHUNK", "PACKED_COEF", "PACKED_COEF_GPUS", "POWER_BACKWARD", "POWER_BACKWARD_GPUS",
-           "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "packed_coef", "packed_coef_default",
-           "power_backward", "tabled_forward", "tabled_outer_sum", "tabled_outer_sum_backward",
+__all__ = ["CHUNK", "FORWARD_CHUNK", "NESTED_POWER", "PACKED_COEF", "PACKED_COEF_GPUS", "POWER_BACKWARD",
+           "POWER_BACKWARD_GPUS", "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "packed_coef",
+           "packed_coef_default", "power_backward", "tabled_forward", "tabled_outer_sum", "tabled_outer_sum_backward",
            "tabled_outer_sum_forward", "split_walks"]

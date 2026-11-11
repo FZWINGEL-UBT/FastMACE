@@ -107,6 +107,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                   "BACKWARD_WALK": "run-walking backward; per GPU, A/B"},
     "fastmace/kernels/triton/tabled_outer_sum.py": {"TABLED_FORWARD": "table read inside the sums; per GPU, A/B",
                                                    "POWER_BACKWARD": "idea 40: power-basis backward; per GPU, A/B",
+                                                   "NESTED_POWER": "nested split's backward basis; A100 A/B",
                                                    "PACKED_COEF": "idea 3: channel-pair packed series; per GPU, A/B",
                                                    "FORWARD_MAXNREG": "tabled forward register cap; A100 A/B",
                                                    "SHAPE_CARRIER": "stride-0 shape view, not [E, K] floats; A/B side"},
