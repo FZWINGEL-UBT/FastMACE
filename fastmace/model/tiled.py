@@ -1013,14 +1013,14 @@ def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, i
 
     Float64 per node only: each edge's integer image ``round(shift @ cell^-1)`` in float32 (exact: |unit| small), a
     halo row's image the smallest encoded unit among its edges (deterministic, as every sweep must see the same rows),
-    its float64 shift ``unit @ cell`` per row; the remaining shift ``(unit - row unit) @ cell`` in float32 (zero
-    unless an atom reaches the tile through two images, which only a box smaller than two tiles allows)."""
+    its float64 shift ``unit @ cell`` per row; the remaining shift ``(unit - row unit) @ cell`` in the model's dtype
+    (zero unless an atom reaches the tile through two images, which only a box smaller than two tiles allows). Local
+    job 56: 1.003 / 1.003 at 320,000 atoms on the RTX 5060 Ti (three float64 3x3 products per edge: 1.020 / 1.027)."""
     import torch
 
     from fastmace.neighbors.skin import times_3x3
 
     count = nodes.shape[0]
-    cell32 = cell.to(torch.float32)
     unit = torch.round(times_3x3(shifts.to(torch.float32), inverse.to(torch.float32)))
     code = unit.to(torch.int32) + 64  # |unit| < 64
     code = (code[:, 0] * 128 + code[:, 1]) * 128 + code[:, 2]
@@ -1034,7 +1034,7 @@ def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, i
     rows64 = positions64[nodes]
     rows = (rows64 - times_3x3(row_unit.to(torch.float64), cell) - rows64[:1]) * node_mask.unsqueeze(1).to(
         torch.float64)
-    return rows.to(dtype), times_3x3(unit - row_unit[local[0]], cell32).to(dtype)
+    return rows.to(dtype), times_3x3((unit - row_unit[local[0]]).to(dtype), cell.to(dtype))  # float64 models: float64
 
 
 def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype,
