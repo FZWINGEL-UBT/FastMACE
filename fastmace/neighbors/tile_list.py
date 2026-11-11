@@ -26,6 +26,11 @@ from .skin import times_3x3
 
 CHUNK = 1 << 22  # atoms per chunk of the binning
 
+# The tile's edge order as one int64 key ``primary * natoms + sender`` while it stays below this; above it (sender
+# groups x natoms^2 past 2^63: 10 species at 1e9 atoms, 3 at 1.75e9) two stable sorts, sender then primary, give the
+# same order (plans/billion-atoms-20261111.md, step 2).
+KEY_LIMIT = 2**63
+
 MIN_BINS = 3  # bins per axis: a pair then has one image within the cutoff, and +-1 bin covers it
 # Bins of half the cutoff and a +-2 stencil (125 bins of (2.5 c)^3 instead of 27 of (3 c)^3: 42 % fewer candidates,
 # the search about 90 % of a list rebuild at 1M atoms; tiled-1m-speed.md, "List rebuilds") where every axis holds
@@ -137,7 +142,11 @@ class TileNeighbours:
         keep = (r2 < self.cutoff ** 2) & ~((sender == receiver) & (unit == 0).all(dim=1))
         sender, receiver, unit, shifts64, r2 = sender[keep], receiver[keep], unit[keep], shifts64[keep], r2[keep]
         primary = receiver if self.groups is None else receiver * self.group_count + self.groups[sender]
-        order = torch.sort(primary * natoms + sender).indices
+        if (1 if self.groups is None else self.group_count) * natoms * natoms <= KEY_LIMIT:
+            order = torch.sort(primary * natoms + sender).indices
+        else:  # lexicographic (primary, sender) without the key's overflow: the same order
+            order = torch.sort(sender, stable=True).indices
+            order = order[torch.sort(primary[order], stable=True).indices]
         out = sender[order], receiver[order], unit[order], shifts64[order].to(self.float_dtype)
         return out if inner is None else out + (r2[order] < inner ** 2,)
 

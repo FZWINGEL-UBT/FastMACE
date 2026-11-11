@@ -222,14 +222,20 @@ def big_structure(seed=8):
     return atoms
 
 
+@pytest.mark.parametrize("key", ["key", "two-sorts"])
 @pytest.mark.parametrize("split", [1, 2])
 @pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
-def test_tile_neighbours_are_bitwise_the_global_list(names, split):
+def test_tile_neighbours_are_bitwise_the_global_list(names, split, key, monkeypatch):
     """Each tile's edges from the cell bins (fastmace.neighbors.tile_list) are the global skin list's edges for
     those receivers after compact at the same positions: the same pairs, unit shifts and shifts, in the same order
     (with MH-1's rewrites the list sorts by sender group too), with cutoff-wide bins and a +-1 stencil and with
-    half-cutoff bins and a +-2 stencil (the default on this cell)."""
+    half-cutoff bins and a +-2 stencil (the default on this cell). "two-sorts": the order without the int64 key
+    (``KEY_LIMIT``; groups x natoms^2 past 2^63 above about 1e9 atoms) is the same."""
+    from fastmace.neighbors import tile_list
     from fastmace.neighbors.tile_list import TileNeighbours
+
+    if key == "two-sorts":
+        monkeypatch.setattr(tile_list, "KEY_LIMIT", 1)
 
     calc, atoms = calculator(), big_structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
