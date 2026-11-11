@@ -24,9 +24,9 @@ for REPEAT in "$@"; do
     python "$S" compare "$O/edge32-off.pt" "$O/edge32-on.pt"; echo "compare exit=$?"
     python "$S" compare "$O/edge32-off.pt" "$O/edge32-off2.pt"; echo "control exit=$?"
     fi
-    python "$S" run "$O" --side off --repeat "$REPEAT" --reproducible --model mh1 --tag r; echo "off r exit=$?"
-    python "$S" run "$O" --side on --repeat "$REPEAT" --reproducible --model mh1 --tag r; echo "on r exit=$?"
-    python "$S" run "$O" --side off --repeat "$REPEAT" --reproducible --model mh1 --tag r2; echo "off r2 exit=$?"
+    python "$S" run "$O" --side off --repeat "$REPEAT" --reproducible --model mh1-r2scan --tag r; echo "off r exit=$?"
+    python "$S" run "$O" --side on --repeat "$REPEAT" --reproducible --model mh1-r2scan --tag r; echo "on r exit=$?"
+    python "$S" run "$O" --side off --repeat "$REPEAT" --reproducible --model mh1-r2scan --tag r2; echo "off r2 exit=$?"
     python "$S" compare "$O/edge32-offr.pt" "$O/edge32-onr.pt"; echo "reproducible compare exit=$?"
     python "$S" compare "$O/edge32-offr.pt" "$O/edge32-offr2.pt"; echo "reproducible control exit=$?"
   } > "$O/edge32.log" 2>&1 < /dev/null
