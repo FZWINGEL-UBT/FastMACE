@@ -182,7 +182,7 @@ def test_nested_split_walks_match_the_full_walks(monkeypatch, inner):
     pair = torch.randint(0, coef.shape[0], (edges,), generator=g).to(torch.int32).cuda()
     y = torch.randn((edges, d), generator=g).cuda()
     key = torch.sort(torch.randint(0, slots, (edges,), generator=g)).values.cuda()
-    grads = [torch.randn((slots // inner, d * k * inner), generator=g).cuda(),
+    grads = [torch.randn((slots, d * k), generator=g).cuda(),  # the op's [slots, D K] in either layout
              torch.randn((edges, 1), generator=g).cuda()]
     coef_c, dcoef_c, starts_c, scales_c, bins_c = (t.float().cuda() if t.is_floating_point() else t.cuda()
                                                    for t in (coef, dcoef, starts, scales, bins))
