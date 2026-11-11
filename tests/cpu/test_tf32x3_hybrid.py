@@ -31,3 +31,37 @@ def test_build_flag_swaps_every_math_operator():
     header = (HERE / "hybrid_f16.h").read_text()
     assert "struct OpMultiplyAddHybridF16" in header and "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32" in header
     assert "-DFM_HYBRID_F16" in (HERE.parents[2] / "tools" / "build_cutlass_tf32x3.sh").read_text()
+
+
+# Range check before the merge (results/hybrid-gemm-20261111/range_probe.py): HYBRID's cross parts are float16, so
+# operands must stay below 32,752. Bar: every recorded operand and the OMAT-0 medium weights at most 3,000 (10x).
+RANGE_RECORD = Path(__file__).resolve().parents[2] / "results" / "hybrid-gemm-20261111" / "range_probe.json"
+HYBRID_LIMIT = 32752.0
+MARGIN = 10.0
+
+
+def test_recorded_operands_and_weights_keep_a_tenfold_margin():
+    record = __import__("json").loads(RANGE_RECORD.read_text())
+    assert record["limit"] == HYBRID_LIMIT
+    assert record["max_abs_parameter"] * MARGIN <= HYBRID_LIMIT
+    for name in ("SrTiO3", "NaCl", "NbCl5"):
+        assert name in record["cases"]
+    for name, case in record["cases"].items():
+        assert max(case["max_a"], case["max_b"]) * MARGIN <= HYBRID_LIMIT, name
+
+
+def test_omat0_medium_weights_keep_a_tenfold_margin():
+    """With the checkpoint at hand ($FASTMACE_MODELS), its parameters still match the record's margin."""
+    import os
+
+    import pytest
+    import torch
+    models = os.environ.get("FASTMACE_MODELS")
+    path = Path(models) / "mace-omat-0-medium.model" if models else None
+    if path is None or not path.is_file():
+        pytest.skip("no OMAT-0 medium checkpoint under FASTMACE_MODELS")
+    model = torch.load(path, map_location="cpu", weights_only=False)
+    largest = max(float(t.detach().abs().max()) for t in model.parameters() if t.numel())
+    assert largest * MARGIN <= HYBRID_LIMIT
+    record = __import__("json").loads(RANGE_RECORD.read_text())
+    assert abs(largest - record["max_abs_parameter"]) <= 1e-3 * record["max_abs_parameter"]
