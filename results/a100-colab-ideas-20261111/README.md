@@ -8,7 +8,7 @@ Benchmark_loup SrTiO3 10x10x10 (5,000 atoms, 373,760 padded edges) unless stated
 
 | # | Idea | First test | Result | Verdict |
 | --- | --- | --- | --- | --- |
-| 1 | Far-shell edges (r > r_h) in packed `half2` | CPU oracle: far-edge inputs, messages, dout and per-receiver sums in float16 | force/stress error of the float32 run 0.9–1.8× the float32 rounding at r_h 5.0–5.8 Å (gate 3×); 5.0 Å with half accumulation 2.96× (SrTiO3) | **Bound passes** |
+| 1 | Far-shell edges (r > r_h) in packed `half2` | CPU oracle: far-edge inputs, messages, dout and per-receiver sums in float16 | force/stress error of the float32 run 0.9–1.8× the float32 rounding at r_h 5.0–5.8 Å (gate 3×); 5.0 Å with half accumulation 2.96× (SrTiO3) | **Bound, census and A100 lab pass** (lab 0.48 of fp32 per far edge) |
 | 1 | | HFMA2 beside FFMA on sm_80 (`tools/fma_dual_pipe_bench.py --hfma2`) | FFMA alone 63.8, HFMA2 alone 127.3, 1:1 mix 167.7 FMA results/clk/SM (55.9 FFMA + 55.9 HFMA2 instructions) | **HFMA2 is a second pipe** on the A100 |
 | 2 | Two half-systems out of phase | two independent half-size force graphs (SrTiO3 10x10x5) on two streams | concurrent 6,326 µs, back to back 6,894 µs, the full system's graph 6,273 µs: concurrent / full **1.008** | **Rejected** (even the uncoupled upper bound gains nothing) |
 | 3 | Machine search over kernel formulations | exhaustive contraction-order search of w′'s trilinear sums with the real CG sparsity | from the unfactored form (602 FP instructions per edge and channel) FACTORED is 251, rank 2 of 27; the best tree 241.7 (−3.7 %), the best per-path mix 238.25 (−5.1 % of the TP arithmetic, about 1 % of the step) | **Closed** (below the bound; the same M-precontraction dropped on 5 Nov) |
@@ -45,8 +45,40 @@ FMA instructions and move them off the FP32 pipe that bounds w′ on the A100 (8
 20261109). Size: w′ is 2,265 µs of a 6.8 ms force call; its tensor-product arithmetic for 13–26 % of the edges is
 the part that moves, so about 2–5 % of the step. The layout that fits w′'s one-thread-per-channel walk is two far
 edges of one receiver per `half2` (g broadcast, x from the two senders, per-edge u, v and weight gradient in the
-two halves). Next stage: a w′ kernel lab (falsifier: the far-edge loop in `half2` pairs, numbers wrong) on the
-A100; it needs a free A100 slot.
+two halves).
+
+### Stage 2: offline census (`half2_wprime_census.py`, NVRTC, no GPU)
+
+Today's w′ channel loop (the captured A100 kernel, FACTORED, HORNER, SCALAR_PATHS) in a minimal harness, once
+unchanged (`fp32`) and once with every channel value an `__half2` of two far edges of one receiver (`half2`: x of the
+two senders packed from a float16 copy, dout broadcast in a staged `__half2` row, the table from a float16 copy, two
+8-byte loads and four PRMTs per path, the slope masked per half, dx by two float atomics). Loop instructions per
+edge (`half2_wprime_census.json`):
+
+| | fp32 | half2 (per edge) | ratio | registers | spills |
+| --- | --- | --- | --- | --- | --- |
+| sm_80 | 460 (310 FFMA, 39 FMUL) | 291.5 (317 HFMA2, 32 HMUL2, 44 PRMT per pair) | 0.634 | 80 / 104 | none |
+| sm_80, `__launch_bounds__(256, 3)` | 460 | 316.5 | 0.688 | 80 / 80 | none |
+| sm_90 | 462 | 293.5 | 0.635 | 80 / 106 | none |
+
+### Stage 3: A100 lab (`half2_wprime_lab.py`, Colab A100-SXM4-40GB, records `half2/`)
+
+The three census kernels on far-edge-like data (5,000 senders, the real table geometry 731 × 1,280 × 4, every edge
+interior and sloped), 100 interleaved launches each; numbers of half2 against fp32 on the same float16-rounded inputs:
+
+| far edges | fp32 | half2 | half2, 80 registers | half2 / fp32 | numbers (max\|d\|/max\|a\|: edge grad, radial grad, dx) |
+| --- | --- | --- | --- | --- | --- |
+| 131,072 | 1,139.7 µs | 601.1 µs | 551.9 µs | 0.527 / **0.484** | 1.5e-3, 2.5e-3, 7.0e-4 |
+| 65,536 | 608.3 µs | 341.5 µs | 301.6 µs | 0.561 / **0.496** | 1.4e-3, 1.2e-3, 8.0e-4 |
+
+The falsifier does not fire: half2 does a far edge in about half the time (less than the 0.63–0.69 of the issue
+slots: the float16 x and table halve the far edges' load bytes too), and its numbers differ from fp32 by float16
+rounding only. Size, if w′'s time scales with edges: far edges at r_h 5.5–5.8 Å are 13–26 % of interaction 2's
+edges, so 0.5 × (13–26 %) × 2,265 µs ≈ 150–300 µs, **2–4.5 % of the force call** (stage-3 rule: twice the 1 % bound,
+passes). Not yet covered: the half-precision Horner in the force/stress gate (the oracle did not model it), the
+pairing of far edges per receiver (an odd edge per receiver runs in fp32), and the float16 copies of x and the
+table (32 MB). Next stage: a production w′ far-edge path behind a `*_GPUS` switch, then the MD-step A/B and the gate.
+Colab cost 0.74 CU (699 s, 11 min set-up).
 
 ## Idea 2: two half-systems on two streams
 
