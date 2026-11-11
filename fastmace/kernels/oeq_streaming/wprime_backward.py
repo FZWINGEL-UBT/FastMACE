@@ -2011,12 +2011,15 @@ class WPrime(torch.nn.Module):
                 and self.spline_block[0] == fused.id and BLOCK_MESSAGE is not False):  # SPLINE_W
             convolution = (_SplineLocatedBlockConvolution if self.spline_block[1].shared_locator
                            else _SplineBlockConvolution)  # SHARED_LOCATOR
+            force = self._force_arguments(vectors)
+            # EDGE_FORCE: sh detached, so autograd neither materialises a zero dsh [E, 16] for the None gradient nor
+            # runs edge_sh3's backward on it (A100 profile: +76 B/edge, the step 2.4-3.3 % slower)
             *groups, density = convolution.apply(
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
-                x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
-                int(block_rows or 0), self.spline_packed if self.spline_block[1].packed8 else None,  # PACKED8
-                *self._force_arguments(vectors))
+                x, sh.detach() if force[1] >= 0 else sh, senders, receivers, row_ptr, self.spline_block[1].id,
+                self.spline_block[2].id, int(block_rows or 0),
+                self.spline_packed if self.spline_block[1].packed8 else None, *force)  # PACKED8
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
