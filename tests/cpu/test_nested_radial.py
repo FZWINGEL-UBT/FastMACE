@@ -17,6 +17,15 @@ from fastmace.rewrites.radial import nested
 R_MAX = 6.0
 
 
+@pytest.fixture(autouse=True)
+def _float32_default():
+    """The tables and sums here are float32: pin the default dtype (other suite tests leave float64 behind)."""
+    previous = torch.get_default_dtype()
+    torch.set_default_dtype(torch.float32)
+    yield
+    torch.set_default_dtype(previous)
+
+
 class _Chain:
     """64 channels: 16 smooth functions over the whole range (mixed) plus 48 compact bumps that end before 3 Å,
     then the c column and a density column; one species pair."""
