@@ -22,7 +22,10 @@ through `tools/ci/local_gpu.py`).
 
 Decision 66: a rounding change needs the gate, and it passed; the A/B is not slower on either GPU. Adopted (conductor,
 11 November 2026): `NeighbourConfig.edge_index_int32` "auto" is on on the RTX 4000 Ada and the RTX 5060 Ti
-(`planner.fixed.DECISION_66_EDGE_INDEX_INT32_GPUS`), off elsewhere; the A100 joins after one Alex A/B and gate.
+(`planner.fixed.DECISION_66_EDGE_INDEX_INT32_GPUS`), off elsewhere. The A100 joined after its own run (Alex job
+4981362, A100-SXM4-80GB, source `25df4873`): A/B b/a **0.9960 / 0.9951**, gate passed (SrTiO3 3×3×3 forces 0.93, stress
+0.65, energy 2.4e-3; NaCl forces 0.83, stress 0.88, energy 1.7e-4); every A100 model takes it (GPUModels). The H200 is
+not measured and keeps it off.
 
 The tiled and wavefront paths keep no int64 edge_index on the host: the kept lists and the per-call list cache store
 an int32 sender dictionary, int16 codes, narrow per-receiver counts and uint8 unit-shift codes (about 3 B per edge),
@@ -37,3 +40,4 @@ int64 [2, E]) are wide; int32 would not change the tiled host state.
 - `ada/reproducible-run.log`: the reproducible MH-1 comparison (`tools/bench/edge32_leto.sh`, `tools/bench/edge32_probe.py`,
   source `79cceac0`).
 - `ada/gate.log`: the gate (`tools/bench/gate_edge32_leto.sh`, source `79cceac0`).
+- `a100/`: the A100 gate and A/B (`tools/jobs/alex_edge32.sh`, Alex job 4981362).

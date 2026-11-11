@@ -680,24 +680,26 @@ def test_chunked_compact_is_bitwise_the_one_chunk_compact(chunk, variable_cell, 
 
 
 def test_the_planner_turns_edge_index_int32_on_on_measured_gpus_only():
-    """Decision 66 (11 November 2026): "auto" on on the RTX 4000 Ada and the RTX 5060 Ti (gate and A/B passed),
-    off elsewhere (the A100 until its own A/B and gate); an explicit value is kept."""
+    """Decision 66 (11 November 2026): "auto" on on the RTX 4000 Ada, the RTX 5060 Ti and every A100 (gate and A/B
+    passed), off elsewhere (the H200, not measured); an explicit value is kept."""
     import dataclasses
 
     from test_planner import GPU, plan_for
 
     from fastmace.planner import fixed
 
-    assert fixed.DECISION_66_EDGE_INDEX_INT32_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
-    assert "NVIDIA A100-SXM4-80GB" not in fixed.DECISION_66_EDGE_INDEX_INT32_GPUS
+    assert fixed.DECISION_66_EDGE_INDEX_INT32_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                                       "NVIDIA A100-SXM4-80GB")
+    assert "NVIDIA A100 80GB PCIe" in fixed.DECISION_66_EDGE_INDEX_INT32_GPUS
+    assert "NVIDIA H200" not in fixed.DECISION_66_EDGE_INDEX_INT32_GPUS
     measured = plan_for("omat0-medium")
     _, choice, why = measured.decision("NeighbourConfig.edge_index_int32")
     assert measured.neighbours.edge_index_int32 == choice == "on" and "gate and A/B passed" in str(why)
     off = plan_for("omat0-medium", neighbours=NeighbourConfig(edge_index_int32="off"))
     assert off.neighbours.edge_index_int32 == "off"
-    a100 = dataclasses.replace(GPU, name="NVIDIA A100-SXM4-80GB")
+    h200 = dataclasses.replace(GPU, name="NVIDIA H200")
     from test_planner import planner, traits
 
-    other = planner().plan(traits("omat0-medium"), nacl(), fixed.IntegratorConfig(), a100, model_label="omat0-medium")
+    other = planner().plan(traits("omat0-medium"), nacl(), fixed.IntegratorConfig(), h200, model_label="omat0-medium")
     _, choice, why = other.decision("NeighbourConfig.edge_index_int32")
     assert other.neighbours.edge_index_int32 == choice == "off" and "not a measured GPU" in str(why)

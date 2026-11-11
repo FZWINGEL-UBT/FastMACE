@@ -540,8 +540,10 @@ DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDI
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 # The skin list's edge_index in int32 (11 November 2026, results/edge-index-int32-20261111): OMAT-0 medium SrTiO3
 # 10x10x10, MD step b/a (b = int32), ab / ba: RTX 4000 Ada 1.0001 / 0.9987, RTX 5060 Ti 1.0022 / 0.9959; the 3x
-# float32 gate passed on the Ada (SrTiO3 forces 0.79, NaCl 0.91). The A100 joins after its own A/B and gate.
-DECISION_66_EDGE_INDEX_INT32_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
+# float32 gate passed on the Ada (SrTiO3 forces 0.79, NaCl 0.91). A100-SXM4-80GB (Alex 4981362): b/a 0.9960 / 0.9951,
+# gate SrTiO3 forces 0.93, NaCl 0.83 (every A100 model, GPUModels). The H200 is not measured and keeps it off.
+DECISION_66_EDGE_INDEX_INT32_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                               "NVIDIA A100-SXM4-80GB"))
 DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                                                    "NVIDIA H200"))
 
