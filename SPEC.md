@@ -3562,3 +3562,20 @@ CPU suite on murphy (tests/cpu) at f8ea447e with main b951e804 merged in: 5,610 
   - Closed by argument: texture interpolation.
 - **Four stale statuses corrected to REJECTED:** omat0-slope-vector, -stream-w, -stream-store-w, -eos-chunks.
 - **The 27 unverified agent notes on the rejected-row catalogue:** 14 confirmed and fixed, 11 not confirmed, 2 unclear (their records are in ResearchModule). See `plans/notes/rejected-ledger-20261111/verified.md`.
+
+**BINNED_SCREEN on the RTX 5060 Ti and tf32x3 HYBRID on the A100 family (11 November 2026; owner request, workers review and a100-colab-ideas, conductor, decision 66):**
+- **`pair_search.BINNED_SCREEN_GPUS` gains the RTX 5060 Ti.**
+  - Work removal; the neighbour list is the same bit for bit.
+  - MD step SrTiO3 16×16×16: 0.9812 / 0.9769. 20×20×20: 0.9614.
+  - Rebuild at 214,375 atoms: 2,131 → 73 ms.
+  - See `results/binned-screen-5060ti-20261111/`.
+- **`tf32x3.HYBRID` (None: on for `HYBRID_GPUS`, the A100 family).**
+  - The cubins are built with `-DFM_HYBRID_F16` (`hybrid_f16.h`): big·big on TF32 tensor cores, both cross products in one FP16 mma.
+  - Lab: 0.873 of 3×TF32, error at or below 3×TF32's on every shape.
+  - MD step: SrTiO3 10×10×10 0.9896 / 0.9877, NbCl5 0.9832 / 0.9846 (Alex A100-SXM4-80GB). The gate passes.
+  - Range: float16 cross parts overflow above 32,752. On the CPU, the worst operand is 778.7 (a 3×3 stress product; feature GEMMs at most 101.5) and the weights' max is 81.8. The cases covered: the gate structures, 30 % compression, a 0.8 Å pair and a 2,000 K MD frame. A CPU test keeps the tenfold margin on record.
+  - The sm_90 cubin exists; the H200 is not measured (no Modal budget this month).
+  - See `results/hybrid-gemm-20261111/`.
+- **Closed with records in the same merge:** half-precision far edges (`HALF_FAR`) fail NaCl's symmetric shell at every radius (F 7.1×, S 13×). Two half-systems out of phase measured 1.016.
+
+CPU suite on murphy at the merged tip 1a80d2e9 (tests/cpu): 5,613 passed, 203 skipped, 0 failed. The range-check commit after it adds one test file: 36 passed, 1 skipped, with test_layering.
