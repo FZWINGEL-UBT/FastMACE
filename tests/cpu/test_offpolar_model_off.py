@@ -28,7 +28,7 @@ def gpu(monkeypatch):
 
 def test_the_maps_list_the_measured_models_on_the_a100_family():
     assert set(skin.SORT_BY_LENGTH_MODEL_OFF_GPUS) == {"off23-small", "off23-large"}
-    assert set(wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS) == {"polar1-m"}
+    assert set(wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS) == {"polar1-m", "polar1-l"}  # -L: the Ada only
     assert set(fused_forward.DEGREE_PARTS_MODEL_OFF_GPUS) == {"polar1-m"}
     for table in (skin.SORT_BY_LENGTH_MODEL_OFF_GPUS, wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS,
                   fused_forward.DEGREE_PARTS_MODEL_OFF_GPUS):

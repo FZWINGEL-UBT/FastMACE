@@ -140,15 +140,16 @@ def test_omat0_small_keeps_prefetch_ahead_off_on_the_a100(monkeypatch):
 
 
 def test_wprime_stage_edges_adds_the_h200_for_omat0_small(monkeypatch):
-    """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family) for every model, plus the H200 for OMAT-0
-    small (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""
+    """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family; the RTX 4000 Ada and RTX 5060 Ti since
+    ada-5060-screen, 11 November 2026) for every model, plus the H200 for OMAT-0 small (STAGE_EDGES_MODEL_GPUS); the
+    constant still decides an A/B side."""
     monkeypatch.setattr(wp, "_device_name", lambda device: device)
     assert wp.STAGE_EDGES is None
     for device, label in (("NVIDIA H200", "omat0-small"), ("NVIDIA A100-SXM4-80GB", "omat0-small"),
-                          ("NVIDIA A100-SXM4-80GB", "omat0-medium"), ("NVIDIA A100-SXM4-80GB", None)):
+                          ("NVIDIA A100-SXM4-80GB", "omat0-medium"), ("NVIDIA A100-SXM4-80GB", None),
+                          ("NVIDIA RTX 4000 Ada Generation", "omat0-small"), ("NVIDIA GeForce RTX 5060 Ti", None)):
         assert wp.stage_edges_default(device, label), (device, label)
-    for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None),
-                          ("NVIDIA RTX 4000 Ada Generation", "omat0-small")):
+    for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None), ("NVIDIA L4", "omat0-small")):
         assert not wp.stage_edges_default(device, label), (device, label)
     monkeypatch.setattr(wp, "STAGE_EDGES", False)
     assert not wp.stage_edges_default("NVIDIA H200", "omat0-small")
