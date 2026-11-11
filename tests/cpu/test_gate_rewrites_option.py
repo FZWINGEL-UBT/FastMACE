@@ -82,7 +82,7 @@ def test_a_revised_candidate_plan_fails_the_gate():
 def test_a_candidate_whose_proof_counter_did_not_advance_fails_the_gate():
     """--production-expect (11 November 2026: NESTED_RADIAL gates and A/Bs ran with the switch silently off): a
     counter that did not advance over a structure's builds, or was never recorded, fails that structure."""
-    item = "fastmace.kernels.triton.tabled_outer_sum:SPLIT_WALKS"
+    item = "fastmace.kernels.triton.tabled_outer_sum:split_walks"
     info = {"expect": {"NaCl/fixed": {item: 4}, "NaCl/variable": {item: 2}, "NbCl5/fixed": {item: 0}}}
     assert gate.mark_expectations({"passed": True}, info, "NaCl", [item])["passed"] is True
     assert gate.mark_expectations({"passed": True}, info, "NbCl5", [item])["passed"] is False

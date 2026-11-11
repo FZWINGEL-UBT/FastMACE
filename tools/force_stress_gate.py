@@ -467,7 +467,8 @@ def parse_args(argv=None):
     p.add_argument("--engine-config", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="Boolean EngineConfig fields for FastMACE's minimal planner (e.g. model_template_cache=false)")
     p.add_argument("--production-expect", nargs="*", default=[], metavar="MODULE:NAME",
-                   help="Proof counters (ints, e.g. fastmace.kernels.triton.tabled_outer_sum:SPLIT_WALKS) that must "
+                   help="Proof counters (ints or functions returning one, e.g. "
+                        "fastmace.kernels.triton.tabled_outer_sum:split_walks) that must "
                         "advance over each production build and its evaluations; a structure where one does not "
                         "fails the gate")
     p.add_argument("--production-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
@@ -1072,7 +1073,8 @@ def fastmace_production_child(job, result):
     def expect_values():
         import importlib
 
-        return {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1]) for item in expect}
+        values = {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1]) for item in expect}
+        return {item: value() if callable(value) else value for item, value in values.items()}
 
     if expect:
         result["expect"] = {}

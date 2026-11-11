@@ -66,7 +66,8 @@ def parse_args(argv=None):
                         "warm-up (new edge sizes) reads them too")
     p.add_argument("--b-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side b's, as --a-constant")
     p.add_argument("--b-expect", nargs="*", default=[], metavar="MODULE:NAME",
-                   help="Proof counters (ints, e.g. fastmace.kernels.triton.tabled_outer_sum:SPLIT_WALKS) that must "
+                   help="Proof counters (ints or functions returning one, e.g. "
+                        "fastmace.kernels.triton.tabled_outer_sum:split_walks) that must "
                         "advance over side b's build and warm-up, and stay put over side a's; recorded per side as "
                         "'expect', and the entry is INVALID (exit 3) where they do not")
     p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
@@ -354,9 +355,10 @@ def main(argv=None):
                  if any(f"RewriteConfig.{f} " in line for f in every_field)]
         return timed, time.perf_counter() - started, lines
 
-    def expect_values():
-        return {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1])
-                for item in args.b_expect}
+    def expect_values():  # an int attribute, or a function returning one
+        values = {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1])
+                  for item in args.b_expect}
+        return {item: value() if callable(value) else value for item, value in values.items()}
 
     def measure(name, sides, setup, lines, structure, natoms, advanced):
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
