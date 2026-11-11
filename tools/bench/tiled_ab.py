@@ -42,6 +42,9 @@ def parse_args(argv=None):
     p.add_argument("--no-budget", action="store_true", help="the receiver cap stays --receivers")
     p.add_argument("--b-receivers", type=int, default=None,
                    help="side b's own TiledForceField with this fixed receiver cap (both sides --no-budget)")
+    p.add_argument("--b-host-positions", action="store_true",
+                   help="side b: its own TiledForceField called with the float64 positions on the host "
+                        "(TILE_HOST_ROWS; side a: on the device)")
     p.add_argument("--mode", choices=("eager", "padded", "compiled", "auto"), default="auto")
     p.add_argument("--host-state", action="store_true")
     p.add_argument("--alias-state", action="store_true")
@@ -99,7 +102,8 @@ def main(argv=None):
     atoms = tiled_capacity.supercell(args.structure, repeat, 0.0, 0.0)
     n = len(atoms)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, model=args.model, order=args.order,
-                  a=args.a, b=args.b, receivers=args.receivers, b_receivers=args.b_receivers, mode=args.mode, host_state=args.host_state,
+                  a=args.a, b=args.b, receivers=args.receivers, b_receivers=args.b_receivers,
+                  b_host_positions=args.b_host_positions, mode=args.mode, host_state=args.host_state,
                   alias_state=args.alias_state, wavefront=args.wavefront, device=torch.cuda.get_device_name(),
                   torch=torch.__version__, source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"))
     args.output.mkdir(parents=True, exist_ok=True)
@@ -120,8 +124,12 @@ def main(argv=None):
 
         tiled = tiled_field(args.receivers)
         # --b-receivers: side b's own field (its own slots, state and kept lists; the force field is shared)
-        tiled_of = {"a": tiled, "b": tiled if args.b_receivers is None else tiled_field(args.b_receivers)}
+        own_b = args.b_receivers is not None or args.b_host_positions
+        tiled_of = {"a": tiled, "b": tiled_field(args.b_receivers or args.receivers) if own_b else tiled}
         positions = field._prepare_one_off(atoms)
+        positions_of = {"a": positions, "b": positions}
+        if args.b_host_positions:  # the same float64 values, a view of the atoms' array
+            positions_of["b"] = field._prepare_one_off(atoms, host=True)
     record["rewrites"] = [str(r) for r in getattr(field, "applied", ())]
     configs = {"a": dataclasses.replace(tiled_of["a"].config, **config_a),
                "b": dataclasses.replace(tiled_of["b"].config, **config_b)}
@@ -138,7 +146,7 @@ def main(argv=None):
         with constants(sides[side]):
             torch.cuda.synchronize()
             started = time.perf_counter()
-            out = tiled(positions)
+            out = tiled(positions_of[side])
             torch.cuda.synchronize()
             seconds = time.perf_counter() - started
         if own:
