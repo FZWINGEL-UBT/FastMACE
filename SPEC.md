@@ -3465,3 +3465,27 @@ between plans is unchanged. See `docs/validation/capacity/setup-fixes.md`.
   - step limiters on an Alex A100 (no new 1 % lead).
 - CPU suite on murphy at the merged tip a00c07e3: 5,572 passed, 203 skipped, 1 failed. The failure was a test expectation, which counts 4 strain self-check modules since VIRIAL_ELEMENTWISE; it was fixed in 0426f7d7, and test_rewrites_engine.py and test_layering.py were rerun: 59 passed.
 - See `results/virial-elementwise-20261110/README.md` and the other-ways README under results/.
+
+**SplineForward registry: one object per equal build (11 November 2026; worker ada-5060-screen, conductor; correctness fix):** `SplineForward.__init__` replaced `_REGISTRY[id]` on every equal build. The id depends only on source and device, so a second force field in the same process overwrote the first's entry. The custom op `spline_message_blocks` launches through the registry, so earlier force fields, and their captured graphs, used the newer object's BLOCK_ORDER `order`. Once that object was replaced again and freed, a replay read freed memory: a CUDA illegal address in a five-engine A/B process on the RTX 4000 Ada (10 November). Forces stayed correct until then, because any receiver permutation gives the same message. The registry now keeps the first object (`_REGISTRY.setdefault`, `spline_forward.shared`). The w′ build binds that registered object, and each force field binds its own `order` on it before every call and capture (`forces._bind_streaming_count`). `launch_order` never reads a bound order of another row count; identity orders are cached per row count. This affects every process with more than one force field and BLOCK_ORDER on (H200 and A100 family defaults): Monte Carlo, replicas, A/B harnesses. Tests: 6 CPU tests, plus a GPU test with three engines of different sizes in one process, one closed mid-run, each matching its alone run (forces ≤ 2.0e-5 eV/Å, RTX 4000 Ada). The GPU test pins the shared-object semantics but did not reproduce the use-after-free on the old code; compute-sanitizer 2026.2 aborts this stack on the host. CPU suite on murphy at the merged tip be193ea0: 5,563 passed, 203 skipped; the 16 failures, all in test_colab_driver.py, come from git's NFS ownership check (all 27 pass with safe.directory set).
+
+**A100 idea screen on Colab (11 November 2026; worker a100-colab-ideas, conductor; records and lab tools, no production change):** five ideas screened on a Colab NVIDIA A100-SXM4-40GB.
+- **forward ghoist:** superseded by GEOM. The same regrouping of the forward's sums, built as `spline_forward.GHOIST` and dropped at the merge (source kept at cd7575bb). Its A/B is an independent replication of GEOM's A100 gain on a 40 GB A100: MD step SrTiO3 10×10×10 0.9774 / 0.9806, NbCl5 3×3×3 0.9891 / 0.9886; gate passes.
+- **Half-precision far-shell edges (half-far-edges, OPEN):**
+  - CPU oracle with float16 far-edge inputs, messages and sums: 0.9–1.8× float32 rounding at r_h 5.0–5.8 Å (gate 3×).
+  - HFMA2 is a second pipe on sm_80: 63.8 FFMA, 127.3 HFMA2, 167.7 in a 1:1 mix (FMA results/clk/SM).
+  - Offline census of w′ with two far edges per `__half2`: 0.634 of the issue slots per edge, 0.688 at 80 registers.
+  - Colab lab: 0.484–0.496 of fp32's time per far edge; estimated 2–4.5 % of the force call.
+- **Two half-systems on two streams: rejected** (1.008 of the full graph).
+- **Formulation search: closed.** It rediscovers FACTORED, ranking it 2nd of 27; the best tree is about 1 % of the step.
+- **TF32 big·big with FP16 cross GEMM: stopped,** error 6.3e-7 to 1.4e-6 against the 2.7e-7 stop rule.
+
+Tools: `tools/bench/cu_census.py`, `tools/bench/half_system_streams.py`, `tools/fma_dual_pipe_bench.py` HFMA2, `tools/fp16x3_gemm_bench.py`. CPU suite on leto at 51634810: 5,579 passed, 203 skipped, 0 failed. Colab spend 14.9 CU. See `results/a100-colab-ideas-20261111/README.md`.
+
+**int32 neighbour-list edge_index (11 November 2026; worker omat0-ada-capacity, conductor, decision 66):** `NeighbourConfig.edge_index_int32` (default "auto") stores the skin list's `edge_index` in int32. The planner turns it on for `planner.fixed.DECISION_66_EDGE_INDEX_INT32_GPUS` (RTX 4000 Ada, RTX 5060 Ti, every A100 model) and records the decision in the plan; the H200 is not measured and stays off. It is a rounding change: on the reproducible MH-1 plan, forces differ by up to 3.8e-5 eV/Å, while energy and cell stay bitwise. The 3× float32 gate passes:
+
+| GPU | SrTiO3 forces / stress | NaCl forces / stress |
+|---|---|---|
+| RTX 4000 Ada | 0.79 / 0.47 | 0.91 / 1.00 |
+| A100-SXM4-80GB (Alex 4981362) | 0.93 / 0.65 | 0.83 / 0.88 |
+
+MD step b/a, SrTiO3 10×10×10 (b = int32), ab / ba: Ada 1.0001 / 0.9987, RTX 5060 Ti 1.0022 / 0.9959, A100 0.9960 / 0.9951. Memory at Ada SrTiO3 34³: neighbour list 1.37 → 1.21 GiB (0.8 kB/atom), peak reserved 13.40 → 12.95 GiB; the cube-step capacity limits do not move. The tiled kept lists are already about 3 B per edge, so they gain nothing. CPU suite on leto at the merged tip 20352f78: 5,580 passed, 203 skipped, 2 failed. Both failures were the new test, fixed in efc24fe0; the changed test files were rerun (77 + 204 passed). See `results/edge-index-int32-20261111/`.

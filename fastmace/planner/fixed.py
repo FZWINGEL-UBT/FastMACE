@@ -81,6 +81,7 @@ AUTO_RULES = MappingProxyType({
     "NeighbourConfig.skin": "rule_11_skin_from_workload",
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
     "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
+    "NeighbourConfig.edge_index_int32": "on_for_decision_66_gpus",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
@@ -537,6 +538,12 @@ DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDI
 # not measured and keeps it off unless asked for.
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.033 / 1.032 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+# The skin list's edge_index in int32 (11 November 2026, results/edge-index-int32-20261111): OMAT-0 medium SrTiO3
+# 10x10x10, MD step b/a (b = int32), ab / ba: RTX 4000 Ada 1.0001 / 0.9987, RTX 5060 Ti 1.0022 / 0.9959; the 3x
+# float32 gate passed on the Ada (SrTiO3 forces 0.79, NaCl 0.91). A100-SXM4-80GB (Alex 4981362): b/a 0.9960 / 0.9951,
+# gate SrTiO3 forces 0.93, NaCl 0.83 (every A100 model, GPUModels). The H200 is not measured and keeps it off.
+DECISION_66_EDGE_INDEX_INT32_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                               "NVIDIA A100-SXM4-80GB"))
 DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                                                    "NVIDIA H200"))
 
@@ -1028,6 +1035,13 @@ class FixedPlanner:
             engine.memory_probe, AUTO_RULES["EngineConfig.memory_probe"],
             "MD with CUDA graphs: rule 12's ambiguous memory choices are measured on a replica"
             if probing else "no MD on CUDA: nothing to probe"))
+        int32_request = self.neighbours.edge_index_int32
+        measured = getattr(hardware, "name", None) in DECISION_66_EDGE_INDEX_INT32_GPUS
+        edge_index_int32 = int32_request if int32_request != "auto" else _toggle(measured)
+        book.decide("NeighbourConfig.edge_index_int32", edge_index_int32, _why(
+            int32_request, AUTO_RULES["NeighbourConfig.edge_index_int32"],
+            "gate and A/B passed on this GPU" if measured
+            else f"not a measured GPU ({getattr(hardware, 'name', None)})"))
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
                                        evaluation=evaluation, mc=mc, optimizer=optimizer)
         return dict(
@@ -1042,7 +1056,7 @@ class FixedPlanner:
             precision=dataclasses.replace(self.precision, dtype=dtype, **phase_3["precision"]),
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),
                                            gpu_neighbour_list=_toggle(values["gpu_neighbour_list"]),
-                                           **phase_3["neighbours"]),
+                                           edge_index_int32=edge_index_int32, **phase_3["neighbours"]),
             polar=polar,
             integrator=None if evaluation else integrator,
             optimizer=optimizer,

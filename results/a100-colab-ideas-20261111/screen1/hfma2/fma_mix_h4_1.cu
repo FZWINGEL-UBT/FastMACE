@@ -1,0 +1,52 @@
+extern "C" __global__ void __launch_bounds__(256) fma_mix(float* out, double* dout, int iters, float a, float c, double ad, double cd) {
+    const float base = threadIdx.x * 1e-6f;
+    float f0 = base + 0.f;
+    float f1 = base + 1.f;
+    float f2 = base + 2.f;
+    float f3 = base + 3.f;
+    float f4 = base + 4.f;
+    float f5 = base + 5.f;
+    float f6 = base + 6.f;
+    float f7 = base + 7.f;
+    float f8 = base + 8.f;
+    float f9 = base + 9.f;
+    float f10 = base + 10.f;
+    float f11 = base + 11.f;
+    float f12 = base + 12.f;
+    float f13 = base + 13.f;
+    float f14 = base + 14.f;
+    float f15 = base + 15.f;
+    const unsigned ah2 = 0x3BFE3BFEu, ch2 = 0x04000400u;
+    unsigned h0 = 0x3C003C00u + threadIdx.x + 0u;
+    unsigned h1 = 0x3C003C00u + threadIdx.x + 1u;
+    unsigned h2 = 0x3C003C00u + threadIdx.x + 2u;
+    unsigned h3 = 0x3C003C00u + threadIdx.x + 3u;
+    for (int it = 0; it < iters; ++it) {
+        #pragma unroll
+        for (int j = 0; j < 32; ++j) {
+            f0 = fmaf(f0, a, c);
+            f1 = fmaf(f1, a, c);
+            f2 = fmaf(f2, a, c);
+            f3 = fmaf(f3, a, c);
+            f4 = fmaf(f4, a, c);
+            f5 = fmaf(f5, a, c);
+            f6 = fmaf(f6, a, c);
+            f7 = fmaf(f7, a, c);
+            f8 = fmaf(f8, a, c);
+            f9 = fmaf(f9, a, c);
+            f10 = fmaf(f10, a, c);
+            f11 = fmaf(f11, a, c);
+            f12 = fmaf(f12, a, c);
+            f13 = fmaf(f13, a, c);
+            f14 = fmaf(f14, a, c);
+            f15 = fmaf(f15, a, c);
+            asm volatile("fma.rn.f16x2 %0, %0, %1, %2;" : "+r"(h0) : "r"(ah2), "r"(ch2));
+            asm volatile("fma.rn.f16x2 %0, %0, %1, %2;" : "+r"(h1) : "r"(ah2), "r"(ch2));
+            asm volatile("fma.rn.f16x2 %0, %0, %1, %2;" : "+r"(h2) : "r"(ah2), "r"(ch2));
+            asm volatile("fma.rn.f16x2 %0, %0, %1, %2;" : "+r"(h3) : "r"(ah2), "r"(ch2));
+        }
+    }
+    const int t = blockIdx.x * blockDim.x + threadIdx.x;
+    out[t] = f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13 + f14 + f15 + (float)(h0 & 0xffffu) + (float)(h1 & 0xffffu) + (float)(h2 & 0xffffu) + (float)(h3 & 0xffffu);
+    dout[t] = 0.0;
+}
