@@ -31,6 +31,7 @@ from types import MappingProxyType
 import torch
 
 from fastmace.kernels.gpu_models import GPUModels, lookup
+from fastmace.kernels.oeq_streaming import half_far
 
 _REGISTRY = {}
 # The w-rebuilding backward's launch for recompute_conv_weights: one path part, four edges per batch (the fastest of
@@ -275,6 +276,22 @@ SPLINE_VECTOR = None
 # / 0.9906 (b = 2):
 # float4 is slower there, so the Ada keeps 2.
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+
+
+# HALF_FAR (11 November 2026, idea 1 of the A100 screen; kernels in ``half_far``): interaction edges longer than
+# HALF_FAR_RADIUS (Angstrom, inside the cutoff) leave the float32 w' kernel two at a time (consecutive far edges of one
+# receiver) for a packed-half2 kernel (HFMA2). Rounding: the force/stress gate decides. Needs STAGE_EDGES and SPLINE_W
+# (float32). HALF_FAR_MIN_BLOCKS: the half2 kernel's __launch_bounds__ minimum blocks per SM (3: 80 registers).
+# None: on for HALF_FAR_GPUS (empty until the A/Bs and the gate); True / False: an A/B side's choice.
+HALF_FAR = None
+HALF_FAR_GPUS = GPUModels(())
+HALF_FAR_RADIUS = 5.8
+HALF_FAR_MIN_BLOCKS = 3
+
+
+def half_far_default(device):
+    """``HALF_FAR`` on ``device``: the constant when set, else on for ``HALF_FAR_GPUS``."""
+    return bool(HALF_FAR) if HALF_FAR is not None else _device_name(device) in HALF_FAR_GPUS
 
 
 def spline_vector_default(device):
@@ -1183,6 +1200,16 @@ class WPrimeBackward:
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges)
+        # HALF_FAR: far edges in packed half2 pairs (``half_far``); the float32 kernel skips the paired edges.
+        self.half_far = (self.stage_edges and self.table_w and self.horner and scalar == "float"
+                         and self.blocks is not None and half_far_default(device))
+        self.half_table = None  # (the spline table's address, its float16 copy, inverse scales): prepare_blocks
+        if HALF_FAR is True and self.spline is not None and not self.half_far:
+            raise ValueError("HALF_FAR=True: the spline w' kernel needs STAGE_EDGES, TABLE_W, HORNER, float32 and "
+                             "the block layout")
+        if self.half_far:
+            self._compile_half_far(device)
+            self.source = half_far.with_skip(self.source)
         options = ()
         if SMEM_SPILL:
             head = 'extern "C" __global__ void oeq_projected_backward_wprime('
@@ -1227,8 +1254,74 @@ class WPrimeBackward:
         types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + douts) + (real, real, real)
                  + (ctypes.c_int, ctypes.c_int, p))
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
+        if self.half_far:  # pair the far edges first; the float32 kernel skips them
+            skip, pairs, count, dscale = self._half_pairs(nodes, edges, senders, receivers, r, r_max, dout, stream)
+            values, types = values + (skip.data_ptr(),), types + (p,)
         _check(driver.cuLaunchKernel(self._function, blocks, 1, 1, self.num_threads, 1, 1, self.shared_memory,
                                      stream, (values, types), 0))
+        if self.half_far:
+            self._half_far_launch(nodes, pairs, count, x, sh, senders, receivers, dout, dx, dsh, r, pair, gprime,
+                                  starts.shape[0], dscale, dr, stream)
+
+    def _compile_half_far(self, device):
+        from cuda.bindings import driver
+
+        from fastmace.kernels.oeq_streaming.runtime import _check, compile_cubin
+        from fastmace.kernels.oeq_streaming.spline_forward import lookup_code
+        lookup = lookup_code(self.spline, "clamped", "float", "            ")
+        self.half_blocks = half_far.dout_blocks(self.source)
+        self.half_source = half_far.kernel_source(self.source, lookup, int(HALF_FAR_MIN_BLOCKS))
+        self.half_radius = float(HALF_FAR_RADIUS)
+        cubin = compile_cubin(self.half_source, torch.cuda.get_device_capability(device), ())
+        torch.cuda.current_stream(device)
+        self._half_module = _check(driver.cuModuleLoadData(cubin))
+        self._half_pairs_fn = _check(driver.cuModuleGetFunction(self._half_module, b"wprime_half_pairs"))
+        self._half_far_fn = _check(driver.cuModuleGetFunction(self._half_module, b"wprime_half_far"))
+        self._half_scale_fn = _check(driver.cuModuleGetFunction(self._half_module, b"wprime_half_scale"))
+        self._half_grid = (torch.cuda.get_device_properties(device).multi_processor_count
+                           * int(HALF_FAR_MIN_BLOCKS))
+
+    def _half_pairs(self, nodes, edges, senders, receivers, r, r_max, dout, stream):
+        """Pair the far edges (skip flags, the pair list and its count) and scale the paired receivers' dout rows."""
+        from cuda.bindings import driver
+
+        from fastmace.kernels.oeq_streaming.runtime import _check
+        device = senders.device
+        skip = torch.empty(edges, dtype=torch.uint8, device=device)
+        pairs = torch.empty((edges // 2 + 1, 2), dtype=torch.int32, device=device)
+        count = torch.zeros(1, dtype=torch.int32, device=device)
+        paired = torch.zeros(nodes, dtype=torch.uint8, device=device)
+        dscale = torch.empty(nodes, dtype=torch.float32, device=device)
+        p = ctypes.c_void_p
+        values = (edges, nodes, senders.data_ptr(), receivers.data_ptr(), r.data_ptr(), self.half_radius,
+                  float(r_max), skip.data_ptr(), pairs.data_ptr(), count.data_ptr(), paired.data_ptr())
+        types = (ctypes.c_longlong, ctypes.c_longlong, p, p, p, ctypes.c_float, ctypes.c_float, p, p, p, p)
+        _check(driver.cuLaunchKernel(self._half_pairs_fn, (edges + 255) // 256, 1, 1, 256, 1, 1, 0, stream,
+                                     (values, types), 0))
+        douts = [dout[k].data_ptr() for k, _, _ in self.half_blocks]
+        values = (nodes, paired.data_ptr(), *douts, dscale.data_ptr())
+        types = (ctypes.c_longlong,) + (p,) * (2 + len(douts))
+        _check(driver.cuLaunchKernel(self._half_scale_fn, (nodes * 32 + 255) // 256, 1, 1, 256, 1, 1, 0, stream,
+                                     (values, types), 0))
+        return skip, pairs, count, dscale
+
+    def _half_far_launch(self, nodes, pairs, count, x, sh, senders, receivers, dout, dx, dsh, r, pair, gprime,
+                         pieces, dscale, dr, stream):
+        from cuda.bindings import driver
+
+        from fastmace.kernels.oeq_streaming.runtime import _check
+        if self.half_table is None or self.half_table[0] != gprime.data_ptr():
+            raise RuntimeError("HALF_FAR: the w' kernel has no float16 copy of this spline table "
+                               "(WPrime.prepare_blocks makes it)")
+        p = ctypes.c_void_p
+        douts = [dout[k].data_ptr() for k, _, _ in self.half_blocks]
+        values = (nodes, pairs.data_ptr(), count.data_ptr(), x.data_ptr(), sh.data_ptr(), senders.data_ptr(),
+                  receivers.data_ptr(), *douts, dx.data_ptr(), dsh.data_ptr(), r.data_ptr(), pair.data_ptr(),
+                  self.half_table[1].data_ptr(), self.half_table[2].data_ptr(), int(pieces), dscale.data_ptr(),
+                  dr.data_ptr())
+        types = (ctypes.c_longlong,) + (p,) * (6 + len(douts)) + (p, p, p, p, p, p, ctypes.c_int, p, p)
+        _check(driver.cuLaunchKernel(self._half_far_fn, self._half_grid, 1, 1, 256, 1, 1, 0, stream,
+                                     (values, types), 0))
 
 
 @torch.library.custom_op("fastmace::streaming_conv_wprime_backward", mutates_args=())
@@ -1799,6 +1892,12 @@ class WPrime(torch.nn.Module):
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid, shared_locator=shared, model_label=self.model_label))
+            if self.spline_block[2].half_far:  # HALF_FAR: the half2 kernel's float16 copy of the spline table
+                bits, inverse = half_far.half_table(self.spline_table)
+                self.register_buffer("spline_table_half", bits, persistent=False)
+                self.register_buffer("spline_table_half_inverse", inverse, persistent=False)
+                self.spline_block[2].half_table = (self.spline_table.data_ptr(), self.spline_table_half,
+                                                   self.spline_table_half_inverse)
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
