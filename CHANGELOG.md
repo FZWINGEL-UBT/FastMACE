@@ -33,6 +33,10 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   in CUDA graphs per slot and sweep. Steady tiled call 0.90 at 40k and 0.961 at 214k atoms (RTX 5060 Ti), 1.000 at
   1M (RTX 4000 Ada); the private pools cost memory, so 1M runs out of memory with it on the 16 GB RTX A4000
   (docs/validation/tiled/tiled-1m-speed.md, "CUDA graphs for compiled tiles").
+  11 November 2026: default None, on for `COMPILED_GRAPH_GPUS` (empty until the A/Bs) behind a memory guard: the
+  first compiled call runs uncaptured and measures its tile workspace, the captures follow only where one capture
+  pool per slot and the warm-ups fit (`compiled_graphs_fit`, x1.1; the A4000 case stays off), and a captured call
+  that runs out of device memory drops its graphs and runs again without them. `--compiled-graphs auto|on|off`.
 - The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
   records:
   - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming
