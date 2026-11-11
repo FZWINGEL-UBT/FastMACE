@@ -159,7 +159,8 @@ job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
 | first call, eager (mode auto measures its memory) | 11,468 s | 28.8 us/atom | about 8 h |
 | second call, compiled | 3,913 s | 9.84 us/atom | about 2.7 h |
 
-1. **Our own supercell builder** (the ASE step). `Atoms.repeat` loops in Python over every unit-cell copy (about 200M
+1. **Our own supercell builder** (the ASE step; built on branch `fastmace/fast-setup`: `tiled_capacity.supercell`
+   chunked, `supercell_ase` the reference, bitwise at small sizes in `tests/cpu/test_tiled_supercell.py`). `Atoms.repeat` loops in Python over every unit-cell copy (about 200M
    passes at 585^3, a slice write each), and `wrap` makes whole-system fractional temporaries (several 24 GB float64
    arrays at 10^9); the 519M segmentation fault came out of this step (ASE `cell.py` `__array__`). Replacement, about
    50 lines in `tools/bench/tiled_capacity.py` (or `fastmace.io` if it is to serve users): allocate the float64
@@ -169,11 +170,17 @@ job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
    numbers and cell at small and medium sizes; then a CPU-only dry run of this step at 520^3 and 585^3 (no GPU), which
    also answers the 519M fault.
 2. **The eager first call** is the largest cost (about 8 of the run's 11 h at 10^9). Mode auto runs a whole call
-   eager to measure the tile workspace before compiling. The workspace is not size-independent (R 16,384: 1.8 GiB
-   above the call's start at 20.48M, Alex 4985398; 3.4 GB at 397.5M), so a small run's number cannot simply be
-   handed in; a measurement on a few of the run's own largest tiles (eager, then compile for the rest of the call)
-   would give the same decision in minutes. Also: re-measure the eager call with 16 CPUs (the record had one; the
-   host-state writes and gathers are host work).
+   eager to measure the tile workspace before compiling. Correction (11 November 2026, from the records' own
+   numbers): the tiles' workspace (``tiles_peak - loop_base``, what ``_choose_mode`` and ``_choose_receivers`` read)
+   is set by the largest tile, not by the atom count: eager at R 8,192, 526,080,512 bytes at 149M, 320M and 397.5M
+   (Alex 4973640), 503,742,464 at 20.48M with a smaller largest tile (Alex 4985398); compiled at R 16,384, 1.074 GB
+   at 397.5M and 1.055 GB at 20.48M. (The earlier "1.8 GiB / 3.4 GB" were peaks above the call's start, which
+   include the call's per-atom buffers.) So the decision can come from the run's own largest tiles:
+   ``TILE_FIRST_CALL_PROBE`` (branch `fastmace/fast-setup`, opt-in) runs the measuring call's eager sweeps on the 8
+   largest tiles only, decides the mode and the cap from them, and runs the call again in the chosen mode. A/B on
+   Alex: the probe's decision and workspace against the whole call's at 58^3 and 160^3
+   (`results/billion-atoms-20261111/jobs/alex_setup.sh`). Also: the go/no-go (Alex 4985889) has 16 CPUs where the
+   record had one, so it re-measures the eager call's host share for free.
 3. **The force-field build** (660 s, host peak 111 GB, about 279 B/atom at its peak): profile it at 20M (cProfile and
    the host peak by step) before changing anything; the one-hot and species tables built on the host at construction
    are the first suspects.
@@ -207,5 +214,6 @@ Still possible on paper; step 3's measured peak decides it.
 | 0 | done: about 100 B/atom live before the first tile, 24 of it float64 positions | `census-colab/` (Colab A100, 3.91 CU) |
 | 1 | in (34 B/atom): gate 3x 12/12 (Alex 4984899); host rows 1.043 / 1.021 at 58^3 (a capacity option, not a default) | `073f1f37`, `step1-alex-4984899/` |
 | 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); Alex 4984768 at 750M: the gathers bitwise (compiled and eager `_tile_vectors`, compiled `_slot_local_vectors`), untouched rows zero, the flat view's tail right; `index_add_` differed by 3e-5 at 1M as at 750M (the atomics' order with random values), again with integer values in 4984899: every check bitwise at 1M and 750M | `jobs/alex_overflow.sh`, `step1-alex-4984899/probe-*` |
-| 3 | running: Alex 4985152 (one A100-80, 430^3 with `--host-positions`) | `jobs/alex_go.sh` |
+| 3 | queued: Alex 4985889 on main `e7ac9b42` (one A100-80, 430^3 with `--host-positions`; 4985152 cancelled before it started, its source older than the large caps) | `jobs/alex_go.sh` |
+| before 4 | supercell builder: bitwise ASE's at 300^3, 135 s and 31.5 GB at 585^3 (10^9 atoms); first-call probe: the whole call's decision at 58^3 and 160^3, workspace 0.998, on for the A100 family (Alex 4985954) | `setup-alex-4985954/` |
 | 4 | not reserved (owner, 11 November 2026) | |

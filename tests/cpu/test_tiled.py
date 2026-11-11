@@ -2120,3 +2120,51 @@ def test_large_caps_need_room_on_the_host(monkeypatch):
         tiled._choose_receivers((8192 * 1000, 10**12))  # the device fits every cap
         chosen[name] = tiled.receivers
     assert chosen == {"plenty": 65536, "half": 32768, "short": 16384, "unknown": 65536}
+
+
+def test_first_call_probe_runs_the_largest_tiles_then_the_whole_call_bitwise(monkeypatch):
+    """``TILE_FIRST_CALL_PROBE``: mode "auto"'s measuring call runs the sweeps of the ``TILE_PROBE_TILES`` largest
+    tiles only, then the call runs again (here eager: no device memory measurement), bitwise the call without the
+    probe; a call that is not measuring runs no probe."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "TILE_PROBE_TILES", 2)
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results, probes = [], []
+    for probe in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", probe)
+        tiled = TiledForceField(field, TileConfig(12, neighbours="tiles", state="host", alias_state=True,
+                                                  wavefront="on", list_reuse_floor=2**21))
+        tiled._auto = True  # as for a compiled force field
+        results.append([tiled.evaluate(atoms), tiled.evaluate(strained(atoms))])
+        probes.append(tiled.last.get("probe"))
+        assert tiled.last["wavefront"]["on"] and tiled.last["tiles"] > 4
+    assert probes[0] is None and probes[1] is None  # the second call measures nothing
+    for plain, probed in zip(*results):
+        assert plain[0] == probed[0]
+        np.testing.assert_array_equal(plain[1], probed[1])
+
+    monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", True)
+    tiled = TiledForceField(field, TileConfig(12, neighbours="tiles", state="host", alias_state=True,
+                                              wavefront="on", list_reuse_floor=2**21))
+    tiled._auto = True
+    energy, forces, _ = tiled.evaluate(atoms)
+    probe = tiled.last["probe"]
+    assert len(probe["tiles"]) == 2 and probe["steps"] == 6 and probe["mode"] == "eager"
+    assert energy == results[0][0][0]
+    np.testing.assert_array_equal(forces, results[0][0][1])
+
+
+def test_first_call_probe_needs_the_wavefront(monkeypatch):
+    """Without the wavefront the measuring call runs whole, once (no probe)."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", True)
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(5, wavefront="off"))
+    tiled._auto = True
+    tiled.evaluate(atoms)
+    assert "probe" not in tiled.last and tiled.list_rebuilds <= 1

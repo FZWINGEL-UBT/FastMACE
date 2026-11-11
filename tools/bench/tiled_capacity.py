@@ -114,6 +114,9 @@ def parse_args(argv=None):
     p.add_argument("--host-positions", action="store_true",
                    help="keep the call's float64 positions on the host (--tile-list; TILE_HOST_ROWS: 24 bytes per "
                         "atom off the device)")
+    p.add_argument("--first-call-probe", choices=("default", "on", "off"), default="default",
+                   help="tiled.TILE_FIRST_CALL_PROBE: mode auto's measuring first call on its largest tiles only "
+                        "(the probe's report in the first call's record, 'probe')")
     p.add_argument("--call-history", type=int, default=None, metavar="CALL",
                    help="record the CUDA allocator's trace during tiled call CALL (0-based) and keep the allocations "
                         "made in it that are live at its peak, by source line (call_peak in the record; the peak "
@@ -133,7 +136,13 @@ def parse_args(argv=None):
     return args
 
 
-def supercell(structure, repeat, rattle, strain):
+# Cell copies per chunk of ``supercell`` (about 6 MB of float64 positions per chunk at five atoms per copy).
+SUPERCELL_CHUNK_COPIES = 1 << 17
+
+
+def supercell_ase(structure, repeat, rattle, strain):
+    """The ASE form of ``supercell`` (``Atoms.repeat``, ``set_cell(scale_atoms=True)``, ``wrap``): the reference
+    of its tests. It loops in Python over every cell copy and wraps through whole-system temporaries."""
     import numpy as np
 
     _, cell = capacity_scan.base_cell(structure)
@@ -146,6 +155,57 @@ def supercell(structure, repeat, rattle, strain):
     if rattle:
         atoms.positions = atoms.positions + rng.uniform(-rattle, rattle, atoms.positions.shape)
     atoms.wrap()
+    return atoms
+
+
+def supercell(structure, repeat, rattle, strain, chunk=SUPERCELL_CHUNK_COPIES):
+    """``supercell_ase``'s atoms, built a chunk of cell copies at a time: the float64 positions are allocated once
+    and each chunk is placed (ASE's copy order, ``m2`` fastest), strained, rattled (the same seed-0 stream, drawn
+    in atom order) and wrapped (``ase.geometry.wrap_positions``) before the next. No Python loop over the copies
+    (about 2e8 at 585^3) and no whole-system temporaries: the 519M-atom segmentation fault of 9 November 2026 came
+    out of ASE's per-copy loop (plans/billion-atoms-20261111.md, "Before step 4")."""
+    import numpy as np
+    from ase import Atoms
+    from ase.cell import Cell
+    from ase.geometry import wrap_positions
+
+    _, unit = capacity_scan.base_cell(structure)
+    if unit.constraints:
+        return supercell_ase(structure, repeat, rattle, strain)
+    m = (repeat,) * 3 if isinstance(repeat, int) else tuple(int(x) for x in repeat)
+    base_cell = unit.cell.array.copy()
+    for x, vec in zip(m, base_cell):
+        if x != 1 and not vec.any():
+            raise ValueError("Cannot repeat along undefined lattice vector")
+    copies = int(np.prod(m))
+    n = len(unit)
+    final = Cell(np.array([m[c] * base_cell[c] for c in range(3)]))
+    rng = np.random.default_rng(0)
+    scale = None
+    if strain:
+        e = rng.uniform(-strain, strain, (3, 3))
+        e = 0.5 * (e + e.T)
+        strained = Cell(final.array @ (np.eye(3) + e))
+        scale = np.linalg.solve(final.complete(), strained.complete())
+        final = strained
+    base = unit.arrays["positions"]
+    positions = np.empty((copies * n, 3), dtype=np.float64)
+    for q0 in range(0, copies, chunk):
+        q1 = min(copies, q0 + chunk)
+        index = np.stack(np.unravel_index(np.arange(q0, q1), m), axis=1)
+        offsets = np.dot(index, base_cell)  # ASE: np.dot((m0, m1, m2), cell) per copy
+        block = (base[None, :, :] + offsets[:, None, :]).reshape(-1, 3)
+        if scale is not None:
+            block = np.dot(block, scale)
+        if rattle:
+            block = block + rng.uniform(-rattle, rattle, block.shape)
+        positions[q0 * n:q1 * n] = wrap_positions(block, final, pbc=unit.pbc)
+    atoms = Atoms(cell=final, pbc=unit.pbc)
+    atoms.info = dict(unit.info)
+    for name, a in unit.arrays.items():
+        if name != "positions":
+            atoms.arrays[name] = np.tile(a, (copies,) + (1,) * (a.ndim - 1))
+    atoms.arrays["positions"] = positions
     return atoms
 
 
@@ -386,6 +446,11 @@ def main(argv=None):
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
         record["mode"] = args.mode
+        if args.first_call_probe != "default":
+            from fastmace.model import tiled as tiled_module
+
+            tiled_module.TILE_FIRST_CALL_PROBE = args.first_call_probe == "on"
+        record["first_call_probe"] = args.first_call_probe
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges, mode=args.mode,
                                                   neighbours="tiles" if args.tile_list else "global",
                                                   budget_receivers=() if args.no_budget else
