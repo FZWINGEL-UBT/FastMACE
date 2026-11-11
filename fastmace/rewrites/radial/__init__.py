@@ -234,6 +234,9 @@ def _table_module(tables, columns, device, single=False):
             folded input's leading ``columns`` only."""
             from fastmace.kernels.triton.radial_table import radial_table
 
+            if getattr(self, "nested_active", False):  # rewrites.radial.nested: the rows are rotated
+                raise RuntimeError("a NESTED_RADIAL table is read by the tabled outer sum's split walks only")
+
             return radial_table(lengths, self.pair(node_attrs, edge_index), self.coef, self.dcoef, self.starts,
                                 self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density, columns)
 
@@ -1293,6 +1296,9 @@ def tabulate_generic(model, context):
                      f"{'pairs' if per_pair else 'table, no species input'}, "
                      f"certificate {table.certificate['worst']:.2f}, {source})")
     model.radial_embedding = _lengths_embedding(model.radial_embedding)
+    from fastmace.rewrites import precision  # rewrites.radial.nested: routed once the tables exist
+
+    precision.route_nested(model)
     return names
 
 
@@ -1316,6 +1322,13 @@ def _generic_selfcheck(original, rewritten, context):
             failures.append(f"interactions.{index}: certificate {table.certificate.get('worst')} > 1 "
                             f"(pairs {table.certificate.get('pairs')})")
         device, dtype = table.coef.device, table.coef.dtype
+        if getattr(table, "nested_active", False):  # rewrites.radial.nested: the plain rows wait on the host
+            import types
+
+            table = types.SimpleNamespace(
+                coef=table.nested_plain["coef"].to(device), dcoef=table.nested_plain["dcoef"].to(device),
+                **{name: getattr(table, name) for name in ("starts", "scales", "bins", "r_lo", "bin_scale", "r_max",
+                                                           "species", "columns")})
         chain = _GenericChain(rewritten, interaction, table.columns.tolist(), torch.float64, torch.device("cpu"),
                               radial=radial)
         r = R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=torch.float64)

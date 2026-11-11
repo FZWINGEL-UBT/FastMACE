@@ -434,3 +434,6 @@ recovers. Further GEMM work on this GPU is closed; the normalized tensor path's 
 The separate **row/column-normalized standalone `3×FP16` path** remains a candidate for `sm_80`/`sm_89`,
 not an adopted backend. Its previously recorded local evidence does not qualify another GPU, a complete
 force/stress gate or MD. Workstation validation and NAS synchronization wait for the owner's explicit permission.
+
+(Note, 11 November 2026: superseded. The standalone `3×FP16` path was screened on the A100, RTX A4000 and RTX 4000 Ada
+on 26 October and rejected: 1.12–1.71× of cuBLAS, see `docs/validation/speed/opt-5.md` §3.11.)

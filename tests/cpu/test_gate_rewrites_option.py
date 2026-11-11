@@ -77,3 +77,14 @@ def test_a_revised_candidate_plan_fails_the_gate():
     assert gate.mark_revisions({"passed": True}, info, "NbCl5") == {"passed": True}
     default = gate.mark_revisions({"passed": True}, {"plans": info["plans"]}, "NaCl")
     assert default["passed"] is True and default["rule13_revisions"]  # the default plan: reported, not failed
+
+
+def test_a_candidate_whose_proof_counter_did_not_advance_fails_the_gate():
+    """--production-expect (11 November 2026: NESTED_RADIAL gates and A/Bs ran with the switch silently off): a
+    counter that did not advance over a structure's builds, or was never recorded, fails that structure."""
+    item = "fastmace.kernels.triton.tabled_outer_sum:split_walks"
+    info = {"expect": {"NaCl/fixed": {item: 4}, "NaCl/variable": {item: 2}, "NbCl5/fixed": {item: 0}}}
+    assert gate.mark_expectations({"passed": True}, info, "NaCl", [item])["passed"] is True
+    assert gate.mark_expectations({"passed": True}, info, "NbCl5", [item])["passed"] is False
+    assert gate.mark_expectations({"passed": True}, {}, "NaCl", [item])["passed"] is False
+    assert gate.mark_expectations({"passed": True}, {}, "NaCl") == {"passed": True}

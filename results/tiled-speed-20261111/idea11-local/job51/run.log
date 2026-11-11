@@ -1,0 +1,37 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'tiled-gap-job51' (pid 16028)
+11:55:35 driver NVIDIA GeForce RTX 5060 Ti, 621.14, 16311 MiB, 1331 MiB; lockup lines 0
+11:55:35 == accuracy 0.13 0.13 0.37 limit 1800 s
+11:58:06 end accuracy exit=0 took=151s peak=3429 (processes 0) MiB
+   1500  rattled    whole-f64-on max|F| 2.048e+00 diff 2.563e-06 rel 1.25e-06 dE 5.96e-06 dS 1.17e-06
+summary
+      0  perfect   whole-f64-off max|F| 1.987e-05 diff 0.000e+00 rel 0.00e+00 dE 0.00e+00 dS 0.00e+00
+      0  perfect  tiled-frame-on max|F| 3.976e-06 diff 0.000e+00 rel 0.00e+00 dE 0.00e+00 dS 0.00e+00
+      0  perfect    whole-f64-on max|F| 2.291e-06 diff 0.000e+00 rel 0.00e+00 dE 0.00e+00 dS 0.00e+00
+      0  rattled   whole-f64-off max|F| 2.048e+00 diff 0.000e+00 rel 0.00e+00 dE 0.00e+00 dS 0.00e+00
+      0  rattled  tiled-frame-on max|F| 2.048e+00 diff 0.000e+00 rel 0.00e+00 dE 0.00e+00 dS 0.00e+00
+      0  rattled    whole-f64-on max|F| 2.048e+00 diff 0.000e+00 rel 0.00e+00 dE 0.00e+00 dS 0.00e+00
+    200  perfect   whole-f64-off max|F| 8.078e-05 diff 8.241e-05 rel 4.15e+00 dE -2.30e-04 dS 1.81e-07
+    200  perfect  tiled-frame-on max|F| 4.256e-06 diff 2.849e-06 rel 7.16e-01 dE -1.98e-05 dS 5.59e-09
+    200  perfect    whole-f64-on max|F| 2.143e-06 diff 2.213e-06 rel 9.66e-01 dE -5.25e-06 dS 1.45e-07
+    200  rattled   whole-f64-off max|F| 2.048e+00 diff 3.154e-04 rel 1.54e-04 dE -3.60e-05 dS 7.82e-08
+    200  rattled  tiled-frame-on max|F| 2.048e+00 diff 2.861e-05 rel 1.40e-05 dE 2.38e-07 dS 1.86e-08
+    200  rattled    whole-f64-on max|F| 2.048e+00 diff 3.159e-06 rel 1.54e-06 dE 1.43e-05 dS 1.08e-07
+   1500  perfect   whole-f64-off max|F| 1.332e-03 diff 1.333e-03 rel 6.71e+01 dE 2.67e-04 dS 1.88e-06
+   1500  perfect  tiled-frame-on max|F| 4.957e-06 diff 2.723e-06 rel 6.85e-01 dE 2.55e-05 dS 1.86e-09
+   1500  perfect    whole-f64-on max|F| 2.189e-06 diff 2.552e-06 rel 1.11e+00 dE -8.58e-06 dS 3.56e-07
+   1500  rattled   whole-f64-off max|F| 2.047e+00 diff 2.694e-03 rel 1.32e-03 dE 8.94e-05 dS 1.60e-06
+   1500  rattled  tiled-frame-on max|F| 2.048e+00 diff 2.849e-05 rel 1.39e-05 dE 1.12e-05 dS 1.86e-08
+   1500  rattled    whole-f64-on max|F| 2.048e+00 diff 2.563e-06 rel 1.25e-06 dE 5.96e-06 dS 1.17e-06
+11:58:06 == whole-ab 2.65 1.07 0.68 limit 900 s
+11:59:13 end whole-ab exit=0 took=67s peak=6353 (processes 0) MiB
+{"gpu": "NVIDIA GeForce RTX 5060 Ti", "atoms": 40000, "repeat": "20x20x20", "offset": 0.0, "order": "ab", "a": ["fastmace.model.forces:WHOLE_SYSTEM_FLOAT64_EDGES=False"], "b": ["fastmace.model.forces:WHOLE_SYSTEM_FLOAT64_EDGES=True"], "calls": 5, "float64_edges": {"a": false, "b": true}, "a_s": 0.18181974879994411, "b_s": 0.18474745140001686, "b_over_a": 1.0161022255249845, "us_per_atom": {"a": 4.545493719998603, "b": 4.618686285000422}, "energy": {"a": -319581.97549689695, "b": -319581.97491324827}, "forces_max_abs": 4.383677151054144e-05, "forces_max": 4.349592563812621e-05, "peak_gib": 3.7076573371887207, "stress_max_abs": 6.51925802230835e-08}
+11:59:13 == whole-ba 1.73 1.10 0.72 limit 900 s
+12:00:00 end whole-ba exit=0 took=47s peak=6358 (processes 0) MiB
+{"gpu": "NVIDIA GeForce RTX 5060 Ti", "atoms": 40000, "repeat": "20x20x20", "offset": 0.0, "order": "ba", "a": ["fastmace.model.forces:WHOLE_SYSTEM_FLOAT64_EDGES=False"], "b": ["fastmace.model.forces:WHOLE_SYSTEM_FLOAT64_EDGES=True"], "calls": 5, "float64_edges": {"b": true, "a": false}, "a_s": 0.1818688638000367, "b_s": 0.18454867280001963, "b_over_a": 1.0147348421493927, "us_per_atom": {"a": 4.546721595000918, "b": 4.613716820000491}, "energy": {"a": -319581.9755088177, "b": -319581.9747818795}, "forces_max_abs": 4.369906241663557e-05, "forces_max": 4.367111250758171e-05, "peak_gib": 3.7076573371887207, "stress_max_abs": 6.891787052154541e-08}
+12:00:00 == tiled-ab 1.33 1.09 0.74 limit 1500 s
+12:02:01 end tiled-ab exit=0 took=121s peak=5984 (processes 0) MiB
+{"atoms": 320000, "order": "ab", "median_s": {"a": 2.122684199999867, "b": 2.6244751404999533}, "us_per_atom": {"a": 6.633388124999584, "b": 8.201484814062354}, "ratio_b_over_a": 1.2363945331576491, "pair_ratios": [1.239025283205571, 1.238392216785192, 1.232775671659538, 1.2398562332210685], "energy_eV": {"a": -2556655.802534253, "b": -2556655.8091610973}, "energy_diff_meV_per_atom": -2.070888876914978e-05, "forces_bitwise": false, "max_force_diff": 8.498431634507142e-05, "max_abs_force": 8.391142182517797e-05, "max_stress_diff": 3.725290298461914e-09, "stress_bitwise": false}
+12:02:01 == tiled-ba 1.25 1.18 0.83 limit 1500 s
+12:04:02 end tiled-ba exit=0 took=121s peak=5996 (processes 0) MiB
+{"atoms": 320000, "order": "ba", "median_s": {"b": 2.62325877100011, "a": 2.130089268999882}, "us_per_atom": {"b": 8.197683659375343, "a": 6.656528965624632}, "ratio_b_over_a": 1.2315252741645804, "pair_ratios": [1.2305562294505767, 1.2312294843955431, 1.226185124469719, 1.2375963147124214], "energy_eV": {"a": -2556655.802452237, "b": -2556655.8088099067}, "energy_diff_meV_per_atom": -1.986771821975708e-05, "forces_bitwise": false, "max_force_diff": 8.550239726901054e-05, "max_abs_force": 8.403591345995665e-05, "max_stress_diff": 5.587935447692871e-09, "stress_bitwise": false}
+done

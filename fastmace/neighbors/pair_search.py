@@ -35,9 +35,13 @@ CPU_CHUNK = 1 << 22  # elements of the (images, rows, atoms) distance block per 
 # the full list (not ``half``); otherwise the tile screen runs. None: on for BINNED_SCREEN_GPUS; True / False: an
 # A/B side's choice.
 # SrTiO3 16x16x16 (20,480 atoms) MD: H200 0.9767 / 0.9833, A100-SXM4 0.9765 / 0.9776; the A100 80GB PCIe follows
-# the SXM4 (the owner: relative results carry over).
+# the SXM4 (the owner: relative results carry over). RTX 5060 Ti (11 November 2026, results/binned-screen-5060ti-20261111,
+# work removal by decision 66): SrTiO3 16x16x16 0.9812 / 0.9769, 20x20x20 0.9614 (ab); rebuild at 214,375 atoms
+# 2,131 -> 73 ms. RTX 4000 Ada (11 November 2026, results/binned-screen-ada-20261111, murphy, same setup): SrTiO3
+# 16x16x16 0.9846 / 0.9810, 20x20x20 0.9657 / 0.9602; rebuild 21.9 -> 4.4 ms (20,480 atoms), 76.6 -> 8.6 ms (40,000).
 BINNED_SCREEN = None
-BINNED_SCREEN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+BINNED_SCREEN_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe",
+                                "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
 # The default (None) takes the binned screen from this many atoms: below it the tile screen is cheap and hides behind
 # the force call, and the binned path's extra launches cost a little (A100-SXM4 SrTiO3 10x10x10, 5,000 atoms:
 # MD 1.0038 / 1.0044; H200 a tie). True forces it on at any size.

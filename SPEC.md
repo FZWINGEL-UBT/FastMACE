@@ -3530,3 +3530,105 @@ Records: Ada tiled capacity 179.7M SrTiO3 atoms; the A100's 52 % GPU-idle share 
 - **Gates.** All pass: OMAT-0 on both GPUs, POLAR-1-M and OFF23-medium on the Ada, POLAR S, M and L on the 5060 Ti.
 
 CPU suite on murphy at e63f2a9c: 5,552 passed, 203 skipped, 38 failed. 37 failures came from dftd3_params.npz missing from the tree sent, and 1 from a stale test, fixed in 47cec07f (the only later change). The 8 affected files were rerun with the npz present: 115 passed, 16 skipped, 0 failed. See `results/ada-5060-screen-20261110/README.md` and `docs/current/models-firing.md`.
+
+**Compiled tile bodies in CUDA graphs on the A100, behind a memory guard (11 November 2026; worker tiled-speed, conductor, decision 66):** `TileConfig.compiled_graphs` is now None / True / False, with None as the default.
+- **Default:** None turns it on for `COMPILED_GRAPH_GPUS` (the A100 family), only with device state, mode compiled or auto, lanes not "on", and no aliased device state.
+- **Memory guard:**
+  - The first compiled call runs uncaptured and measures its tile workspace.
+  - Captures follow only where (slots + 1) × 1.1 × workspace fits the available memory (`compiled_graphs_fit`), checked again when more slots appear.
+  - A captured call that runs out of memory drops its graphs and runs again without them.
+- **A100-SXM4-80GB:** 975,560 SrTiO3 atoms, 0.569 / 0.571, 3.68 → 2.09 µs/atom against 1.96 for the whole system (Alex 4981483). The A100 tiled call was host-bound, and the graphs remove the Python and autograd gaps. The 3× gate passes with graphs on (Alex 4982466).
+- **RTX 5060 Ti: off.** 30³ 1.007 / 0.990, 40³ 0.998; at 50³ the guard turns it off (local job 49, under the watchdog).
+- **RTX 4000 Ada: off.** 40³ 1.0015; 58³ 1.0010 / 1.0007, with the guard off.
+- The first idea-11 frame code (`TILE_LOCAL_FRAME`) is included, switched off. The accuracy fix follows in its own merge request.
+
+CPU suite on murphy at the merged tip 0d1ce6d6, collecting `tests/`: 5,600 passed, 873 skipped (203 in tests/cpu as on main, plus 670 GPU tests without CUDA), 1 failed. The failure was the layering allow-list, fixed in 7a62514c (test_layering: 32 passed). See `results/tiled-speed-20261111/`.
+
+**Float64 edge vectors for large boxes (idea 11; 11 November 2026; worker tiled-speed, conductor; accuracy fix):** float32 edge vectors carry the float32 spacing of their coordinates. On the perfect SrTiO3 crystal the largest force therefore grew from 1.64e-4 eV/Å at 1M atoms to 1.32e-3 at 149M and 320M atoms, 37× the gate's rounding basis. A 6³ crystal moved to +1,500 Å reproduces it. The positions carry the error; the shifts' share is at most half.
+- **`tiled.TILE_LOCAL_FRAME` (tiles).** Each tile's rows and remaining shifts are built relative to its first receiver in float64, then stored as float32 hi/lo halves with an exact TwoSum. Halo atoms sit at their edge's periodic image. With positions on the host it uses int16 bins plus float32 offsets.
+- **`forces.WHOLE_SYSTEM_FLOAT64_EDGES` (whole system).** It adds a detached float64 correction to MACE's float32 edge vectors (`engine.float64_edge_vectors`), with float64 positions in the dict (24 B/atom). With a strain, the edges carry it, which fixes the float32 virial cancellation far from the origin.
+- **Default.** Both are None: on for float32 models where the largest |coordinate| of the positions and the cell's corners is at least `FLOAT64_EDGES_EXTENT` = 64 Å. Below that the code path is unchanged.
+- **Accuracy.** About 3e-6 eV/Å on the perfect crystal at 0, +200 and +1,500 Å, in production tiles (R 16,384, including a tile that meets itself through the boundary). A100 at +1,500 Å: tiles 2.5e-6, whole system 6.6e-6, against 1.33e-3 off. The 3× gate with both forced on passes on the A100 (Alex 4983752, 12/12).
+- **Cost where on.**
+  - Frame: A100 at 58³ with compiled graphs 1.028 / 1.029, Ada at 40³ 1.0078 / 1.0064, 5060 Ti at 40³ 1.004 / 1.010.
+  - Whole system with stress: A100 at 40³ 1.0146 / 1.0146, 5060 Ti 1.016 / 1.015.
+  - The conductor accepted these as an accuracy fix: 2 % bar, 3.5 % for the A100 frame, because the A100 is the capacity GPU. A faster A100 frame is follow-up 11b in `plans/ideas-20261111-tiled-round2.md`.
+
+CPU suite on murphy (tests/cpu) at f8ea447e with main b951e804 merged in: 5,610 passed, 203 skipped. The later commits are docs and records; main's later f31d4f50 touches only plans/, results/ and docs/. See `results/tiled-speed-20261111/README.md`.
+
+**Ledger tidy (11 November 2026; worker docs-refresh, conductor; docs only):**
+- **Six new rows.**
+  - Open, with estimated sizes, first tests and stop rules: ideas 18, 19 and 20, and the outside ideas "joint rescaling" and "one decode for two edges".
+  - Closed by argument: texture interpolation.
+- **Four stale statuses corrected to REJECTED:** omat0-slope-vector, -stream-w, -stream-store-w, -eos-chunks.
+- **The 27 unverified agent notes on the rejected-row catalogue:** 14 confirmed and fixed, 11 not confirmed, 2 unclear (their records are in ResearchModule). See `plans/notes/rejected-ledger-20261111/verified.md`.
+
+**BINNED_SCREEN on the RTX 5060 Ti and tf32x3 HYBRID on the A100 family (11 November 2026; owner request, workers review and a100-colab-ideas, conductor, decision 66):**
+- **`pair_search.BINNED_SCREEN_GPUS` gains the RTX 5060 Ti.**
+  - Work removal; the neighbour list is the same bit for bit.
+  - MD step SrTiO3 16×16×16: 0.9812 / 0.9769. 20×20×20: 0.9614.
+  - Rebuild at 214,375 atoms: 2,131 → 73 ms.
+  - See `results/binned-screen-5060ti-20261111/`.
+- **`tf32x3.HYBRID` (None: on for `HYBRID_GPUS`, the A100 family).**
+  - The cubins are built with `-DFM_HYBRID_F16` (`hybrid_f16.h`): big·big on TF32 tensor cores, both cross products in one FP16 mma.
+  - Lab: 0.873 of 3×TF32, error at or below 3×TF32's on every shape.
+  - MD step: SrTiO3 10×10×10 0.9896 / 0.9877, NbCl5 0.9832 / 0.9846 (Alex A100-SXM4-80GB). The gate passes.
+  - Range: float16 cross parts overflow above 32,752. On the CPU, the worst operand is 778.7 (a 3×3 stress product; feature GEMMs at most 101.5) and the weights' max is 81.8. The cases covered: the gate structures, 30 % compression, a 0.8 Å pair and a 2,000 K MD frame. A CPU test keeps the tenfold margin on record.
+  - The sm_90 cubin exists; the H200 is not measured (no Modal budget this month).
+  - See `results/hybrid-gemm-20261111/`.
+- **Closed with records in the same merge:** half-precision far edges (`HALF_FAR`) fail NaCl's symmetric shell at every radius (F 7.1×, S 13×). Two half-systems out of phase measured 1.016.
+
+CPU suite on murphy at the merged tip 1a80d2e9 (tests/cpu): 5,613 passed, 203 skipped, 0 failed. The range-check commit after it adds one test file: 36 passed, 1 skipped, with test_layering.
+
+**Offline census of C3, C4 and C5 (11 November 2026; worker a100-colab-ideas, conductor; records only):** NVRTC builds for sm_80 and sm_90 of the production w′ and forward sources. All three stop at their bars without GPU time:
+- **C3, one spline decode for two edges:** spills on sm_90, and saves 17.9 / 7.7 / −10.4 instructions per edge and channel at the note's pairing rates, against a bar of 27.
+- **C4, staging-only joint rescaling:** about 16 instructions per edge and channel, about 97 µs on the A100 and 37 µs on the H200, against bars of 130 and 68.
+- **C5, w′ accumulators from the first product:** no drop on sm_90 (477 → 477).
+
+See `results/census-c345-20261111/`.
+
+**First interaction, C1 and C2 (11 November 2026; owner request, worker first-interaction, conductor; records only, both stopped):**
+- **C1, the forward by slot with sums in registers.** The falsifier saved 202 µs on the A100 (bar 130). Most of that came from dropping sm_80's scalar atomics: 64 atom instructions, 128 → 72 registers. No correct form keeps that.
+  - Best correct form, one warp per slot: −76 µs (1.2 %).
+  - The run-aligned walks: 474–555 µs against today's 466.
+  - Stopped.
+- **C2, a packed first radial table.** The falsifier saved 168 µs on the A100, over the bar. But certified packed slopes need 9.6k–15k pieces from 1 Å, which is 71–91 MB of table against the A100's 40 MB L2. Values alone would fit (1,402 pieces, 6.4 MB) but are worth at most the forward's 76 µs. Stopped by bound.
+
+See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
+
+**Ledger, second outside note (11 November 2026; rev2 queue, worker docs-refresh, conductor; docs only):** three new ledger rows. Nested radial basis is OPEN; the first-interaction lane owns it, and the certificate is next. Compact angular products waits on GEOM's H200 A/B. Shared denominator is stopped by the bound: about 34 µs on the A100 and 7–10 µs on the H200, under both bars. The index rows for ideas 18–20 and the first two outside ideas (C1–C5) now show today's stops, and the original estimates stay in the rows, marked "Before the test".
+
+**BINNED_SCREEN on the RTX 4000 Ada; shuffled atom order (11 November 2026; rev2 queue B2 and B4, worker ada-5060-screen, conductor):**
+- **B2, BINNED_SCREEN on the RTX 4000 Ada.** Murphy, OMAT-0 medium MD. SrTiO3 16³ 0.9846 / 0.9810, 20³ 0.9657 / 0.9602. The neighbour list is bit-identical (work removal, decision 66). The Ada is added to `pair_search.BINNED_SCREEN_GPUS`, so the switch is now on for all five GPU families.
+- **B4, shuffled against ordered atoms.** Local 5060 Ti, SrTiO3 24³ (69,120 atoms): shuffled is 1.167× slower (1.157 and 1.177 pairwise). A spatial sort at setup is needed for arbitrary inputs. Ledger row `setup-spatial-sort` PROPOSED, not built.
+- Suite on the branch tip (= merged tree) on murphy: 5,615 passed, 203 skipped.
+
+**Billion-atom steps 1–2 (11 November 2026; owner request, worker tiled-speed, conductor):**
+- **Step 1, 34 B/atom off the device in the tiled call.**
+  - Host float64 positions (`TILE_HOST_ROWS`): opt-in per call, by passing host positions. A capacity option, not a default: A100 58³ 1.043 / 1.021.
+  - uint8 species maps and no whole-system BLOCK_ORDER order: both on by default. A100 58³ A/B (decision 66, work removal): default tiled call 1.000 / 1.002, capacity call 0.982 / 0.984.
+  - Gate 12/12 on Alex.
+- **Step 2, overflow audit.** Tile-list sort key guarded (`KEY_LIMIT`); the overflow probe is bitwise at 1M and 750M atoms.
+- Suite on the merged tree 9f39b607 (leeloo): 5,631 passed, 204 skipped. The 397.5M go/no-go (step 3) is still pending.
+
+**Nested radial basis (11 November 2026; rev2 queue §1, worker first-interaction, conductor): REJECTED on the A100 and the Ada, kept opt-in.**
+- Certificate: far rank at most 29 at 1e-7. With exactly 32 far columns the certificate stays at 0.3011.
+- Timing bound: 303 µs on the A100. Real kernels in isolation: forward −137 µs, power backward −144 µs. sm_80 forward at 72 registers.
+- MD A/B, both orders. A100: SrTiO3 10³ 0.984 / 0.982, NbCl5 1.057 / 1.057. The A100 split runs clear the power backward: alone it ties (0.998 / 0.996), and nested with the recompute backward also loses NbCl5 (1.063 / 1.065). Ada: SrTiO3 1.026 / 1.021, NbCl5 1.119 / 1.118.
+- The loss follows edges per receiver (26 per atom on NbCl5, 74 on SrTiO3), not the far fraction (0.92 / 0.84): the split costs more per run than the skipped columns save on short runs. No size rule, because one structure sits on each side.
+- Gates pass on both GPUs. `NESTED_RADIAL_GPUS` is empty.
+- Kept: the switch (opt-in), the route fix (nested routing after the radial tables), and proof counters for A/Bs and gates (`ab_rewrites --b-expect`, `force_stress_gate --production-expect`). The H200 is not measured.
+- Suite on the merged tip 55685b55 (murphy): 5,623 passed, 204 skipped. The 18 failures there were all in `test_colab_driver.py`, from murphy's git setup; that file passes 32/32 on leeloo for the same tree.
+
+**A100 receiver caps 32,768 / 65,536 (11 November 2026; rev2 queue §3 B3, worker tiled-speed, conductor): ADOPTED on the A100 family.**
+- `TILE_LARGE_CAPS` (None = on for `TILE_LARGE_CAP_GPUS`): a host-state tiled call with the default budget also offers receiver caps 32,768 and 65,536. An explicit budget, device state and other GPUs are unchanged.
+- MD A/B against R 16,384, b/a both orders (Alex 4984555). 58³: host state 0.886 / 0.893 (32,768) and 0.549 / 0.549 (65,536); wavefront 0.675 / 0.671 and 0.410 / 0.409. 160³: host state 0.732 / 0.724 and 0.597 / 0.599; wavefront 0.722 / 0.723 and 0.573 / 0.583. Energy within 1e-5 meV/atom.
+- Peak memory at 160³ (Alex 4985398), device / host: 8,192 2.83 GiB / 24.3 GB; 16,384 3.33 / 28.0; 32,768 4.20 / 31.9; 65,536 6.11 / 43.3. The device fits every cap; the host grows about 0.33 MB per receiver.
+- Size rule `TILE_LARGE_CAP_HOST_BYTES` (0.35 MB per added receiver, plus 10 %, above `list_reuse_floor`). Without it, the 397.5M record (229 of 231.5 GB) would have taken 65,536 and run out of host memory.
+- Also: `test_colab_driver` takes its git config from the environment (safe.directory, identity), which fixes murphy's 18 "dubious ownership" failures (32/32 there). Billion-atom plan notes (documentation only).
+- Suite on the merged tip 16da79e2 (leeloo): 5,643 passed, 204 skipped, 0 failed.
+
+**Billion-atom setup speed-ups (11 November 2026; billion-atom plan "Before step 4", worker tiled-speed, owner "go ahead" in that session, conductor): MERGED.**
+- Supercell builder `tools/bench/tiled_capacity.py supercell`, tools only. Builds the cell copies in chunks with ASE's order of repeat, strain, rattle and wrap; `supercell_ase` is kept as the reference. Bitwise to ASE in the CPU tests (SrTiO3, triclinic, chunks that split copies) and at 300³. Alex 4985954: 300³ (135M atoms) 18.6 s against 206 s; 430³ 55 s; 520³ 95 s; 585³ (1.001e9 atoms) 135 s at 31.5 GB max RSS. The 519M segmentation fault came from ASE's per-copy loop.
+- `TILE_FIRST_CALL_PROBE` (None = on for `TILE_PROBE_GPUS`, the A100 family; wavefront calls only, exact). Mode auto's measuring first call runs its eager sweeps on the `TILE_PROBE_TILES` = 8 largest tiles only, picks the mode and receiver cap, drops that pass's buffers and kept lists, then runs the whole call in the chosen mode. Basis: the eager workspace is set by the largest tile (526,080,512 bytes at 149M, 320M and 397.5M atoms; Alex 4973640). A/B on the go/no-go call (Alex 4985954): probe workspace 0.9986 of the whole call's at 58³ and 0.9982 at 160³; same mode, cap and reason; forces check passed; two calls at 160³ 287 s against 601 s. At 397.5M it replaces the 11,468 s eager first call.
+- Suite on the merged tree 93daefd1 (murphy, idle check incl. our jobs): 5,699 passed, 204 skipped, 0 failed. Also: ledger rows tiled-first-call-probe and capacity-supercell-chunked, a defaults-by-gpu row, the plan's status table.

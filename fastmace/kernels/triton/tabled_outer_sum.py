@@ -54,6 +54,9 @@ POWER_BACKWARD = None
 # SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9917 / 0.9946, 0.9944 / 0.9941;
 # left out of the candidate set 1.0126 / 1.0070, 1.0068 / 1.0091.
 POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200", "NVIDIA RTX 4000 Ada Generation", "NVIDIA GeForce RTX 5060 Ti"))
+# rewrites.radial.nested (11 November 2026): NESTED_POWER True runs the nested split's backward in the power basis on
+# every GPU (dual Horner); False: as POWER_BACKWARD says there (the recompute split where it is off, the A100's).
+NESTED_POWER = True
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
 # The tabled forward's register cap (Triton's maxnreg; None: Triton's choice). step_limiters (9 November 2026):
@@ -315,6 +318,183 @@ def _kernel():
 
 
 @cache
+def _split_kernels():
+    """The walks of the nested radial basis (``rewrites.radial.nested``; ``tools/nested_radial_lab.py``): the K
+    channels as two halves of ``HALF``. Every edge evaluates the low half and the density column; an edge with
+    ``r < r_far`` (near) also the high half (a scalar branch per edge, one warp). The forward keeps the [D, K] slot
+    block: a run's low half is added always, its high half if the run had a near edge. The backward loads a slot's
+    high gradient block at its first near edge. Unpacked rows; the backward's value series is the power basis (dual
+    Horner, ``POWER``) or Clenshaw (value and slope rows)."""
+    import triton
+    import triton.language as tl
+
+    from fastmace.kernels.triton.edge_outer_sum import _base_fn
+
+    _base = _base_fn()
+
+    @triton.jit
+    def _values(coef_ptr, base, x, col, J: tl.constexpr, TERMS: tl.constexpr):
+        """Clenshaw sum of columns ``col`` (a [HALF] index vector) of the value rows at ``base``."""
+        v1 = tl.zeros(col.shape, dtype=tl.float32)
+        v2 = tl.zeros(col.shape, dtype=tl.float32)
+        for t in tl.static_range(TERMS - 1, 0, -1):
+            c = tl.load(coef_ptr + base + t * J + col)
+            v = c + 2.0 * x * v1 - v2
+            v2 = v1
+            v1 = v
+        return tl.load(coef_ptr + base + col) + x * v1 - v2
+
+    @triton.jit
+    def _horner(coef_ptr, base, x, col, J: tl.constexpr, TERMS: tl.constexpr):
+        """(p, dp/dx) of columns ``col`` by dual Horner from the power-basis rows at ``base``."""
+        pa = tl.load(coef_ptr + base + (TERMS - 1) * J + col)
+        pd = tl.zeros(col.shape, dtype=tl.float32)
+        for t in tl.static_range(TERMS - 2, -1, -1):
+            c = tl.load(coef_ptr + base + t * J + col)
+            pd = pd * x + pa
+            pa = pa * x + c
+        return pa, pd
+
+    @triton.jit
+    def forward_split(y_ptr, key_ptr, r_ptr, pair_ptr, coef_ptr, starts_ptr, scales_ptr, bins_ptr, out_ptr,
+                      density_ptr, num_edges, n_pieces, n_bins, r_lo, bin_scale, r_max, r_far, K: tl.constexpr,
+                      D: tl.constexpr, INNER: tl.constexpr, TERMS: tl.constexpr, J: tl.constexpr,
+                      CHUNK: tl.constexpr, HALF: tl.constexpr, BLOCK_D: tl.constexpr):
+        start = tl.program_id(0) * CHUNK
+        d = tl.arange(0, BLOCK_D)
+        h = tl.arange(0, HALF)
+        mask = (d < D)[:, None] & (h < HALF)[None, :]
+        offsets = d[:, None] * (INNER * K) + h[None, :]
+        lo = tl.zeros((BLOCK_D, HALF), dtype=tl.float32)
+        hi = tl.zeros((BLOCK_D, HALF), dtype=tl.float32)
+        near_run = start * 0
+        current = tl.load(key_ptr + start).to(tl.int64)
+        stop = tl.minimum(start + CHUNK, num_edges)
+        for edge in range(start, stop):
+            key = tl.load(key_ptr + edge).to(tl.int64)
+            if key != current:  # a run ends: its low block always, its high block if it had a near edge
+                slot = out_ptr + _base(current, D, K, INNER) + offsets
+                tl.atomic_add(slot, lo, mask=mask, sem="relaxed")
+                if near_run != 0:
+                    tl.atomic_add(slot + HALF, hi, mask=mask, sem="relaxed")
+                lo = tl.zeros((BLOCK_D, HALF), dtype=tl.float32)
+                hi = tl.zeros((BLOCK_D, HALF), dtype=tl.float32)
+                near_run = start * 0
+                current = key
+            row = edge.to(tl.int64)
+            r = tl.load(r_ptr + row)
+            pair = tl.load(pair_ptr + row).to(tl.int64)
+            clamped = tl.maximum(r, r_lo)
+            index = tl.minimum(((clamped - r_lo) * bin_scale).to(tl.int32), n_bins - 1)
+            piece = tl.load(bins_ptr + index).to(tl.int64)
+            x = (clamped - tl.load(starts_ptr + piece)) * tl.load(scales_ptr + piece) - 1.0
+            base = (pair * n_pieces + piece) * TERMS * J
+            inside = r < r_max
+            c1 = 0.0 * x
+            c2 = 0.0 * x
+            for t in tl.static_range(TERMS - 1, 0, -1):
+                cd = tl.load(coef_ptr + base + t * J + (J - 1))
+                cn = cd + 2.0 * x * c1 - c2
+                c2 = c1
+                c1 = cn
+            density = tl.where(inside, tl.load(coef_ptr + base + (J - 1)) + x * c1 - c2, 0.0)
+            tl.store(density_ptr + row, density)
+            y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
+            a = tl.where(inside, _values(coef_ptr, base, x, h, J, TERMS), 0.0)
+            lo += y[:, None] * a[None, :]
+            if r < r_far:  # near: the high half too
+                b = tl.where(inside, _values(coef_ptr, base, x, h + HALF, J, TERMS), 0.0)
+                hi += y[:, None] * b[None, :]
+                near_run = start * 0 + 1
+        slot = out_ptr + _base(current, D, K, INNER) + offsets
+        tl.atomic_add(slot, lo, mask=mask, sem="relaxed")
+        if near_run != 0:
+            tl.atomic_add(slot + HALF, hi, mask=mask, sem="relaxed")
+
+    @triton.jit
+    def backward_split(grad_ptr, y_ptr, key_ptr, r_ptr, pair_ptr, dcoef_ptr, starts_ptr, scales_ptr, bins_ptr,
+                       grad_density_ptr, dr_ptr, grad_y_ptr, num_edges, E_DENSITY, n_pieces, n_bins, r_lo, bin_scale,
+                       r_max, r_far, K: tl.constexpr, D: tl.constexpr, INNER: tl.constexpr, TERMS: tl.constexpr,
+                       J: tl.constexpr, CHUNK: tl.constexpr, HALF: tl.constexpr, BLOCK_D: tl.constexpr, coef_ptr,
+                       VTERMS: tl.constexpr, POWER: tl.constexpr):
+        start = tl.program_id(0) * CHUNK
+        d = tl.arange(0, BLOCK_D)
+        h = tl.arange(0, HALF)
+        mask = (d < D)[:, None] & (h < HALF)[None, :]
+        offsets = d[:, None] * (INNER * K) + h[None, :]
+        current = tl.load(key_ptr + start).to(tl.int64)
+        block = tl.load(grad_ptr + _base(current, D, K, INNER) + offsets, mask=mask, other=0.0)
+        upper = tl.zeros((BLOCK_D, HALF), dtype=tl.float32)
+        upper_key = current * 0 - 1  # the slot whose high block is in ``upper`` (-1: none)
+        stop = tl.minimum(start + CHUNK, num_edges)
+        for edge in range(start, stop):
+            key = tl.load(key_ptr + edge).to(tl.int64)
+            if key != current:
+                block = tl.load(grad_ptr + _base(key, D, K, INNER) + offsets, mask=mask, other=0.0)
+                current = key
+            row = edge.to(tl.int64)
+            r = tl.load(r_ptr + row)
+            pair = tl.load(pair_ptr + row).to(tl.int64)
+            clamped = tl.maximum(r, r_lo)
+            index = tl.minimum(((clamped - r_lo) * bin_scale).to(tl.int32), n_bins - 1)
+            piece = tl.load(bins_ptr + index).to(tl.int64)
+            x = (clamped - tl.load(starts_ptr + piece)) * tl.load(scales_ptr + piece) - 1.0
+            sc = tl.load(scales_ptr + piece)
+            vbase = (pair * n_pieces + piece) * VTERMS * J
+            base = (pair * n_pieces + piece) * TERMS * J
+            inside = r < r_max
+            y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
+            # the density column's slope
+            if POWER:
+                qa = tl.load(coef_ptr + vbase + (VTERMS - 1) * J + (J - 1))
+                qd = 0.0 * x
+                for t in tl.static_range(VTERMS - 2, -1, -1):
+                    cd = tl.load(coef_ptr + vbase + t * J + (J - 1))
+                    qd = qd * x + qa
+                    qa = qa * x + cd
+                slope_density = qd * sc
+            else:
+                c1 = 0.0 * x
+                c2 = 0.0 * x
+                for t in tl.static_range(TERMS - 1, 0, -1):
+                    cd = tl.load(dcoef_ptr + base + t * J + (J - 1))
+                    cn = cd + 2.0 * x * c1 - c2
+                    c2 = c1
+                    c1 = cn
+                slope_density = tl.load(dcoef_ptr + base + (J - 1)) + x * c1 - c2
+            # the low half
+            if POWER:
+                pa, pd = _horner(coef_ptr, vbase, x, h, J, VTERMS)
+                a = tl.where(inside, pa, 0.0)
+                slope = pd * sc
+            else:
+                a = tl.where(inside, _values(coef_ptr, vbase, x, h, J, VTERMS), 0.0)
+                slope = _values(dcoef_ptr, base, x, h, J, TERMS)
+            grad_y = tl.sum(block * a[None, :], axis=1)
+            total = tl.sum(tl.sum(block * y[:, None], axis=0) * slope, axis=0)
+            if r < r_far:  # near: the high half, its gradient block loaded once per slot
+                if upper_key != current:
+                    upper = tl.load(grad_ptr + _base(current, D, K, INNER) + offsets + HALF, mask=mask, other=0.0)
+                    upper_key = current
+                if POWER:
+                    pa, pd = _horner(coef_ptr, vbase, x, h + HALF, J, VTERMS)
+                    b = tl.where(inside, pa, 0.0)
+                    slope_b = pd * sc
+                else:
+                    b = tl.where(inside, _values(coef_ptr, vbase, x, h + HALF, J, VTERMS), 0.0)
+                    slope_b = _values(dcoef_ptr, base, x, h + HALF, J, TERMS)
+                grad_y += tl.sum(upper * b[None, :], axis=1)
+                total += tl.sum(tl.sum(upper * y[:, None], axis=0) * slope_b, axis=0)
+            tl.store(grad_y_ptr + row * D + d, grad_y, mask=d < D)
+            grad_density = tl.load(grad_density_ptr + row, mask=edge < E_DENSITY, other=0.0)
+            total = total + grad_density * slope_density
+            total = tl.where((r < r_max) & (r >= r_lo), total, 0.0)
+            tl.store(dr_ptr + row, total)
+
+    return forward_split, backward_split
+
+
+@cache
 def _forward_kernel():
     import triton
     import triton.language as tl
@@ -386,14 +566,28 @@ def _forward_kernel():
     return kernel
 
 
+# Launches of the nested split walks (r_far > 0, rewrites.radial.nested), forward and backward: the proof a run
+# took the nested path (tools/ab_rewrites.py --b-expect, tools/force_stress_gate.py --production-expect). The ops'
+# bodies run outside compiled regions; a CUDA graph replay launches without counting, its capture counts.
+_SPLIT_WALKS = {"launches": 0}
+
+
+def split_walks():
+    """The nested split walks' launches so far in this process (forward and backward)."""
+    return _SPLIT_WALKS["launches"]
+
+
 @torch.library.custom_op("fastmace::tabled_outer_sum_forward", mutates_args=())
 def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor, starts: torch.Tensor,
                              scales: torch.Tensor, bins: torch.Tensor, r_lo: float, bin_scale: float, r_max: float,
                              columns: int, y: torch.Tensor, key: torch.Tensor, slots: int,
-                             inner: int = 1, packed: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+                             inner: int = 1, packed: torch.Tensor | None = None,
+                             r_far: float = 0.0) -> tuple[torch.Tensor, torch.Tensor]:
     """(S [slots, D * K], edge density [E, 1]) with a = the table's leading ``columns`` values evaluated in the walk
     (``TABLED_FORWARD``); float32 CUDA (elsewhere: the table, then ``edge_outer_sum_forward``). ``packed``
-    (``PACKED_COEF``): ``packed_coef(coef)``, the channels' series read from it where it serves (``_packs``)."""
+    (``PACKED_COEF``): ``packed_coef(coef)``, the channels' series read from it where it serves (``_packs``).
+    ``r_far`` > 0 (``rewrites.radial.nested``, even K): from ``r_far`` only the leading K / 2 channels (the split
+    walk; elsewhere every channel)."""
     import triton
 
     from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum_forward
@@ -406,7 +600,14 @@ def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Te
     out = torch.zeros((slots, d * k), dtype=y.dtype, device=y.device)
     density = r.new_empty((edges, 1))
     packs = _packs(packed, coef, k)
-    if edges:
+    if edges and r_far > 0 and k % 2 == 0:
+        _SPLIT_WALKS["launches"] += 1
+        _split_kernels()[0][(triton.cdiv(edges, FORWARD_CHUNK),)](
+            y, key, r, pair, coef, starts, scales, bins, out, density, edges, coef.shape[1], bins.shape[0],
+            float(r_lo), float(bin_scale), float(r_max), float(r_far), K=k, D=d, INNER=inner, TERMS=coef.shape[2],
+            J=coef.shape[-1], CHUNK=FORWARD_CHUNK, HALF=k // 2, BLOCK_D=triton.next_power_of_2(d),
+            num_warps=FORWARD_WARPS)
+    elif edges:
         _forward_kernel()[(triton.cdiv(edges, FORWARD_CHUNK),)](
             y, key, r, pair, coef, starts, scales, bins, out, density, edges, coef.shape[1], bins.shape[0],
             float(r_lo), float(bin_scale), float(r_max), K=k, D=d, INNER=inner, TERMS=coef.shape[2],
@@ -418,7 +619,8 @@ def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Te
 
 
 @tabled_outer_sum_forward.register_fake
-def _(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y, key, slots, inner=1, packed=None):
+def _(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y, key, slots, inner=1, packed=None,
+      r_far=0.0):
     return y.new_empty((slots, y.shape[1] * int(columns))), r.new_empty((r.numel(), 1))
 
 
@@ -428,12 +630,15 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
                               scales: torch.Tensor, bins: torch.Tensor, grad_density: torch.Tensor, r_lo: float,
                               bin_scale: float, r_max: float, inner: int = 1,
                               coef: torch.Tensor | None = None, columns: int = 0, power: bool = False,
-                              packed: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+                              packed: torch.Tensor | None = None,
+                              r_far: float = 0.0) -> tuple[torch.Tensor, torch.Tensor]:
     """(dL/dr [E], grad_y [E, D]) from the slots' gradient ``grad [slots, D * K]`` (``inner`` layout), the table rows
     ``a [E, K]`` (the table's leading K columns) and the edge density's gradient (``[E, 0]``: none). With ``coef``
     (``TABLED_FORWARD``): ``a`` is evaluated again from the value table's leading ``columns`` (``a`` unused);
     ``power`` (``POWER_BACKWARD``): ``coef`` is the power-basis table ``pcoef``, a and the slopes by dual Horner;
-    ``packed`` (``PACKED_COEF``): ``packed_coef(coef)``, the channels' series read from it where it serves."""
+    ``packed`` (``PACKED_COEF``): ``packed_coef(coef)``, the channels' series read from it where it serves.
+    ``r_far`` > 0 (with ``coef``, even K; ``rewrites.radial.nested``): the split walk, from ``r_far`` the leading
+    K / 2 channels only."""
     if coef is not None:
         if not (grad.is_cuda and coef.dtype == torch.float32):
             if power:
@@ -469,7 +674,15 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
     dr = r.new_empty((num_edges,))
     grad_y = torch.empty_like(y)
     packs = coef is not None and _packs(packed, coef, k)
-    if num_edges:
+    if num_edges and r_far > 0 and coef is not None and k % 2 == 0:
+        _SPLIT_WALKS["launches"] += 1
+        _split_kernels()[1][(triton.cdiv(num_edges, CHUNK),)](
+            grad, y, key, r, pair, dcoef, starts, scales, bins, grad_density if grad_density.numel() else r, dr,
+            grad_y, num_edges, grad_density.numel(), dcoef.shape[1], bins.shape[0], float(r_lo), float(bin_scale),
+            float(r_max), float(r_far), K=k, D=d, INNER=inner, TERMS=dcoef.shape[2], J=dcoef.shape[-1], CHUNK=CHUNK,
+            HALF=k // 2, BLOCK_D=triton.next_power_of_2(d), coef_ptr=coef, VTERMS=coef.shape[2],
+            POWER=bool(power), num_warps=WARPS)
+    elif num_edges:
         _kernel()[(triton.cdiv(num_edges, CHUNK),)](
             grad, a, y, key, r, pair, dcoef, starts, scales, bins, grad_density if grad_density.numel() else r, dr,
             grad_y, num_edges, a.stride(0), grad_density.numel(), dcoef.shape[1], bins.shape[0], float(r_lo),
@@ -484,14 +697,14 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
 
 @tabled_outer_sum_backward.register_fake
 def _(grad, a, y, key, r, pair, dcoef, starts, scales, bins, grad_density, r_lo, bin_scale, r_max, inner=1,
-      coef=None, columns=0, power=False, packed=None):
+      coef=None, columns=0, power=False, packed=None, r_far=0.0):
     return r.new_empty((r.numel(),)), torch.empty_like(y)
 
 
 class _TabledOuterSum(torch.autograd.Function):
     @staticmethod
     def forward(ctx, r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y, key, slots,
-                inner, pcoef, packed, ppacked):
+                inner, pcoef, packed, ppacked, r_far):
         from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum_forward
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -499,14 +712,18 @@ class _TabledOuterSum(torch.autograd.Function):
         ctx.inner, ctx.columns = inner, int(columns)
         ctx.shape, ctx.slots = r.shape, int(slots)
         ctx.tabled = tabled_forward(r.device) and r.dtype == torch.float32
-        ctx.power = ctx.tabled and pcoef is not None and r.is_cuda and power_backward(r.device)
+        # the nested split (r_far > 0) runs with the tabled CUDA walks only, its backward in the power basis where
+        # NESTED_POWER says so (else as POWER_BACKWARD)
+        ctx.r_far = r_far if ctx.tabled and r.is_cuda and pcoef is not None else 0.0
+        ctx.power = ctx.tabled and pcoef is not None and r.is_cuda and (
+            power_backward(r.device) or (ctx.r_far > 0 and bool(NESTED_POWER)))
         if ctx.tabled:  # nothing of a kept: the backward evaluates it again
             # PACKED_COEF: the packed copies exist where it was on at the table's build (saved last, if any)
             pack = ppacked if ctx.power else packed
             ctx.save_for_backward(pcoef if ctx.power else coef, y, key, r, pair, dcoef, starts, scales, bins,
                                   *(() if pack is None else (pack,)))
             return tabled_outer_sum_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y,
-                                            key, slots, inner, packed)
+                                            key, slots, inner, None if ctx.r_far > 0 else packed, ctx.r_far)
         a, density = radial_table_forward(r, pair, coef, starts, scales, bins, r_lo, bin_scale, r_max, True, columns)
         ctx.save_for_backward(a, y, key, r, pair, dcoef, starts, scales, bins)
         return edge_outer_sum_forward(a, y, key, slots, inner), density
@@ -521,24 +738,28 @@ class _TabledOuterSum(torch.autograd.Function):
         if ctx.tabled:  # first is coef
             dr, grad_y = tabled_outer_sum_backward(grad, y.new_empty((0, 0)), y, key, r, pair, dcoef, starts, scales,
                                                    bins, grad_density, *ctx.constants, ctx.inner, first, ctx.columns,
-                                                   ctx.power, packed[0] if packed else None)
+                                                   ctx.power, None if ctx.r_far > 0 or not packed else packed[0],
+                                                   ctx.r_far)
         else:  # first is a
             dr, grad_y = tabled_outer_sum_backward(grad, first, y, key, r, pair, dcoef, starts, scales, bins,
                                                    grad_density, *ctx.constants, ctx.inner)
         return (dr.reshape(ctx.shape), None, None, None, None, None, None, None, None, None, None, grad_y, None,
-                None, None, None, None, None)
+                None, None, None, None, None, None)
 
 
 def tabled_outer_sum(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max, columns, y, key, slots,
-                     inner=1, pcoef=None, packed=None, ppacked=None):
+                     inner=1, pcoef=None, packed=None, ppacked=None, r_far=0.0):
     """``(S [slots, D * K], edge density [E, 1])``: the table's leading ``columns`` = K values ``a`` of each edge
     length ``r``, summed as ``S[key] += y a^T`` (``edge_outer_sum``'s segmented forward, d major), with the fused
     backward (module docstring). Differentiable in ``r`` and ``y``. ``packed`` / ``ppacked``: ``packed_coef`` of
-    ``coef`` / ``pcoef`` (``PACKED_COEF``; None: the unpacked rows)."""
+    ``coef`` / ``pcoef`` (``PACKED_COEF``; None: the unpacked rows). ``r_far`` > 0: the nested radial basis's split
+    walks (``rewrites.radial.nested``; the tables are the rotated ones; tabled CUDA walks only)."""
     return _TabledOuterSum.apply(r, pair, coef, dcoef, starts, scales, bins, float(r_lo), float(bin_scale),
-                                 float(r_max), int(columns), y, key, int(slots), int(inner), pcoef, packed, ppacked)
+                                 float(r_max), int(columns), y, key, int(slots), int(inner), pcoef, packed, ppacked,
+                                 float(r_far))
 
 
-__all__ = ["CHUNK", "FORWARD_CHUNK", "PACKED_COEF", "PACKED_COEF_GPUS", "POWER_BACKWARD", "POWER_BACKWARD_GPUS",
-           "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "packed_coef", "packed_coef_default", "power_backward",
-           "tabled_forward", "tabled_outer_sum", "tabled_outer_sum_backward", "tabled_outer_sum_forward"]
+__all__ = ["CHUNK", "FORWARD_CHUNK", "NESTED_POWER", "PACKED_COEF", "PACKED_COEF_GPUS", "POWER_BACKWARD",
+           "POWER_BACKWARD_GPUS", "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "packed_coef",
+           "packed_coef_default", "power_backward", "tabled_forward", "tabled_outer_sum", "tabled_outer_sum_backward",
+           "tabled_outer_sum_forward", "split_walks"]

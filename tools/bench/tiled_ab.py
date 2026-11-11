@@ -40,6 +40,14 @@ def parse_args(argv=None):
     p.add_argument("--repeat", required=True, help="NXxNYxNZ")
     p.add_argument("--receivers", type=int, default=8192)
     p.add_argument("--no-budget", action="store_true", help="the receiver cap stays --receivers")
+    p.add_argument("--b-receivers", type=int, default=None,
+                   help="side b's own TiledForceField with this fixed receiver cap (both sides --no-budget)")
+    p.add_argument("--b-host-positions", action="store_true",
+                   help="side b: its own TiledForceField called with the float64 positions on the host "
+                        "(TILE_HOST_ROWS; side a: on the device)")
+    p.add_argument("--a-int32-maps", action="store_true",
+                   help="side a: its own TiledForceField with the species index, sender groups and their tables in "
+                        "int32 (as before the uint8 maps; swapped in before each of its calls)")
     p.add_argument("--mode", choices=("eager", "padded", "compiled", "auto"), default="auto")
     p.add_argument("--host-state", action="store_true")
     p.add_argument("--alias-state", action="store_true")
@@ -97,7 +105,8 @@ def main(argv=None):
     atoms = tiled_capacity.supercell(args.structure, repeat, 0.0, 0.0)
     n = len(atoms)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, model=args.model, order=args.order,
-                  a=args.a, b=args.b, receivers=args.receivers, mode=args.mode, host_state=args.host_state,
+                  a=args.a, b=args.b, receivers=args.receivers, b_receivers=args.b_receivers,
+                  b_host_positions=args.b_host_positions, a_int32_maps=args.a_int32_maps, mode=args.mode, host_state=args.host_state,
                   alias_state=args.alias_state, wavefront=args.wavefront, device=torch.cuda.get_device_name(),
                   torch=torch.__version__, source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"))
     args.output.mkdir(parents=True, exist_ok=True)
@@ -109,26 +118,59 @@ def main(argv=None):
     with tiled_capacity.no_global_list(True):
         field = planner.build_evaluation(plan, user, atoms, call_rows=args.receivers, release_node_attrs=True,
                                          release_whole_system=True, global_list=False)
-        tiled = TiledForceField(field, TileConfig(
-            args.receivers, None, mode=args.mode, neighbours="tiles", budget_receivers=() if args.no_budget else None,
-            state="host" if args.host_state else "device", alias_state=args.alias_state, wavefront=args.wavefront,
-            species="index"))
+        def tiled_field(receivers):
+            fixed = args.no_budget or args.b_receivers is not None
+            return TiledForceField(field, TileConfig(
+                receivers, None, mode=args.mode, neighbours="tiles", budget_receivers=() if fixed else None,
+                state="host" if args.host_state else "device", alias_state=args.alias_state,
+                wavefront=args.wavefront, species="index"))
+
+        maps = {}
+        if args.a_int32_maps:  # side a's maps in int32 (the same values), side b's the field's own
+            names = ("_species_index", "_sender_groups", "_column_of", "_group_of")
+            maps["b"] = {name: getattr(field, name) for name in names}
+            shared_groups = getattr(field.neighbours, "sender_groups", None) is field._sender_groups
+            maps["a"] = {name: tensor.to(torch.int32) for name, tensor in maps["b"].items()}
+            record_maps = {side: str(maps[side]["_species_index"].dtype) for side in maps}
+
+        def use_maps(side):
+            if side in maps:
+                for name, tensor in maps[side].items():
+                    setattr(field, name, tensor)
+                if shared_groups:  # the tile lists read the field's groups through the neighbour list
+                    field.neighbours.sender_groups = maps[side]["_sender_groups"]
+
+        use_maps("a")
+        tiled = tiled_field(args.receivers)  # its species index: side a's
+        use_maps("b")
+        # --b-receivers: side b's own field (its own slots, state and kept lists; the force field is shared)
+        own_b = args.b_receivers is not None or args.b_host_positions or args.a_int32_maps
+        tiled_of = {"a": tiled, "b": tiled_field(args.b_receivers or args.receivers) if own_b else tiled}
         positions = field._prepare_one_off(atoms)
+        positions_of = {"a": positions, "b": positions}
+        if args.b_host_positions:  # the same float64 values, a view of the atoms' array
+            positions_of["b"] = field._prepare_one_off(atoms, host=True)
     record["rewrites"] = [str(r) for r in getattr(field, "applied", ())]
-    configs = {"a": dataclasses.replace(tiled.config, **config_a), "b": dataclasses.replace(tiled.config, **config_b)}
+    configs = {"a": dataclasses.replace(tiled_of["a"].config, **config_a),
+               "b": dataclasses.replace(tiled_of["b"].config, **config_b)}
     own = bool(config_a or config_b)  # TileConfig sides: each side's own globals and state
     globals_of = {}
 
     kept = {}
 
+    if maps:
+        record["maps"] = record_maps
+
     def call(side, keep=False):
+        tiled = tiled_of[side]
+        use_maps(side)
         if own:
             tiled.config = configs[side]
             tiled._g, tiled._kept = globals_of.get(side, (None, None))
         with constants(sides[side]):
             torch.cuda.synchronize()
             started = time.perf_counter()
-            out = tiled(positions)
+            out = tiled(positions_of[side])
             torch.cuda.synchronize()
             seconds = time.perf_counter() - started
         if own:
@@ -147,7 +189,7 @@ def main(argv=None):
         entry = {}
         for side in order:
             entry[side] = [call(side) for _ in range(args.calls)]
-            record["last"][side] = dict(tiled.last)
+            record["last"][side] = dict(tiled_of[side].last)
         blocks.append(entry)
         record["blocks"] = blocks
         path.write_text(json.dumps(record, indent=1, default=str))

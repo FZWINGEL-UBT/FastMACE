@@ -1,0 +1,276 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  40,
+  40,
+  40
+ ],
+ "atoms": 320000,
+ "model": "omat0-medium",
+ "order": "ba",
+ "a": [
+  "fastmace.model.tiled:TILE_LOCAL_FRAME=False",
+  "config:compiled_graphs=True"
+ ],
+ "b": [
+  "fastmace.model.tiled:TILE_LOCAL_FRAME=True",
+  "config:compiled_graphs=True"
+ ],
+ "receivers": 8192,
+ "mode": "compiled",
+ "host_state": false,
+ "alias_state": false,
+ "wavefront": "auto",
+ "device": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "source_commit": "2f7e8a3f",
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=5.496454742719308e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.234540474287792e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=8.058418700527604e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=5.266697537874076e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=3.929123560001295e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=3.845525186384246e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=3.845525186384246e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=2.5368899312462236e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_launch', result=CheckResult(passed=True, max_relative_error=8.659261266431614e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_fold_product_linear', result=CheckResult(passed=True, max_relative_error=5.873681350808216e-07, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['products.0.linear', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'readouts.0.linear', 'interactions.0.linear', 'interactions.0.skip_tp', 'products.1.linear', 'interactions.1.skip_tp', 'readouts.1.linear_1'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.110640918170247e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (893 pieces, 9 pairs, certificate 0.34, cached)', 'interactions.1 (619 pieces, 9 pairs, certificate 0.36, cached)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.262527314552999e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB; spline 731 intervals, certificate 0.48)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=2.265465478596652e-16, threshold=1e-10, modules=4, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "warmup": {
+  "b": [
+   29.437346817000616,
+   18.924032377000003,
+   1.5389808720001383
+  ],
+  "a": [
+   2.2899424040006124,
+   1.499464378999619,
+   1.4875850220005304
+  ]
+ },
+ "last": {
+  "b": {
+   "tiles": 27,
+   "grid": [
+    3,
+    3,
+    3
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 12585,
+   "max_halo": 7574,
+   "max_edges": 937854,
+   "list_reused": true,
+   "list_rebuilds": 3,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 23680000,
+   "mode": "compiled",
+   "mode_reason": "configured",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.0950783690004755,
+   "lanes": "off: not measured faster on NVIDIA GeForce RTX 5060 Ti",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "6": [
+     12457,
+     7701,
+     844800
+    ],
+    "7": [
+     13845,
+     8332,
+     985600
+    ]
+   },
+   "slot_needs": {
+    "6": [
+     11323,
+     7000,
+     835874
+    ],
+    "7": [
+     12585,
+     7574,
+     937854
+    ]
+   },
+   "slot_changes": 5,
+   "local_frame": "tiles",
+   "compiled_graphs": "off: 3 capture pools and the warm-ups of 3.60 GiB (x1.1) do not fit 14.05 GiB",
+   "copy_stream": false,
+   "host_worker": false,
+   "tiles_s": 1.3027224850002312,
+   "graph_cache": {
+    "tiles": 27,
+    "bytes": 477720816,
+    "budget": 2847115404
+   },
+   "global_bytes": 1351680000,
+   "heap_trims": 1,
+   "heap_trim_s": 0.006,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 99739768,
+   "list_kept_pinned_bytes": 170704896,
+   "list_cache_hits": 0,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "state_dtype": null,
+   "state_dtype_reason": null
+  },
+  "a": {
+   "tiles": 27,
+   "grid": [
+    3,
+    3,
+    3
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 12585,
+   "max_halo": 7574,
+   "max_edges": 937854,
+   "list_reused": true,
+   "list_rebuilds": 3,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 23680000,
+   "mode": "compiled",
+   "mode_reason": "configured",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.09083139999984269,
+   "lanes": "off: not measured faster on NVIDIA GeForce RTX 5060 Ti",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "6": [
+     12457,
+     7701,
+     844800
+    ],
+    "7": [
+     13845,
+     8332,
+     985600
+    ]
+   },
+   "slot_needs": {
+    "6": [
+     11323,
+     7000,
+     835874
+    ],
+    "7": [
+     12585,
+     7574,
+     937854
+    ]
+   },
+   "slot_changes": 5,
+   "local_frame": null,
+   "compiled_graphs": "off: 3 capture pools and the warm-ups of 3.60 GiB (x1.1) do not fit 14.05 GiB",
+   "copy_stream": false,
+   "host_worker": false,
+   "tiles_s": 1.2787037999996755,
+   "graph_cache": {
+    "tiles": 27,
+    "bytes": 477720816,
+    "budget": 2847115404
+   },
+   "global_bytes": 1351680000,
+   "heap_trims": 1,
+   "heap_trim_s": 0.006,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 99739768,
+   "list_kept_pinned_bytes": 170704896,
+   "list_cache_hits": 0,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "state_dtype": null,
+   "state_dtype_reason": null
+  }
+ },
+ "blocks": [
+  {
+   "b": [
+    1.5511443619998317,
+    1.525150100999781
+   ],
+   "a": [
+    1.4941856880004707,
+    1.5029653089995918
+   ]
+  },
+  {
+   "b": [
+    1.5263880319998862,
+    1.5158883800004332
+   ],
+   "a": [
+    1.4957062369994674,
+    1.4951679609994244
+   ]
+  },
+  {
+   "b": [
+    1.5370255930001804,
+    1.521516654000152
+   ],
+   "a": [
+    1.5019022879996555,
+    1.491728274999332
+   ]
+  },
+  {
+   "b": [
+    1.5370519869993586,
+    1.524027221000324
+   ],
+   "a": [
+    1.4865599590002603,
+    1.5006323659999907
+   ]
+  }
+ ],
+ "result": {
+  "median_s": {
+   "b": 1.5257690664998336,
+   "a": 1.4954370989994459
+  },
+  "us_per_atom": {
+   "b": 4.76802833281198,
+   "a": 4.673240934373268
+  },
+  "ratio_b_over_a": 1.0202830112484718,
+  "pair_ratios": [
+   1.026406232478366,
+   1.0171863510795003,
+   1.0216832647300063,
+   1.024734558394872
+  ],
+  "energy_eV": {
+   "a": -2556655.902128846,
+   "b": -2556655.923264176
+  },
+  "energy_diff_meV_per_atom": -6.604790687561035e-05,
+  "forces_bitwise": false,
+  "max_force_diff": 8.456967771053314e-05,
+  "max_abs_force": 8.31185097922571e-05,
+  "max_stress_diff": 2.2351741790771484e-08,
+  "stress_bitwise": false
+ }
+}

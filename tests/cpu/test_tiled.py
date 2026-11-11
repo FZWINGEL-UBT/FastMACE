@@ -222,14 +222,25 @@ def big_structure(seed=8):
     return atoms
 
 
+@pytest.mark.parametrize("key", ["key", "two-sorts", "host-rows"])
 @pytest.mark.parametrize("split", [1, 2])
 @pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
-def test_tile_neighbours_are_bitwise_the_global_list(names, split):
+def test_tile_neighbours_are_bitwise_the_global_list(names, split, key, monkeypatch):
     """Each tile's edges from the cell bins (fastmace.neighbors.tile_list) are the global skin list's edges for
     those receivers after compact at the same positions: the same pairs, unit shifts and shifts, in the same order
     (with MH-1's rewrites the list sorts by sender group too), with cutoff-wide bins and a +-1 stencil and with
-    half-cutoff bins and a +-2 stencil (the default on this cell)."""
+    half-cutoff bins and a +-2 stencil (the default on this cell). "two-sorts": the order without the int64 key
+    (``KEY_LIMIT``; groups x natoms^2 past 2^63 above about 1e9 atoms) is the same. "host-rows": the positions
+    on the host (``rows_on_host``; billion-atom step 1), binned a chunk at a time and each tile's rows gathered there:
+    the same edges."""
+    from fastmace.neighbors import tile_list
     from fastmace.neighbors.tile_list import TileNeighbours
+
+    if key == "two-sorts":
+        monkeypatch.setattr(tile_list, "KEY_LIMIT", 1)
+    if key == "host-rows":
+        monkeypatch.setattr(tile_list, "rows_on_host", lambda positions, device: True)
+        monkeypatch.setattr(tile_list, "CHUNK", 1000)  # several chunks of the binning
 
     calc, atoms = calculator(), big_structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
@@ -423,6 +434,83 @@ def test_compiled_graphs_refuse_other_modes_host_state_lanes_and_the_cpu():
     with pytest.raises(ValueError, match="CUDA"):
         TiledForceField(MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER),
                         TileConfig(mode="auto", compiled_graphs=True))
+
+
+def test_compiled_graphs_none_is_off_where_the_configuration_or_device_refuses():
+    """``compiled_graphs=None`` (the default): no refusal anywhere; off off a CUDA device and off the GPU list."""
+    for kwargs in (dict(mode="padded"), dict(mode="compiled", state="host"), dict(mode="auto", lanes="on")):
+        TileConfig(5, **kwargs)  # None: these configurations run without graphs
+    with pytest.raises(ValueError, match="None, True or False"):
+        TileConfig(5, compiled_graphs="on")
+    calc, atoms = calculator(), structure()
+    tiled = TiledForceField(MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER), TileConfig(5))
+    assert tiled.config.compiled_graphs is None and not tiled._graphs_wanted() and not tiled._captured()
+
+
+def _guarded(receivers=8192, slots=3):
+    """A tiled field's guard state alone (no model): compiled tiles with ``compiled_graphs=True``."""
+    tiled = TiledForceField.__new__(TiledForceField)
+    tiled.config, tiled.mode, tiled.device = TileConfig(5, mode="compiled", compiled_graphs=True), "compiled", \
+        torch.device("cpu")
+    tiled.receivers, tiled._graph_gpu = receivers, False
+    tiled._graphs_fit, tiled._graph_memory, tiled.graphs_state = None, None, None
+    tiled._slots = {key: dict(graphs={1: object()}, graph_out={1: {}}, out={1: {}}) for key in range(slots)}
+    tiled._pool, tiled._graph_key = object(), (1,)
+    return tiled
+
+
+# The 16 GB RTX A4000 (trillian, 3 November 2026; results/tiled-1m-20261103/rtx-a4000-trillian): 975,560 SrTiO3
+# atoms at R 8,192 ran out of memory in the first call with graphs (7.15 GiB in private pools, 2.62 GiB more
+# requested). Its run without graphs measured the compiled call's tiles at 12,743,459,840 bytes peak over a base of
+# 5,236,912,128 in 3 slots; the card holds 16,743,333,888 bytes.
+A4000_WORKSPACE = 12_743_459_840 - 5_236_912_128
+A4000_AVAILABLE = 16_743_333_888 - 5_236_912_128  # at most: the whole card past the base
+
+
+def test_compiled_graphs_guard_turns_the_a4000_case_off():
+    from fastmace.model.tiled import compiled_graphs_fit
+
+    assert not compiled_graphs_fit(A4000_WORKSPACE, A4000_AVAILABLE, 3)
+    assert not compiled_graphs_fit(A4000_WORKSPACE, A4000_AVAILABLE, 1)  # not even one pool beside the warm-ups
+    assert compiled_graphs_fit(A4000_WORKSPACE, 80 * 2**30 - 5_236_912_128, 3)  # an 80 GB A100: room for all
+    tiled = _guarded()
+    tiled._choose_graphs((A4000_WORKSPACE, A4000_AVAILABLE), 3, 8192)
+    assert tiled._graphs_fit is False and not tiled._captured() and tiled.graphs_state.startswith("off: 3 capture")
+    tiled = _guarded()
+    tiled._choose_graphs((A4000_WORKSPACE, 80 * 2**30), 3, 8192)
+    assert tiled._graphs_fit is True and tiled._captured() and tiled.graphs_state.startswith("on")
+    tiled = _guarded(receivers=16384)  # the budget doubled the cap after the measured call: twice the workspace
+    tiled._choose_graphs((A4000_WORKSPACE, 40 * 2**30), 3, 8192)
+    assert tiled._graphs_fit is False and tiled._graph_memory[0] == 2 * A4000_WORKSPACE
+    tiled = _guarded()
+    tiled._choose_graphs(None, 3, 8192)
+    assert tiled._graphs_fit is False
+
+
+def test_compiled_graphs_guard_drops_the_graphs_for_more_slots_or_out_of_memory():
+    tiled = _guarded()
+    tiled._choose_graphs((A4000_WORKSPACE, 5 * 1.1 * A4000_WORKSPACE), 3, 8192)  # 4 pools fit, 5 do not
+    assert tiled._captured() and tiled._graphs_slots_fit(3) and tiled._graphs_slots_fit(4)
+    assert not tiled._graphs_slots_fit(5)
+    assert not tiled._captured() and tiled._pool is None and tiled._graph_key is None
+    assert all(not slot["graphs"] and "graph_out" not in slot and "out" not in slot for slot in tiled._slots.values())
+
+    tiled = _guarded()  # a captured call that runs out of memory runs again without graphs, at the same cap
+    tiled._graphs_fit = True
+    tiled.lanes_state, tiled._budget_raised, tiled._fallback, tiled._g, tiled._list_cache = "off", False, None, {}, {}
+    seen = []
+
+    def call(positions):
+        seen.append(tiled._captured())
+        if tiled._captured():
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory. Tried to allocate 2.62 GiB.")
+        tiled.last = {}
+        return "out"
+
+    tiled._call = call
+    assert tiled(None) == "out" and seen == [True, False] and tiled.receivers == 8192
+    assert tiled.graphs_state.startswith("off: out of device memory") and "compiled graphs off" in tiled._fallback
+    assert tiled.last["budget_fallback"] == tiled._fallback and tiled._g is None
 
 
 # ---------------------------------------------------------------- the species index instead of the one-hot
@@ -1248,6 +1336,134 @@ def test_virial_from_edge_gradients_is_the_strain_leafs_gradient(mode, monkeypat
         assert relative(edges[2], field.evaluate(current, stress=True)[2]) <= 1e-11
 
 
+@pytest.mark.parametrize("length", [226.5, 1210.5, 1562.0])
+def test_local_frame_edge_vectors_keep_float32_accuracy_in_any_box(length):
+    """``TILE_LOCAL_FRAME`` (idea 11): float32 edge vectors from the positions' 32 A bins and offsets, and the shift
+    rebuilt from its unit shift, stay within about 6e-6 A of float64 in a triclinic box of any size, also 1,500 A from
+    the origin and across the periodic boundary; the plain float32 vectors carry the coordinates' float32 spacing
+    (1.5e-5 A at 226 A, 1.2e-4 A from 1,024 A: the capacity records' residual force, 8x from 1M to 149M atoms)."""
+    from fastmace.model.tiled import TILE_LOCAL_FRAME_WIDTH, _frame_parts, _frame_vectors, _tile_vectors
+
+    rng = np.random.default_rng(11)
+    cell = torch.tensor([[length, 0, 0], [0.13 * length, length, 0], [-0.07 * length, 0.05 * length, length]],
+                        dtype=torch.float64)
+    n, e = 400, 4000
+    origin = 1500.0 if length < 1000 else 0.0
+    positions = torch.tensor(rng.uniform(0, 1, (n, 3)), dtype=torch.float64) @ cell + origin
+    receiver = torch.tensor(rng.integers(0, n, e))
+    unit = torch.tensor(rng.integers(-1, 2, (e, 3)), dtype=torch.float64)
+    d = torch.tensor(rng.uniform(-3.5, 3.5, (e, 3)), dtype=torch.float64)  # the edge vectors, within the cutoff
+    shift = unit @ cell
+    # each sender a copy of its receiver's image: v = p[r] - p[s] + shift = d
+    positions = torch.cat([positions, positions[receiver] - d + shift])
+    ei = torch.stack([torch.arange(n, n + e), receiver])
+    exact = positions[ei[1]] - positions[ei[0]] + shift
+    assert float((exact - d).abs().max()) < 1e-9
+    shifts32 = shift.to(torch.float32)
+    far = torch.tensor([13.0, 0.0, 0.0], dtype=torch.float32)  # padding edges as _tile_vectors
+    plain = _tile_vectors(positions.to(torch.float32), ei, shifts32, torch.ones(e), far).double()
+    bins, offsets = _frame_parts(positions, TILE_LOCAL_FRAME_WIDTH, torch.float32)
+    assert bins.dtype == torch.int16 and float(offsets.min()) >= 0 and float(offsets.max()) < TILE_LOCAL_FRAME_WIDTH
+    frame = (bins, offsets, cell, torch.linalg.inv(cell), TILE_LOCAL_FRAME_WIDTH)
+    local = _frame_vectors(frame, ei, shifts32, torch.ones(e), far)
+    assert local.dtype == torch.float32
+    plain_error, local_error = float((plain - exact).abs().max()), float((local.double() - exact).abs().max())
+    assert local_error <= 6e-6, (plain_error, local_error)  # two offsets and the remainder at ulp(32)/2, the sums
+    assert plain_error >= 5 * local_error, (plain_error, local_error)
+    mask = torch.ones(e)
+    mask[::7] = 0
+    padded = _frame_vectors(frame, ei, shifts32, mask, far)
+    assert torch.equal(padded[::7], far.expand(len(range(0, e, 7)), 3)) and torch.equal(padded[1::7], local[1::7])
+
+
+@pytest.mark.parametrize("length", [226.5, 1210.5, 1562.0])
+def test_tile_local_edge_vectors_keep_float32_accuracy_in_any_box(length):
+    """``TILE_LOCAL_FRAME``, tile-local form (idea 11): one tile of receivers within 40 A at the box's corner (its
+    halo across the periodic boundary, and the box 1,500 A from the origin), its rows relative to the first receiver
+    and each halo row at its edge's image, in float64 before the cast: the float32 vectors within 8e-6 A of float64
+    (the tile's extent, not the box's); the plain float32 vectors carry the box's float32 spacing."""
+    from fastmace.model.tiled import _tile_local, _tile_vectors
+
+    rng = np.random.default_rng(12)
+    cell = torch.tensor([[length, 0, 0], [0.13 * length, length, 0], [-0.07 * length, 0.05 * length, length]],
+                        dtype=torch.float64)
+    origin = 1500.0
+    corner = cell.sum(dim=0) + origin  # receivers around the far corner: most halo images wrap to the near side
+    r, e = 300, 3000
+    receivers = corner + torch.tensor(rng.uniform(-20, 20, (r, 3)), dtype=torch.float64)
+    receiver = torch.tensor(rng.integers(0, r, e))
+    d = torch.tensor(rng.uniform(-3.5, 3.5, (e, 3)), dtype=torch.float64)
+    image = receivers[receiver] - d  # the sender's image near the tile
+    fractional = (image - origin) @ torch.linalg.inv(cell)
+    unit = -torch.floor(fractional)  # the sender stored inside the box: p = image + unit @ cell
+    shift = unit @ cell
+    senders = image + shift
+    assert float(((senders - origin) @ torch.linalg.inv(cell)).min()) >= -1e-9
+    rows64 = torch.cat([receivers, senders])
+    local = torch.stack([torch.arange(r, r + e), receiver])
+    exact = rows64[local[1]] - rows64[local[0]] + shift
+    assert float((exact - d).abs().max()) < 1e-9 and int((unit != 0).any(dim=1).sum()) > e // 2
+    shifts32 = shift.to(torch.float32)
+    far = torch.tensor([13.0, 0.0, 0.0], dtype=torch.float32)
+    plain = _tile_vectors(rows64.to(torch.float32), local, shifts32, torch.ones(e), far).double()
+    rows, remaining = _tile_local(rows64, r, local, shifts32, cell, torch.linalg.inv(cell), torch.float32)
+    assert rows.dtype == torch.float32 and float(rows.abs().max()) < 64
+    assert torch.equal(remaining, torch.zeros_like(remaining))  # one image per halo row here
+    local_vectors = _tile_vectors(rows, local, remaining, torch.ones(e), far).double()
+    plain_error, local_error = float((plain - exact).abs().max()), float((local_vectors - exact).abs().max())
+    assert local_error <= 8e-6, (plain_error, local_error)
+    assert plain_error >= 5 * local_error, (plain_error, local_error)
+    # a halo atom reached through a second image keeps its first edge's image; the other edge's shift remains
+    twice = torch.cat([local, torch.tensor([[r], [0]])], dim=1)
+    other = torch.cat([shifts32, (shift[0] + cell[0]).to(torch.float32).unsqueeze(0)])
+    rows2, remaining2 = _tile_local(rows64, r, twice, other, cell, torch.linalg.inv(cell), torch.float32)
+    assert torch.equal(rows2, rows) and torch.equal(remaining2[:e], remaining)
+    assert float((remaining2[e].double() - cell[0]).abs().max()) <= float(torch.finfo(torch.float32).eps) * length
+    # The padded slot form (in the tile body): same accuracy, padding rows and edges masked, the second image's
+    # shift remaining.
+    from fastmace.model.tiled import _slot_local, _slot_local_vectors
+
+    pad_rows, pad_edges = 7, 11
+    count = r + e + pad_rows
+    nodes = torch.cat([torch.arange(r + e), torch.zeros(pad_rows, dtype=torch.long)])
+    node_mask = torch.cat([torch.ones(r + e), torch.zeros(pad_rows)])
+    slot_local = torch.cat([twice, torch.zeros((2, pad_edges), dtype=torch.long)], dim=1)
+    edge_mask = torch.cat([torch.ones(e + 1), torch.zeros(pad_edges)])
+    slot_shifts = torch.cat([other, torch.full((pad_edges, 3), 7.0)])
+    inverse = torch.linalg.inv(cell)
+    rows3, remaining3 = _slot_local(rows64, nodes, node_mask, slot_local, edge_mask, slot_shifts, cell, inverse, r,
+                                    torch.float32)
+    assert rows3.shape == (count, 3) and float(rows3[r + e:].abs().max()) == 0.0
+    assert float(rows3.abs().max()) < 64 and torch.equal(remaining3[:e], torch.zeros_like(remaining3[:e]))
+    assert float((remaining3[e].double() - cell[0]).abs().max()) <= float(torch.finfo(torch.float32).eps) * length
+    slot_vectors = _slot_local_vectors(rows64, nodes, node_mask, slot_local, edge_mask, slot_shifts, cell, inverse,
+                                       r, torch.float32, far).double()
+    assert float((slot_vectors[:e] - exact).abs().max()) <= 8e-6
+    second = rows64[0] - rows64[r] + shift[0] + cell[0]
+    assert float((slot_vectors[e] - second).abs().max()) <= 8e-6 + float(torch.finfo(torch.float32).eps) * length
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_local_frame_call_is_the_whole_system_call_far_from_the_origin(mode, monkeypatch):
+    """``TILE_LOCAL_FRAME`` in the tiled call (float64 model): far from the origin and strained, the energy, forces and
+    stress are the whole-system call's to float64 rounding, as without the frame."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "TILE_LOCAL_FRAME", True)
+    calc, atoms = calculator(), structure()
+    moved = atoms.copy()
+    moved.positions = moved.positions + np.array([1500.0, -700.0, 333.0])
+    field = MACEForceField(calc, moved, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True)
+    tiled = TiledForceField(field, TileConfig(5, mode=mode))
+    for current in (moved, strained(moved)):
+        expected = field.evaluate(current, stress=True)
+        got = tiled.evaluate(current, stress=True)
+        assert tiled.last["local_frame"] == "tiles"
+        assert got[0] == pytest.approx(expected[0], rel=1e-12, abs=0)
+        assert relative(got[1], expected[1]) <= 1e-10
+        assert relative(got[2], expected[2]) <= 1e-10
+
+
 @pytest.mark.parametrize("virial", [False, True], ids=["strain-leaf", "virial"])
 @pytest.mark.parametrize("mode", ["eager", "padded"])
 def test_epilogue_is_bitwise_the_eager_epilogue_outside_compiled_mode(mode, virial, monkeypatch):
@@ -1800,3 +2016,155 @@ def test_out_of_memory_at_a_budget_raised_cap_retries_at_the_lower_cap(mode, mon
         tiled.receivers = 40  # the configured cap itself: nothing lower to fall back to
         tiled._budget_raised = False
         tiled.evaluate(atoms)
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_host_rows_call_is_bitwise_the_device_rows_call(mode, monkeypatch):
+    """``TILE_HOST_ROWS`` (billion-atom step 1): the call's float64 positions on the host (``rows_on_host``; one
+    device here), the float32 copy made a chunk at a time, the tile lists' rows and the tile-local frame's rows
+    gathered on the host per tile (a padded slot's ``rows64``): energy, forces and stress bitwise the call with
+    the positions on the device, far from the origin and strained."""
+    from fastmace.model import tiled as tiled_module
+    from fastmace.neighbors import tile_list
+
+    monkeypatch.setattr(tiled_module, "TILE_LOCAL_FRAME", True)
+    calc, atoms = calculator(), big_structure()
+    moved = atoms.copy()
+    moved.positions = moved.positions + np.array([1500.0, -700.0, 333.0])
+    field = MACEForceField(calc, moved, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = {}
+    for host in (False, True):
+        if host:
+            monkeypatch.setattr(tile_list, "rows_on_host", lambda positions, device: True)
+            monkeypatch.setattr(tile_list, "CHUNK", 1000)
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles"))
+        tiled.evaluate(moved, stress=True)  # TorchScript's first call in a process rounds differently
+        results[host] = [tiled.evaluate(current, stress=True) for current in (strained(moved), moved)]
+        assert tiled.last["local_frame"] == "tiles" and tiled.last["tiles"] > 1
+        if host and mode == "padded":
+            assert all("rows64" in slot for slot in tiled._slots.values())
+    for device, host in zip(results[False], results[True]):
+        assert host[0] == device[0]
+        assert np.array_equal(host[1], device[1]) and np.array_equal(host[2], device[2])
+
+
+def test_host_positions_need_the_tile_lists_and_are_a_view():
+    """``_prepare_one_off(host=True)``: refused with the global list (it compacts on the device); without it the
+    atoms' own float64 array, not a copy."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    with pytest.raises(ValueError, match="global_list=False"):
+        field._prepare_one_off(atoms, host=True)
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(), global_list=False)
+    positions = field._prepare_one_off(atoms, host=True)
+    assert positions.dtype == torch.float64 and positions.device.type == "cpu"
+    assert np.shares_memory(positions.numpy(), atoms.arrays["positions"])
+
+
+def test_released_species_maps_are_uint8_with_the_same_values():
+    """``release_whole_system``: the species index and sender groups (and their tables) as uint8 where every
+    column and group is below 256 (billion-atom step 1: 6 bytes per atom), the same values, at the construction
+    and after it; ``node_e0`` the same."""
+    calc, atoms = calculator(), structure()
+    kept = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    species, groups, e0 = kept._species_index.long(), kept._sender_groups.long(), kept.node_e0()
+    for whole in (True, False):
+        field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE),
+                               release_node_attrs=True, release_whole_system=whole)
+        if not whole:
+            field.release_whole_system()
+        for name in ("_species_index", "_sender_groups", "_column_of", "_group_of"):
+            assert getattr(field, name).dtype == torch.uint8, name
+        assert torch.equal(field._species_index.long(), species)
+        assert torch.equal(field._sender_groups.long(), groups)
+        assert torch.equal(field.node_e0(), e0)
+
+
+def test_large_caps_join_a_default_budget_of_host_state_calls_only(monkeypatch):
+    """``TILE_LARGE_CAPS`` (B3): a host-state call with the default budget may take caps 32,768 and 65,536 (where the
+    budget fits them); an explicit budget, the device state and the switch off leave the budget as it was."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", True)
+    large = (8192, 16384, 32768, 65536)
+    assert TiledForceField(field, TileConfig(5, mode="auto", state="host")).config.budget_receivers == large
+    assert TiledForceField(field, TileConfig(5, mode="auto")).config.budget_receivers == (8192, 16384)
+    explicit = TileConfig(5, mode="auto", state="host", budget_receivers=(8192,))
+    assert TiledForceField(field, explicit).config.budget_receivers == (8192,)
+    assert TiledForceField(field, TileConfig(5, mode="padded", state="host")).config.budget_receivers == ()
+    monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", None)  # on the CPU: not an A100
+    assert TiledForceField(field, TileConfig(5, mode="auto", state="host")).config.budget_receivers == (
+        8192, 16384)
+
+
+def test_large_caps_need_room_on_the_host(monkeypatch):
+    """``TILE_LARGE_CAP_HOST_BYTES`` (the large caps' size rule): the budget takes 32,768 or 65,536 only where the host
+    keeps their per-receiver host bytes (plus 10 %) above ``list_reuse_floor``; the device budget alone decides the
+    smaller caps."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", True)
+    per = tiled_module.TILE_LARGE_CAP_HOST_BYTES
+    chosen = {}
+    for name, extra in (("plenty", 1.1 * per * (65536 - 8192) + 1), ("half", 1.1 * per * (32768 - 8192) + 1),
+                        ("short", -1), ("unknown", None)):
+        tiled = TiledForceField(field, TileConfig(8192, mode="auto", state="host"))
+        floor = int(tiled.config.list_reuse_floor)
+        monkeypatch.setattr(tiled_module, "_host_available", lambda extra=extra: None if extra is None
+                            else int(floor + extra))
+        tiled._choose_receivers((8192 * 1000, 10**12))  # the device fits every cap
+        chosen[name] = tiled.receivers
+    assert chosen == {"plenty": 65536, "half": 32768, "short": 16384, "unknown": 65536}
+
+
+def test_first_call_probe_runs_the_largest_tiles_then_the_whole_call_bitwise(monkeypatch):
+    """``TILE_FIRST_CALL_PROBE``: mode "auto"'s measuring call runs the sweeps of the ``TILE_PROBE_TILES`` largest
+    tiles only, then the call runs again (here eager: no device memory measurement), bitwise the call without the
+    probe; a call that is not measuring runs no probe."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "TILE_PROBE_TILES", 2)
+    calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results, probes = [], []
+    for probe in (False, True):
+        monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", probe)
+        tiled = TiledForceField(field, TileConfig(12, neighbours="tiles", state="host", alias_state=True,
+                                                  wavefront="on", list_reuse_floor=2**21))
+        tiled._auto = True  # as for a compiled force field
+        results.append([tiled.evaluate(atoms), tiled.evaluate(strained(atoms))])
+        probes.append(tiled.last.get("probe"))
+        assert tiled.last["wavefront"]["on"] and tiled.last["tiles"] > 4
+    assert probes[0] is None and probes[1] is None  # the second call measures nothing
+    for plain, probed in zip(*results):
+        assert plain[0] == probed[0]
+        np.testing.assert_array_equal(plain[1], probed[1])
+
+    monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", True)
+    tiled = TiledForceField(field, TileConfig(12, neighbours="tiles", state="host", alias_state=True,
+                                              wavefront="on", list_reuse_floor=2**21))
+    tiled._auto = True
+    energy, forces, _ = tiled.evaluate(atoms)
+    probe = tiled.last["probe"]
+    assert len(probe["tiles"]) == 2 and probe["steps"] == 6 and probe["mode"] == "eager"
+    assert energy == results[0][0][0]
+    np.testing.assert_array_equal(forces, results[0][0][1])
+
+
+def test_first_call_probe_needs_the_wavefront(monkeypatch):
+    """Without the wavefront the measuring call runs whole, once (no probe)."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", True)
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    tiled = TiledForceField(field, TileConfig(5, wavefront="off"))
+    tiled._auto = True
+    tiled.evaluate(atoms)
+    assert "probe" not in tiled.last and tiled.list_rebuilds <= 1

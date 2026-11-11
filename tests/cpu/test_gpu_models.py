@@ -305,6 +305,10 @@ def test_h200_defaults():
     # 16x16x16 MD H200 0.9767 / 0.9833, A100-SXM4 0.9765 / 0.9776 (10x10x10: H200 a tie, A100 1.0038 / 1.0044)
     from fastmace.neighbors import pair_search
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"} <= set(pair_search.BINNED_SCREEN_GPUS)
+    # RTX 5060 Ti (11 November 2026, binned-screen-5060ti): 16x16x16 0.9812 / 0.9769, 20x20x20 0.9614
+    assert "NVIDIA GeForce RTX 5060 Ti" in pair_search.BINNED_SCREEN_GPUS
+    # RTX 4000 Ada (11 November 2026, binned-screen-ada): 16x16x16 0.9846 / 0.9810, 20x20x20 0.9657 / 0.9602
+    assert "NVIDIA RTX 4000 Ada Generation" in pair_search.BINNED_SCREEN_GPUS
     assert 5_000 < pair_search.BINNED_MIN_ATOMS <= 20_480
     assert "NVIDIA H200" not in edge_outer_sum.BACKWARD_WALK_GPUS
     assert "NVIDIA H200" not in fused_forward.WGMMA_GPUS  # 1.024 / 1.025, pipelined 1.035 / 1.033

@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import re
+import os
 import subprocess
 import tarfile
 from datetime import datetime, timezone
@@ -116,13 +117,24 @@ def test_ledger_header_once_and_rows(tmp_path):
     assert rows[0]["commands"] == "pytest -m compat ; echo, \"hi\""
 
 
+@pytest.fixture(autouse=True)
+def _git_independent_of_the_machine(monkeypatch):
+    """Every git process of these tests (the temporary repos and the driver's own ``rev-parse`` and ``archive``) reads
+    no global or system configuration and gets an identity and ``safe.directory=*`` from the environment (command-line
+    scope, which git trusts): on murphy a temporary repo on the NAS (/mnt/homes) failed git's ownership check (exit
+    128, "dubious ownership"), and there is no global identity there."""
+    for key, value in {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_COUNT": "3",
+                       "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*",
+                       "GIT_CONFIG_KEY_1": "user.email", "GIT_CONFIG_VALUE_1": "t@t",
+                       "GIT_CONFIG_KEY_2": "user.name", "GIT_CONFIG_VALUE_2": "t"}.items():
+        monkeypatch.setenv(key, value)
+
+
 def _git_repo(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
-    run("init", "-q")
-    run("config", "user.email", "t@t")
-    run("config", "user.name", "t")
+    run("init", "-q")  # identity and safe.directory: ``_git_independent_of_the_machine``
     (repo / "a.txt").write_text("one\n")
     run("add", "a.txt")
     run("commit", "-q", "-m", "one")
@@ -153,8 +165,8 @@ def test_payload_holds_source_commands_models_and_baseline(tmp_path):
 class FakeColab:
     """The colab CLI as the driver sees it: canned results per subcommand, every call recorded."""
 
-    def __init__(self, fail_on=None, interrupt_on=None, capability="12.0", cache_changed=True, live=()):
-        self.calls, self.fail_on, self.interrupt_on, self.live = [], fail_on, interrupt_on, live
+    def __init__(self, fail_on=None, interrupt_on=None, capability="12.0", cache_changed=True, live=(), parts=()):
+        self.calls, self.fail_on, self.interrupt_on, self.live, self.parts = [], fail_on, interrupt_on, live, parts
         self.capability, self.cache_changed = capability, cache_changed
         self.balance = 198.99
 
@@ -179,7 +191,8 @@ class FakeColab:
             log = ""
             if stage == "probe":
                 log = json.dumps(dict(gpu_name="NVIDIA RTX PRO 6000 Blackwell Server Edition", driver="580.82.07",
-                                      capability=self.capability, cuda_driver="13.0", cpus=48, ram_gib=176.0))
+                                      capability=self.capability, cuda_driver="13.0", cpus=48, ram_gib=176.0,
+                                      cache_parts=list(self.parts)))
             if stage == "pack":
                 log = "caches changed: 10M" if self.cache_changed else "caches unchanged"
             return log + "\n@@STEP " + json.dumps(dict(step=step, state="done", exit=0, seconds=3)) + "\n"
@@ -423,3 +436,86 @@ def test_polls_give_up_after_repeated_failures_but_salvage_the_records(tmp_path,
     assert fc.stop_args("t1") in fake.calls
     assert "pack" in fake.stages()  # the records were packed and downloaded before the stop
     assert (tmp_path / "out" / "out" / "setup.json").exists()
+
+
+def test_warm_names_its_session_and_keeps_it():
+    args = fc.parse_args(["--gpu", "A100", "--warm", "--command", "x", "--out", "/x"])
+    assert args.session == "fm-a100-warm" and args.reuse and args.keep and args.idle_stop_min == 20.0
+    with pytest.raises(SystemExit):
+        fc.parse_args(["--gpu", "A100", "--warm", "--session", "other", "--command", "x", "--out", "/x"])
+
+
+def test_warm_vm_gets_only_the_cache_parts_it_lacks_and_marks_its_own(tmp_path, monkeypatch):
+    started = []
+    monkeypatch.setattr(fc, "start_idle_stop", lambda *a: started.append(a))
+    args = _job_args(tmp_path)
+    first = fc.run_job(args, FakeColab())  # store part 000
+    fc.run_job(args, FakeColab(cache_changed=True))  # store part 001
+    key = first["cache_key"]
+    warm = fc.argparse.Namespace(**vars(args))
+    warm.session, warm.reuse, warm.keep, warm.warm = "fm-g4-warm", True, True, True
+    colab = FakeColab(live=("fm-g4-warm",), parts=(f"{key}/000.tar.gz", "sm80-py310-other/001.tar.gz"))
+    record = fc.run_job(warm, colab)
+    assert [c[-1] for c in colab.calls if c[1] == "upload" and "cache-in" in c[-1]] == [
+        "/content/fm_cache-in-001.tar.gz"]  # 000 is on the VM; the other key's 001 is not this one
+    assert record["cache_parts_on_vm"] == ["000.tar.gz"] and "new" not in colab.subcommands()
+    restore = next(c for c in colab.calls if "STAGE=restore" in c)
+    assert f"ARG={key}" in restore
+    # the changed caches became part 002, which the kept VM holds already: marked, and the VM stays
+    mark = [c for c in colab.calls if "STAGE=mark" in c]
+    assert colab.stages()[-1] == "mark" and len(mark) == 1 and f"ARG={key}/002.tar.gz" in mark[0]
+    assert "stop" not in colab.subcommands() and started == []
+    assert fc.warm_lock_path(warm.store, "fm-g4-warm").exists()
+
+
+def test_a_warm_vm_allocated_by_a_job_gets_its_idle_stop(tmp_path, monkeypatch):
+    started = []
+    monkeypatch.setattr(fc, "start_idle_stop", lambda *a: started.append(a))
+    warm = _job_args(tmp_path)
+    warm.session, warm.reuse, warm.keep, warm.warm = "fm-g4-warm", True, True, True
+    colab = FakeColab()
+    fc.run_job(warm, colab)
+    assert "new" in colab.subcommands() and "stop" not in colab.subcommands()
+    assert len(started) == 1 and started[0][:2] == ("fm-g4-warm", 20.0)
+
+
+def test_idle_stop_waits_for_jobs_and_idleness(tmp_path):
+    store = tmp_path / "store"
+    lock = fc.warm_lock_path(store, "w")
+    lock.parent.mkdir(parents=True)
+    lock.touch()
+    now = {"t": lock.stat().st_mtime}
+    calls = []
+
+    def colab(argv, timeout=None):
+        calls.append(argv)
+        return "[w] gpu-x | Hardware: A100\n" if argv[1] == "sessions" else ""
+
+    def sleep(seconds):
+        now["t"] += seconds
+
+    assert fc.idle_stop("w", 3, store, colab=colab, clock=lambda: now["t"], sleep=sleep) is True
+    assert fc.stop_args("w") in calls
+    assert now["t"] - lock.stat().st_mtime >= 180  # it stopped only once three idle minutes had passed
+    stops = [c for c in calls if c[1] == "stop"]
+    assert len(stops) == 1 and len([c for c in calls if c[1] == "sessions"]) == 3
+
+
+def test_idle_stop_leaves_a_busy_vm_and_ends_when_it_is_gone(tmp_path):
+    store = tmp_path / "store"
+    sessions = iter(["[w] x\n", "[w] x\n", ""])
+    calls = []
+
+    def colab(argv, timeout=None):
+        calls.append(argv)
+        return next(sessions) if argv[1] == "sessions" else ""
+
+    with fc.warm_lock(store, "w"):  # a job holds the VM: never stopped under it
+        import threading
+
+        result = {}
+        thread = threading.Thread(target=lambda: result.update(
+            r=fc.idle_stop("w", 0, store, colab=colab, sleep=lambda s: None)))
+        thread.start()
+        thread.join(10)
+    assert result["r"] is False and not any(c[1] == "stop" for c in calls)

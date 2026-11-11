@@ -1,0 +1,80 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/home/fzwin/fm-runs/tiled-speed-20261108/src-cf76159a/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/fm-runs/tiled-speed-20261108/src-cf76159a/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/fm-runs/tiled-speed-20261108/src-cf76159a/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/home/fzwin/fm-runs/tiled-speed-20261108/src-cf76159a/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+W1111 11:38:12.072000 13348 torch/_inductor/utils.py:1806] [0/0] Not enough SMs to use max_autotune_gemm mode
+{"offset": 0.0, "kind": "perfect", "path": "whole", "energy": -8628.713588921795, "max_force": 1.8875522073358297e-05}
+{"offset": 0.0, "kind": "perfect", "path": "tiled-frame-off", "energy": -8628.71329948169, "max_force": 1.9452680135145783e-05}
+{"offset": 0.0, "kind": "perfect", "path": "tiled-frame-on", "energy": -8628.713179557144, "max_force": 4.584086127579212e-06}
+{"offset": 0.0, "kind": "rattled", "path": "whole", "energy": -8613.18672796942, "max_force": 2.0479888916015625}
+{"offset": 0.0, "kind": "rattled", "path": "tiled-frame-off", "energy": -8613.186682908356, "max_force": 2.047987222671509}
+{"offset": 0.0, "kind": "rattled", "path": "tiled-frame-on", "energy": -8613.186661212265, "max_force": 2.0479912757873535}
+{"offset": 200.0, "kind": "perfect", "path": "whole", "energy": -8628.713884799256, "max_force": 8.076918311417103e-05, "max_diff_from_origin": 8.26459954623715e-05, "rel_diff_from_origin": 4.3784746795968905}
+{"offset": 200.0, "kind": "perfect", "path": "tiled-frame-off", "energy": -8628.713537900268, "max_force": 8.324836380779743e-05, "max_diff_from_origin": 8.545752643840387e-05, "rel_diff_from_origin": 4.39309780681609}
+{"offset": 200.0, "kind": "perfect", "path": "tiled-frame-on", "energy": -8628.713169543564, "max_force": 3.95604138248018e-06, "max_diff_from_origin": 2.304092049598694e-06, "rel_diff_from_origin": 0.5026284379206135}
+{"offset": 200.0, "kind": "rattled", "path": "whole", "energy": -8613.186756341232, "max_force": 2.0482265949249268, "max_diff_from_origin": 0.0003147125244140625, "rel_diff_from_origin": 0.00015366905831601065}
+{"offset": 200.0, "kind": "rattled", "path": "tiled-frame-off", "energy": -8613.186717002212, "max_force": 2.048227071762085, "max_diff_from_origin": 0.0003135800361633301, "rel_diff_from_origin": 0.0001531162073141642}
+{"offset": 200.0, "kind": "rattled", "path": "tiled-frame-on", "energy": -8613.186669795334, "max_force": 2.047996997833252, "max_diff_from_origin": 2.9802322387695312e-05, "rel_diff_from_origin": 1.4551977217890131e-05}
+{"offset": 1500.0, "kind": "perfect", "path": "whole", "energy": -8628.713361708893, "max_force": 0.001330133993178606, "max_diff_from_origin": 0.001331586972810328, "rel_diff_from_origin": 70.54570292865094}
+{"offset": 1500.0, "kind": "perfect", "path": "tiled-frame-off", "energy": -8628.71354099971, "max_force": 0.0013301592553034425, "max_diff_from_origin": 0.0013326401822268963, "rel_diff_from_origin": 68.50676477320842}
+{"offset": 1500.0, "kind": "perfect", "path": "tiled-frame-on", "energy": -8628.713174311935, "max_force": 4.0944346437754575e-06, "max_diff_from_origin": 2.7964568154459357e-06, "rel_diff_from_origin": 0.6100358365043859}
+{"offset": 1500.0, "kind": "rattled", "path": "whole", "energy": -8613.186683623564, "max_force": 2.046632766723633, "max_diff_from_origin": 0.002694070339202881, "rel_diff_from_origin": 0.0013154711679593495}
+{"offset": 1500.0, "kind": "rattled", "path": "tiled-frame-off", "energy": -8613.18653961879, "max_force": 2.046632766723633, "max_diff_from_origin": 0.002695798873901367, "rel_diff_from_origin": 0.0013163162563020372}
+{"offset": 1500.0, "kind": "rattled", "path": "tiled-frame-on", "energy": -8613.186670987427, "max_force": 2.0479979515075684, "max_diff_from_origin": 2.968311309814453e-05, "rel_diff_from_origin": 1.449376930901857e-05}
+summary
+      0  perfect           whole max|F| 1.888e-05 diff 0.000e+00 rel 0.00e+00
+      0  perfect tiled-frame-off max|F| 1.945e-05 diff 0.000e+00 rel 0.00e+00
+      0  perfect  tiled-frame-on max|F| 4.584e-06 diff 0.000e+00 rel 0.00e+00
+      0  rattled           whole max|F| 2.048e+00 diff 0.000e+00 rel 0.00e+00
+      0  rattled tiled-frame-off max|F| 2.048e+00 diff 0.000e+00 rel 0.00e+00
+      0  rattled  tiled-frame-on max|F| 2.048e+00 diff 0.000e+00 rel 0.00e+00
+    200  perfect           whole max|F| 8.077e-05 diff 8.265e-05 rel 4.38e+00
+    200  perfect tiled-frame-off max|F| 8.325e-05 diff 8.546e-05 rel 4.39e+00
+    200  perfect  tiled-frame-on max|F| 3.956e-06 diff 2.304e-06 rel 5.03e-01
+    200  rattled           whole max|F| 2.048e+00 diff 3.147e-04 rel 1.54e-04
+    200  rattled tiled-frame-off max|F| 2.048e+00 diff 3.136e-04 rel 1.53e-04
+    200  rattled  tiled-frame-on max|F| 2.048e+00 diff 2.980e-05 rel 1.46e-05
+   1500  perfect           whole max|F| 1.330e-03 diff 1.332e-03 rel 7.05e+01
+   1500  perfect tiled-frame-off max|F| 1.330e-03 diff 1.333e-03 rel 6.85e+01
+   1500  perfect  tiled-frame-on max|F| 4.094e-06 diff 2.796e-06 rel 6.10e-01
+   1500  rattled           whole max|F| 2.047e+00 diff 2.694e-03 rel 1.32e-03
+   1500  rattled tiled-frame-off max|F| 2.047e+00 diff 2.696e-03 rel 1.32e-03
+   1500  rattled  tiled-frame-on max|F| 2.048e+00 diff 2.968e-05 rel 1.45e-05

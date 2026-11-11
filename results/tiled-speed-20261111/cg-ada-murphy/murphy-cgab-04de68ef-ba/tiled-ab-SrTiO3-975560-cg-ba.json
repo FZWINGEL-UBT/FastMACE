@@ -1,0 +1,292 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  58,
+  58,
+  58
+ ],
+ "atoms": 975560,
+ "model": "omat0-medium",
+ "order": "ba",
+ "a": [
+  "config:compiled_graphs=False"
+ ],
+ "b": [
+  "config:compiled_graphs=True"
+ ],
+ "receivers": 8192,
+ "mode": "compiled",
+ "host_state": false,
+ "alias_state": false,
+ "wavefront": "auto",
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "source_commit": "04de68ef",
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=5.716314943273929e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.279755298938403e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.722647624453153e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.7445807662076195e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_fold_product_linear', result=CheckResult(passed=True, max_relative_error=4.970337440350773e-07, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['products.0.linear', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'readouts.0.linear', 'interactions.0.linear', 'interactions.0.skip_tp', 'products.1.linear', 'interactions.1.skip_tp', 'readouts.1.linear_1'])",
+  "AppliedRewrite(name='tf32x3_gemms', result=CheckResult(passed=True, max_relative_error=3.9655253091721805e-07, threshold=0.0001, modules=12, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.skip_tp', 'interactions.0.first_reassociation', 'interactions.1.linear_up', 'interactions.1.linear', 'interactions.1.skip_tp', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.11064092067543e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (892 pieces, 9 pairs, certificate 0.34, cached)', 'interactions.1 (622 pieces, 9 pairs, certificate 0.36, cached)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.1723467920849276e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB; spline 731 intervals, certificate 0.48)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=2.265465478596652e-16, threshold=1e-10, modules=4, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "warmup": {
+  "b": [
+   37.448155962862074,
+   32.912420467007905,
+   5.443718719063327
+  ],
+  "a": [
+   7.074213313870132,
+   5.489868490956724,
+   5.497335980879143
+  ]
+ },
+ "last": {
+  "b": {
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": true,
+   "list_rebuilds": 3,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "configured",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.14499456784687936,
+   "lanes": "off: needs PyTorch's cudaMallocAsync allocator backend (PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync before CUDA starts), not native",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 6,
+   "compiled_graphs": "off: 3 capture pools and the warm-ups of 8.63 GiB (x1.1) do not fit 18.70 GiB",
+   "copy_stream": false,
+   "host_worker": false,
+   "tiles_s": 5.224137039855123,
+   "graph_cache": {
+    "tiles": 68,
+    "bytes": 1455992184,
+    "budget": 2684792934
+   },
+   "global_bytes": 4120765440,
+   "heap_trims": 1,
+   "heap_trim_s": 0.023,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 303814192,
+   "list_kept_pinned_bytes": 412353216,
+   "list_cache_hits": 0,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "state_dtype": null,
+   "state_dtype_reason": null
+  },
+  "a": {
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": true,
+   "list_rebuilds": 3,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "configured",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.14551627892069519,
+   "lanes": "off: needs PyTorch's cudaMallocAsync allocator backend (PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync before CUDA starts), not native",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 6,
+   "compiled_graphs": "off",
+   "copy_stream": false,
+   "host_worker": false,
+   "tiles_s": 5.228238428942859,
+   "graph_cache": {
+    "tiles": 68,
+    "bytes": 1455992184,
+    "budget": 2684792934
+   },
+   "global_bytes": 4120765440,
+   "heap_trims": 1,
+   "heap_trim_s": 0.023,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 303814192,
+   "list_kept_pinned_bytes": 412353216,
+   "list_cache_hits": 0,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "state_dtype": null,
+   "state_dtype_reason": null
+  }
+ },
+ "blocks": [
+  {
+   "b": [
+    5.506325796013698,
+    5.498524850932881
+   ],
+   "a": [
+    5.5094212151598185,
+    5.522703147958964
+   ]
+  },
+  {
+   "b": [
+    5.524047309998423,
+    5.531941541004926
+   ],
+   "a": [
+    5.5163425779901445,
+    5.522789787966758
+   ]
+  },
+  {
+   "b": [
+    5.536859536077827,
+    5.530004062922671
+   ],
+   "a": [
+    5.531656484119594,
+    5.531648868927732
+   ]
+  },
+  {
+   "b": [
+    5.539571573957801,
+    5.535799811827019
+   ],
+   "a": [
+    5.534357005031779,
+    5.539551790105179
+   ]
+  }
+ ],
+ "result": {
+  "median_s": {
+   "b": 5.530972801963799,
+   "a": 5.527219328447245
+  },
+  "us_per_atom": {
+   "b": 5.66953626836258,
+   "a": 5.665688761785277
+  },
+  "ratio_b_over_a": 1.0006790889402988,
+  "pair_ratios": [
+   0.997527791087691,
+   1.0015269755346379,
+   1.0003216259372423,
+   1.0001320753741898
+  ],
+  "energy_eV": {
+   "a": -7794284.295835318,
+   "b": -7794284.295690836
+  },
+  "energy_diff_meV_per_atom": 1.4810125357286776e-07,
+  "forces_bitwise": false,
+  "max_force_diff": 3.9389124140143394e-06,
+  "max_abs_force": 0.00016710441559553146,
+  "max_stress_diff": 1.0312695142289385e-11,
+  "stress_bitwise": false
+ }
+}

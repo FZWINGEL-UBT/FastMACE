@@ -65,6 +65,31 @@ TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Genera
 # RTX 4000 Ada device state 0.868 / 0.868, wavefront 0.772 / 0.769; A100-SXM4-80GB 0.792 / 0.789 and 0.782 / 0.785
 # (every A100 model: GPUModels matches the family).
 TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# TileConfig.compiled_graphs None: on for these GPU families (decision 66: where a same-process A/B measured the
+# captured compiled bodies faster in both orders), device state only, and only where the memory guard below fits.
+# A100-SXM4-80GB 0.569 / 0.571 at 975,560 SrTiO3 atoms (Alex 4981483; the host-bound call: GPU idle 52 % in nsys), gate
+# 3x passed with it on (Alex 4982466); every A100 model (GPUModels matches the family). RTX 5060 Ti: no gain (30^3
+# 1.007 / 0.990, 40^3 0.998; local job 49), not listed.
+COMPILED_GRAPH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# The memory guard of TileConfig.compiled_graphs (on or None): the first compiled call runs uncaptured and measures its
+# tile workspace; the bodies are captured from the next call on when ``available`` holds one capture pool of that
+# workspace per slot, plus the uncaptured warm-ups' own workspace, each with this margin (``compiled_graphs_fit``).
+# A captured call that still runs out of device memory drops its graphs and runs again without them.
+COMPILED_GRAPH_MARGIN = 1.1
+
+
+def _tile_list():
+    """``fastmace.neighbors.tile_list``, imported when a call needs it (it imports torch; this module stays importable
+    without it, as the gate driver's subprocess needs)."""
+    from fastmace.neighbors import tile_list
+
+    return tile_list
+
+
+def compiled_graphs_fit(workspace, available, slots):
+    """Whether ``slots`` capture pools of a measured tile ``workspace`` (bytes), and the warm-ups' workspace beside
+    them, fit ``available`` bytes (the guard of ``TileConfig.compiled_graphs``)."""
+    return (int(slots) + 1) * COMPILED_GRAPH_MARGIN * float(workspace) <= float(available)
 # TILE_PREFETCH_DEVICE (exact): TileConfig.prefetch also with the state on the device, where it builds the next tile's
 # graph on the side stream while the current tile runs (its rows are read in the body, as before). Without it a
 # device-state call built each graph after the previous body had drained the GPU (torch.unique and the edge counts
@@ -110,6 +135,56 @@ TILE_FILTER32 = None
 # call at 975,560 SrTiO3 atoms). The gradients are the same products; the virial's and the objective's sums change
 # their order.
 TILE_EPILOGUE = None
+# TILE_LOCAL_FRAME (accuracy; idea 11, results/tiled-speed-20261111 "Idea 11"): the tiles' edge vectors from positions
+# held as an int16 bin of TILE_LOCAL_FRAME_WIDTH Angstrom plus a float32 offset within it, and each edge's shift
+# rebuilt in float64 from its unit shift (recovered exactly from the float32 shift and the cell) and split the same
+# way: v = (bin_r - bin_s + k) W + (off_r - off_s + rem). Plain float32 positions round each coordinate to its
+# float32 spacing, so a perfect crystal's edge vectors carry 1.5e-5 A at 226 A and 1.1e-4 A from 1,024 A (the
+# residual force 1.64e-4 -> 1.32e-3 eV/A from 1M to 149M atoms); in the frame they carry a few 1e-6 A in any
+# box (6e-6 A worst case). Where the call's float64 positions are on the device, each tile builds its float32 rows
+# relative to its first receiver instead (``_tile_local``; no stored bytes); the bins and offsets (18 bytes per atom
+# beside the field's float32 positions) only for positions on the host. None (auto, the conductor's size rule of 11
+# November): on where the structure's extent (the largest |coordinate| of the positions and of the cell's corners) is
+# at least ``forces.FLOAT64_EDGES_EXTENT`` (64 A), decided once per atom count and cell; True / False: every size.
+TILE_LOCAL_FRAME = None
+TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in float32
+# TILE_HOST_ROWS (exact; billion-atom plan step 1, 11 November 2026): where the call's float64 positions are on the
+# host (``ForceField._prepare_one_off(host=True)``: 24 bytes per atom off the device), the tile-local frame stays the
+# tiles' form: each padded slot gets its float64 rows gathered on the host and copied in (``_fill``; an eager tile
+# gathers its own), the values ``positions64[nodes]`` reads on the device. False: the bins and offsets as before.
+TILE_HOST_ROWS = True
+# TILE_WHOLE_BLOCK_ORDER (A/B only; billion-atom step 1): True binds the whole-system BLOCK_ORDER receiver order in the
+# tiled call as before (int32 [N], 4 B/atom; its per-tile kernels never read it). False (default): not built.
+TILE_WHOLE_BLOCK_ORDER = False
+# TILE_LARGE_CAPS (B3, 11 November 2026, results/tiled-caps-20261111): a host-state call whose budget_receivers were
+# left at their default may also take receiver caps of TILE_LARGE_CAP_RECEIVERS where the memory budget fits them
+# (``_choose_receivers``: the first call's measured workspace per receiver, times the cap, plus 10 %, within the
+# memory left; at the capacity limit it keeps the smaller cap). A100 against R 16,384 (Alex 4984555), b/a both
+# orders: 58^3 host state 0.886 / 0.893 at 32,768 and 0.549 / 0.549 at 65,536, wavefront 0.675 / 0.671 and 0.410 /
+# 0.409; 160^3 host state 0.732 / 0.724 and 0.597 / 0.599, wavefront 0.722 / 0.723 and 0.573 / 0.583. None: on for
+# TILE_LARGE_CAP_GPUS (decision 66, per family); True / False force it.
+TILE_LARGE_CAPS = None
+TILE_LARGE_CAP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+TILE_LARGE_CAP_RECEIVERS = (32768, 65536)
+# The large caps' host cost (the size rule): host-state tiles hold per-tile host buffers (kept lists, staging) that grow
+# with the cap. SrTiO3 160^3 on the A100 (Alex 4985398): host peak 24.3 / 28.0 / 31.9 / 43.3 GB at R 8,192 / 16,384 /
+# 32,768 / 65,536, about 0.33 MB per receiver, while the device workspace fits at every size. ``_choose_receivers``
+# takes a large cap only where the host keeps this much per added receiver (plus 10 %) above ``list_reuse_floor``:
+# at the 397.5M record (229 of the cgroup's 231.5 GB) the cap stays where it was.
+TILE_LARGE_CAP_HOST_BYTES = 350_000
+# TILE_FIRST_CALL_PROBE (billion-atom plan, "Before step 4" 2; 11 November 2026): mode "auto"'s measuring first call
+# runs its eager sweeps on the TILE_PROBE_TILES largest tiles only (the wavefront's order, the others left out), takes
+# the mode and the receiver cap from that measurement as from a whole eager call, drops that call's buffers and kept
+# lists, and runs the call again in the chosen mode. The eager tiles' workspace is set by the largest tile, not by the
+# atom count: SrTiO3 at R 8,192 on the A100, 526,080,512 bytes above the tiles' start at 149M, 320M and 397.5M atoms
+# (Alex 4973640), 503,742,464 at 20.48M with a smaller largest tile. The 397.5M record's eager first call took
+# 11,468 s of 15,041. Wavefront calls only (else the whole eager call, as before). A100, Alex 4985954 (the go/no-go's
+# call): the probe's workspace 0.9986 of the whole call's at 58^3, 0.9982 at 160^3 (the 10 % of _choose_receivers
+# covers it), the same mode and cap; two calls at 160^3 286.5 s against 600.6 s. None: on for TILE_PROBE_GPUS
+# (decision 66, per family); True / False force it (True also off a CUDA device, for tests).
+TILE_FIRST_CALL_PROBE = None
+TILE_PROBE_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+TILE_PROBE_TILES = 8
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -256,9 +331,13 @@ class TileConfig:
     boundary_skin: bool = True
     # Compiled tiles (mode "compiled", or "auto" once it compiles): each slot's compiled sweep bodies captured in a
     # CUDA graph (one per slot and sweep, after two warm-ups) and replayed per tile, as mode "graphs" does with the
-    # eager bodies. Device state only (the captured bodies read it), no lanes. Off by default: the gaps between a
-    # compiled call's kernels are about 2 % of it (tiled-call-memory.md, tiled-1m-speed.md).
-    compiled_graphs: bool = False
+    # eager bodies. Device state only (the captured bodies read it), no lanes. The first compiled call runs
+    # uncaptured and measures its workspace; the captures follow only where one capture pool per slot fits beside it
+    # (``compiled_graphs_fit``; the 16 GB A4000 ran out of memory at 975,560 atoms, R 8,192, with graphs on from the
+    # first call), and a captured call that runs out of memory runs again without graphs. None: on for
+    # ``COMPILED_GRAPH_GPUS`` where the configuration allows it (mode compiled or auto, device state, no lanes="on",
+    # no aliased device state), else off; True refuses those configurations.
+    compiled_graphs: bool | None = None
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -274,7 +353,7 @@ class TileConfig:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
         if self.species not in ("one_hot", "index"):
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
-        if self.alias_state and self.state == "device" and (self.mode == "graphs" or self.compiled_graphs):
+        if self.alias_state and self.state == "device" and (self.mode == "graphs" or self.compiled_graphs is True):
             raise ValueError("TileConfig.alias_state with state='device' cannot run in CUDA graphs: the window and the "
                              "pooled rows are indexed outside the captured bodies")
         if self.alias_state and self.state == "device" and self.lanes == "on":
@@ -294,6 +373,8 @@ class TileConfig:
         if self.budget_receivers is None:  # compiled tiles take the larger caps when they fit (tiled-speed.md)
             compiled = self.mode in ("compiled", "auto")  # "auto": only once its tiles compile
             object.__setattr__(self, "budget_receivers", (8192, 16384) if compiled else ())
+            # (not a field: TiledForceField adds TILE_LARGE_CAP_RECEIVERS to a default budget only)
+            object.__setattr__(self, "_budget_default", compiled)
         if any(int(r) < 1 for r in self.budget_receivers):
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
@@ -310,7 +391,9 @@ class TileConfig:
             raise ValueError(f"TileConfig.lanes must be 'auto', 'on' or 'off', got {self.lanes!r}")
         if self.lanes == "on" and self.mode in ("eager", "graphs"):
             raise ValueError(f"TileConfig.lanes='on' needs padded or compiled tiles, not mode {self.mode!r}")
-        if self.compiled_graphs:
+        if self.compiled_graphs not in (None, True, False):
+            raise ValueError(f"TileConfig.compiled_graphs must be None, True or False, got {self.compiled_graphs!r}")
+        if self.compiled_graphs is True:
             if self.mode not in ("compiled", "auto"):
                 raise ValueError(f"TileConfig.compiled_graphs needs mode 'compiled' or 'auto', not {self.mode!r}")
             if self.state == "host":
@@ -942,6 +1025,135 @@ def _tile_vectors(pos, ei, shifts, edge_mask, far):
     return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
 
 
+def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
+    """``TILE_LOCAL_FRAME``, tile-local form: one tile's node rows ``rows64`` [rows, 3] (float64 positions) and its
+    edges' float32 ``shifts`` as ``(positions, shifts)`` in ``dtype`` whose ``positions[local[1]] - positions[local[0]]
+    + shifts`` are the edge vectors. Each halo row sits at its first edge's periodic image (``p - shift``), every row
+    relative to the first receiver, in float64 before the cast; an edge's remaining shift (``shift`` less its sender
+    row's) is zero unless one atom reaches the tile through two images. The float64 shift is ``round(shift @ cell^-1)
+    @ cell`` (exact: the float32 shift is within its rounding of an integer combination of the cell's rows). Rows
+    below ``receiver_rows`` keep their own image."""
+    import torch
+
+    count, e = rows64.shape[0], local.shape[1]
+    from fastmace.neighbors.skin import times_3x3
+
+    # Element-wise 3 x 3 products: as cuBLAS DGEMMs they cost 0.46 s of a 2.1 s call at 320,000 atoms on the RTX
+    # 5060 Ti (local job 52; FP64 GEMM is slow on GeForce parts).
+    shift = times_3x3(torch.round(times_3x3(shifts.double(), inverse)), cell)
+    image = torch.zeros_like(rows64)
+    if e:
+        edge = torch.arange(e, device=local.device)
+        first = torch.full((count,), e, dtype=edge.dtype, device=local.device).scatter_reduce(
+            0, local[0], edge, reduce="amin")
+        halo = (first < e) & (torch.arange(count, device=local.device) >= receiver_rows)
+        image = torch.where(halo.unsqueeze(1), shift[first.clamp(max=e - 1)], image)
+    origin = rows64[:1]
+    return (rows64 - image - origin).to(dtype), (shift - image[local[0]]).to(dtype)
+
+
+def _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+    """``_tile_local`` on a padded slot's fixed-size buffers (rows ``nodes`` with ``node_mask``, edges ``local`` and
+    ``shifts`` with ``edge_mask``; ``receivers`` slot receiver rows), each part split in two ``dtype`` halves:
+    ``(rows, rows_low, remaining, remaining_low)``, the padding rows zero. The vector ``(rows[r] - rows[s] +
+    remaining) + (rows_low[r] - rows_low[s] + remaining_low)`` is the float64 vector's rounding: the first sum is exact
+    for an edge (nearby rows, Sterbenz), the second carries what float32 rows of up to the tile's extent drop.
+    Without the low halves the rows' float32 spacing at R 16,384 (rows up to 56 A) left 4.4e-5 eV/A on the perfect
+    40^3 crystal, and a tile that meets itself through the periodic boundary (20^3, R 16,384: 68,911 edges with a
+    78 A remaining shift) 1.2e-4 (local job 61).
+
+    Float64 per row: each edge's integer image ``round(shift @ cell^-1)`` in float32 (exact: |unit| small), a halo
+    row's image the smallest encoded unit among its edges (deterministic, as every sweep must see the same rows),
+    its float64 shift ``unit @ cell`` per row; per edge one float64 ``(unit - row unit) @ cell``. Local job 56 (no
+    low halves): 1.003 / 1.003 at 320,000 atoms on the RTX 5060 Ti (three float64 3x3 products per edge: 1.020 /
+    1.027)."""
+    import torch
+
+    from fastmace.neighbors.skin import times_3x3
+
+    count = nodes.shape[0]
+    unit = torch.round(times_3x3(shifts.to(torch.float32), inverse.to(torch.float32)))
+    code = unit.to(torch.int32) + 64  # |unit| < 64
+    code = (code[:, 0] * 128 + code[:, 1]) * 128 + code[:, 2]
+    none = 1 << 21  # above every code
+    code = torch.where(edge_mask > 0, code, torch.full_like(code, none))
+    best = torch.full((count,), none, dtype=code.dtype, device=local.device).scatter_reduce(
+        0, local[0], code, reduce="amin")
+    halo = (best < none) & (torch.arange(count, device=local.device) >= receivers)
+    best = torch.where(halo, best, torch.full_like(best, (64 * 128 + 64) * 128 + 64))  # unit 0
+    row_unit = torch.stack((best // 16384, (best // 128) % 128, best % 128), dim=1).to(torch.float32) - 64
+    rows64 = positions64[nodes]
+    rows64 = (rows64 - times_3x3(row_unit.to(torch.float64), cell) - rows64[:1]) * node_mask.unsqueeze(1).to(
+        torch.float64)
+    remaining64 = times_3x3((unit - row_unit[local[0]]).to(torch.float64), cell)
+    rows, remaining = rows64.to(dtype), remaining64.to(dtype)
+    return rows, (rows64 - rows.to(torch.float64)).to(dtype), remaining, (remaining64 - remaining.to(
+        torch.float64)).to(dtype)
+
+
+def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+    """``_slot_local_parts``' high halves: ``(rows, remaining shifts)``."""
+    rows, _, remaining, _ = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse,
+                                              receivers, dtype)
+    return rows, remaining
+
+
+def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype,
+                        far):
+    """``TILE_LOCAL_FRAME`` inside the tile body: the slot's edge vectors from ``_slot_local_parts`` (``far`` for the
+    padding edges, as ``_tile_vectors``), one fixed-shape graph per slot bucket. In the body the frame is part of the
+    captured tile (``compiled_graphs``): built before the body as its own compiled call, its per-tile host overhead
+    cost 1.047 / 1.048 at 975,560 atoms on the launch-bound A100 (Alex 4983258)."""
+    import torch
+
+    rows, low, remaining, remaining_low = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts,
+                                                            cell, inverse, receivers, dtype)
+    both = torch.cat([rows, low], dim=1)  # one gather per end
+    receiver, sender = both[local[1]], both[local[0]]
+    a, b = receiver[:, :3], sender[:, :3]
+    # TwoSum: difference + error == a - b exactly (rows of a tile that meets itself through the boundary are up to
+    # a box apart, and their float32 difference rounds: 3.8e-6 A at 78 A, local job 62)
+    difference = a - b
+    a_part = difference + b
+    b_part = a_part - difference
+    error = (a - a_part) + (b_part - b)
+    vectors = (difference + remaining) + (error + (receiver[:, 3:] - sender[:, 3:]) + remaining_low)
+    return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
+
+
+def _frame_parts(positions64, width, dtype):
+    """``TILE_LOCAL_FRAME``: float64 positions [n, 3] as int16 bins of ``width`` and offsets in ``dtype``."""
+    import torch
+
+    b = torch.floor(positions64 / width)
+    if b.numel() and float(b.abs().max()) > 32000:
+        raise ValueError(f"TILE_LOCAL_FRAME: a coordinate beyond {32000 * width:.0f} A")
+    return b.to(torch.int16), (positions64 - b * width).to(dtype)
+
+
+def _frame_vectors(frame, ei, shifts, edge_mask, far):
+    """``TILE_LOCAL_FRAME``: ``_tile_vectors`` from the positions' bins and offsets (``frame``: bins [N, 3] int16,
+    offsets [N, 3] float32, the float64 cell, its inverse and the bin width). The edge's unit shift is
+    ``round(shift @ cell^-1)`` (exact: the float32 shift is within its rounding of an integer combination of the
+    cell's rows), its float64 shift ``unit @ cell`` splits into ``k W + rem``; the bins' integer part is exact in
+    float32, and the rest is a sum of terms below 2 W."""
+    import torch
+
+    bins, offsets, cell, inverse, width = frame
+    from fastmace.neighbors.skin import times_3x3
+
+    # Element-wise 3 x 3 products: as cuBLAS DGEMMs they cost 0.46 s of a 2.1 s call at 320,000 atoms on the RTX
+    # 5060 Ti (local job 52; FP64 GEMM is slow on GeForce parts).
+    shift = times_3x3(torch.round(times_3x3(shifts.double(), inverse)), cell)
+    k = torch.floor(shift / width)
+    rem = (shift - k * width).to(offsets.dtype)
+    coarse = ((bins[ei[1]] - bins[ei[0]]).double() + k).mul_(width).to(offsets.dtype)
+    vectors = coarse + ((offsets[ei[1]] - offsets[ei[0]]) + rem)
+    if edge_mask is None:
+        return vectors
+    return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
+
+
 def _split_streams(device):
     """Two CUDA streams of two green contexts holding disjoint halves of ``device``'s SMs (one split of its SM
     resource, rounded to the split's granularity: 2 SMs before sm_90, 8 from it), with the contexts that keep them
@@ -1233,8 +1445,12 @@ class TiledForceField:
             raise ValueError("TiledForceField does not support joint embeddings or PolarMACE")
         if self.config.mode == "graphs" and field.device.type != "cuda":
             raise ValueError("TileConfig.mode='graphs' needs a CUDA device")
-        if self.config.compiled_graphs and field.device.type != "cuda":
+        if self.config.compiled_graphs is True and field.device.type != "cuda":
             raise ValueError("TileConfig.compiled_graphs needs a CUDA device")
+        # rewrites.radial.nested: the tile calls take the plain products, so the plain tables come back (one table)
+        from fastmace.rewrites.radial import nested
+
+        nested.release(model.modules())
         self.model = model
         self.device = field.device
         self.dtype = field.dtype
@@ -1266,7 +1482,7 @@ class TiledForceField:
             self._species, self._width, self._attrs_dtype = field._species_index, stored.shape[1], stored.dtype
             field.release_node_attrs()
             field.release_whole_system()  # the per-atom buffers only the whole-system call reads
-            self._species = field._species_index  # now int32
+            self._species = field._species_index  # now uint8 (int32 with 256 or more columns)
         scale = self.config.backward_chunk_scale
         if scale is None:
             name = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else None
@@ -1274,6 +1490,11 @@ class TiledForceField:
         self.backward_chunk_scale = int(scale)
         # TILED_SPEED_GPUS: where the tiled speed switches left at None are on
         self._speed_gpu = self.device.type == "cuda" and torch.cuda.get_device_name(self.device) in TILED_SPEED_GPUS
+        # TileConfig.compiled_graphs: None is on for COMPILED_GRAPH_GPUS; the memory guard's verdict (None until the
+        # first compiled call measured), its measurement (workspace, available, slots) and the reason
+        self._graph_gpu = (self.device.type == "cuda"
+                           and torch.cuda.get_device_name(self.device) in COMPILED_GRAPH_GPUS)
+        self._graphs_fit, self._graph_memory, self.graphs_state = None, None, None
         for module in model.modules():  # from each module's own value: a second tiled field scales it once
             if getattr(module, "chunked_backward_edges", 0) > 0:
                 base = getattr(module, "_tile_chunk_base", module.chunked_backward_edges)
@@ -1282,6 +1503,10 @@ class TiledForceField:
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
+        # TILE_LARGE_CAPS: a default budget of a host-state call takes the large caps too, where they fit
+        if getattr(self.config, "_budget_default", False) and self.config.state == "host" and self._large_caps():
+            self.config = dataclasses.replace(self.config, budget_receivers=tuple(sorted(
+                {*map(int, self.config.budget_receivers), *TILE_LARGE_CAP_RECEIVERS})))
         self.receivers = int(self.config.receivers)  # the receiver cap (budget_receivers may raise it once)
         # mode "auto": a compiled force field's first call runs eager tiles and measures its peak; the later calls
         # compile when the compiled residency and a margin fit (``_choose_mode``). An eager field stays eager.
@@ -1297,6 +1522,7 @@ class TiledForceField:
         self._budget_raised, self._fallback = False, None  # the budget raised the cap; the last step down
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
+        self._probe = 0  # TILE_FIRST_CALL_PROBE: the tiles this measuring call runs (0: all)
         self._grid_fit = None  # (key, blocks per axis) of fit_grid's last choice
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
@@ -1430,6 +1656,14 @@ class TiledForceField:
         if free is not None:
             workspace = 1.1 * self._per_receiver * self.receivers if self._per_receiver else 0
             self._pieces, self._piece_budget = {}, int(float(fraction) * max(0.0, free - workspace))
+
+    def _large_caps(self):
+        """``TILE_LARGE_CAPS``: the constant when set, else on for ``TILE_LARGE_CAP_GPUS``."""
+        import torch
+
+        if TILE_LARGE_CAPS is not None:
+            return bool(TILE_LARGE_CAPS)
+        return self.device.type == "cuda" and torch.cuda.get_device_name(self.device) in TILE_LARGE_CAP_GPUS
 
     def _speed(self, value, on=True):
         """A tiled speed switch's value (``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE``, ``TILE_GRAPH_CACHE``, ...): the
@@ -1848,15 +2082,31 @@ class TiledForceField:
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
                     count=new((), dtype=i64), out={}, graphs={})
 
-    def _fill(self, slot, piece):
+    def _fill(self, slot, piece, g=None, host_nodes=None):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
 
         Padding: receivers and halo rows read atom 0 and are masked; padding edges join the last receiver slot
         (always padding) to itself, after the tile's edges (so the receivers stay sorted), beyond the cutoff and
-        beyond the tile's edge count (the streaming kernels' ``streaming_count``)."""
+        beyond the tile's edge count (the streaming kernels' ``streaming_count``).
+
+        TILE_HOST_ROWS (``g``'s tile-local frame on the host): the slot's float64 rows ``rows64`` are gathered on the
+        host in the slot's layout (padding rows: atom 0's, as ``positions64[nodes]`` reads them) and copied in; the
+        body reads them in place of ``positions64[nodes]``, the same values."""
+        import torch
+
         nodes, ei, shifts, local, r, h = piece
         receivers, _, edges = slot["sizes"]
         e = ei.shape[1]
+        frame = None if g is None else g.get("local_frame")
+        if frame is not None and _tile_list().rows_on_host(frame[0], self.device):
+            here = nodes.cpu() if host_nodes is None else host_nodes
+            layout = torch.zeros(slot["nodes"].shape[0], dtype=torch.int64)
+            layout[:r] = here[:r]
+            layout[receivers:receivers + h] = here[r:]
+            if "rows64" not in slot:  # fixed addresses (the captured bodies read them)
+                slot["rows64"] = torch.zeros((layout.shape[0], 3), dtype=torch.float64, device=self.device)
+                slot["row_ids"] = torch.arange(layout.shape[0], device=self.device)
+            slot["rows64"].copy_(frame[0][layout])
         slot["nodes"].zero_()
         slot["nodes"][:r] = nodes[:r]
         slot["nodes"][receivers:receivers + h] = nodes[r:]
@@ -1882,7 +2132,18 @@ class TiledForceField:
 
         receivers = slot["sizes"][0]
         nodes, ei = slot["nodes"], slot["ei"]
-        if self._speed(TILE_EPILOGUE):
+        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local: rows and remaining shifts in the body
+            positions64, cell, inverse = g["local_frame"]
+            vectors_of = (self._compiled_once("local_vectors", _slot_local_vectors) if self._speed(TILE_EPILOGUE)
+                          else _slot_local_vectors)
+            rows_of = nodes
+            if "rows64" in slot:  # TILE_HOST_ROWS: the slot's own rows (``_fill``), read in place
+                positions64, rows_of = slot["rows64"], slot["row_ids"]
+            vectors = vectors_of(positions64, rows_of, slot["node_mask"], slot["local"], slot["edge_mask"],
+                                 slot["shifts"], cell, inverse, receivers, self.dtype, self._far)
+        elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
+            vectors = _frame_vectors(g["frame"], ei, slot["shifts"], slot["edge_mask"], self._far)
+        elif self._speed(TILE_EPILOGUE):
             vectors = self._compiled_once("vectors", _tile_vectors)(g["pos"], ei, slot["shifts"], slot["edge_mask"],
                                                                    self._far)
         else:
@@ -1957,7 +2218,60 @@ class TiledForceField:
     def _captured(self):
         """Whether the slots' sweep bodies run as captured CUDA graphs: mode "graphs" (eager bodies), or compiled
         bodies with ``TileConfig.compiled_graphs``."""
-        return self.mode == "graphs" or (self.mode == "compiled" and self.config.compiled_graphs)
+        return self.mode == "graphs" or (self.mode == "compiled" and self._graphs_wanted() and self._graphs_fit is True)
+
+    def _graphs_wanted(self):
+        """Whether ``TileConfig.compiled_graphs`` asks for captured compiled bodies (before the memory guard): True,
+        or None on ``COMPILED_GRAPH_GPUS`` with a configuration that allows them."""
+        config = self.config
+        if config.compiled_graphs is None:
+            return (getattr(self, "_graph_gpu", False) and config.state == "device" and config.lanes != "on"
+                    and not config.alias_state and config.mode in ("compiled", "auto"))
+        return bool(config.compiled_graphs)
+
+    def _choose_graphs(self, memory, slots, measured_receivers):
+        """The memory guard of ``TileConfig.compiled_graphs`` after the first compiled call (uncaptured): on when
+        ``slots`` capture pools of its tile workspace (scaled to the cap the budget chose) and the warm-ups' fit
+        ``available`` (``compiled_graphs_fit``), else off for the field's life."""
+        if memory is None:
+            self._graphs_fit, self.graphs_state = False, "off: no device memory measurement"
+            return
+        workspace, available = memory
+        workspace = workspace * self.receivers / max(1, int(measured_receivers))
+        self._graph_memory = (workspace, available, int(slots))
+        self._graphs_fit = compiled_graphs_fit(workspace, available, slots)
+        verdict = "fit" if self._graphs_fit else "do not fit"
+        self.graphs_state = (f"{'on' if self._graphs_fit else 'off'}: {int(slots)} capture pools and the warm-ups of "
+                             f"{workspace / 2**30:.2f} GiB (x{COMPILED_GRAPH_MARGIN}) {verdict} "
+                             f"{available / 2**30:.2f} GiB")
+
+    def _graphs_slots_fit(self, slots):
+        """A captured call with more slots than the guard measured: whether their pools still fit (else graphs off,
+        the captured ones dropped)."""
+        if self._graph_memory is None or slots <= self._graph_memory[2]:
+            return True
+        workspace, available, _ = self._graph_memory
+        if compiled_graphs_fit(workspace, available, slots):
+            self._graph_memory = (workspace, available, int(slots))
+            return True
+        self._drop_graphs(f"off: {int(slots)} slots' capture pools of {workspace / 2**30:.2f} GiB do not fit "
+                          f"{available / 2**30:.2f} GiB")
+        return False
+
+    def _drop_graphs(self, reason):
+        """``TileConfig.compiled_graphs`` off for the field's life: the captured graphs, their outputs and pool
+        released."""
+        import torch
+
+        self._graphs_fit, self.graphs_state = False, reason
+        for slot in self._slots.values():
+            slot["graphs"].clear()
+            slot.pop("graph_out", None)
+            slot.pop("out", None)
+        self._pool = None
+        self._graph_key = None
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
 
     def _run_slot(self, sweep, slot, g):
         """The sweep's body on the filled slot: eagerly, or by replaying its graph (captured on first use)."""
@@ -1993,7 +2307,9 @@ class TiledForceField:
 
     def _bind(self, count=None):
         field = self.field
-        field._bind_streaming_count()  # species tables; then every tile edge is a real edge
+        # species tables; then every tile edge is a real edge. No whole-system BLOCK_ORDER order: a tile has
+        # fewer rows than N, so its kernels never read it (they launch with their rows' identity)
+        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER))
         saved = []
         for module in field._streaming:
             saved.append((module, module._buffers.get("streaming_count")))
@@ -2008,10 +2324,21 @@ class TiledForceField:
         first, eager call's, and a compiled tile's workspace can exceed it: tiled-omat.md)."""
         import torch
 
+        probe = None
+        if self._probe_wanted():
+            self._probe = max(1, int(TILE_PROBE_TILES))
         while True:
             fallback = None
             try:
                 out = self._call(positions)
+                if getattr(self, "_probe", 0):
+                    self._probe = 0
+                    if "probe" in self.last:  # its tiles measured, the mode and cap chosen: the call again
+                        del out
+                        probe = self._after_probe()
+                        continue
+                if probe is not None:
+                    self.last["probe"] = probe
                 if self._fallback is not None:
                     self.last["budget_fallback"] = self._fallback
                 return out
@@ -2019,13 +2346,20 @@ class TiledForceField:
                 oom = isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in str(error)
                 lower = [int(r) for r in (self.config.receivers, *self.config.budget_receivers)
                          if int(r) < self.receivers]
+                graphs = self.mode == "compiled" and self._captured()
                 lanes = self.lanes_state == "on" and self.config.lanes == "auto"
-                if not (oom and (lanes or (self._budget_raised and lower))):
+                if not (oom and (graphs or lanes or (self._budget_raised and lower))):
                     raise
-                fallback = (self.receivers, self.receivers if lanes else max(lower),
-                            str(error).splitlines()[0][:200])
+                fallback = (self.receivers, self.receivers if graphs or lanes else max(lower),
+                            str(error).splitlines()[0][:200], graphs)
             # Outside the handler, so the failed call's frames (and their tensors) are released.
-            old, new, why = fallback
+            old, new, why, graphs = fallback
+            if graphs:  # TileConfig.compiled_graphs goes first: the same call again without captures
+                self._drop_graphs(f"off: out of device memory in a captured call ({why})")
+                self._g = None
+                self._list_cache = None
+                self._fallback = f"compiled graphs off after running out of device memory ({why})"
+                continue
             if new == old:  # the lanes go first: one tile workspace again at the same cap
                 self._lanes_fit = False
                 self._lane_slots.clear()
@@ -2046,6 +2380,37 @@ class TiledForceField:
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()
 
+    def _probe_wanted(self):
+        """``TILE_FIRST_CALL_PROBE`` for this call: mode "auto"'s measuring first call (a compiled force field's)."""
+        if not getattr(self, "_auto", False) or TILE_FIRST_CALL_PROBE is False:
+            return False
+        if TILE_FIRST_CALL_PROBE:
+            return True
+        if self.device.type != "cuda":
+            return False
+        import torch
+
+        return torch.cuda.get_device_name(self.device) in TILE_PROBE_GPUS
+
+    def _after_probe(self):
+        """``TILE_FIRST_CALL_PROBE``: the probe's report; its call's buffers and partial kept lists dropped (the call
+        again allocates and searches anew)."""
+        import torch
+
+        last = self.last
+        probe = dict(last["probe"], mode=self.mode, mode_reason=self.mode_reason, receivers=self.receivers,
+                     search_s=last.get("search_s"), tiles_s=last.get("tiles_s"))
+        if "tiles_peak" in last:
+            probe["workspace"] = last["tiles_peak"] - last["loop_base"]
+        _release_kept(self._kept)
+        self._kept, self._reusing = None, False
+        self._g = None
+        self._list_cache = None
+        self._pieces = None
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        return probe
+
     def _call(self, positions):
         import torch
 
@@ -2054,7 +2419,12 @@ class TiledForceField:
         stress = field.compute_stress
         padded = self.mode != "eager"
         with torch.no_grad():
-            field.positions.copy_(positions)
+            if _tile_list().rows_on_host(positions, self.device):  # a chunk at a time: no float64 copy on the device
+                for start in range(0, positions.shape[0], _tile_list().CHUNK):
+                    stop = start + _tile_list().CHUNK
+                    field.positions[start:stop].copy_(positions[start:stop].to(self.device))
+            else:
+                field.positions.copy_(positions)
         pos = field.positions.detach()
         n = pos.shape[0]
         self.node_attrs = data["node_attrs"] if self._species is None else None
@@ -2084,7 +2454,15 @@ class TiledForceField:
         # The first padded (compiled) call also measures: the lanes' fit is its own tile workspace, not the eager
         # first call's scaled to the cap (eager tiles hold several times more: R 16,384 was refused with 12 GiB free).
         lanes_unmeasured = self._lanes_fit is None and padded and not self._captured()
-        measure = (not self._budgeted or self._auto or lanes_unmeasured) and self.device.type == "cuda"
+        # TileConfig.compiled_graphs: the first compiled call runs uncaptured and measures (the memory guard)
+        graphs_unmeasured = self.mode == "compiled" and self._graphs_fit is None and self._graphs_wanted()
+        if graphs_unmeasured:
+            self.graphs_state = "measuring: the first compiled call runs uncaptured"
+        graphs_state = self.graphs_state if self._graphs_wanted() else (
+            "off" if self.config.compiled_graphs is not None else
+            "off: not measured faster on this GPU or configuration" if self.mode == "compiled" else None)
+        measure = (not self._budgeted or self._auto or lanes_unmeasured or graphs_unmeasured) \
+            and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
@@ -2102,6 +2480,12 @@ class TiledForceField:
             keys = self._slot_keys(tiles, source, local_of, n) if padded else None
             steps, pool_rows = [(sweep, index) for sweep in (1, 2, 3) for index in range(len(tiles))], 0
         stats["search_s"] = time.perf_counter() - started if padded or wave else 0.0
+        if self._probe and wave and not padded:  # TILE_FIRST_CALL_PROBE: the largest tiles' sweeps only
+            sizes = [int(t.shape[0]) for t in tiles]
+            chosen = set(sorted(range(len(tiles)), key=lambda i: (-sizes[i], i))[:self._probe])
+            steps = [kept_item for kept_item in ((item[0], *[i for i in item[1:] if i in chosen]) for item in steps)
+                     if len(kept_item) > 1]
+            stats["probe"] = dict(tiles=sorted(chosen), steps=len(steps), largest=max(sizes, default=0))
         lanes = self._lanes_on(padded, n)
         if lanes:  # sweep 2 in pairs: its sweep-3 steps between a pair's tiles wait for the pair (a larger pool)
             steps, lane_peak = lane_steps(steps, [int(t.shape[0]) for t in tiles])
@@ -2122,10 +2506,20 @@ class TiledForceField:
         bound = None
         try:
             g = self._globals(n, stress, pos, heads)
+            g["local_frame"], g["frame"] = (self._frames(positions, n) if self._frame_wanted(positions, n)
+                                            else (None, None))
+            stats["local_frame"] = ("tiles" if g["local_frame"] is not None else
+                                    "bins" if g["frame"] is not None else None)
             self.heads, self.arange = g["heads"], g["arange"]
+            if padded and self.mode == "compiled" and self._captured():  # the guard: pools for every slot in use
+                self._graphs_slots_fit(len(set(keys)))
+                graphs_state = self.graphs_state
+            stats["compiled_graphs"] = graphs_state
             if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
-                key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
+                # (and the body's edge-vector form: TILE_LOCAL_FRAME is read per call)
+                frame = g.get("local_frame")
+                key = (id(g), pos.data_ptr(), species.data_ptr(), stress, None if frame is None else frame[0].data_ptr())
                 if key != self._graph_key:  # the graphs read these addresses
                     for slot in self._slots.values():
                         slot["graphs"].clear()
@@ -2223,7 +2617,7 @@ class TiledForceField:
                     if slot.get("event") is not None:  # a lane still reads this slot's buffers
                         torch.cuda.current_stream().wait_event(slot["event"])
                         slot["event"] = None
-                    self._fill(slot, piece)
+                    self._fill(slot, piece, g, host_nodes)
                     state.prefetched = fetched  # rows() takes these instead of gathering them now
                     following = position is not None and position + 1 < len(order)
                     if lane is None:
@@ -2334,6 +2728,7 @@ class TiledForceField:
             # Handed out: the caller holds the forces, not the call (else a caller that drops them still has them
             # on the device through the next call, beside its new buffer: 12 bytes per atom of that call's peak).
             g["forces"] = None
+            memory = None
             if self._auto or not self._budgeted:
                 memory = self._memory()  # None without a CUDA device: the mode and the cap stay
                 self._choose_mode(memory)
@@ -2342,8 +2737,13 @@ class TiledForceField:
                     if self.config.mode != "auto" or self.mode == "compiled":  # "auto": eager tiles take no budget
                         self._choose_receivers(memory)
             elif lanes_unmeasured and measure:  # TileConfig.lanes: a second workspace of this padded call's
-                workspace, available = self._memory()
+                memory = self._memory()
+                workspace, available = memory
                 self._lanes_fit = 2 * 1.1 * workspace <= available
+            if graphs_unmeasured and measure:  # TileConfig.compiled_graphs: the guard, from this call's workspace
+                self._choose_graphs(memory if memory is not None else self._memory(), len(stats["slots"]),
+                                    stats["receivers"])
+                stats["compiled_graphs"] = self.graphs_state
             return out
         finally:
             for module, count in saved:
@@ -2454,8 +2854,16 @@ class TiledForceField:
             return
         workspace, available = memory
         per_receiver = workspace / self.receivers
-        fits = [r for r in (self.receivers, *map(int, self.config.budget_receivers))
-                if 1.1 * per_receiver * r <= available]
+        candidates = (self.receivers, *map(int, self.config.budget_receivers))
+        host = _host_available() if any(r in TILE_LARGE_CAP_RECEIVERS for r in candidates) else None
+        floor = int(self.config.list_reuse_floor)
+
+        def host_fits(r):  # TILE_LARGE_CAP_HOST_BYTES: the large caps' host buffers
+            if r not in TILE_LARGE_CAP_RECEIVERS or r <= self.receivers or host is None:
+                return True
+            return host - floor >= 1.1 * TILE_LARGE_CAP_HOST_BYTES * (r - self.receivers)
+
+        fits = [r for r in candidates if 1.1 * per_receiver * r <= available and host_fits(r)]
         chosen = max(fits, default=self.receivers)
         if chosen != self.receivers:
             self._budget_raised = chosen > int(self.config.receivers)
@@ -2464,6 +2872,81 @@ class TiledForceField:
             self._lane_slots.clear()
             self._edge_step = None
             self._graph_key = None
+
+    def _frame_wanted(self, positions, n):
+        """``TILE_LOCAL_FRAME`` for this call: None decides by the structure's extent (``forces.float64_edges_wanted``),
+        once per atom count and cell (one host read of the positions' largest |coordinate|)."""
+        import numpy as np
+
+        from fastmace.model import forces as forces_module
+
+        if TILE_LOCAL_FRAME is not None:
+            return bool(TILE_LOCAL_FRAME)
+        if str(self.dtype) == "torch.float64":  # float64 positions: nothing to fix
+            return False
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3).detach().cpu().numpy()
+        cell = np.asarray(cell, dtype=np.float64).reshape(3, 3)
+        key = (n, cell.tobytes())
+        kept = getattr(self, "_frame_choice", None)
+        if kept is None or kept[0] != key:
+            largest = _tile_list().abs_max(positions) if n else 0.0
+            extent = max(largest, forces_module.structure_extent(np.zeros((0, 3)), cell))
+            kept = self._frame_choice = (key, forces_module.float64_edges_wanted(None, extent))
+        return kept[1]
+
+    def _frames(self, positions, n):
+        """``TILE_LOCAL_FRAME``: ``(local_frame, frame)``, one of them set. Tile-local positions (``(positions64,
+        cell, inverse)``) where the call's float64 positions are on the device (no stored bytes), else the bins and
+        offsets of ``_local_frame``; neither without a full periodic cell."""
+        import torch
+
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3)
+        cell = torch.as_tensor(cell, dtype=torch.float64).reshape(3, 3)
+        if abs(float(torch.linalg.det(cell))) < 1e-9:
+            return None, None
+        if _tile_list().rows_on_host(positions, self.device) and not TILE_HOST_ROWS:
+            return None, self._local_frame(positions, n)
+        kept = getattr(self, "_frame_cell", None)  # fixed addresses: the captured tile bodies read them
+        if kept is None or not torch.equal(kept[0].cpu(), cell):
+            device_cell = cell.to(self.device)
+            kept = self._frame_cell = (cell.clone(), device_cell, torch.linalg.inv(device_cell))
+        # TILE_HOST_ROWS: host positions stay there; each slot gets its rows (``_fill``), an eager tile gathers them
+        return (positions if positions.dtype == torch.float64 else positions.to(torch.float64), kept[1], kept[2]), None
+
+    def _local_frame(self, positions, n):
+        """``TILE_LOCAL_FRAME``: the call's positions as int16 bins of ``TILE_LOCAL_FRAME_WIDTH`` and offsets in the
+        field's dtype (kept between calls), from the float64 ``positions`` a chunk at a time (no whole float64 copy
+        on the device), with the float64 cell and its inverse."""
+        import torch
+
+        width = float(TILE_LOCAL_FRAME_WIDTH)
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3)
+        cell = torch.as_tensor(cell, dtype=torch.float64).reshape(3, 3)
+        if abs(float(torch.linalg.det(cell))) < 1e-9:  # no full periodic cell: the plain float32 vectors
+            return None
+        kept = getattr(self, "_frame_buffers", None)
+        if kept is None or kept[0].shape[0] != n:  # fixed addresses between calls (the CUDA graphs read them)
+            kept = (torch.empty((n, 3), dtype=torch.int16, device=self.device),
+                    torch.empty((n, 3), dtype=self.dtype, device=self.device),
+                    torch.empty((3, 3), dtype=torch.float64, device=self.device),
+                    torch.empty((3, 3), dtype=torch.float64, device=self.device))
+            self._frame_buffers = kept
+        bins, offsets, cell_kept, inverse_kept = kept
+        cell_kept.copy_(cell)
+        inverse_kept.copy_(torch.linalg.inv(cell))
+        chunk = 1 << 20
+        for start in range(0, n, chunk):
+            b, o = _frame_parts(positions[start:start + chunk].to(device=self.device, dtype=torch.float64), width,
+                                self.dtype)
+            bins[start:start + chunk] = b
+            offsets[start:start + chunk] = o
+        return bins, offsets, cell_kept, inverse_kept, width
 
     def _globals(self, n, stress, pos, heads):
         """The call's global buffers, kept between calls at fixed addresses (the graphs read them) and zeroed.
@@ -2735,7 +3218,18 @@ class TiledForceField:
         if sweep != 2 and self._reassociations:  # interaction 0 runs on the tile's R + H rows
             self._bind_tables(self.field.species_tables(nodes.shape[0]))
         state = g["state"]
-        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
+        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local
+            positions64, cell, inverse = g["local_frame"]
+            if _tile_list().rows_on_host(positions64, self.device):  # TILE_HOST_ROWS: the tile's rows from the host
+                rows64 = positions64[nodes.cpu()].to(self.device)
+            else:
+                rows64 = positions64[nodes]
+            rows, remaining = _tile_local(rows64, r, local, shifts, cell, inverse, self.dtype)
+            vectors = rows[local[1]] - rows[local[0]] + remaining
+        elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
+            vectors = _frame_vectors(g["frame"], ei, shifts, None, None)
+        else:
+            vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
         tile = (nodes, local, r, vectors, None, None, None)
         receivers = nodes[:r]
         strain = True if g["stress"] else None
