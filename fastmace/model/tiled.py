@@ -1976,7 +1976,9 @@ class TiledForceField:
                 for _ in range(2):  # library workspaces and the allocator, outside the capture
                     self._body(sweep, slot, g)
             torch.cuda.current_stream().wait_stream(self._stream)
-            if self._pool is None:
+            if self._pool is None or not any(s["graphs"] for s in self._slots.values()):
+                # a new pool once no graph holds the old one (PyTorch releases a private pool with its last graph,
+                # and a capture into the released handle fails an allocator assertion)
                 self._pool = torch.cuda.graph_pool_handle()
             graph = torch.cuda.CUDAGraph()
             with torch.cuda.graph(graph, pool=self._pool, stream=self._stream):
@@ -2118,7 +2120,7 @@ class TiledForceField:
         try:
             g = self._globals(n, stress, pos, heads)
             self.heads, self.arange = g["heads"], g["arange"]
-            if padded:
+            if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
                 key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
                 if key != self._graph_key:  # the graphs read these addresses
