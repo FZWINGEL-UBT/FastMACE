@@ -206,6 +206,16 @@ def float64_edges_wanted(switch, extent):
         return extent >= FLOAT64_EDGES_EXTENT
     return bool(switch)
 
+def _narrow_map_dtype(*tables):
+    """The species maps' dtype after ``release_whole_system``: uint8 when every entry of ``tables`` (the species
+    columns and sender groups by atomic number) is below 256, else int32. The maps are read as indices (widened
+    where read) and written by index_select from these tables, so their values are unchanged (billion-atom
+    plan, step 1, 11 November 2026)."""
+    import torch
+
+    return torch.uint8 if all(int(table.max()) < 256 and int(table.min()) >= 0 for table in tables) else torch.int32
+
+
 # The batch entries the tiled path's force field keeps on the device (``release_whole_system``): every other
 # per-atom entry is read by the whole-system call only.
 WHOLE_SYSTEM_KEEP = frozenset({"positions", "node_attrs", "edge_index", "shifts", "unit_shifts", "cell", "head", "ptr",
@@ -773,10 +783,11 @@ class MACEForceField:
             group_of[z_table[column]] = group
         if early:
             numbers = torch.as_tensor(atoms.numbers, dtype=torch.int64)
-            self._column_of, self._group_of = column_of.to(device, torch.int32), group_of.to(device, torch.int32)
+            narrow = _narrow_map_dtype(column_of, group_of)
+            self._column_of, self._group_of = column_of.to(device, narrow), group_of.to(device, narrow)
             self.atomic_numbers = numbers
-            self._species_index = torch.index_select(column_of, 0, numbers).to(device, torch.int32)
-            self._sender_groups = torch.index_select(group_of, 0, numbers).to(device, torch.int32)
+            self._species_index = torch.index_select(column_of, 0, numbers).to(device, narrow)
+            self._sender_groups = torch.index_select(group_of, 0, numbers).to(device, narrow)
             self._ones = torch.empty((n, 1), dtype=self._dtype, device="meta")
             tracked = [name for name in ("total_charge", "total_spin")
                        if torch.is_tensor(self.data.get(name)) and name in self._embedding_inputs]
@@ -1004,13 +1015,17 @@ class MACEForceField:
 
     # ------------------------------------------------------------------ graph level
 
-    def _bind_streaming_count(self):
+    def _bind_streaming_count(self, block_order=True):
         """Point the streaming interactions at this force field's edge count, and the reassociated
         first interaction at its sender-feature table (host-side pointer swaps).
 
         The model may be shared with other force fields (one compiled model per cache key), so each
         call binds its own counter and table before the model runs; a captured graph keeps the
         address it was captured with. Nothing outside the force field ever rebinds.
+
+        ``block_order=False`` (the tiled call, whose kernels run per tile over fewer rows): no
+        whole-system BLOCK_ORDER order is built (int32 [N], 4 B/atom); the kernels launch with the
+        identity of their rows, which gives the same message (any permutation does).
         """
         # A copy that follows another force field (``follow``) reads that force field's edges and count.
         count = (self.neighbours if self._leader is None else self._leader.neighbours).count
@@ -1020,6 +1035,10 @@ class MACEForceField:
         for _, reassociation, table, _ in self._tables:
             reassociation.bind(table)
         ordered = self._ordered_spline_kernels()
+        if not block_order:
+            for kernel in ordered:
+                kernel.order = None
+            return
         if ordered and self._block_order is None:
             from fastmace.kernels.oeq_streaming.spline_forward import receiver_order
             self._block_order = receiver_order(self._species_index).to(self._device)
@@ -1103,10 +1122,12 @@ class MACEForceField:
         self.atomic_numbers = self.atomic_numbers.cpu()
         # int32 species columns and sender groups (the tiles index with them; their refreshes write int32 from int32
         # tables, the same values): 8 bytes per atom less for each, and the neighbour list's groups are the same tensor.
-        self._column_of, self._group_of = self._column_of.to(torch.int32), self._group_of.to(torch.int32)
-        self._species_index = self._species_index.to(torch.int32)
+        # uint8 when every column and group is below 256 (any model so far: 3 bytes per atom less for each).
+        narrow = _narrow_map_dtype(self._column_of, self._group_of)
+        self._column_of, self._group_of = self._column_of.to(narrow), self._group_of.to(narrow)
+        self._species_index = self._species_index.to(narrow)
         shared = getattr(self.neighbours, "sender_groups", None) is self._sender_groups
-        self._sender_groups = self._sender_groups.to(torch.int32)
+        self._sender_groups = self._sender_groups.to(narrow)
         if shared:
             self.neighbours.sender_groups = self._sender_groups
         self.whole_system_released = True
@@ -1123,6 +1144,8 @@ class MACEForceField:
         if stored is not None and not stored.is_meta:
             return stored if rows is None else stored[rows]
         species = self._species_index if rows is None else self._species_index[rows]
+        if species.dtype == torch.uint8:  # an index_select index is int32 or int64 (the same entries)
+            species = species.int()
         return torch.index_select(self._e0_row, 0, species)
 
     def _outputs(self, positions):
@@ -1390,8 +1413,12 @@ class MACEForceField:
                                float(out["energy_unresolved_float64"].detach().reshape(-1)[0]),
                                energy64.terms(self.source_model))
 
-    def _prepare_one_off(self, atoms):
-        """Check ``atoms``, set its cell, rebuild and compact the list; its float64 device positions."""
+    def _prepare_one_off(self, atoms, host=False):
+        """Check ``atoms``, set its cell, rebuild and compact the list; its float64 device positions.
+
+        ``host`` (``global_list=False``, the tiled call's ``TILE_HOST_ROWS``): the float64 positions stay on the
+        host, a view of ``atoms``' own array where it is float64 and contiguous (no copy; 24 bytes per atom off
+        the device)."""
         import numpy as np
         import torch
 
@@ -1407,7 +1434,12 @@ class MACEForceField:
         elif not np.allclose(cell, self.neighbours.cell, rtol=0, atol=1e-12):
             raise ValueError("a fixed-cell force field evaluates its own cell only; build it with "
                              "compute_stress=True for other cells")
-        positions = torch.tensor(atoms.get_positions(), dtype=torch.float64, device=self._device)
+        if host:
+            if self.global_list:
+                raise ValueError("host positions need global_list=False (the global list compacts on the device)")
+            positions = torch.from_numpy(np.ascontiguousarray(atoms.arrays["positions"], dtype=np.float64))
+        else:
+            positions = torch.tensor(atoms.get_positions(), dtype=torch.float64, device=self._device)
         self.rebuild(positions)
         self.compact(positions)
         self.use_edges(int(self.neighbours.count))

@@ -1,0 +1,299 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  58,
+  58,
+  58
+ ],
+ "atoms": 975560,
+ "model": "omat0-medium",
+ "order": "ba",
+ "a": [
+  "fastmace.model.tiled:TILE_WHOLE_BLOCK_ORDER=True"
+ ],
+ "b": [],
+ "receivers": 16384,
+ "b_receivers": null,
+ "b_host_positions": false,
+ "a_int32_maps": true,
+ "mode": "auto",
+ "host_state": false,
+ "alias_state": false,
+ "wavefront": "auto",
+ "device": "NVIDIA A100-SXM4-80GB",
+ "torch": "2.14.1+cu130",
+ "source_commit": "2845354c",
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=4.3971645675775597e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.585259070478081e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.585259070478081e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.7445807662076195e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=5.008168586552488e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.4307143943444155e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=1.1638604404365322e-06, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=4.3058104256444307e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=4.3058104256444307e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_fold_product_linear', result=CheckResult(passed=True, max_relative_error=5.934048979640278e-07, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['products.0.linear', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'readouts.0.linear', 'interactions.0.linear', 'interactions.0.skip_tp', 'products.1.linear', 'interactions.1.skip_tp', 'readouts.1.linear_1'])",
+  "AppliedRewrite(name='tf32x3_gemms', result=CheckResult(passed=True, max_relative_error=5.646331310346931e-07, threshold=0.0001, modules=12, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.skip_tp', 'interactions.0.first_reassociation', 'interactions.1.linear_up', 'interactions.1.linear', 'interactions.1.skip_tp', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.110640918170247e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (895 pieces, 9 pairs, certificate 0.34, cached)', 'interactions.1 (612 pieces, 9 pairs, certificate 0.36, cached)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.262527314552999e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB; spline 731 intervals, certificate 0.48)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=2.265465478596652e-16, threshold=1e-10, modules=4, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "maps": {
+  "b": "torch.uint8",
+  "a": "torch.int32"
+ },
+ "warmup": {
+  "b": [
+   12.617178181011695,
+   77.59367849997943,
+   2.5398853159858845
+  ],
+  "a": [
+   6.568005995999556,
+   4.130842487968039,
+   2.532813140016515
+  ]
+ },
+ "last": {
+  "b": {
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": true,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "73.33 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.13463158201193437,
+   "lanes": "off: compiled tiles in CUDA graphs",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "local_frame": "tiles",
+   "compiled_graphs": "on: 3 capture pools and the warm-ups of 0.98 GiB (x1.1) fit 74.17 GiB",
+   "copy_stream": false,
+   "host_worker": false,
+   "tiles_s": 1.5233641189988703,
+   "graph_cache": {
+    "tiles": 68,
+    "bytes": 1455992184,
+    "budget": 18425876940
+   },
+   "global_bytes": 4120765440,
+   "heap_trims": 0,
+   "heap_trim_s": 0.0,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 303814192,
+   "list_kept_pinned_bytes": 412353216,
+   "list_cache_hits": 0,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "state_dtype": null,
+   "state_dtype_reason": null
+  },
+  "a": {
+   "tiles": 68,
+   "grid": [
+    4,
+    4,
+    4
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8920,
+   "max_edges": 1215116,
+   "list_reused": true,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 72191440,
+   "mode": "compiled",
+   "mode_reason": "69.10 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 0.1344711909769103,
+   "lanes": "off: compiled tiles in CUDA graphs",
+   "wavefront": {
+    "on": false,
+    "pool_rows": 0,
+    "pool_fraction": 0.0,
+    "boundary_skin": 0.0
+   },
+   "slots": {
+    "1": [
+     542,
+     2115,
+     182272
+    ],
+    "6": [
+     16187,
+     9106,
+     1093632
+    ],
+    "7": [
+     16385,
+     9812,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     491,
+     1922,
+     36334
+    ],
+    "6": [
+     14714,
+     8278,
+     1088836
+    ],
+    "7": [
+     16384,
+     8920,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "local_frame": "tiles",
+   "compiled_graphs": "on: 3 capture pools and the warm-ups of 0.98 GiB (x1.1) fit 69.96 GiB",
+   "copy_stream": false,
+   "host_worker": false,
+   "tiles_s": 1.5193537839804776,
+   "graph_cache": {
+    "tiles": 68,
+    "bytes": 1455992184,
+    "budget": 18425932979
+   },
+   "global_bytes": 4120765440,
+   "heap_trims": 0,
+   "heap_trim_s": 0.0,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 303814192,
+   "list_kept_pinned_bytes": 412353216,
+   "list_cache_hits": 0,
+   "list_cache": "on",
+   "host_bytes": 0,
+   "state_dtype": null,
+   "state_dtype_reason": null
+  }
+ },
+ "blocks": [
+  {
+   "b": [
+    2.077487126982305,
+    2.0789039240335114
+   ],
+   "a": [
+    2.071835523005575,
+    2.0731682130135596
+   ]
+  },
+  {
+   "b": [
+    2.0779423380154185,
+    2.07828439300647
+   ],
+   "a": [
+    2.075920708011836,
+    2.074176863010507
+   ]
+  },
+  {
+   "b": [
+    2.0797102710348554,
+    2.0775263350224122
+   ],
+   "a": [
+    2.0747825669823214,
+    2.0765097880503163
+   ]
+  },
+  {
+   "b": [
+    2.0809270180179738,
+    2.0796824949793518
+   ],
+   "a": [
+    2.0748753029620275,
+    2.0770923150121234
+   ]
+  }
+ ],
+ "result": {
+  "median_s": {
+   "b": 2.0785941585199907,
+   "a": 2.0748289349721745
+  },
+  "us_per_atom": {
+   "b": 2.1306676765344936,
+   "a": 2.1268081255608826
+  },
+  "ratio_b_over_a": 1.0018147151721049,
+  "pair_ratios": [
+   1.0027472387775502,
+   1.0014768713011333,
+   1.0014319037341284,
+   1.0020813975007328
+  ],
+  "energy_eV": {
+   "a": -7794281.787794651,
+   "b": -7794281.787803711
+  },
+  "energy_diff_meV_per_atom": -9.286877286747484e-09,
+  "forces_bitwise": false,
+  "max_force_diff": 2.6071794536619564e-06,
+  "max_abs_force": 3.0028422770556062e-06,
+  "max_stress_diff": 9.59024526459018e-12,
+  "stress_bitwise": false
+ }
+}
