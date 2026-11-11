@@ -120,6 +120,8 @@ def _route_nested(module, reassociation, device):
     says so, the tabled forward runs, the interaction's table is per species pair over the reassociation's and the
     skip's superset columns with 64 folded channels, and every table row passes ``nested.install``'s check. Sets
     ``reassociation.nested_rotation`` (the maps composed into the products); the table keeps the rotated copies."""
+    import sys
+
     import torch
 
     from fastmace.kernels.triton.tabled_outer_sum import tabled_forward
@@ -139,8 +141,15 @@ def _route_nested(module, reassociation, device):
             or getattr(skip, "columns", None) is None or skip.columns.cpu().tolist() != columns):
         return
     if not nested.install(table):
+        import logging
+
+        worst = max((max(e) for e in table.nested_errors), default=None)
+        logging.getLogger(__name__).warning("NESTED_RADIAL refused: far error %s > %s", worst, nested.TOLERANCE)
         return
     reassociation.nested_rotation = nested.rotation(table, len(columns), len(columns))
+    worst = max(max(e) for e in table.nested_errors)
+    print(f"fastmace: NESTED_RADIAL on ({table.coef.shape[0]} rows, far error {worst:.2e}, r_far {table.nested_r_far})",
+          file=sys.stderr, flush=True)
 
 
 def _support(model):

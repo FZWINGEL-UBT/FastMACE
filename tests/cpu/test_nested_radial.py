@@ -73,8 +73,8 @@ def test_rotated_table_maps_back_and_truncates_within_tolerance(table):
 
 
 def test_rotation_blocks_follow_the_tables_pair_rule(table):
-    out = nested.rotation(table, 2, 2)
-    assert out.shape == (2, 128, 128)
+    out = nested.rotation(table, 1, 1)
+    assert out.shape == (1, 64, 64) and torch.equal(out[0], table.nested_map[0])
     m = table.nested_map
     fake = SimpleNamespace(nested_map=torch.stack([m[0], 2 * m[0], 3 * m[0], 4 * m[0]]), single=False,
                            symmetric=False, species=2)

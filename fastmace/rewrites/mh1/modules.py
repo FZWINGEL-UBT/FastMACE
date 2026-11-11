@@ -195,11 +195,11 @@ class FirstInteractionReassociation(torch.nn.Module):
         import weakref
 
         cache = self.__dict__.setdefault("_composed_cache", {})
+        nested = self.nested_rotation is not None
+        if self.__dict__.get("_composed_nested", False) != nested:  # nested_rotation set or cleared: compose again
+            cache.clear()
+            self.__dict__["_composed_nested"] = nested
         entry = cache.get(id(table))
-        count = 2 * len(self.ls) * (1 if self.nested_rotation is None else 2)
-        if entry is not None and len(entry[2]) != count:  # nested_rotation set or cleared since: compose again
-            del cache[id(table)]
-            entry = None
         if entry is not None and entry[0]() is table and entry[1] == table._version:
             return entry
         with torch.no_grad():
