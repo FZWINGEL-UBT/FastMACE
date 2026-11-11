@@ -50,6 +50,9 @@ SF = {"sf-base": base_sf,
       "sf-packed8": sf.packed8_source(base_sf, 20),
       "sf-block_order": sf.render(schedule, blocks, GRID, R_MAX, [1.0] * paths, block_order=True, **stage),
       "sf-prefetch2": sf.render(schedule, blocks, GRID, R_MAX, [1.0] * paths, prefetch=2, **stage)}
+if hasattr(sf, "geom_source"):  # GEOM (main 4e9388c8): on the float4 and the PACKED8 table read
+    SF["sf-geom"] = sf.geom_source(base_sf)[0]
+    SF["sf-packed8-geom"] = sf.geom_source(SF["sf-packed8"])[0]
 common = dict(vector=2, table_w=True, blocks=blocks, factored=True, horner=True, spline=GRID)
 sh = NUM_THREADS // 32
 WP = {"wp-base": {}, "wp-butterfly": dict(butterfly=True), "wp-redux": dict(redux=True),
