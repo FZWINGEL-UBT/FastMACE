@@ -1,0 +1,23 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'first-interaction falsifiers (C1/C2 lab)' (pid 93831)
+/home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+2026-11-11T16:14:31 watchdog: memory fraction 0.9; kernel-log baseline 0 matching lines
+2026-11-11T16:14:33 NVIDIA GeForce RTX 5060 Ti: 368752 edges, 15000 slots, 9 pairs, 24.6 edges per filled slot
+2026-11-11T16:14:34 checks (max |d| / max |ref| against prod): {"fwd-copy": 8.722841471353604e-08, "fwd-byslot-w1": 2.616852441406081e-07, "fwd-byslot-w2": 2.616852441406081e-07, "fwd-byslot-w4": 2.616852441406081e-07, "bwd-recompute-copy": 0.0, "bwd-power-copy": 0.0}
+2026-11-11T16:14:38 fwd-prod                    725.6 us  (p10 716.9, p90 754.2)
+2026-11-11T16:14:38 fwd-copy                    720.2 us  (p10 713.0, p90 736.6)
+2026-11-11T16:14:38 fwd-fill-only               187.7 us  (p10 163.0, p90 198.1)
+2026-11-11T16:14:38 fwd-noslot                  401.2 us  (p10 396.3, p90 422.6)
+2026-11-11T16:14:38 fwd-noslot-fill             594.2 us  (p10 588.0, p90 615.0)
+2026-11-11T16:14:38 fwd-oneload                 666.7 us  (p10 657.7, p90 688.6)
+2026-11-11T16:14:38 fwd-byslot-w1               489.7 us  (p10 488.4, p90 514.6)
+2026-11-11T16:14:38 fwd-byslot-w2               521.5 us  (p10 518.6, p90 542.3)
+2026-11-11T16:14:38 fwd-byslot-w4               894.0 us  (p10 889.1, p90 918.2)
+2026-11-11T16:14:38 bwd-recompute-prod          841.5 us  (p10 821.7, p90 866.8)
+2026-11-11T16:14:38 bwd-recompute-copy          825.6 us  (p10 822.1, p90 845.4)
+2026-11-11T16:14:38 bwd-recompute-oneload       607.4 us  (p10 604.8, p90 674.8)
+2026-11-11T16:14:38 bwd-power-prod              720.6 us  (p10 700.2, p90 742.8)
+2026-11-11T16:14:38 bwd-power-copy              713.2 us  (p10 711.9, p90 834.6)
+2026-11-11T16:14:38 bwd-power-oneload           622.9 us  (p10 621.9, p90 641.1)
+2026-11-11T16:14:38 summary: {"C1_noslot_saving_us": 318.97919178009033, "C1_noslot_kernel_saving_us": 126.03521347045898, "C1_byslot_best_saving_us": 230.52000999450684, "C2_forward_saving_us": 53.540802001953125, "C2_backward_recompute_saving_us": 218.17281246185303, "C2_backward_power_saving_us": 90.20640850067139}
+exit 0

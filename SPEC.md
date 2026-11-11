@@ -3586,3 +3586,12 @@ CPU suite on murphy at the merged tip 1a80d2e9 (tests/cpu): 5,613 passed, 203 sk
 - **C5, w′ accumulators from the first product:** no drop on sm_90 (477 → 477).
 
 See `results/census-c345-20261111/`.
+
+**First interaction, C1 and C2 (11 November 2026; owner request, worker first-interaction, conductor; records only, both stopped):**
+- **C1, the forward by slot with sums in registers.** The falsifier saved 202 µs on the A100 (bar 130). Most of that came from dropping sm_80's scalar atomics: 64 atom instructions, 128 → 72 registers. No correct form keeps that.
+  - Best correct form, one warp per slot: −76 µs (1.2 %).
+  - The run-aligned walks: 474–555 µs against today's 466.
+  - Stopped.
+- **C2, a packed first radial table.** The falsifier saved 168 µs on the A100, over the bar. But certified packed slopes need 9.6k–15k pieces from 1 Å, which is 71–91 MB of table against the A100's 40 MB L2. Values alone would fit (1,402 pieces, 6.4 MB) but are worth at most the forward's 76 µs. Stopped by bound.
+
+See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
