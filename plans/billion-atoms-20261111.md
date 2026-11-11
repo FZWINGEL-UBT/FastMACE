@@ -214,5 +214,6 @@ Still possible on paper; step 3's measured peak decides it.
 | 0 | done: about 100 B/atom live before the first tile, 24 of it float64 positions | `census-colab/` (Colab A100, 3.91 CU) |
 | 1 | in (34 B/atom): gate 3x 12/12 (Alex 4984899); host rows 1.043 / 1.021 at 58^3 (a capacity option, not a default) | `073f1f37`, `step1-alex-4984899/` |
 | 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); Alex 4984768 at 750M: the gathers bitwise (compiled and eager `_tile_vectors`, compiled `_slot_local_vectors`), untouched rows zero, the flat view's tail right; `index_add_` differed by 3e-5 at 1M as at 750M (the atomics' order with random values), again with integer values in 4984899: every check bitwise at 1M and 750M | `jobs/alex_overflow.sh`, `step1-alex-4984899/probe-*` |
-| 3 | running: Alex 4985152 (one A100-80, 430^3 with `--host-positions`) | `jobs/alex_go.sh` |
+| 3 | queued: Alex 4985889 on main `e7ac9b42` (one A100-80, 430^3 with `--host-positions`; 4985152 cancelled before it started, its source older than the large caps) | `jobs/alex_go.sh` |
+| before 4 | supercell builder: bitwise ASE's at 300^3, 135 s and 31.5 GB at 585^3 (10^9 atoms); first-call probe: the whole call's decision at 58^3 and 160^3, workspace 0.998, on for the A100 family (Alex 4985954) | `setup-alex-4985954/` |
 | 4 | not reserved (owner, 11 November 2026) | |

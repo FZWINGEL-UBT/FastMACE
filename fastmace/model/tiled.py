@@ -178,10 +178,12 @@ TILE_LARGE_CAP_HOST_BYTES = 350_000
 # lists, and runs the call again in the chosen mode. The eager tiles' workspace is set by the largest tile, not by the
 # atom count: SrTiO3 at R 8,192 on the A100, 526,080,512 bytes above the tiles' start at 149M, 320M and 397.5M atoms
 # (Alex 4973640), 503,742,464 at 20.48M with a smaller largest tile. The 397.5M record's eager first call took
-# 11,468 s of 15,041. Wavefront calls only (else the whole eager call, as before). None: on for no GPU yet (A/B:
-# the probe's decision against the whole call's); True / False force it (True also off a CUDA device, for tests).
+# 11,468 s of 15,041. Wavefront calls only (else the whole eager call, as before). A100, Alex 4985954 (the go/no-go's
+# call): the probe's workspace 0.9986 of the whole call's at 58^3, 0.9982 at 160^3 (the 10 % of _choose_receivers
+# covers it), the same mode and cap; two calls at 160^3 286.5 s against 600.6 s. None: on for TILE_PROBE_GPUS
+# (decision 66, per family); True / False force it (True also off a CUDA device, for tests).
 TILE_FIRST_CALL_PROBE = None
-TILE_PROBE_GPUS = GPUModels(())
+TILE_PROBE_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 TILE_PROBE_TILES = 8
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
