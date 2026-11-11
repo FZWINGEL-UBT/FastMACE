@@ -3595,3 +3595,5 @@ See `results/census-c345-20261111/`.
 - **C2, a packed first radial table.** The falsifier saved 168 µs on the A100, over the bar. But certified packed slopes need 9.6k–15k pieces from 1 Å, which is 71–91 MB of table against the A100's 40 MB L2. Values alone would fit (1,402 pieces, 6.4 MB) but are worth at most the forward's 76 µs. Stopped by bound.
 
 See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
+
+**Ledger, second outside note (11 November 2026; rev2 queue, worker docs-refresh, conductor; docs only):** three new ledger rows. Nested radial basis is OPEN; the first-interaction lane owns it, and the certificate is next. Compact angular products waits on GEOM's H200 A/B. Shared denominator is stopped by the bound: about 34 µs on the A100 and 7–10 µs on the H200, under both bars. The index rows for ideas 18–20 and the first two outside ideas (C1–C5) now show today's stops, and the original estimates stay in the rows, marked "Before the test".
