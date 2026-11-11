@@ -360,19 +360,19 @@ def test_keys_only_sort_builds_the_same_list(sort, groups, by_length, monkeypatc
 
 @pytest.mark.parametrize("chunked", [False, True])
 def test_edge_index_int32_stores_the_same_edges(chunked, monkeypatch):
-    """EDGE_INDEX_INT32: compact() writes the same pairs, in the same order, into an int32 edge_index; the shifts and
-    count are unchanged. Off by default (int64)."""
+    """NeighbourConfig.edge_index_int32="on": compact() writes the same pairs, in the same order, into an int32
+    edge_index; the shifts and count are unchanged. "auto" without a plan, and "off", keep int64; the module's
+    EDGE_INDEX_INT32 (None by default) overrides the config for an A/B side."""
     from fastmace.neighbors import skin
 
-    assert skin.EDGE_INDEX_INT32 is False
+    assert skin.EDGE_INDEX_INT32 is None and NeighbourConfig().edge_index_int32 == "auto"
     if chunked:
         monkeypatch.setattr(skin, "COMPACT_CHUNK", 97)
     atoms = nbcl5(rattle=0.05, seed=7)
     positions = torch.tensor(atoms.positions)
     lists = []
-    for int32 in (False, True):
-        monkeypatch.setattr(skin, "EDGE_INDEX_INT32", int32)
-        nl = make(atoms, sort=True)
+    for toggle in ("auto", "on"):
+        nl = make(atoms, sort=True, edge_index_int32=toggle)
         nl.build_gpu(positions)
         nl.compact(positions)
         lists.append(nl)
@@ -384,6 +384,17 @@ def test_edge_index_int32_stores_the_same_edges(chunked, monkeypatch):
     count = int(narrow.count)
     index, _, _ = narrow.edges(count)
     assert index.dtype == torch.int32 and index.shape == (2, count)
+
+    def dtype(toggle):
+        nl = make(atoms, sort=True, edge_index_int32=toggle)
+        nl.build_gpu(positions)  # the buffers exist from the first build
+        return nl.edge_index.dtype
+
+    assert dtype("off") == torch.int64
+    monkeypatch.setattr(skin, "EDGE_INDEX_INT32", False)
+    assert dtype("on") == torch.int64
+    monkeypatch.setattr(skin, "EDGE_INDEX_INT32", True)
+    assert dtype("off") == torch.int32
 
 
 def test_sort_by_length_is_off_by_default_and_needs_sort_receivers(monkeypatch):
@@ -666,3 +677,29 @@ def test_chunked_compact_is_bitwise_the_one_chunk_compact(chunk, variable_cell, 
     assert count == count_c > 0
     assert torch.equal(index, index_c) and torch.equal(unit, unit_c) and torch.equal(shifts, shifts_c)
 
+
+
+def test_the_planner_turns_edge_index_int32_on_on_measured_gpus_only():
+    """Decision 66 (11 November 2026): "auto" on on the RTX 4000 Ada, the RTX 5060 Ti and every A100 (gate and A/B
+    passed), off elsewhere (the H200, not measured); an explicit value is kept."""
+    import dataclasses
+
+    from test_planner import GPU, plan_for
+
+    from fastmace.planner import fixed
+
+    assert fixed.DECISION_66_EDGE_INDEX_INT32_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
+                                                       "NVIDIA A100-SXM4-80GB")
+    assert "NVIDIA A100 80GB PCIe" in fixed.DECISION_66_EDGE_INDEX_INT32_GPUS
+    assert "NVIDIA H200" not in fixed.DECISION_66_EDGE_INDEX_INT32_GPUS
+    measured = plan_for("omat0-medium")
+    _, choice, why = measured.decision("NeighbourConfig.edge_index_int32")
+    assert measured.neighbours.edge_index_int32 == choice == "on" and "gate and A/B passed" in str(why)
+    off = plan_for("omat0-medium", neighbours=NeighbourConfig(edge_index_int32="off"))
+    assert off.neighbours.edge_index_int32 == "off"
+    h200 = dataclasses.replace(GPU, name="NVIDIA H200")
+    from test_planner import planner, traits
+
+    other = planner().plan(traits("omat0-medium"), nacl(), fixed.IntegratorConfig(), h200, model_label="omat0-medium")
+    _, choice, why = other.decision("NeighbourConfig.edge_index_int32")
+    assert other.neighbours.edge_index_int32 == choice == "off" and "not a measured GPU" in str(why)

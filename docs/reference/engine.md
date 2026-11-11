@@ -117,6 +117,7 @@ reason is in `sim.plan.describe(full=True)`, under the key
 | `capacity_headroom` | float ≥ 1 | `1.15` | The pair buffer holds this many times the pairs of the first build. A list that outgrows it is reallocated, which drops the graphs that read it. | With `headroom="auto"` and an MC or species-change workload, the planner sizes it from the skin and the cutoff (at least 1.15). |
 | `headroom` | `"auto"`, `"fixed"` | `"auto"`: resolves to `"fixed"` with `capacity_headroom` sized for MC and species-change workloads | `"fixed"` uses `capacity_headroom` and `edge_bucket_fraction` as given. | For plain MD `"auto"` keeps the given values. The plan always records `"fixed"` with the value it used. `edge_bucket_fraction` is never resized. |
 | `d3_skin` | `"auto"` or float > 0, Å | `"auto"`: sized for the D3 pair list from the fastest atom and, under a barostat, the expected cell strain | The skin of the D3 dispersion pair list, which is separate from the model's list. | Read only when the force field has D3. Without D3 the plan records it as unused. |
+| `edge_index_int32` | `"auto"`, `"on"`, `"off"` | `"auto"`: on on the RTX 4000 Ada, RTX 5060 Ti and A100, off elsewhere | Stores the compacted edge_index in int32 instead of int64 (8 B per edge). | A rounding change inside the 3× float32 gate; on where its gate and A/B passed (results/edge-index-int32-20261111). |
 
 ## When to change these
 
