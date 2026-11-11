@@ -4,11 +4,12 @@
 #   1. MD-step A/B, a = the H200's default plan, b = one switch on, both build orders (ab: abab, ba: abba), SrTiO3
 #      10x10x10 and NbCl5 3x3x3, 1 fs, skin 0.5, warm-up 200, 6 blocks of 256 steps per side. One
 #      tools/ab_rewrites.py --pack process per order builds side a once for both switches (as alex_ab_pack v2).
-#   2. The force/stress gate (tools/force_stress_gate.py, 3x the float32 error): the default plan, then each switch;
-#      SrTiO3 3x3x3, NaCl, NbCl5.
+#   2. The force/stress gate (tools/force_stress_gate.py, 3x the float32 error) of each switch; SrTiO3 3x3x3, NaCl,
+#      NbCl5. The default plan's own gate is left out (decision 66 needs the switch's gate to pass; it keeps the pack
+#      within the month's remaining Modal credit).
 # Every step runs whatever the others give (one pack, no relaunch). Stop rule per switch: not faster in both orders on
 # both structures, or the gate fails.
-#   modal run tools/modal/fastmace_modal.py::job --gpu H200 --timeout-min 75 --tarball <slim tar> \
+#   modal run tools/modal/fastmace_modal.py::job --gpu H200 --timeout-min 50 --tarball <slim tar> \
 #     --command "bash tools/modal/h200_hybrid_geom.sh" --out <dir>
 # Environment: OUT (the job sets it), EXPECT_GPU (default H200), BLOCKS (6), DRY (1: print the commands only).
 set -uo pipefail
@@ -50,7 +51,6 @@ gate() {
   [ "$code" = 0 ] || failed=$((failed + 1))
   note "end gate-$name exit=$code $(tail -n 4 "$out/gate-$name/summary.txt" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
 }
-gate default
 gate hybrid --production-constant "$hybrid"
 gate geom --production-constant "$geom"
 note "done failed=$failed"

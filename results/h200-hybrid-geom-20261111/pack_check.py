@@ -35,7 +35,7 @@ for order, pattern in (("ab", "abab"), ("ba", "abba")):
         "NbCl5@3x3x3", "--timestep-fs", "1", "--a-neighbours", "skin=0.5", "--b-neighbours", "skin=0.5", "--warmup",
         "200", "--block", "256", "--blocks", "6", "--order", order, "--pattern", pattern,
         "--pack", f"hybrid|{HYBRID};geom|{GEOM}"])
-entries = ab_rewrites.pack_entries(args.pack)
+entries = args.pack if isinstance(args.pack, list) else ab_rewrites.pack_entries(args.pack)  # parse_args parses it
 result["pack"] = [(name, sorted(f"{m}:{n}={v}" for (m, n), v in consts.items())) for name, _, consts in entries]
 result["structures"] = [force_stress_gate.structure_spec(s, (3, 3, 3), "/nonexistent")[0:3:2]
                         for s in (f"{ST}@10x10x10",)]
