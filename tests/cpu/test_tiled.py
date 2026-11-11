@@ -1328,7 +1328,7 @@ def test_virial_from_edge_gradients_is_the_strain_leafs_gradient(mode, monkeypat
 @pytest.mark.parametrize("length", [226.5, 1210.5, 1562.0])
 def test_local_frame_edge_vectors_keep_float32_accuracy_in_any_box(length):
     """``TILE_LOCAL_FRAME`` (idea 11): float32 edge vectors from the positions' 32 A bins and offsets, and the shift
-    rebuilt from its unit shift, stay within about 4e-6 A of float64 in a triclinic box of any size, also 1,500 A from
+    rebuilt from its unit shift, stay within about 6e-6 A of float64 in a triclinic box of any size, also 1,500 A from
     the origin and across the periodic boundary; the plain float32 vectors carry the coordinates' float32 spacing
     (1.5e-5 A at 226 A, 1.2e-4 A from 1,024 A: the capacity records' residual force, 8x from 1M to 149M atoms)."""
     from fastmace.model.tiled import TILE_LOCAL_FRAME_WIDTH, _frame_parts, _frame_vectors, _tile_vectors
@@ -1357,12 +1357,57 @@ def test_local_frame_edge_vectors_keep_float32_accuracy_in_any_box(length):
     local = _frame_vectors(frame, ei, shifts32, torch.ones(e), far)
     assert local.dtype == torch.float32
     plain_error, local_error = float((plain - exact).abs().max()), float((local.double() - exact).abs().max())
-    assert local_error <= 4e-6, (plain_error, local_error)
+    assert local_error <= 6e-6, (plain_error, local_error)  # two offsets and the remainder at ulp(32)/2, the sums
     assert plain_error >= 5 * local_error, (plain_error, local_error)
     mask = torch.ones(e)
     mask[::7] = 0
     padded = _frame_vectors(frame, ei, shifts32, mask, far)
     assert torch.equal(padded[::7], far.expand(len(range(0, e, 7)), 3)) and torch.equal(padded[1::7], local[1::7])
+
+
+@pytest.mark.parametrize("length", [226.5, 1210.5, 1562.0])
+def test_tile_local_edge_vectors_keep_float32_accuracy_in_any_box(length):
+    """``TILE_LOCAL_FRAME``, tile-local form (idea 11): one tile of receivers within 40 A at the box's corner (its
+    halo across the periodic boundary, and the box 1,500 A from the origin), its rows relative to the first receiver
+    and each halo row at its edge's image, in float64 before the cast: the float32 vectors within 8e-6 A of float64
+    (the tile's extent, not the box's); the plain float32 vectors carry the box's float32 spacing."""
+    from fastmace.model.tiled import _tile_local, _tile_vectors
+
+    rng = np.random.default_rng(12)
+    cell = torch.tensor([[length, 0, 0], [0.13 * length, length, 0], [-0.07 * length, 0.05 * length, length]],
+                        dtype=torch.float64)
+    origin = 1500.0
+    corner = cell.sum(dim=0) + origin  # receivers around the far corner: most halo images wrap to the near side
+    r, e = 300, 3000
+    receivers = corner + torch.tensor(rng.uniform(-20, 20, (r, 3)), dtype=torch.float64)
+    receiver = torch.tensor(rng.integers(0, r, e))
+    d = torch.tensor(rng.uniform(-3.5, 3.5, (e, 3)), dtype=torch.float64)
+    image = receivers[receiver] - d  # the sender's image near the tile
+    fractional = (image - origin) @ torch.linalg.inv(cell)
+    unit = -torch.floor(fractional)  # the sender stored inside the box: p = image + unit @ cell
+    shift = unit @ cell
+    senders = image + shift
+    assert float(((senders - origin) @ torch.linalg.inv(cell)).min()) >= -1e-9
+    rows64 = torch.cat([receivers, senders])
+    local = torch.stack([torch.arange(r, r + e), receiver])
+    exact = rows64[local[1]] - rows64[local[0]] + shift
+    assert float((exact - d).abs().max()) < 1e-9 and int((unit != 0).any(dim=1).sum()) > e // 2
+    shifts32 = shift.to(torch.float32)
+    far = torch.tensor([13.0, 0.0, 0.0], dtype=torch.float32)
+    plain = _tile_vectors(rows64.to(torch.float32), local, shifts32, torch.ones(e), far).double()
+    rows, remaining = _tile_local(rows64, r, local, shifts32, cell, torch.linalg.inv(cell), torch.float32)
+    assert rows.dtype == torch.float32 and float(rows.abs().max()) < 64
+    assert torch.equal(remaining, torch.zeros_like(remaining))  # one image per halo row here
+    local_vectors = _tile_vectors(rows, local, remaining, torch.ones(e), far).double()
+    plain_error, local_error = float((plain - exact).abs().max()), float((local_vectors - exact).abs().max())
+    assert local_error <= 8e-6, (plain_error, local_error)
+    assert plain_error >= 5 * local_error, (plain_error, local_error)
+    # a halo atom reached through a second image keeps its first edge's image; the other edge's shift remains
+    twice = torch.cat([local, torch.tensor([[r], [0]])], dim=1)
+    other = torch.cat([shifts32, (shift[0] + cell[0]).to(torch.float32).unsqueeze(0)])
+    rows2, remaining2 = _tile_local(rows64, r, twice, other, cell, torch.linalg.inv(cell), torch.float32)
+    assert torch.equal(rows2, rows) and torch.equal(remaining2[:e], remaining)
+    assert float((remaining2[e].double() - cell[0]).abs().max()) <= float(torch.finfo(torch.float32).eps) * length
 
 
 @pytest.mark.parametrize("mode", ["eager", "padded"])
@@ -1380,7 +1425,7 @@ def test_local_frame_call_is_the_whole_system_call_far_from_the_origin(mode, mon
     for current in (moved, strained(moved)):
         expected = field.evaluate(current, stress=True)
         got = tiled.evaluate(current, stress=True)
-        assert tiled.last["local_frame"] is True
+        assert tiled.last["local_frame"] == "tiles"
         assert got[0] == pytest.approx(expected[0], rel=1e-12, abs=0)
         assert relative(got[1], expected[1]) <= 1e-10
         assert relative(got[2], expected[2]) <= 1e-10

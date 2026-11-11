@@ -129,8 +129,10 @@ TILE_EPILOGUE = None
 # rebuilt in float64 from its unit shift (recovered exactly from the float32 shift and the cell) and split the same
 # way: v = (bin_r - bin_s + k) W + (off_r - off_s + rem). Plain float32 positions round each coordinate to its
 # float32 spacing, so a perfect crystal's edge vectors carry 1.5e-5 A at 226 A and 1.1e-4 A from 1,024 A (the
-# residual force 1.64e-4 -> 1.32e-3 eV/A from 1M to 149M atoms); in the frame they carry at most about 4e-6 A in any
-# box. 18 bytes per atom more on the device (bins and offsets beside the field's float32 positions).
+# residual force 1.64e-4 -> 1.32e-3 eV/A from 1M to 149M atoms); in the frame they carry a few 1e-6 A in any
+# box (6e-6 A worst case). Where the call's float64 positions are on the device, each tile builds its float32 rows
+# relative to its first receiver instead (``_tile_local``; no stored bytes); the bins and offsets (18 bytes per atom
+# beside the field's float32 positions) only for positions on the host.
 TILE_LOCAL_FRAME = False
 TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in float32
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
@@ -969,6 +971,29 @@ def _tile_vectors(pos, ei, shifts, edge_mask, far):
 
     vectors = pos[ei[1]] - pos[ei[0]] + shifts
     return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
+
+
+def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
+    """``TILE_LOCAL_FRAME``, tile-local form: one tile's node rows ``rows64`` [rows, 3] (float64 positions) and its
+    edges' float32 ``shifts`` as ``(positions, shifts)`` in ``dtype`` whose ``positions[local[1]] - positions[local[0]]
+    + shifts`` are the edge vectors. Each halo row sits at its first edge's periodic image (``p - shift``), every row
+    relative to the first receiver, in float64 before the cast; an edge's remaining shift (``shift`` less its sender
+    row's) is zero unless one atom reaches the tile through two images. The float64 shift is ``round(shift @ cell^-1)
+    @ cell`` (exact: the float32 shift is within its rounding of an integer combination of the cell's rows). Rows
+    below ``receiver_rows`` keep their own image."""
+    import torch
+
+    count, e = rows64.shape[0], local.shape[1]
+    shift = torch.round(shifts.double() @ inverse) @ cell
+    image = torch.zeros_like(rows64)
+    if e:
+        edge = torch.arange(e, device=local.device)
+        first = torch.full((count,), e, dtype=edge.dtype, device=local.device).scatter_reduce(
+            0, local[0], edge, reduce="amin")
+        halo = (first < e) & (torch.arange(count, device=local.device) >= receiver_rows)
+        image = torch.where(halo.unsqueeze(1), shift[first.clamp(max=e - 1)], image)
+    origin = rows64[:1]
+    return (rows64 - image - origin).to(dtype), (shift - image[local[0]]).to(dtype)
 
 
 def _frame_parts(positions64, width, dtype):
@@ -1909,7 +1934,26 @@ class TiledForceField:
                     node_mask=new(receivers + halo, dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype),
                     ei=new((2, edges), dtype=i64), shifts=new((edges, 3), dtype=self.dtype),
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
-                    count=new((), dtype=i64), out={}, graphs={})
+                    count=new((), dtype=i64), out={}, graphs={},
+                    rows=new((receivers + halo, 3), dtype=self.dtype))  # TILE_LOCAL_FRAME: tile-local positions
+
+    def _fill_local(self, slot, piece, local_frame):
+        """``TILE_LOCAL_FRAME``: the slot's tile-local positions (``rows``, in its node layout) and its edges'
+        remaining shifts (in ``shifts``), from the call's float64 positions."""
+        import torch
+
+        positions64, cell, inverse = local_frame
+        nodes, _, shifts, local, r, h = piece
+        receivers, halo, edges = slot["sizes"]
+        e = local.shape[1]
+        rows64 = torch.zeros((receivers + halo, 3), dtype=torch.float64, device=self.device)
+        rows64[:r] = positions64[nodes[:r]]
+        rows64[receivers:receivers + h] = positions64[nodes[r:]]
+        rows, remaining = _tile_local(rows64, receivers, local, shifts, cell, inverse, self.dtype)
+        slot["rows"].copy_(rows)
+        slot["rows"][r:receivers].zero_()  # padding receivers and halo rows as the plain positions' atom 0 rows
+        slot["rows"][receivers + h:].zero_()
+        slot["shifts"][:e] = remaining
 
     def _fill(self, slot, piece):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
@@ -1945,7 +1989,10 @@ class TiledForceField:
 
         receivers = slot["sizes"][0]
         nodes, ei = slot["nodes"], slot["ei"]
-        if g.get("frame") is not None:  # TILE_LOCAL_FRAME
+        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local: the slot's rows and remaining shifts
+            vectors_of = self._compiled_once("vectors", _tile_vectors) if self._speed(TILE_EPILOGUE) else _tile_vectors
+            vectors = vectors_of(slot["rows"], slot["local"], slot["shifts"], slot["edge_mask"], self._far)
+        elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
             vectors = _frame_vectors(g["frame"], ei, slot["shifts"], slot["edge_mask"], self._far)
         elif self._speed(TILE_EPILOGUE):
             vectors = self._compiled_once("vectors", _tile_vectors)(g["pos"], ei, slot["shifts"], slot["edge_mask"],
@@ -2255,8 +2302,9 @@ class TiledForceField:
         bound = None
         try:
             g = self._globals(n, stress, pos, heads)
-            g["frame"] = self._local_frame(positions, n) if TILE_LOCAL_FRAME else None
-            stats["local_frame"] = g["frame"] is not None
+            g["local_frame"], g["frame"] = self._frames(positions, n) if TILE_LOCAL_FRAME else (None, None)
+            stats["local_frame"] = ("tiles" if g["local_frame"] is not None else
+                                    "bins" if g["frame"] is not None else None)
             self.heads, self.arange = g["heads"], g["arange"]
             if padded and self.mode == "compiled" and self._captured():  # the guard: pools for every slot in use
                 self._graphs_slots_fit(len(set(keys)))
@@ -2363,6 +2411,8 @@ class TiledForceField:
                         torch.cuda.current_stream().wait_event(slot["event"])
                         slot["event"] = None
                     self._fill(slot, piece)
+                    if g.get("local_frame") is not None:
+                        self._fill_local(slot, piece, g["local_frame"])
                     state.prefetched = fetched  # rows() takes these instead of gathering them now
                     following = position is not None and position + 1 < len(order)
                     if lane is None:
@@ -2609,6 +2659,23 @@ class TiledForceField:
             self._lane_slots.clear()
             self._edge_step = None
             self._graph_key = None
+
+    def _frames(self, positions, n):
+        """``TILE_LOCAL_FRAME``: ``(local_frame, frame)``, one of them set. Tile-local positions (``(positions64,
+        cell, inverse)``) where the call's float64 positions are on the device (no stored bytes), else the bins and
+        offsets of ``_local_frame``; neither without a full periodic cell."""
+        import torch
+
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3)
+        cell = torch.as_tensor(cell, dtype=torch.float64).reshape(3, 3)
+        if abs(float(torch.linalg.det(cell))) < 1e-9:
+            return None, None
+        if positions.device != self.device:
+            return None, self._local_frame(positions, n)
+        cell = cell.to(self.device)
+        return (positions.to(torch.float64), cell, torch.linalg.inv(cell)), None
 
     def _local_frame(self, positions, n):
         """``TILE_LOCAL_FRAME``: the call's positions as int16 bins of ``TILE_LOCAL_FRAME_WIDTH`` and offsets in the
@@ -2911,7 +2978,11 @@ class TiledForceField:
         if sweep != 2 and self._reassociations:  # interaction 0 runs on the tile's R + H rows
             self._bind_tables(self.field.species_tables(nodes.shape[0]))
         state = g["state"]
-        if g.get("frame") is not None:  # TILE_LOCAL_FRAME
+        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local
+            positions64, cell, inverse = g["local_frame"]
+            rows, remaining = _tile_local(positions64[nodes], r, local, shifts, cell, inverse, self.dtype)
+            vectors = rows[local[1]] - rows[local[0]] + remaining
+        elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
             vectors = _frame_vectors(g["frame"], ei, shifts, None, None)
         else:
             vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
