@@ -241,6 +241,124 @@ def packed8_source(source, bias):
     return source
 
 
+# GEOM (results/other-ways-20261109 section 4; the 9 November external proposal 1, "shared geometric expressions
+# across the ten paths"; rounding: the CG sum is taken before the multiply by w x_i): with STAGE_EDGES each path of the
+# forward takes the cheapest of three forms by FP32 operations per (edge, channel), float32 +-1 coefficients free:
+# as today; w x_i factored out of a one-component path; or g_oi = sum_j c_oij e_j computed once per tile edge into
+# shared memory (it does not depend on the channel) and acc_o += (w x_i) g_oi. OMAT-0 medium: FMULs per edge and
+# channel 69 -> 48, shared loads 9 -> 28, 80 registers. Kernel lab, SrTiO3 10x10x10, A100 defaults (PACKED8):
+# Alex A100-SXM4-80GB 0.867 / 0.868 of the forward (two jobs); local RTX 5060 Ti 1.080 (memory-bound there).
+# NVIDIA A100-SXM4-80GB (10 November 2026, Alex job 4973813, source 219602cf; Benchmark_loup MD step b/a, a = the A100
+# defaults): 0.9756 / 0.9806 (ab / ba); force/stress gate passes with SC_FACTORED also on (forces 0.863 / 0.913 /
+# 0.985, stress 0.727 / 0.896 / 1.343). The H200 is not measured (issue-bound there, not FMA-bound). None: on for
+# GEOM_GPUS; True / False: an A/B side's choice.
+GEOM = None
+GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+
+
+def geom_default(device):
+    """``GEOM`` on ``device``: the constant when set, else on for ``GEOM_GPUS``."""
+    return _switch(GEOM, GEOM_GPUS, device)
+
+
+def _f32_unit(literal):
+    """+1, -1 or None: the coefficient literal ("0x1.fff...p-1f") as float32 is exactly +-1."""
+    import struct
+
+    v = struct.unpack("f", struct.pack("f", float.fromhex(literal.rstrip("f"))))[0]
+    return 1 if v == 1.0 else -1 if v == -1.0 else None
+
+
+def geom_source(source):
+    """``GEOM``'s form of a STAGE_EDGES ``spline_forward`` source (float4 or PACKED8 table read): returns (source,
+    number of shared g values per edge)."""
+    import re
+
+    def replace(text, old, new):
+        if text.count(old) != 1:
+            raise ValueError(f"GEOM: expected one {old!r}, found {text.count(old)}")
+        return text.replace(old, new)
+
+    term = re.compile(r"x(\d+) \* e(\d+) \* (-?0x[0-9a-fA-F.]+p[+-]?\d+f)")
+    if "s_tq[TILE]" not in source:
+        raise ValueError("GEOM needs the STAGE_EDGES kernel")
+    head, sep, loop = source.partition("        for (int k = 0; k < count; ++k) {")
+    if not sep:
+        raise ValueError("GEOM: no edge loop")
+    parts = re.split(r"(\n            \{\n)", loop)
+    fills, ng, chosen = [], 0, []
+    out = [parts[0]]
+    for marker, block in zip(parts[1::2], parts[2::2]):
+        she = dict(re.findall(r"const float (e\d+) = she\[(\d+)\];", block))
+        rows = re.findall(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", block)
+        if not rows or not she:
+            out += [marker, block]
+            continue
+        terms = {o: [(int(xi), ej, c) for xi, ej, c in term.findall(expr)] for o, expr in rows}
+        for (o, expr) in rows:  # every product of the row parsed, or the path stays as it is
+            if len(terms[o]) != expr.count("*") // 2:
+                raise ValueError(f"GEOM: cannot parse acc[{o}]'s row")
+        xs = sorted({t[0] for ts in terms.values() for t in ts})
+        nonunit = sum(1 for ts in terms.values() for t in ts if _f32_unit(t[2]) is None)
+        cur = sum(len(ts) + 1 for ts in terms.values()) + nonunit
+        factor = 1 + sum(len(ts) for ts in terms.values()) + nonunit if len(xs) == 1 else cur + 1
+        pairs = sum(len({t[0] for t in ts}) for ts in terms.values())
+        hoist = len(xs) + pairs
+        best = min(cur, factor, hoist)
+        new_rows = {}
+        if best == cur:
+            chosen.append("cur")
+            out += [marker, block]
+            continue
+        if best == factor:
+            chosen.append("factor")
+            i = xs[0]
+            for o, ts in terms.items():
+                expr = f"acc[{o}]"
+                for _, ej, c in ts:
+                    unit = _f32_unit(c)
+                    e = f"-e{ej}" if unit == -1 else f"e{ej}" if unit == 1 else f"e{ej} * {c}"
+                    expr = f"fmaf(wx{i}, {e}, {expr})"
+                new_rows[o] = f"acc[{o}] = {expr};"
+        else:
+            chosen.append("hoist")
+            for o, ts in terms.items():
+                expr = f"acc[{o}]"
+                for i in sorted({t[0] for t in ts}):
+                    g = " + ".join(f"q[{she['e' + ej]}] * {c}" for xi, ej, c in ts if xi == i)
+                    fills.append(f"g[{ng}] = {g};")
+                    expr = f"fmaf(wx{i}, s_g[gk + {ng}], {expr})"
+                    ng += 1
+                new_rows[o] = f"acc[{o}] = {expr};"
+        wx = ", ".join(f"wx{i} = w * x{i}" for i in xs)
+        block, n = re.subn(r"(const float w = fmaf\(.*;\n)",
+                           lambda m: m.group(1) + f"                const float {wx};\n", block, count=1)
+        if n != 1:
+            raise ValueError("GEOM: a path without its w line")
+        block = re.sub(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", lambda m: new_rows[m.group(1)], block)
+        block = re.sub(r"\s*const float e\d+ = she\[\d+\];", "", block) if best != factor else block
+        out += [marker, block]
+    source = head + sep + "".join(out)
+    if ng:
+        gd = (ng + 3) // 4 * 4
+        source = replace(source, "__shared__ __align__(16) float s_sh[TILE * ED];",
+                         f"__shared__ __align__(16) float s_sh[TILE * ED];\n    constexpr int GD = {gd};\n"
+                         "    __shared__ __align__(16) float s_g[TILE * GD];")
+        body = "\n                ".join(fills)
+        source = replace(source, "        const int count = s_count;\n",
+                         "        for (int kk = ch; kk < count_in; kk += C) {  // GEOM: the tile's g, once per edge\n"
+                         "            const float* q = s_sh + kk * ED;\n"
+                         "            float* g = s_g + kk * GD;\n"
+                         f"                {body}\n"
+                         "        }\n"
+                         "        __syncthreads();\n"
+                         "        const int count = s_count;\n")
+        she = "const float* she = s_sh + s_k[k] * ED;"
+        source = replace(source, she, she + "\n            const int gk = s_k[k] * GD;")
+    source = source.replace("// spline_forward", f"// GEOM (paths: {' '.join(chosen)}); spline_forward", 1)
+    return source, ng
+
+
 def stage_edges_default(device):
     """``STAGE_EDGES`` on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
     if STAGE_EDGES is not None:
@@ -720,6 +838,10 @@ class SplineForward:
         self.packed8 = packed8_bias is not None and self.stage_edges
         if self.packed8:
             self.sources = [packed8_source(s, int(packed8_bias)) for s in self.sources]
+        # GEOM: shared per-edge CG sums for the paths where they save FP32 work (on the table read in use)
+        self.geom = geom_default(device) and self.stage_edges
+        if self.geom:
+            self.sources = [geom_source(s)[0] for s in self.sources]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
         self.source = "\n".join(self.sources)
@@ -860,7 +982,8 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["shared", "PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
+__all__ = ["shared", "GEOM", "GEOM_GPUS", "geom_default", "geom_source",
+           "PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
            "PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
            "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",

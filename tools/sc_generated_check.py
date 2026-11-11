@@ -64,9 +64,15 @@ def main(argv=None) -> int:
                 if issubclass(type(obj), torch.nn.Module) and hasattr(type(obj), "sc_generated_base")]
     marked = [obj for obj in gc.get_objects()
               if issubclass(type(obj), torch.nn.Module) and getattr(obj, "sc_generated", False) is True]
+    from fastmace.kernels.oeq_streaming import spline_forward
+
+    forwards = list(spline_forward._REGISTRY.values())  # every compiled SplineForward of the process
     record = dict(constants=args.constant, rewrites=args.rewrites, structure=args.structure,
                   products_routed=len(products), interactions_marked=len(marked),
-                  kernels=len(kernels._REGISTRY), in_use=bool(products and marked))
+                  kernels=len(kernels._REGISTRY), in_use=bool(products and marked),
+                  # SC_FACTORED: the routed product reads the folded weights; GEOM: spline forwards in that form
+                  factored=any(getattr(p, "sc_generated_weight", None) is not None for p in products),
+                  spline_forwards=len(forwards), geom=sum(bool(getattr(f, "geom", False)) for f in forwards))
     if kernels._REGISTRY:
         from cuda.bindings import driver
 
