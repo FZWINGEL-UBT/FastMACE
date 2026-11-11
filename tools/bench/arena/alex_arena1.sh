@@ -36,7 +36,7 @@ CK=$B/models/mace-omat-0-medium.model
 note "job $SLURM_JOB_ID on $(hostname); $(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader | head -1); source $SHA; gcc $(command -v gcc || echo missing)"
 C=tools/bench/capacity_scan.py
 {
-  python -m pytest -q -p no:cacheprovider -m slow -s tests/gpu/test_capture_arena_gpu.py > $OUT/gputest.log 2>&1
+  python -m pytest -q -p no:cacheprovider -s tests/gpu/test_capture_arena_gpu.py > $OUT/gputest.log 2>&1
   echo "gpu test exit=$? $(tail -n 1 $OUT/gputest.log)"
   for side in off on; do
     value=$([ $side = on ] && echo true || echo false)

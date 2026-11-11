@@ -8,9 +8,11 @@
  *   1  planned:  the k-th malloc is served at base + offset[k] of one arena when its size equals the plan's; any
  *                other request (a mismatch, or past the plan's end) falls back to cuMemAlloc and is counted.
  *                Frees inside the arena are no-ops; arena_release() returns the arena.
- *   2  virtual:  every request gets a reserved virtual address range with no memory behind it (cuMemAddressReserve).
- *                A capture only records pointers, so a recording capture needs no device memory; such a graph
- *                must never be replayed. Frees return the range.
+ *   2  virtual:  every request gets a reserved virtual address range (cuMemAddressReserve) whose granules all map
+ *                one shared physical chunk (cuMemCreate of one granule, cuMemMap at every granule): every pointer
+ *                is valid device memory, as Triton's launcher checks at capture, yet the recording costs one
+ *                granule. A capture only records pointers; such a graph aliases all its buffers and must never be
+ *                replayed. Frees unmap and return the range.
  * Every call is logged, so a planned capture can be checked against its plan.
  *
  * Guard (owner, 10 November 2026; the HYPERVISOR_ERROR crashes of the local 5060 Ti under WSL2): a request for
@@ -27,12 +29,43 @@ typedef int (*mem_free_t)(uint64_t);
 typedef int (*mem_info_t)(size_t *, size_t *);
 typedef int (*va_reserve_t)(uint64_t *, size_t, size_t, uint64_t, unsigned long long);
 typedef int (*va_free_t)(uint64_t, size_t);
+/* The driver's CUmemAllocationProp / CUmemAccessDesc (cuda.h, CUDA 10.2 on), spelled out: no CUDA headers here. */
+typedef struct {
+    int type, id;
+} mem_location;
+typedef struct {
+    int type, requested_handle_types;
+    mem_location location;
+    void *win32_handle_metadata;
+    unsigned char compression_type, gpu_direct_rdma_capable;
+    unsigned short usage;
+    unsigned char reserved[4];
+} mem_prop;
+typedef struct {
+    mem_location location;
+    int flags;
+} mem_access;
+typedef int (*mem_create_t)(unsigned long long *, size_t, const mem_prop *, unsigned long long);
+typedef int (*mem_granularity_t)(size_t *, const mem_prop *, int);
+typedef int (*mem_map_t)(uint64_t, size_t, size_t, unsigned long long, unsigned long long);
+typedef int (*mem_unmap_t)(uint64_t, size_t);
+typedef int (*mem_set_access_t)(uint64_t, size_t, const mem_access *, size_t);
+typedef int (*mem_release_t)(unsigned long long);
 
 static mem_alloc_t mem_alloc;
 static mem_free_t mem_free;
 static mem_info_t mem_info;
 static va_reserve_t va_reserve;
 static va_free_t va_free;
+static mem_create_t mem_create;
+static mem_granularity_t mem_granularity;
+static mem_map_t mem_map;
+static mem_unmap_t mem_unmap;
+static mem_set_access_t mem_set_access;
+static mem_release_t mem_release;
+static unsigned long long alias_handle; /* the shared physical chunk of mode 2 */
+static size_t alias_granule;
+static int alias_device = -1;
 
 #define LOG_CAP (1 << 20)
 static int64_t log_kind[LOG_CAP], log_size[LOG_CAP];
@@ -60,6 +93,12 @@ static int resolve(void) {
     mem_info = (mem_info_t)dlsym(h, "cuMemGetInfo_v2");
     va_reserve = (va_reserve_t)dlsym(h, "cuMemAddressReserve");
     va_free = (va_free_t)dlsym(h, "cuMemAddressFree");
+    mem_create = (mem_create_t)dlsym(h, "cuMemCreate");
+    mem_granularity = (mem_granularity_t)dlsym(h, "cuMemGetAllocationGranularity");
+    mem_map = (mem_map_t)dlsym(h, "cuMemMap");
+    mem_unmap = (mem_unmap_t)dlsym(h, "cuMemUnmap");
+    mem_set_access = (mem_set_access_t)dlsym(h, "cuMemSetAccess");
+    mem_release = (mem_release_t)dlsym(h, "cuMemRelease");
     return (mem_alloc && mem_free && mem_info) ? 0 : -1;
 }
 
@@ -84,12 +123,44 @@ static uint64_t raw_alloc(size_t size) {
     return p;
 }
 
-static uint64_t virtual_alloc(size_t size) {
+static int alias_ready(int device) {
+    if (alias_handle && alias_device == device) return 0;
+    if (alias_handle) return -1; /* one device per process */
+    if (!mem_create || !mem_granularity || !mem_map || !mem_unmap || !mem_set_access || !mem_release) return -1;
+    mem_prop prop = {0};
+    prop.type = 1;          /* CU_MEM_ALLOCATION_TYPE_PINNED */
+    prop.location.type = 1; /* CU_MEM_LOCATION_TYPE_DEVICE */
+    prop.location.id = device;
+    size_t granule = 0;
+    if (mem_granularity(&granule, &prop, 0) != 0 || !granule) return -1;
+    unsigned long long handle = 0;
+    if (mem_create(&handle, granule, &prop, 0) != 0) return -1;
+    alias_handle = handle;
+    alias_granule = granule;
+    alias_device = device;
+    return 0;
+}
+
+static void alias_unmap(uint64_t p, size_t mapped) {
+    for (size_t at = 0; at < mapped; at += alias_granule) mem_unmap(p + at, alias_granule);
+}
+
+static uint64_t virtual_alloc(size_t size, int device) {
     uint64_t p = 0;
-    if (resolve() != 0 || !va_reserve || virtual_n >= VIRTUAL_CAP) return 0;
-    if (va_reserve(&p, size, (size_t)2 << 20, 0, 0) != 0) return 0;
+    if (resolve() != 0 || !va_reserve || virtual_n >= VIRTUAL_CAP || alias_ready(device) != 0) return 0;
+    size_t span = (size + alias_granule - 1) / alias_granule * alias_granule;
+    if (va_reserve(&p, span, alias_granule, 0, 0) != 0) return 0;
+    size_t at = 0;
+    for (; at < span; at += alias_granule)
+        if (mem_map(p + at, alias_granule, 0, alias_handle, 0) != 0) break;
+    mem_access access = {{1, device}, 3}; /* the device, CU_MEM_ACCESS_FLAGS_PROT_READWRITE */
+    if (at < span || mem_set_access(p, span, &access, 1) != 0) {
+        alias_unmap(p, at);
+        va_free(p, span);
+        return 0;
+    }
     virtual_ptr[virtual_n] = p;
-    virtual_size[virtual_n] = (int64_t)size;
+    virtual_size[virtual_n] = (int64_t)span;
     virtual_n++;
     return p;
 }
@@ -97,6 +168,7 @@ static uint64_t virtual_alloc(size_t size) {
 static int virtual_release(uint64_t p) {
     for (int64_t i = 0; i < virtual_n; i++) {
         if (virtual_ptr[i] == p) {
+            alias_unmap(p, (size_t)virtual_size[i]);
             if (va_free) va_free(p, (size_t)virtual_size[i]);
             virtual_n--;
             virtual_ptr[i] = virtual_ptr[virtual_n];
@@ -112,7 +184,7 @@ void *arena_malloc(size_t size, int device, void *stream) {
     (void)stream;
     uint64_t p = 0;
     if (mode == 2) {
-        p = virtual_alloc(size);
+        p = virtual_alloc(size, device);
         record(1, (int64_t)size, p);
         return (void *)p;
     }
@@ -181,5 +253,10 @@ uint64_t arena_base(void) { return base; }
 int arena_release(void) {
     if (base && resolve() == 0) mem_free(base);
     base = 0;
+    if (alias_handle && !virtual_n && mem_release) { /* the shared chunk, once no range maps it */
+        mem_release(alias_handle);
+        alias_handle = 0;
+        alias_device = -1;
+    }
     return 0;
 }

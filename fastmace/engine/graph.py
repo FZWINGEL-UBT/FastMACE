@@ -1473,8 +1473,8 @@ class GraphEngine(Engine):
             self._arena = held
             logger.info("graph engine: capture arena active, %d segments, %.0f MiB reserved -> %.0f MiB",
                         len(plan.sizes), plan.reserved / 2**20, plan.total / 2**20)
-        except (arena_cuda.ArenaUnavailable, ValueError, RuntimeError) as error:
-            # RuntimeError covers _ArenaFallback, CUDA errors of a virtual-address capture and refused requests.
+        except Exception as error:  # noqa: BLE001 - any build failure falls back to the caching pool
+            # _ArenaFallback, CUDA errors, refused requests, and launcher checks (Triton raises ValueError).
             info.update(status="fallback", reason=f"{type(error).__name__}: {error}"[:1000])
             logger.warning("graph engine: capture arena not used (%s); caching pool", error)
             self._arena_drop(held)
@@ -1532,7 +1532,7 @@ class GraphEngine(Engine):
                 self._pool = pool.id
                 self._arena_capture_keys(keys)
                 events = arena_cuda.stop_history(pool.id)
-            except RuntimeError as error:
+            except Exception as error:  # noqa: BLE001 - the device recording is tried next
                 torch.cuda.memory._record_memory_history(enabled=None)
                 self.capture_arena_info[f"record_{name}_error"] = f"{type(error).__name__}: {error}"[:500]
                 shim.mode(arena_cuda.RECORD)
@@ -1563,7 +1563,7 @@ class GraphEngine(Engine):
             self._pool = pool.id
             self._arena_capture_keys(keys)
             events = arena_cuda.stop_history(pool.id)
-        except RuntimeError as error:
+        except Exception as error:  # noqa: BLE001 - the build falls back
             torch.cuda.memory._record_memory_history(enabled=None)
             shim.mode(arena_cuda.RECORD)
             self._arena_drop(held)
