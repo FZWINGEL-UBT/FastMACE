@@ -230,9 +230,12 @@ STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX
 # 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911. RTX 4000 Ada (ada-5060-screen, 11 November
 # 2026, results/ada-5060-screen-20261110, murphy): the Ada set slowed POLAR-1-M NaCl (1.0061 / 1.0077 against the Ada
 # defaults); leave-one-out from the set, b = STAGE_DOUT off: NaCl 0.9868 / 0.9858 (switches that do not run for
-# POLAR read 0.994-1.002).
+# POLAR read 0.994-1.002). The set without STAGE_DOUT against the Ada defaults (leto): NaCl 0.9986 / 1.0006, NbCl5
+# 0.9999 / 0.9982. POLAR-1-L NbCl5 on the Ada: the set 1.0033 / 1.0021, leave-one-out b = STAGE_DOUT off 0.9986 /
+# 0.9987, the set without it against the defaults 1.0005 / 1.0005 (leto).
 STAGE_DOUT_MODEL_OFF_GPUS = MappingProxyType({
     "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA RTX 4000 Ada Generation")),
+    "polar1-l": GPUModels(("NVIDIA RTX 4000 Ada Generation",)),
 })
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # STAGE_DOUT's row as quartets of output-gradient components (Codex H200 follow-up, 7 November 2026, item 2): with

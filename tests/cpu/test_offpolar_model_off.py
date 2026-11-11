@@ -71,12 +71,15 @@ def test_stage_dout_and_degree_parts_are_off_for_polar1_m_on_the_a100(gpu, monke
     assert fused_forward.degree_parts_default(A100, "polar1-m")
 
 
-def test_stage_dout_is_off_for_polar1_m_on_the_ada(gpu):
-    # ada-5060-screen, 11 November 2026: leave-one-out from the Ada set, POLAR-1-M NaCl 0.9868 / 0.9858 with it off
-    assert "NVIDIA RTX 4000 Ada Generation" in wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS["polar1-m"]
+def test_stage_dout_is_off_for_polar1_on_the_ada(gpu):
+    # ada-5060-screen, 11 November 2026: leave-one-out from the Ada set, POLAR-1-M NaCl 0.9868 / 0.9858 and POLAR-1-L
+    # NbCl5 0.9986 / 0.9987 with it off
+    for label in ("polar1-m", "polar1-l"):
+        assert "NVIDIA RTX 4000 Ada Generation" in wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS[label]
     gpu("NVIDIA RTX 4000 Ada Generation")
     assert not wprime_backward.stage_dout_default("cuda", "polar1-m")
-    assert wprime_backward.stage_dout_default("cuda", "polar1-l")
+    assert not wprime_backward.stage_dout_default("cuda", "polar1-l")
+    assert wprime_backward.stage_dout_default("cuda", "polar1-s")
     assert wprime_backward.stage_dout_default("cuda", "omat0-medium")
 
 
