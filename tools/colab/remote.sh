@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # FastMACE on a Colab VM: the VM side of tools/colab/fastmace_colab.py. Usage on the VM:
 #   bash /content/fm/remote.sh <stage> [arg]
-# Stages: probe | setup | restore | run <n> | pack
+# Stages: probe | setup | restore <key> | run <n> | pack | mark <key/part>
+# A kept (warm) VM keeps the venv, the models and the unpacked compile caches between jobs: probe lists the cache
+# parts already unpacked ($FM/cache-parts.txt, "<key>/<part>" lines), so the driver uploads only the others.
 # Expects /content/fm/payload.tar (gzipped source, baseline export, requirements, models list) from the driver,
 # and for `restore` the store's cache parts /content/fm/cache-in-<nnn>.tar.gz. Records go to /content/fm/out (downloaded by the driver).
 # Mirrors tools/modal/fastmace_modal.py: Python 3.10 (uv-managed), requirements-hybrid.txt with the cu130
@@ -29,7 +31,9 @@ since() { python3 -c "import sys; print(round($(now) - $1, 1))"; }
 cd "$FM"
 case $stage in
 probe)
-  # The GPU as the driver keys the compile caches by it; no venv needed yet.
+  # A new job: the last job's records go (a warm VM keeps $OUT otherwise). The GPU as the driver keys the compile
+  # caches by it; no venv needed yet.
+  rm -rf "$OUT" && mkdir -p "$OUT"
   python3 - <<'EOF' > "$OUT/probe.json"
 import json, os, subprocess
 def sh(cmd):
@@ -38,8 +42,10 @@ name, driver, memory, cap = [s.strip() for s in sh(
     "nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader").split(",")]
 cuda = sh("nvidia-smi | grep -oE 'CUDA (UMD )?Version: [0-9.]+' | grep -oE '[0-9.]+$'")
 mem_gib = round(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30, 1)
+parts = open("/content/fm/cache-parts.txt").read().split() if os.path.exists("/content/fm/cache-parts.txt") else []
 print(json.dumps(dict(gpu_name=name, driver=driver, gpu_memory=memory, capability=cap, cuda_driver=cuda,
-                      cpus=os.cpu_count(), ram_gib=mem_gib)))
+                      cpus=os.cpu_count(), ram_gib=mem_gib, cache_parts=parts,
+                      venv=os.path.exists("/content/fm/venv/bin/python"))))
 EOF
   cat "$OUT/probe.json"
   ;;
@@ -117,7 +123,10 @@ restore)
   # Compile caches from an earlier run on the same capability and stack; the listing tells `pack` what changed.
   t0=$(now)
   # The store's parts in order (the first run's caches, then each later run's new files).
-  for part in $(ls cache-in-*.tar.gz 2>/dev/null | sort); do tar -xzf "$part" -C "$CACHE" && rm -f "$part"; done
+  key=${2:-}
+  for part in $(ls cache-in-*.tar.gz 2>/dev/null | sort); do
+    tar -xzf "$part" -C "$CACHE" && rm -f "$part" && [ -n "$key" ] && echo "$key/${part#cache-in-}" >> "$FM/cache-parts.txt"
+  done
   find "$CACHE" -type f -printf '%s %T@ %P\0' > "$FM/cache-before.lst"
   echo "restored $(du -sh "$CACHE" | cut -f1), $(since "$t0") s"
   ;;
@@ -151,6 +160,10 @@ EOF
   fi
   tar -czf out.tar.gz -C "$FM" out
   echo "pack $(since "$t0") s"
+  ;;
+mark)
+  # The part the driver stored from this VM's last pack: its files are here already.
+  echo "${2:?key/part}" >> "$FM/cache-parts.txt"
   ;;
 *) echo "unknown stage $stage"; exit 2 ;;
 esac

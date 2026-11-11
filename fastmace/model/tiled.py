@@ -78,6 +78,14 @@ COMPILED_GRAPH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 COMPILED_GRAPH_MARGIN = 1.1
 
 
+def _tile_list():
+    """``fastmace.neighbors.tile_list``, imported when a call needs it (it imports torch; this module stays importable
+    without it, as the gate driver's subprocess needs)."""
+    from fastmace.neighbors import tile_list
+
+    return tile_list
+
+
 def compiled_graphs_fit(workspace, available, slots):
     """Whether ``slots`` capture pools of a measured tile ``workspace`` (bytes), and the warm-ups' workspace beside
     them, fit ``available`` bytes (the guard of ``TileConfig.compiled_graphs``)."""
@@ -140,6 +148,14 @@ TILE_EPILOGUE = None
 # at least ``forces.FLOAT64_EDGES_EXTENT`` (64 A), decided once per atom count and cell; True / False: every size.
 TILE_LOCAL_FRAME = None
 TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in float32
+# TILE_HOST_ROWS (exact; billion-atom plan step 1, 11 November 2026): where the call's float64 positions are on the
+# host (``ForceField._prepare_one_off(host=True)``: 24 bytes per atom off the device), the tile-local frame stays the
+# tiles' form: each padded slot gets its float64 rows gathered on the host and copied in (``_fill``; an eager tile
+# gathers its own), the values ``positions64[nodes]`` reads on the device. False: the bins and offsets as before.
+TILE_HOST_ROWS = True
+# TILE_WHOLE_BLOCK_ORDER (A/B only; billion-atom step 1): True binds the whole-system BLOCK_ORDER receiver order in the
+# tiled call as before (int32 [N], 4 B/atom; its per-tile kernels never read it). False (default): not built.
+TILE_WHOLE_BLOCK_ORDER = False
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -1435,7 +1451,7 @@ class TiledForceField:
             self._species, self._width, self._attrs_dtype = field._species_index, stored.shape[1], stored.dtype
             field.release_node_attrs()
             field.release_whole_system()  # the per-atom buffers only the whole-system call reads
-            self._species = field._species_index  # now int32
+            self._species = field._species_index  # now uint8 (int32 with 256 or more columns)
         scale = self.config.backward_chunk_scale
         if scale is None:
             name = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else None
@@ -2022,15 +2038,31 @@ class TiledForceField:
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
                     count=new((), dtype=i64), out={}, graphs={})
 
-    def _fill(self, slot, piece):
+    def _fill(self, slot, piece, g=None, host_nodes=None):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
 
         Padding: receivers and halo rows read atom 0 and are masked; padding edges join the last receiver slot
         (always padding) to itself, after the tile's edges (so the receivers stay sorted), beyond the cutoff and
-        beyond the tile's edge count (the streaming kernels' ``streaming_count``)."""
+        beyond the tile's edge count (the streaming kernels' ``streaming_count``).
+
+        TILE_HOST_ROWS (``g``'s tile-local frame on the host): the slot's float64 rows ``rows64`` are gathered on the
+        host in the slot's layout (padding rows: atom 0's, as ``positions64[nodes]`` reads them) and copied in; the
+        body reads them in place of ``positions64[nodes]``, the same values."""
+        import torch
+
         nodes, ei, shifts, local, r, h = piece
         receivers, _, edges = slot["sizes"]
         e = ei.shape[1]
+        frame = None if g is None else g.get("local_frame")
+        if frame is not None and _tile_list().rows_on_host(frame[0], self.device):
+            here = nodes.cpu() if host_nodes is None else host_nodes
+            layout = torch.zeros(slot["nodes"].shape[0], dtype=torch.int64)
+            layout[:r] = here[:r]
+            layout[receivers:receivers + h] = here[r:]
+            if "rows64" not in slot:  # fixed addresses (the captured bodies read them)
+                slot["rows64"] = torch.zeros((layout.shape[0], 3), dtype=torch.float64, device=self.device)
+                slot["row_ids"] = torch.arange(layout.shape[0], device=self.device)
+            slot["rows64"].copy_(frame[0][layout])
         slot["nodes"].zero_()
         slot["nodes"][:r] = nodes[:r]
         slot["nodes"][receivers:receivers + h] = nodes[r:]
@@ -2060,7 +2092,10 @@ class TiledForceField:
             positions64, cell, inverse = g["local_frame"]
             vectors_of = (self._compiled_once("local_vectors", _slot_local_vectors) if self._speed(TILE_EPILOGUE)
                           else _slot_local_vectors)
-            vectors = vectors_of(positions64, nodes, slot["node_mask"], slot["local"], slot["edge_mask"],
+            rows_of = nodes
+            if "rows64" in slot:  # TILE_HOST_ROWS: the slot's own rows (``_fill``), read in place
+                positions64, rows_of = slot["rows64"], slot["row_ids"]
+            vectors = vectors_of(positions64, rows_of, slot["node_mask"], slot["local"], slot["edge_mask"],
                                  slot["shifts"], cell, inverse, receivers, self.dtype, self._far)
         elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
             vectors = _frame_vectors(g["frame"], ei, slot["shifts"], slot["edge_mask"], self._far)
@@ -2228,7 +2263,9 @@ class TiledForceField:
 
     def _bind(self, count=None):
         field = self.field
-        field._bind_streaming_count()  # species tables; then every tile edge is a real edge
+        # species tables; then every tile edge is a real edge. No whole-system BLOCK_ORDER order: a tile has
+        # fewer rows than N, so its kernels never read it (they launch with their rows' identity)
+        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER))
         saved = []
         for module in field._streaming:
             saved.append((module, module._buffers.get("streaming_count")))
@@ -2296,7 +2333,12 @@ class TiledForceField:
         stress = field.compute_stress
         padded = self.mode != "eager"
         with torch.no_grad():
-            field.positions.copy_(positions)
+            if _tile_list().rows_on_host(positions, self.device):  # a chunk at a time: no float64 copy on the device
+                for start in range(0, positions.shape[0], _tile_list().CHUNK):
+                    stop = start + _tile_list().CHUNK
+                    field.positions[start:stop].copy_(positions[start:stop].to(self.device))
+            else:
+                field.positions.copy_(positions)
         pos = field.positions.detach()
         n = pos.shape[0]
         self.node_attrs = data["node_attrs"] if self._species is None else None
@@ -2483,7 +2525,7 @@ class TiledForceField:
                     if slot.get("event") is not None:  # a lane still reads this slot's buffers
                         torch.cuda.current_stream().wait_event(slot["event"])
                         slot["event"] = None
-                    self._fill(slot, piece)
+                    self._fill(slot, piece, g, host_nodes)
                     state.prefetched = fetched  # rows() takes these instead of gathering them now
                     following = position is not None and position + 1 < len(order)
                     if lane is None:
@@ -2749,7 +2791,7 @@ class TiledForceField:
         key = (n, cell.tobytes())
         kept = getattr(self, "_frame_choice", None)
         if kept is None or kept[0] != key:
-            largest = float(positions.abs().max()) if n else 0.0
+            largest = _tile_list().abs_max(positions) if n else 0.0
             extent = max(largest, forces_module.structure_extent(np.zeros((0, 3)), cell))
             kept = self._frame_choice = (key, forces_module.float64_edges_wanted(None, extent))
         return kept[1]
@@ -2766,13 +2808,14 @@ class TiledForceField:
         cell = torch.as_tensor(cell, dtype=torch.float64).reshape(3, 3)
         if abs(float(torch.linalg.det(cell))) < 1e-9:
             return None, None
-        if positions.device != self.device:
+        if _tile_list().rows_on_host(positions, self.device) and not TILE_HOST_ROWS:
             return None, self._local_frame(positions, n)
         kept = getattr(self, "_frame_cell", None)  # fixed addresses: the captured tile bodies read them
         if kept is None or not torch.equal(kept[0].cpu(), cell):
             device_cell = cell.to(self.device)
             kept = self._frame_cell = (cell.clone(), device_cell, torch.linalg.inv(device_cell))
-        return (positions.to(torch.float64), kept[1], kept[2]), None
+        # TILE_HOST_ROWS: host positions stay there; each slot gets its rows (``_fill``), an eager tile gathers them
+        return (positions if positions.dtype == torch.float64 else positions.to(torch.float64), kept[1], kept[2]), None
 
     def _local_frame(self, positions, n):
         """``TILE_LOCAL_FRAME``: the call's positions as int16 bins of ``TILE_LOCAL_FRAME_WIDTH`` and offsets in the
@@ -3077,7 +3120,11 @@ class TiledForceField:
         state = g["state"]
         if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local
             positions64, cell, inverse = g["local_frame"]
-            rows, remaining = _tile_local(positions64[nodes], r, local, shifts, cell, inverse, self.dtype)
+            if _tile_list().rows_on_host(positions64, self.device):  # TILE_HOST_ROWS: the tile's rows from the host
+                rows64 = positions64[nodes.cpu()].to(self.device)
+            else:
+                rows64 = positions64[nodes]
+            rows, remaining = _tile_local(rows64, r, local, shifts, cell, inverse, self.dtype)
             vectors = rows[local[1]] - rows[local[0]] + remaining
         elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
             vectors = _frame_vectors(g["frame"], ei, shifts, None, None)

@@ -3595,3 +3595,18 @@ See `results/census-c345-20261111/`.
 - **C2, a packed first radial table.** The falsifier saved 168 µs on the A100, over the bar. But certified packed slopes need 9.6k–15k pieces from 1 Å, which is 71–91 MB of table against the A100's 40 MB L2. Values alone would fit (1,402 pieces, 6.4 MB) but are worth at most the forward's 76 µs. Stopped by bound.
 
 See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
+
+**Ledger, second outside note (11 November 2026; rev2 queue, worker docs-refresh, conductor; docs only):** three new ledger rows. Nested radial basis is OPEN; the first-interaction lane owns it, and the certificate is next. Compact angular products waits on GEOM's H200 A/B. Shared denominator is stopped by the bound: about 34 µs on the A100 and 7–10 µs on the H200, under both bars. The index rows for ideas 18–20 and the first two outside ideas (C1–C5) now show today's stops, and the original estimates stay in the rows, marked "Before the test".
+
+**BINNED_SCREEN on the RTX 4000 Ada; shuffled atom order (11 November 2026; rev2 queue B2 and B4, worker ada-5060-screen, conductor):**
+- **B2, BINNED_SCREEN on the RTX 4000 Ada.** Murphy, OMAT-0 medium MD. SrTiO3 16³ 0.9846 / 0.9810, 20³ 0.9657 / 0.9602. The neighbour list is bit-identical (work removal, decision 66). The Ada is added to `pair_search.BINNED_SCREEN_GPUS`, so the switch is now on for all five GPU families.
+- **B4, shuffled against ordered atoms.** Local 5060 Ti, SrTiO3 24³ (69,120 atoms): shuffled is 1.167× slower (1.157 and 1.177 pairwise). A spatial sort at setup is needed for arbitrary inputs. Ledger row `setup-spatial-sort` PROPOSED, not built.
+- Suite on the branch tip (= merged tree) on murphy: 5,615 passed, 203 skipped.
+
+**Billion-atom steps 1–2 (11 November 2026; owner request, worker tiled-speed, conductor):**
+- **Step 1, 34 B/atom off the device in the tiled call.**
+  - Host float64 positions (`TILE_HOST_ROWS`): opt-in per call, by passing host positions. A capacity option, not a default: A100 58³ 1.043 / 1.021.
+  - uint8 species maps and no whole-system BLOCK_ORDER order: both on by default. A100 58³ A/B (decision 66, work removal): default tiled call 1.000 / 1.002, capacity call 0.982 / 0.984.
+  - Gate 12/12 on Alex.
+- **Step 2, overflow audit.** Tile-list sort key guarded (`KEY_LIMIT`); the overflow probe is bitwise at 1M and 750M atoms.
+- Suite on the merged tree 9f39b607 (leeloo): 5,631 passed, 204 skipped. The 397.5M go/no-go (step 3) is still pending.

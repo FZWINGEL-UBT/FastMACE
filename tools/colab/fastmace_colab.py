@@ -23,6 +23,13 @@ The driver:
 7. writes ``<out>/colab.json`` and a row in the ledger: GPU, capability, driver, versions, commit, setup and
    wall time, compute units before and after.
 
+**Warm VMs** (``--warm``, 11 November 2026): one kept VM per GPU type, named ``fm-<gpu>-warm``, taken if live and
+allocated otherwise, never stopped by the job. It keeps its venv, models and unpacked compile caches, and lists the
+cache parts it has (``probe``), so a job uploads only the source payload and the parts it lacks. Jobs on one warm VM
+take turns (a lock in ``<store>/warm/``). A job that allocates the warm VM starts ``idle-stop``, which stops it after
+``--idle-stop-min`` minutes without a job (default 20; Colab's own idle pruning is the fallback when WSL is not
+running). Stop one now: ``colab stop -s fm-a100-warm``.
+
 Why no Google Drive: ``colab drivemount`` asks for the owner's browser consent on every new VM (checked
 23 October 2026: a second VM got HTTP 400 without a fresh consent), so it cannot run unattended. The store is
 local instead (``FASTMACE_COLAB_STATE``, default ``~/.fastmace-colab``): ``caches/<key>/<nnn>.tar.gz`` with
@@ -90,6 +97,10 @@ def parse_args(argv=None):
     p.add_argument("--session", default=None, help="session name (default fm-<gpu>-<UTC time>-<random>)")
     p.add_argument("--reuse", action="store_true", help="run on the live session --session names (else refused)")
     p.add_argument("--keep", action="store_true", help="leave the VM running afterwards (stop it yourself)")
+    p.add_argument("--warm", action="store_true",
+                   help="run on the kept VM fm-<gpu>-warm (allocated if not live, left running, stopped when idle)")
+    p.add_argument("--idle-stop-min", type=float, default=20.0,
+                   help="--warm: stop the warm VM after this many minutes without a job (0: never)")
     p.add_argument("--models", default=DEFAULT_MODELS, help="checkpoint names of fastmace.model.labels")
     p.add_argument("--baseline", default="~/fastmace-baseline/1a-T18", type=Path,
                    help="the research-engine export with the structures (FASTMACE_STRUCTURES on the VM)")
@@ -101,7 +112,38 @@ def parse_args(argv=None):
     args = p.parse_args(argv)
     if not args.command and not args.build_env:
         p.error("give --command (repeatable) or --build-env")
+    if args.warm:
+        if args.session and args.session != warm_session(args.gpu):
+            p.error("--warm names its own session (fm-<gpu>-warm)")
+        args.session, args.reuse, args.keep = warm_session(args.gpu), True, True
     return args
+
+
+def warm_session(gpu):
+    return f"fm-{gpu.lower()}-warm"
+
+
+def warm_lock_path(store, session):
+    return Path(store).expanduser() / "warm" / f"{session}.lock"
+
+
+@contextlib.contextmanager
+def warm_lock(store, session):
+    """One job at a time on a warm VM (its staging, $OUT and kernel are shared). The lock file's mtime is the last
+    job's end, which ``idle-stop`` reads."""
+    path = warm_lock_path(store, session)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            _log(f"waiting for the running job on {session}")
+            fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            os.utime(path)
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def default_session(gpu, now=None):
@@ -378,7 +420,14 @@ def _log(message):
 
 
 def run_job(args, colab=run_colab):
-    """The whole call; the VM is stopped in ``finally`` unless ``--keep``."""
+    """The whole call; the VM is stopped in ``finally`` unless ``--keep``. ``--warm``: one job at a time."""
+    if getattr(args, "warm", False) and not args.dry_run:
+        with warm_lock(args.store, args.session):
+            return _run_job(args, colab)
+    return _run_job(args, colab)
+
+
+def _run_job(args, colab=run_colab):
     job = Job(args, colab)
     started = time.time()
     raw = REQUIREMENTS.read_text()
@@ -413,6 +462,8 @@ def run_job(args, colab=run_colab):
             _log(f"allocating {args.gpu} as {job.session}")
             owned = True  # from here on, also when `colab new` itself fails half-way
             job.call(new_args(args.gpu, job.session), timeout=900)
+            if args.warm and args.idle_stop_min > 0 and not args.dry_run:
+                start_idle_stop(job.session, args.idle_stop_min, job.store)
         owned = True
         timings["allocate_s"] = round(time.time() - t, 1)
         t = time.time()
@@ -424,6 +475,7 @@ def run_job(args, colab=run_colab):
         record.update({k: probe.get(k) for k in ("gpu_name", "driver", "gpu_memory", "capability", "cuda_driver",
                                                  "cpus", "ram_gib")})
         key = cache_key(record["capability"] or "0.0", stack)
+        present = {entry.split("/", 1)[1] for entry in probe.get("cache_parts") or [] if entry.startswith(key + "/")}
         record["cache_key"] = key
         _log(f"{record.get('gpu_name')} (sm {record['capability']}, driver {record.get('driver')}); cache {key}")
         code, seconds, log = job.step("setup", "setup", timeout_s=3600)
@@ -433,11 +485,13 @@ def run_job(args, colab=run_colab):
         cache = job.store / "caches" / key
         parts = cache_parts(cache)
         record["cache_hit"] = bool(parts)
+        record["cache_parts_on_vm"] = sorted(present)
         t = time.time()
-        for part in parts:
+        missing = [part for part in parts if part.name not in present]
+        for part in missing:
             job.upload(part, f"{STAGING}cache-in-{part.name}")
-        record["cache_bytes_in"] = sum(part.stat().st_size for part in parts)
-        code, seconds, log = job.step("restore", "restore", timeout_s=900)
+        record["cache_bytes_in"] = sum(part.stat().st_size for part in missing)
+        code, seconds, log = job.step("restore", "restore", arg=key, timeout_s=900)
         timings["cache_restore_s"] = round(time.time() - t, 1)
         record["setup_s"] = round(time.time() - started, 1)
         _log(f"ready after {record['setup_s']} s; running {len(args.command)} command(s)")
@@ -458,6 +512,8 @@ def run_job(args, colab=run_colab):
             job.download(f"{REMOTE}/cache-out.tar.gz", incoming)
             part = claim_part(cache, incoming)
             record["cache_bytes_out"] = part.stat().st_size
+            if args.keep:  # the kept VM has this part's files already
+                job.step("mark", "mark", arg=f"{key}/{part.name}", timeout_s=300)
         record["cache_saved"] = changed
         timings["pack_download_s"] = round(time.time() - t, 1)
         if not args.dry_run:
@@ -583,8 +639,63 @@ def stop_endpoint(endpoint, colab=run_colab, run=subprocess.run, python=None):
     _log(f"released {endpoint}")
 
 
+def start_idle_stop(session, minutes, store):
+    """``idle-stop`` for a newly allocated warm VM, detached from this job (its log beside the lock)."""
+    log = warm_lock_path(store, session).with_suffix(".idle.log")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with open(log, "a") as f:
+        subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "idle-stop", session, str(minutes),
+                          str(Path(store).expanduser())], stdin=subprocess.DEVNULL, stdout=f, stderr=f,
+                         start_new_session=True)
+    _log(f"idle-stop started for {session} ({minutes:g} min; log {log})")
+
+
+def idle_stop(session, minutes, store, colab=run_colab, clock=time.time, sleep=time.sleep, interval=60):
+    """Stop the warm VM ``session`` once no job has run on it for ``minutes``; return when it is gone.
+
+    Idle means: the job lock is free and its mtime (the last job's end) is older than ``minutes``. The lock is held
+    while stopping, so a job that starts meanwhile waits, then finds the session gone and allocates a new one."""
+    path = warm_lock_path(store, session)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.touch()
+    while True:
+        sleep(interval)
+        try:
+            live = set(re.findall(r"^\[([^\]]+)\]", colab(["colab", "sessions"], timeout=120), flags=re.M))
+        except (subprocess.SubprocessError, OSError):
+            continue
+        if session not in live:
+            _log(f"{session} is gone; idle-stop ends")
+            return False
+        with open(path, "a") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                continue  # a job runs
+            try:
+                idle = clock() - path.stat().st_mtime
+                if idle < minutes * 60:
+                    continue
+                _log(f"{session} idle for {idle / 60:.0f} min; stopping")
+                for attempt in range(3):
+                    try:
+                        colab(stop_args(session), timeout=300)
+                        _log(f"stopped {session}")
+                        return True
+                    except (subprocess.SubprocessError, OSError) as error:
+                        _log(f"stop attempt {attempt + 1} failed: {error}")
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["idle-stop"]:
+        if len(argv) != 4:
+            raise SystemExit("usage: fastmace_colab.py idle-stop SESSION MINUTES STORE")
+        idle_stop(argv[1], float(argv[2]), argv[3])
+        return 0
     if argv[:1] == ["stop-endpoint"]:
         if len(argv) != 2:
             raise SystemExit("usage: fastmace_colab.py stop-endpoint ENDPOINT")

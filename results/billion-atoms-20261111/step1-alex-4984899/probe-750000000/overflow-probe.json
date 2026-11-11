@@ -1,0 +1,42 @@
+{
+ "atoms": 750000000,
+ "elements": 2250000000,
+ "past_int32": true,
+ "device": "NVIDIA A100-SXM4-80GB",
+ "torch": "2.14.1+cu130",
+ "checks": {
+  "tile_vectors (float32 [N, 3], compiled)": {
+   "bitwise": true,
+   "largest_difference": 0.0
+  },
+  "tile_vectors (eager)": {
+   "bitwise": true,
+   "largest_difference": 0.0
+  },
+  "slot_local_vectors (float64 [N, 3], compiled)": {
+   "bitwise": true,
+   "largest_difference": 0.0
+  },
+  "forces index_add_ ([N, 3])": {
+   "bitwise": true,
+   "largest_difference": 0.0
+  },
+  "forces untouched rows zero": {
+   "bitwise": true
+  },
+  "forces abs max": {
+   "bitwise": true
+  },
+  "positions64 abs max": {
+   "bitwise": true,
+   "value": 2298.06
+  },
+  "flat view tail": {
+   "bitwise": true
+  }
+ },
+ "fill_s": 0.3304078410146758,
+ "peak_gib": 42.70238447189331,
+ "seconds": 8.987956336000934,
+ "failed": []
+}

@@ -222,14 +222,25 @@ def big_structure(seed=8):
     return atoms
 
 
+@pytest.mark.parametrize("key", ["key", "two-sorts", "host-rows"])
 @pytest.mark.parametrize("split", [1, 2])
 @pytest.mark.parametrize("names", [(), MH1_PACKAGE], ids=["stock", "mh1-rewrites"])
-def test_tile_neighbours_are_bitwise_the_global_list(names, split):
+def test_tile_neighbours_are_bitwise_the_global_list(names, split, key, monkeypatch):
     """Each tile's edges from the cell bins (fastmace.neighbors.tile_list) are the global skin list's edges for
     those receivers after compact at the same positions: the same pairs, unit shifts and shifts, in the same order
     (with MH-1's rewrites the list sorts by sender group too), with cutoff-wide bins and a +-1 stencil and with
-    half-cutoff bins and a +-2 stencil (the default on this cell)."""
+    half-cutoff bins and a +-2 stencil (the default on this cell). "two-sorts": the order without the int64 key
+    (``KEY_LIMIT``; groups x natoms^2 past 2^63 above about 1e9 atoms) is the same. "host-rows": the positions
+    on the host (``rows_on_host``; billion-atom step 1), binned a chunk at a time and each tile's rows gathered there:
+    the same edges."""
+    from fastmace.neighbors import tile_list
     from fastmace.neighbors.tile_list import TileNeighbours
+
+    if key == "two-sorts":
+        monkeypatch.setattr(tile_list, "KEY_LIMIT", 1)
+    if key == "host-rows":
+        monkeypatch.setattr(tile_list, "rows_on_host", lambda positions, device: True)
+        monkeypatch.setattr(tile_list, "CHUNK", 1000)  # several chunks of the binning
 
     calc, atoms = calculator(), big_structure()
     field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
@@ -2005,3 +2016,66 @@ def test_out_of_memory_at_a_budget_raised_cap_retries_at_the_lower_cap(mode, mon
         tiled.receivers = 40  # the configured cap itself: nothing lower to fall back to
         tiled._budget_raised = False
         tiled.evaluate(atoms)
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_host_rows_call_is_bitwise_the_device_rows_call(mode, monkeypatch):
+    """``TILE_HOST_ROWS`` (billion-atom step 1): the call's float64 positions on the host (``rows_on_host``; one
+    device here), the float32 copy made a chunk at a time, the tile lists' rows and the tile-local frame's rows
+    gathered on the host per tile (a padded slot's ``rows64``): energy, forces and stress bitwise the call with
+    the positions on the device, far from the origin and strained."""
+    from fastmace.model import tiled as tiled_module
+    from fastmace.neighbors import tile_list
+
+    monkeypatch.setattr(tiled_module, "TILE_LOCAL_FRAME", True)
+    calc, atoms = calculator(), big_structure()
+    moved = atoms.copy()
+    moved.positions = moved.positions + np.array([1500.0, -700.0, 333.0])
+    field = MACEForceField(calc, moved, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results = {}
+    for host in (False, True):
+        if host:
+            monkeypatch.setattr(tile_list, "rows_on_host", lambda positions, device: True)
+            monkeypatch.setattr(tile_list, "CHUNK", 1000)
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles"))
+        tiled.evaluate(moved, stress=True)  # TorchScript's first call in a process rounds differently
+        results[host] = [tiled.evaluate(current, stress=True) for current in (strained(moved), moved)]
+        assert tiled.last["local_frame"] == "tiles" and tiled.last["tiles"] > 1
+        if host and mode == "padded":
+            assert all("rows64" in slot for slot in tiled._slots.values())
+    for device, host in zip(results[False], results[True]):
+        assert host[0] == device[0]
+        assert np.array_equal(host[1], device[1]) and np.array_equal(host[2], device[2])
+
+
+def test_host_positions_need_the_tile_lists_and_are_a_view():
+    """``_prepare_one_off(host=True)``: refused with the global list (it compacts on the device); without it the
+    atoms' own float64 array, not a copy."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    with pytest.raises(ValueError, match="global_list=False"):
+        field._prepare_one_off(atoms, host=True)
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(), global_list=False)
+    positions = field._prepare_one_off(atoms, host=True)
+    assert positions.dtype == torch.float64 and positions.device.type == "cpu"
+    assert np.shares_memory(positions.numpy(), atoms.arrays["positions"])
+
+
+def test_released_species_maps_are_uint8_with_the_same_values():
+    """``release_whole_system``: the species index and sender groups (and their tables) as uint8 where every
+    column and group is below 256 (billion-atom step 1: 6 bytes per atom), the same values, at the construction
+    and after it; ``node_e0`` the same."""
+    calc, atoms = calculator(), structure()
+    kept = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    species, groups, e0 = kept._species_index.long(), kept._sender_groups.long(), kept.node_e0()
+    for whole in (True, False):
+        field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE),
+                               release_node_attrs=True, release_whole_system=whole)
+        if not whole:
+            field.release_whole_system()
+        for name in ("_species_index", "_sender_groups", "_column_of", "_group_of"):
+            assert getattr(field, name).dtype == torch.uint8, name
+        assert torch.equal(field._species_index.long(), species)
+        assert torch.equal(field._sender_groups.long(), groups)
+        assert torch.equal(field.node_e0(), e0)
