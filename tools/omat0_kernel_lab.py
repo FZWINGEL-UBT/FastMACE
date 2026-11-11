@@ -758,7 +758,8 @@ def _wprime_h200_variants():
 
     def make(name):
         return lambda s: wprime_tuning.variant(s, name)
-    kinds = {"skip": "exact", "hoist": "exact", "skip+hoist": "exact", "vec2": "rounding", "skip+vec2": "rounding",
+    # skip: exact in exact arithmetic, but the A100 (12 Nov) measured dsh 4e-9 off (FMA schedule): rounding
+    kinds = {"skip": "rounding", "hoist": "exact", "skip+hoist": "rounding", "vec2": "rounding", "skip+vec2": "rounding",
              "vec4": "rounding", "skip+vec4": "rounding"}
     return {f"h2-{name}": (kind, make(name), ()) for name, kind in kinds.items()}
 

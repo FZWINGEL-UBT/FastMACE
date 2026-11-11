@@ -1,0 +1,107 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-11T23:39:19.019228+00:00",
+  "host": "cb6777d7c118",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "ccafdcf261335cab2650b8f4eb0c897e7261a5ee",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 140.9487566769999,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          6579,
+          1280,
+          4
+        ],
+        "gprime_MB": 128.49609375,
+        "species": 3,
+        "pieces": 731,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "median_us": 2840.575933456421,
+          "min_us": 2836.479902267456,
+          "max_us": 2849.792003631592,
+          "ratio": 1.0
+        },
+        "h2-skip": {
+          "kind": "exact",
+          "registers": 128,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 4.37e-09",
+            "dr": "max|d|/max|a| = 6.87e-08",
+            "dx": "max|d|/max|a| = 1.87e-07"
+          },
+          "median_us": 2831.360101699829,
+          "min_us": 2828.2880783081055,
+          "max_us": 2835.455894470215,
+          "ratio": 0.9967556467517564
+        },
+        "h2-hoist": {
+          "kind": "exact",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 2873.3439445495605,
+          "min_us": 2867.1998977661133,
+          "max_us": 2876.415967941284,
+          "ratio": 1.0115356927118886
+        },
+        "h2-skip+hoist": {
+          "kind": "exact",
+          "registers": 128,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 4.37e-09",
+            "dr": "max|d|/max|a| = 6.87e-08",
+            "dx": "max|d|/max|a| = 1.87e-07"
+          },
+          "median_us": 2911.2319946289062,
+          "min_us": 2909.183979034424,
+          "max_us": 2915.328025817871,
+          "ratio": 1.0248738505245698
+        },
+        "h2-vec2": {
+          "kind": "rounding",
+          "error": "26-D: function \"atomicAdd(unsigned long long *, unsigned long long)\" does not match because argument #1 does not match parameter\nNote #3326-D: function \"atomicAdd(float *, float)\" does not match because argument #1 does not match parameter\nNote #3326-D: function \"atomicAdd(double *, double)\" does not match because argument #1 does not match parameter\n\noeq_streaming.cu(126): warning #177-D: variable \"output_base\" was declared but never referenced\n      const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;\n                    ^\n\n4 errors detected in the compilation of \"oeq_streaming.cu\".\n\u0000"
+        },
+        "h2-skip+vec2": {
+          "kind": "rounding",
+          "error": "26-D: function \"atomicAdd(unsigned long long *, unsigned long long)\" does not match because argument #1 does not match parameter\nNote #3326-D: function \"atomicAdd(float *, float)\" does not match because argument #1 does not match parameter\nNote #3326-D: function \"atomicAdd(double *, double)\" does not match because argument #1 does not match parameter\n\noeq_streaming.cu(126): warning #177-D: variable \"output_base\" was declared but never referenced\n      const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;\n                    ^\n\n4 errors detected in the compilation of \"oeq_streaming.cu\".\n\u0000"
+        },
+        "h2-skip+vec4": {
+          "kind": "rounding",
+          "error": "26-D: function \"atomicAdd(unsigned long long *, unsigned long long)\" does not match because argument #1 does not match parameter\nNote #3326-D: function \"atomicAdd(float *, float)\" does not match because argument #1 does not match parameter\nNote #3326-D: function \"atomicAdd(double *, double)\" does not match because argument #1 does not match parameter\n\noeq_streaming.cu(126): warning #177-D: variable \"output_base\" was declared but never referenced\n      const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;\n                    ^\n\n4 errors detected in the compilation of \"oeq_streaming.cu\".\n\u0000"
+        }
+      }
+    }
+  },
+  "constants": {},
+  "profiled": {
+    "wprime": []
+  }
+}
