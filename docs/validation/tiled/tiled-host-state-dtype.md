@@ -173,6 +173,40 @@ workstations nor the 5060 Ti run these A100-only rewrites, so neither leak showe
 - `leak-4973583` and `leak-4973621` (the census before and after the fix);
 - job scripts in `jobs/`.
 
+## Capacity on one RTX 4000 Ada (murphy, 10 November 2026)
+
+**Result: 179,685,000 atoms** (SrTiO3 330³) on murphy's RTX 4000 Ada (20 GB, 251 GiB host memory), up from the
+148,955,000-atom record of 2 November (compiled call 2,947 s, 19.8 µs/atom). Source `d036568b`; NAS
+`mace_cueq_oeq`; the same `tiled_capacity.py` settings as on the A100. The scan (`jobs/ws_scan.sh`) went upward from
+163.8M and stopped at the first failure. Before each point it checked that the host had none of our other jobs and
+passed `run.sh`'s idle check (no compute process on the GPU, no other user's busy process).
+
+| Atoms | Build | Eager call | Compiled call | µs/atom (compiled) | GPU peak | Host peak | Host state, kept lists |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 163,840,000 | 230 s | 2,354 s | 1,622 s | 9.90 | 17.1 GiB | 124.5 GB | float32, kept |
+| **179,685,000** | 218 s | 2,479 s | **1,773 s** | **9.87** | 18.7 GiB | 129.0 GB | float32, kept |
+| 196,520,000 | 236 s | out of GPU memory | – | – | – | – | – |
+
+- **Validity.** Both points are valid, with 74 edges per atom (13,296,690,000 at 179.7M). The energy is
+  −7.989549 eV/atom; the largest force component is 1.3 meV/Å.
+- **What limits.** The device. At 196.5M the first tiled call asked for 2.26 GiB with 1.39 GiB free: before the
+  tiles, about 10.7 GiB held the per-atom device arrays (about 60 B/atom), and the tiles' workspace (R = 16,384) took
+  the rest. The host used 129 of 251 GiB, so host memory and `state_dtype` "auto" never came into play.
+- **Speed.** The compiled call costs 9.9 µs/atom, half the 2 November record's 19.8 µs/atom. Two things changed:
+  the tiled speed switches from the November rounds (`TILE_BLOCK_ROWS` is on everywhere; the `TILED_SPEED_GPUS`
+  switches are not on the Ada), and the receiver budget's R = 16,384 for the compiled call.
+
+**Records:** `results/tiled-capacity-20261109/murphy/` (each point's `run.log`, idle check and record, and
+`ws-scan-murphy.log`).
+
+**Recheck with the speed switches on** (`4a1ade7e`, `TILED_SPEED_GPUS` holds the Ada; murphy, same settings): 179,685,000
+atoms still fit. Build 221 s, eager call 2,472 s, compiled call **1,676 s (9.33 µs/atom**, was 9.87, −5.5 %), GPU peak
+18.7 GiB, host peak 136.1 GB (was 129.0 GB; the host worker and the side-stream copies), valid with 74 edges per
+atom and the largest force component 1.3 meV/Å. The capacity call gains less than the 975,560-atom A/B (−13 % with
+the state on the device, −23 % on the wavefront): at this size the host state's link traffic and the neighbour
+search (329 s) are fixed costs the switches do not touch. Records:
+`results/tiled-speed-20261110/murphy/murphy-cap-4a1ade7e-330/`.
+
 ## Tests
 
 `tests/cpu/test_tiled.py`:

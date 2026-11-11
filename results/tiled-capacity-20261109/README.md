@@ -9,4 +9,5 @@ Record: [docs/validation/tiled/tiled-host-state-dtype.md](../../docs/validation/
 | `nve/` | 25 (5060 Ti) | `tiled_nve.py`: 40,000 atoms, 1,000 steps, each store |
 | `hostprof/` | 26–31, 33, 34 (5060 Ti) | `tiled_host_profile.py`: host by owner, censuses, malloc settings, 1.25M–30M atoms |
 | `alex/` | Slurm 4972536, 4973583, 4973621, 4973640 | A100-80 scan (149M, 320M, 397.5M atoms), the leak census before and after the fix |
+| `murphy/` | `ws_scan.sh` (RTX 4000 Ada) | the workstation rescan from 163.8M: 179.7M atoms, 196.5M out of GPU memory |
 | `jobs/` | – | the job scripts and the summary helpers (`hostsumm.py`, `censsumm.py`) |

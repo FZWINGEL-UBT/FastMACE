@@ -1,0 +1,351 @@
+{
+ "atoms": 975560,
+ "times": [
+  21.56129632599186,
+  147.4497098471038,
+  3.741378247970715,
+  3.7116822049720213
+ ],
+ "wall": 4.604798029991798,
+ "regions": [
+  {
+   "region": "(none)",
+   "ns_per_atom": 901.061270449798,
+   "kernels": 3892,
+   "ops": {
+    "fastmace::streaming_conv_wprime_backward_blocks": 506.4,
+    "fastmace::tabled_outer_sum_backward": 75.2,
+    "## Call CompiledFxGraph fcglfwjepvvdx6d7vz633nbghb": 66.0,
+    "cuequivariance::uniform_1d": 53.4,
+    "## Call CompiledFxGraph fslmwjjfr5ejnefwga6h6cmeu5": 38.4,
+    "## Call CompiledFxGraph f2jlnhq4h2aly5xdlbrjl26ky5": 28.1,
+    "triton_poi_fused_mul_slice_t_tf32x3_mm_unsqueeze_v": 23.4,
+    "## Call CompiledFxGraph fj4syoiommkykvyeiehqzxytht": 15.8,
+    "triton_red_fused_add_div_mul_neg_slice_backward_su": 14.9,
+    "triton_poi_fused_add_index_select_slice_backward_t": 14.8,
+    "triton_poi_fused__unsafe_view_clone_slice_tf32x3_m": 9.8,
+    "triton_red_fused_add_div_mul_neg_sum_3": 9.4,
+    "triton_poi_fused__unsafe_view_add_clone_div_slice_": 9.3,
+    "fastmace::tf32x3_segment_rows": 7.1,
+    "fastmace::radial_table_backward": 5.0,
+    "triton_poi_fused_add_slice_backward_uniform_1d_4": 4.2,
+    "triton_poi_fused_add_div_eq_exp_gather_index_selec": 3.5,
+    "aten::fill_": 3.5,
+    "triton_poi_fused_add_div_eq_masked_fill_mul_view_9": 2.7,
+    "triton_poi_fused_expand_mul_tf32x3_segment_rows_un": 2.2,
+    "triton_poi_fused_add_div_eq_masked_fill_mul_scalar": 2.1,
+    "aten::copy_": 1.3,
+    "aten::mm": 1.2,
+    "triton_poi_fused_add_div_slice_tf32x3_mm_4": 0.6,
+    "triton_poi_fused__to_copy_index_select_radial_tabl": 0.6
+   }
+  },
+  {
+   "region": "fwd2 < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 318.36055188814186,
+   "kernels": 1568,
+   "ops": {
+    "fastmace::spline_message_blocks": 248.3,
+    "fastmace::tf32x3_linear_div": 48.2,
+    "cuequivariance::uniform_1d": 5.9,
+    "fastmace::radial_table_forward": 3.2,
+    "## Call CompiledFxGraph fqvxmzp3qheuzscnzyiqfr226r": 2.2,
+    "triton_poi_fused__to_copy_add_arange_full_like_ind": 1.7,
+    "fastmace::receiver_sum": 1.3,
+    "fastmace::tf32x3_segment_rows": 1.3,
+    "triton_poi_fused_linalg_vector_norm_0": 1.0,
+    "triton_per_fused__to_copy_argmax_slice_4": 1.0,
+    "triton_poi_fused__to_copy_arange_full_like_lt_sear": 0.8,
+    "## Call CompiledFxGraph fqqvdwoosgtfttjpxf5jv7btls": 0.8,
+    "triton_poi_fused_argmax_index_1": 0.5,
+    "triton_red_fused_add_index_mul_slice_sum_view_8": 0.4,
+    "aten::mm": 0.4,
+    "triton_poi_fused_add_mul_silu_tf32x3_segment_rows_": 0.3,
+    "## Call CompiledFxGraph fnmmtx5jzq5oo4p5cdwgunofpk": 0.2,
+    "triton_poi_fused_clone_5": 0.2,
+    "triton_poi_fused_index_slice_7": 0.2,
+    "aten::fill_": 0.2,
+    "aten::copy_": 0.1,
+    "triton_per_fused_add_index_mul_slice_sum_view_9": 0.1,
+    "triton_poi_fused_add_cat_div_slice_view_5": 0.0,
+    "triton_poi_fused_cat_view_4": 0.0,
+    "triton_poi_fused_clone_7": 0.0
+   }
+  },
+  {
+   "region": "fwd3o < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 267.296186805536,
+   "kernels": 3120,
+   "ops": {
+    "fastmace::tf32x3_skip_select": 71.3,
+    "fastmace::tabled_outer_sum_forward": 57.4,
+    "triton_poi_fused__to_copy_add_div_exp_index_linalg": 25.1,
+    "## Call CompiledFxGraph fc4smhxhxrnxmxisyk3s3snurp": 23.2,
+    "cuequivariance::uniform_1d": 20.6,
+    "triton_poi_fused__unsafe_view_clone_div_mul_slice_": 14.9,
+    "triton_poi_fused__to_copy__unsafe_view_add_clone_d": 10.4,
+    "## Call CompiledFxGraph f3l6gh5upub2vkcphxjbuplcws": 9.7,
+    "triton_poi_fused_cat_view_9": 9.6,
+    "aten::fill_": 6.8,
+    "fastmace::tf32x3_segment_rows": 6.2,
+    "triton_red_fused_mul_sum_unsqueeze_21": 3.2,
+    "triton_per_fused_argmax_1": 1.4,
+    "fastmace::receiver_sum": 1.4,
+    "triton_per_fused__to_copy_argmax_slice_16": 1.0,
+    "aten::copy_": 1.0,
+    "triton_poi_fused_argmax_index_0": 0.5,
+    "aten::mm": 0.5,
+    "triton_red_fused_add_index_mul_slice_sum_view_19": 0.5,
+    "triton_poi_fused_index_slice_10": 0.4,
+    "triton_red_fused_mul_sum_unsqueeze_23": 0.4,
+    "triton_poi_fused__to_copy__unsafe_view_add_argmax_": 0.3,
+    "triton_poi_fused_clone_17": 0.3,
+    "## Call CompiledFxGraph fii5jkr2rrv76qppv242r5zf65": 0.2,
+    "triton_poi_fused_div_mul_slice_t_unsqueeze_4": 0.2
+   }
+  },
+  {
+   "region": "fwd1m < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 262.48817089671604,
+   "kernels": 2788,
+   "ops": {
+    "fastmace::tf32x3_skip_select": 70.9,
+    "fastmace::tabled_outer_sum_forward": 57.2,
+    "## Call CompiledFxGraph f7fa6cbcubxfqlbwfn3fsycz6l": 23.6,
+    "triton_poi_fused__to_copy_add_div_exp_index_linalg": 23.5,
+    "cuequivariance::uniform_1d": 20.4,
+    "triton_poi_fused__unsafe_view_clone_div_mul_slice_": 15.3,
+    "triton_poi_fused_add_cat_div_view_9": 9.7,
+    "## Call CompiledFxGraph fdjnhf7sgwzrj3tcdjm3j7cla5": 9.5,
+    "triton_poi_fused__to_copy__unsafe_view_clone_index": 7.2,
+    "aten::fill_": 6.7,
+    "fastmace::tf32x3_segment_rows": 6.1,
+    "triton_poi_fused__to_copy__unsafe_view_clone_slice": 3.0,
+    "triton_poi_fused_mul_unsqueeze_18": 2.2,
+    "triton_per_fused_argmax_1": 1.2,
+    "fastmace::receiver_sum": 1.2,
+    "triton_per_fused__to_copy__unsafe_view_argmax_clon": 1.1,
+    "aten::copy_": 1.0,
+    "aten::mm": 0.5,
+    "triton_poi_fused__to_copy__unsafe_view_argmax_clon": 0.4,
+    "triton_poi_fused_argmax_index_0": 0.3,
+    "triton_poi_fused__to_copy__unsafe_view_clone_unifo": 0.3,
+    "## Call CompiledFxGraph fqhe6mwwpknavhvqs4rzdd5fst": 0.2,
+    "triton_poi_fused_add_index_mul_slice_squeeze_17": 0.2,
+    "triton_poi_fused_index_slice_10": 0.1,
+    "triton_poi_fused__to_copy_argmax_slice_tf32x3_skip": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._tile_graph < TiledForceField._piece < TiledForceField._slot_keys",
+   "ns_per_atom": 147.84771720857984,
+   "kernels": 7530,
+   "ops": {
+    "aten::copy_": 91.2,
+    "aten::index": 23.9,
+    "aten::nonzero": 9.6,
+    "aten::_unique2": 7.1,
+    "aten::add": 2.5,
+    "aten::cat": 2.3,
+    "aten::sub": 2.2,
+    "aten::sum": 2.2,
+    "aten::_index_put_impl_": 1.9,
+    "aten::mul": 0.9,
+    "aten::gather": 0.8,
+    "aten::repeat_interleave": 0.6,
+    "aten::lt": 0.6,
+    "aten::cumsum": 0.4,
+    "aten::arange": 0.4,
+    "aten::abs": 0.3,
+    "aten::floor_divide": 0.3,
+    "aten::remainder": 0.3,
+    "aten::le": 0.3,
+    "aten::_local_scalar_dense": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._scatter < TiledForceField._call",
+   "ns_per_atom": 110.55927672311799,
+   "kernels": 952,
+   "ops": {
+    "aten::scatter_add_": 69.0,
+    "aten::index_add_": 40.8,
+    "aten::copy_": 0.4,
+    "aten::add_": 0.3
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._call",
+   "ns_per_atom": 32.357723768913424,
+   "kernels": 1020,
+   "ops": {
+    "aten::copy_": 13.2,
+    "aten::where": 6.6,
+    "aten::index": 6.3,
+    "aten::add": 3.2,
+    "aten::ge": 3.1
+   }
+  },
+  {
+   "region": "TiledForceField._fill < TiledForceField._call",
+   "ns_per_atom": 19.325506375838106,
+   "kernels": 3468,
+   "ops": {
+    "aten::copy_": 13.6,
+    "aten::fill_": 5.8
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 9.322319488297323,
+   "kernels": 476,
+   "ops": {
+    "triton_poi_fused_mul_unsqueeze_6": 3.7,
+    "triton_red_fused_mul_sum_unsqueeze_view_3": 3.6,
+    "triton_poi_fused_mul_unsqueeze_2": 1.2,
+    "triton_poi_fused_mul_0": 0.3,
+    "triton_poi_fused_mul_unsqueeze_1": 0.2,
+    "triton_red_fused_mul_sum_unsqueeze_view_4": 0.2,
+    "triton_poi_fused_add_mul_transpose_view_5": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._source < TiledForceField._call",
+   "ns_per_atom": 8.740993890688427,
+   "kernels": 135,
+   "ops": {
+    "aten::copy_": 8.5,
+    "aten::_local_scalar_dense": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::div": 0.0,
+    "aten::mul": 0.0,
+    "aten::floor": 0.0,
+    "aten::abs": 0.0,
+    "aten::max": 0.0,
+    "aten::linalg_lu_solve": 0.0,
+    "aten::cat": 0.0,
+    "aten::arange": 0.0,
+    "aten::linalg_vector_norm": 0.0,
+    "aten::fill_": 0.0,
+    "aten::floor_divide": 0.0,
+    "aten::remainder": 0.0,
+    "aten::reciprocal": 0.0,
+    "aten::add": 0.0,
+    "aten::sub": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._body < TiledForceField._run_slot < TiledForceField._call",
+   "ns_per_atom": 8.057545409812148,
+   "kernels": 204,
+   "ops": {
+    "triton_poi_fused_add_gt_index_select_sub_unsqueeze": 8.1
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 6.216442863583752,
+   "kernels": 680,
+   "ops": {
+    "aten::copy_": 2.6,
+    "aten::fill_": 1.3,
+    "aten::index": 1.2,
+    "aten::scatter_": 1.0
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 5.210163393340269,
+   "kernels": 272,
+   "ops": {
+    "triton_red_fused_mul_sum_unsqueeze_view_1": 3.7,
+    "triton_poi_fused_mul_unsqueeze_0": 1.2,
+    "triton_red_fused_mul_sum_unsqueeze_view_2": 0.2,
+    "triton_poi_fused_add_mul_transpose_view_3": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._second < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 5.1609834351565524,
+   "kernels": 136,
+   "ops": {
+    "aten::index": 5.2
+   }
+  },
+  {
+   "region": "TiledForceField._first < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 3.9423746361050553,
+   "kernels": 204,
+   "ops": {
+    "aten::index": 3.7,
+    "aten::mul": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._call",
+   "ns_per_atom": 3.2835263848425695,
+   "kernels": 303,
+   "ops": {
+    "aten::copy_": 3.2,
+    "aten::index": 0.0,
+    "aten::linalg_lu_factor_ex": 0.0,
+    "aten::sum": 0.0,
+    "aten::add": 0.0,
+    "aten::gather": 0.0,
+    "aten::mul": 0.0,
+    "aten::prod": 0.0,
+    "aten::fill_": 0.0,
+    "aten::div": 0.0,
+    "aten::fmod_": 0.0,
+    "aten::ne": 0.0,
+    "aten::abs": 0.0,
+    "aten::add_": 0.0,
+    "aten::arange": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 3.1059268522715353,
+   "kernels": 340,
+   "ops": {
+    "aten::copy_": 1.3,
+    "aten::fill_": 0.6,
+    "aten::index": 0.6,
+    "aten::scatter_": 0.6
+   }
+  },
+  {
+   "region": "TiledForceField._globals < TiledForceField._call",
+   "ns_per_atom": 2.2377321743409673,
+   "kernels": 8,
+   "ops": {
+    "aten::fill_": 2.2,
+    "aten::copy_": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._slot_keys < TiledForceField._call",
+   "ns_per_atom": 0.6697445569724394,
+   "kernels": 68,
+   "ops": {
+    "aten::copy_": 0.7
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 0.10178256591030775,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 0.10083439255508947,
+   "kernels": 68,
+   "ops": {
+    "aten::fill_": 0.1
+   }
+  }
+ ]
+}

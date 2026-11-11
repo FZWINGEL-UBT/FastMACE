@@ -1,0 +1,68 @@
+### Starting TaskPrologue of job 4977013 on a0537 at Tue Nov 10 01:54:25 PM CET 2026
+Running on cores 96-111 with governor schedutil
+Tue Nov 10 13:54:25 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:D1:00.0 Off |                    0 |
+| N/A   41C    P0             61W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-10T13:54:29+0100 job 4977013 on a0537; NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; source 4a1ade7e; nproc 16
+2026-11-10T13:54:29+0100 start gate-off
+2026-11-10T14:09:20+0100 end gate-off exit=0 NaCl summary {"energy": {"production_max_abs": 0.0003137990863369514, "ase_f32_max_abs": 0.00014952319112900887, "ratio": 2.0986649894744756, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 4.091763548208505e-06, "ase_f32_max_abs": 4.485961188460674e-06, "ratio": 0.9121263819075894, "floor": 1e-05, "limit": 1.3457883565382023e-05, "passed": true, "gat
+2026-11-10T14:09:20+0100 start gate-on
+2026-11-10T14:29:31+0100 end gate-on exit=0 NaCl summary {"energy": {"production_max_abs": 0.00031379908791593524, "ase_f32_max_abs": 0.0001517307700388065, "ratio": 2.068130859915087, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 4.05061023583779e-06, "ase_f32_max_abs": 4.664775123786047e-06, "ratio": 0.8683398724160178, "floor": 1e-05, "limit": 1.399432537135814e-05, "passed": true, "gated"
+2026-11-10T14:29:32+0100 done
+=== JOB_STATISTICS ===
+=== current date     : Tue Nov 10 14:29:34 CET 2026
+= Job-ID             : 4977013 on alex
+= Job-Name           : fm-tgate
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-tiledgate/alex_gate.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-tiledgate
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 02:00:00
+= Elapsed runtime    : 00:37:17
+= Total RAM usage    : 12.1 GiB of assigned  GiB (%)
+= Node list          : a0537
+= Subm/Elig/Start/End: 2026-11-10T12:59:42 / 2026-11-10T12:59:42 / 2026-11-10T13:52:17 / 2026-11-10T14:29:34
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             619.8M   104.9G   209.7G        N/A   1,162      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            38.6G     0.0K     0.0K        N/A     415K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1925230, 1 %, 0 %, 1486 MiB, 33230 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1925708, 1 %, 0 %, 1036 MiB, 27365 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1926111, 1 %, 0 %, 1302 MiB, 24807 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1926438, 1 %, 0 %, 938 MiB, 26489 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1926846, 3 %, 1 %, 5852 MiB, 24436 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1927178, 2 %, 0 %, 3248 MiB, 26561 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1927516, 1 %, 0 %, 2568 MiB, 642625 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1933068, 0 %, 0 %, 1486 MiB, 56468 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1933745, 0 %, 0 %, 1036 MiB, 201686 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1937077, 1 %, 0 %, 1302 MiB, 24282 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1937690, 1 %, 0 %, 938 MiB, 25986 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1938154, 2 %, 1 %, 5852 MiB, 24447 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1938622, 2 %, 0 %, 3248 MiB, 26185 ms
+NVIDIA A100-SXM4-80GB, 00000000:D1:00.0, 1939329, 1 %, 0 %, 2568 MiB, 513142 ms

@@ -1,0 +1,382 @@
+{
+ "atoms": 975560,
+ "times": [
+  18.17200329597108,
+  148.5992284870008,
+  3.7721665180288255,
+  3.7331448440090753
+ ],
+ "wall": 4.638321703008842,
+ "kernels": 24548,
+ "kernel_sum_ns_per_atom": 2013.19365390135,
+ "busy_ns_per_atom": 1995.3548624876353,
+ "unlaunched_ns_per_atom": 0.0,
+ "regions": [
+  {
+   "region": "(device thread) < autograd.grad < TiledForceField._second",
+   "ns_per_atom": 622.6833090737639,
+   "kernels": 1496,
+   "ops": {
+    "oeq_projected_backward_wprime": 524.9,
+    "fm_tf32x3_rr_64x64": 49.8,
+    "segmented_polynomial_bwd_algo1_2": 10.6,
+    "triton_poi_fused__unsafe_view_add_clone_div_slice_tf32x3_mm_": 9.6,
+    "triton_red_fused_add_div_mul_neg_sum_3": 9.4,
+    "_backward": 5.6,
+    "backward": 5.0,
+    "triton_poi_fused_add_div_eq_masked_fill_mul_view_9": 2.4,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 2.0,
+    "fm_tf32x3_species_rr_64x64": 0.8,
+    "triton_poi_fused__to_copy_index_select_radial_table_backward": 0.6,
+    "triton_poi_fused_add_div_slice_tf32x3_mm_4": 0.6,
+    "ampere_sgemm_32x128_nn": 0.4,
+    "triton_poi_fused__to_copy_index_select_streaming_conv_wprime": 0.3,
+    "triton_poi_fused_add_mul_silu_backward_2": 0.2,
+    "triton_poi_fused_add_expand_index_index_put_mul_new_zeros_vi": 0.2,
+    "triton_poi_fused_new_zeros_0": 0.1,
+    "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_back": 0.0,
+    "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_vi": 0.0,
+    "triton_poi_fused_add_div_slice_slice_backward_tf32x3_mm_view": 0.0,
+    "void gemmk1_kernel<int, float, 256, 5, false, false, false, ": 0.0
+   }
+  },
+  {
+   "region": "(device thread) < autograd.grad < TiledForceField._first",
+   "ns_per_atom": 298.45807433679084,
+   "kernels": 2328,
+   "ops": {
+    "fm_tf32x3_rc_64x64": 90.1,
+    "Kernel": 75.5,
+    "segmented_polynomial_bwd_algo1_1": 43.3,
+    "triton_red_fused_add_div_mul_neg_slice_backward_sum_view_9": 14.8,
+    "triton_poi_fused_add_index_select_slice_backward_tabled_oute": 14.8,
+    "triton_poi_fused_mul_slice_t_tf32x3_mm_unsqueeze_view_8": 10.5,
+    "triton_poi_fused_mul_slice_t_tf32x3_mm_unsqueeze_view_7": 7.4,
+    "fm_tf32x3_species_rr_64x64": 6.3,
+    "_backward": 4.8,
+    "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_view_11": 4.5,
+    "triton_poi_fused_mul_slice_t_tf32x3_mm_unsqueeze_view_6": 4.3,
+    "triton_poi_fused_add_slice_backward_uniform_1d_4": 4.2,
+    "triton_poi_fused_add_div_eq_exp_gather_index_select_mul_neg_": 3.5,
+    "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_view_12": 3.2,
+    "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 2.3,
+    "triton_poi_fused_add_div_eq_masked_fill_mul_scalar_tensor_vi": 2.1,
+    "triton_poi_fused_expand_mul_tf32x3_segment_rows_unsqueeze_2": 2.1,
+    "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_view_13": 1.8,
+    "triton_poi_fused_mul_slice_t_tf32x3_mm_unsqueeze_view_5": 1.2,
+    "ampere_sgemm_32x128_nn": 0.7,
+    "triton_poi_fused_expand_mul_t_tf32x3_mm_unsqueeze_view_3": 0.3,
+    "triton_poi_fused_add_expand_index_index_put_mul_new_zeros_vi": 0.2,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 0.1,
+    "triton_poi_fused_new_zeros_0": 0.1,
+    "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_ali": 0.1
+   }
+  },
+  {
+   "region": "fwd2 < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 288.72928266841564,
+   "kernels": 1500,
+   "ops": {
+    "spline_forward0": 217.8,
+    "fm_tf32x3_remap_div_rr_64x64": 49.0,
+    "segmented_polynomial_algo1_1": 6.0,
+    "forward": 3.2,
+    "_forward": 3.0,
+    "triton_poi_fused__to_copy_add_arange_full_like_index_lt_maxi": 1.7,
+    "Kernel": 1.3,
+    "fm_tf32x3_species_rr_64x64": 1.3,
+    "triton_poi_fused_linalg_vector_norm_0": 1.0,
+    "triton_per_fused__to_copy_argmax_slice_4": 1.0,
+    "triton_poi_fused__to_copy_arange_full_like_lt_searchsorted_s": 0.9,
+    "triton_poi_fused_argmax_index_1": 0.5,
+    "triton_red_fused_add_index_mul_slice_sum_view_8": 0.4,
+    "std::enable_if<!(false), void>::type internal::gemvx::kernel": 0.3,
+    "triton_poi_fused_add_mul_silu_tf32x3_segment_rows_6": 0.3,
+    "triton_poi_fused_clone_5": 0.2,
+    "triton_poi_fused_index_slice_7": 0.2,
+    "fm_tf32x3_rr_64x64": 0.2,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 0.2,
+    "triton_per_fused_add_index_mul_slice_sum_view_9": 0.1,
+    "void cutlass::Kernel2<cutlass_80_simt_sgemm_64x64_8x5_nn_ali": 0.1,
+    "triton_poi_fused_add_cat_div_slice_view_5": 0.0,
+    "triton_poi_fused_cat_view_4": 0.0,
+    "void cublasLt::splitKreduce_kernel<32, 16, int, float, float": 0.0,
+    "triton_per_fused__to_copy_argmax_slice_6": 0.0
+   }
+  },
+  {
+   "region": "fwd3o < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 269.03872032473583,
+   "kernels": 3052,
+   "ops": {
+    "fm_tf32x3_remap_select_rr_64x64": 71.7,
+    "Kernel": 59.4,
+    "fm_tf32x3_rr_64x64": 30.0,
+    "triton_poi_fused__to_copy_add_div_exp_index_linalg_vector_no": 25.3,
+    "segmented_polynomial_algo1_2": 20.9,
+    "triton_poi_fused__unsafe_view_clone_div_mul_slice_t_tf32x3_m": 14.9,
+    "triton_poi_fused__to_copy__unsafe_view_add_clone_div_slice_t": 10.4,
+    "triton_poi_fused_cat_view_9": 9.6,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 6.8,
+    "fm_tf32x3_species_rr_64x64": 6.2,
+    "_forward": 3.3,
+    "triton_red_fused_mul_sum_unsqueeze_21": 3.2,
+    "triton_per_fused_argmax_1": 1.4,
+    "triton_per_fused__to_copy_argmax_slice_16": 1.1,
+    "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 0.9,
+    "triton_poi_fused_argmax_index_0": 0.5,
+    "void gemv2T_kernel_val<int, int, float, float, float, float,": 0.5,
+    "triton_red_fused_add_index_mul_slice_sum_view_19": 0.5,
+    "triton_red_fused_mul_sum_unsqueeze_23": 0.4,
+    "triton_poi_fused_index_slice_10": 0.4,
+    "triton_poi_fused__to_copy__unsafe_view_add_argmax_clone_div_": 0.3,
+    "triton_poi_fused_clone_17": 0.3,
+    "triton_poi_fused_div_mul_slice_t_unsqueeze_4": 0.2,
+    "triton_poi_fused_add_index_slice_squeeze_18": 0.2,
+    "triton_per_fused_mul_sum_unsqueeze_22": 0.2
+   }
+  },
+  {
+   "region": "fwd1m < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 267.2015078519015,
+   "kernels": 2720,
+   "ops": {
+    "fm_tf32x3_remap_select_rr_64x64": 72.5,
+    "Kernel": 59.7,
+    "fm_tf32x3_rr_64x64": 30.5,
+    "triton_poi_fused__to_copy_add_div_exp_index_linalg_vector_no": 24.1,
+    "segmented_polynomial_algo1_2": 21.1,
+    "triton_poi_fused__unsafe_view_clone_div_mul_slice_t_tf32x3_m": 15.0,
+    "triton_poi_fused_add_cat_div_view_9": 9.7,
+    "triton_poi_fused__to_copy__unsafe_view_clone_index_slice_tf3": 7.2,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 6.7,
+    "fm_tf32x3_species_rr_64x64": 6.3,
+    "_forward": 3.6,
+    "triton_poi_fused__to_copy__unsafe_view_clone_slice_tf32x3_sk": 3.0,
+    "triton_poi_fused_mul_unsqueeze_18": 2.1,
+    "triton_per_fused_argmax_1": 1.5,
+    "triton_per_fused__to_copy__unsafe_view_argmax_clone_slice_un": 0.9,
+    "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 0.9,
+    "void gemv2T_kernel_val<int, int, float, float, float, float,": 0.5,
+    "triton_poi_fused_argmax_index_0": 0.3,
+    "triton_poi_fused__to_copy__unsafe_view_argmax_clone_index_sl": 0.3,
+    "triton_poi_fused__to_copy__unsafe_view_clone_uniform_1d_16": 0.3,
+    "triton_poi_fused_add_index_mul_slice_squeeze_17": 0.2,
+    "triton_poi_fused_index_slice_10": 0.1,
+    "triton_poi_fused__to_copy_argmax_slice_tf32x3_skip_select_19": 0.1,
+    "triton_poi_fused_mul_unsqueeze_20": 0.1,
+    "triton_poi_fused__to_copy__unsafe_view_argmax_clone_slice_tf": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._scatter < TiledForceField._call",
+   "ns_per_atom": 112.11980606010917,
+   "kernels": 952,
+   "ops": {
+    "void at::native::indexFuncLargeIndex<float, long, unsigned i": 41.4,
+    "void at::native::_scatter_gather_elementwise_kernel<128, 8, ": 38.2,
+    "void at::native::vectorized_scatter_add_kernel<16, float, lo": 31.8,
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 0.4,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 0.3
+   }
+  },
+  {
+   "region": "TiledForceField._tile_graph < TiledForceField._piece < TiledForceField._slot_keys",
+   "ns_per_atom": 62.3296660379682,
+   "kernels": 5966,
+   "ops": {
+    "void at::native::index_elementwise_kernel<128, 4, at::native": 25.7,
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 8.0,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 6.2,
+    "void at_cuda_detail::cub::detail::select::DeviceSelectSweepK": 5.6,
+    "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSor": 5.3,
+    "void at::native::(anonymous namespace)::CatArrayBatchedCopy_": 2.3,
+    "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<": 2.1,
+    "void at_cuda_detail::cub::detail::reduce::DeviceReduceKernel": 1.9,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 1.2,
+    "void at_cuda_detail::cub::detail::reduce::DeviceReduceSingle": 0.9,
+    "void at_cuda_detail::cub::detail::scan::DeviceCompactInitKer": 0.8,
+    "void at::native::_scatter_gather_elementwise_kernel<128, 8, ": 0.8,
+    "void compute_cuda_kernel<long>(long const*, long const*, lon": 0.6,
+    "void (anonymous namespace)::elementwise_kernel_with_index<in": 0.4,
+    "void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_": 0.3,
+    "void at_cuda_detail::cub::detail::scan::DeviceScanInitKernel": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._call",
+   "ns_per_atom": 33.24840091844685,
+   "kernels": 1020,
+   "ops": {
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 13.9,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 9.8,
+    "void at::native::index_elementwise_kernel<128, 4, at::native": 6.5,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 3.0
+   }
+  },
+  {
+   "region": "TiledForceField._fill < TiledForceField._call",
+   "ns_per_atom": 14.741058468981977,
+   "kernels": 2856,
+   "ops": {
+    "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 10.3,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 3.0,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 1.0,
+    "void at::native::unrolled_elementwise_kernel<at::native::Fil": 0.4
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 9.435323301488381,
+   "kernels": 476,
+   "ops": {
+    "triton_poi_fused_mul_unsqueeze_6": 3.8,
+    "triton_red_fused_mul_sum_unsqueeze_view_3": 3.6,
+    "triton_poi_fused_mul_unsqueeze_2": 1.2,
+    "triton_poi_fused_mul_0": 0.3,
+    "triton_poi_fused_mul_unsqueeze_1": 0.3,
+    "triton_red_fused_mul_sum_unsqueeze_view_4": 0.2,
+    "triton_poi_fused_add_mul_transpose_view_5": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._body < TiledForceField._run_slot < TiledForceField._call",
+   "ns_per_atom": 8.087127393497065,
+   "kernels": 204,
+   "ops": {
+    "triton_poi_fused_add_gt_index_select_sub_unsqueeze_where_0": 8.1
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 6.289664397884297,
+   "kernels": 680,
+   "ops": {
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 2.6,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 1.3,
+    "void at::native::index_elementwise_kernel<128, 4, at::native": 1.2,
+    "void at::native::_scatter_gather_elementwise_kernel<128, 8, ": 1.1
+   }
+  },
+  {
+   "region": "TiledForceField._second < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 5.18778547705933,
+   "kernels": 136,
+   "ops": {
+    "void at::native::vectorized_gather_kernel<16, long>(char*, c": 5.2
+   }
+  },
+  {
+   "region": "epilogue < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 5.016916437738325,
+   "kernels": 272,
+   "ops": {
+    "triton_red_fused_mul_sum_unsqueeze_view_1": 3.7,
+    "triton_poi_fused_mul_unsqueeze_0": 1.0,
+    "triton_red_fused_mul_sum_unsqueeze_view_2": 0.2,
+    "triton_poi_fused_add_mul_transpose_view_3": 0.1
+   }
+  },
+  {
+   "region": "TiledForceField._first < TiledForceField._body < TiledForceField._run_slot",
+   "ns_per_atom": 3.9533047685431946,
+   "kernels": 204,
+   "ops": {
+    "void at::native::vectorized_gather_kernel<16, long>(char*, c": 3.8,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 0.2
+   }
+  },
+  {
+   "region": "TiledForceField._attrs < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 3.123075976874821,
+   "kernels": 340,
+   "ops": {
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 1.3,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 0.7,
+    "void at::native::index_elementwise_kernel<128, 4, at::native": 0.6,
+    "void at::native::_scatter_gather_elementwise_kernel<128, 8, ": 0.5
+   }
+  },
+  {
+   "region": "TiledForceField._globals < TiledForceField._call",
+   "ns_per_atom": 2.231927303292468,
+   "kernels": 7,
+   "ops": {
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 2.2,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._piece < TiledForceField._slot_keys < TiledForceField._call",
+   "ns_per_atom": 0.6624349091803683,
+   "kernels": 68,
+   "ops": {
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 0.7
+   }
+  },
+  {
+   "region": "TiledForceField._source < TiledForceField._call",
+   "ns_per_atom": 0.2793728730165238,
+   "kernels": 106,
+   "ops": {
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 0.1,
+    "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<": 0.0,
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 0.0,
+    "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 0.0,
+    "void getrf_pivot<getrf_params_<double, 32, 1, 32, 32, 1> >(i": 0.0,
+    "void (anonymous namespace)::elementwise_kernel_with_index<in": 0.0,
+    "void at::native::(anonymous namespace)::CatArrayBatchedCopy<": 0.0,
+    "void trsm_batch_left_upper_kernel_small<double, 4, 4, 64>(cu": 0.0,
+    "void at::native::unrolled_elementwise_kernel<at::native::AUn": 0.0,
+    "void ipiv_lower_small<double, 32>(int, void*, int, long*, in": 0.0,
+    "void trsm_batch_left_lower_kernel_small<double, 4, 4, 64>(cu": 0.0,
+    "void laswp_kernel<double, false>(int, double* const*, int, i": 0.0,
+    "void create_pivot_v2<32>(int, int*, long*, int)": 0.0,
+    "void at::native::(anonymous namespace)::CatArrayBatchedCopy_": 0.0,
+    "void ipiv_lower_diag<double, 32>(int, void*, int, int*, int)": 0.0,
+    "void at::native::unrolled_elementwise_kernel<at::native::BUn": 0.0,
+    "void ipiv_64_to_32_ker<128>(long, long const*, int*)": 0.0,
+    "xxtrf4_set_info_ker(int, int*)": 0.0
+   }
+  },
+  {
+   "region": "TiledForceField._call",
+   "ns_per_atom": 0.17217495592275206,
+   "kernels": 29,
+   "ops": {
+    "void at::native::unrolled_elementwise_kernel<at::native::dir": 0.1,
+    "void at::native::index_elementwise_kernel<128, 4, at::native": 0.0,
+    "void at::native::vectorized_elementwise_kernel<2, at::native": 0.0,
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 0.0,
+    "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<": 0.0,
+    "void at::native::_scatter_gather_elementwise_kernel<128, 8, ": 0.0,
+    "void getrf_pivot<getrf_params_<double, 32, 1, 32, 32, 1> >(i": 0.0,
+    "reduction_prod_kernel": 0.0,
+    "void ipiv_lower_small<double, 32>(int, void*, int, long*, in": 0.0,
+    "void at::native::unrolled_elementwise_kernel<at::native::Bin": 0.0,
+    "void at::native::elementwise_kernel<128, 2, at::native::gpu_": 0.0,
+    "void create_pivot_v2<32>(int, int*, long*, int)": 0.0,
+    "void ipiv_lower_diag<double, 32>(int, void*, int, int*, int)": 0.0,
+    "void ipiv_64_to_32_ker<128>(long, long const*, int*)": 0.0,
+    "void (anonymous namespace)::elementwise_kernel_with_index<in": 0.0,
+    "xxtrf4_set_info_ker(int, int*)": 0.0
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._second < TiledForceField._body",
+   "ns_per_atom": 0.10250625281889371,
+   "kernels": 68,
+   "ops": {
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 0.1
+   }
+  },
+  {
+   "region": "autograd.grad < TiledForceField._first < TiledForceField._body",
+   "ns_per_atom": 0.10221411291975886,
+   "kernels": 68,
+   "ops": {
+    "void at::native::vectorized_elementwise_kernel<4, at::native": 0.1
+   }
+  }
+ ]
+}
