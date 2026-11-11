@@ -83,8 +83,12 @@ def test_check_plan_refuses_other_choices():
     moved = [(0, 0, 8 * MB, 2, 3), (0, 0, 8 * MB, 4, 5)]  # the second block reuses segment 0
     check = arena.check_plan(plan, trace(segments, moved))
     assert not check.ok and "block placement" in check.reason
-    longer = [(0, 0, 8 * MB, 2, 3), (1, 0, 8 * MB, 4, 6)]  # a lifetime changed
+    # A lifetime that changes the event order (segment 0 busy past segment 1's first block); one that keeps the
+    # order keeps every busy interval, so it is the same plan.
+    longer = [(0, 0, 8 * MB, 2, 5), (1, 0, 8 * MB, 4, 6)]
     assert not arena.check_plan(plan, trace(segments, longer)).ok
+    later = [(0, 0, 8 * MB, 2, 3), (1, 0, 8 * MB, 4, 6)]
+    assert arena.check_plan(plan, trace(segments, later)).ok
     check = arena.check_plan(plan, trace([(10 * MB, 0), (12 * MB, 1)], blocks))
     assert not check.ok and "segment requests" in check.reason
     check = arena.check_plan(plan, trace(segments + [(2 * MB, 6)], blocks))

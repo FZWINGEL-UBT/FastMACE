@@ -375,7 +375,8 @@ def test_cache_root_from_environment_and_subdirectories():
                                   created=os.path.exists(paths["triton"]))))
         """, FASTMACE_CACHE=os.path.join(temp, "fm"))
         assert Path(result["root"]) == Path(temp, "fm").resolve()
-    assert result["kinds"] == ["arena", "compile", "inductor", "models", "oeq", "radial-tables", "triton"]  # radial-table-cache
+    # radial-table-cache; arena: the capture arena's allocator (EngineConfig.capture_arena)
+    assert result["kinds"] == ["arena", "compile", "inductor", "models", "oeq", "radial-tables", "triton"]
     assert all(Path(p).parent == Path(result["root"]) for p in result["paths"].values())
     assert result["created"] is False
 
