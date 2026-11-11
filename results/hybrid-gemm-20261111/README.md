@@ -71,5 +71,24 @@ Local RTX 5060 Ti (sm_120 build, errors only; `smoke_5060ti.json`): the hybrid's
 
 ## MD-step A/B and gate
 
-Alex job 4984171 runs `tools/jobs/alex_ab_pack.sh` with `alex/pack.env` (SrTiO3 10×10×10 and NbCl5 3×3×3, both
-orders). Alex job 4984172 runs gate_pack with `alex/gate.sh` (SrTiO3 3×3×3, NaCl, NbCl5). Results below.
+Alex A100-SXM4-80GB, source 4195be0d, OMAT-0 medium (`omat0-medium`), float32, hybrid backend, today's default A100
+plan (side a) against the same plan with `tf32x3:HYBRID=True` (side b).
+- Job 4984171: `tools/jobs/alex_ab_pack.sh` with `alex/pack.env`. 1 fs, skin 0.5, warm-up 200, 6 blocks of 256
+  steps per side. Records in `alex-ab/`.
+- Job 4984172: gate_pack with `alex/gate.sh`. Records in `alex-gate/`.
+
+| | ab | ba |
+| --- | --- | --- |
+| SrTiO3 10×10×10 | a 6.3081, b 6.2425 ms: **0.9896** | b 6.2345, a 6.3119 ms: **0.9877** |
+| NbCl5 3×3×3 | a 1.6934, b 1.6650 ms: **0.9832** | b 1.6694, a 1.6955 ms: **0.9846** |
+
+Gate (`force_stress_gate.py`, ratio to the ASE float32 error, limit 3×; every structure passes):
+
+| side | SrTiO3 F / S | NaCl F / S | NbCl5 F / S |
+| --- | --- | --- | --- |
+| default | 0.98 / 0.67 | 0.86 / 0.89 | 0.99 / 1.31 |
+| HYBRID | 0.94 / 0.55 | 0.87 / 0.96 | 1.00 / 1.25 |
+
+**Adopted on the A100 family** (decision 66: a rounding switch, faster in both orders, gate passes):
+`HYBRID_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))`, which covers every A100 model. The H200 has an sm_90 hybrid
+cubin, but nothing was measured there, so it stays on 3×TF32.

@@ -99,6 +99,7 @@ certificate). Commits are where the set last gained a family.
 | fused forward `A_LD128` | on | on | not measured | not measured | bitwise | `31c394b4` |
 | fused forward `TP_NOFLUSH` | off (0.9992 / 1.0018) | on | not measured | not measured | bitwise | `31c394b4` |
 | fused forward `SH_LDS4` (needs `VEC_SH`) | off (1.0014 / 1.0027) | off (1.0008 / 0.9949) | n/a (`VEC_SH` off) | on | bitwise | `9a6df1f5` |
+| CUTLASS `tf32x3.HYBRID` (`cutlass.tf32x3.HYBRID_GPUS`; TF32 big·big + one FP16 cross mma in every 3×TF32 entry) | not measured | on (0.9896 / 0.9877 SrTiO3, 0.9832 / 0.9846 NbCl5) | n/a | n/a | rounding (gate passes) | review-retries 2026-11-11 |
 | CUTLASS `LINEAR_DIV` (`cutlass.linear_div.LINEAR_DIV_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `5dc5d799` |
 | CUTLASS `SKIP_SELECT` (`cutlass.skip_select.SKIP_SELECT_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `6561cc13` |
 | `SEGMENT_ROWS` (`cutlass.segment_rows.SEGMENT_ROWS_GPUS`) | off (1.0006 / 1.0000) | on | not measured | not measured | rounding (3×TF32) | `6c2f2967` |

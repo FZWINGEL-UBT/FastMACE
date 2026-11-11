@@ -37,10 +37,11 @@ _TILES = ("64x64", "32x64", "64x32")
 # HYBRID (11 November 2026, review retry of the A100 screen's idea 4; results/hybrid-gemm-20261111): every entry from
 # the cubins built with -DFM_HYBRID_F16 (hybrid_f16.h: big * big on TF32 tensor cores, both cross products in one FP16
 # mma; error at or below 3xTF32's, kernel 0.85-0.90 of it on the A100). Operands must stay below 32752 in magnitude
-# (float16 cross parts). None: on for HYBRID_GPUS (empty until the A/Bs and the gate); True / False: an A/B side's
-# choice, read at call time like TILE.
+# (float16 cross parts). None: on for HYBRID_GPUS; True / False: an A/B side's choice, read at call time like TILE.
+# On the A100 family (decision 66, 11 November 2026, Alex A100-SXM4-80GB, OMAT-0 medium on the default plan: MD step
+# 0.9896 / 0.9877 SrTiO3 10x10x10, 0.9832 / 0.9846 NbCl5 3x3x3; gate passes). The H200 (sm_90 cubin) is not measured.
 HYBRID = None
-HYBRID_GPUS = GPUModels(())
+HYBRID_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 HYBRID_CUBINS = {CAPABILITY: Path(__file__).with_name("tf32x3_hyb_sm80.cubin"),
                  (9, 0): Path(__file__).with_name("tf32x3_hyb_sm90.cubin")}
 _KERNELS = {}  # (device index, hybrid) -> _Kernels

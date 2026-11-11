@@ -1,4 +1,4 @@
-"""tf32x3.HYBRID (hybrid_f16.h): off by default, its cubins shipped and recorded, the build flag wired."""
+"""tf32x3.HYBRID (hybrid_f16.h): on for the A100 family only, its cubins shipped and recorded, the build flag wired."""
 import hashlib
 from pathlib import Path
 
@@ -7,8 +7,12 @@ from fastmace.kernels.cutlass import tf32x3
 HERE = Path(tf32x3.__file__).parent
 
 
-def test_off_by_default():
-    assert tf32x3.HYBRID is None and not tf32x3.HYBRID_GPUS
+def test_on_for_the_a100_family_only():
+    assert tf32x3.HYBRID is None
+    for name in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100-SXM4-40GB", "NVIDIA A100 80GB PCIe"):
+        assert name in tf32x3.HYBRID_GPUS
+    for name in ("NVIDIA H200", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"):
+        assert name not in tf32x3.HYBRID_GPUS
 
 
 def test_hybrid_cubins_shipped_and_recorded():
