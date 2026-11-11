@@ -91,3 +91,49 @@ The backward reads a [16, 64] gradient row per edge either way.
 
 **RTX 5060 Ti:** queued behind another session's reservation of the local GPU (`bound-rtx5060ti/`). It is
 informative only: COMPOSE_SKIP is off there.
+
+## Step 3a: the real kernel shape, timed in isolation (A100)
+
+`tools/nested_radial_lab.py` (commit a9bf5993) runs the K = 64 columns as two halves of 32.
+
+**The split kernels.**
+- Every edge evaluates the low half and the density column. Edges with r < r_far also evaluate the high half,
+  through a scalar branch per edge.
+- The forward keeps [16, 64] slots. A run's high block is added only if the run had a near edge.
+- The backward loads a slot's high gradient block only for its first near edge.
+
+**The lab.**
+- r_far is 3.1518 Å, a piece start, and the far fraction on SrTiO3 10×10×10 is 0.837.
+- Random tables are zero in columns 32–63 from r_far. On them the split kernels match the K = 64 copies to
+  1.6e-7 relative.
+- The savings below are measured at the real far fraction, so no 0.84 factor applies.
+
+**A100-SXM4-80GB, Alex job 4984793 (a0831), two repeats agreeing within 1 µs:**
+
+| Kernel (µs) | K = 64 copy | Split | Saving |
+| --- | ---: | ---: | ---: |
+| forward | 463.5 | 326.7 | **137** |
+| backward, recompute (today's A100 default) | 466.3 | 414.7 | 52 |
+| backward, power | 471.2 | 326.8 | **144** |
+
+**Reading the table.**
+- The recompute split keeps little: it runs two Clenshaw series per half, values and slopes.
+- The power split does one dual Horner per half, and its saving holds.
+- Against the A100's default backward (recompute, 466 µs), the power split saves 139 µs. With nested, the A100's
+  backward would therefore switch to POWER_BACKWARD.
+- POWER_BACKWARD alone is a tie on the A100 (1.0020 / 0.9977). It is already a gated rounding switch on the H200,
+  Ada and 5060 Ti.
+- Forward plus backward: 137 + 139 = **276 µs**, about 4.2 % of the 6,512 µs call.
+
+**Census** (`split-census/`; registers / SASS instructions):
+
+| Kernel | sm_80 | sm_90 | sm_120 |
+| --- | --- | --- | --- |
+| forward, split (copy) | **72** / 393 (128 / 508) | 118 / 521 (64 / 372) | 125 / 515 (80 / 390) |
+| backward, recompute split | 80 / 500 | 72 / 506 | 80 / 515 |
+| backward, power split | 80 / 452 | 72 / 474 | 80 / 491 |
+
+- No spills; shared memory is 0–512 B.
+- The sm_80 forward drops to 72 registers, because each half's atomics are 32 scalar `atom` instructions.
+- The sm_90 forward rises from 64 to 118 registers. That matters for the H200's occupancy, so it is for the H200
+  census step.
