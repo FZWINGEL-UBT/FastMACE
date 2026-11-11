@@ -49,11 +49,12 @@ def _eval64(table, pair, r, derivative=False):
     return out[:, :COLUMNS].numpy()
 
 
-def nested_basis(table, pair, tolerance, r_far=R_FAR):
+def nested_basis(table, pair, tolerance, r_far=R_FAR, fixed=None):
     """(Q [64, 64] orthonormal rows, D [64], far rank, far errors (value, slope)): the probe's construction
     (``nested_radial_basis.py``) with two bands, [r_lo, r_far) and [r_far, r_max)."""
     import numpy as np
 
+    # fixed: keep exactly that many far directions (the kernel's width) instead of searching for the tolerance
     lo, hi = table["r_lo"], table["r_max"]
     rfit = np.linspace(lo, hi, FIT_POINTS, endpoint=False)
     rtest = lo + (np.arange(TEST_POINTS) + 0.38196601125) * (hi - lo) / TEST_POINTS
@@ -87,7 +88,7 @@ def nested_basis(table, pair, tolerance, r_far=R_FAR):
             bb = candidate[:k]
             e1 = float(np.max(np.abs((vv @ bb.T) @ bb - vv)))
             e2 = float(np.max(np.abs(((dd @ bb.T) @ bb - dd) / dnorm)))
-            if max(e1, e2) <= tolerance:
+            if (k == fixed) if fixed is not None else (max(e1, e2) <= tolerance):
                 rank, errors = k, (e1, e2)
                 break
         base = candidate[:rank]
@@ -176,6 +177,8 @@ def main(argv=None):
     p.add_argument("--checkpoint", required=True)
     p.add_argument("--elements", nargs="+", default=["Sr", "Ti", "O"])
     p.add_argument("--tolerances", nargs="+", type=float, default=[1e-7, 5e-8, 2e-8])
+    p.add_argument("--far-columns", type=int, default=None,
+                   help="also certify exactly this many far columns for every pair (the kernel's width)")
     p.add_argument("--r-far", type=float, default=R_FAR)
     p.add_argument("--threads", type=int, default=8)
     p.add_argument("--output", type=Path, required=True)
@@ -212,10 +215,11 @@ def main(argv=None):
               "checkpoint": args.checkpoint, "elements": args.elements, "pairs": [f"{s}-{t}" for s, t in pairs],
               "r_far": args.r_far, "pieces": int(table["coef"].shape[1]), "fit_error": table["fit_error"],
               "production_certificate": production["worst"], "unrotated": base, "rows": []}
-    for tolerance in args.tolerances:
+    settings = [(t, None) for t in args.tolerances] + ([(None, args.far_columns)] if args.far_columns else [])
+    for tolerance, fixed in settings:
         transforms, ranks, errors = [], [], []
         for pair in range(len(pairs)):
-            q, d, rank, err = nested_basis(table, pair, tolerance, args.r_far)
+            q, d, rank, err = nested_basis(table, pair, tolerance, args.r_far, fixed)
             transforms.append((q, d, rank))
             ranks.append(rank)
             errors.append(err)
@@ -223,11 +227,14 @@ def main(argv=None):
         # the same bases with no truncation: the rotation's own float32 rounding
         full = certificate(table, chain64, chain32, pairs, [(q, d, COLUMNS) for q, d, _ in transforms],
                            args.r_far, seed=index)
-        row = {"tolerance": tolerance, "ranks": ranks, "max_rank": max(ranks), "projection_errors": errors,
+        row = {"tolerance": tolerance, "fixed_far_columns": fixed, "ranks": ranks, "max_rank": max(ranks),
+               "projection_errors": errors,
                "certificate": cert["worst"], "certificate_untruncated": full["worst"],
                "per_pair": {k: v["worst"] for k, v in cert["pairs"].items()}, "detail": cert["pairs"]}
         report["rows"].append(row)
-        say(f"tolerance {tolerance:g}: far ranks {ranks} (max {max(ranks)}); certificate {cert['worst']:.4f} "
+        label = f"fixed {fixed} far columns" if fixed else f"tolerance {tolerance:g}"
+        say(f"{label}: far errors (value, slope) max {max(max(e) for e in errors):.2e}; "
+            f"far ranks {ranks} (max {max(ranks)}); certificate {cert['worst']:.4f} "
             f"(untruncated rotation {full['worst']:.4f}; production {production['worst']:.4f})")
         (args.output / "certificate.json").write_text(json.dumps(report, indent=1, default=float))
 
