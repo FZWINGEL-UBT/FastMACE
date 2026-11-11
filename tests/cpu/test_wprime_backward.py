@@ -6,6 +6,7 @@ The chain: the streaming backward's weight gradient ``dw``, ``da = dw [W, b]``, 
 C' [W, b]^T`` per (pair, piece), plus the table's backward on the density column alone.
 """
 
+import weakref
 from types import SimpleNamespace
 
 import numpy as np
@@ -299,7 +300,9 @@ def test_edge_vectors_only_for_edge_sh_output():
     assert gm.edge_vectors(interaction, torch.zeros(2, 16)) is None  # no reference
     interaction.__dict__["edge_sh_source"] = source
     vectors, attrs = torch.zeros(2, 3), torch.zeros(2, 16)
-    source.vectors, source.attrs = vectors, attrs
+    source.last = (weakref.ref(vectors), weakref.ref(attrs))
     assert gm.edge_vectors(interaction, attrs) is vectors
     assert gm.edge_vectors(interaction, attrs.clone()) is None
+    del vectors, attrs  # weak: a finished forward's tensors (and their autograd graph) are not kept alive
+    assert gm.edge_vectors(interaction, torch.zeros(2, 16)) is None and source.last[0]() is None
     assert "edge_sh_source" not in dict(interaction.named_modules())  # a reference, not a submodule

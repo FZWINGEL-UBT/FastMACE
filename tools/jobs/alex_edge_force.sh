@@ -9,7 +9,7 @@
 # Usage: sbatch alex_edge_force.sh SHA [REPEAT]   (SRC tarball $B/src-SHA.tar)
 #SBATCH --job-name=fm-edgeforce
 #SBATCH -p a100 --gres=gpu:a100:1 -C a100_80
-#SBATCH --time=04:00:00
+#SBATCH --time=06:00:00
 #SBATCH --export=NONE
 #SBATCH --output=/home/atuin/v130cb/v130cb18/fm-arena/runs/slurm-%x-%j.out
 unset SLURM_EXPORT_ENV
@@ -51,13 +51,13 @@ for order in ab ba; do
 done
 for side in off on; do
   value=$([ $side = on ] && echo True || echo False)
-  python $C point --structure SrTiO3 --model omat0-medium --repeat $REPEAT --steps 100 --warmup 20 \
+  timeout 50m python $C point --structure SrTiO3 --model omat0-medium --repeat $REPEAT --steps 100 --warmup 20 \
     --output $out/point-$side --constant $K=$value > $out/point-$side.log 2>&1 < /dev/null
   note "point $side exit=$? $(grep -h 'steady peak' $out/point-$side.log | tail -n 1 | cut -c1-200)"
 done
 for side in off on; do
   value=$([ $side = on ] && echo True || echo False)
-  python $C scan --structure SrTiO3 --model omat0-medium --steps 50 --warmup 20 --start-atoms 233280 \
+  timeout 55m python $C scan --structure SrTiO3 --model omat0-medium --steps 50 --warmup 20 --start-atoms 233280 \
     --budget-minutes 40 --output $out/scan-$side --constant $K=$value > $out/scan-$side.log 2>&1 < /dev/null
   note "scan $side exit=$? $(tail -n 2 $out/scan-$side.log | tr '\n' ' ' | cut -c1-300)"
 done

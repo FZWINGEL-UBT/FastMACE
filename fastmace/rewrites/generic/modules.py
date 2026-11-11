@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import MappingProxyType
+from weakref import ref
 
 import torch
 
@@ -661,15 +662,18 @@ class EdgeSH(torch.nn.Module):
     def __init__(self, original):
         super().__init__()
         self.original = original
-        # EDGE_FORCE: the last call's (vectors, output), read by the w' convolution (``edge_vectors``)
-        self.keep_vectors, self.vectors, self.attrs = False, None, None
+        # EDGE_FORCE: weak references to the last call's (vectors, output), read by the w' convolution
+        # (``edge_vectors``) during the same forward. Weak, so a finished forward's autograd graph is not kept alive:
+        # a strong reference held the warmup graph into the capture (stale default-stream AccumulateGrad) and kept a
+        # whole step's activations at the capacity point.
+        self.keep_vectors, self.last = False, None
 
     def forward(self, x):
         if x.is_cuda and x.dtype == torch.float32 and x.dim() == 2 and x.shape[1] == 3:
             from fastmace.kernels.triton.edge_sh import edge_sh3
             out = edge_sh3(x)
             if self.keep_vectors:
-                self.vectors, self.attrs = x, out
+                self.last = (ref(x), ref(out))
             return out
         return self.original(x)
 
@@ -678,9 +682,10 @@ def edge_vectors(interaction, edge_attrs):
     """The edge vectors ``edge_attrs`` were computed from by the model's ``EdgeSH`` (EDGE_FORCE), or None when
     ``edge_attrs`` is not that module's last output."""
     source = interaction.__dict__.get("edge_sh_source")
-    if source is None or source.attrs is not edge_attrs:
+    last = None if source is None else source.last
+    if last is None or last[1]() is not edge_attrs:
         return None
-    return source.vectors
+    return last[0]()
 
 
 def edge_sh_replaceable(module):
