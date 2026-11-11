@@ -250,3 +250,68 @@ def test_whole_system_and_tiled_calls_agree_with_nested_on(monkeypatch):
     again, again_density = call(rows=nodes)
     assert torch.equal(again, tiled) and torch.equal(again_density, tiled_density)
     assert torch.equal(call()[0], whole)
+
+
+def test_forced_on_setup_routes_the_first_interaction_through_the_split_walks(monkeypatch):
+    """NESTED_RADIAL=True and the radial record's routing (precision.route_nested, after the tables exist; 11
+    November 2026: the route ran before the tables and nested stayed off): the first interaction's whole-system call
+    passes the table's r_far to the tabled outer sum, with the rotated rows, and the forced switch fails loudly on a
+    table that needs more far columns."""
+    from fastmace.kernels.triton import tabled_outer_sum as tos
+    from fastmace.rewrites import precision
+    from fastmace.rewrites.generic import modules as gm
+
+    module = radial._table_module(radial.fit(_Chain(1), [(0, 0)], R_MAX), [0], torch.device("cpu"))
+    g = torch.Generator().manual_seed(5)
+    c, nodes, edges = 3, 6, 60
+    dim = sum(2 * l + 1 for l in LS)  # noqa: E741
+    columns = torch.tensor([0])
+    reassociation = FirstInteractionReassociation(columns, c, LS, (1.0, 0.7), ir_mul=True,
+                                                  species_feats=torch.randn(1, c, generator=g), segmented=True)
+    segments, linear_segments, offset = [], [], 0
+    for l in LS:  # noqa: E741
+        segments.append((offset, c, c * (2 * l + 1)))
+        linear_segments.append((offset, c, 2 * l + 1))
+        offset += c * (2 * l + 1)
+    skip = SpeciesSkip(columns, segments, segments, [(k, k, torch.randn(1, c, c, generator=g)) for k in range(2)],
+                       "ir_mul")
+    linear = BlockLinear(torch.nn.Identity(), torch.nn.Identity(), linear_segments, linear_segments,
+                         [(k, k, torch.randn(c, c, generator=g)) for k in range(len(LS))])
+    holder = SimpleNamespace(generic_kind="density", first_reassociation=reassociation, linear=linear, skip_tp=skip,
+                             radial_table=module,
+                             radial_last=SimpleNamespace(weight=torch.randn(64, len(LS) * c, generator=g), h_in=1.0,
+                                                         var_in=1.0, var_out=1.0))
+    products = compose_skip_products(holder)
+    reassociation.compose_skip = (linear, products[0], skip, products[1])
+    model = SimpleNamespace(modules=lambda: [holder])
+    # the CUDA conditions of the route, as on a GPU where the switch is forced on
+    monkeypatch.setattr(nested, "NESTED_RADIAL", True)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda *args: "NVIDIA A100-SXM4-80GB")
+    monkeypatch.setattr(tos, "tabled_forward", lambda *args: True)
+    monkeypatch.setattr(gm, "fused_first_backward", lambda *args: True)
+    monkeypatch.setattr(gm, "FIRST_FULL_ROWS", False)
+    monkeypatch.setattr(gm, "fused_first_applies", lambda *args, **kwargs: True)
+    plain = module.coef.clone()
+    precision.route_nested(model)
+    assert reassociation.nested_rotation is not None and module.nested_active
+    assert not torch.equal(module.coef, plain)  # the device holds the rotated rows
+    calls = []
+    walk = tos.tabled_outer_sum
+
+    def recorded(*args, **kwargs):
+        calls.append((kwargs.get("r_far", 0.0), args[2]))
+        return walk(*args, **kwargs)
+
+    monkeypatch.setattr(tos, "tabled_outer_sum", recorded)
+    receiver = torch.sort(torch.randint(0, nodes, (edges,), generator=g)).values
+    edge_index = torch.stack([torch.randint(0, nodes, (edges,), generator=g), receiver])
+    r = 0.8 + 5.0 * torch.rand((edges, 1), generator=g)
+    gm.fused_first_message(holder, r, None, torch.ones(nodes, 1), torch.randn(edges, dim, generator=g), edge_index)
+    assert calls and all(r_far == module.nested_r_far > 0 for r_far, _ in calls)
+    assert all(coef is module.coef for _, coef in calls)
+    # forced on, a table that needs more far columns fails loudly at setup
+    far = radial._table_module(radial.fit(_FarChain(), [(0, 0)], R_MAX), [0], torch.device("cpu"))
+    nested.release([holder])
+    holder.radial_table = far
+    with pytest.raises(RuntimeError, match="far columns"):
+        precision.route_nested(model)

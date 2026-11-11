@@ -466,6 +466,10 @@ def parse_args(argv=None):
                    help="RewriteConfig fields for FastMACE's minimal planner (e.g. gated_rows=on); others stay auto")
     p.add_argument("--engine-config", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="Boolean EngineConfig fields for FastMACE's minimal planner (e.g. model_template_cache=false)")
+    p.add_argument("--production-expect", nargs="*", default=[], metavar="MODULE:NAME",
+                   help="Proof counters (ints, e.g. fastmace.kernels.triton.tabled_outer_sum:SPLIT_WALKS) that must "
+                        "advance over each production build and its evaluations; a structure where one does not "
+                        "fails the gate")
     p.add_argument("--production-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
                    help="Module constants of the FastMACE production process (A/B switches such as "
                         "fastmace.rewrites.radial:DEGREE=5); the references are unchanged")
@@ -604,6 +608,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
                       backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
                       production_constants=list(args.production_constant),
+                      production_expect=list(args.production_expect),
                       engine_config=args.engine_config, production_tf32=args.production_tf32,
                       tiled_receivers=args.tiled_receivers, tiled_mode=args.tiled_mode,
                       tiled_config=args.tiled_config)
@@ -666,6 +671,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
             # run asked for (8 November 2026: a float32 self-check failure re-planned polar_uvu off, and gates of
             # POLAR candidates passed on a model without them). With --production-constant the gate fails.
             mark_revisions(summary, production_info, structure)
+            mark_expectations(summary, production_info, structure, args.production_expect)
             meta["summary"][structure] = summary
             print(structure, "summary", json.dumps(summary), flush=True)
         meta["passed"] = all(s["passed"] for s in meta["summary"].values())
@@ -893,6 +899,24 @@ def mark_revisions(summary, production_info, structure):
     return summary
 
 
+def mark_expectations(summary, production_info, structure, requested=()):
+    """``--production-expect``: the counters' advance over each of ``structure``'s production builds and
+    evaluations on its summary; one that did not advance fails it (the run did not take the path it gated)."""
+    expect = {where: values for where, values in (production_info.get("expect") or {}).items()
+              if where.split("/")[0] == structure}
+    if not expect:
+        if requested:  # asked for, never recorded (a child without the counters): not the path it gated
+            summary["passed"] = False
+            summary["failed_because"] = f"expected counters not recorded: {list(requested)}"
+        return summary
+    summary["expect"] = expect
+    stalled = [f"{where} {item}" for where, values in expect.items() for item, value in values.items() if value <= 0]
+    if stalled:
+        summary["passed"] = False
+        summary["failed_because"] = f"expected counters did not advance: {stalled}"
+    return summary
+
+
 def build_with_rule13(build, plan, limit=8):
     """``build(plan)`` with SPEC §9.3 rule 13 as production applies it: a failed self-check revises the plan
     (``reactions.selfcheck_revision``: the record and its dependants off) and builds again. Returns the
@@ -1043,9 +1067,19 @@ def fastmace_production_child(job, result):
     from fastmace import _patches
     result.update(edges={}, setup_s={}, plans={}, force_fields={})
     values = {}
+    expect = list(job.get("production_expect") or [])
+
+    def expect_values():
+        import importlib
+
+        return {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1]) for item in expect}
+
+    if expect:
+        result["expect"] = {}
     for structure, entry in job["structures"].items():
         base, configs = read_configurations(entry["configurations"])
         for cell_mode in CELL_MODES:
+            counters = expect_values()
             started = time.perf_counter()
             engine, plan = build(structure, base, cell_mode)
             if job.get("production_tf32"):
@@ -1061,6 +1095,9 @@ def fastmace_production_child(job, result):
                 values[f"{structure}/{key}"] = (energy, forces, stress)
                 result["edges"][f"{structure}/{key}"] = edges
                 print(job["name"], structure, key, flush=True)
+            if expect:
+                result["expect"][f"{structure}/{cell_mode}"] = {
+                    item: value - counters[item] for item, value in expect_values().items()}
             del engine
             torch.cuda.empty_cache()
     result["patches"] = [str(record) for record in _patches.applied()]

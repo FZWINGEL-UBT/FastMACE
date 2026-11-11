@@ -563,6 +563,12 @@ def _forward_kernel():
     return kernel
 
 
+# Launches of the nested split walks (r_far > 0, rewrites.radial.nested), forward and backward: the proof a run
+# took the nested path (tools/ab_rewrites.py --b-expect, tools/force_stress_gate.py --production-expect). The ops'
+# bodies run outside compiled regions; a CUDA graph replay launches without counting, its capture counts.
+SPLIT_WALKS = 0
+
+
 @torch.library.custom_op("fastmace::tabled_outer_sum_forward", mutates_args=())
 def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Tensor, starts: torch.Tensor,
                              scales: torch.Tensor, bins: torch.Tensor, r_lo: float, bin_scale: float, r_max: float,
@@ -587,6 +593,8 @@ def tabled_outer_sum_forward(r: torch.Tensor, pair: torch.Tensor, coef: torch.Te
     density = r.new_empty((edges, 1))
     packs = _packs(packed, coef, k)
     if edges and r_far > 0 and k % 2 == 0:
+        global SPLIT_WALKS
+        SPLIT_WALKS += 1
         _split_kernels()[0][(triton.cdiv(edges, FORWARD_CHUNK),)](
             y, key, r, pair, coef, starts, scales, bins, out, density, edges, coef.shape[1], bins.shape[0],
             float(r_lo), float(bin_scale), float(r_max), float(r_far), K=k, D=d, INNER=inner, TERMS=coef.shape[2],
@@ -660,6 +668,8 @@ def tabled_outer_sum_backward(grad: torch.Tensor, a: torch.Tensor, y: torch.Tens
     grad_y = torch.empty_like(y)
     packs = coef is not None and _packs(packed, coef, k)
     if num_edges and r_far > 0 and coef is not None and k % 2 == 0:
+        global SPLIT_WALKS
+        SPLIT_WALKS += 1
         _split_kernels()[1][(triton.cdiv(num_edges, CHUNK),)](
             grad, y, key, r, pair, dcoef, starts, scales, bins, grad_density if grad_density.numel() else r, dr,
             grad_y, num_edges, grad_density.numel(), dcoef.shape[1], bins.shape[0], float(r_lo), float(bin_scale),
@@ -742,5 +752,6 @@ def tabled_outer_sum(r, pair, coef, dcoef, starts, scales, bins, r_lo, bin_scale
 
 
 __all__ = ["CHUNK", "FORWARD_CHUNK", "PACKED_COEF", "PACKED_COEF_GPUS", "POWER_BACKWARD", "POWER_BACKWARD_GPUS",
-           "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "packed_coef", "packed_coef_default", "power_backward",
-           "tabled_forward", "tabled_outer_sum", "tabled_outer_sum_backward", "tabled_outer_sum_forward"]
+           "SPLIT_WALKS", "TABLED_FORWARD", "TABLED_FORWARD_GPUS", "WARPS", "packed_coef", "packed_coef_default",
+           "power_backward", "tabled_forward", "tabled_outer_sum", "tabled_outer_sum_backward",
+           "tabled_outer_sum_forward"]

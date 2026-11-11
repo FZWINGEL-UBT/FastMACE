@@ -65,6 +65,10 @@ def parse_args(argv=None):
                         "fastmace.kernels.oeq_streaming.fused_forward:BLOCKS_PER_SM=4): what it captures again in "
                         "warm-up (new edge sizes) reads them too")
     p.add_argument("--b-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side b's, as --a-constant")
+    p.add_argument("--b-expect", nargs="*", default=[], metavar="MODULE:NAME",
+                   help="Proof counters (ints, e.g. fastmace.kernels.triton.tabled_outer_sum:SPLIT_WALKS) that must "
+                        "advance over side b's build and warm-up, and stay put over side a's; recorded per side as "
+                        "'expect', and the entry is INVALID (exit 3) where they do not")
     p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"])
     p.add_argument("--temperature-K", type=float, default=300.0)
@@ -314,6 +318,8 @@ def main(argv=None):
             entry_meta["pack"] = dict(name=name, entries=[entry[0] for entry in specs], shared_a=True)
         metas[name] = entry_meta
 
+    failed_expectations = []
+
     def build(side, base, fields_side, constants_side, every_field):
         """One side's engine (timed wrapper), its setup time and its plan lines."""
         started = time.perf_counter()
@@ -348,9 +354,16 @@ def main(argv=None):
                  if any(f"RewriteConfig.{f} " in line for f in every_field)]
         return timed, time.perf_counter() - started, lines
 
-    def measure(name, sides, setup, lines, structure, natoms):
+    def expect_values():
+        return {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1])
+                for item in args.b_expect}
+
+    def measure(name, sides, setup, lines, structure, natoms, advanced):
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
+            before = expect_values()
             step_time.warm_up(sides[side], protocol.warmup)
+            for item, value in expect_values().items():
+                advanced[side][item] += value - before[item]
 
         def engine_counters():  # rebuilds and redos explain a neighbour-list A/B (fp32 profile)
             return {side: {key: getattr(sides[side].engine, key, None)
@@ -372,7 +385,12 @@ def main(argv=None):
                                                          else None) for key, value in now.items()}
                                             for side, now in engine_counters().items()},
                      other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()])
-        entry["valid"] = not recompiled and not entry["other_gpu_processes"]
+        entry["expect"] = advanced
+        entry["expect_failed"] = [f"{side} {item}" for item in args.b_expect for side in sides
+                                  if (advanced[side][item] > 0) != (side == "b")]
+        entry["valid"] = not recompiled and not entry["other_gpu_processes"] and not entry["expect_failed"]
+        if entry["expect_failed"]:
+            failed_expectations.append(f"{name} {structure}: {entry['expect_failed']}")
         metas[name]["structures"][structure] = entry
         print(*([name] if name is not None else []), structure,
               " ".join(f"{s} {medians[s]:.4f} ms" for s in sides), f"b/a {entry['ratio_b_over_a']:.4f}",
@@ -388,17 +406,25 @@ def main(argv=None):
         for _, fields_b, _ in specs:
             everything.update(fields_b)
 
+        advanced = {key: {item: 0 for item in args.b_expect} for key in ["a", *range(len(specs))]}
+
+        def counted(key, make):
+            before = expect_values()
+            built[key] = make()
+            for item, value in expect_values().items():
+                advanced[key][item] += value - before[item]
+
         def build_b(index):
             name, fields_b, constants_b = specs[index]
-            built[index] = build("b", base, fields_b, constants_b, {**args.a, **fields_b})
+            counted(index, lambda: build("b", base, fields_b, constants_b, {**args.a, **fields_b}))
 
         # order ab: a, then each b just before its pair; order ba: every b, then a
         if order[0] == "a":
-            built["a"] = build("a", base, args.a, args.a_constant, everything)
+            counted("a", lambda: build("a", base, args.a, args.a_constant, everything))
         else:
             for index in range(len(specs)):
                 build_b(index)
-            built["a"] = build("a", base, args.a, args.a_constant, everything)
+            counted("a", lambda: build("a", base, args.a, args.a_constant, everything))
         for index, (name, fields_b, _) in enumerate(specs):
             if index not in built:
                 build_b(index)
@@ -408,12 +434,16 @@ def main(argv=None):
             measure(name, {side: {"a": a_side, "b": b_side}[side] for side in order},
                     {"a": a_setup, "b": b_setup},
                     {"a": [line for line in a_lines if any(f"RewriteConfig.{f} " in line for f in keep)],
-                     "b": b_lines}, structure, len(base))
+                     "b": b_lines}, structure, len(base),
+                    {"a": dict(advanced["a"]), "b": dict(advanced[index])})
             b_side = None
             torch.cuda.empty_cache()
         built = None
         ab_step_time.set_tf32(torch, False)
         torch.cuda.empty_cache()
+    if failed_expectations:
+        print("EXPECT FAILED:", *failed_expectations, sep="\n  ", flush=True)
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":
