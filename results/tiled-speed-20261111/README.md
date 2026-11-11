@@ -79,9 +79,24 @@ busy; job 40 sets device spans over 50 ms aside.)
 ### A100 idle-gap profile (Alex 4981351, `gap-a100/`): wrong
 
 `gapprof.py` counted the GPU-timeline copies of the `record_function` annotations (per-tile spans under 50 ms) as
-busy time, which covered the gaps: it reported 4.39 s busy of a 4.74 s profiled call, against 1.96 s of kernels in
-the call (`kprof7`). On the 5060 Ti this did not matter (its GPU is busy). `gapprof2.py` counts only kernel, copy and
-fill events: PENDING (Alex 4981405, local job 44).
+busy time, which covered the gaps: it reported 4.39 s busy of a 4.74 s profiled call. On the 5060 Ti this did not
+matter (its GPU is busy).
+
+### A100 idle share without the torch profiler: Nsight Systems (Alex 4981411, `nsys-a100/`)
+
+69a48049, the same call: `jobs/nsysprof.py` under `nsys profile -t cuda,nvtx --capture-range=cudaProfilerApi`, the
+tiled methods and `autograd.grad` as NVTX ranges; `jobs/nsysan.py` reads the sqlite export (busy: the union of
+kernel, memcpy and memset intervals within the host's `captured_call` range). Uncaptured calls 3.85 / 3.84 / 3.81 s;
+captured 4.12 s, of which the GPU is busy 1.957 s in kernels, 0.023 s in copies and 0.002 s in fills: **idle 52 %**
+(49 % against the uncaptured wall). `gapprof2.py` (the torch profiler's trace, kernel, copy and fill events only;
+Alex 4981405, `gap2-a100/`) agrees: busy 1.95 s.
+
+Idle gaps by the host's innermost NVTX range at each gap's midpoint (s): `_first` 0.84, `autograd.grad` 0.78,
+`_tile_graph` 0.09, `_edges` 0.08, `_second` 0.08, `_keep_lists` 0.075, gaps under 20 µs 0.064, every other range
+under 0.035. Unprofiled host self time (`gapprof2`): `_first` 1.31 s over 136 calls (about 9.7 ms each),
+`autograd.grad` 1.11 s over 136, while the launches cost little (`cuLaunchKernel` in `_first`: 5,228 calls,
+0.064 s). The A100 waits on the Python side of the compiled tile bodies (guards, the Inductor wrapper) and on the
+autograd engine of their backward. Next: `TileConfig.compiled_graphs` on the A100 (Alex 4981422).
 
 ## The wavefront's row pool on the device (idea 3): rejected; the aliased device state: measured
 
