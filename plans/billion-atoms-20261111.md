@@ -147,6 +147,37 @@ segmentation fault before the build (exit 139 ten minutes in, the stack in ASE's
 while the supercell was made on the host; `tiled-host-state-dtype.md`) is unexplained; a 703M point (520³) first would
 separate it from the 10^9 question, at a second node-day.
 
+**Before step 4 (documented 11 November 2026, owner: "only document for now"):**
+
+*Where the 397.5M record's 4 h 38 min went* (Alex 4973640, `results/tiled-capacity-20261109/alex/cap-4973640`; the
+job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
+
+| Phase | 397.5M | B/atom or us/atom | Scaled to 10^9 |
+| --- | ---: | ---: | ---: |
+| supercell (`tiled_capacity.supercell`: ASE `repeat` + `wrap`), plan, checks | about 10 min | | about 25 min |
+| force-field build (`phases.build`) | 660 s, host peak 111 GB | 1.66 us/atom | about 28 min |
+| first call, eager (mode auto measures its memory) | 11,468 s | 28.8 us/atom | about 8 h |
+| second call, compiled | 3,913 s | 9.84 us/atom | about 2.7 h |
+
+1. **Our own supercell builder** (the ASE step). `Atoms.repeat` loops in Python over every unit-cell copy (about 200M
+   passes at 585^3, a slice write each), and `wrap` makes whole-system fractional temporaries (several 24 GB float64
+   arrays at 10^9); the 519M segmentation fault came out of this step (ASE `cell.py` `__array__`). Replacement, about
+   50 lines in `tools/bench/tiled_capacity.py` (or `fastmace.io` if it is to serve users): allocate the float64
+   positions once, fill them a chunk of cell copies at a time by broadcasting (copy positions plus lattice offsets),
+   no `wrap` (a perfect repeat is inside the box; rattle and strain chunked where asked), narrow atomic numbers, and
+   wrap the arrays in an `ase.Atoms` without a copy (the force field takes one). Check: bitwise ASE's positions,
+   numbers and cell at small and medium sizes; then a CPU-only dry run of this step at 520^3 and 585^3 (no GPU), which
+   also answers the 519M fault.
+2. **The eager first call** is the largest cost (about 8 of the run's 11 h at 10^9). Mode auto runs a whole call
+   eager to measure the tile workspace before compiling. The workspace is not size-independent (R 16,384: 1.8 GiB
+   above the call's start at 20.48M, Alex 4985398; 3.4 GB at 397.5M), so a small run's number cannot simply be
+   handed in; a measurement on a few of the run's own largest tiles (eager, then compile for the rest of the call)
+   would give the same decision in minutes. Also: re-measure the eager call with 16 CPUs (the record had one; the
+   host-state writes and gathers are host work).
+3. **The force-field build** (660 s, host peak 111 GB, about 279 B/atom at its peak): profile it at 20M (cProfile and
+   the host peak by step) before changing anything; the one-hot and species tables built on the host at construction
+   are the first suspects.
+
 ## Status
 
 | Step | State | Record |
