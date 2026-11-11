@@ -1,0 +1,58 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/home/fzwin/fm-runs/tiled-speed-20261108/src-d4014c75/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/fm-runs/tiled-speed-20261108/src-d4014c75/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/fm-runs/tiled-speed-20261108/src-d4014c75/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/home/fzwin/fm-runs/tiled-speed-20261108/src-d4014c75/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py:2604: UserWarning: Dynamo does not know how to trace the builtin `time.perf_counter.` This function is either a Python builtin (e.g. _warnings.warn) or a third-party C/C++ Python extension (perhaps created with pybind).
+If it is a Python builtin, please file an issue on GitHub so the PyTorch team can add support for it and see the next case for a workaround.
+If it is a third-party C/C++ Python extension, please either wrap it into a PyTorch-understood custom operator (see https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html for more details) or, if it is traceable, use `torch.compiler.allow_in_graph`.
+  torch._dynamo.utils.warn_once(explanation + "\n" + "\n".join(hints))
+W1111 03:53:38.788000 74853 torch/_logging/_internal.py:1394] [4/0] Profiler record function <class 'torch.autograd.profiler.record_function'> will be ignored
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64] torch._dynamo hit config.recompile_limit (64)
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64]    function: 'torch_dynamo_resume_in_wrapped_at_49' (/home/fzwin/fm-runs/tiled-speed-20261108/gapprof.py:49)
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64]    last reason: 4/63: ___stack0 == 16931.837116967                             # spent = time.perf_counter() - started  # fm-runs/tiled-speed-20261108/gapprof.py:56 in torch_dynamo_resume_in_wrapped_at_49
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64] User stack trace:
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64]   File "/home/fzwin/fm-runs/tiled-speed-20261108/gapprof.py", line 56, in torch_dynamo_resume_in_wrapped_at_49
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64]     spent = time.perf_counter() - started
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+W1111 03:53:51.917000 74853 torch/_dynamo/convert_frame.py:2008] [4/64] To diagnose recompilation issues, see https://docs.pytorch.org/docs/main/user_guide/torch_compiler/compile/programming_model.recompilation.html
+USDT:2026-11-11 03:54:31 74853:74853 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-11-11 03:54:37 74853:74853 SyncActivityProfilerHandler.cpp:46] profiler_stop
+{"atoms": 975560, "times": [13.869171024001844, 33.50892144500176, 6.060637795999355, 6.1294614680009545], "wall": 6.144924428001104, "busy": 6.005492128999996, "idle": 0.031010125000004655, "gaps_top": {"_call": {"count": 69, "seconds": 0.0153}, "_tile_graph": {"count": 51, "seconds": 0.0052}, "(gaps under 20 us)": {"count": 1198, "seconds": 0.0026}, "_piece": {"count": 12, "seconds": 0.0025}, "_kept_form": {"count": 9, "seconds": 0.002}, "_free_bytes": {"count": 1, "seconds": 0.0009}, "_speed": {"count": 4, "seconds": 0.0008}, "_slot_keys": {"count": 4, "seconds": 0.0008}}, "host_top": {"_first": [1.7622, 136], "autograd.grad": [1.7438, 136], "_fill": [1.1018, 204], "_call": [0.4753, 1], "_tile_graph": [0.2838, 68], "_second": [0.266, 68], "_attrs": [0.1147, 204], "_edges": [0.0795, 204], "_body": [0.0576, 204], "_piece": [0.032, 272]}}
