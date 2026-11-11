@@ -39,8 +39,10 @@ SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A
 # Benchmark_loup MD step b/a, a = the A100 defaults): 0.9889 / 0.9881 (ab / ba); force/stress gate passes with GEOM
 # also on (forces 0.863 / 0.913 / 0.985, stress 0.727 / 0.896 / 1.343). The H200 stopped at its bound (ledger
 # sc0-invariant-basis: under 1 % there). None: on for SC_FACTORED_GPUS; True / False: an A/B side's choice.
+# RTX 4000 Ada (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; on top of SC_GENERATED, MD step
+# b/a SrTiO3 10x10x10 0.9978 / 0.9978, NbCl5 0.9907 / 0.9906, ab / ba): on with the Ada set, gated with it.
 SC_FACTORED = None
-SC_FACTORED_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+SC_FACTORED_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA RTX 4000 Ada Generation"))
 
 _subclasses = {}
 

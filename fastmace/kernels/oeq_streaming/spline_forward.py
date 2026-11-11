@@ -254,7 +254,9 @@ def packed8_source(source, bias):
 # NVIDIA A100-SXM4-80GB (10 November 2026, Alex job 4973813, source 219602cf; Benchmark_loup MD step b/a, a = the A100
 # defaults): 0.9756 / 0.9806 (ab / ba); force/stress gate passes with SC_FACTORED also on (forces 0.863 / 0.913 /
 # 0.985, stress 0.727 / 0.896 / 1.343). The H200 is not measured (issue-bound there, not FMA-bound). None: on for
-# GEOM_GPUS; True / False: an A/B side's choice.
+# GEOM_GPUS; True / False: an A/B side's choice. RTX 4000 Ada (ada-5060-screen, 11 November 2026): off, 1.0226 / 1.0209
+# (SrTiO3 10x10x10), 1.0156 / 1.0159 (NbCl5); with PACKED8 0.9120 / 0.9139 against PACKED8's 0.9013 / 0.9058 (census on
+# sm_89: 614 -> 667 instructions, stack 8 -> 16 bytes, shared 2.7 -> 10.4 kB).
 GEOM = None
 GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 
