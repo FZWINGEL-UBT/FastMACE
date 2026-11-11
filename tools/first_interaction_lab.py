@@ -12,6 +12,8 @@ copies of the production kernels with timing-only changes. Numbers of the falsif
 - ``aligned-wN``: C1's candidate kernel (correct sums): 32-edge programs moved to slot boundaries, each owned
   slot's sums in registers and written once with plain stores; no atomics, no fill. ``-nostore``: its stores
   masked off (timing only).
+- ``walk``: the production walk's single edge loop over run-aligned ranges, run ends written with plain stores
+  (the falsifier's loop with real stores); correct sums.
 - ``byslot-wN``: a prototype of idea 18's shape (not the falsifier the plan names; timing and a rounding check):
   one program of N warps per slot over that slot's edges, the [D, K] sums in registers, one plain store per slot.
 - **C2 falsifier** ``oneload``: one table load per column and edge (and one for the density column) in place of the
@@ -134,6 +136,65 @@ def kernels():
             tl.atomic_add(out_ptr + _base(current, D, K, INNER) + offsets, acc, mask=mask, sem="relaxed")
         else:
             tl.store(out_ptr + _base(current, D, K, INNER) + offsets, acc, mask=mask & (live != 0))
+
+    @triton.jit
+    def walk(y_ptr, key_ptr, slot_start_ptr, prog_first_ptr, r_ptr, pair_ptr, coef_ptr, starts_ptr, scales_ptr,
+             bins_ptr, out_ptr, density_ptr, n_pieces, n_bins, r_lo, bin_scale, r_max, K: tl.constexpr,
+             D: tl.constexpr, INNER: tl.constexpr, TERMS: tl.constexpr, J: tl.constexpr, BLOCK_K: tl.constexpr,
+             BLOCK_D: tl.constexpr):
+        """The production walk's single edge loop (run ends close a slot) over a run-aligned edge range: program p
+        owns slots [first, last) (``prog_first``) and their edges; each run end writes its slot's block with plain
+        stores, and owned empty slots get zeros. No atomics, no fill."""
+        p = tl.program_id(0)
+        first = tl.load(prog_first_ptr + p)
+        last = tl.load(prog_first_ptr + p + 1)
+        d = tl.arange(0, BLOCK_D)
+        k = tl.arange(0, BLOCK_K)
+        mask = (d < D)[:, None] & (k < K)[None, :]
+        offsets = d[:, None] * (INNER * K) + k[None, :]
+        acc = tl.zeros((BLOCK_D, BLOCK_K), dtype=tl.float32)
+        start = tl.load(slot_start_ptr + first)
+        stop = tl.load(slot_start_ptr + last)
+        current = first.to(tl.int64)
+        for edge in range(start, stop):
+            key = tl.load(key_ptr + edge).to(tl.int64)
+            if key != current:  # a run ends: its slot's block, then zeros for the owned empty slots between
+                tl.store(out_ptr + _base(current, D, K, INNER) + offsets, acc, mask=mask)
+                for gap in range(current + 1, key):
+                    tl.store(out_ptr + _base(gap, D, K, INNER) + offsets, tl.zeros_like(acc), mask=mask)
+                acc = tl.zeros((BLOCK_D, BLOCK_K), dtype=tl.float32)
+                current = key
+            row = edge.to(tl.int64)
+            r = tl.load(r_ptr + row)
+            pair = tl.load(pair_ptr + row).to(tl.int64)
+            clamped = tl.maximum(r, r_lo)
+            index = tl.minimum(((clamped - r_lo) * bin_scale).to(tl.int32), n_bins - 1)
+            piece = tl.load(bins_ptr + index).to(tl.int64)
+            x = (clamped - tl.load(starts_ptr + piece)) * tl.load(scales_ptr + piece) - 1.0
+            base = (pair * n_pieces + piece) * TERMS * J
+            inside = r < r_max
+            v1 = tl.zeros((BLOCK_K,), dtype=tl.float32)
+            v2 = tl.zeros((BLOCK_K,), dtype=tl.float32)
+            c1 = 0.0 * x
+            c2 = 0.0 * x
+            for t in tl.static_range(TERMS - 1, 0, -1):
+                c = tl.load(coef_ptr + base + t * J + k, mask=k < K, other=0.0)
+                v = c + 2.0 * x * v1 - v2
+                v2 = v1
+                v1 = v
+                cd = tl.load(coef_ptr + base + t * J + (J - 1))
+                cn = cd + 2.0 * x * c1 - c2
+                c2 = c1
+                c1 = cn
+            a = tl.where(inside, tl.load(coef_ptr + base + k, mask=k < K, other=0.0) + x * v1 - v2, 0.0)
+            density = tl.where(inside, tl.load(coef_ptr + base + (J - 1)) + x * c1 - c2, 0.0)
+            tl.store(density_ptr + row, density)
+            y = tl.load(y_ptr + row * D + d, mask=d < D, other=0.0)
+            acc += y[:, None] * a[None, :]
+        if first < last:
+            tl.store(out_ptr + _base(current, D, K, INNER) + offsets, acc, mask=mask)
+            for gap in range(current + 1, last):
+                tl.store(out_ptr + _base(gap, D, K, INNER) + offsets, tl.zeros_like(acc), mask=mask)
 
     @triton.jit
     def aligned(y_ptr, slot_start_ptr, prog_first_ptr, r_ptr, pair_ptr, coef_ptr, starts_ptr, scales_ptr, bins_ptr,
@@ -334,7 +395,7 @@ def kernels():
             total = tl.where((r < r_max) & (r >= r_lo), total, 0.0)
             tl.store(dr_ptr + row, total)
 
-    return forward, by_slot, backward, aligned
+    return forward, by_slot, backward, aligned, walk
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -371,7 +432,7 @@ def _source(kernel, constexprs):
 def census_variants(k=64, d=16, terms=6, columns=66):
     from fastmace.kernels.triton import tabled_outer_sum as tos
 
-    forward, by_slot, backward, aligned = kernels()
+    forward, by_slot, backward, aligned, walk = kernels()
     common = dict(K=k, D=d, J=columns, BLOCK_K=64, BLOCK_D=16)
     fwd = dict(common, INNER=1, TERMS=terms, CHUNK=tos.FORWARD_CHUNK)
     bwd = dict(common, INNER=1, TERMS=terms - 1, CHUNK=tos.CHUNK, VTERMS=terms)
@@ -380,6 +441,7 @@ def census_variants(k=64, d=16, terms=6, columns=66):
             ("forward-oneload", forward, dict(fwd, SLOTS=True, ONE=True), tos.FORWARD_WARPS)]
     rows += [(f"byslot-w{w}", by_slot, dict(common, TERMS=terms), w) for w in (1, 2, 4)]
     rows += [(f"aligned-w{w}", aligned, dict(common, INNER=1, TERMS=terms), w) for w in (1, 2)]
+    rows += [("walk-w1", walk, dict(common, INNER=1, TERMS=terms), 1)]
     for power in (False, True):
         name = "power" if power else "recompute"
         rows += [(f"backward-{name}-copy", backward, dict(bwd, POWER=power, ONE=False), tos.WARPS),
@@ -513,7 +575,7 @@ def main(argv=None):
 
     if args.watchdog:
         start_watchdog(log)
-    forward_k, by_slot_k, backward_k, aligned_k = kernels()
+    forward_k, by_slot_k, backward_k, aligned_k, walk_k = kernels()
 
     key, pair, dist, slots, pairs = edges_of(args.structure, args.cutoff, args.jitter)
     dev = torch.device("cuda")
@@ -568,6 +630,14 @@ def main(argv=None):
                                BLOCK_D=16, num_warps=warps)
         return out, density
 
+    def fwd_walk():
+        out = torch.empty((slots, d * k), device=dev)
+        density = r.new_empty((edges, 1))
+        walk_k[(programs,)](y, key_t, slot_start, prog_first, r_flat, pair_t, coef, starts, scales, bins, out, density,
+                            coef.shape[1], *fwd_args, K=k, D=d, INNER=1, TERMS=6, J=66, BLOCK_K=64, BLOCK_D=16,
+                            num_warps=tos.FORWARD_WARPS)
+        return out, density
+
     def bwd_copy(power, one=False):
         dr = r_flat.new_empty((edges,))
         grad_y = torch.empty_like(y)
@@ -592,6 +662,7 @@ def main(argv=None):
         **{f"fwd-byslot-w{w}": (lambda w=w: fwd_by_slot(w)) for w in (1, 2, 4)},
         **{f"fwd-aligned-w{w}": (lambda w=w: fwd_aligned(w)) for w in (1, 2)},
         "fwd-aligned-w1-nostore": lambda: fwd_aligned(1, 0),
+        "fwd-walk": fwd_walk,
         "bwd-recompute-prod": lambda: bwd_prod(False),
         "bwd-recompute-copy": lambda: bwd_copy(False),
         "bwd-recompute-oneload": lambda: bwd_copy(False, True),
@@ -607,7 +678,8 @@ def main(argv=None):
     # Faithfulness of the copies, and the prototype's rounding.
     checks = {}
     ref_f = variants["fwd-prod"]()
-    for name in ("fwd-copy", "fwd-byslot-w1", "fwd-byslot-w2", "fwd-byslot-w4", "fwd-aligned-w1", "fwd-aligned-w2"):
+    for name in ("fwd-copy", "fwd-byslot-w1", "fwd-byslot-w2", "fwd-byslot-w4", "fwd-aligned-w1", "fwd-aligned-w2",
+                 "fwd-walk"):
         checks[name] = err(variants[name](), ref_f)
     for name in ("recompute", "power"):
         ref_b = variants[f"bwd-{name}-prod"]()
@@ -653,6 +725,7 @@ def main(argv=None):
         "C1_noslot_kernel_saving_us": m("fwd-copy") - m("fwd-noslot-fill"),
         "C1_byslot_best_saving_us": m("fwd-copy") - min(m(f"fwd-byslot-w{w}") for w in (1, 2, 4)),
         "C1_aligned_best_saving_us": m("fwd-copy") - min(m(f"fwd-aligned-w{w}") for w in (1, 2)),
+        "C1_walk_saving_us": m("fwd-copy") - m("fwd-walk"),
         "C2_forward_saving_us": m("fwd-copy") - m("fwd-oneload"),
         "C2_backward_recompute_saving_us": m("bwd-recompute-copy") - m("bwd-recompute-oneload"),
         "C2_backward_power_saving_us": m("bwd-power-copy") - m("bwd-power-oneload"),
