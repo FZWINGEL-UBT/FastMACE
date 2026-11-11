@@ -23,7 +23,26 @@ def capacity():
     return module
 
 
-@pytest.mark.parametrize("structure", ["SrTiO3", "NbCl5"])
+def _triclinic():
+    """A skewed three-species cell with tags and initial charges (arrays beyond positions and numbers)."""
+    from ase import Atoms
+
+    atoms = Atoms("NaClO", scaled_positions=[(0.1, 0.2, 0.3), (0.55, 0.45, 0.6), (0.9, 0.05, 0.75)],
+                  cell=[[4.1, 0.0, 0.0], [1.3, 3.7, 0.0], [0.7, -0.9, 5.3]], pbc=True)
+    atoms.set_tags([1, 2, 3])
+    atoms.set_initial_charges([0.5, -0.5, 0.0])
+    return atoms
+
+
+@pytest.fixture
+def base_cells(capacity, monkeypatch):
+    original = capacity.capacity_scan.base_cell
+    monkeypatch.setattr(capacity.capacity_scan, "base_cell",
+                        lambda name: ("triclinic", _triclinic()) if name == "triclinic" else original(name))
+
+
+@pytest.mark.usefixtures("base_cells")
+@pytest.mark.parametrize("structure", ["SrTiO3", "triclinic"])
 @pytest.mark.parametrize("repeat", [(1, 1, 1), (3, 4, 5), (7, 2, 3)])
 @pytest.mark.parametrize("rattle, strain", [(0.0, 0.0), (0.05, 0.0), (0.05, 0.02)])
 @pytest.mark.parametrize("chunk", [1, 7, 1 << 17])
