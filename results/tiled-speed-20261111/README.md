@@ -275,14 +275,14 @@ force on the perfect crystal, rattled forces' largest change from the origin run
 | local job 51 (935a7473), RTX 5060 Ti | 1.33e-3 / 2.69e-3 at +1,500 Å | 2.2e-6 / 2.6e-6 | 5.0e-6 / 2.8e-5 |
 | local job 56 (8dfe40d9), RTX 5060 Ti | 1.33e-3 / 2.70e-3 | 6.9e-6 / 1.9e-6 | 4.7e-6 / 3.0e-5 |
 | Alex 4983424 (ace12ea0), A100-SXM4-80GB | 1.33e-3 / 2.70e-3 | 6.8e-6 / 1.8e-6 | 6.3e-6 / 3.3e-5 |
-| Alex 4983752 (f8ea447e), A100-SXM4-80GB | A100PENDING | | |
+| Alex 4983752 (f8ea447e), A100-SXM4-80GB | 1.33e-3 / 2.70e-3 | 6.6e-6 / 1.9e-6 | 2.5e-6 / 3.7e-6 |
 
 (R 256 tiles; the rattled tiled change is the tiled call's own rounding against the whole-system origin run, as at
 the origin.)
 
 **Gate.** `tools/force_stress_gate.py` 3x, both switches forced on (`--production-constant`; the size rule leaves the
 gate's cells off), tiled R 48 compiled, OMAT-0 medium, SrTiO3 3x3x3, NaCl, NbCl5: 12/12 passed on ace12ea0 (Alex
-4983424); f8ea447e: A100PENDING (Alex 4983752).
+4983424) and on f8ea447e (Alex 4983752).
 
 **Speed** (same-process A/B, both orders; where the size rule leaves them off the calls are unchanged):
 
@@ -300,7 +300,7 @@ gate's cells off), tiled R 48 compiled, OMAT-0 medium, SrTiO3 3x3x3, NaCl, NbCl5
 | | f8ea447e (job 63: halves, TwoSum) | 1.004 / 1.010 |
 | frame, A100-SXM4-80GB, 58³ (975,560), R 8,192 budget, compiled graphs | 98ca790e (Alex 4983258) | 1.047 / 1.048 |
 | | ace12ea0 (Alex 4983424) | 1.029 / 1.029 |
-| | f8ea447e (Alex 4983752) | A100PENDING |
+| | f8ea447e (Alex 4983752) | 1.028 / 1.029 |
 | frame, RTX 4000 Ada (murphy), 40³ | f8ea447e (`idea11-ada/`) | 1.0078 / 1.0064 |
 
 On the Ada at 975,560 atoms (226 Å, the frame on by size on both sides of a compiled-graphs A/B that a template slip ran first, `idea11-ada/murphy-frameab-*`) the perfect crystal's largest force is 3.0e-6 eV/Å, against the 1.64e-4 of the capacity record without the frame. The tests/cpu suite on f8ea447e (murphy): 5,610 passed, 203 skipped.
@@ -309,4 +309,6 @@ The local job pairs drift by about 1 % between runs (job 63's block pairs 0.93-1
 are within that drift. On the A100 the frame was a separate compiled call per tile and sweep (98ca790e), outside
 the captured body: 1.047. The conductor's decision (11 November 2026): on by size on every GPU, the A100 included up
 to about 3.5 %, since the A100 is the capacity machine and at 64 Å and above the plain forces reach 37x the gate's
-rounding basis; a faster frame on the A100 is a follow-up item.
+rounding basis; a faster frame on the A100 is a follow-up item. The A100 on f8ea447e: 1.028 / 1.029 (block pairs
+1.024-1.031), inside that bar. In the same A/B at 58³ (975,560 atoms, 226 Å) the plain call's largest force on the
+perfect crystal is 1.68e-4 eV/Å and the frame's difference from it the same (1.69e-4): the frame removes it.

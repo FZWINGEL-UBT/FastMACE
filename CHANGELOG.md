@@ -26,7 +26,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   the edges) and `tiled.TILE_LOCAL_FRAME` builds each tile's edge vectors in tile-local coordinates (float32 high and
   low halves, exact differences). The perfect crystal's largest force at +1,500 A falls from 1.33e-3 to 2-5e-6 eV/A
   (the 149M/320M capacity records' 1.32e-3). Smaller structures and float64 models are unchanged. Cost where on:
-  whole system 1.5 % with stress; tiles about 1 % (RTX 5060 Ti), A100PENDING (A100). Gate 3x passed.
+  whole system 1.5 % with stress; tiles about 1 % (RTX 5060 Ti, RTX 4000 Ada), 2.8 % (A100). Gate 3x passed.
 - Decision-66 GPU lists (`kernels/gpu_models.GPUModels`): an A100 entry stands for every A100 model, so the
   A100-SXM4-40GB and A100-PCIE-40GB take the A100 defaults (owner, 4 November 2026).
 

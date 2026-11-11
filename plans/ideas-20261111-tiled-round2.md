@@ -98,14 +98,14 @@ whole-system positions on the device (24 B/atom of the Ada's 111.6), since each 
 
 **Outcome (11 November 2026).** Both paths, on by size: `FLOAT64_EDGES_EXTENT` = 64 A (conductor: float32's ulp error
 at least twice a 30 A box's), float32 models only; the threshold lives in `fastmace/model/forces.py`. Whole system
-1.5 % with stress; tiles about 1 % on the RTX 5060 Ti and A100PENDING on the A100 (accepted up to about 3.5 %). The
+1.5 % with stress; tiles about 1 % on the RTX 5060 Ti and 2.8 % on the A100 (1.028 / 1.029; accepted up to about 3.5 %). The
 tile frame needed float32 high and low halves and an exact difference: at R 16,384 the rows' own spacing left
 4.4e-5 eV/A. Records: `results/tiled-speed-20261111/README.md`, "Idea 11"; ledger `tiled-local-frame`,
 `whole-system-float64-edges`.
 
 ## 11b. A faster tile-local frame on the A100 (follow-up)
 
-The frame costs A100PENDING at 975,560 atoms on the A100 (58^3, compiled graphs), against about 1 % on the RTX 5060
+The frame costs 2.8 % (1.028 / 1.029) at 975,560 atoms on the A100 (58^3, compiled graphs), against about 1 % on the RTX 5060
 Ti. Candidates: the remaining shift from a small per-slot table instead of a float64 product per edge, the halves'
 gather folded into the edge kernel that already reads the rows, and the rows' frame built once per tile instead of
 once per sweep. Decide with an nsys trace of one A100 call first.
