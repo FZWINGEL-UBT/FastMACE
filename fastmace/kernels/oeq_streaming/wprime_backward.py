@@ -311,6 +311,12 @@ SPLINE_VECTOR = None
 # before it is added to interaction 0's). None: on for EDGE_FORCE_GPUS (none yet); True / False: an A/B side's choice.
 EDGE_FORCE = None
 EDGE_FORCE_GPUS = GPUModels(())
+# H200 w' instruction tuning (12 November 2026, results/wprime-h200-20261111): an edge at or beyond the cutoff (the
+# engine's padding edges; the skin list is compacted to the cutoff) writes dsh = 0 and dr = 0 and skips the channel
+# loop, so the table loads need no zero fill (sm_90 census: 2,198 -> 2,026 instructions per edge and lane, 72 -> 96
+# registers). Exact. None: on for SKIP_OUTSIDE_GPUS; True / False: an A/B side's choice.
+SKIP_OUTSIDE = None
+SKIP_OUTSIDE_GPUS = GPUModels(())
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
@@ -625,6 +631,17 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     }
     {%- endif %}
 
+    {%- if skip_outside %}
+    if (!inside) {  // SKIP_OUTSIDE: w = 0 at and beyond the cutoff (the padding edges): zeros, no channel loop
+        {%- if edge_force %}
+        if (lane < 3) dsh[e * 3 + lane] = scalar_t(0);  // EDGE_FORCE: dL/dv[e]
+        {%- else %}
+        for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);
+        {%- endif %}
+        if (lane == 0) dr[e] = scalar_t(0);
+        {{ "continue" if stage_dout else "return" }};
+    }
+    {%- endif %}
     acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};
     acc_t radial_gradient = acc_t(0);
     for (int channel = lane; channel < CHANNEL_DIM;
@@ -644,7 +661,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 const int64_t radial_weight_index = weight_base + weight_index;
                 {%- if table_w %}
                 scalar_t gv[PADDED_TERMS];
-                if (inside) {
+                if ({{ "true" if skip_outside else "inside" }}) {
                     {%- if table_pairs %}
                     // TABLE_PAIRS: term pair k of weight q at (k * WEIGHT_DIM + q) float2s.
                     const {{ vector_type }}* gq = reinterpret_cast<const {{ vector_type }}*>(g) + weight_index;
@@ -970,7 +987,8 @@ def factored_paths(schedule, scale=False):
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
            table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
-           stage_quads=False, shared_locator=False, stage_sh=0, stage_edges=False, edge_force=False):
+           stage_quads=False, shared_locator=False, stage_sh=0, stage_edges=False, edge_force=False,
+           skip_outside=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -995,7 +1013,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     block's chunk of edges staged once at block entry (features, sender, receiver, spline interval).
     ``edge_force`` (``EDGE_FORCE``, idea 13; float32, edge features l <= 3 of ``edge_sh3``): the kernel takes the edge
     vectors ``vec [E, 3]`` after ``dr`` and writes ``dL/dv [E, 3]`` through ``dsh`` (edge_sh3's backward contracted
-    in the epilogue, one lane per edge) instead of ``dsh [E, 16]``."""
+    in the epilogue, one lane per edge) instead of ``dsh [E, 16]``. ``skip_outside`` (``SKIP_OUTSIDE``; with
+    ``table_w``): an edge at or beyond the cutoff writes its zeros and skips the channel loop, whose table loads are
+    then unconditional (exact)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -1042,6 +1062,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     if stage_edges and not (stage_dout and stage_sh and spline is not None and not shared_locator):
         raise ValueError("stage_edges stages STAGE_DOUT's chunk for SPLINE_W: it needs stage_dout, stage_sh and "
                          "spline, without shared_locator")
+    if skip_outside and not table_w:
+        raise ValueError("skip_outside skips TABLE_W's zero weights at the cutoff: it needs table_w")
     if edge_force and not edge_force_supported(schedule, scalar):
         raise ValueError("edge_force contracts edge_sh3's 16 features: it needs float32 and an edge dimension of 16")
     stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
@@ -1068,6 +1090,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             spline=None if spline is None else _spline_lookup(spline, scalar),
                                             shared_locator=bool(shared_locator), stage_sh=int(stage_sh),
                                             stage_edges=bool(stage_edges), edge_force=bool(edge_force),
+                                            skip_outside=bool(skip_outside),
                                             slab="int64_t(loc.x)" if shared_locator
                                             else "int64_t(stage_slab[stage_k])" if stage_edges
                                             else "(int64_t(pairs[e]) * pieces + piece)")
@@ -1288,6 +1311,7 @@ class WPrimeBackward:
         self.stage_edges = (self.stage_dout and bool(self.stage_sh) and self.spline is not None
                             and not self.shared_locator and stage_edges_default(device, model_label))
         self.edge_force = bool(edge_force)  # EDGE_FORCE: dL/dv [E, 3] through dsh; the vectors after dr
+        self.skip_outside = self.table_w and skip_outside_default(device)
         self.launches = 0  # host-side launch count (tests: the EDGE_FORCE kernel ran)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
@@ -1296,7 +1320,8 @@ class WPrimeBackward:
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
-                             stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force)
+                             stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force,
+                             skip_outside=self.skip_outside)
         options = ()
         if SMEM_SPILL:
             head = 'extern "C" __global__ void oeq_projected_backward_wprime('
@@ -1822,6 +1847,11 @@ def stage_edges_default(device, model_label=None):
     return name in STAGE_EDGES_GPUS or name in STAGE_EDGES_MODEL_GPUS.get(model_label, ())
 
 
+def skip_outside_default(device):
+    """``SKIP_OUTSIDE`` on ``device``: the constant when set, else on for ``SKIP_OUTSIDE_GPUS``."""
+    return bool(SKIP_OUTSIDE) if SKIP_OUTSIDE is not None else _device_name(device) in SKIP_OUTSIDE_GPUS
+
+
 def edge_force_default(device):
     """``EDGE_FORCE`` on ``device``: the constant when set, else on for ``EDGE_FORCE_GPUS``."""
     return bool(EDGE_FORCE) if EDGE_FORCE is not None else _device_name(device) in EDGE_FORCE_GPUS
@@ -2058,6 +2088,7 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["EDGE_FORCE", "EDGE_FORCE_GPUS", "edge_force_default", "edge_force_supported",
+           "SKIP_OUTSIDE", "SKIP_OUTSIDE_GPUS", "skip_outside_default",
            "streaming_conv_wprime_backward_force", "BLOCK_LDG", "BLOCK_LDG_GPUS",
            "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
            "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",

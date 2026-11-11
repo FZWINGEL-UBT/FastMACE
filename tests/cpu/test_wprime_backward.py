@@ -290,6 +290,42 @@ def test_edge_force_compiles_with_nvrtc():
             assert compile_cubin(wp.render(_edge16(), "float", 10, edge_force=True, **options), capability)
 
 
+def test_skip_outside_source():
+    """SKIP_OUTSIDE (12 November 2026, results/wprime-h200-20261111): an edge at or beyond the cutoff writes its zeros
+    and leaves before the channel loop, whose table loads are then unconditional; off, the zero fill stays."""
+    options = dict(vector=2, table_w=True)
+    plain = wp.render(_schedule(), "float", 4, **options)
+    source = wp.render(_schedule(), "float", 4, skip_outside=True, **options)
+    assert "SKIP_OUTSIDE" not in plain and "if (inside) {" in plain
+    assert "if (inside) {" not in source and "if (true) {" in source and "if (!inside) {" in source
+    skip = source[source.index("if (!inside) {"):source.index("acc_t edge_gradient[EDGE_DIM]")]
+    assert "dsh[e * EDGE_DIM + c] = scalar_t(0);" in skip and "dr[e] = scalar_t(0);" in skip and "return;" in skip
+    force = wp.render(_edge16(), "float", 4, skip_outside=True, edge_force=True, **options)
+    skip = force[force.index("if (!inside) {"):force.index("acc_t edge_gradient[EDGE_DIM]")]
+    assert "if (lane < 3) dsh[e * 3 + lane] = scalar_t(0);" in skip
+    with pytest.raises(ValueError, match="skip_outside"):
+        wp.render(_schedule(), "float", 4, skip_outside=True)  # no TABLE_W: no inside flag
+
+
+def test_skip_outside_default(monkeypatch):
+    monkeypatch.setattr(wp, "SKIP_OUTSIDE", None)
+    assert not wp.skip_outside_default(torch.device("cpu")) and len(wp.SKIP_OUTSIDE_GPUS) == 0
+    monkeypatch.setattr(wp, "SKIP_OUTSIDE", True)
+    assert wp.skip_outside_default(torch.device("cpu"))
+
+
+def test_skip_outside_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    for capability in ((9, 0), (8, 0)):
+        for edge_force in (False, True):
+            assert compile_cubin(wp.render(_edge16(), "float", 4, vector=2, table_w=True, skip_outside=True,
+                                           edge_force=edge_force), capability)
+
+
 def test_edge_vectors_only_for_edge_sh_output():
     """EDGE_FORCE's hand-over (rewrites.generic.modules): an interaction gets EdgeSH's vectors only for the very
     tensor EdgeSH returned last; anything else (another tensor, no EdgeSH reference) keeps the dsh path."""
