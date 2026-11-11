@@ -1,0 +1,88 @@
+[fastmace-colab 03:16:33] allocating A100 as fm-a100-20261111-031603-95660f
+[fastmace-colab 03:19:39] NVIDIA A100-SXM4-40GB (sm 8.0, driver 580.82.07); cache sm80-py310-f00d5798f8b5
+[fastmace-colab 03:27:21] ready after 677.4 s; running 1 command(s)
+[fastmace-colab 03:27:36] command 1 exit 0 after 13 s
+port]
+{
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "torch": "2.14.1+cu130",
+ "edges": 131072,
+ "pairs": 65536,
+ "reps": 100,
+ "registers": {
+  "fp32": 80,
+  "half2": 104,
+  "half2_lb3": 80
+ },
+ "median_us": {
+  "fp32": 1139.7119760513306,
+  "half2": 601.0879874229431,
+  "half2_lb3": 551.9359707832336
+ },
+ "us_per_edge": {
+  "fp32": 0.008695312317286152,
+  "half2": 0.004585937404044671,
+  "half2_lb3": 0.0042109372770937625
+ },
+ "half2_over_fp32": 0.5274034142428553,
+ "half2_lb3_over_fp32": 0.48427671410059436,
+ "check": {
+  "half2": {
+   "edge_gradient": 0.0014579137787222862,
+   "radial_gradient": 0.002512635663151741,
+   "dx": 0.0007030327105894685,
+   "finite": true
+  },
+  "half2_lb3": {
+   "edge_gradient": 0.0014579137787222862,
+   "radial_gradient": 0.002512635663151741,
+   "dx": 0.0007030327105894685,
+   "finite": true
+  }
+ }
+}
+half2-65536 0
+/content/fm/venv/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+{
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "torch": "2.14.1+cu130",
+ "edges": 65536,
+ "pairs": 32768,
+ "reps": 100,
+ "registers": {
+  "fp32": 80,
+  "half2": 104,
+  "half2_lb3": 80
+ },
+ "median_us": {
+  "fp32": 608.2559823989868,
+  "half2": 341.5040075778961,
+  "half2_lb3": 301.56800150871277
+ },
+ "us_per_edge": {
+  "fp32": 0.009281249731429853,
+  "half2": 0.005210937615629518,
+  "half2_lb3": 0.00460156252302113
+ },
+ "half2_over_fp32": 0.5614478401527432,
+ "half2_lb3_over_fp32": 0.4957912626182747,
+ "check": {
+  "half2": {
+   "edge_gradient": 0.0014008720172569156,
+   "radial_gradient": 0.001226005726493895,
+   "dx": 0.0008009662851691246,
+   "finite": true
+  },
+  "half2_lb3": {
+   "edge_gradient": 0.0014008720172569156,
+   "radial_gradient": 0.001226005726493895,
+   "dx": 0.0008009662851691246,
+   "finite": true
+  }
+ }
+}
+
+
+[fastmace-colab 03:27:42] exit 0, wall 699.0 s, CU 185.86 -> 185.12; /home/fzwin/fastmace-runs/a100-colab-ideas-20261111/half2/colab.json; ledger /home/fzwin/.fastmace-colab/colab-ledger.csv
+driver exit 0

@@ -531,3 +531,4 @@ def test_block_order_sources_compile_with_nvrtc():
     for options in (dict(), dict(stage_edges=True, threads=64, min_blocks=6)):
         assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], block_order=True, **options),
                              (9, 0))
+

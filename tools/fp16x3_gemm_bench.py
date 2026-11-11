@@ -49,6 +49,38 @@ def split_b(b):
     return torch.cat([hi, lo, hi], dim=0), s
 
 
+def hybrid_parts(a, b):
+    """Idea 4 (11 Nov): big*big in TF32, the two cross products in one FP16 GEMM over 2K.
+
+    Returns (Ah fp32 [M, K], Bh fp32 [K, N], A2 fp16 [M, 2K] = [Ah, 2^11 Al], B2 fp16 [2K, N] = [2^11 Bl; Bh],
+    row scale, column scale). Ah and Bh have 11-bit significands, so the TF32 product of them is exact per term.
+    """
+    sa, sb = pow2_scale(a, 1), pow2_scale(b, 0)
+    xa, xb = a * sa, b * sb
+    ah, bh = xa.half(), xb.half()
+    al, bl = ((xa - ah.float()) * 2048.0).half(), ((xb - bh.float()) * 2048.0).half()
+    return ah.float(), bh.float(), torch.cat([ah, al], dim=1), torch.cat([bl, bh], dim=0), sa, sb
+
+
+def hybrid(parts):
+    ah, bh, a2, b2, sa, sb = parts
+    torch.backends.cuda.matmul.allow_tf32 = True
+    try:
+        big = torch.mm(ah, bh)
+    finally:
+        torch.backends.cuda.matmul.allow_tf32 = False
+    cross = torch.mm(a2, b2, out_dtype=torch.float32)
+    return (big + cross * (1.0 / 2048.0)) / sa / sb
+
+
+def tf32_mm(x, y):
+    torch.backends.cuda.matmul.allow_tf32 = True
+    try:
+        return torch.mm(x, y)
+    finally:
+        torch.backends.cuda.matmul.allow_tf32 = False
+
+
 def fp16x3(a_split, b_split):
     (a3, ra), (b3, cb) = a_split, b_split
     return torch.mm(a3, b3, out_dtype=torch.float32) * (1.0 / 2048.0) / ra / cb
@@ -109,6 +141,14 @@ def main(argv=None):
         row["fp16_gemm_us"] = timed(lambda: torch.mm(a3, b3, out_dtype=torch.float32))
         row["fp16_split_a_us"] = timed(lambda: split_a_compiled(a))
         row["fp16x3_err"] = error(fp16x3(a_split, b_split), exact, scale)
+        parts = hybrid_parts(a, b)
+        ah, bh, a2, b2 = parts[:4]
+        row["hyb_tf32_us"] = timed(lambda: tf32_mm(ah, bh))
+        row["hyb_fp16_2k_us"] = timed(lambda: torch.mm(a2, b2, out_dtype=torch.float32))
+        row["hyb_sum_us"] = row["hyb_tf32_us"] + row["hyb_fp16_2k_us"]
+        if "tf32x3_us" in row:
+            row["hyb_over_tf32x3"] = row["hyb_sum_us"] / row["tf32x3_us"]
+        row["hybrid_err"] = error(hybrid(parts), exact, scale)
         rows.append(row)
         print(json.dumps({key: (round(v, 2) if isinstance(v, float) and v > 1e-3 else v) for key, v in row.items()}),
               flush=True)
