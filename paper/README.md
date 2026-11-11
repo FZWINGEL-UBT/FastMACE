@@ -77,13 +77,12 @@ measured for the paper. Appendix A of the paper has the same list with source re
 - **Bibliography.** Titles and authors of all 36 entries are now confirmed, most of them from the downloaded
   copies in `references/`. What is still unconfirmed are publication details whose publisher pages could not be
   read: the proceedings names and DOIs of PyTorch 2, Triton and the SC '23 paper, the publisher and year of the
-  Trefethen book, the LAMMPS entry (secondary source), and the journal fields of MACE-MP-0 (J. Chem. Phys.),
-  MACE-OFF (JACS) and the NequIP infrastructure paper (Digital Discovery).
-- **Reference copies.** `references/` holds a copy of 28 of the 29 papers that could be had free and legally,
-  plus README and citation snapshots of the software references; `references/README.md` lists the source and
-  checksum of each. Three decisions are open there: the 84 MB PDF of the MACE foundation-model paper is
-  downloaded but not committed; the LAMMPS paper (open access) has to be fetched in a browser; Drautz's Phys. Rev.
-  B paper is paywalled. Check the licences before the repository becomes public.
+  Trefethen book, and the journal fields of MACE-MP-0 (J. Chem. Phys.), MACE-OFF (JACS) and the NequIP
+  infrastructure paper (Digital Discovery).
+- **Reference copies.** `references/` holds 28 papers and one book excerpt, plus README and citation snapshots
+  of the software references; `references/README.md` lists the source and checksum of each. Only Drautz's Phys.
+  Rev. B paper is missing (paywalled). The folder is 158 MB, of which one PDF is 84 MB. Check the licences before
+  the repository becomes public.
 - **Provenance.** `docs/current/omat0-a100.md` stops at 8 November and lists eight parts with no recorded origin
   (its §7). Table 12 marks three of them "not recorded". The LLM research reports are credited generically; decide
   how to name them.

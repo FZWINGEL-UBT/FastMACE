@@ -3,7 +3,8 @@
 Source: an owner request (11 November 2026, "make sure all references are downloaded in the branch"). The
 files were downloaded on 11 November 2026 by Haiku subagents through one helper script, and each PDF was then
 checked independently: the words of its bibliography title were searched for on its first two pages, and the
-arXiv stamp on page 1 was compared with the address it came from. Every PDF listed here passed.
+arXiv stamp on page 1 was compared with the address it came from. Every PDF listed here passed. One file,
+`thompson2022lammps.pdf`, was downloaded by the owner in a browser and checked the same way.
 
 Each file is named after its key in `../references.bib`.
 
@@ -23,7 +24,7 @@ terms. The README and citation snapshots come from repositories with open-source
 | `ansel2024pytorch2` | `ansel2024pytorch2.pdf` | ASPLOS '24 paper, copy hosted by the PyTorch project. | https://docs.pytorch.org/assets/pytorch2-2.pdf | 18 | 895 kB | `9fba949b3405` |
 | `barroso2024omat24` | `barroso2024omat24.pdf` | arXiv preprint. | https://arxiv.org/abs/2410.12771v2 | 34 | 3.0 MB | `3bbcd0bb5ced` |
 | `batatia2022mace` | `batatia2022mace.pdf` | arXiv preprint. | https://arxiv.org/abs/2206.07697v2 | 18 | 579 kB | `3c4497aa9e90` |
-| `batatia2023foundation` | `batatia2023foundation.pdf` | arXiv preprint. **Not committed** (see below). | https://arxiv.org/abs/2401.00096v3 | 153 | 84.1 MB | `15665521b2cd` |
+| `batatia2023foundation` | `batatia2023foundation.pdf` | arXiv preprint. | https://arxiv.org/abs/2401.00096v3 | 153 | 84.1 MB | `15665521b2cd` |
 | `batatia2025mh1` | `batatia2025mh1.pdf` | arXiv preprint. | https://arxiv.org/abs/2510.25380v1 | 22 | 1.7 MB | `8c25459b178d` |
 | `batzner2022nequip` | `batzner2022nequip.pdf` | arXiv preprint of the Nature Communications paper. | https://arxiv.org/abs/2101.03164v3 | 22 | 5.6 MB | `12221983e564` |
 | `bharadwaj2025oeq` | `bharadwaj2025oeq.pdf` | arXiv preprint. | https://arxiv.org/abs/2501.13986v4 | 15 | 1.9 MB | `2c2479c48e52` |
@@ -44,6 +45,7 @@ terms. The README and citation snapshots come from repositories with open-source
 | `park2024scalable` | `park2024scalable.pdf` | arXiv preprint of the journal paper. | https://arxiv.org/abs/2402.03789v1 | 36 | 3.8 MB | `4e67f95911c3` |
 | `riebesell2025matbench` | `riebesell2025matbench.pdf` | arXiv preprint. | https://arxiv.org/abs/2308.14920v3 | 32 | 4.6 MB | `6a37da286baa` |
 | `tan2026nequip` | `tan2026nequip.pdf` | arXiv preprint of the Digital Discovery paper. | https://arxiv.org/abs/2504.16068v1 | 9 | 370 kB | `63ec707162eb` |
+| `thompson2022lammps` | `thompson2022lammps.pdf` | Published article (open access, CC BY-NC-ND 4.0), downloaded by the owner in a browser. | https://doi.org/10.1016/j.cpc.2021.108171 | 34 | 2.7 MB | `0f755d4a6623` |
 | `tillet2019triton` | `tillet2019triton.pdf` | MAPL 2019 paper, copy hosted by an author. | https://www.eecs.harvard.edu/~htk/publication/2019-mapl-tillet-kung-cox.pdf | 10 | 1.0 MB | `7c4d200693c2` |
 | `torchsim` | `torchsim.pdf` | arXiv preprint of the AI for Science paper. | https://arxiv.org/abs/2508.06628v1 | 12 | 622 kB | `34758ab103bf` |
 | `trefethen2013atap` | `trefethen2013atap.pdf` | The author's free excerpt: the first six chapters only, not the whole book. | https://people.maths.ox.ac.uk/trefethen/ATAP/ATAPfirst6chapters.pdf | 48 | 771 kB | `35ac0be38186` |
@@ -70,14 +72,15 @@ version and the citation the project asks for.
 
 | Key | Why | Where to get it |
 | --- | --- | --- |
-| `batatia2023foundation` | Downloaded and checked, but **not committed**: the PDF is 84.1 MB (153 pages), which is above GitHub's 50 MB warning level and would stay in the repository history for good. It is in the working folder of the checkout that downloaded it and is ignored by `paper/.gitignore`. Earlier arXiv versions are also large (v1 44 MB, v2 39 MB). Waits for the owner's decision. | https://arxiv.org/abs/2401.00096v3 |
-| `thompson2022lammps` | The article is open access, but the publisher's site refuses automated downloads, OSTI lists the record without a full text, and the LAMMPS site links only to the DOI. | https://doi.org/10.1016/j.cpc.2021.108171 (opens in a browser) |
 | `drautz2019ace` | Behind the publisher's paywall; no arXiv or repository copy was found. | https://doi.org/10.1103/PhysRevB.99.014104 |
 | `cudagraphs` | Vendor documentation, not openly licensed, so only the link is kept. | https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html |
 
 Two saved files are not the version the bibliography cites: `fasi2021tensorcores.pdf` is the authors' preprint
 and `larsen2017ase.pdf` the accepted manuscript. `trefethen2013atap.pdf` holds the first six chapters only; the
 paper cites the book for Chebyshev series, which those chapters cover.
+
+`batatia2023foundation.pdf` is 84.1 MB, above GitHub's 50 MB warning level. The owner decided on 11 November 2026
+to commit it as it is ("yes commit it").
 
 The citation file of `wcwitt/symmetrix` was not saved: it is 164 bytes and names only "Symmetrix developers".
 
@@ -87,4 +90,4 @@ The helper and the check are not part of this folder, so that nothing here is ex
 download it from a source of the kinds named above, name it after its bibliography key, and add a row with its
 source, page count, size and SHA-256.
 
-Committed files in this folder: 71.4 MB in total.
+Committed files in this folder: 158.1 MB in total.
