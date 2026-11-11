@@ -1027,6 +1027,17 @@ def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, i
     return rows.to(dtype), (shift - image[local[0]]).to(dtype)
 
 
+def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype,
+                        far):
+    """``TILE_LOCAL_FRAME`` inside the tile body: the slot's edge vectors from ``_slot_local``'s tile-local rows and
+    remaining shifts (``_tile_vectors``), one fixed-shape graph per slot bucket. In the body the frame is part of the
+    captured tile (``compiled_graphs``): built before the body as its own compiled call, its per-tile host overhead
+    cost 1.047 / 1.048 at 975,560 atoms on the launch-bound A100 (Alex 4983258)."""
+    rows, remaining = _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers,
+                                  dtype)
+    return _tile_vectors(rows, local, remaining, edge_mask, far)
+
+
 def _frame_parts(positions64, width, dtype):
     """``TILE_LOCAL_FRAME``: float64 positions [n, 3] as int16 bins of ``width`` and offsets in ``dtype``."""
     import torch
@@ -1969,22 +1980,7 @@ class TiledForceField:
                     node_mask=new(receivers + halo, dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype),
                     ei=new((2, edges), dtype=i64), shifts=new((edges, 3), dtype=self.dtype),
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
-                    count=new((), dtype=i64), out={}, graphs={},
-                    rows=new((receivers + halo, 3), dtype=self.dtype))  # TILE_LOCAL_FRAME: tile-local positions
-
-    def _fill_local(self, slot, piece, local_frame):
-        """``TILE_LOCAL_FRAME``: the slot's tile-local positions (``rows``, in its node layout) and its edges'
-        remaining shifts (in ``shifts``), from the call's float64 positions."""
-        import torch
-
-        positions64, cell, inverse = local_frame
-        receivers = slot["sizes"][0]
-        # On the slot's padded buffers (after _fill): one fixed-shape graph per slot bucket in mode "compiled".
-        rows, remaining = self._compiled_once("tile_local", _slot_local)(
-            positions64, slot["nodes"], slot["node_mask"], slot["local"], slot["edge_mask"], slot["shifts"], cell,
-            inverse, receivers, self.dtype)
-        slot["rows"].copy_(rows)  # the padding rows zero (masked, as the plain positions' atom 0 rows are)
-        slot["shifts"].copy_(remaining)
+                    count=new((), dtype=i64), out={}, graphs={})
 
     def _fill(self, slot, piece):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
@@ -2020,9 +2016,12 @@ class TiledForceField:
 
         receivers = slot["sizes"][0]
         nodes, ei = slot["nodes"], slot["ei"]
-        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local: the slot's rows and remaining shifts
-            vectors_of = self._compiled_once("vectors", _tile_vectors) if self._speed(TILE_EPILOGUE) else _tile_vectors
-            vectors = vectors_of(slot["rows"], slot["local"], slot["shifts"], slot["edge_mask"], self._far)
+        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local: rows and remaining shifts in the body
+            positions64, cell, inverse = g["local_frame"]
+            vectors_of = (self._compiled_once("local_vectors", _slot_local_vectors) if self._speed(TILE_EPILOGUE)
+                          else _slot_local_vectors)
+            vectors = vectors_of(positions64, nodes, slot["node_mask"], slot["local"], slot["edge_mask"],
+                                 slot["shifts"], cell, inverse, receivers, self.dtype, self._far)
         elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
             vectors = _frame_vectors(g["frame"], ei, slot["shifts"], slot["edge_mask"], self._far)
         elif self._speed(TILE_EPILOGUE):
@@ -2345,7 +2344,8 @@ class TiledForceField:
             if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
                 # (and the body's edge-vector form: TILE_LOCAL_FRAME is read per call)
-                key = (id(g), pos.data_ptr(), species.data_ptr(), stress, g.get("local_frame") is not None)
+                frame = g.get("local_frame")
+                key = (id(g), pos.data_ptr(), species.data_ptr(), stress, None if frame is None else frame[0].data_ptr())
                 if key != self._graph_key:  # the graphs read these addresses
                     for slot in self._slots.values():
                         slot["graphs"].clear()
@@ -2444,8 +2444,6 @@ class TiledForceField:
                         torch.cuda.current_stream().wait_event(slot["event"])
                         slot["event"] = None
                     self._fill(slot, piece)
-                    if g.get("local_frame") is not None:
-                        self._fill_local(slot, piece, g["local_frame"])
                     state.prefetched = fetched  # rows() takes these instead of gathering them now
                     following = position is not None and position + 1 < len(order)
                     if lane is None:
@@ -2730,8 +2728,11 @@ class TiledForceField:
             return None, None
         if positions.device != self.device:
             return None, self._local_frame(positions, n)
-        cell = cell.to(self.device)
-        return (positions.to(torch.float64), cell, torch.linalg.inv(cell)), None
+        kept = getattr(self, "_frame_cell", None)  # fixed addresses: the captured tile bodies read them
+        if kept is None or not torch.equal(kept[0].cpu(), cell):
+            device_cell = cell.to(self.device)
+            kept = self._frame_cell = (cell.clone(), device_cell, torch.linalg.inv(device_cell))
+        return (positions.to(torch.float64), kept[1], kept[2]), None
 
     def _local_frame(self, positions, n):
         """``TILE_LOCAL_FRAME``: the call's positions as int16 bins of ``TILE_LOCAL_FRAME_WIDTH`` and offsets in the
