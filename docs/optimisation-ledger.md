@@ -748,6 +748,8 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-device-pool](#tiled-device-pool) | The wavefront's row pool (and the alias window) on the device | `TileConfig(state="device", alias_state=True, wavefront="on")` | FM | REJECTED (speed) | 2026-11-11 | 5060 Ti 975,560 atoms: against the host wavefront 1.012 / 0.994; against the plain device state 1.263 / 1.181 | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-device-alias](#tiled-device-alias) | The aliased state on the device (x and sc only; dE/dx in a planned window) | `TileConfig(state="device", alias_state=True)` | FM | MEASURED (opt-in; capacity lever, not a default) | 2026-11-11 | device state 4.99 → 2.52 GB at 975,560 atoms; 1.034 / 1.021 slower (5060 Ti) | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-heap-trim](#tiled-heap-trim) | `malloc_trim(0)` after the kept lists are dropped or the list cache cleared | `tiled.TILE_HEAP_TRIM` | FM | DEFAULT (memory only) | 2026-11-11 | 7.0 GiB forced drop at 20.1M atoms: resident 8.11 → 5.48 GiB (trimmed 5.37); A100 397.5M: A100PENDING | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
+| [tiled-compiled-graphs-guard](#tiled-compiled-graphs-guard) | Compiled tile bodies in CUDA graphs behind a memory guard; the RTX 5060 Ti twin of the A100's A/B | `TileConfig.compiled_graphs` (None: `COMPILED_GRAPH_GPUS`) | FM | MEASURED (5060 Ti: no gain, stays off; A100 and Ada pending) | 2026-11-11 | 5060 Ti 30³ 1.007 / 0.990, 40³ 0.998 (on) / 1.004 (guard off), 50³ guard off; A100 0.569 / 0.571 | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
+| [tiled-local-frame](#tiled-local-frame) | Tile edge vectors from tile-local float64-built positions (idea 11, accuracy) | `tiled.TILE_LOCAL_FRAME` | FM | MEASURED (accuracy; gate and A/B pending) | 2026-11-11 | perfect SrTiO3 6³ at +1,500 Å: largest force 1.33e-3 → 4.1e-6 eV/Å (the 149M/320M records' 1.32e-3) | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-malloc-mmap](#tiled-malloc-mmap) | glibc mmap threshold 1 MiB for capacity runs | `MALLOC_MMAP_THRESHOLD_` (environment) | FM | MEASURED (environment, not code) | 2026-11-09 | process peak -7 % at 10M atoms; calls within 1 % | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 
 <a id="tiled-prefetch-device"></a>
@@ -886,6 +888,24 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - What: x and sc on the device with dE/dsc in sc's rows and dE/dx in x's rows once an atom is closed, its sum until then in a window whose rows are planned after sweep 1 (`_State._plan_slots`): two of the four state tensors.
 - Status: MEASURED. Device state 4.99 → 2.52 GB at 975,560 SrTiO3 atoms (about 2.6 kB/atom less); 1.034 / 1.021 slower on the RTX 5060 Ti (job 43). Bitwise the plain device state on CPU. A capacity lever for device state near its limit (the Ada and the 5060 Ti hold 3–5M atoms in device state); no automatic choice yet.
 - Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`devalias/`).
+
+<a id="tiled-compiled-graphs-guard"></a>
+#### tiled-compiled-graphs-guard: CUDA graphs for compiled tiles behind a memory guard
+- Switch: `TileConfig.compiled_graphs` (None: on for `COMPILED_GRAPH_GPUS`, empty until the A/Bs; True / False)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed, after the nsys profile of the A100 call)
+- What: the first compiled call runs uncaptured and measures its tile workspace; the bodies are captured from the next call only where one capture pool per slot and the warm-ups fit (`compiled_graphs_fit`, x1.1); more slots later check again; a captured call that runs out of memory drops its graphs and runs again.
+- Status: MEASURED. A100-SXM4-80GB 0.569 / 0.571 at 975,560 atoms (Alex 4981483); RTX 5060 Ti 30³ 1.007 / 0.990 and 40³ 0.998 with graphs on (not launch-bound there: stays off), 40³ ba and 50³ guard off; local job 46 (unguarded, 1M on the 16 GB card) preceded the PC's 07:29 bugcheck on 11 November. A100 gate (Alex 4982466) and the Ada A/B (murphy) pending.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`cgab-a100/`, `cg-5060ti-job49/`).
+
+<a id="tiled-local-frame"></a>
+#### tiled-local-frame: tile-local coordinates for the edge vectors (idea 11)
+- Switch: `fastmace.model.tiled.TILE_LOCAL_FRAME` (default False until the gate and the A/B)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled ideas, round 2, idea 11)
+- What: each tile's float32 node rows built in float64 relative to its first receiver, each halo row at its edge's periodic image, the edge keeping only the remaining shift; for positions on the host, int16 bins of 32 Å and float32 offsets.
+- Status: MEASURED (accuracy). Traced: the float32 positions carry the residual (edges inside the box carry it all; the shifts add at most half the box's float32 spacing). Perfect SrTiO3 6³, RTX 5060 Ti, OMAT-0 medium float32: largest force at +1,500 Å 1.33e-3 → 4.1e-6 eV/Å, at +200 Å 8.3e-5 → 4.0e-6; rattled forces within 3.0e-5 eV/Å of the origin run. The whole-system path carries 4.3x its origin residual at +200 Å: same treatment in progress.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`idea11-gpu-job50/`, `jobs/idea11_vectors.py`).
 
 <a id="tiled-heap-trim"></a>
 #### tiled-heap-trim: return dropped kept lists to the system
