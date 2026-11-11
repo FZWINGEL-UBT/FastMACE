@@ -440,7 +440,7 @@ def test_warm_vm_gets_only_the_cache_parts_it_lacks_and_marks_its_own(tmp_path, 
     first = fc.run_job(args, FakeColab())  # store part 000
     fc.run_job(args, FakeColab(cache_changed=True))  # store part 001
     key = first["cache_key"]
-    warm = _job_args(tmp_path)
+    warm = fc.argparse.Namespace(**vars(args))
     warm.session, warm.reuse, warm.keep, warm.warm = "fm-g4-warm", True, True, True
     colab = FakeColab(live=("fm-g4-warm",), parts=(f"{key}/000.tar.gz", "sm80-py310-other/001.tar.gz"))
     record = fc.run_job(warm, colab)
