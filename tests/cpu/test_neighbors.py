@@ -384,11 +384,17 @@ def test_edge_index_int32_stores_the_same_edges(chunked, monkeypatch):
     count = int(narrow.count)
     index, _, _ = narrow.edges(count)
     assert index.dtype == torch.int32 and index.shape == (2, count)
-    assert make(atoms, edge_index_int32="off").edge_index.dtype == torch.int64
+
+    def dtype(toggle):
+        nl = make(atoms, sort=True, edge_index_int32=toggle)
+        nl.build_gpu(positions)  # the buffers exist from the first build
+        return nl.edge_index.dtype
+
+    assert dtype("off") == torch.int64
     monkeypatch.setattr(skin, "EDGE_INDEX_INT32", False)
-    assert make(atoms, edge_index_int32="on").edge_index.dtype == torch.int64
+    assert dtype("on") == torch.int64
     monkeypatch.setattr(skin, "EDGE_INDEX_INT32", True)
-    assert make(atoms, edge_index_int32="off").edge_index.dtype == torch.int32
+    assert dtype("off") == torch.int32
 
 
 def test_sort_by_length_is_off_by_default_and_needs_sort_receivers(monkeypatch):
