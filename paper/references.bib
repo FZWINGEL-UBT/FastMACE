@@ -1,6 +1,11 @@
-% Bibliography for the FastMACE preprint draft (11 November 2026).
-% Entries marked VERIFIED were checked against the arXiv abstract page on 11 November 2026.
-% The others are from memory and must be checked before submission.
+% Bibliography for the FastMACE preprint draft (revised 11 November 2026).
+%
+% Status marks, one per entry:
+%   VERIFIED    checked on 11 November 2026 against a primary page (arXiv abstract page, publisher page,
+%               Crossref record, PMLR page, or the project's own repository).
+%   SECONDARY   fields agree between two independent secondary sources (for example another paper's reference
+%               list and a project README), but the publisher page could not be read.
+%   UNVERIFIED  from memory or from one secondary source only. Check before submission.
 
 @inproceedings{batatia2022mace,
   title     = {{MACE}: Higher Order Equivariant Message Passing Neural Networks for Fast and Accurate Force Fields},
@@ -9,30 +14,41 @@
   year      = {2022},
   note      = {arXiv:2206.07697}
 }
-% VERIFIED
+% VERIFIED (arXiv abstract page)
 
 @article{batatia2023foundation,
   title   = {A foundation model for atomistic materials chemistry},
-  author  = {Batatia, Ilyes and others},
-  journal = {arXiv preprint arXiv:2401.00096},
-  year    = {2023}
+  author  = {Batatia, Ilyes and Benner, Philipp and Chiang, Yuan and Elena, Alin M. and Kov{\'a}cs, D{\'a}vid P. and Riebesell, Janosh and Advincula, Xavier R. and Asta, Mark and Avaylon, Matthew and Baldwin, William J. and others},
+  journal = {The Journal of Chemical Physics},
+  volume  = {163},
+  pages   = {184110},
+  year    = {2025},
+  doi     = {10.1063/5.0297006},
+  note    = {arXiv:2401.00096}
 }
+% Authors, title and arXiv id: VERIFIED (arXiv abstract page, 88 authors, first ten listed).
+% Journal, volume, article number and DOI: SECONDARY (reference list of arXiv:2610.01036 and the Symmetrix README).
 
 @article{barroso2024omat24,
   title   = {Open Materials 2024 ({OMat24}) Inorganic Materials Dataset and Models},
-  author  = {Barroso-Luque, Luis and others},
+  author  = {Barroso-Luque, Luis and Shuaibi, Muhammed and Fu, Xiang and Wood, Brandon M. and Dzamba, Misko and Gao, Meng and Rizvi, Ammar and Zitnick, C. Lawrence and Ulissi, Zachary W.},
   journal = {arXiv preprint arXiv:2410.12771},
   year    = {2024}
 }
+% VERIFIED (arXiv abstract page). arXiv:2610.01036 cites a journal version (Nature Computational Science 6,
+% 642-652, 2026, doi 10.1038/s43588-026-00996-w); that is UNVERIFIED and not used here.
 
 @article{drautz2019ace,
   title   = {Atomic cluster expansion for accurate and transferable interatomic potentials},
   author  = {Drautz, Ralf},
   journal = {Physical Review B},
   volume  = {99},
+  number  = {1},
   pages   = {014104},
-  year    = {2019}
+  year    = {2019},
+  doi     = {10.1103/PhysRevB.99.014104}
 }
+% VERIFIED (APS page)
 
 @article{geiger2022e3nn,
   title   = {e3nn: Euclidean Neural Networks},
@@ -40,50 +56,66 @@
   journal = {arXiv preprint arXiv:2207.09453},
   year    = {2022}
 }
+% VERIFIED (arXiv abstract page)
 
 @article{batzner2022nequip,
   title   = {E(3)-equivariant graph neural networks for data-efficient and accurate interatomic potentials},
   author  = {Batzner, Simon and Musaelian, Albert and Sun, Lixin and Geiger, Mario and Mailoa, Jonathan P. and Kornbluth, Mordechai and Molinari, Nicola and Smidt, Tess E. and Kozinsky, Boris},
   journal = {Nature Communications},
   volume  = {13},
+  number  = {1},
   pages   = {2453},
-  year    = {2022}
+  year    = {2022},
+  doi     = {10.1038/s41467-022-29939-5}
 }
+% VERIFIED (the NequIP repository's CITATION.bib; DOI and authors match arXiv:2101.03164)
 
 @inproceedings{musaelian2023scaling,
   title     = {Scaling the Leading Accuracy of Deep Equivariant Models to Biomolecular Simulations of Realistic Size},
   author    = {Musaelian, Albert and Johansson, Anders and Batzner, Simon and Kozinsky, Boris},
   booktitle = {Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis (SC '23)},
-  year      = {2023}
+  year      = {2023},
+  doi       = {10.1145/3581784.3627041}
 }
+% UNVERIFIED: the ACM page could not be read. DOI and author order are from the NequIP README; the same
+% repository's CITATION.bib lists the authors in a different order.
 
-@article{bharadwaj2025oeq,
-  title   = {An Efficient Sparse Kernel Generator for {O(3)}-Equivariant Deep Networks},
-  author  = {Bharadwaj, Vivek and Glover, Austin and Buluc, Aydin and Demmel, James},
-  journal = {arXiv preprint arXiv:2501.13986},
-  year    = {2025}
+@inproceedings{bharadwaj2025oeq,
+  title     = {An Efficient Sparse Kernel Generator for {O(3)}-Equivariant Deep Networks},
+  author    = {Bharadwaj, Vivek and Glover, Austin and Buluc, Aydin and Demmel, James},
+  booktitle = {Proceedings of the SIAM Conference on Applied and Computational Discrete Algorithms (ACDA25)},
+  year      = {2025},
+  note      = {arXiv:2501.13986}
 }
+% VERIFIED (arXiv abstract page and the OpenEquivariance README). Pages and DOI not confirmed.
+% arXiv:2610.01036 prints a different venue (PASC) with doi 10.1137/1.9781611979084.3; the SIAM venue is the one
+% the arXiv comment and the project's README give.
 
 @misc{cuequivariance,
-  title        = {{cuEquivariance}: accelerated equivariant operations},
-  author       = {{NVIDIA Corporation}},
-  howpublished = {Software and documentation},
-  year         = {2025}
+  title        = {{cuEquivariance}},
+  author       = {{NVIDIA}},
+  howpublished = {Software, \url{https://github.com/NVIDIA/cuEquivariance}},
+  year         = {2026},
+  note         = {Version 0.12.0 used here}
 }
+% VERIFIED (repository page; the project names no paper to cite)
 
 @misc{cutlass,
-  title        = {{CUTLASS}: {CUDA} Templates for Linear Algebra Subroutines},
-  author       = {{NVIDIA Corporation}},
+  title        = {{CUTLASS}},
+  author       = {Thakkar, Vijay and Ramani, Pradeep and Cecka, Cris and Shivam, Aniket and Lu, Honghao and Yan, Ethan and Kosaian, Jack and Hoemmen, Mark and Wu, Haicheng and Kerr, Andrew and Nicely, Matt and Merrill, Duane and Blasig, Dustyn and Atluri, Aditya and Qiao, Fengqi and Majcher, Piotr and Springer, Paul and Hohnerbach, Markus and Wang, Jin and Gupta, Manish},
   howpublished = {Software, \url{https://github.com/NVIDIA/cutlass}},
-  year         = {2025}
+  year         = {2023},
+  note         = {Version 4.8.1 used here}
 }
+% VERIFIED (the repository's CITATION.cff, which is dated 2023 and names version 3.0.0)
 
 @misc{cudagraphs,
   title        = {{CUDA} {C++} Programming Guide: {CUDA} Graphs},
-  author       = {{NVIDIA Corporation}},
-  howpublished = {Documentation},
+  author       = {{NVIDIA}},
+  howpublished = {Documentation, \url{https://docs.nvidia.com/cuda/cuda-c-programming-guide/}},
   year         = {2026}
 }
+% VERIFIED (table of contents of the guide; the subsection itself was not read)
 
 @article{ootomo2022tf32,
   title   = {Recovering single precision accuracy from Tensor Cores while surpassing the {FP32} theoretical peak performance},
@@ -92,8 +124,10 @@
   volume  = {36},
   number  = {4},
   pages   = {475--491},
-  year    = {2022}
+  year    = {2022},
+  doi     = {10.1177/10943420221090256}
 }
+% VERIFIED (Crossref record)
 
 @article{fasi2021tensorcores,
   title   = {Numerical behavior of {NVIDIA} tensor cores},
@@ -101,8 +135,10 @@
   journal = {PeerJ Computer Science},
   volume  = {7},
   pages   = {e330},
-  year    = {2021}
+  year    = {2021},
+  doi     = {10.7717/peerj-cs.330}
 }
+% VERIFIED (Crossref record)
 
 @article{lu2022dpcompress,
   title   = {{DP} Compress: A Model Compression Scheme for Generating Efficient Deep Potential Models},
@@ -111,8 +147,10 @@
   volume  = {18},
   number  = {9},
   pages   = {5559--5567},
-  year    = {2022}
+  year    = {2022},
+  doi     = {10.1021/acs.jctc.2c00102}
 }
+% VERIFIED (Crossref record)
 
 @inproceedings{ansel2024pytorch2,
   title     = {{PyTorch} 2: Faster Machine Learning Through Dynamic {Python} Bytecode Transformation and Graph Compilation},
@@ -120,6 +158,7 @@
   booktitle = {Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS '24)},
   year      = {2024}
 }
+% UNVERIFIED: the ACM page could not be read.
 
 @inproceedings{tillet2019triton,
   title     = {Triton: an intermediate language and compiler for tiled neural network computations},
@@ -127,15 +166,19 @@
   booktitle = {Proceedings of the 3rd ACM SIGPLAN International Workshop on Machine Learning and Programming Languages (MAPL)},
   year      = {2019}
 }
+% UNVERIFIED: the ACM page could not be read.
 
 @article{larsen2017ase,
   title   = {The atomic simulation environment---a {Python} library for working with atoms},
-  author  = {Larsen, Ask Hjorth and others},
+  author  = {Larsen, Ask Hjorth and Mortensen, Jens J{\o}rgen and Blomqvist, Jakob and Castelli, Ivano E. and Christensen, Rune and Du{\l}ak, Marcin and Friis, Jesper and Groves, Michael N. and Hammer, Bj{\o}rk and Hargus, Cory and others},
   journal = {Journal of Physics: Condensed Matter},
   volume  = {29},
+  number  = {27},
   pages   = {273002},
-  year    = {2017}
+  year    = {2017},
+  doi     = {10.1088/1361-648X/aa680e}
 }
+% VERIFIED (IOP page; 35 authors, first ten listed)
 
 @article{thompson2022lammps,
   title   = {{LAMMPS} - a flexible simulation tool for particle-based materials modeling at the atomic, meso, and continuum scales},
@@ -143,17 +186,23 @@
   journal = {Computer Physics Communications},
   volume  = {271},
   pages   = {108171},
-  year    = {2022}
+  year    = {2022},
+  doi     = {10.1016/j.cpc.2021.108171}
 }
+% SECONDARY: the same details are printed in the reference list of arXiv:2610.01036; the publisher page could
+% not be read.
 
 @article{verlet1967,
   title   = {Computer ``Experiments'' on Classical Fluids. {I}. Thermodynamical Properties of {Lennard-Jones} Molecules},
   author  = {Verlet, Loup},
   journal = {Physical Review},
   volume  = {159},
+  number  = {1},
   pages   = {98--103},
-  year    = {1967}
+  year    = {1967},
+  doi     = {10.1103/PhysRev.159.98}
 }
+% VERIFIED (Crossref record)
 
 @book{trefethen2013atap,
   title     = {Approximation Theory and Approximation Practice},
@@ -161,6 +210,7 @@
   publisher = {SIAM},
   year      = {2013}
 }
+% UNVERIFIED: the SIAM page could not be read.
 
 @article{chorosajev2026sobek,
   title   = {Sobek: Streaming Equivariant Tensor Product Convolutions},
@@ -168,14 +218,16 @@
   journal = {arXiv preprint arXiv:2607.18074},
   year    = {2026}
 }
-% VERIFIED
+% VERIFIED (arXiv abstract page)
 
 @misc{fuchs2026oeqpr223,
   title        = {Add receiver-streaming {UVU} convolution kernel},
   author       = {Fuchs, Paul},
-  howpublished = {OpenEquivariance pull request 223},
+  howpublished = {OpenEquivariance pull request 223, \url{https://github.com/PASSIONLab/OpenEquivariance/pull/223}},
   year         = {2026}
 }
+% VERIFIED (pull-request page: title, year, state open). The page shows the GitHub user name pl-fuchs, not the
+% full name.
 
 @article{fu2026symmetrixxl,
   title   = {Train for Accuracy, Execute at Scale: Architecture-Preserving Inference for Equivariant Atomistic Foundation Models},
@@ -183,7 +235,15 @@
   journal = {arXiv preprint arXiv:2610.01036},
   year    = {2026}
 }
-% VERIFIED
+% VERIFIED (arXiv abstract page; the full text was read as the arXiv HTML on 11 November 2026)
+
+@misc{witt2026symmetrix,
+  title        = {Symmetrix},
+  author       = {Witt, William C.},
+  howpublished = {Software, \url{https://github.com/wcwitt/symmetrix}},
+  year         = {2026}
+}
+% VERIFIED (repository page)
 
 @misc{torchsim,
   title        = {{TorchSim}: an atomistic simulation engine in {PyTorch}},
@@ -191,10 +251,113 @@
   howpublished = {Software, package \texttt{torch-sim-atomistic}, version 0.6.2},
   year         = {2026}
 }
+% UNVERIFIED: no primary page was reached. Add the project's preferred citation.
 
 @misc{alchemi,
   title        = {{ALCHEMI} Toolkit},
-  author       = {{NVIDIA Corporation}},
+  author       = {{NVIDIA}},
   howpublished = {Software, version 0.2.0},
   year         = {2026}
 }
+% UNVERIFIED: no primary page was reached. Add the project's preferred citation.
+
+@inproceedings{lee2025flashtp,
+  title     = {{FlashTP}: Fused, Sparsity-Aware Tensor Product for Machine Learning Interatomic Potentials},
+  author    = {Lee, Seung Yul and Kim, Hojoon and Park, Yutack and Jeong, Dawoon and Han, Seungwu and Park, Yeonhong and Lee, Jae W.},
+  booktitle = {Proceedings of the 42nd International Conference on Machine Learning},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {267},
+  pages     = {33143--33156},
+  year      = {2025}
+}
+% VERIFIED (PMLR page)
+
+@article{fuchs2025chemtraindeploy,
+  title   = {chemtrain-deploy: A parallel and scalable framework for machine learning potentials in million-atom {MD} simulations},
+  author  = {Fuchs, Paul and Chen, Weilong and Thaler, Stephan and Zavadlav, Julija},
+  journal = {arXiv preprint arXiv:2506.04055},
+  year    = {2025}
+}
+% VERIFIED (arXiv abstract page)
+
+@article{tan2026nequip,
+  title   = {High-performance training and inference for deep equivariant interatomic potentials},
+  author  = {Tan, Chuin Wei and Descoteaux, Marc L. and Kotak, Mit and de Miranda Nascimento, Gabriel and Kavanagh, Se{\'a}n R. and Zichi, Laura and Wang, Menghang and Saluja, Aadit and Hu, Yizhong R. and Smidt, Tess and Johansson, Anders and Witt, William C. and Kozinsky, Boris and Musaelian, Albert},
+  journal = {Digital Discovery},
+  year    = {2026},
+  doi     = {10.1039/D5DD00423C},
+  note    = {arXiv:2504.16068}
+}
+% Authors, title and arXiv id: VERIFIED (arXiv abstract page). Journal and DOI: SECONDARY (the NequIP
+% repository's CITATION.bib and the reference list of arXiv:2610.01036).
+
+@article{kavanagh2026fast,
+  title   = {Fast and Accurate Equivariant Foundation Models for Atomistic Simulation},
+  author  = {Kavanagh, Se{\'a}n R. and Tan, Chuin Wei and Wang, Menghang and Descoteaux, Marc L. and de Miranda Nascimento, Gabriel and Unneberg, Ulrik and Zichi, Laura and Libbi, Francesco and Rivano, Norma and Glover, Austin and Bharadwaj, Vivek and Johansson, Anders and Witt, William C. and Musaelian, Albert and Kozinsky, Boris},
+  journal = {arXiv preprint arXiv:2607.28461},
+  year    = {2026}
+}
+% VERIFIED (arXiv abstract page)
+
+@article{park2024scalable,
+  title   = {Scalable Parallel Algorithm for Graph Neural Network Interatomic Potentials in Molecular Dynamics Simulations},
+  author  = {Park, Yutack and Kim, Jaesun and Hwang, Seungwoo and Han, Seungwu},
+  journal = {Journal of Chemical Theory and Computation},
+  volume  = {20},
+  number  = {11},
+  pages   = {4857--4868},
+  year    = {2024},
+  doi     = {10.1021/acs.jctc.4c00190}
+}
+% VERIFIED (Crossref record)
+
+@article{johansson2025lammpskokkos,
+  title   = {{LAMMPS-KOKKOS}: Performance Portable Molecular Dynamics Across Exascale Architectures},
+  author  = {Johansson, Anders and Weinberg, Evan and Trott, Christian R. and McCarthy, Megan J. and Moore, Stan G.},
+  journal = {arXiv preprint arXiv:2508.13523},
+  year    = {2025}
+}
+% VERIFIED (arXiv abstract page). Proceedings venue and pages not confirmed.
+
+@article{kovacs2025maceoff,
+  title   = {{MACE-OFF}: Short-Range Transferable Machine Learning Force Fields for Organic Molecules},
+  author  = {Kov{\'a}cs, D{\'a}vid P{\'e}ter and Moore, J. Harry and Browning, Nicholas J. and Batatia, Ilyes and Horton, Joshua T. and Pu, Yixuan and Kapil, Venkat and Witt, William C. and Magd{\u{a}}u, Ioan-Bogdan and Cole, Daniel J. and Cs{\'a}nyi, G{\'a}bor},
+  journal = {Journal of the American Chemical Society},
+  volume  = {147},
+  number  = {21},
+  pages   = {17598--17611},
+  year    = {2025},
+  doi     = {10.1021/jacs.4c07099},
+  note    = {arXiv:2312.15211}
+}
+% Authors, title and arXiv id: VERIFIED (arXiv abstract page). Journal fields: SECONDARY (reference list of
+% arXiv:2610.01036 and the Symmetrix README).
+
+@article{batatia2025mh1,
+  title   = {Cross Learning between Electronic Structure Theories for Unifying Molecular, Surface, and Inorganic Crystal Foundation Force Fields},
+  author  = {Batatia, Ilyes and Lin, Chen and Hart, Joseph and Kasoar, Elliott and Elena, Alin M. and Norwood, Sam Walton and Wolf, Thomas and Cs{\'a}nyi, G{\'a}bor},
+  journal = {arXiv preprint arXiv:2510.25380},
+  year    = {2025}
+}
+% VERIFIED (arXiv abstract page; the model card of MACE-MH-1 cites this paper)
+
+@article{riebesell2025matbench,
+  title   = {Matbench Discovery -- A framework to evaluate machine learning crystal stability predictions},
+  author  = {Riebesell, Janosh and Goodall, Rhys E. A. and Benner, Philipp and Chiang, Yuan and Deng, Bowen and Ceder, Gerbrand and Asta, Mark and Lee, Alpha A. and Jain, Anubhav and Persson, Kristin A.},
+  journal = {arXiv preprint arXiv:2308.14920},
+  year    = {2023}
+}
+% VERIFIED (arXiv abstract page). arXiv:2610.01036 cites a journal version (Nature Machine Intelligence 7,
+% 836-847, 2025); that is UNVERIFIED and not used here.
+
+@article{fan2022gpumd,
+  title   = {{GPUMD}: A package for constructing accurate machine-learned potentials and performing highly efficient atomistic simulations},
+  author  = {Fan, Zheyong and Wang, Yanzhou and Ying, Penghua and Song, Keke and Wang, Junjie and Wang, Yong and Zeng, Zezhu and Xu, Ke and Lindgren, Eric and Rahm, J. Magnus and others},
+  journal = {The Journal of Chemical Physics},
+  volume  = {157},
+  number  = {11},
+  pages   = {114801},
+  year    = {2022},
+  doi     = {10.1063/5.0106617}
+}
+% VERIFIED (Crossref record; 20 authors, first ten listed)
