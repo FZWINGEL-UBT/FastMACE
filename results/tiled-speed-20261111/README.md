@@ -114,3 +114,31 @@ both orders (`jobs/job41.sh`, `jobs/job43.sh`):
 The host copies were not the wavefront's cost any more (the copy stream and the host worker hide them); its plan is
 (100 tiles with the boundary skins against 68 and a pool of 91 % of the atoms at this size). The aliased device
 state halves the device state for 2–3 %: an opt-in capacity lever, not a default. Records: `devpool/`, `devalias/`.
+
+## CUDA graphs for the compiled tiles on the A100 (`TileConfig.compiled_graphs`)
+
+nsys put the A100's idle time in the host's compiled tile bodies and the autograd engine, which
+`TileConfig.compiled_graphs` (opt-in since `fe7b0a7b`, 3 November) replays from CUDA graphs. It had never run beside
+uncaptured calls, and the A/B, whose sides alternate on one tiled field with their own globals, found two bugs:
+
+- Alex 4981422 (69a48049): a capture after every slot's graphs had been dropped by a new graph key reused the private
+  pool that PyTorch releases with its last graph (`CUDACachingAllocator` assertion `use_count > 0`). Fixed in
+  35bcd4ab: a new pool handle once no graph holds the old one, and the graph key checked only in calls that capture.
+- Alex 4981467 (35bcd4ab): an uncaptured call replaces `slot["out"]`, and a later replay's scatter found no outputs
+  (`KeyError`). Fixed in d7d9e7ce: the graphs' outputs live in `slot["graph_out"]`, and `slot["out"]` points at them
+  after each replay.
+
+Both are covered by `tests/gpu/test_tiled_speed_cuda.py::test_compiled_graphs_alternate_with_uncaptured_calls`.
+
+A/B (Alex 4981483, d7d9e7ce, A100-SXM4-80GB, 975,560 SrTiO3 atoms, device state, compiled tiles, R 16,384 budget,
+off against on in one process, 4 blocks of 2 calls, `jobs/alex_cgab.sh`; records `cgab-a100/`):
+
+| order | off (s) | on (s) | on / off | pair ratios |
+| --- | ---: | ---: | ---: | --- |
+| ab | 3.589 | 2.042 | 0.569 | 0.566-0.570 |
+| ba | 3.561 | 2.035 | 0.571 | 0.568-0.573 |
+
+3.68 → 2.09 µs/atom (the whole-system call: 1.96); the host's time in the tile loop 3.43 → 1.50 s. Energy within
+6e-8 meV/atom, forces within 3.8e-6 eV/Å of a largest 1.7e-4 (the atomics' order, as between two calls). The
+default (with a memory guard: the graphs keep private pools; the 16 GB A4000 ran out of memory in the first call at
+R 8,192 on 3 November) follows in its own merge request after the gate (Alex 4981512) and the 5060 Ti and Ada A/Bs.
