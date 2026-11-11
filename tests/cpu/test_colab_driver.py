@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import re
+import os
 import subprocess
 import tarfile
 from datetime import datetime, timezone
@@ -119,10 +120,13 @@ def test_ledger_header_once_and_rows(tmp_path):
 def _git_repo(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
-    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    # Independent of the machine's git configuration (murphy: no global identity, config exited 128): no global or
+    # system config, the identity on the command line.
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+    run = lambda *a: subprocess.run(  # noqa: E731
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "-C", str(repo), *a], check=True, capture_output=True,
+        env=env)
     run("init", "-q")
-    run("config", "user.email", "t@t")
-    run("config", "user.name", "t")
     (repo / "a.txt").write_text("one\n")
     run("add", "a.txt")
     run("commit", "-q", "-m", "one")
