@@ -159,3 +159,94 @@ def test_composed_rotation_is_applied_in_float64():
     w, w_t = compose_skip.composed(right, ws, None, rotation)
     assert torch.equal(w, (rotation @ (right.double()[None] @ ws.double())).float())
     assert torch.equal(w_t, w.transpose(1, 2))
+
+
+class _FarChain(_Chain):
+    """48 compact bumps centred beyond R_FAR: the far band needs about 48 directions, more than 32."""
+
+    def __init__(self):
+        super().__init__()
+        self.centres = torch.linspace(3.4, 5.6, 48, dtype=torch.float64)
+
+
+def test_setup_certificate_fails_loudly_when_a_table_needs_more_far_columns():
+    module = radial._table_module(radial.fit(_FarChain(), [(0, 0)], R_MAX), [0], torch.device("cpu"))
+    assert not nested.install(module)
+    assert max(module.nested_errors[0]) > nested.TOLERANCE
+    assert not hasattr(module, "nested_coef")
+    with pytest.raises(RuntimeError, match="need more than 32 far columns"):
+        nested.require(module)
+    with pytest.raises(RuntimeError):
+        nested.activate(module)
+
+
+def test_activate_holds_one_table_and_release_restores_the_plain_rows():
+    module = radial._table_module(radial.fit(_Chain(), [(0, 0)], R_MAX), [0], torch.device("cpu"))
+    plain = {name: getattr(module, name).clone() for name in ("coef", "dcoef", "pcoef")}
+    assert nested.install(module)
+    rotated = module.nested_coef.clone()
+    nested.activate(module)
+    assert torch.equal(module.coef, rotated) and not hasattr(module, "nested_coef")
+    assert not hasattr(module, "nested_dcoef") and not hasattr(module, "nested_pcoef")
+    r = torch.tensor([[1.5]])
+    with pytest.raises(RuntimeError, match="split walks"):
+        module(r, torch.ones(2, 1), torch.zeros(2, 1, dtype=torch.long))
+    holder = SimpleNamespace(radial_table=module, first_reassociation=None)
+    nested.release([holder])
+    for name, value in plain.items():
+        assert torch.equal(getattr(module, name), value)
+    assert not module.nested_active and not hasattr(module, "nested_ok")
+
+
+def test_whole_system_and_tiled_calls_agree_with_nested_on(monkeypatch):
+    from fastmace.rewrites.generic import modules as gm
+
+    module = radial._table_module(radial.fit(_Chain(1), [(0, 0)], R_MAX), [0], torch.device("cpu"))
+    g = torch.Generator().manual_seed(4)
+    c, nodes, edges = 3, 6, 60
+    dim = sum(2 * l + 1 for l in LS)  # noqa: E741
+    columns = torch.tensor([0])
+    attrs = torch.ones(nodes, 1)
+    x = torch.randn(1, c, generator=g)
+    reassociation = FirstInteractionReassociation(columns, c, LS, (1.0, 0.7), ir_mul=True, species_feats=x,
+                                                  segmented=True)
+    segments, linear_segments, offset = [], [], 0
+    for l in LS:  # noqa: E741
+        segments.append((offset, c, c * (2 * l + 1)))
+        linear_segments.append((offset, c, 2 * l + 1))
+        offset += c * (2 * l + 1)
+    skip = SpeciesSkip(columns, segments, segments, [(k, k, torch.randn(1, c, c, generator=g)) for k in range(2)],
+                       "ir_mul")
+    linear = BlockLinear(torch.nn.Identity(), torch.nn.Identity(), linear_segments, linear_segments,
+                         [(k, k, torch.randn(c, c, generator=g)) for k in range(len(LS))])
+    holder = SimpleNamespace(generic_kind="density", first_reassociation=reassociation, linear=linear, skip_tp=skip,
+                             radial_table=module,
+                             radial_last=SimpleNamespace(weight=torch.randn(64, len(LS) * c, generator=g), h_in=1.0,
+                                                         var_in=1.0, var_out=1.0))
+    products = compose_skip_products(holder)
+    reassociation.compose_skip = (linear, products[0], skip, products[1])
+    monkeypatch.setattr(gm, "fused_first_applies", lambda *args, **kwargs: True)
+    receiver = torch.sort(torch.randint(0, nodes, (edges,), generator=g)).values
+    sender = torch.randint(0, nodes, (edges,), generator=g)
+    edge_index = torch.stack([sender, receiver])
+    r = 0.8 + 5.0 * torch.rand((edges, 1), generator=g)
+    edge_attrs = torch.randn(edges, dim, generator=g)
+
+    def call(rows=None):
+        return gm.fused_first_message(holder, r, None, attrs, edge_attrs, edge_index, rows=rows)
+
+    whole, density = call()
+    tiled, tiled_density = call(rows=nodes)
+    assert nested.install(module)
+    reassociation.nested_rotation = nested.rotation(module, 1, 1)
+    nested.activate(module)
+    nested_whole, nested_density = call()
+    scale = whole.abs().max()
+    assert (nested_whole - whole).abs().max() <= 1e-5 * scale  # the rotation round trip in float32 (no truncation)
+    assert torch.equal(nested_density, density)
+    with pytest.raises(RuntimeError, match="whole-system"):
+        call(rows=nodes)  # the tiled path releases first
+    nested.release([holder])
+    again, again_density = call(rows=nodes)
+    assert torch.equal(again, tiled) and torch.equal(again_density, tiled_density)
+    assert torch.equal(call()[0], whole)

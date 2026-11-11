@@ -178,13 +178,15 @@ def fused_first_message(self, edge_feats, node_feats, node_attrs, edge_attrs, ed
     width = weight.shape[-1]
     pair = table.pair(node_attrs, edge_index)
     density = []
-    # rewrites.radial.nested: the rotated table and the split walks where the products compose its map (every row)
-    nested = (rows is None and getattr(reassociation, "nested_rotation", None) is not None
-              and getattr(reassociation, "compose_skip", None) is not None and getattr(table, "nested_ok", False)
-              and width == table.nested_map.shape[-1])
+    # rewrites.radial.nested: the table's rows are the rotated ones (nested.activate), read by the split walks; the
+    # products compose the map, on every row (the tiled path releases the nested tables first)
+    nested = getattr(table, "nested_active", False)
+    if nested and (rows is not None or getattr(reassociation, "nested_rotation", None) is None
+                   or getattr(reassociation, "compose_skip", None) is None):
+        raise RuntimeError("NESTED_RADIAL tables serve the composed whole-system call only (nested.release first)")
     if nested:
-        coef, dcoef, pcoef, packed, ppacked, r_far = (table.nested_coef, table.nested_dcoef, table.nested_pcoef, None,
-                                                      None, table.nested_r_far)
+        coef, dcoef, pcoef, packed, ppacked, r_far = (table.coef, table.dcoef, table.pcoef, None, None,
+                                                      table.nested_r_far)
     else:
         coef, dcoef, pcoef, r_far = table.coef, table.dcoef, getattr(table, "pcoef", None), 0.0
         packed, ppacked = getattr(table, "coef_pairs", None), getattr(table, "pcoef_pairs", None)

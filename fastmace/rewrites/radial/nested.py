@@ -16,6 +16,9 @@ far width is fixed at ``FAR_COLUMNS`` (the kernel's half width); ``install`` ref
 projection error exceeds ``TOLERANCE``. Records: certificate 0.3011 against the production 0.3011 (OMAT-0 medium,
 Sr Ti O, every row at 32 far columns, far error at most 5.4e-8).
 
+Memory: ``activate`` swaps the rotated rows in, so the device holds one table; the tiled path (whose tile calls
+take the plain products, not the composed ones) calls ``release`` when it wraps a force field (``model.tiled``).
+
 Rounding class (a truncation under the radial certificate): the force/stress gate decides adoption.
 ``NESTED_RADIAL``: None: on for ``NESTED_RADIAL_GPUS``; True / False: an A/B side's choice. Read at build
 (``precision._route_compose_skip``), only where ``COMPOSE_SKIP`` runs and the tabled forward is on; with it the
@@ -110,6 +113,8 @@ def install(table, r_far=R_FAR):
 
     from fastmace.rewrites.radial import power_basis
 
+    if getattr(table, "nested_active", False):
+        return True
     if hasattr(table, "nested_ok"):
         return table.nested_ok
     coef = table.coef.detach().cpu().double()
@@ -147,6 +152,59 @@ def install(table, r_far=R_FAR):
     return True
 
 
+def require(table):
+    """``install``, raising where the table needs more than ``FAR_COLUMNS`` far columns (``NESTED_RADIAL`` forced
+    on): the rows and their far errors in the message."""
+    if install(table):
+        return
+    bad = {row: errors for row, errors in enumerate(table.nested_errors) if max(errors) > TOLERANCE}
+    raise RuntimeError(f"NESTED_RADIAL: {len(bad)} table rows need more than {FAR_COLUMNS} far columns at "
+                       f"{TOLERANCE:g} from {R_FAR} A (row: (value, slope) error): {bad}")
+
+
+PLAIN = ("coef", "dcoef", "pcoef", "coef_pairs", "pcoef_pairs")
+
+
+def activate(table):
+    """Make the installed rotated copies the table's own rows (``coef``, ``dcoef``, ``pcoef``; no packed copies) so
+    the device holds one table; the plain rows wait on the host for ``release``. A table read by anything but the
+    nested split walks refuses (``nested_active``)."""
+    if getattr(table, "nested_active", False):
+        return
+    if not install(table):
+        raise RuntimeError("nested.activate: the table has no nested copies (install refused it)")
+    table.nested_plain = {name: (None if getattr(table, name, None) is None else getattr(table, name).detach().cpu())
+                          for name in PLAIN}
+    for name, rotated in (("coef", "nested_coef"), ("dcoef", "nested_dcoef"), ("pcoef", "nested_pcoef")):
+        table.register_buffer(name, table._buffers.pop(rotated), persistent=False)
+    table.register_buffer("coef_pairs", None, persistent=False)
+    table.register_buffer("pcoef_pairs", None, persistent=False)
+    table.nested_active = True
+
+
+def release(modules):
+    """Undo ``activate`` on every interaction of ``modules`` (an iterable, e.g. ``model.modules()``): the plain rows
+    back on the table's device, no nested copies, ``nested_rotation`` cleared and the composed weights bound again
+    (the tiled path, whose tile calls take the plain products: ``model.tiled``)."""
+    for module in modules:
+        table, reassociation = getattr(module, "radial_table", None), getattr(module, "first_reassociation", None)
+        if table is not None and getattr(table, "nested_active", False):
+            device = table.starts.device
+            for name, plain in table.nested_plain.items():
+                table.register_buffer(name, None if plain is None else plain.to(device), persistent=False)
+            del table.nested_plain
+            table.nested_active = False
+            for name in ("nested_ok", "nested_r_far"):
+                table.__dict__.pop(name, None)
+            table._buffers.pop("nested_map", None)
+        if reassociation is not None and getattr(reassociation, "nested_rotation", None) is not None:
+            reassociation.nested_rotation = None
+            feats = reassociation._buffers.get("species_feats")
+            if (feats is not None and reassociation.compose_skip is not None
+                    and reassociation.compose_radial is not None):
+                reassociation.bind(feats)
+
+
 def rotation(table, receivers, senders):
     """``[receivers, senders * 64, senders * 64]`` float64 block-diagonal maps: block (z, z) of receiver species s is
     ``M`` of the row the table reads for edges z -> s (``table.pair``'s rule; superset indices)."""
@@ -165,5 +223,5 @@ def rotation(table, receivers, senders):
     return out
 
 
-__all__ = ["COLUMNS", "FAR_COLUMNS", "NESTED_RADIAL", "NESTED_RADIAL_GPUS", "R_FAR", "TOLERANCE", "basis", "install",
-           "nested_default", "rotation"]
+__all__ = ["COLUMNS", "FAR_COLUMNS", "NESTED_RADIAL", "NESTED_RADIAL_GPUS", "PLAIN", "R_FAR", "TOLERANCE", "activate",
+           "basis", "install", "nested_default", "release", "require", "rotation"]

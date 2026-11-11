@@ -234,6 +234,9 @@ def _table_module(tables, columns, device, single=False):
             folded input's leading ``columns`` only."""
             from fastmace.kernels.triton.radial_table import radial_table
 
+            if getattr(self, "nested_active", False):  # rewrites.radial.nested: the rows are rotated
+                raise RuntimeError("a NESTED_RADIAL table is read by the tabled outer sum's split walks only")
+
             return radial_table(lengths, self.pair(node_attrs, edge_index), self.coef, self.dcoef, self.starts,
                                 self.scales, self.bins, self.r_lo, self.bin_scale, self.r_max, density, columns)
 

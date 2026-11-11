@@ -91,8 +91,10 @@ def _route_compose_skip(model):
             continue
         reassociation.compose_skip = None
         reassociation.compose_radial = None
-        if hasattr(reassociation, "nested_rotation"):
-            reassociation.nested_rotation = None
+        if getattr(reassociation, "nested_rotation", None) is not None:  # routed again: the plain table back
+            from fastmace.rewrites.radial import nested
+
+            nested.release([module])
         reassociation.compose_joined = False
         reassociation.count_plan = False
         reassociation.joined_layout = False
@@ -125,12 +127,16 @@ def _route_nested(module, reassociation, device):
     import torch
 
     from fastmace.kernels.triton.tabled_outer_sum import tabled_forward
+    from fastmace.rewrites.generic import modules as gm
     from fastmace.rewrites.generic.modules import fc_last_weight
     from fastmace.rewrites.radial import nested
 
     if not hasattr(reassociation, "nested_rotation"):
         return
     if not nested.nested_default(torch.cuda.get_device_name(device)) or not tabled_forward(device):
+        return
+    # every whole-system call of the interaction must take the fused walk (fused_first_applies), the only reader
+    if gm.FIRST_FULL_ROWS or not reassociation.segmented or not gm.fused_first_backward(device):
         return
     table, last = getattr(module, "radial_table", None), getattr(module, "radial_last", None)
     skip = reassociation.compose_skip[2]
@@ -140,6 +146,8 @@ def _route_nested(module, reassociation, device):
     if (fc_last_weight(last).shape[-1] != nested.COLUMNS or table.columns.cpu().tolist() != columns
             or getattr(skip, "columns", None) is None or skip.columns.cpu().tolist() != columns):
         return
+    if nested.NESTED_RADIAL is True:
+        nested.require(table)  # forced on: a table that needs more far columns fails loudly
     if not nested.install(table):
         import logging
 
@@ -147,6 +155,7 @@ def _route_nested(module, reassociation, device):
         logging.getLogger(__name__).warning("NESTED_RADIAL refused: far error %s > %s", worst, nested.TOLERANCE)
         return
     reassociation.nested_rotation = nested.rotation(table, len(columns), len(columns))
+    nested.activate(table)  # one table on the device: the rotated rows
     worst = max(max(e) for e in table.nested_errors)
     print(f"fastmace: NESTED_RADIAL on ({table.coef.shape[0]} rows, far error {worst:.2e}, r_far {table.nested_r_far})",
           file=sys.stderr, flush=True)
