@@ -737,6 +737,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-state-dtype](#tiled-state-dtype) | Host state stored in 16 bits when the host is short (`"auto"`: kept lists first, then float16) | `TileConfig.state_dtype` | FM | DEFAULT `"auto"` (capacity fallback; float16 and bfloat16 not a default) | 2026-11-09 | float16 gate 12-51x, bfloat16 50-750x (fail); f16 store 0.983 / 0.977; host state halved | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 | [tiled-kept-compact](#tiled-kept-compact) | Kept lists delta-encoded below their 3 B per edge | - | FM | REJECTED (bound) | 2026-11-09 | at most a third of the lists; dropping them whole when short saves all | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 | [tiled-receiver-cap](#tiled-receiver-cap) | Receiver caps above 16,384 in the compiled budget (32,768, 65,536) | `TileConfig.budget_receivers` | FM | REJECTED | 2026-11-11 | 5060 Ti device: 32,768 within noise of 16,384 (6.13–6.19 s against 6.12–6.26 s), 65,536 +3.5 % | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
+| [tiled-heap-trim](#tiled-heap-trim) | `malloc_trim(0)` after the kept lists are dropped or the list cache cleared | `tiled.TILE_HEAP_TRIM` | FM | DEFAULT (memory only) | 2026-11-11 | 7.0 GiB forced drop at 20.1M atoms: resident 8.11 → 5.48 GiB (trimmed 5.37); A100 397.5M: A100PENDING | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-malloc-mmap](#tiled-malloc-mmap) | glibc mmap threshold 1 MiB for capacity runs | `MALLOC_MMAP_THRESHOLD_` (environment) | FM | MEASURED (environment, not code) | 2026-11-09 | process peak -7 % at 10M atoms; calls within 1 % | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 
 <a id="tiled-prefetch-device"></a>
@@ -858,6 +859,16 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Status: REJECTED on the RTX 5060 Ti. 975,560 SrTiO3 atoms, device state, the cap fixed (`--no-budget`), medians of two calls per side: R = 16,384 6.20 / 6.26 s, then 6.14 / 6.12 s at the end; R = 32,768 6.19 / 6.13 s (within the drift); R = 65,536 6.40 / 6.39 s (+3.5 %). Not measured on the A100 or the Ada, where the tiles' share of the GPU differs; open for a screen there.
 - Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) (`capscreen/`, job 37, 4c9be2bb).
 
+<a id="tiled-heap-trim"></a>
+#### tiled-heap-trim: return dropped kept lists to the system
+- Switch: `fastmace.model.tiled.TILE_HEAP_TRIM` (default True; stats `heap_trims`, `heap_trim_s`)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed, idea 1)
+- What: the kept lists' few-MB host tensors come from glibc's heap once its mmap threshold has risen; freed, they stayed resident (the A100 397.5M record held about 110 GiB no live array accounted for, which forced float16 state and switched the list cache off). The call now runs `malloc_trim(0)` after it drops the kept lists and after it clears the list cache, next to the pinned allocator's `empty_cache` (3899b8b0).
+- Status: DEFAULT. Memory only; no rounding change (same arrays, same order).
+- Measured: SrTiO3 20,098,395 atoms on the 5060 Ti host, the first call forced to drop its 7.00 GiB of kept lists: resident set after the drop 8.11 GiB without the trim, 5.48 GiB with it (5.37 GiB after a manual trim; live arrays 1.17 GiB in both). A100 397.5M (Alex 4981047): A100PENDING. Not addressed: about 1.5 GiB glibc holds at the end of a call.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`census38/`, `census39/`).
+
 <a id="tiled-malloc-mmap"></a>
 #### tiled-malloc-mmap: glibc's mmap threshold for capacity runs
 - Switch: environment `MALLOC_MMAP_THRESHOLD_=1048576` (also `MALLOC_ARENA_MAX=2`)
@@ -897,6 +908,7 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - Measured: 975,560 SrTiO3 atoms, all nine off against all on, same process, both orders (24926149). RTX 4000 Ada (murphy): device state 0.868 / 0.868 (6.50 → 5.64 µs/atom), wavefront 0.772 / 0.769 (8.05 → 6.20). A100-SXM4-80GB (Alex 4976251): device state 0.792 / 0.789 (4.72 → 3.73), wavefront 0.782 / 0.785 (8.98 → 7.04). Every A100 model (GPUModels family).
 - Gates (decision 66: `TILE_VIRIAL` and `TILE_EPILOGUE` round; their 12/12 gates were the 5060 Ti's): `tools/force_stress_gate.py --engine fastmace --model omat0-medium --tiled-receivers 48 --tiled-mode compiled`, SrTiO3 3×3×3, NaCl, NbCl5, the nine switches all off and all on (`--production-constant`), 4a1ade7e. Every check passes on both GPUs, both sides. Ratios to ASE float32 (energy / forces / stress), off → on: Ada (murphy) SrTiO3 4.13 / 0.94 / 0.43 → 4.29 / 0.81 / 0.39, NaCl 1.28 / 0.90 / 1.06 → 1.24 / 1.01 / 1.06, NbCl5 1.36 / 0.95 / 1.31 → 1.31 / 0.98 / 1.23; A100-SXM4-80GB (Alex 4977013) SrTiO3 7.52 / 1.08 / 0.77 → 8.86 / 0.98 / 0.63, NaCl 2.10 / 0.91 / 1.13 → 2.07 / 0.87 / 1.11, NbCl5 8.35 / 1.02 / 1.43 → 8.16 / 1.01 / 1.62. The energy ratios above 3 are under the 0.01 meV/atom floor (largest 2.9e-3 meV/atom) and as high with the switches off.
 - Host memory: `TILE_PINNED_SUPERSET` held its pinned blocks after the kept lists were dropped or rebuilt (see [tiled-pinned-superset](#tiled-pinned-superset)); fixed in 3899b8b0 before the A100's 397.5M record was rerun with the switches on.
+- Gate on the merged tip (69a48049, main 4e9388c8 merged; A100-SXM4-80GB, Alex 4981048): every check passes, off → on: SrTiO3 10.59 / 1.05 / 0.66 → 8.80 / 1.08 / 0.66, NaCl 1.94 / 0.90 / 1.02 → 1.91 / 0.84 / 1.04, NbCl5 8.31 / 1.00 / 1.70 → 8.64 / 1.01 / 1.36 (energy ratios above 3 under the floor, as high with the switches off). Records: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`gate/alex-4981048/`).
 - Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md).
 
 <a id="tiled-lazy-keys"></a>

@@ -34,8 +34,7 @@ PENDING
 ## A100 force/stress gate on the merged tip (Alex 4981048)
 
 Source 69a48049 (`fastmace/tiled-speed` with main 4e9388c8 merged), A100-SXM4-80GB, `tools/force_stress_gate.py`
-with the production constant; switches all off and all on. Ratios to the ASE float32 yardstick (limit 3; the energy
-limit has the 0.01 eV floor):
+with the production constant; switches all off and all on. Ratios to the ASE float32 yardstick (limit 3):
 
 | system | off: energy / forces / stress | on: energy / forces / stress |
 | --- | --- | --- |
@@ -43,16 +42,18 @@ limit has the 0.01 eV floor):
 | NaCl | 1.94 / 0.905 / 1.020 | 1.91 / 0.843 / 1.041 |
 | NbCl5 | 8.31 / 1.000 / 1.698 | 8.64 / 1.005 / 1.356 |
 
-All pass (energy under the 0.01 eV floor). Records in `gate/alex-4981048/`.
+All pass; the energy ratios above 3 are under the 0.01 meV/atom floor and as high with the switches off. Records in `gate/alex-4981048/`.
 
 ## Where the steady device-state call's time goes (idea 2)
 
-### A100 kernel regions (Alex 4980926, `a100prof/`)
+### A100 kernel regions (Alex 4980926, `a100prof/`): undercounted
 
-3899b8b0, SrTiO3 975,560 atoms, device state, R = 16,384: steady calls 3.74 / 3.71 s (3.8 µs/atom) while the
-kernels sum to 2,115 ns/atom (the whole-system call: 1.96 µs/atom). Interaction 0's forwards are 262 + 267 ns/atom
-and already run tabled and fused, so a composed interaction 0 in the tile bodies has little to win; the GPU is idle
-for about 43 % of the call.
+3899b8b0, SrTiO3 975,560 atoms, device state, R = 16,384: steady calls 3.74 / 3.71 s (3.8 µs/atom). `kprof6.py`
+summed 2,115 ns/atom of kernels (the whole-system call: 1.96 µs/atom), which read as a GPU idle 43 % of the call.
+That was wrong: it charged only kernels attached to torch ops (`FunctionEvent.kernels`) and missed Inductor's Triton
+launches and cuEquivariance's raw `cuLaunchKernel` calls. The idle-gap profile below counts every kernel. A corrected
+region profile (`kprof7.py`, each kernel charged through its correlation id to the call that launched it) is
+PENDING (Alex 4981367).
 
 ### Local idle-gap profile (job 40, `gap-local/`, `jobs/gapprof.py`)
 
@@ -62,6 +63,9 @@ the idle gaps total 31 ms (largest: 15 ms charged to `_call`). The 5060 Ti call 
 runs under the kernels. (The first run, `gap-local/job39-gapprof-58.json`, counted the profiler's 6 s `_call` device span as
 busy; job 40 sets device spans over 50 ms aside.)
 
-### A100 idle-gap profile (Alex 4981351)
+### A100 idle-gap profile (Alex 4981351, `gap-a100/`)
 
-PENDING
+69a48049, A100-SXM4-80GB, the same system: steady 3.83 / 3.78 s. In the profiled call (4.74 s) the GPU is busy
+4.39 s and idle 0.35 s (7 %), in gaps charged to `_fill` 74 ms, `_first` 68 ms, `_attrs` 61 ms, `_call` 49 ms and
+less. The A100 call is GPU-bound too: its gap to the whole-system call (3.8 against 1.96 µs/atom) is kernel time in
+the tiles, so idea 2 (the composed interaction 0 and the generated contraction in the tile bodies) stays open.
