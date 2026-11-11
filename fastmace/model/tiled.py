@@ -172,6 +172,17 @@ TILE_LARGE_CAP_RECEIVERS = (32768, 65536)
 # takes a large cap only where the host keeps this much per added receiver (plus 10 %) above ``list_reuse_floor``:
 # at the 397.5M record (229 of the cgroup's 231.5 GB) the cap stays where it was.
 TILE_LARGE_CAP_HOST_BYTES = 350_000
+# TILE_FIRST_CALL_PROBE (billion-atom plan, "Before step 4" 2; 11 November 2026): mode "auto"'s measuring first call
+# runs its eager sweeps on the TILE_PROBE_TILES largest tiles only (the wavefront's order, the others left out), takes
+# the mode and the receiver cap from that measurement as from a whole eager call, drops that call's buffers and kept
+# lists, and runs the call again in the chosen mode. The eager tiles' workspace is set by the largest tile, not by the
+# atom count: SrTiO3 at R 8,192 on the A100, 526,080,512 bytes above the tiles' start at 149M, 320M and 397.5M atoms
+# (Alex 4973640), 503,742,464 at 20.48M with a smaller largest tile. The 397.5M record's eager first call took
+# 11,468 s of 15,041. Wavefront calls only (else the whole eager call, as before). None: on for no GPU yet (A/B:
+# the probe's decision against the whole call's); True / False force it (True also off a CUDA device, for tests).
+TILE_FIRST_CALL_PROBE = None
+TILE_PROBE_GPUS = GPUModels(())
+TILE_PROBE_TILES = 8
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -1509,6 +1520,7 @@ class TiledForceField:
         self._budget_raised, self._fallback = False, None  # the budget raised the cap; the last step down
         self.slot_changes = 0  # slots created or grown (each change compiles and captures again)
         self._kept, self._reusing, self._tile_index = None, False, {}  # list_reuse: the kept lists and plan
+        self._probe = 0  # TILE_FIRST_CALL_PROBE: the tiles this measuring call runs (0: all)
         self._grid_fit = None  # (key, blocks per axis) of fit_grid's last choice
         self._reuse_ok = None
         self.list_reuse_state = "off" if not (self.config.list_reuse and self.config.neighbours == "tiles") else None
@@ -2310,10 +2322,21 @@ class TiledForceField:
         first, eager call's, and a compiled tile's workspace can exceed it: tiled-omat.md)."""
         import torch
 
+        probe = None
+        if self._probe_wanted():
+            self._probe = max(1, int(TILE_PROBE_TILES))
         while True:
             fallback = None
             try:
                 out = self._call(positions)
+                if self._probe:
+                    self._probe = 0
+                    if "probe" in self.last:  # its tiles measured, the mode and cap chosen: the call again
+                        del out
+                        probe = self._after_probe()
+                        continue
+                if probe is not None:
+                    self.last["probe"] = probe
                 if self._fallback is not None:
                     self.last["budget_fallback"] = self._fallback
                 return out
@@ -2354,6 +2377,37 @@ class TiledForceField:
             self._fallback = f"receiver cap {old} -> {new} after running out of device memory ({why})"
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()
+
+    def _probe_wanted(self):
+        """``TILE_FIRST_CALL_PROBE`` for this call: mode "auto"'s measuring first call (a compiled force field's)."""
+        if not self._auto or TILE_FIRST_CALL_PROBE is False:
+            return False
+        if TILE_FIRST_CALL_PROBE:
+            return True
+        if self.device.type != "cuda":
+            return False
+        import torch
+
+        return torch.cuda.get_device_name(self.device) in TILE_PROBE_GPUS
+
+    def _after_probe(self):
+        """``TILE_FIRST_CALL_PROBE``: the probe's report; its call's buffers and partial kept lists dropped (the call
+        again allocates and searches anew)."""
+        import torch
+
+        last = self.last
+        probe = dict(last["probe"], mode=self.mode, mode_reason=self.mode_reason, receivers=self.receivers,
+                     search_s=last.get("search_s"), tiles_s=last.get("tiles_s"))
+        if "tiles_peak" in last:
+            probe["workspace"] = last["tiles_peak"] - last["loop_base"]
+        _release_kept(self._kept)
+        self._kept, self._reusing = None, False
+        self._g = None
+        self._list_cache = None
+        self._pieces = None
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        return probe
 
     def _call(self, positions):
         import torch
@@ -2424,6 +2478,12 @@ class TiledForceField:
             keys = self._slot_keys(tiles, source, local_of, n) if padded else None
             steps, pool_rows = [(sweep, index) for sweep in (1, 2, 3) for index in range(len(tiles))], 0
         stats["search_s"] = time.perf_counter() - started if padded or wave else 0.0
+        if self._probe and wave and not padded:  # TILE_FIRST_CALL_PROBE: the largest tiles' sweeps only
+            sizes = [int(t.shape[0]) for t in tiles]
+            chosen = set(sorted(range(len(tiles)), key=lambda i: (-sizes[i], i))[:self._probe])
+            steps = [kept_item for kept_item in ((item[0], *[i for i in item[1:] if i in chosen]) for item in steps)
+                     if len(kept_item) > 1]
+            stats["probe"] = dict(tiles=sorted(chosen), steps=len(steps), largest=max(sizes, default=0))
         lanes = self._lanes_on(padded, n)
         if lanes:  # sweep 2 in pairs: its sweep-3 steps between a pair's tiles wait for the pair (a larger pool)
             steps, lane_peak = lane_steps(steps, [int(t.shape[0]) for t in tiles])

@@ -145,7 +145,9 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                 "TILE_WHOLE_BLOCK_ORDER": "whole-system BLOCK_ORDER order in the tiled call; default "
                                                           "off, A/B only",
                                 "TILE_LARGE_CAPS": "host-state receiver caps 32,768 / 65,536 in the budget; None = "
-                                                   "per GPU, A/B"},
+                                                   "per GPU, A/B",
+                                "TILE_FIRST_CALL_PROBE": "mode auto's first call measured on its largest tiles; "
+                                                         "None = per GPU, A/B"},
     "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B",
                                    "FUSED_FOURIER": "k-space sums without dense cos/sin; A/B",
                                    "SPIN_BATCHED": "alpha and beta field features in one call; default on",
