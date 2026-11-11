@@ -307,6 +307,22 @@ def test_skip_outside_source():
         wp.render(_schedule(), "float", 4, skip_outside=True)  # no TABLE_W: no inside flag
 
 
+def test_skip_outside_lab_form_is_the_template():
+    """The kernel lab's h2-skip transform (wprime_tuning.skip) is SKIP_OUTSIDE's template code."""
+    import re
+
+    from fastmace.kernels.oeq_streaming import wprime_tuning as wt
+
+    def code(text):
+        lines = (re.sub(r"//.*", "", line).strip() for line in text.splitlines())
+        return [line.replace("dsh[edge_base + c]", "dsh[e * EDGE_DIM + c]") for line in lines if line]
+    options = dict(vector=2, table_w=True, factored=True, scale=True, horner=True, blocks=[(1, [0]), (3, [64])],
+                   stage_dout=True, stage_sh=4)
+    assert code(wt.skip(wp.render(_edge16(), "float", 4, **options))) == code(
+        wp.render(_edge16(), "float", 4, skip_outside=True, **options).replace("return;", "continue;"))
+    assert wt.variant(wp.render(_edge16(), "float", 4, **options), "skip+vec2").count("if (!inside) {") == 1
+
+
 def test_skip_outside_default(monkeypatch):
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", None)
     assert not wp.skip_outside_default(torch.device("cpu")) and len(wp.SKIP_OUTSIDE_GPUS) == 0
@@ -324,6 +340,57 @@ def test_skip_outside_compiles_with_nvrtc():
         for edge_force in (False, True):
             assert compile_cubin(wp.render(_edge16(), "float", 4, vector=2, table_w=True, skip_outside=True,
                                            edge_force=edge_force), capability)
+
+
+def _tuned_base():
+    return wp.render(_edge16(), "float", 4, vector=2, table_w=True, factored=True, scale=True, horner=True,
+                     blocks=[(1, [0]), (3, [64])], stage_dout=True, stage_sh=4)
+
+
+def test_hoist_dx_and_channel_vector_sources():
+    """HOIST_DX / CHANNEL_VECTOR (wprime_tuning, 12 November 2026): the dx address as one pointer per lane; N channels
+    per lane with vector staged-row, x and dx accesses (vector atomics from sm_90 only)."""
+    from fastmace.kernels.oeq_streaming import wprime_tuning as wt
+
+    base = _tuned_base()
+    hoisted = wt.apply(base, hoist_dx=True)
+    assert "scalar_t* dx_lane = dx + input_base + lane;" in hoisted and "dx_lane += LOGICAL_GROUP_SIZE;" in hoisted
+    assert "dx + input_base + 0 + channel" in base and "dx + input_base + 0 + channel" not in hoisted
+    for n in (2, 4):
+        source = wt.apply(base, hoist_dx=True, channel_vector=n)  # the vector form needs no hoist
+        assert f"for (int cbase = lane * {n}; cbase < CHANNEL_DIM; cbase += LOGICAL_GROUP_SIZE * {n})" in source
+        assert f"reinterpret_cast<const float{n}*>(stage_row + " in source and "#if __CUDA_ARCH__ >= 900" in source
+        assert f"atomicAdd(reinterpret_cast<float{n}*>(dx + input_base + 0 + cbase)" in source
+        assert "for (int channel = lane;" not in source and "dx_lane" not in source
+    assert wt.apply(base) == base
+    with pytest.raises(ValueError):
+        wt.vec(base, 3)
+    with pytest.raises(ValueError):
+        wt.hoist("no channel loop here")
+
+
+def test_hoist_dx_and_channel_vector_defaults(monkeypatch):
+    cpu = torch.device("cpu")
+    monkeypatch.setattr(wp, "HOIST_DX", None)
+    monkeypatch.setattr(wp, "CHANNEL_VECTOR", None)
+    assert not wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 0
+    assert len(wp.HOIST_DX_GPUS) == 0 and len(wp.CHANNEL_VECTOR_GPUS) == 0
+    monkeypatch.setattr(wp, "HOIST_DX", True)
+    monkeypatch.setattr(wp, "CHANNEL_VECTOR", 2)
+    assert wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 2
+
+
+def test_tuned_sources_compile_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming import wprime_tuning as wt
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    base = _tuned_base()
+    for capability in ((9, 0), (8, 0)):
+        for options in (dict(hoist_dx=True), dict(channel_vector=2), dict(channel_vector=4)):
+            assert compile_cubin(wt.apply(base, **options), capability)
 
 
 def test_edge_vectors_only_for_edge_sh_output():

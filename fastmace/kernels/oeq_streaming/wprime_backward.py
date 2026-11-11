@@ -317,6 +317,15 @@ EDGE_FORCE_GPUS = GPUModels(())
 # registers). Exact. None: on for SKIP_OUTSIDE_GPUS; True / False: an A/B side's choice.
 SKIP_OUTSIDE = None
 SKIP_OUTSIDE_GPUS = GPUModels(())
+# The same lane (wprime_tuning's post-render transforms; float32 FACTORED kernels with STAGE_DOUT). HOIST_DX: the dx
+# atomics' address as one pointer per lane (exact; sm_90 census 2,198 -> 2,141, 80 registers). CHANNEL_VECTOR 2 / 4:
+# that many consecutive channels per lane with vector dout, x and dx accesses (rounding: each lane's dsh and dr sums in
+# another channel order; with SKIP_OUTSIDE, CHANNEL_VECTOR 2: 1,864 at 128 registers). None: on for the *_GPUS sets
+# (none yet); True / False, 0 / 2 / 4: an A/B side's choice.
+HOIST_DX = None
+HOIST_DX_GPUS = GPUModels(())
+CHANNEL_VECTOR = None
+CHANNEL_VECTOR_GPUS = MappingProxyType({})  # device name -> 2 or 4
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
@@ -1322,6 +1331,10 @@ class WPrimeBackward:
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force,
                              skip_outside=self.skip_outside)
+        self.hoist_dx, self.channel_vector = hoist_dx_default(device), channel_vector_default(device)
+        if self.hoist_dx or self.channel_vector:  # HOIST_DX / CHANNEL_VECTOR (wprime_tuning; raise where unmatched)
+            from fastmace.kernels.oeq_streaming import wprime_tuning
+            self.source = wprime_tuning.apply(self.source, self.hoist_dx, self.channel_vector)
         options = ()
         if SMEM_SPILL:
             head = 'extern "C" __global__ void oeq_projected_backward_wprime('
@@ -1852,6 +1865,16 @@ def skip_outside_default(device):
     return bool(SKIP_OUTSIDE) if SKIP_OUTSIDE is not None else _device_name(device) in SKIP_OUTSIDE_GPUS
 
 
+def hoist_dx_default(device):
+    """``HOIST_DX`` on ``device``: the constant when set, else on for ``HOIST_DX_GPUS``."""
+    return bool(HOIST_DX) if HOIST_DX is not None else _device_name(device) in HOIST_DX_GPUS
+
+
+def channel_vector_default(device):
+    """``CHANNEL_VECTOR`` on ``device``: the constant when set, else ``CHANNEL_VECTOR_GPUS``' entry (0 without)."""
+    return int(CHANNEL_VECTOR) if CHANNEL_VECTOR is not None else int(CHANNEL_VECTOR_GPUS.get(_device_name(device), 0))
+
+
 def edge_force_default(device):
     """``EDGE_FORCE`` on ``device``: the constant when set, else on for ``EDGE_FORCE_GPUS``."""
     return bool(EDGE_FORCE) if EDGE_FORCE is not None else _device_name(device) in EDGE_FORCE_GPUS
@@ -2088,7 +2111,8 @@ class WPrime(torch.nn.Module):
 
 
 __all__ = ["EDGE_FORCE", "EDGE_FORCE_GPUS", "edge_force_default", "edge_force_supported",
-           "SKIP_OUTSIDE", "SKIP_OUTSIDE_GPUS", "skip_outside_default",
+           "SKIP_OUTSIDE", "SKIP_OUTSIDE_GPUS", "skip_outside_default", "HOIST_DX", "HOIST_DX_GPUS",
+           "hoist_dx_default", "CHANNEL_VECTOR", "CHANNEL_VECTOR_GPUS", "channel_vector_default",
            "streaming_conv_wprime_backward_force", "BLOCK_LDG", "BLOCK_LDG_GPUS",
            "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
            "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",
