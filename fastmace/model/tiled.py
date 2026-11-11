@@ -2315,7 +2315,8 @@ class TiledForceField:
             stats["compiled_graphs"] = graphs_state
             if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
-                key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
+                # (and the body's edge-vector form: TILE_LOCAL_FRAME is read per call)
+                key = (id(g), pos.data_ptr(), species.data_ptr(), stress, g.get("local_frame") is not None)
                 if key != self._graph_key:  # the graphs read these addresses
                     for slot in self._slots.values():
                         slot["graphs"].clear()
