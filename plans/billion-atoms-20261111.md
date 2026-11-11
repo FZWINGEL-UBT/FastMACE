@@ -178,6 +178,28 @@ job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
    the host peak by step) before changing anything; the one-hot and species tables built on the host at construction
    are the first suspects.
 
+Together, 1 and 2 would take about 8.5 of the 10^9 run's 11.5 h (the supercell's 25 min and most of the eager call's
+8 h); 2 is the less certain one (a few tiles must decide as a whole call does). Order: 1 (also the 519M fault's
+answer), the 16-CPU re-measurement, then 2, then 3's profile.
+
+## Feasibility of 10^9 atoms (owner's question, 11 November 2026)
+
+Still possible on paper; step 3's measured peak decides it.
+- **Device (the hard limit):** about 101 B/atom before the tiles (census), less step 1's 34 (host positions 24, uint8
+  maps 6, no whole-system order 4): about 67 B/atom, so about 67 GB of per-atom arrays and 3-4 GB of tile workspace
+  at 10^9, about 71 GB of the A100-80's 85.9 GB (about 15 GB left). Step 3 measures it at 397.5M (projected
+  28.0 GiB). If it lands above, the held-back cuts remain: the plan's order in int32 (4 B/atom), the bins' atom
+  bins (6).
+- **32-bit indices:** audited; the one real overflow (the tile lists' sort key) is fixed and the 750M probe is
+  bitwise on every check. The 10^9 run is still the first to cross 716M end to end, beyond the probe's per-tile paths.
+- **Host:** about 0.6-0.8 TB at 10^9; one A100's share of an Alex node (231.5 GB) does not hold it, a whole node
+  (2 TB) does. Needs the owner's go for a whole node (step 4).
+- **Time:** about 30 min of build, about 8 h of eager first call, about 2.7 h per compiled call, plus 2-4 % for host
+  positions: inside 24 h (and much less with "Before step 4" 1-2).
+- **Risks:** the 519M segmentation fault in ASE's supercell (answered by our own builder and a CPU-only dry run);
+  ASE's slow `repeat` loop and whole-system `wrap` temporaries; the large receiver caps (B3) are no risk here, as the
+  host rule (`TILE_LARGE_CAP_HOST_BYTES`) keeps the cap at the host limit.
+
 ## Status
 
 | Step | State | Record |
