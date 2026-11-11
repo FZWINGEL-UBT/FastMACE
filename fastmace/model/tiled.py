@@ -130,6 +130,13 @@ TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
 # copy's event. The wavefront at 975,560 SrTiO3 atoms on the RTX 5060 Ti had 0.44 s of device-to-host copies on the
 # compute stream in a 7.7 s call. None: on for TILED_SPEED_GPUS.
 TILE_COPY_STREAM = None
+# TILE_HEAP_TRIM (memory only): kept lists or the list cache dropped hand glibc's free heap back to the system
+# (``malloc_trim(0)``, ``_trim_heap``). The lists are many tensors of a few MB, which glibc serves from its heap once
+# its mmap threshold has risen, and keeps resident when they are freed; the host budget (MemAvailable, the cgroup)
+# counted them as used. At 20.1M SrTiO3 atoms on the RTX 5060 Ti a forced drop of 7.0 GiB of lists left 2.77 GiB in
+# glibc's free heap, all returned by a trim; the A100's 397.5M record (lists all pageable) kept about 110 GiB and
+# fell to float16 state (plans/ideas-20261111-tiled.md, idea 1).
+TILE_HEAP_TRIM = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1030,6 +1037,21 @@ def _kept_bytes(kept):
     return int(sum(held(t) for entry in entries for t in entry) + kept["reference"].numel() * 8)
 
 
+def _trim_heap():
+    """``malloc_trim(0)``: glibc's free heap (every arena) back to the system (``TILE_HEAP_TRIM``). True if glibc
+    returned memory; False where it did not, or without glibc."""
+    if not TILE_HEAP_TRIM:
+        return False
+    import ctypes
+
+    try:
+        trim = ctypes.CDLL(None).malloc_trim
+    except (OSError, AttributeError):  # not glibc (macOS, Windows, musl)
+        return False
+    trim.argtypes, trim.restype = [ctypes.c_size_t], ctypes.c_int
+    return bool(trim(0))
+
+
 def _release_kept(kept):
     """Kept lists dropped or replaced: their tensors go, and pinned ones (``TILE_PINNED_SUPERSET``) back to the
     operating system. PyTorch's pinned allocator keeps a freed block for reuse, resident, so without this the bytes
@@ -1041,6 +1063,7 @@ def _release_kept(kept):
     kept["superset"].clear()
     kept.get("mirrors", {}).clear()
     kept["complete"] = False
+    _trim_heap()  # the pageable lists' heap pages (TILE_HEAP_TRIM)
     if kept.get("pinned_bytes"):
         kept["pinned_bytes"] = 0
         import torch
@@ -1532,6 +1555,7 @@ class TiledForceField:
         if available is None or available >= int(self.config.list_reuse_floor):
             return True
         cache.clear()
+        _trim_heap()
         self.list_cache_state = (f"off: {available / 2**30:.1f} GiB available on the host while the list cache "
                                  f"filled, below the floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
         return False

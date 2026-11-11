@@ -1597,6 +1597,24 @@ def test_pinned_kept_lists_are_counted_by_their_blocks_and_returned_when_dropped
     assert emptied == [True]  # nothing pinned: the cache stays
 
 
+def test_dropped_kept_lists_trim_the_heap(monkeypatch):
+    """``TILE_HEAP_TRIM``: kept lists dropped or replaced hand glibc's free heap back (``_trim_heap`` per release,
+    also without pinned lists); off, nothing is trimmed. ``_trim_heap`` is a no-op where there is no glibc."""
+    from fastmace.model import tiled as tiled_module
+
+    trims = []
+    monkeypatch.setattr(tiled_module, "_trim_heap", lambda: trims.append(True) or True)
+    kept = dict(reference=torch.zeros(1), superset={0: (torch.zeros(2),)}, complete=True)
+    tiled_module._release_kept(kept)
+    tiled_module._release_kept(None)
+    assert trims == [True] and kept["superset"] == {}
+    monkeypatch.undo()
+    monkeypatch.setattr(tiled_module, "TILE_HEAP_TRIM", False)
+    assert tiled_module._trim_heap() is False
+    monkeypatch.setattr(tiled_module, "TILE_HEAP_TRIM", True)
+    assert tiled_module._trim_heap() in (True, False)
+
+
 def test_host_room_is_the_memory_cgroups_where_they_limit_it(tmp_path):
     """``_cgroup_room``: a batch job's memory cgroup (v2: the job's limit one level up from the step's, v1: the
     memory controller's) leaves the limit less the usage less the inactive file cache; no limit, no room."""
