@@ -1037,6 +1037,9 @@ def _kept_bytes(kept):
     return int(sum(held(t) for entry in entries for t in entry) + kept["reference"].numel() * 8)
 
 
+HEAP_TRIMS = [0, 0.0]  # the process's malloc_trim calls and their seconds (the call's stats: heap_trims, heap_trim_s)
+
+
 def _trim_heap():
     """``malloc_trim(0)``: glibc's free heap (every arena) back to the system (``TILE_HEAP_TRIM``). True if glibc
     returned memory; False where it did not, or without glibc."""
@@ -1049,7 +1052,11 @@ def _trim_heap():
     except (OSError, AttributeError):  # not glibc (macOS, Windows, musl)
         return False
     trim.argtypes, trim.restype = [ctypes.c_size_t], ctypes.c_int
-    return bool(trim(0))
+    started = time.perf_counter()
+    returned = bool(trim(0))
+    HEAP_TRIMS[0] += 1
+    HEAP_TRIMS[1] += time.perf_counter() - started
+    return returned
 
 
 def _release_kept(kept):
@@ -2242,6 +2249,7 @@ class TiledForceField:
                 stats["tiles_peak"] = int(torch.cuda.max_memory_allocated(self.device))
             source = None  # the tile lists' cell bins (per-atom device arrays) before the energy's transients
             stats["global_bytes"] = state.bytes()
+            stats["heap_trims"], stats["heap_trim_s"] = HEAP_TRIMS[0], round(HEAP_TRIMS[1], 3)
             list_cache = getattr(self, "_list_cache", None)
             stats["list_cache_bytes"] = int(sum(t.numel() * t.element_size() for entry in (list_cache or {}).values()
                                                 for t in entry))
