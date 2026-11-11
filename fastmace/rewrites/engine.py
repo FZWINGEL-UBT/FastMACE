@@ -64,6 +64,38 @@ STRAIN_SOURCE = {"mace.modules.utils:get_symmetric_displacement":
                  "a369db1b449ebb4f4105cf7e42ad4cebea28950cd9d51a07f7b6cc8ec425c557"}
 
 
+# VIRIAL_ELEMENTWISE (rounding; tiled-speed's TILE_VIRIAL for the whole-system plans): with single_graph_strain the
+# strained shifts and positions as elementwise products summed over the 3 x 3 strain, not einsum. The einsum's
+# backward to the strain is a [3, E] x [E, 3] product that cuBLAS runs as a split-K GEMM (sgemm_largek_lds64):
+# 145 of 5,171 ns per atom of kernel time for OMAT-0 medium, SrTiO3 18^3 on the RTX 5060 Ti (evaluate with stress,
+# tiled-speed kprof5). As products and sums the backward is one reduction over the edges. Stress calls only (NVE MD
+# has no strain leaf). Bound when the force field binds its strain path (``one_graph_choice``). None: on for
+# VIRIAL_ELEMENTWISE_GPUS; True / False: an A/B side's choice. results/virial-elementwise-20261110: RTX 5060 Ti
+# (SrTiO3 10x10x10 force call with stress, tools/virial_ab.py) b/a 0.9675 / 0.9648 (ab / ba), gate passes (forces
+# 0.795 / 0.796 / 0.970, stress 0.647 / 0.685 / 0.619); A100-SXM4-80GB off: the GEMM is 0.4 % of its kernel time
+# (Alex job 4976350); H200 and Ada not measured.
+VIRIAL_ELEMENTWISE = None
+VIRIAL_ELEMENTWISE_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
+
+
+def virial_elementwise_default(device) -> bool:
+    """``VIRIAL_ELEMENTWISE`` (an A/B side's choice) when set; else ``device``'s name in ``VIRIAL_ELEMENTWISE_GPUS``
+    (CUDA devices only)."""
+    if VIRIAL_ELEMENTWISE is not None:
+        return bool(VIRIAL_ELEMENTWISE)
+    import torch
+
+    from fastmace.kernels.gpu_models import GPUModels
+
+    device = torch.device(device)
+    return device.type == "cuda" and torch.cuda.get_device_name(device) in GPUModels(VIRIAL_ELEMENTWISE_GPUS)
+
+
+def one_graph_choice(device):
+    """The one-graph strain path for ``device``: "elementwise" (``VIRIAL_ELEMENTWISE``) or True."""
+    return "elementwise" if virial_elementwise_default(device) else True
+
+
 def _mace_utils():
     from mace.modules import utils
 
@@ -157,6 +189,29 @@ def single_graph_symmetric_displacement(positions, unit_shifts, cell, edge_index
     cell = cell.view(-1, 3, 3)
     cell = cell + torch.matmul(cell, symmetric_displacement)
     shifts = torch.einsum("be,ec->bc", unit_shifts, cell[0])
+    return positions, shifts, displacement
+
+
+def single_graph_elementwise_displacement(positions, unit_shifts, cell, edge_index, num_graphs, batch,
+                                          displacement=None):
+    """``single_graph_symmetric_displacement`` with the strained positions and shifts as elementwise products summed
+    over three (``VIRIAL_ELEMENTWISE``): the backward to the strain is a reduction over the rows, not a split-K
+    GEMM. The same values up to rounding."""
+    import torch
+
+    if num_graphs != 1:
+        return _patches._original(_mace_utils(), "get_symmetric_displacement")(
+            positions, unit_shifts, cell, edge_index, num_graphs, batch, displacement)
+    if cell is None:
+        cell = torch.zeros(3, 3, dtype=positions.dtype, device=positions.device)
+    if displacement is None:
+        displacement = torch.zeros((1, 3, 3), dtype=positions.dtype, device=positions.device)
+        displacement = displacement + positions.sum() * 0.0
+    symmetric_displacement = 0.5 * (displacement + displacement.transpose(-1, -2))
+    positions = positions + (positions.unsqueeze(-1) * symmetric_displacement[0]).sum(1)
+    cell = cell.view(-1, 3, 3)
+    cell = cell + torch.matmul(cell, symmetric_displacement)
+    shifts = (unit_shifts.unsqueeze(-1) * cell[0]).sum(1)
     return positions, shifts, displacement
 
 
@@ -301,7 +356,8 @@ def _rebound(function, namespace):
 
 
 def strain_prepare_graph(one_graph):
-    """MACE's ``prepare_graph`` with its own strain function: one-graph (True) or MACE's (False).
+    """MACE's ``prepare_graph`` with its own strain function: one-graph (True; "elementwise":
+    ``single_graph_elementwise_displacement``) or MACE's (False).
 
     The same code, with a copy of ``mace.modules.utils``' globals taken at the first call; only
     ``get_symmetric_displacement`` differs, and MACE's own is the original even while the
@@ -314,7 +370,8 @@ def strain_prepare_graph(one_graph):
     if frozen:
         raise StrainBindingError("mace.modules.utils.prepare_graph reads " + ", ".join(frozen)
                                  + ", which a process-wide patch replaces")
-    strain = (single_graph_symmetric_displacement if one_graph
+    strain = (single_graph_elementwise_displacement if one_graph == "elementwise"
+              else single_graph_symmetric_displacement if one_graph
               else _patches._original(utils, "get_symmetric_displacement"))
     key = (utils.prepare_graph, strain)
     found = _REBOUND.get(key)
@@ -510,8 +567,9 @@ def _selfcheck_strain(original, rewritten, context):
     for seed, strain in ((0, 0.0), (1, 0.03)):
         inputs = strain_inputs(seed=context.seed + seed, strain=strain)
         expected = strained_outputs_and_gradients(mace_function, inputs)
-        got = strained_outputs_and_gradients(single_graph_symmetric_displacement, inputs)
-        cases += [(f"get_symmetric_displacement(strain={strain})", a, b) for a, b in zip(expected, got)]
+        for function in (single_graph_symmetric_displacement, single_graph_elementwise_displacement):
+            got = strained_outputs_and_gradients(function, inputs)
+            cases += [(f"{function.__name__}(strain={strain})", a, b) for a, b in zip(expected, got)]
     return check_tensors(cases, torch.float64)
 
 
@@ -568,8 +626,9 @@ RECORDS = {"single_graph_strain": PROCESS_RECORDS["single_graph_strain"]}
 
 __all__ = [
     "CONFIG_FIELDS", "PROCESS_RECORDS", "RECORDS", "STRAIN_ATTRIBUTE", "StrainBindingError", "UNFUSED_ADDMM_UUID",
-    "bind_strain_path", "capture_safe_mask_head", "first_derivative_forces", "first_derivative_forces_virials",
-    "install", "single_graph_symmetric_displacement", "strain_forward", "strain_inputs", "strain_path",
-    "strain_prepare_graph", "strain_problems", "strained_outputs_and_gradients", "unfused_addmm_key",
-    "unfused_full_addmm_rule",
+    "VIRIAL_ELEMENTWISE", "VIRIAL_ELEMENTWISE_GPUS", "bind_strain_path", "capture_safe_mask_head",
+    "first_derivative_forces", "first_derivative_forces_virials", "install", "one_graph_choice",
+    "single_graph_elementwise_displacement", "single_graph_symmetric_displacement", "strain_forward", "strain_inputs",
+    "strain_path", "strain_prepare_graph", "strain_problems", "strained_outputs_and_gradients", "unfused_addmm_key",
+    "unfused_full_addmm_rule", "virial_elementwise_default",
 ]

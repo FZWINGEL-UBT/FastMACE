@@ -1,0 +1,25 @@
+run exit=0
+factored {"nodes": 230, "ops": 413, "by_kind": {"mul": 120, "lin": 183, "dot": 110}, "output_fma": 61, "check": 7.0547252049926515e-09}
+check {"gen_vs_cueq": {"max_abs": 1.3113021850585938e-06, "max_rel_to_max": 8.767027566136676e-07, "rms_rel": 2.587789253993833e-07}, "gen_fused_vs_cueq_div": {"max_abs": 1.3113021850585938e-06, "max_rel_to_max": 8.767027566136676e-07, "rms_rel": 2.6560655896901153e-07}, "dm_vs_autograd": {"max_abs": 7.152557373046875e-07, "max_rel_to_max": 4.787989382748492e-07, "rms_rel": 2.43942963606969e-07}, "dD_vs_autograd": {"max_abs": 1.0728836059570312e-06, "max_rel_to_max": 4.745425883356802e-07, "rms_rel": 2.94733354166965e-07}, "fac_vs_cueq_div": {"max_abs": 1.3113021850585938e-06, "max_rel_to_max": 8.767027566136676e-07, "rms_rel": 2.63090129237753e-07}, "fac_dm_vs_autograd": {"max_abs": 6.556510925292969e-07, "max_rel_to_max": 4.3889903622584825e-07, "rms_rel": 2.483692753685318e-07}, "fac_dD_vs_autograd": {"max_abs": 9.5367431640625e-07, "max_rel_to_max": 4.2181562776022474e-07, "rms_rel":
+cueq: 157.0 us  segmented_polynomial_algo4_4 157.0
+cueq+div: 385.6 us  triton_poi_fused_add_div_0 228.4  segmented_polynomial_algo4_4 157.1
+gen: 141.2 us  sc0_fwd 141.2
+gen-fused: 141.3 us  sc0_fwd 141.3
+proxy: 1083.3 us  triton_poi_fused_add_div_0 232.0  segmented_polynomial_algo4_4 156.7  segmented_polynomial_bwd_algo6_4 379.3  triton_red_fused_add_div_mul_neg_sum_0 315.4
+gen-pair: 397.9 us  sc0_fwd 140.8  sc0_bwd 258.0
+fac-fused: 140.5 us  sc0_fwd 140.5
+fac-pair: 396.7 us  sc0_fwd 139.4  sc0_bwd 256.6
+fac-pair4: 399.0 us  sc0_fwd 140.2  sc0_bwd 258.7
+registers {'gen': 80, 'gen-fused': 80, 'gen-bwd': 96, 'fac-fused': 64, 'fac-bwd': 152, 'fac-bwd4': 128}, local bytes {'gen': 0, 'gen-fused': 0, 'gen-bwd': 0, 'fac-fused': 0, 'fac-bwd': 0, 'fac-bwd4': 24}, counts {'gen': {'terms': 480, 'monomials': 410, 'groups': 61, 'fmul_monomials': 478, 'fp32_per_channel': 1019}, 'gen-fused': {'terms': 480, 'monomials': 410, 'groups': 61, 'fmul_monomials': 478, 'fp32_per_channel': 1035}, 'gen-bwd': {'terms': 480, 'monomials': 410, 'groups': 61, 'fp32_per_channel': 1668}, 'fac': {'nodes': 230, 'ops': 413, 'by_kind': {'mul': 120, 'lin': 183, 'dot': 110}, 'output_fma': 61, 'check': np.float64(7.0547252049926515e-09)}}; gen/cueq 0.8991, fused saves 244.31 us of the forward pair; backward {'proxy': 694.85, 'gen-pair': 257.96, 'fac-pair': 256.65, 'fac-pair4': 258.66}; bucket saving 685.43 us; factored forward 0.994, pair 0.997, pair4 1.0027
+registers {'gen': 80, 'gen-fused': 80, 'gen-bwd': 96, 'fac-fused': 64, 'fac-bwd': 152, 'fac-bwd4': 128}, local bytes {'gen': 0, 'gen-fused': 0, 'gen-bwd': 0, 'fac-fused': 0, 'fac-bwd': 0, 'fac-bwd4': 24}, counts {'gen': {'terms': 480, 'monomials': 410, 'groups': 61, 'fmul_monomials': 478, 'fp32_per_channel': 1019}, 'gen-fused': {'terms': 480, 'monomials': 410, 'groups': 61, 'fmul_monomials': 478, 'fp32_per_channel': 1035}, 'gen-bwd': {'terms': 480, 'monomials': 410, 'groups': 61, 'fp32_per_channel': 1668}, 'fac': {'nodes': 230, 'ops': 413, 'by_kind': {'mul': 120, 'lin': 183, 'dot': 110}, 'output_fma': 61, 'check': np.float64(7.0547252049926515e-09)}}; gen/cueq 0.8991, fused saves 244.31 us of the forward pair; backward {'proxy': 694.85, 'gen-pair': 257.96, 'fac-pair': 256.65, 'fac-pair4': 258.66}; bucket saving 685.43 us; factored forward 0.994, pair 0.997, pair4 1.0027
+sc0 exit=0
+geom: 731 intervals, 54 table reads (ghoist: g values; deferred: phi accumulators) per edge, registers [80] (production [80]), table 64.2 MiB, bias 0
+forward slab-sorted against real: max|d|/max|a| 5.82e-07
+forward species-blocks against real: max|d|/max|a| nan
+forward slab-sorted+species-blocks against real: max|d|/max|a| nan
+forward geom against real: max|d|/max|a| 5.82e-07
+forward one-slab+geom: finite True
+forward: edges 373760 (inside 370966); real flush 2162.1 / warm 2151.8 us (x 1.0000 / 1.0000); one-slab flush 1699.6 / warm 1679.2 us (x 0.7861 / 0.7804); slab-sorted flush 2125.7 / warm 2117.5 us (x 0.9832 / 0.9841); species-blocks flush 3464.1 / warm 3451.8 us (x 1.6022 / 1.6041); slab-sorted+species-blocks flush 3412.9 / warm 3415.0 us (x 1.5785 / 1.5870); geom flush 2334.5 / warm 2320.2 us (x 1.0797 / 1.0783); one-slab+geom flush 1740.7 / warm 1724.1 us (x 0.8051 / 0.8012)
+geom exit=0
+
+[exited with code 0]

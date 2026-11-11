@@ -65,8 +65,11 @@ def _relative(a, b):
     return float((a - b).abs().max() / b.abs().max())
 
 
+@pytest.mark.parametrize("factored", [False, True])
 @pytest.mark.parametrize("projected", [False, True])
-def test_generated_matches_cueq(projected):
+def test_generated_matches_cueq(projected, factored):
+    """SC_GENERATED's kernel pair, and with ``factored`` SC_FACTORED's (folded weights), against cuEq on the divided
+    features: output, feature and density gradients."""
     from fastmace.rewrites import sc_generated
 
     reference = _product(projected)
@@ -80,7 +83,11 @@ def test_generated_matches_cueq(projected):
             from fastmace.kernels.cuda.sc_generated import GeneratedContraction
 
             product = copy.deepcopy(reference)
-            product.sc_generated_id = GeneratedContraction(product.symmetric_contractions).id
+            kernels = GeneratedContraction(product.symmetric_contractions, factored=factored)
+            assert kernels.factored == factored
+            if factored:
+                product.sc_generated_weight = kernels.fold(sc_generated._weight(product.symmetric_contractions))
+            product.sc_generated_id = kernels.id
             product.__class__ = sc_generated._subclass(type(product))
         f = feats.clone().requires_grad_()
         d = density.clone().requires_grad_()
