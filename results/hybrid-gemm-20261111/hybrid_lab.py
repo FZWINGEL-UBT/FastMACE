@@ -49,7 +49,8 @@ class Lab:
         m, k = a.shape
         n = b.shape[1]
         p, i = ctypes.c_void_p, ctypes.c_int
-        values = (m, n, k, a.data_ptr(), a.stride(0), b.data_ptr(), b.stride(0), c.data_ptr(), c.stride(0))
+        ldb = b.stride(1) if b.stride(0) == 1 and b.shape[1] > 1 else b.stride(0)  # column-major B: ld = K
+        values = (m, n, k, a.data_ptr(), a.stride(0), b.data_ptr(), ldb, c.data_ptr(), c.stride(0))
         types = (i, i, i, p, i, p, i, p, i)
         stream = self.driver.CUstream(torch.cuda.current_stream(a.device).cuda_stream)
         self.check(self.driver.cuLaunchKernel(self.fn[name], (m + 63) // 64, (n + 63) // 64, 1, self.threads, 1, 1,
