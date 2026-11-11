@@ -113,7 +113,7 @@ certificate). Commits are where the set last gained a family.
 | spline forward `PREFETCH_AHEAD` (off for omat0-small on the A100: `PREFETCH_AHEAD_MODEL_OFF_GPUS`) | off (1.0046 / 1.0067) | on | not measured | not measured | bitwise | `8aaace6b`, `50480105` |
 | spline forward `BLOCK_ORDER` | on | on | not measured | not measured | bitwise | `5e7d961f` |
 | spline forward `PACKED8` | on | on | not measured | not measured | rounding | `e3049399` |
-| spline forward `GEOM` (`spline_forward.GEOM_GPUS`) | not measured | on | not measured | not measured | rounding | `48000458` |
+| spline forward `GEOM` (`spline_forward.GEOM_GPUS`) | not measured | on | not measured | n/a (needs SPLINE_W + STAGE_EDGES, not on here; 11 Nov check: 0 forwards routed) | rounding | `48000458` |
 | `COMPOSE_SKIP` | on | on | on (with OMAT-0 tf32x3) | not measured | rounding | `b8d977f4`, `1cd369e4` |
 | `COMPOSE_FAST` | on | on | on | not measured | bitwise | `b8d977f4`, `1cd369e4` |
 | `COUNT_PLAN` | on | on | off (tie 1.0000 / 1.0004) | not measured | bitwise | `b8d977f4` |
@@ -121,7 +121,7 @@ certificate). Commits are where the set last gained a family.
 | `GENERIC_FOLD_READOUT_TAIL` (`species.GENERIC_FOLD_READOUT_TAIL_GPUS`) | on | on | on | not measured | rounding | `b8d977f4`, `1cd369e4` |
 | `SORT_BY_LENGTH` (`neighbors.skin.SORT_BY_LENGTH_GPUS`) | on | on (not OFF23-small, -large) | not measured | not measured | rounding | `ec716912` |
 | `SC_GENERATED` (`sc_generated.SC_GENERATED_GPUS`) | on | on | not measured | not measured | rounding | `9225793e` |
-| `SC_FACTORED` (`sc_generated.SC_FACTORED_GPUS`) | off (lab bound under 1 %, sc0-invariant-basis; no MD A/B) | on | not measured | not measured (kernel lab 1.003) | rounding | `48000458` |
+| `SC_FACTORED` (`sc_generated.SC_FACTORED_GPUS`) | off (lab bound under 1 %, sc0-invariant-basis; no MD A/B) | on | not measured (needs SC_GENERATED, not measured here) | n/a (needs SC_GENERATED, not on here; 11 Nov check: 0 products routed; kernel lab 1.003) | rounding | `48000458` |
 
 ### 0.3 Tiled mode, plain constants and the memory-rescue rungs
 
@@ -201,8 +201,8 @@ measured by the session `ada-5060-screen` (10 November 2026), which updates its 
 | `R128` `MIN_BLOCKS` 8 for omat0-small | A100, Ada, 5060 Ti | A/B only (bitwise) |
 | spline `PREFETCH_AHEAD`, `BLOCK_ORDER` | Ada, 5060 Ti | A/B only (bitwise) |
 | `PACKED8`, `SORT_BY_LENGTH`, `SC_GENERATED` | Ada, 5060 Ti | A/B + gate |
-| spline `GEOM` | H200, Ada, 5060 Ti | A/B + gate |
-| `SC_FACTORED` | Ada, 5060 Ti (H200: lab bound under 1 %, no MD A/B) | A/B + gate |
+| spline `GEOM` | H200, Ada; 5060 Ti only once SPLINE_W + STAGE_EDGES are on there | A/B + gate |
+| `SC_FACTORED` | Ada and 5060 Ti only once SC_GENERATED is on there (H200: lab bound under 1 %, no MD A/B) | A/B + gate |
 | `VIRIAL_ELEMENTWISE` | H200, Ada; other families than OMAT-0 medium on the 5060 Ti | stress-call A/B (tools/virial_ab.py) + gate |
 | `COMPOSE_SKIP`, `GENERIC_FOLD_READOUT_TAIL` | 5060 Ti | A/B + gate |
 | tiled speed switches | H200, A100, Ada | A/B only, except `TILE_VIRIAL`, `TILE_EPILOGUE` (A/B + gate) |
