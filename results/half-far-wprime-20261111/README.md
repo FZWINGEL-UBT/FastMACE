@@ -93,3 +93,32 @@ outside the half loop. Likely causes, not profiled:
 
 Retrying would need the far edges compacted out of the float32 kernel's edge list, plus a profile of the three
 kernels. Not started: Alex confirmation and the leto suite; both were for adoption only.
+
+## Review retry (11 November 2026): NaCl on the oracle, idea closed
+
+The review is in `review-20261111-rejections.md` (copied here). It asked to explain the gate's NaCl failure at 5.5 Å
+(8.9× F, 6.95× S) before any one-kernel retest.
+
+Oracle (`oracle5_NaCl_3x.json`; NaCl r2SCAN benchmark CIF, 3×3×3, 216 atoms, 6,912 edges; rattle 0.05 Å; float32
+error F 3.9e-6 eV/Å, S 1.7e-8). The built design is `w4dr`:
+
+| r_h | half edges | all/w4dr | dx only | dsh only | dr only | all, no scaling |
+| --- | --- | --- | --- | --- | --- | --- |
+| 5.5 Å | 15.7 % | F 7.10 S 13.4 | F 0.95 S 0.50 | F 0.99 S 1.11 | F 7.05 S 14.0 | F 13.1 S 10.3 |
+| 5.3 Å | 18.8 % | F 7.12 S 17.3 | F 0.99 S 0.55 | F 1.00 S 1.00 | F 7.04 S 17.5 | F 14.0 S 13.0 |
+
+**Explanation.** The oracle reproduces the GPU failure, and all of it is the radial gradient dr; dx and dsh stay at
+the float32 level.
+- dr = Σ over paths and channels of weight_gradient × dw/dr, where weight_gradient (x · dout · Y products) is summed
+  in float16.
+- NaCl's shell at a = 5.59 Å (6 like neighbours, inside 5.3–6.0 Å) is dense and symmetric. Its per-edge dr terms are
+  large and nearly cancel in the force: the float32 force error is only 3.9e-6 eV/Å.
+- A ~5e-4 relative float16 error in each edge's weight gradient does not cancel, so the ratio reaches 7–17×.
+- Float32 slope and radial sums do not help (dr only is the same 7×), because the error is already in the float16
+  weight gradient. Keeping weight_gradient in float32 would put most of the loop back in float32.
+
+**No safe r_h.** Every NaCl r_h with half edges fails. NaCl passed at 5.8 Å only because it has no shell between
+5.8 and 6.0 Å (its next shell is at 6.25 Å), so nothing ran in half precision. SrTiO3 and NbCl5 passed in the
+oracle because their far shells are less symmetric and their float32 errors larger. The error is inherent to
+float16 weight gradients on close, symmetric shells, and a cutoff chosen per structure would be a per-crystal rule
+(SPEC §1.1 goal 2). **The idea is closed; the one-kernel retest is not built.**
