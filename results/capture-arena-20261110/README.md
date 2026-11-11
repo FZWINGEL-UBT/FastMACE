@@ -1,4 +1,4 @@
-# Capture arena, stage 0: STOPPED (10 November 2026)
+# Capture arena, stage 0 (10 November 2026): stopped, then reopened as the segment-level arena (A)
 
 **Question.** Can the CUDA graph's requests be served at planned offsets in one buffer, so the graph pool's
 placement loss comes back? The offline bound on the r3 SrTiO3 36³ trace (`results/rung-b-20261109`) said a
@@ -6,9 +6,10 @@ lifetime-aware arena would recover about 80 % of it, about 11 kB/atom.
 
 **Answer.** Not through `torch.cuda.MemPool` with a `CUDAPluggableAllocator`. The shim builds and runs everywhere, and
 the captures are deterministic. But the caching layer still owns block placement inside the pool, so a shim can only
-place whole segments. That recovers 42–45 % of the placement loss. Block-level placement, which would recover 86–99 %,
-needs the process allocator replaced. The conductor stopped the work here (option C). The shim and the stage-0 script
-stay on the branch as lab tools.
+place whole segments. That recovers 42–52 % of the placement loss. Block-level placement, which would recover 73–99 %,
+needs the process allocator replaced. The conductor first stopped the work here (option C). Later the same day the owner
+allowed testing our own allocator if it saves memory, carefully, so the segment-level arena (option A) is reopened with
+guards (below). The shim and the stage-0 script stay on the branch as lab tools.
 
 ## Setup
 
@@ -41,13 +42,13 @@ and `compare` steps and the offline bounds (`segment_bound`).
 |---|---|---|---|
 | Compiler | gcc 13.3 | gcc 11.4 | /usr/bin/gcc |
 | Toy capture into the shim pool (MLP forward + `autograd.grad`), replay versus eager | bitwise | bitwise | bitwise |
-| Two MD captures, shim request sequence | identical (10³, 30³) | identical (36³ no_split) | identical (36³) |
-| Two MD captures, block-level pool events | identical (10³, 30³) | identical (36³ no_split) | identical (36³) |
+| Two MD captures, shim request sequence | identical (10³, 30³) | identical (34³; 36³ no_split) | identical (36³) |
+| Two MD captures, block-level pool events | identical (10³, 30³) | identical (34³; 36³ no_split) | identical (36³) |
 
 The shim saw these requests in one MD build and 20 steps: 13 mallocs at 10³, 27 at 30³ (5060 Ti) and 24 at 36³
 (A100). It saw no frees: the caching layer keeps every segment until the pool is released.
 
-## Granularity: why the shim reaches only 42–45 %
+## Granularity: why the shim reaches only 42–52 %
 
 `MemPool(allocator)` keeps the caching allocator's block management. The pool asks the shim for segments, then splits
 them and reuses freed blocks itself. So the shim never sees block lifetimes, and the most it can do is overlap
@@ -63,6 +64,7 @@ first):
 |---|---:|---:|---:|---:|
 | A100, 36³ (233,280 atoms) | 10.31 GiB | 14.23 GiB | 12.45 GiB (−1.79, 45 % of the loss) | 10.87 GiB (86 %) |
 | 5060 Ti, 30³ (135,000 atoms) | 8.36 GiB | 10.88 GiB | 9.82 GiB (−1.05, 42 %) | 8.39 GiB (99 %) |
+| Ada, 34³ (196,520 atoms) | 8.42 GiB | 13.68 GiB | 10.96 GiB (−2.72, 52 %) | 9.82 GiB (73 %) |
 | 5060 Ti, 10³ (5,000 atoms) | 0.32 GiB | 0.41 GiB | 0.39 GiB (28 %) | — |
 
 The allocator's own options do not help:
@@ -83,8 +85,23 @@ The allocator's own options do not help:
     tensors on the main MD path.
 - **(B) Block-level placement.** Needs the process allocator replaced (`change_current_allocator` before any CUDA use),
   with our own caching for every eager allocation as well. A global change.
-- **(C) Stop.** Chosen by the conductor (10 November 2026): A's gain does not justify a silent-aliasing risk on the
-  main MD path, and B is too global.
+- **(C) Stop.** Chosen first by the conductor (10 November 2026): A's gain does not justify a silent-aliasing risk on
+  the main MD path, and B is too global.
+- **Reopened as (A)**, later on 10 November 2026: the owner allowed testing our own allocator if it saves memory,
+  carefully. The conductor's guards:
+  - **Native Linux first:** the Alex A100, then leto or murphy after the idle check, where oversubscription is a
+    clean out-of-memory error.
+  - **The local 5060 Ti only once it works,** and only with all of these:
+    - the shim refuses any `cuMemAlloc` beyond `cuMemGetInfo`'s free memory minus 1 GiB;
+    - `set_per_process_memory_fraction(0.9)`;
+    - a 15 GiB reserved-memory watchdog;
+    - sizes from 10³ up, nothing unattended above 20³;
+    - no `max_split_size` without expandable segments.
+  - **Overlapping segments only behind a build-time plan-match check:** re-record the planned capture's block trace;
+    any mismatch falls back to the caching pool.
+  - **Forces and stress bitwise equal** to the default capture on the same plan, checked at build and in a GPU test.
+  - **Off by default** until the A/B, the bitwise check and the new limits are in on the A100 and the Ada.
+  - The `check_allocator` exemption is in (`ProcessRecord.arena_pools`, with a CPU test).
 
 ## Finding: the shim crashed the local PC twice (HYPERVISOR_ERROR)
 
