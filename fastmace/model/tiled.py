@@ -135,8 +135,10 @@ TILE_EPILOGUE = None
 # residual force 1.64e-4 -> 1.32e-3 eV/A from 1M to 149M atoms); in the frame they carry a few 1e-6 A in any
 # box (6e-6 A worst case). Where the call's float64 positions are on the device, each tile builds its float32 rows
 # relative to its first receiver instead (``_tile_local``; no stored bytes); the bins and offsets (18 bytes per atom
-# beside the field's float32 positions) only for positions on the host.
-TILE_LOCAL_FRAME = False
+# beside the field's float32 positions) only for positions on the host. None (auto, the conductor's size rule of 11
+# November): on where the structure's extent (the largest |coordinate| of the positions and of the cell's corners) is
+# at least ``forces.FLOAT64_EDGES_EXTENT`` (64 A), decided once per atom count and cell; True / False: every size.
+TILE_LOCAL_FRAME = None
 TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in float32
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
@@ -987,7 +989,11 @@ def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
     import torch
 
     count, e = rows64.shape[0], local.shape[1]
-    shift = torch.round(shifts.double() @ inverse) @ cell
+    from fastmace.neighbors.skin import times_3x3
+
+    # Element-wise 3 x 3 products: as cuBLAS DGEMMs they cost 0.46 s of a 2.1 s call at 320,000 atoms on the RTX
+    # 5060 Ti (local job 52; FP64 GEMM is slow on GeForce parts).
+    shift = times_3x3(torch.round(times_3x3(shifts.double(), inverse)), cell)
     image = torch.zeros_like(rows64)
     if e:
         edge = torch.arange(e, device=local.device)
@@ -997,6 +1003,75 @@ def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
         image = torch.where(halo.unsqueeze(1), shift[first.clamp(max=e - 1)], image)
     origin = rows64[:1]
     return (rows64 - image - origin).to(dtype), (shift - image[local[0]]).to(dtype)
+
+
+def _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+    """``_tile_local`` on a padded slot's fixed-size buffers (rows ``nodes`` with ``node_mask``, edges ``local`` and
+    ``shifts`` with ``edge_mask``; ``receivers`` slot receiver rows), each part split in two ``dtype`` halves:
+    ``(rows, rows_low, remaining, remaining_low)``, the padding rows zero. The vector ``(rows[r] - rows[s] +
+    remaining) + (rows_low[r] - rows_low[s] + remaining_low)`` is the float64 vector's rounding: the first sum is exact
+    for an edge (nearby rows, Sterbenz), the second carries what float32 rows of up to the tile's extent drop.
+    Without the low halves the rows' float32 spacing at R 16,384 (rows up to 56 A) left 4.4e-5 eV/A on the perfect
+    40^3 crystal, and a tile that meets itself through the periodic boundary (20^3, R 16,384: 68,911 edges with a
+    78 A remaining shift) 1.2e-4 (local job 61).
+
+    Float64 per row: each edge's integer image ``round(shift @ cell^-1)`` in float32 (exact: |unit| small), a halo
+    row's image the smallest encoded unit among its edges (deterministic, as every sweep must see the same rows),
+    its float64 shift ``unit @ cell`` per row; per edge one float64 ``(unit - row unit) @ cell``. Local job 56 (no
+    low halves): 1.003 / 1.003 at 320,000 atoms on the RTX 5060 Ti (three float64 3x3 products per edge: 1.020 /
+    1.027)."""
+    import torch
+
+    from fastmace.neighbors.skin import times_3x3
+
+    count = nodes.shape[0]
+    unit = torch.round(times_3x3(shifts.to(torch.float32), inverse.to(torch.float32)))
+    code = unit.to(torch.int32) + 64  # |unit| < 64
+    code = (code[:, 0] * 128 + code[:, 1]) * 128 + code[:, 2]
+    none = 1 << 21  # above every code
+    code = torch.where(edge_mask > 0, code, torch.full_like(code, none))
+    best = torch.full((count,), none, dtype=code.dtype, device=local.device).scatter_reduce(
+        0, local[0], code, reduce="amin")
+    halo = (best < none) & (torch.arange(count, device=local.device) >= receivers)
+    best = torch.where(halo, best, torch.full_like(best, (64 * 128 + 64) * 128 + 64))  # unit 0
+    row_unit = torch.stack((best // 16384, (best // 128) % 128, best % 128), dim=1).to(torch.float32) - 64
+    rows64 = positions64[nodes]
+    rows64 = (rows64 - times_3x3(row_unit.to(torch.float64), cell) - rows64[:1]) * node_mask.unsqueeze(1).to(
+        torch.float64)
+    remaining64 = times_3x3((unit - row_unit[local[0]]).to(torch.float64), cell)
+    rows, remaining = rows64.to(dtype), remaining64.to(dtype)
+    return rows, (rows64 - rows.to(torch.float64)).to(dtype), remaining, (remaining64 - remaining.to(
+        torch.float64)).to(dtype)
+
+
+def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+    """``_slot_local_parts``' high halves: ``(rows, remaining shifts)``."""
+    rows, _, remaining, _ = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse,
+                                              receivers, dtype)
+    return rows, remaining
+
+
+def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype,
+                        far):
+    """``TILE_LOCAL_FRAME`` inside the tile body: the slot's edge vectors from ``_slot_local_parts`` (``far`` for the
+    padding edges, as ``_tile_vectors``), one fixed-shape graph per slot bucket. In the body the frame is part of the
+    captured tile (``compiled_graphs``): built before the body as its own compiled call, its per-tile host overhead
+    cost 1.047 / 1.048 at 975,560 atoms on the launch-bound A100 (Alex 4983258)."""
+    import torch
+
+    rows, low, remaining, remaining_low = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts,
+                                                            cell, inverse, receivers, dtype)
+    both = torch.cat([rows, low], dim=1)  # one gather per end
+    receiver, sender = both[local[1]], both[local[0]]
+    a, b = receiver[:, :3], sender[:, :3]
+    # TwoSum: difference + error == a - b exactly (rows of a tile that meets itself through the boundary are up to
+    # a box apart, and their float32 difference rounds: 3.8e-6 A at 78 A, local job 62)
+    difference = a - b
+    a_part = difference + b
+    b_part = a_part - difference
+    error = (a - a_part) + (b_part - b)
+    vectors = (difference + remaining) + (error + (receiver[:, 3:] - sender[:, 3:]) + remaining_low)
+    return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
 
 
 def _frame_parts(positions64, width, dtype):
@@ -1018,7 +1093,11 @@ def _frame_vectors(frame, ei, shifts, edge_mask, far):
     import torch
 
     bins, offsets, cell, inverse, width = frame
-    shift = torch.round(shifts.double() @ inverse) @ cell
+    from fastmace.neighbors.skin import times_3x3
+
+    # Element-wise 3 x 3 products: as cuBLAS DGEMMs they cost 0.46 s of a 2.1 s call at 320,000 atoms on the RTX
+    # 5060 Ti (local job 52; FP64 GEMM is slow on GeForce parts).
+    shift = times_3x3(torch.round(times_3x3(shifts.double(), inverse)), cell)
     k = torch.floor(shift / width)
     rem = (shift - k * width).to(offsets.dtype)
     coarse = ((bins[ei[1]] - bins[ei[0]]).double() + k).mul_(width).to(offsets.dtype)
@@ -1937,26 +2016,7 @@ class TiledForceField:
                     node_mask=new(receivers + halo, dtype=self.dtype), recv_mask=new(receivers, dtype=self.dtype),
                     ei=new((2, edges), dtype=i64), shifts=new((edges, 3), dtype=self.dtype),
                     local=new((2, edges), dtype=i64), edge_mask=new(edges, dtype=self.dtype),
-                    count=new((), dtype=i64), out={}, graphs={},
-                    rows=new((receivers + halo, 3), dtype=self.dtype))  # TILE_LOCAL_FRAME: tile-local positions
-
-    def _fill_local(self, slot, piece, local_frame):
-        """``TILE_LOCAL_FRAME``: the slot's tile-local positions (``rows``, in its node layout) and its edges'
-        remaining shifts (in ``shifts``), from the call's float64 positions."""
-        import torch
-
-        positions64, cell, inverse = local_frame
-        nodes, _, shifts, local, r, h = piece
-        receivers, halo, edges = slot["sizes"]
-        e = local.shape[1]
-        rows64 = torch.zeros((receivers + halo, 3), dtype=torch.float64, device=self.device)
-        rows64[:r] = positions64[nodes[:r]]
-        rows64[receivers:receivers + h] = positions64[nodes[r:]]
-        rows, remaining = _tile_local(rows64, receivers, local, shifts, cell, inverse, self.dtype)
-        slot["rows"].copy_(rows)
-        slot["rows"][r:receivers].zero_()  # padding receivers and halo rows as the plain positions' atom 0 rows
-        slot["rows"][receivers + h:].zero_()
-        slot["shifts"][:e] = remaining
+                    count=new((), dtype=i64), out={}, graphs={})
 
     def _fill(self, slot, piece):
         """Copy one tile (``_tile_graph``'s output at the slot's halo start) into the slot's static buffers.
@@ -1992,9 +2052,12 @@ class TiledForceField:
 
         receivers = slot["sizes"][0]
         nodes, ei = slot["nodes"], slot["ei"]
-        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local: the slot's rows and remaining shifts
-            vectors_of = self._compiled_once("vectors", _tile_vectors) if self._speed(TILE_EPILOGUE) else _tile_vectors
-            vectors = vectors_of(slot["rows"], slot["local"], slot["shifts"], slot["edge_mask"], self._far)
+        if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local: rows and remaining shifts in the body
+            positions64, cell, inverse = g["local_frame"]
+            vectors_of = (self._compiled_once("local_vectors", _slot_local_vectors) if self._speed(TILE_EPILOGUE)
+                          else _slot_local_vectors)
+            vectors = vectors_of(positions64, nodes, slot["node_mask"], slot["local"], slot["edge_mask"],
+                                 slot["shifts"], cell, inverse, receivers, self.dtype, self._far)
         elif g.get("frame") is not None:  # TILE_LOCAL_FRAME, bins and offsets (host positions)
             vectors = _frame_vectors(g["frame"], ei, slot["shifts"], slot["edge_mask"], self._far)
         elif self._speed(TILE_EPILOGUE):
@@ -2305,7 +2368,8 @@ class TiledForceField:
         bound = None
         try:
             g = self._globals(n, stress, pos, heads)
-            g["local_frame"], g["frame"] = self._frames(positions, n) if TILE_LOCAL_FRAME else (None, None)
+            g["local_frame"], g["frame"] = (self._frames(positions, n) if self._frame_wanted(positions, n)
+                                            else (None, None))
             stats["local_frame"] = ("tiles" if g["local_frame"] is not None else
                                     "bins" if g["frame"] is not None else None)
             self.heads, self.arange = g["heads"], g["arange"]
@@ -2315,7 +2379,9 @@ class TiledForceField:
             stats["compiled_graphs"] = graphs_state
             if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
-                key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
+                # (and the body's edge-vector form: TILE_LOCAL_FRAME is read per call)
+                frame = g.get("local_frame")
+                key = (id(g), pos.data_ptr(), species.data_ptr(), stress, None if frame is None else frame[0].data_ptr())
                 if key != self._graph_key:  # the graphs read these addresses
                     for slot in self._slots.values():
                         slot["graphs"].clear()
@@ -2414,8 +2480,6 @@ class TiledForceField:
                         torch.cuda.current_stream().wait_event(slot["event"])
                         slot["event"] = None
                     self._fill(slot, piece)
-                    if g.get("local_frame") is not None:
-                        self._fill_local(slot, piece, g["local_frame"])
                     state.prefetched = fetched  # rows() takes these instead of gathering them now
                     following = position is not None and position + 1 < len(order)
                     if lane is None:
@@ -2663,6 +2727,29 @@ class TiledForceField:
             self._edge_step = None
             self._graph_key = None
 
+    def _frame_wanted(self, positions, n):
+        """``TILE_LOCAL_FRAME`` for this call: None decides by the structure's extent (``forces.float64_edges_wanted``),
+        once per atom count and cell (one host read of the positions' largest |coordinate|)."""
+        import numpy as np
+
+        from fastmace.model import forces as forces_module
+
+        if TILE_LOCAL_FRAME is not None:
+            return bool(TILE_LOCAL_FRAME)
+        if str(self.dtype) == "torch.float64":  # float64 positions: nothing to fix
+            return False
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3).detach().cpu().numpy()
+        cell = np.asarray(cell, dtype=np.float64).reshape(3, 3)
+        key = (n, cell.tobytes())
+        kept = getattr(self, "_frame_choice", None)
+        if kept is None or kept[0] != key:
+            largest = float(positions.abs().max()) if n else 0.0
+            extent = max(largest, forces_module.structure_extent(np.zeros((0, 3)), cell))
+            kept = self._frame_choice = (key, forces_module.float64_edges_wanted(None, extent))
+        return kept[1]
+
     def _frames(self, positions, n):
         """``TILE_LOCAL_FRAME``: ``(local_frame, frame)``, one of them set. Tile-local positions (``(positions64,
         cell, inverse)``) where the call's float64 positions are on the device (no stored bytes), else the bins and
@@ -2677,8 +2764,11 @@ class TiledForceField:
             return None, None
         if positions.device != self.device:
             return None, self._local_frame(positions, n)
-        cell = cell.to(self.device)
-        return (positions.to(torch.float64), cell, torch.linalg.inv(cell)), None
+        kept = getattr(self, "_frame_cell", None)  # fixed addresses: the captured tile bodies read them
+        if kept is None or not torch.equal(kept[0].cpu(), cell):
+            device_cell = cell.to(self.device)
+            kept = self._frame_cell = (cell.clone(), device_cell, torch.linalg.inv(device_cell))
+        return (positions.to(torch.float64), kept[1], kept[2]), None
 
     def _local_frame(self, positions, n):
         """``TILE_LOCAL_FRAME``: the call's positions as int16 bins of ``TILE_LOCAL_FRAME_WIDTH`` and offsets in the

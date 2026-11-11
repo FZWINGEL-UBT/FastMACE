@@ -173,10 +173,49 @@ BATCH_EDGE_KEYS = ("edge_index", "shifts", "unit_shifts")
 SPECIES_DEPENDENT = "fixed_species_superset"
 
 
+# Idea 11 (tiled-speed 11 November 2026): the whole-system call's edge vectors from float64 positions
+# (``engine.float64_edge_vectors``) for float32 models with a bound strain path (non-polar): the float64 positions in
+# the dict (24 bytes per atom, until ``release_whole_system``) and a detached per-edge correction in the forward.
+# None (auto, the conductor's size rule of 11 November): on where the structure's extent (the largest |coordinate| of
+# the positions and of the cell's corners) is at least FLOAT64_EDGES_EXTENT (64 A: float32's coordinate spacing there,
+# 7.6e-6 A, is four times a 30 A box's 1.9e-6); below it the dict carries no float64 positions and the call is MACE's
+# (nothing to pay). True / False: on / off for every size.
+# Local job 51 (RTX 5060 Ti, SrTiO3 6^3, OMAT-0 medium float32): the perfect crystal's largest force 2.2e-6 eV/A with it
+# at 0, +200 and +1,500 A (without: 2.0e-5, 8.1e-5, 1.33e-3); the call with stress 1.016 / 1.015 at 40,000 atoms.
+WHOLE_SYSTEM_FLOAT64_EDGES = None
+FLOAT64_EDGES_EXTENT = 64.0
+
+
+def structure_extent(positions, cell):
+    """The largest |coordinate| of ``positions`` [N, 3] and of the corners of ``cell`` [3, 3] (Angstrom)."""
+    import itertools
+
+    import numpy as np
+
+    cell = np.asarray(cell, dtype=np.float64).reshape(3, 3)
+    corners = np.array([np.asarray(c, dtype=np.float64) @ cell for c in itertools.product((0, 1), repeat=3)])
+    positions = np.asarray(positions, dtype=np.float64).reshape(-1, 3)
+    largest = float(np.abs(positions).max()) if positions.size else 0.0
+    return max(largest, float(np.abs(corners).max()))
+
+
+def float64_edges_wanted(switch, extent):
+    """``WHOLE_SYSTEM_FLOAT64_EDGES`` for a structure of ``extent`` (``structure_extent``): None means on from
+    FLOAT64_EDGES_EXTENT."""
+    if switch is None:
+        return extent >= FLOAT64_EDGES_EXTENT
+    return bool(switch)
+
 # The batch entries the tiled path's force field keeps on the device (``release_whole_system``): every other
 # per-atom entry is read by the whole-system call only.
 WHOLE_SYSTEM_KEEP = frozenset({"positions", "node_attrs", "edge_index", "shifts", "unit_shifts", "cell", "head", "ptr",
                                "displacement"})
+
+
+def torch_float64():
+    import torch
+
+    return torch.float64
 
 
 def _table_label(loaded):
@@ -527,6 +566,10 @@ class MACEForceField:
         if not strain and (_patches.patch_problems("single_graph_strain") or (
                 not self.is_polar and engine_rewrites.strain_problems(type(source).forward))):
             strain = None
+        # The float64 edge vectors ride on the bound strain path (its prepare_graph reads the dict's float64 positions).
+        self.float64_edges = bool(strain is not None and not self.is_polar and self._dtype != torch_float64()
+                                  and float64_edges_wanted(WHOLE_SYSTEM_FLOAT64_EDGES,
+                                                           structure_extent(atoms.get_positions(), atoms.cell.array)))
         self.applied = ()
         self.split_forces = False
         self.dynamo_reset = False
@@ -660,6 +703,11 @@ class MACEForceField:
         # Leaf tensor that the model differentiates; refilled before every call.
         self.positions = torch.zeros((len(atoms), 3), dtype=self._dtype, device=self._device, requires_grad=True)
         self.data["positions"] = self.positions
+        if self.float64_edges:  # fixed address (CUDA graphs); refilled before every call beside the float32 copy
+            from fastmace.rewrites import engine as engine_rewrites
+
+            self.data[engine_rewrites.POSITIONS64_KEY] = torch.zeros((len(atoms), 3), dtype=torch.float64,
+                                                                     device=self._device)
         self.global_list = bool(global_list)
         # Without the field's own list, no float64 device positions either (24 bytes per atom at the build's peak).
         positions = (torch.tensor(atoms.get_positions(), dtype=torch.float64, device=self._device)
@@ -1027,6 +1075,11 @@ class MACEForceField:
             raise RuntimeError("release_whole_system needs the one-hot released first (release_node_attrs)")
         if self.whole_system_released:
             return
+        from fastmace.rewrites import engine as engine_rewrites
+
+        for key in (engine_rewrites.POSITIONS64_KEY, engine_rewrites.CELL64_KEY):  # the whole-system edge vectors'
+            self.data.pop(key, None)
+        self.float64_edges = False
         n = self.positions.shape[0]
         for key, value in list(self.data.items()):
             if not torch.is_tensor(value) or not _whole_system_only(key, value, n):
@@ -1085,6 +1138,7 @@ class MACEForceField:
         self._bind_streaming_count()
         with torch.no_grad():
             self.positions.copy_(positions)
+            self._fill_positions64(positions)
         if self.split_forces:
             return self._split_outputs(self._compute_stress)
         if not self._compute_stress:
@@ -1092,6 +1146,14 @@ class MACEForceField:
         # MACE's stress path replaces "positions" and "shifts" in the dict it gets (strained
         # copies); a shallow copy keeps ours bound to the buffers.
         return self._model_call(dict(self.data), training=self.training, compute_force=True, compute_stress=True)
+
+    def _fill_positions64(self, positions):
+        """The float64 positions the whole-system forward reads for its edge vectors (``float64_edges``)."""
+        from fastmace.rewrites import engine as engine_rewrites
+
+        stored = self.data.get(engine_rewrites.POSITIONS64_KEY)
+        if stored is not None:
+            stored.copy_(positions)
 
     def _split_outputs(self, stress):
         """The force call with MACE's gradient step after the compiled model instead of inside it (F2).
@@ -1142,6 +1204,7 @@ class MACEForceField:
             if self._leader is not None:
                 self._read_leader()
             self.positions.copy_(positions)
+            self._fill_positions64(positions)
             out = self._model_call(self.data, training=False, compute_force=False, compute_stress=False)
             energy = out["energy"]
             return energy if energy.dtype == torch.float64 else energy.to(torch.float64)
@@ -1272,8 +1335,19 @@ class MACEForceField:
                 self._shifts = torch.zeros((capacity, 3), dtype=self._dtype, device=self._device)
             self.data["edge_index"] = leader.edge_index[:, :num_edges]
             self.data["shifts"], self.data["unit_shifts"] = self._shifts[:num_edges], self._unit_shifts[:num_edges]
+            cell64 = leader.cell_t if self._compute_stress else getattr(self, "_leader_cell", None)
         else:
             self.data["edge_index"], self.data["shifts"], self.data["unit_shifts"] = self.neighbours.edges(num_edges)
+            neighbours = self.neighbours
+            cell64 = neighbours.cell_t if neighbours.variable_cell else neighbours.build_cell
+        if getattr(self, "float64_edges", False):
+            from fastmace.rewrites import engine as engine_rewrites
+
+            if cell64 is None:  # a copy without its leader's float64 cell: MACE's vectors
+                self.data.pop(engine_rewrites.POSITIONS64_KEY, None)
+                self.float64_edges = False
+            else:
+                self.data[engine_rewrites.CELL64_KEY] = cell64
         if self.dynamic_edges:
             from fastmace.model import compile as compiling
 

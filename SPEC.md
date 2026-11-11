@@ -3543,3 +3543,15 @@ CPU suite on murphy at e63f2a9c: 5,552 passed, 203 skipped, 38 failed. 37 failur
 - The first idea-11 frame code (`TILE_LOCAL_FRAME`) is included, switched off. The accuracy fix follows in its own merge request.
 
 CPU suite on murphy at the merged tip 0d1ce6d6, collecting `tests/`: 5,600 passed, 873 skipped (203 in tests/cpu as on main, plus 670 GPU tests without CUDA), 1 failed. The failure was the layering allow-list, fixed in 7a62514c (test_layering: 32 passed). See `results/tiled-speed-20261111/`.
+
+**Float64 edge vectors for large boxes (idea 11; 11 November 2026; worker tiled-speed, conductor; accuracy fix):** float32 edge vectors carry the float32 spacing of their coordinates. On the perfect SrTiO3 crystal the largest force therefore grew from 1.64e-4 eV/Å at 1M atoms to 1.32e-3 at 149M and 320M atoms, 37× the gate's rounding basis. A 6³ crystal moved to +1,500 Å reproduces it. The positions carry the error; the shifts' share is at most half.
+- **`tiled.TILE_LOCAL_FRAME` (tiles).** Each tile's rows and remaining shifts are built relative to its first receiver in float64, then stored as float32 hi/lo halves with an exact TwoSum. Halo atoms sit at their edge's periodic image. With positions on the host it uses int16 bins plus float32 offsets.
+- **`forces.WHOLE_SYSTEM_FLOAT64_EDGES` (whole system).** It adds a detached float64 correction to MACE's float32 edge vectors (`engine.float64_edge_vectors`), with float64 positions in the dict (24 B/atom). With a strain, the edges carry it, which fixes the float32 virial cancellation far from the origin.
+- **Default.** Both are None: on for float32 models where the largest |coordinate| of the positions and the cell's corners is at least `FLOAT64_EDGES_EXTENT` = 64 Å. Below that the code path is unchanged.
+- **Accuracy.** About 3e-6 eV/Å on the perfect crystal at 0, +200 and +1,500 Å, in production tiles (R 16,384, including a tile that meets itself through the boundary). A100 at +1,500 Å: tiles 2.5e-6, whole system 6.6e-6, against 1.33e-3 off. The 3× gate with both forced on passes on the A100 (Alex 4983752, 12/12).
+- **Cost where on.**
+  - Frame: A100 at 58³ with compiled graphs 1.028 / 1.029, Ada at 40³ 1.0078 / 1.0064, 5060 Ti at 40³ 1.004 / 1.010.
+  - Whole system with stress: A100 at 40³ 1.0146 / 1.0146, 5060 Ti 1.016 / 1.015.
+  - The conductor accepted these as an accuracy fix: 2 % bar, 3.5 % for the A100 frame, because the A100 is the capacity GPU. A faster A100 frame is follow-up 11b in `plans/ideas-20261111-tiled-round2.md`.
+
+CPU suite on murphy (tests/cpu) at f8ea447e with main b951e804 merged in: 5,610 passed, 203 skipped. The later commits are docs and records; main's later f31d4f50 touches only plans/, results/ and docs/. See `results/tiled-speed-20261111/README.md`.
