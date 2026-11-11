@@ -1005,17 +1005,21 @@ def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
     return (rows64 - image - origin).to(dtype), (shift - image[local[0]]).to(dtype)
 
 
-def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+def _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
     """``_tile_local`` on a padded slot's fixed-size buffers (rows ``nodes`` with ``node_mask``, edges ``local`` and
-    ``shifts`` with ``edge_mask``; ``receivers`` slot receiver rows): ``(rows, remaining shifts)`` with the padding
-    rows zero, as one fixed-shape graph that mode "compiled" compiles once per slot bucket (local job 53: the
-    per-tile eager form cost 1.06x at 320,000 atoms on the RTX 5060 Ti).
+    ``shifts`` with ``edge_mask``; ``receivers`` slot receiver rows), each part split in two ``dtype`` halves:
+    ``(rows, rows_low, remaining, remaining_low)``, the padding rows zero. The vector ``(rows[r] - rows[s] +
+    remaining) + (rows_low[r] - rows_low[s] + remaining_low)`` is the float64 vector's rounding: the first sum is exact
+    for an edge (nearby rows, Sterbenz), the second carries what float32 rows of up to the tile's extent drop.
+    Without the low halves the rows' float32 spacing at R 16,384 (rows up to 56 A) left 4.4e-5 eV/A on the perfect
+    40^3 crystal, and a tile that meets itself through the periodic boundary (20^3, R 16,384: 68,911 edges with a
+    78 A remaining shift) 1.2e-4 (local job 61).
 
-    Float64 per node only: each edge's integer image ``round(shift @ cell^-1)`` in float32 (exact: |unit| small), a
-    halo row's image the smallest encoded unit among its edges (deterministic, as every sweep must see the same rows),
-    its float64 shift ``unit @ cell`` per row; the remaining shift ``(unit - row unit) @ cell`` in the model's dtype
-    (zero unless an atom reaches the tile through two images, which only a box smaller than two tiles allows). Local
-    job 56: 1.003 / 1.003 at 320,000 atoms on the RTX 5060 Ti (three float64 3x3 products per edge: 1.020 / 1.027)."""
+    Float64 per row: each edge's integer image ``round(shift @ cell^-1)`` in float32 (exact: |unit| small), a halo
+    row's image the smallest encoded unit among its edges (deterministic, as every sweep must see the same rows),
+    its float64 shift ``unit @ cell`` per row; per edge one float64 ``(unit - row unit) @ cell``. Local job 56 (no
+    low halves): 1.003 / 1.003 at 320,000 atoms on the RTX 5060 Ti (three float64 3x3 products per edge: 1.020 /
+    1.027)."""
     import torch
 
     from fastmace.neighbors.skin import times_3x3
@@ -1032,20 +1036,34 @@ def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, i
     best = torch.where(halo, best, torch.full_like(best, (64 * 128 + 64) * 128 + 64))  # unit 0
     row_unit = torch.stack((best // 16384, (best // 128) % 128, best % 128), dim=1).to(torch.float32) - 64
     rows64 = positions64[nodes]
-    rows = (rows64 - times_3x3(row_unit.to(torch.float64), cell) - rows64[:1]) * node_mask.unsqueeze(1).to(
+    rows64 = (rows64 - times_3x3(row_unit.to(torch.float64), cell) - rows64[:1]) * node_mask.unsqueeze(1).to(
         torch.float64)
-    return rows.to(dtype), times_3x3((unit - row_unit[local[0]]).to(dtype), cell.to(dtype))  # float64 models: float64
+    remaining64 = times_3x3((unit - row_unit[local[0]]).to(torch.float64), cell)
+    rows, remaining = rows64.to(dtype), remaining64.to(dtype)
+    return rows, (rows64 - rows.to(torch.float64)).to(dtype), remaining, (remaining64 - remaining.to(
+        torch.float64)).to(dtype)
+
+
+def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype):
+    """``_slot_local_parts``' high halves: ``(rows, remaining shifts)``."""
+    rows, _, remaining, _ = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse,
+                                              receivers, dtype)
+    return rows, remaining
 
 
 def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype,
                         far):
-    """``TILE_LOCAL_FRAME`` inside the tile body: the slot's edge vectors from ``_slot_local``'s tile-local rows and
-    remaining shifts (``_tile_vectors``), one fixed-shape graph per slot bucket. In the body the frame is part of the
+    """``TILE_LOCAL_FRAME`` inside the tile body: the slot's edge vectors from ``_slot_local_parts`` (``far`` for the
+    padding edges, as ``_tile_vectors``), one fixed-shape graph per slot bucket. In the body the frame is part of the
     captured tile (``compiled_graphs``): built before the body as its own compiled call, its per-tile host overhead
     cost 1.047 / 1.048 at 975,560 atoms on the launch-bound A100 (Alex 4983258)."""
-    rows, remaining = _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers,
-                                  dtype)
-    return _tile_vectors(rows, local, remaining, edge_mask, far)
+    import torch
+
+    rows, low, remaining, remaining_low = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts,
+                                                            cell, inverse, receivers, dtype)
+    receiver, sender = local[1], local[0]
+    vectors = (rows[receiver] - rows[sender] + remaining) + (low[receiver] - low[sender] + remaining_low)
+    return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
 
 
 def _frame_parts(positions64, width, dtype):
