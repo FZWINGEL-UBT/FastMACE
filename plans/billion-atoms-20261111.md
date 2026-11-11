@@ -101,6 +101,25 @@ confirmed by the census:
 Each change: exact (bitwise where the order is unchanged), tests in `tests/cpu` (run on leto/murphy), the 3x gate on
 the A100 (Alex, one GPU) and a same-process A/B at 975,560 atoms (not slower, both orders). Each gets a ledger row.
 
+**In (11 November 2026, `073f1f37`; CPU tests 211/211 on leeloo; Alex 4984899: gate, A/B, probe):**
+- `TILE_HOST_ROWS` (24 B/atom): `_prepare_one_off(host=True)` keeps the call's float64 positions on the host, a view
+  of the atoms' own array (no host copy either). The float32 copy, the tile lists' binning and the size rule's
+  largest coordinate go a chunk at a time; each tile's distance test gathers its own rows on the host (`unique`
+  of its receivers and candidate senders, then `searchsorted`), and the tile-local frame's float64 rows are gathered
+  per padded slot in `_fill` (`rows64`, fixed addresses for the captured bodies; padding rows atom 0's, as on the
+  device). The same float64 values, so bitwise the device-positions call (CPU test, eager and padded, far from the
+  origin and strained; the tile lists bitwise the global list). `tiled_capacity.py --host-positions`,
+  `tiled_ab.py --b-host-positions`.
+- uint8 species index, sender groups and their tables after `release_whole_system` where every column and group is
+  below 256 (6 B/atom); `node_e0` widens the index where it looks up.
+- No whole-system BLOCK_ORDER receiver order in the tiled call (4 B/atom): its kernels run per tile on fewer rows than
+  N, so they launched with their rows' identity already; `_bind_streaming_count(block_order=False)`.
+
+Projected at 397.5M: 101 - 34 = 67 B/atom before the tiles, about 75.6 with the tile workspace (28.0 GiB, the
+go/no-go's line); at 10^9 about 71 GB of the A100's 85.9. Held back: the plan's order in int32 (4 B/atom; the tiles
+are int32 views that every consumer would widen, and the kept lists look tiles up by address) and the bins' atom
+bins (6), if step 3 lands above the line.
+
 ### 2. 32-bit index audit above 716M atoms
 
 At 715,827,883 atoms 3 x atoms passes 2^31: any kernel or view that indexes flattened [N, 3] arrays (positions,
@@ -133,7 +152,7 @@ separate it from the 10^9 question, at a second node-day.
 | Step | State | Record |
 | --- | --- | --- |
 | 0 | done: about 100 B/atom live before the first tile, 24 of it float64 positions | `census-colab/` (Colab A100, 3.91 CU) |
-| 1 | in progress: the four cuts above | |
-| 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); GPU probe queued on Alex (4984768), the Colab G4 unavailable twice | `jobs/alex_overflow.sh` |
+| 1 | in: host float64 positions, uint8 maps, no whole-system order (34 B/atom); gate and A/B on Alex 4984899 | `073f1f37`, `jobs/alex_step1.sh` |
+| 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); Alex 4984768 at 750M: the gathers bitwise (compiled and eager `_tile_vectors`, compiled `_slot_local_vectors`), untouched rows zero, the flat view's tail right; `index_add_` differed by 3e-5 at 1M as at 750M (the atomics' order with random values), so again with integer values in 4984899 | `jobs/alex_overflow.sh` |
 | 3 | planned | |
 | 4 | not reserved (owner, 11 November 2026) | |
