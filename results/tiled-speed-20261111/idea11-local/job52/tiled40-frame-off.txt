@@ -1,0 +1,94 @@
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                                  Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                      CompiledFunction         0.25%       5.486ms        32.30%     719.915ms      13.332ms       0.000us         0.00%     805.318ms      14.913ms            54  
+         autograd::engine::evaluate_function: CompiledFunctionBackward         0.06%       1.240ms        16.37%     364.952ms       6.758ms       0.000us         0.00%     783.984ms      14.518ms            54  
+                                              CompiledFunctionBackward         0.38%       8.536ms        16.32%     363.712ms       6.735ms       0.000us         0.00%     783.984ms      14.518ms            54  
+                                            Torch-Compiled Region: 2/3         0.07%       1.647ms        11.62%     259.100ms      11.265ms       0.000us         0.00%     459.061ms      19.959ms            23  
+## Call CompiledFxGraph fmq6fxavmk237afb75h3cquq34qjg2z7r57bnhccm2h...         0.73%      16.240ms        11.43%     254.745ms      11.076ms       4.299ms         0.21%     459.061ms      19.959ms            23  
+## Call CompiledFxGraph fifx6xzgwnabl7im7z35txtjn7c5ucldgxswj2frwns...         0.63%      14.035ms         1.97%      44.000ms       1.913ms       4.372ms         0.22%     425.364ms      18.494ms            23  
+                                 fastmace::fused_folded_message_blocks         0.12%       2.616ms         0.18%       4.021ms     148.944us     408.744ms        20.25%     408.765ms      15.139ms            27  
+                                                  fused_folded_forward         0.00%       0.000us         0.00%       0.000us       0.000us     408.744ms        20.25%     408.744ms      15.139ms            27  
+                       fastmace::streaming_conv_wprime_backward_blocks         0.13%       2.967ms         0.19%       4.243ms     157.154us     378.001ms        18.72%     380.747ms      14.102ms            27  
+                                         oeq_projected_backward_wprime         0.00%       0.000us         0.00%       0.000us       0.000us     378.001ms        18.72%     378.001ms      14.000ms            27  
+## Call CompiledFxGraph fgthut3viwtd2on43o77wux7l4rabkgfqumg6lv24ld...         1.62%      36.181ms        12.31%     274.328ms      11.927ms       4.369ms         0.22%     255.154ms      11.094ms            23  
+                                                              aten::mm         0.99%      22.076ms        14.18%     315.943ms     220.784us     253.490ms        12.56%     253.490ms     177.142us          1431  
+                                            Torch-Compiled Region: 4/3         0.07%       1.572ms        16.89%     376.460ms      16.368ms       0.000us         0.00%     238.785ms      10.382ms            23  
+## Call CompiledFxGraph f4b5irkgk76cr5q5ibkldmqrmv6a4noi647stgc7fqd...         1.94%      43.148ms        16.68%     371.692ms      16.161ms       4.219ms         0.21%     238.785ms      10.382ms            23  
+                                            Torch-Compiled Region: 1/3         0.06%       1.317ms         4.86%     108.381ms       4.712ms       0.000us         0.00%     227.226ms       9.879ms            23  
+## Call CompiledFxGraph f63hnwszutepu3jfj2npgnx7zzxkc4ixp3zhno3tpyg...         1.49%      33.236ms         4.79%     106.655ms       4.637ms       4.472ms         0.22%     227.226ms       9.879ms            23  
+void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(c...         0.00%       0.000us         0.00%       0.000us       0.000us     193.224ms         9.57%     193.224ms     246.774us           783  
+                                                                kernel         0.00%       0.000us         0.00%       0.000us       0.000us     118.474ms         5.87%     118.474ms       1.463ms            81  
+                                    fastmace::tabled_outer_sum_forward         0.27%       5.944ms         0.42%       9.413ms     174.320us      65.106ms         3.22%      91.064ms       1.686ms            54  
+                                                  fastmace::species_mm         1.38%      30.836ms         3.21%      71.640ms     176.888us      74.472ms         3.69%      74.472ms     183.881us           405  
+                                                                  gemm         0.00%       0.000us         0.00%       0.000us       0.000us      74.472ms         3.69%      74.472ms     183.881us           405  
+                                            Torch-Compiled Region: 2/4         0.01%     230.255us         2.61%      58.107ms      14.527ms       0.000us         0.00%      72.394ms      18.098ms             4  
+## Call CompiledFxGraph fuif7yvifcskfepnbwrgs3ypbazjxmsocompkahdc5e...         0.13%       2.827ms         2.57%      57.378ms      14.344ms     629.701us         0.03%      72.394ms      18.098ms             4  
+## Call CompiledFxGraph fvwelcuj5qzn2xoilkpnrdijiqa5bni7hqsphow5qab...         0.09%       2.071ms         0.29%       6.392ms       1.598ms     652.962us         0.03%      65.518ms      16.379ms             4  
+                                            cuequivariance::uniform_1d         5.56%     124.017ms         5.91%     131.678ms     975.393us      63.622ms         3.15%      63.622ms     471.277us           135  
+                                   fastmace::tabled_outer_sum_backward         0.22%       4.903ms         0.30%       6.607ms     244.693us      53.368ms         2.64%      53.368ms       1.977ms            27  
+                                                      aten::index_add_         0.11%       2.345ms         0.38%       8.436ms      31.246us      10.705ms         0.53%      38.447ms     142.395us           270  
+## Call CompiledFxGraph fv64xfovzwfm42xbkgdciqpwi4o23c2fg3gafehoc75...         0.26%       5.792ms         1.19%      26.424ms       6.606ms     636.133us         0.03%      37.910ms       9.478ms             4  
+                                                           aten::fill_         0.38%       8.373ms         1.90%      42.329ms      32.992us      36.951ms         1.83%      36.951ms      28.801us          1283  
+                                                           aten::index         0.32%       7.078ms         2.64%      58.938ms      94.604us      34.346ms         1.70%      36.678ms      58.873us           623  
+                                                           aten::zero_         0.08%       1.678ms         1.49%      33.140ms      44.906us       0.000us         0.00%      36.113ms      48.934us           738  
+                                                           aten::copy_         0.29%       6.522ms        19.02%     423.880ms     310.307us      36.091ms         1.79%      36.091ms      26.421us          1366  
+                                      segmented_polynomial_bwd_algo1_4         0.00%       0.000us         0.00%       0.000us       0.000us      35.525ms         1.76%      35.525ms     657.875us            54  
+                                            Torch-Compiled Region: 4/4         0.01%     246.210us         1.41%      31.318ms       7.829ms       0.000us         0.00%      35.078ms       8.770ms             4  
+## Call CompiledFxGraph fr2o22r4vvyq3ryl4ljqqn3r6dxnfapshh2cfqud6bi...         0.30%       6.595ms         1.37%      30.614ms       7.653ms     527.797us         0.03%      35.078ms       8.770ms             4  
+                                            Torch-Compiled Region: 1/4         0.01%     300.424us         1.21%      27.000ms       6.750ms       0.000us         0.00%      34.369ms       8.592ms             4  
+## Call CompiledFxGraph fvutfyeafpowhl2bmcv2gclhwymdkry3bucgrkpo26c...         0.29%       6.431ms         1.19%      26.610ms       6.652ms     635.589us         0.03%      34.369ms       8.592ms             4  
+void at::native::vectorized_elementwise_kernel<4, at::native::FillF...         0.00%       0.000us         0.00%       0.000us       0.000us      34.065ms         1.69%      34.065ms      52.086us           654  
+void magma_sgemmEx_kernel<float, float, float, false, false, 6, 3, ...         0.00%       0.000us         0.00%       0.000us       0.000us      30.680ms         1.52%      30.680ms      76.509us           401  
+void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6...         0.00%       0.000us         0.00%       0.000us       0.000us      28.957ms         1.43%      28.957ms     268.118us           108  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 2.229s
+Self CUDA time total: 2.019s
+
+
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                                  Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                   Command Buffer Full        34.75%     774.414ms        34.75%     774.414ms     571.102us       0.000us         0.00%       0.000us       0.000us          1356  
+                                                      CompiledFunction         0.25%       5.486ms        32.30%     719.915ms      13.332ms       0.000us         0.00%     805.318ms      14.913ms            54  
+                                                           aten::copy_         0.29%       6.522ms        19.02%     423.880ms     310.307us      36.091ms         1.79%      36.091ms      26.421us          1366  
+                                                              aten::to         0.04%     853.380us        18.88%     420.787ms     477.624us       0.000us         0.00%      22.126ms      25.114us           881  
+                                                        aten::_to_copy         0.11%       2.541ms        18.84%     419.934ms     496.376us       0.000us         0.00%      22.126ms      26.153us           846  
+                                                      cudaLaunchKernel         4.50%     100.245ms        18.38%     409.674ms      58.567us       0.000us         0.00%       0.000us       0.000us          6995  
+                                                       cudaMemcpyAsync        17.55%     391.116ms        18.10%     403.532ms     467.051us       0.000us         0.00%       0.000us       0.000us           864  
+                                            Torch-Compiled Region: 4/3         0.07%       1.572ms        16.89%     376.460ms      16.368ms       0.000us         0.00%     238.785ms      10.382ms            23  
+## Call CompiledFxGraph f4b5irkgk76cr5q5ibkldmqrmv6a4noi647stgc7fqd...         1.94%      43.148ms        16.68%     371.692ms      16.161ms       4.219ms         0.21%     238.785ms      10.382ms            23  
+         autograd::engine::evaluate_function: CompiledFunctionBackward         0.06%       1.240ms        16.37%     364.952ms       6.758ms       0.000us         0.00%     783.984ms      14.518ms            54  
+                                              CompiledFunctionBackward         0.38%       8.536ms        16.32%     363.712ms       6.735ms       0.000us         0.00%     783.984ms      14.518ms            54  
+                                                        cuLaunchKernel         5.71%     127.241ms        15.53%     346.049ms      63.835us       0.000us         0.00%       0.000us       0.000us          5421  
+                                                              aten::mm         0.99%      22.076ms        14.18%     315.943ms     220.784us     253.490ms        12.56%     253.490ms     177.142us          1431  
+## Call CompiledFxGraph fgthut3viwtd2on43o77wux7l4rabkgfqumg6lv24ld...         1.62%      36.181ms        12.31%     274.328ms      11.927ms       4.369ms         0.22%     255.154ms      11.094ms            23  
+                                            Torch-Compiled Region: 2/3         0.07%       1.647ms        11.62%     259.100ms      11.265ms       0.000us         0.00%     459.061ms      19.959ms            23  
+## Call CompiledFxGraph fmq6fxavmk237afb75h3cquq34qjg2z7r57bnhccm2h...         0.73%      16.240ms        11.43%     254.745ms      11.076ms       4.299ms         0.21%     459.061ms      19.959ms            23  
+                                            cuequivariance::uniform_1d         5.56%     124.017ms         5.91%     131.678ms     975.393us      63.622ms         3.15%      63.622ms     471.277us           135  
+                                                            aten::sort         0.20%       4.506ms         5.60%     124.731ms       1.155ms       5.357ms         0.27%       5.542ms      51.318us           108  
+                                            Torch-Compiled Region: 1/3         0.06%       1.317ms         4.86%     108.381ms       4.712ms       0.000us         0.00%     227.226ms       9.879ms            23  
+                                                 cudaDeviceSynchronize         4.81%     107.196ms         4.81%     107.196ms      53.598ms       0.000us         0.00%       0.000us       0.000us             2  
+## Call CompiledFxGraph f63hnwszutepu3jfj2npgnx7zzxkc4ixp3zhno3tpyg...         1.49%      33.236ms         4.79%     106.655ms       4.637ms       4.472ms         0.22%     227.226ms       9.879ms            23  
+                                                  fastmace::species_mm         1.38%      30.836ms         3.21%      71.640ms     176.888us      74.472ms         3.69%      74.472ms     183.881us           405  
+                                                      cuLaunchKernelEx         2.32%      51.760ms         2.67%      59.439ms      84.671us       0.000us         0.00%       0.000us       0.000us           702  
+                                                           aten::index         0.32%       7.078ms         2.64%      58.938ms      94.604us      34.346ms         1.70%      36.678ms      58.873us           623  
+                                                 cudaStreamSynchronize         2.64%      58.918ms         2.64%      58.918ms     157.534us       0.000us         0.00%       0.000us       0.000us           374  
+                                                       cudaMemsetAsync         0.24%       5.390ms         2.62%      58.292ms      43.020us       0.000us         0.00%       0.000us       0.000us          1355  
+                                            Torch-Compiled Region: 2/4         0.01%     230.255us         2.61%      58.107ms      14.527ms       0.000us         0.00%      72.394ms      18.098ms             4  
+## Call CompiledFxGraph fuif7yvifcskfepnbwrgs3ypbazjxmsocompkahdc5e...         0.13%       2.827ms         2.57%      57.378ms      14.344ms     629.701us         0.03%      72.394ms      18.098ms             4  
+                                              TorchDynamo Cache Lookup         2.52%      56.266ms         2.52%      56.266ms     260.491us       0.000us         0.00%       0.000us       0.000us           216  
+                                                         aten::nonzero         0.15%       3.360ms         2.25%      50.178ms     309.744us       2.711ms         0.13%       2.711ms      16.734us           162  
+## Call CompiledFxGraph fifx6xzgwnabl7im7z35txtjn7c5ucldgxswj2frwns...         0.63%      14.035ms         1.97%      44.000ms       1.913ms       4.372ms         0.22%     425.364ms      18.494ms            23  
+                                                           aten::fill_         0.38%       8.373ms         1.90%      42.329ms      32.992us      36.951ms         1.83%      36.951ms      28.801us          1283  
+                                                           aten::addmm         0.04%     791.447us         1.81%      40.437ms       1.498ms       2.116ms         0.10%       2.116ms      78.382us            27  
+                                                           aten::zero_         0.08%       1.678ms         1.49%      33.140ms      44.906us       0.000us         0.00%      36.113ms      48.934us           738  
+                                            Torch-Compiled Region: 4/4         0.01%     246.210us         1.41%      31.318ms       7.829ms       0.000us         0.00%      35.078ms       8.770ms             4  
+## Call CompiledFxGraph fr2o22r4vvyq3ryl4ljqqn3r6dxnfapshh2cfqud6bi...         0.30%       6.595ms         1.37%      30.614ms       7.653ms     527.797us         0.03%      35.078ms       8.770ms             4  
+                                          triton_poi_fused_mul_silu_13         0.02%     488.173us         1.34%      29.934ms       1.109ms      40.891us         0.00%      40.891us       1.514us            27  
+                                            Torch-Compiled Region: 1/4         0.01%     300.424us         1.21%      27.000ms       6.750ms       0.000us         0.00%      34.369ms       8.592ms             4  
+## Call CompiledFxGraph fvutfyeafpowhl2bmcv2gclhwymdkry3bucgrkpo26c...         0.29%       6.431ms         1.19%      26.610ms       6.652ms     635.589us         0.03%      34.369ms       8.592ms             4  
+## Call CompiledFxGraph fv64xfovzwfm42xbkgdciqpwi4o23c2fg3gafehoc75...         0.26%       5.792ms         1.19%      26.424ms       6.606ms     636.133us         0.03%      37.910ms       9.478ms             4  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 2.229s
+Self CUDA time total: 2.019s
